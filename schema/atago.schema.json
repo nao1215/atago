@@ -7,7 +7,10 @@
   "required": ["version", "suite", "scenarios"],
   "additionalProperties": false,
   "properties": {
-    "version": { "const": "1" },
+    "version": {
+      "enum": ["1", 1],
+      "description": "Spec format version. Write \"1\" (quoted); a bare 1 is accepted for convenience \u2014 the loader coerces it to \"1\"."
+    },
     "suite": {
       "type": "object",
       "required": ["name"],
