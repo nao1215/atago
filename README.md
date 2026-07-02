@@ -141,6 +141,7 @@ Every feature has a commented, runnable spec under [examples/](examples/). The e
 | [snapshot](examples/snapshot.atago.yaml) | golden-file testing with normalized output |
 | [services](examples/services.atago.yaml) | background servers: readiness probes, `ready.store`, teardown |
 | [defaults](examples/defaults.atago.yaml) | sharing `shell`/`env`/`service` fragments across scenarios |
+| [suite_setup](examples/suite_setup.atago.yaml) | once-per-suite bootstrap: ordered setup steps, suite-wide `service:` steps, `${suitedir}`, suite env, always-run suite teardown |
 | [select_skip_only](examples/select_skip_only.atago.yaml) | tags, and gating scenarios by OS, env var, or a probe command |
 | [db](examples/db.atago.yaml) | SQL via the bundled SQLite driver, `rows` assertions, value binding |
 | [image_and_pdf](examples/image_and_pdf.atago.yaml) | image format/dimension/similarity checks, PDF page/metadata/text checks |

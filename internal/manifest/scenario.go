@@ -86,6 +86,14 @@ func buildStep(index int, step *spec.Step, vars map[string]bool) Step {
 		st.Action = "write fixture " + step.Fixture.File
 		collectVars(vars, step.Fixture.File, step.Fixture.Content, step.Fixture.Symlink)
 
+	case spec.StepService:
+		svc := step.Service
+		st.Command = svc.Command
+		st.Shell = svc.ShellEnabled()
+		st.Target = svc.Name
+		st.Action = "start suite service " + svc.Name
+		collectVars(vars, svc.Command, svc.Cwd)
+
 	case spec.StepRun:
 		r := step.Run
 		st.Command = r.Command

@@ -209,6 +209,42 @@ func TestLoadBytes_Errors(t *testing.T) {
 			wantMsg:  "is not an octal file mode",
 		},
 		{
+			name:     "service step inside a scenario is rejected",
+			src:      "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - service: {name: p, command: ./p}\n      - run: {command: echo}",
+			wantKind: KindValidation,
+			wantMsg:  "service steps are only allowed in suite.setup",
+		},
+		{
+			name:     "service step inside scenario teardown is rejected",
+			src:      "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n    teardown:\n      - service: {name: p, command: ./p}",
+			wantKind: KindValidation,
+			wantMsg:  "service steps are only allowed in suite.setup",
+		},
+		{
+			name:     "service step inside suite teardown is rejected",
+			src:      "version: \"1\"\nsuite:\n  name: x\n  teardown:\n    - service: {name: p, command: ./p}\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}",
+			wantKind: KindValidation,
+			wantMsg:  "service steps are only allowed in suite.setup",
+		},
+		{
+			name:     "http step at suite level is rejected with a pointer",
+			src:      "version: \"1\"\nsuite:\n  name: x\n  setup:\n    - http: {method: GET, path: /}\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}",
+			wantKind: KindValidation,
+			wantMsg:  "per-scenario",
+		},
+		{
+			name:     "duplicate suite service names are rejected",
+			src:      "version: \"1\"\nsuite:\n  name: x\n  setup:\n    - service: {name: p, command: ./p}\n    - service: {name: p, command: ./q}\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}",
+			wantKind: KindValidation,
+			wantMsg:  "duplicate suite service name",
+		},
+		{
+			name:     "suite setup run without a command is rejected",
+			src:      "version: \"1\"\nsuite:\n  name: x\n  setup:\n    - run: {shell: true}\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}",
+			wantKind: KindValidation,
+			wantMsg:  "run.command is required",
+		},
+		{
 			name:     "invalid fixture mtime fails at load",
 			src:      "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - fixture: {file: f.txt, content: x, mtime: \"yesterday\"}\n      - run: {command: echo}",
 			wantKind: KindValidation,

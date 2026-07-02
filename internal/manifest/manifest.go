@@ -67,11 +67,18 @@ type Spec struct {
 	Suite    string `json:"suite"`
 	// Source is the authored location of the suite declaration (#80). Omitted
 	// when positions are unavailable.
-	Source    *Source    `json:"source,omitempty"`
-	Secrets   []string   `json:"secrets,omitempty"`
-	Network   Network    `json:"network"`
-	Runners   []Runner   `json:"runners,omitempty"`
-	Scenarios []Scenario `json:"scenarios"`
+	Source  *Source  `json:"source,omitempty"`
+	Secrets []string `json:"secrets,omitempty"`
+	Network Network  `json:"network"`
+	Runners []Runner `json:"runners,omitempty"`
+	// SuiteEnv, SuiteSetup, and SuiteTeardown mirror the suite-level lifecycle
+	// (#7): env exported to every scenario, steps run once before any scenario
+	// (setup may contain service steps starting suite-wide peers), and steps
+	// that always run after the last scenario.
+	SuiteEnv      []string   `json:"suite_env,omitempty"`
+	SuiteSetup    []Step     `json:"suite_setup,omitempty"`
+	SuiteTeardown []Step     `json:"suite_teardown,omitempty"`
+	Scenarios     []Scenario `json:"scenarios"`
 }
 
 // Network summarizes the spec's network policy.
@@ -193,6 +200,23 @@ func buildSpec(in Input) Spec {
 	}
 	if in.Source != nil {
 		out.Source = sourceFrom(in.Source.SuitePos())
+	}
+	// Suite lifecycle (#7). Env is emitted as sorted key names only — values
+	// may embed credentials, same rule as a db runner's dsn.
+	if len(s.Suite.Env) > 0 {
+		keys := make([]string, 0, len(s.Suite.Env))
+		for k := range s.Suite.Env {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		out.SuiteEnv = keys
+	}
+	suiteVars := map[string]bool{}
+	for i := range s.Suite.Setup {
+		out.SuiteSetup = append(out.SuiteSetup, buildStep(i, &s.Suite.Setup[i], suiteVars))
+	}
+	for i := range s.Suite.Teardown {
+		out.SuiteTeardown = append(out.SuiteTeardown, buildStep(i, &s.Suite.Teardown[i], suiteVars))
 	}
 	for i := range s.Scenarios {
 		out.Scenarios = append(out.Scenarios, buildScenario(&s.Scenarios[i], in.Source))

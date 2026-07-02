@@ -22,6 +22,8 @@ func Explain(w io.Writer, s *spec.Spec, path string) error {
 		fmt.Fprintf(&b, "Secrets declared: %s\n", strings.Join(s.Secrets, ", "))
 	}
 	fmt.Fprintf(&b, "Network policy: %s\n", networkPolicy(s))
+	explainSuiteBlock(&b, "Suite setup (runs once before any scenario)", s.Suite.Setup)
+	explainSuiteBlock(&b, "Suite teardown (always runs after the last scenario)", s.Suite.Teardown)
 
 	for i := range s.Scenarios {
 		explainScenario(&b, &s.Scenarios[i])
@@ -38,6 +40,33 @@ func networkPolicy(s *spec.Spec) string {
 	// every host is permitted (security.CheckHost). Say so plainly instead of
 	// implying a restrictive default that does not exist (issue #41).
 	return "unrestricted (no allowlist set; all hosts permitted)"
+}
+
+// explainSuiteBlock summarizes suite.setup / suite.teardown (#7) so a reviewer
+// sees the once-per-suite bootstrap (built helpers, suite-wide services,
+// cleanup) without reading YAML.
+func explainSuiteBlock(b *strings.Builder, label string, steps []spec.Step) {
+	if len(steps) == 0 {
+		return
+	}
+	fmt.Fprintf(b, "%s:\n", label)
+	for i := range steps {
+		step := &steps[i]
+		switch step.Kind() {
+		case spec.StepRun:
+			fmt.Fprintf(b, "  - %s\n", describeRun(step.Run))
+		case spec.StepService:
+			fmt.Fprintf(b, "  - start suite service %q: %s\n", step.Service.Name, step.Service.Command)
+		case spec.StepFixture:
+			fmt.Fprintf(b, "  - %s\n", describeFixture(step.Fixture))
+		case spec.StepStore:
+			fmt.Fprintf(b, "  - store %s\n", step.Store.Name)
+		case spec.StepAssert:
+			for _, d := range describeAsserts(step.Assert) {
+				fmt.Fprintf(b, "  - expect %s\n", d)
+			}
+		}
+	}
 }
 
 func explainScenario(b *strings.Builder, sc *spec.Scenario) {

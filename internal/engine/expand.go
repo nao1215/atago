@@ -172,3 +172,20 @@ func expandCDP(st *store.Store, c *spec.CDP) *spec.CDP {
 	}
 	return &out
 }
+
+// mergedEnv layers base beneath own (own wins per key) without mutating either.
+// It returns own unchanged when base is empty, so the common no-suite-env case
+// allocates nothing.
+func mergedEnv(base, own map[string]string) map[string]string {
+	if len(base) == 0 {
+		return own
+	}
+	out := make(map[string]string, len(base)+len(own))
+	for k, v := range base {
+		out[k] = v
+	}
+	for k, v := range own {
+		out[k] = v
+	}
+	return out
+}

@@ -34,6 +34,8 @@ func validate(s *spec.Spec) []string {
 	}
 	validateRunners(add, s.Runners)
 	validateDefaults(add, s.Defaults)
+	validateSuiteBlock(add, "suite.setup", s.Suite.Setup, s.Runners, true)
+	validateSuiteBlock(add, "suite.teardown", s.Suite.Teardown, s.Runners, false)
 
 	seen := make(map[string]bool, len(s.Scenarios))
 	for i := range s.Scenarios {
@@ -200,6 +202,62 @@ func validateServices(add func(string, ...any), where string, services []spec.Se
 	}
 }
 
+// validateSuiteBlock checks suite.setup / suite.teardown (#7): steps run once
+// per suite in the ${suitedir} scratch dir, so only the suite-scoped kinds are
+// allowed — fixture, run, store, assert, and (setup only) `service:`. The
+// runner-backed kinds (http/query/grpc/cdp) are per-scenario machinery and are
+// rejected with a pointer to where they belong.
+func validateSuiteBlock(add func(string, ...any), where string, steps []spec.Step, runners map[string]spec.Runner, allowService bool) {
+	seenService := map[string]bool{}
+	for i := range steps {
+		st := &steps[i]
+		sw := fmt.Sprintf("%s[%d]", where, i)
+		keys := st.SetKeys()
+		if len(keys) != 1 {
+			add("%s: step must set exactly one action (got %v)", sw, keys)
+			continue
+		}
+		switch st.Kind() {
+		case spec.StepFixture:
+			validateFixture(add, sw, st.Fixture)
+		case spec.StepRun:
+			validateRunnerRef(add, sw, "run", st.Run.Runner, runners)
+			if st.Run.Timeout != "" {
+				if _, err := time.ParseDuration(st.Run.Timeout); err != nil {
+					add("%s.run.timeout %q is not a valid duration (e.g. \"30s\")", sw, st.Run.Timeout)
+				}
+			}
+			if st.Run.Command == "" {
+				add("%s.run.command is required", sw)
+			}
+			validateRetry(add, sw+".run", st.Run.Retry)
+		case spec.StepStore:
+			validateStore(add, sw, st.Store)
+		case spec.StepAssert:
+			validateAssert(add, sw, st.Assert)
+		case spec.StepService:
+			if !allowService {
+				add("%s: service steps are only allowed in suite.setup", sw)
+				continue
+			}
+			svc := st.Service
+			if svc.Name == "" {
+				add("%s.service.name is required", sw)
+			} else if seenService[svc.Name] {
+				add("%s: duplicate suite service name %q", where, svc.Name)
+			} else {
+				seenService[svc.Name] = true
+			}
+			if svc.Command == "" {
+				add("%s.service.command is required", sw)
+			}
+			validateReady(add, sw+".service", svc.Ready)
+		default:
+			add("%s: %s steps are per-scenario (they need a scenario workdir and runners); move it into a scenario", sw, st.Kind())
+		}
+	}
+}
+
 func validateReady(add func(string, ...any), where string, r *spec.Ready) {
 	if r == nil {
 		return
@@ -356,6 +414,8 @@ func validateStep(add func(string, ...any), where string, st *spec.Step, runners
 		validateCDPActions(add, where, st.CDP.Actions)
 	case spec.StepStore:
 		validateStore(add, where, st.Store)
+	case spec.StepService:
+		add("%s: service steps are only allowed in suite.setup (scenario-scoped peers go under the scenario's services: list)", where)
 	}
 }
 

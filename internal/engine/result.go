@@ -90,7 +90,13 @@ type SuiteResult struct {
 	SpecPath  string
 	Status    Status
 	Scenarios []ScenarioResult
-	Duration  time.Duration
+	// Setup records the suite.setup steps (#7). A failed setup step errors
+	// every scenario (none runs) and the failure is visible here.
+	Setup []StepResult
+	// Teardown records the suite.teardown steps (#7). They always run after
+	// the last scenario; failures are reported but never change Status.
+	Teardown []StepResult
+	Duration time.Duration
 	// SecurityViolation is true when any scenario breached the security policy.
 	SecurityViolation bool
 }

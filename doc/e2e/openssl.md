@@ -17,7 +17,7 @@ Source: `test/e2e/thirdparty/openssl/openssl.atago.yaml`
 - Fixture file `msg.txt` is created.
 #### Inputs
 _Fixture `msg.txt`:_
-```
+```text
 the quick brown fox
 ```
 #### When
@@ -30,11 +30,11 @@ openssl dgst -sha256 -r msg.txt
 ### Scenario: base64 encode and decode round-trip via stdin
 #### Inputs
 _stdin for `openssl`:_
-```
+```text
 round-trip me
 ```
 _stdin for `openssl`:_
-```
+```text
 ${encoded}
 ```
 #### When
@@ -78,7 +78,7 @@ openssl pkey -in key.pem -pubout -out pub.pem
 - Fixture file `secret.txt` is created.
 #### Inputs
 _Fixture `secret.txt`:_
-```
+```text
 attack at dawn
 ```
 #### When
@@ -122,11 +122,11 @@ openssl verify -CAfile ca.crt ca.crt
 - Fixture file `payload.txt` is created.
 #### Inputs
 _Fixture `payload.txt`:_
-```
+```text
 sign me
 ```
 _Fixture `payload.txt`:_
-```
+```text
 sign me (tampered)
 ```
 #### When

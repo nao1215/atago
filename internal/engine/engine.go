@@ -119,6 +119,50 @@ func (e *Engine) Run(ctx context.Context, s *spec.Spec, specPath string) *SuiteR
 
 	selected := e.selectScenarios(s, specPath)
 
+	// Suite lifecycle (#7): run suite.setup once before any scenario, expose
+	// its scratch dir/stores/services to every scenario, and guarantee
+	// suite.teardown runs after the last one (before services stop, LIFO).
+	suiteRT, rtErr := e.newSuiteRuntime(s)
+	if rtErr != nil {
+		res.Status = StatusError
+		for _, i := range selected {
+			res.Scenarios = append(res.Scenarios, ScenarioResult{Name: s.Scenarios[i].Name, Suite: s.Suite.Name, Status: StatusError,
+				Steps: []StepResult{{Kind: spec.StepNone, Setup: true, ErrMsg: suiteSetupLabel + ": " + rtErr.Error()}}})
+		}
+		res.Duration = time.Since(start)
+		return res
+	}
+	if suiteRT != nil {
+		defer suiteRT.stop()
+		var setupOK bool
+		res.Setup, setupOK = e.runSuiteSteps(ctx, s.Suite.Setup, suiteRT, rc, true)
+		if !setupOK {
+			// Every selected scenario is errored with the suite-setup phase
+			// named; none of their steps run. Teardown still runs: a partially
+			// executed setup may have created external state worth cleaning.
+			res.Status = StatusError
+			failure := suiteSetupFailure(res.Setup)
+			for _, i := range selected {
+				sr := ScenarioResult{Name: s.Scenarios[i].Name, Suite: s.Suite.Name, Status: StatusError,
+					Steps: []StepResult{{Kind: spec.StepNone, Setup: true, ErrMsg: failure}}}
+				if e.OnScenario != nil {
+					e.OnScenario(sr)
+				}
+				res.Scenarios = append(res.Scenarios, sr)
+			}
+			res.Teardown = e.runSuiteTeardown(ctx, s, suiteRT, rc)
+			res.Duration = time.Since(start)
+			return res
+		}
+		rc.suiteVars = suiteRT.vars
+		rc.suiteEnv = suiteRT.env
+		defer func() {
+			// Deferred after suiteRT.stop ⇒ runs before it, so teardown can
+			// still reach the suite services.
+			res.Teardown = e.runSuiteTeardown(ctx, s, suiteRT, rc)
+		}()
+	}
+
 	results := make([]ScenarioResult, len(s.Scenarios))
 	done := make([]bool, len(s.Scenarios))
 	jobs := make(chan int)
@@ -272,6 +316,12 @@ type runConfig struct {
 	masker   *security.Masker
 	runners  map[string]spec.Runner
 	allow    []string
+	// suiteVars is the suite store snapshot (#7): ${suitedir} plus values
+	// captured by suite.setup (store steps, service ready.store). Seeded into
+	// every scenario's store before its own vars.
+	suiteVars map[string]string
+	// suiteEnv is the raw suite.env, layered beneath each scenario's env.
+	suiteEnv map[string]string
 }
 
 func (e *Engine) runScenario(ctx context.Context, scenarioIdx int, sc *spec.Scenario, rc runConfig) ScenarioResult {
@@ -295,6 +345,11 @@ func (e *Engine) runScenario(ctx context.Context, scenarioIdx int, sc *spec.Scen
 	for k, v := range e.builtins {
 		st.Set(k, v)
 	}
+	// Suite-level values (#7) come before the scenario's own: ${suitedir} and
+	// suite.setup captures are shared context every scenario may reference.
+	for k, v := range rc.suiteVars {
+		st.Set(k, v)
+	}
 	// ${workdir} is the absolute path of this scenario's isolated temp dir, so
 	// specs can build absolute env paths (e.g. HOME=${workdir}/home,
 	// GOBIN=${workdir}/gobin) that child toolchains require.
@@ -304,6 +359,9 @@ func (e *Engine) runScenario(ctx context.Context, scenarioIdx int, sc *spec.Scen
 	for k, v := range sc.Vars {
 		st.Set(k, v)
 	}
+	// suite.env layers beneath the scenario's own env (the scenario wins per
+	// key); scEnv replaces sc.Env for every use below.
+	scEnv := mergedEnv(rc.suiteEnv, sc.Env)
 	// Database connections are opened lazily per scenario and closed at its end,
 	// so a dsn referencing ${workdir} yields a fresh isolated DB each time.
 	dbConns := map[string]*dbrunner.Runner{}
@@ -356,7 +414,7 @@ func (e *Engine) runScenario(ctx context.Context, scenarioIdx int, sc *spec.Scen
 		}
 	}()
 	for i := range sc.Services {
-		proc, captured, err := servicerunner.Start(ctx, expandService(st, sc.Env, &sc.Services[i]), workdir)
+		proc, captured, err := servicerunner.Start(ctx, expandService(st, scEnv, &sc.Services[i]), workdir)
 		if err != nil {
 			out.Status = StatusError
 			// Preserve the failed service's log (and any peers already started) as a
@@ -414,7 +472,7 @@ func (e *Engine) runScenario(ctx context.Context, scenarioIdx int, sc *spec.Scen
 					return sr, StatusError, false
 				}
 			}
-			run := mergeScenarioEnv(sc.Env, expandRun(st, step.Run), st)
+			run := mergeScenarioEnv(scEnv, expandRun(st, step.Run), st)
 			r, untilChecks, err := e.runStep(ctx, run, st, workdir, specDir, rc, sshConns)
 			if err != nil {
 				sr.ErrMsg = err.Error()
