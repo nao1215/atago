@@ -24,7 +24,7 @@ caddy list-modules
 - Fixture file `Caddyfile` is created.
 #### Inputs
 _Fixture `Caddyfile`:_
-```
+```text
 :18080
 respond "hello from caddy"
 ```
@@ -40,7 +40,7 @@ caddy adapt --config Caddyfile
 - Fixture file `Caddyfile` is created.
 #### Inputs
 _Fixture `Caddyfile`:_
-```
+```text
 :18080   {
         respond    "ok"
   }
@@ -57,7 +57,7 @@ caddy fmt --overwrite Caddyfile
 - Fixture file `Caddyfile` is created.
 #### Inputs
 _Fixture `Caddyfile`:_
-```
+```text
 :18080
 no_such_directive_xyz
 ```
@@ -74,7 +74,7 @@ caddy validate --config Caddyfile --adapter caddyfile
 - Fixture file `Caddyfile` is created.
 #### Inputs
 _Fixture `Caddyfile`:_
-```
+```text
 {
 	admin off
 }
@@ -96,11 +96,11 @@ respond "configured response" 200
 - Fixture file `site/api/status.json` is created.
 #### Inputs
 _Fixture `site/index.html`:_
-```
+```text
 <html><body>hello from caddy</body></html>
 ```
 _Fixture `site/api/status.json`:_
-```
+```text
 {"status":"ok","service":"caddy"}
 ```
 #### When

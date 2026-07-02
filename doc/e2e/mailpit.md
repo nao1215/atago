@@ -24,7 +24,7 @@ mailpit version
 - Fixture file `mail.txt` is created.
 #### Inputs
 _Fixture `mail.txt`:_
-```
+```text
 From: Alice <alice@example.test>
 To: Bob <bob@example.test>
 Subject: Deploy finished
@@ -55,7 +55,7 @@ curl -s --url smtp://127.0.0.1:18170 --mail-from alice@example.test --mail-rcpt 
 - Fixture file `mail2.txt` is created.
 #### Inputs
 _Fixture `mail1.txt`:_
-```
+```text
 From: ci@example.test
 To: team@example.test
 Subject: nightly build report
@@ -63,7 +63,7 @@ Subject: nightly build report
 All tests were green tonight.
 ```
 _Fixture `mail2.txt`:_
-```
+```text
 From: ci@example.test
 To: team@example.test
 Subject: invoice reminder
@@ -88,7 +88,7 @@ curl -s --url smtp://127.0.0.1:18172 --mail-from ci@example.test --mail-rcpt tea
 - Fixture file `mail.txt` is created.
 #### Inputs
 _Fixture `mail.txt`:_
-```
+```text
 From: reports@example.test
 To: audit@example.test
 Subject: weekly numbers
@@ -125,7 +125,7 @@ curl -s --url smtp://127.0.0.1:18174 --mail-from reports@example.test --mail-rcp
 - Fixture file `mail.txt` is created.
 #### Inputs
 _Fixture `mail.txt`:_
-```
+```text
 From: temp@example.test
 To: trash@example.test
 Subject: ephemeral

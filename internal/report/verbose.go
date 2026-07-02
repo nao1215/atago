@@ -74,11 +74,20 @@ func (v *Verbose) writeStep(b *strings.Builder, phase string, sr *engine.StepRes
 	}
 	fmt.Fprintln(b)
 
+	// Each result family renders its own observable surface; treating a DB,
+	// gRPC, or CDP result like a process would print a misleading "exit 0".
 	if sr.Run != nil {
 		switch {
 		case sr.Run.IsHTTP:
 			fmt.Fprintf(b, "      status %d\n", sr.Run.StatusCode)
 			writeStream(b, "body", sr.Run.Body)
+		case sr.Run.IsDB:
+			writeStream(b, "rows", sr.Run.RowsJSON)
+		case sr.Run.IsGRPC:
+			fmt.Fprintf(b, "      grpc status %d\n", sr.Run.GRPCStatus)
+			writeStream(b, "message", sr.Run.MessageJSON)
+		case sr.Run.IsCDP:
+			writeStream(b, "value", sr.Run.CDPValue)
 		default:
 			fmt.Fprintf(b, "      exit %d\n", sr.Run.ExitCode)
 			writeStream(b, "stdout", sr.Run.Stdout)

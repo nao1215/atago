@@ -15,7 +15,7 @@ Source: `test/e2e/thirdparty/prometheus/prometheus.atago.yaml`
 - Fixture file `broken.yml` is created.
 #### Inputs
 _Fixture `prometheus.yml`:_
-```
+```text
 global:
   scrape_interval: 15s
 scrape_configs:
@@ -24,7 +24,7 @@ scrape_configs:
       - targets: ["127.0.0.1:9090"]
 ```
 _Fixture `broken.yml`:_
-```
+```text
 global:
   scrape_interval: not-a-duration
 ```
@@ -46,7 +46,7 @@ promtool check config broken.yml
 - Fixture file `rules_test.yml` is created.
 #### Inputs
 _Fixture `rules.yml`:_
-```
+```text
 groups:
   - name: atago
     rules:
@@ -61,7 +61,7 @@ groups:
           summary: "Instance down"
 ```
 _Fixture `rules_test.yml`:_
-```
+```text
 rule_files:
   - rules.yml
 evaluation_interval: 1m
@@ -99,7 +99,7 @@ promtool test rules rules_test.yml
 - Fixture file `prometheus.yml` is created.
 #### Inputs
 _Fixture `prometheus.yml`:_
-```
+```text
 global:
   scrape_interval: 15s
 scrape_configs: []
@@ -131,7 +131,7 @@ scrape_configs: []
 - Fixture file `prometheus.yml` is created.
 #### Inputs
 _Fixture `prometheus.yml`:_
-```
+```text
 global:
   scrape_interval: 1s
 scrape_configs:

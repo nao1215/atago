@@ -100,6 +100,36 @@ func TestVerbose_TruncatesLongOutput(t *testing.T) {
 	}
 }
 
+// TestVerbose_NonProcessFamiliesRenderTheirOwnSurface proves DB/gRPC/CDP/HTTP
+// results are traced by family instead of as a misleading process-style
+// "exit 0" block (CodeRabbit finding on #9).
+func TestVerbose_NonProcessFamiliesRenderTheirOwnSurface(t *testing.T) {
+	t.Parallel()
+	res := engine.ScenarioResult{
+		Suite:  "demo",
+		Name:   "families",
+		Status: engine.StatusPassed,
+		Steps: []engine.StepResult{
+			{Index: 0, Kind: spec.StepQuery, Run: &runner.Result{IsDB: true, RowsJSON: []byte(`[{"id":1}]`)}},
+			{Index: 1, Kind: spec.StepGRPC, Run: &runner.Result{IsGRPC: true, GRPCStatus: 0, MessageJSON: []byte(`{"ok":true}`)}},
+			{Index: 2, Kind: spec.StepCDP, Run: &runner.Result{IsCDP: true, CDPValue: []byte("page-title")}},
+			{Index: 3, Kind: spec.StepHTTP, Run: &runner.Result{IsHTTP: true, StatusCode: 201, Body: []byte(`{"id":9}`)}},
+		},
+	}
+	var b strings.Builder
+	NewVerbose(&b).Scenario(res)
+	out := b.String()
+
+	for _, want := range []string{`[{"id":1}]`, "grpc status 0", `{"ok":true}`, "page-title", "status 201"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("trace = %q, want %q", out, want)
+		}
+	}
+	if strings.Contains(out, "exit 0") {
+		t.Errorf("trace = %q, must not render a process-style exit for non-process families", out)
+	}
+}
+
 // TestVerbose_SkippedScenarioShowsReason proves a skipped scenario's reason —
 // currently visible only in the JSON report — is spelled out in the trace.
 func TestVerbose_SkippedScenarioShowsReason(t *testing.T) {

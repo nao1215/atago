@@ -2072,11 +2072,11 @@ Source: `test/e2e/tools/mimixbox/archival/ar.atago.yaml`
 - Fixture file `b.txt` is created.
 #### Inputs
 _Fixture `a.txt`:_
-```
+```text
 alpha
 ```
 _Fixture `b.txt`:_
-```
+```text
 beta
 ```
 #### When
@@ -2092,7 +2092,7 @@ ar rc lib.a a.txt b.txt && ar t lib.a
 - Fixture file `a.txt` is created.
 #### Inputs
 _Fixture `a.txt`:_
-```
+```text
 alpha
 ```
 #### When
@@ -2141,7 +2141,7 @@ Source: `test/e2e/tools/mimixbox/archival/compress.atago.yaml`
 - Fixture file `data.txt` is created.
 #### Inputs
 _Fixture `data.txt`:_
-```
+```text
 compress me compress me compress me
 ```
 #### When
@@ -2158,7 +2158,7 @@ Source: `test/e2e/tools/mimixbox/archival/cpio.atago.yaml`
 - Fixture file `in/file.txt` is created.
 #### Inputs
 _Fixture `in/file.txt`:_
-```
+```text
 payload
 ```
 #### When
@@ -2179,7 +2179,7 @@ cat file.txt
 - Fixture file `in/file.txt` is created.
 #### Inputs
 _Fixture `in/file.txt`:_
-```
+```text
 payload
 ```
 #### When
@@ -2487,7 +2487,7 @@ Source: `test/e2e/tools/mimixbox/archival/tar.atago.yaml`
 - Fixture file `src/a.txt` is created.
 #### Inputs
 _Fixture `src/a.txt`:_
-```
+```text
 alpha
 ```
 #### When
@@ -2506,7 +2506,7 @@ cat dest/src/a.txt
 - Fixture file `src/a.txt` is created.
 #### Inputs
 _Fixture `src/a.txt`:_
-```
+```text
 alpha
 ```
 #### When
@@ -2647,7 +2647,7 @@ Source: `test/e2e/tools/mimixbox/archival/zip.atago.yaml`
 - Fixture file `a.txt` is created.
 #### Inputs
 _Fixture `a.txt`:_
-```
+```text
 zipped
 ```
 #### When
@@ -2662,7 +2662,7 @@ zip out.zip a.txt >/dev/null && unzip -l out.zip
 - Fixture file `a.txt` is created.
 #### Inputs
 _Fixture `a.txt`:_
-```
+```text
 zipped
 ```
 #### When
@@ -2793,7 +2793,7 @@ mimixbox '[' -f /no/such/mimixbox/file ']' && echo yes || echo no
 - Fixture file `f` is created.
 #### Inputs
 _Fixture `f`:_
-```
+```text
 hello
 ```
 #### When
@@ -3058,7 +3058,7 @@ chat
 ### Scenario: fails when an expected string never arrives
 #### Inputs
 _stdin for `chat`:_
-```
+```text
 nope
 ```
 #### When
@@ -3356,7 +3356,7 @@ printf 'a\nb\nc\n' | more
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 a
 b
 c
@@ -3371,7 +3371,7 @@ printf 'x\ny\nz\n' | less
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 x
 y
 z
@@ -3381,7 +3381,7 @@ z
 - Fixture file `f` is created.
 #### Inputs
 _Fixture `f`:_
-```
+```text
 one
 two
 ```
@@ -3394,7 +3394,7 @@ more f
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 one
 two
 ```
@@ -3551,7 +3551,7 @@ Source: `test/e2e/tools/mimixbox/console-tools/stty.atago.yaml`
 ### Scenario: reports when standard input is not a terminal
 #### Inputs
 _stdin for `stty`:_
-```
+```text
 x
 ```
 #### When
@@ -3609,7 +3609,7 @@ printf 'a b\nb c\n' | tsort
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 a
 b
 c
@@ -3624,7 +3624,7 @@ printf 'foo\nbar\nbaz\n' | egrep 'ba(r|z)'
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 bar
 baz
 ```
@@ -3732,7 +3732,7 @@ valid-shell --help
 - Fixture file `shells.txt` is created.
 #### Inputs
 _Fixture `shells.txt`:_
-```
+```text
 /bin/sh
 /bin/bash
 ```
@@ -3785,13 +3785,13 @@ Source: `test/e2e/tools/mimixbox/editors/diff.atago.yaml`
 - Fixture file `b` is created.
 #### Inputs
 _Fixture `a`:_
-```
+```text
 one
 two
 three
 ```
 _Fixture `b`:_
-```
+```text
 one
 2
 three
@@ -3809,13 +3809,13 @@ diff a b
 - Fixture file `c` is created.
 #### Inputs
 _Fixture `a`:_
-```
+```text
 one
 two
 three
 ```
 _Fixture `c`:_
-```
+```text
 one
 two
 three
@@ -3833,13 +3833,13 @@ diff a c
 - Fixture file `b` is created.
 #### Inputs
 _Fixture `a`:_
-```
+```text
 one
 two
 three
 ```
 _Fixture `b`:_
-```
+```text
 one
 2
 three
@@ -3858,13 +3858,13 @@ Source: `test/e2e/tools/mimixbox/editors/ed.atago.yaml`
 - Fixture file `buf.txt` is created.
 #### Inputs
 _Fixture `buf.txt`:_
-```
+```text
 one
 two
 three
 ```
 _stdin for `ed`:_
-```
+```text
 1,$p
 q
 ```
@@ -3877,7 +3877,7 @@ ed buf.txt
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 14
 one
 two
@@ -3888,7 +3888,7 @@ three
 - Fixture file `buf.txt` is created.
 #### Inputs
 _Fixture `buf.txt`:_
-```
+```text
 one
 two
 three
@@ -3904,7 +3904,7 @@ cat buf.txt
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 one
 two
 INSERTED
@@ -3915,7 +3915,7 @@ three
 - Fixture file `buf.txt` is created.
 #### Inputs
 _Fixture `buf.txt`:_
-```
+```text
 one
 two
 three
@@ -3931,7 +3931,7 @@ cat buf.txt
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 one
 TWO
 three
@@ -3944,13 +3944,13 @@ Source: `test/e2e/tools/mimixbox/editors/patch.atago.yaml`
 - Fixture file `p.diff` is created.
 #### Inputs
 _Fixture `f.txt`:_
-```
+```text
 one
 two
 three
 ```
 _Fixture `p.diff`:_
-```
+```text
 --- ${workdir}/f.txt
 +++ ${workdir}/f.txt
 @@ -1,3 +1,3 @@
@@ -3972,7 +3972,7 @@ cat f.txt
   - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 one
 2
 three
@@ -4019,7 +4019,7 @@ Source: `test/e2e/tools/mimixbox/editors/vi.atago.yaml`
 - Fixture file `a.txt` is created.
 #### Inputs
 _Fixture `a.txt`:_
-```
+```text
 hello
 world
 ```
@@ -4034,7 +4034,7 @@ cat a.txt
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 ello
 world
 ```
@@ -4043,7 +4043,7 @@ world
 - Fixture file `b.txt` is created.
 #### Inputs
 _Fixture `b.txt`:_
-```
+```text
 bar
 ```
 #### When
@@ -4070,7 +4070,7 @@ cat new.txt
 - Fixture file `a.txt` is created.
 #### Inputs
 _Fixture `a.txt`:_
-```
+```text
 hello
 world
 ```
@@ -4085,7 +4085,7 @@ cat a.txt
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 hello
 world
 ```
@@ -4094,7 +4094,7 @@ world
 - Fixture file `yp.txt` is created.
 #### Inputs
 _Fixture `yp.txt`:_
-```
+```text
 one
 two
 ```
@@ -4109,7 +4109,7 @@ cat yp.txt
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 one
 one
 two
@@ -4119,7 +4119,7 @@ two
 - Fixture file `cd.txt` is created.
 #### Inputs
 _Fixture `cd.txt`:_
-```
+```text
 abcdef
 ```
 #### When
@@ -4136,7 +4136,7 @@ cat cd.txt
 - Fixture file `u.txt` is created.
 #### Inputs
 _Fixture `u.txt`:_
-```
+```text
 keepme
 ```
 #### When
@@ -4153,7 +4153,7 @@ cat u.txt
 - Fixture file `sn.txt` is created.
 #### Inputs
 _Fixture `sn.txt`:_
-```
+```text
 x
 foo
 y
@@ -4171,7 +4171,7 @@ cat sn.txt
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 x
 foo
 y
@@ -6546,7 +6546,7 @@ lpq -S spool
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 page content
 no entries
 ```
@@ -6632,7 +6632,7 @@ Source: `test/e2e/tools/mimixbox/embedded/makedevs.atago.yaml`
 - Fixture file `table.txt` is created.
 #### Inputs
 _Fixture `table.txt`:_
-```
+```text
 # device table
 /dev d 755 0 0 0 0 0 0 0
 /etc/hostname f 644 0 0 0 0 0 0 0
@@ -7062,7 +7062,7 @@ cp -r ${workdir}/cp ${workdir}/cp2 && ls ${workdir}/cp2 && ls ${workdir}/cp2/cp
   - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 cp
 1.txt
 2.txt
@@ -7081,7 +7081,7 @@ cp -r ${workdir}/cp ${workdir}/cp; ls ${workdir}/cp
   - stderr equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 1.txt
 2.txt
 3.txt
@@ -7109,7 +7109,7 @@ cp ${workdir}/cp/1.txt ${workdir}/cp/2.txt ${workdir}/cp/3.txt ${workdir}/cp2 &&
   - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 1.txt
 2.txt
 3.txt
@@ -7126,7 +7126,7 @@ cp ${workdir}/cp ${workdir}/cp2
   - stderr equals an exact value
 #### Expected output
 _expected stderr:_
-```
+```text
 cp: --recursive is not specified: omitting directory: ${workdir}/cp
 ```
 ### Scenario: can not copy a directory to root without authority
@@ -7150,7 +7150,7 @@ printf 'A\n' > a.txt && printf 'B\n' > b.txt && mkdir dst_t dst_plain && cp --ta
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 A
 B
 ```
@@ -7182,7 +7182,7 @@ printf 'new\n' > src.txt && printf 'old\n' > dst.txt && cp --backup=simple src.t
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 new
 old
 ```
@@ -7215,7 +7215,7 @@ mkdir -p src dst/src && printf 'new\n' > src/f.txt && printf 'old\n' > dst/src/f
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 new
 old
 ```
@@ -7283,7 +7283,7 @@ Source: `test/e2e/tools/mimixbox/fileutils/link.atago.yaml`
 - Fixture file `link_src` is created.
 #### Inputs
 _Fixture `link_src`:_
-```
+```text
 data
 ```
 #### When
@@ -7300,7 +7300,7 @@ Source: `test/e2e/tools/mimixbox/fileutils/ln.atago.yaml`
 - Fixture file `ln/target.txt` is created.
 #### Inputs
 _Fixture `ln/target.txt`:_
-```
+```text
 content
 ```
 #### When
@@ -7315,7 +7315,7 @@ ln ${workdir}/ln/target.txt ${workdir}/ln/hardlink.txt && cat ${workdir}/ln/hard
 - Fixture file `ln/target.txt` is created.
 #### Inputs
 _Fixture `ln/target.txt`:_
-```
+```text
 content
 ```
 #### When
@@ -7362,7 +7362,7 @@ ln --target-directory ${workdir}/ln_gnu/dst ${workdir}/ln_gnu/a.txt ${workdir}/l
   - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 a.txt
 b.txt
 ```
@@ -7380,7 +7380,7 @@ ls ${workdir}/ls
   - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 a.txt
 b.txt
 sub
@@ -7634,7 +7634,7 @@ mkdir -p mkdir && mkdir ${workdir}/mkdir/1 ${workdir}/mkdir/2 ${workdir}/mkdir/3
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 1
 2
 3
@@ -7681,7 +7681,7 @@ mkdir -p mkdir && mkdir ${workdir}/mkdir/1 /mkdir/2 ${workdir}/mkdir/3; ls ${wor
 - stderr equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 1
 3
 ```
@@ -7710,7 +7710,7 @@ ls -al ${workdir}/mkfifo/3 | cut -f 1 -d " "
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 prw-r--r--
 prw-r--r--
 prw-r--r--
@@ -7746,7 +7746,7 @@ ls ${workdir}/mkfifo
 - stderr equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 1
 3
 ```
@@ -7784,7 +7784,7 @@ mv ${workdir}/mv/1.txt ${workdir}/mv/inner && ls ${workdir}/mv/inner
   - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 1.txt
 inner.txt
 ```
@@ -7800,7 +7800,7 @@ mv ${workdir}/mv/1.txt ${workdir}/mv/2.txt ${workdir}/mv/3.txt ${workdir}/mv/inn
   - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 1.txt
 2.txt
 3.txt
@@ -7818,7 +7818,7 @@ mv ${workdir}/mv/1.txt ${workdir}/mv/no_exist_file ${workdir}/mv/3.txt ${workdir
   - stderr equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 1.txt
 3.txt
 inner.txt
@@ -7835,7 +7835,7 @@ mv ${workdir}/mv2 ${workdir}/mv && ls ${workdir}/mv
   - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 1.txt
 2.txt
 3.txt
@@ -7854,7 +7854,7 @@ mv ${workdir}/mv2 ${workdir}/mv3 ${workdir}/mv4 ${workdir}/mv && ls ${workdir}/m
   - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 1.txt
 2.txt
 3.txt
@@ -7875,7 +7875,7 @@ mv ${workdir}/mv2 ${workdir}/mv/no_exist_dir ${workdir}/mv4 ${workdir}/mv/inner;
   - stderr equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 inner.txt
 mv2
 mv4
@@ -7892,7 +7892,7 @@ mv ${workdir}/mv/1.txt ${workdir}/mv/1.txt
   - stderr equals an exact value
 #### Expected output
 _expected stderr:_
-```
+```text
 mv: source '${workdir}/mv/1.txt' and destination '${workdir}/mv/1.txt' is same
 ```
 ### Scenario: overwrite a file with the same destination name
@@ -7907,7 +7907,7 @@ touch ${workdir}/mv/inner.txt && mv ${workdir}/mv/inner.txt ${workdir}/mv/inner/
   - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 1.txt
 2.txt
 3.txt
@@ -7926,7 +7926,7 @@ touch ${workdir}/mv/inner.txt && mv -b ${workdir}/mv/inner.txt ${workdir}/mv/inn
   - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 inner.txt
 inner.txt~
 ```
@@ -7947,7 +7947,7 @@ mv --target-directory ${workdir}/mv_gnu/dst ${workdir}/mv_gnu/a.txt ${workdir}/m
   - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 a.txt
 b.txt
 ```
@@ -8037,7 +8037,7 @@ rm ${workdir}/rm/1.txt && ls ${workdir}/rm
   - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 2.txt
 3.txt
 inner
@@ -8074,12 +8074,12 @@ rm ${workdir}/rm/1.txt ${workdir}/rm/no_exist_file.txt ${workdir}/rm/3.txt; ls $
   - stderr equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 2.txt
 inner
 ```
 _expected stderr:_
-```
+```text
 rm: can't remove ${workdir}/rm/no_exist_file.txt: No such file or directory exists
 ```
 ### Scenario: can not remove a directory without the recursive option
@@ -8094,7 +8094,7 @@ rm ${workdir}/rm; ls ${workdir}/rm
   - stderr equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 1.txt
 2.txt
 3.txt
@@ -8165,7 +8165,7 @@ rmdir ${workdir}/rmdir/full
   - stderr equals an exact value
 #### Expected output
 _expected stderr:_
-```
+```text
 rmdir: failed to remove '${workdir}/rmdir/full': Directory not empty
 ```
 ### Scenario: rmdir -p removes nested empty directories
@@ -8202,7 +8202,7 @@ serial ${workdir}/serial > /dev/null && ls ${workdir}/serial
   - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 0_apple.txt
 1_banana.txt
 2_cherry.txt
@@ -8219,7 +8219,7 @@ serial -d ${workdir}/serial > /dev/null && ls ${workdir}/serial
   - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 apple.txt
 banana.txt
 cherry.txt
@@ -8239,7 +8239,7 @@ Source: `test/e2e/tools/mimixbox/fileutils/shred.atago.yaml`
 - Fixture file `shred_file` is created.
 #### Inputs
 _Fixture `shred_file`:_
-```
+```text
 secret
 ```
 #### When
@@ -8256,7 +8256,7 @@ Source: `test/e2e/tools/mimixbox/fileutils/stat.atago.yaml`
 - Fixture file `stat_file` is created.
 #### Inputs
 _Fixture `stat_file`:_
-```
+```text
 hello
 ```
 #### When
@@ -8273,7 +8273,7 @@ Source: `test/e2e/tools/mimixbox/fileutils/stat_gnu.atago.yaml`
 - Fixture file `stat_file` is created.
 #### Inputs
 _Fixture `stat_file`:_
-```
+```text
 hello
 ```
 #### When
@@ -8288,7 +8288,7 @@ stat --printf '%n=%s' ${workdir}/stat_file
 - Fixture file `stat_file` is created.
 #### Inputs
 _Fixture `stat_file`:_
-```
+```text
 hello
 ```
 #### When
@@ -8303,7 +8303,7 @@ stat --printf '%n %s\n' ${workdir}/stat_file
 - Fixture file `stat_file` is created.
 #### Inputs
 _Fixture `stat_file`:_
-```
+```text
 hello
 ```
 #### When
@@ -8318,7 +8318,7 @@ stat --format '%s' ${workdir}/stat_file | wc -l | tr -d ' '
 - Fixture file `stat_file` is created.
 #### Inputs
 _Fixture `stat_file`:_
-```
+```text
 hello
 ```
 #### When
@@ -8333,7 +8333,7 @@ stat --terse ${workdir}/stat_file | awk '{print NF}'
 - Fixture file `stat_file` is created.
 #### Inputs
 _Fixture `stat_file`:_
-```
+```text
 hello
 ```
 #### When
@@ -8368,7 +8368,7 @@ ls ${workdir}/touch/3.txt
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 ${workdir}/touch/1.txt
 ${workdir}/touch/2.txt
 ${workdir}/touch/3.txt
@@ -8387,7 +8387,7 @@ ls ${workdir}/touch/3.txt
 - stderr equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 ${workdir}/touch/1.txt
 ${workdir}/touch/3.txt
 ```
@@ -8452,7 +8452,7 @@ Source: `test/e2e/tools/mimixbox/fileutils/unlink.atago.yaml`
 - Fixture file `unlink.txt` is created.
 #### Inputs
 _Fixture `unlink.txt`:_
-```
+```text
 x
 ```
 #### When
@@ -8469,7 +8469,7 @@ Source: `test/e2e/tools/mimixbox/findutils/alias_parity.atago.yaml`
 - Fixture file `fixture.txt` is created.
 #### Inputs
 _Fixture `fixture.txt`:_
-```
+```text
 apple
 banana
 a.b
@@ -8484,7 +8484,7 @@ egrep 'a(p|x)' fixture.txt
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 apple
 axb
 ```
@@ -8493,7 +8493,7 @@ axb
 - Fixture file `fixture.txt` is created.
 #### Inputs
 _Fixture `fixture.txt`:_
-```
+```text
 apple
 banana
 a.b
@@ -8625,7 +8625,7 @@ printf 'one\ntwo\nthree\n' | grep two
 - Fixture file `fruits.txt` is created.
 #### Inputs
 _Fixture `fruits.txt`:_
-```
+```text
 apple
 banana
 cherry
@@ -8642,7 +8642,7 @@ grep an ${workdir}/fruits.txt
 - Fixture file `fruits.txt` is created.
 #### Inputs
 _Fixture `fruits.txt`:_
-```
+```text
 apple
 banana
 cherry
@@ -8668,7 +8668,7 @@ Source: `test/e2e/tools/mimixbox/findutils/grep_gnu.atago.yaml`
 - Fixture file `grep_gnu/ctx.txt` is created.
 #### Inputs
 _Fixture `grep_gnu/ctx.txt`:_
-```
+```text
 1
 2
 MATCH
@@ -8684,7 +8684,7 @@ grep -A1 MATCH ${workdir}/grep_gnu/ctx.txt
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 MATCH
 b
 ```
@@ -8693,7 +8693,7 @@ b
 - Fixture file `grep_gnu/ctx2.txt` is created.
 #### Inputs
 _Fixture `grep_gnu/ctx2.txt`:_
-```
+```text
 a
 MATCH
 b
@@ -8707,7 +8707,7 @@ grep -B1 MATCH ${workdir}/grep_gnu/ctx2.txt
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 a
 MATCH
 ```
@@ -8716,7 +8716,7 @@ MATCH
 - Fixture file `grep_gnu/ctx2.txt` is created.
 #### Inputs
 _Fixture `grep_gnu/ctx2.txt`:_
-```
+```text
 a
 MATCH
 b
@@ -8730,7 +8730,7 @@ grep -C1 MATCH ${workdir}/grep_gnu/ctx2.txt
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 a
 MATCH
 b
@@ -8740,7 +8740,7 @@ b
 - Fixture file `grep_gnu/groups.txt` is created.
 #### Inputs
 _Fixture `grep_gnu/groups.txt`:_
-```
+```text
 MATCH
 b
 c
@@ -8809,7 +8809,7 @@ printf 'hello world\n' | grep --color=always world
 - Fixture file `grep_gnu/off.txt` is created.
 #### Inputs
 _Fixture `grep_gnu/off.txt`:_
-```
+```text
 aaa
 bbb
 ccc
@@ -9110,7 +9110,7 @@ Source: `test/e2e/tools/mimixbox/loginutils/chpasswd.atago.yaml`
 ### Scenario: rejects an unknown method
 #### Inputs
 _stdin for `chpasswd`:_
-```
+```text
 alice:secret
 ```
 #### When
@@ -9197,7 +9197,7 @@ Source: `test/e2e/tools/mimixbox/loginutils/cryptpw.atago.yaml`
 ### Scenario: hashes a stdin password with sha-512
 #### Inputs
 _stdin for `cryptpw`:_
-```
+```text
 secret
 ```
 #### When
@@ -9209,13 +9209,13 @@ cryptpw -S abcdefgh
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 $6$abcdefgh$ltjgWl6579NluT/Vi1nwEvcil.G5Nbc4NiXZaNGStk8PSwGfQv72N2CKPPrVACtLtip/cZ/1GM/O6IND4WQhG.
 ```
 ### Scenario: supports the md5 method
 #### Inputs
 _stdin for `cryptpw`:_
-```
+```text
 secret
 ```
 #### When
@@ -9267,7 +9267,7 @@ printf '\n' | getty tty1 2>/dev/null | grep -c 'login: '
 ### Scenario: requires a TTY argument
 #### Inputs
 _stdin for `getty`:_
-```
+```text
 alice
 ```
 #### When
@@ -9349,7 +9349,7 @@ Source: `test/e2e/tools/mimixbox/loginutils/init.atago.yaml`
 - Fixture file `inittab` is created.
 #### Inputs
 _Fixture `inittab`:_
-```
+```text
 si::sysinit:echo SYSINIT
 l::wait:echo WAIT
 ```
@@ -9373,7 +9373,7 @@ Source: `test/e2e/tools/mimixbox/loginutils/login.atago.yaml`
 ### Scenario: fails for an unknown user
 #### Inputs
 _stdin for `login`:_
-```
+```text
 nope
 ```
 #### When
@@ -9402,13 +9402,13 @@ mkpasswd -m sha-512 -S abcdefgh secret
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 $6$abcdefgh$ltjgWl6579NluT/Vi1nwEvcil.G5Nbc4NiXZaNGStk8PSwGfQv72N2CKPPrVACtLtip/cZ/1GM/O6IND4WQhG.
 ```
 ### Scenario: reads the password from stdin
 #### Inputs
 _stdin for `mkpasswd`:_
-```
+```text
 frompipe
 ```
 #### When
@@ -9499,12 +9499,12 @@ Source: `test/e2e/tools/mimixbox/loginutils/run_parts.atago.yaml`
 - Fixture file `parts/10-a` is created.
 #### Inputs
 _Fixture `parts/20-b`:_
-```
+```text
 #!/bin/sh
 echo B
 ```
 _Fixture `parts/10-a`:_
-```
+```text
 #!/bin/sh
 echo A
 ```
@@ -9594,7 +9594,7 @@ Source: `test/e2e/tools/mimixbox/loginutils/sulogin.atago.yaml`
 ### Scenario: rejects a wrong root password
 #### Inputs
 _stdin for `sulogin`:_
-```
+```text
 definitely_wrong_password
 ```
 #### When
@@ -9616,7 +9616,7 @@ Source: `test/e2e/tools/mimixbox/loginutils/vlock.atago.yaml`
 ### Scenario: fails on a wrong password
 #### Inputs
 _stdin for `vlock`:_
-```
+```text
 definitely_wrong_xyz
 ```
 #### When
@@ -10964,7 +10964,7 @@ Source: `test/e2e/tools/mimixbox/procps/logread.atago.yaml`
 - Fixture file `sys.log` is created.
 #### Inputs
 _Fixture `sys.log`:_
-```
+```text
 msg one
 msg two
 ```
@@ -11297,7 +11297,7 @@ Source: `test/e2e/tools/mimixbox/runit/chpst.atago.yaml`
 - Fixture file `env/HELLO` is created.
 #### Inputs
 _Fixture `env/HELLO`:_
-```
+```text
 world
 ```
 #### When
@@ -11321,7 +11321,7 @@ Source: `test/e2e/tools/mimixbox/runit/envdir.atago.yaml`
 - Fixture file `env/GREETING` is created.
 #### Inputs
 _Fixture `env/GREETING`:_
-```
+```text
 hello
 ```
 #### When
@@ -11440,7 +11440,7 @@ sv up svc && cat svc/supervise/control
 - Fixture file `svc2/supervise/pid` is created.
 #### Inputs
 _Fixture `svc2/supervise/pid`:_
-```
+```text
 99
 ```
 #### When
@@ -11487,7 +11487,7 @@ cat log/current
 ### Scenario: requires a directory
 #### Inputs
 _stdin for `svlogd`:_
-```
+```text
 x
 ```
 #### When
@@ -11662,7 +11662,7 @@ Source: `test/e2e/tools/mimixbox/securityutils/pwcrack.atago.yaml`
 - Fixture file `words.txt` is created.
 #### Inputs
 _Fixture `words.txt`:_
-```
+```text
 alpha
 secret
 beta
@@ -11768,11 +11768,11 @@ Source: `test/e2e/tools/mimixbox/securityutils/unshadow.atago.yaml`
 - Fixture file `shadow` is created.
 #### Inputs
 _Fixture `passwd`:_
-```
+```text
 alice:x:1000:1000:Alice:/home/alice:/bin/sh
 ```
 _Fixture `shadow`:_
-```
+```text
 alice:$6$abc$HASH:19000:0:99999:7:::
 ```
 #### When
@@ -11801,7 +11801,7 @@ Source: `test/e2e/tools/mimixbox/securityutils/zippwcrack.atago.yaml`
 - Fixture file `enc.zip` is created.
 #### Inputs
 _Fixture `words.txt`:_
-```
+```text
 alpha
 hunter2
 beta
@@ -11838,7 +11838,7 @@ printf 'hello\n' | base64
 - Fixture file `base64.txt` is created.
 #### Inputs
 _Fixture `base64.txt`:_
-```
+```text
 hello
 ```
 #### When
@@ -11948,7 +11948,7 @@ basename -a /bin/basename /home/nao /home
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 basename
 nao
 home
@@ -12023,7 +12023,7 @@ cal 11 2023
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
    November 2023
 Su Mo Tu We Th Fr Sa
           1  2  3  4
@@ -12060,7 +12060,7 @@ chmod 644 /no_such_file
 - stderr equals an exact value
 #### Expected output
 _expected stderr:_
-```
+```text
 chmod: cannot access '/no_such_file': no such file or directory
 ```
 ## mimixbox chroot
@@ -12097,11 +12097,11 @@ Source: `test/e2e/tools/mimixbox/shellutils/cmp.atago.yaml`
 - Fixture file `cmp/same.txt` is created.
 #### Inputs
 _Fixture `cmp/a.txt`:_
-```
+```text
 abc
 ```
 _Fixture `cmp/same.txt`:_
-```
+```text
 abc
 ```
 #### When
@@ -12117,11 +12117,11 @@ cmp cmp/a.txt cmp/same.txt; echo "rc=$?"
 - Fixture file `cmp/diff.txt` is created.
 #### Inputs
 _Fixture `cmp/a.txt`:_
-```
+```text
 abc
 ```
 _Fixture `cmp/diff.txt`:_
-```
+```text
 abd
 ```
 #### When
@@ -12133,7 +12133,7 @@ cmp ${workdir}/cmp/a.txt ${workdir}/cmp/diff.txt
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 ${workdir}/cmp/a.txt ${workdir}/cmp/diff.txt differ: byte 3, line 1
 ```
 ### Scenario: cmp -s prints nothing but exits non-zero
@@ -12142,11 +12142,11 @@ ${workdir}/cmp/a.txt ${workdir}/cmp/diff.txt differ: byte 3, line 1
 - Fixture file `cmp/diff.txt` is created.
 #### Inputs
 _Fixture `cmp/a.txt`:_
-```
+```text
 abc
 ```
 _Fixture `cmp/diff.txt`:_
-```
+```text
 abd
 ```
 #### When
@@ -12164,11 +12164,11 @@ Source: `test/e2e/tools/mimixbox/shellutils/cmp_gnu.atago.yaml`
 - Fixture file `cmp_gnu/b.txt` is created.
 #### Inputs
 _Fixture `cmp_gnu/a.txt`:_
-```
+```text
 abcXdef
 ```
 _Fixture `cmp_gnu/b.txt`:_
-```
+```text
 abcYdef
 ```
 #### When
@@ -12184,11 +12184,11 @@ cmp -n 3 cmp_gnu/a.txt cmp_gnu/b.txt; echo "rc=$?"
 - Fixture file `cmp_gnu/b.txt` is created.
 #### Inputs
 _Fixture `cmp_gnu/a.txt`:_
-```
+```text
 abcXdef
 ```
 _Fixture `cmp_gnu/b.txt`:_
-```
+```text
 abcYdef
 ```
 #### When
@@ -12204,11 +12204,11 @@ cmp --bytes=4 ${workdir}/cmp_gnu/a.txt ${workdir}/cmp_gnu/b.txt
 - Fixture file `cmp_gnu/skip_b.txt` is created.
 #### Inputs
 _Fixture `cmp_gnu/skip_a.txt`:_
-```
+```text
 XXXcommon
 ```
 _Fixture `cmp_gnu/skip_b.txt`:_
-```
+```text
 YYYcommon
 ```
 #### When
@@ -12224,11 +12224,11 @@ cmp -i 3 cmp_gnu/skip_a.txt cmp_gnu/skip_b.txt; echo "rc=$?"
 - Fixture file `cmp_gnu/pair_b.txt` is created.
 #### Inputs
 _Fixture `cmp_gnu/pair_a.txt`:_
-```
+```text
 _abZ
 ```
 _Fixture `cmp_gnu/pair_b.txt`:_
-```
+```text
 ___abQ
 ```
 #### When
@@ -12244,12 +12244,12 @@ cmp -i 1:3 ${workdir}/cmp_gnu/pair_a.txt ${workdir}/cmp_gnu/pair_b.txt
 - Fixture file `cmp_gnu/pb_b.txt` is created.
 #### Inputs
 _Fixture `cmp_gnu/pb_a.txt`:_
-```
+```text
 first
 second
 ```
 _Fixture `cmp_gnu/pb_b.txt`:_
-```
+```text
 first
 SECOND
 ```
@@ -12621,7 +12621,7 @@ dirname /bin/dirname /home/nao /home
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 /bin
 /home
 /
@@ -13036,7 +13036,7 @@ Source: `test/e2e/tools/mimixbox/shellutils/gzip.atago.yaml`
 - Fixture file `g.txt` is created.
 #### Inputs
 _Fixture `g.txt`:_
-```
+```text
 hello gzip roundtrip
 ```
 #### When
@@ -13168,7 +13168,7 @@ Source: `test/e2e/tools/mimixbox/shellutils/install.atago.yaml`
 - Fixture file `install/src` is created.
 #### Inputs
 _Fixture `install/src`:_
-```
+```text
 hello
 ```
 #### When
@@ -13183,7 +13183,7 @@ install -m 640 install/src install/dst && printf '%s' "$(cat install/dst)"
 - Fixture file `install/src` is created.
 #### Inputs
 _Fixture `install/src`:_
-```
+```text
 hello
 ```
 #### When
@@ -13225,7 +13225,7 @@ cat dst dst~
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 new
 old
 ```
@@ -13257,7 +13257,7 @@ cat dst dst.~1~ dst.~2~
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 v2
 orig
 v1
@@ -13421,7 +13421,7 @@ Source: `test/e2e/tools/mimixbox/shellutils/logcollect.atago.yaml`
 - Fixture file `src/a.log` is created.
 #### Inputs
 _Fixture `src/a.log`:_
-```
+```text
 log
 ```
 #### When
@@ -13531,7 +13531,7 @@ rm -rf "$d"
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 one
 two
 ```
@@ -13673,7 +13673,7 @@ printf 'ABC\n' | od -c
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 0000000   A   B   C  \n
 0000004
 ```
@@ -13687,7 +13687,7 @@ printf 'AB' | od -A x -t x1
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 000000 41 42
 000002
 ```
@@ -13967,7 +13967,7 @@ seq 3
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 1
 2
 3
@@ -13982,7 +13982,7 @@ seq 2 5
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 2
 3
 4
@@ -13998,7 +13998,7 @@ seq 1 2 9
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 1
 3
 5
@@ -14023,7 +14023,7 @@ seq -w 8 10
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 08
 09
 10
@@ -14058,7 +14058,7 @@ printf 'banana\napple\ncherry\n' | sort
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 apple
 banana
 cherry
@@ -14073,7 +14073,7 @@ printf '10\n2\n1\n' | sort -n
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 1
 2
 10
@@ -14088,7 +14088,7 @@ printf 'a\nb\nc\n' | sort -r
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 c
 b
 a
@@ -14103,7 +14103,7 @@ printf 'a\na\nb\n' | sort -u
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 a
 b
 ```
@@ -14119,7 +14119,7 @@ printf '1.10\n1.2\n1.1\n' | sort -V
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 1.1
 1.2
 1.10
@@ -14134,7 +14134,7 @@ printf '1e3\n2.5\n100\n0.5\n' | sort -g
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 0.5
 2.5
 100
@@ -14150,7 +14150,7 @@ printf '1G\n2K\n1M\n' | sort -h
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 2K
 1M
 1G
@@ -14165,7 +14165,7 @@ printf '5 zebra\n5 apple\n5 mango\n' | sort -s -n
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 5 zebra
 5 apple
 5 mango
@@ -14188,7 +14188,7 @@ printf 'apple\nbanana\ncherry\n' | sort -m
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 apple
 banana
 cherry
@@ -14203,7 +14203,7 @@ printf 'b\na\n' | sort --parallel=4
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 a
 b
 ```
@@ -14217,7 +14217,7 @@ printf 'b\na\n' | sort --temporary-directory=/tmp
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 a
 b
 ```
@@ -14272,7 +14272,7 @@ cat ${workdir}/log.txt
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 one
 two
 ```
@@ -14420,7 +14420,7 @@ env time echo x 2>&1 1>/dev/null | grep -c real
 - Fixture file `f.txt` is created.
 #### Inputs
 _Fixture `f.txt`:_
-```
+```text
 data
 ```
 #### When
@@ -14520,7 +14520,7 @@ tsort --help
 ### Scenario: produces a topological order
 #### Inputs
 _stdin for `tsort`:_
-```
+```text
 a b
 b c
 ```
@@ -14533,7 +14533,7 @@ tsort
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 a
 b
 c
@@ -14570,7 +14570,7 @@ printf 'a\na\nb\nc\nc\nc\n' | uniq
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 a
 b
 c
@@ -14585,7 +14585,7 @@ printf 'a\na\nb\nc\nc\nc\n' | uniq -c
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
       2 a
       1 b
       3 c
@@ -14600,7 +14600,7 @@ printf 'a\na\nb\nc\nc\n' | uniq -d
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 a
 c
 ```
@@ -14821,7 +14821,7 @@ yes | head -n 3
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 y
 y
 y
@@ -14836,7 +14836,7 @@ yes mimix | head -n 2
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 mimix
 mimix
 ```
@@ -14865,7 +14865,7 @@ Source: `test/e2e/tools/mimixbox/textutils/cat.atago.yaml`
 - Fixture file `cat.txt` is created.
 #### Inputs
 _Fixture `cat.txt`:_
-```
+```text
 sh
 ash
 csh
@@ -14880,7 +14880,7 @@ cat cat.txt
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 sh
 ash
 csh
@@ -14891,7 +14891,7 @@ bash
 - Fixture file `cat.txt` is created.
 #### Inputs
 _Fixture `cat.txt`:_
-```
+```text
 sh
 ash
 csh
@@ -14906,7 +14906,7 @@ cat -n cat.txt
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
      1	sh
      2	ash
      3	csh
@@ -14925,7 +14925,7 @@ echo "${workdir}/cat.txt" | cat
 - Fixture file `cat.txt` is created.
 #### Inputs
 _Fixture `cat.txt`:_
-```
+```text
 sh
 ash
 csh
@@ -14940,7 +14940,7 @@ echo "${workdir}/cat2.txt" | cat cat.txt
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 sh
 ash
 csh
@@ -14952,14 +14952,14 @@ bash
 - Fixture file `cat2.txt` is created.
 #### Inputs
 _Fixture `cat.txt`:_
-```
+```text
 sh
 ash
 csh
 bash
 ```
 _Fixture `cat2.txt`:_
-```
+```text
 fish
 zsh
 ```
@@ -14972,7 +14972,7 @@ cat cat.txt cat2.txt
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 sh
 ash
 csh
@@ -14986,14 +14986,14 @@ zsh
 - Fixture file `cat2.txt` is created.
 #### Inputs
 _Fixture `cat.txt`:_
-```
+```text
 sh
 ash
 csh
 bash
 ```
 _Fixture `cat2.txt`:_
-```
+```text
 fish
 zsh
 ```
@@ -15006,7 +15006,7 @@ cat -n cat.txt cat2.txt
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
      1	sh
      2	ash
      3	csh
@@ -15019,7 +15019,7 @@ _expected stdout:_
 - Fixture file `cat.txt` is created.
 #### Inputs
 _Fixture `cat.txt`:_
-```
+```text
 sh
 ash
 csh
@@ -15039,7 +15039,7 @@ cat cat2.txt
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 fish
 zsh
 sh
@@ -15095,7 +15095,7 @@ cat --show-all ${workdir}/cat_nonprinting.bin
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 a^Ib^A$
 $
 ^?M-^@$
@@ -15112,7 +15112,7 @@ cat --show-nonprinting ${workdir}/cat_nonprinting.bin
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 a	b^A
 
 ^?M-^@
@@ -15161,12 +15161,12 @@ Source: `test/e2e/tools/mimixbox/textutils/comm.atago.yaml`
 - Fixture file `comm_b.txt` is created.
 #### Inputs
 _Fixture `comm_a.txt`:_
-```
+```text
 apple
 banana
 ```
 _Fixture `comm_b.txt`:_
-```
+```text
 banana
 cherry
 ```
@@ -15185,13 +15185,13 @@ Source: `test/e2e/tools/mimixbox/textutils/comm_gnu.atago.yaml`
 - Fixture file `comm_gnu/b.txt` is created.
 #### Inputs
 _Fixture `comm_gnu/a.txt`:_
-```
+```text
 apple
 banana
 cherry
 ```
 _Fixture `comm_gnu/b.txt`:_
-```
+```text
 banana
 cherry
 date
@@ -15223,12 +15223,12 @@ comm -z -1 -2 ${workdir}/comm_gnu/za.txt ${workdir}/comm_gnu/zb.txt | tr '\0' '#
 - Fixture file `comm_gnu/b.txt` is created.
 #### Inputs
 _Fixture `comm_gnu/unsorted.txt`:_
-```
+```text
 cherry
 banana
 ```
 _Fixture `comm_gnu/b.txt`:_
-```
+```text
 banana
 cherry
 date
@@ -15250,7 +15250,7 @@ Source: `test/e2e/tools/mimixbox/textutils/convert_mode.atago.yaml`
 - Fixture file `d2u.txt` is created.
 #### Inputs
 _Fixture `d2u.txt`:_
-```
+```text
 a
 b
 ```
@@ -15268,7 +15268,7 @@ stat -c '%a' "${workdir}/d2u.txt"
 - Fixture file `u2d.txt` is created.
 #### Inputs
 _Fixture `u2d.txt`:_
-```
+```text
 a
 b
 ```
@@ -15295,7 +15295,7 @@ crc32 --help
 ### Scenario: prints the CRC-32 of stdin
 #### Inputs
 _stdin for `crc32`:_
-```
+```text
 hello
 ```
 #### When
@@ -15312,7 +15312,7 @@ Source: `test/e2e/tools/mimixbox/textutils/dos2unix.atago.yaml`
 - Fixture file `dos2unix/1.txt` is created.
 #### Inputs
 _Fixture `dos2unix/1.txt`:_
-```
+```text
 abc
 def
 ghi
@@ -15327,7 +15327,7 @@ file "${workdir}/dos2unix/1.txt"
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 dos2unix: converting file ${workdir}/dos2unix/1.txt to Unix format...
 ${workdir}/dos2unix/1.txt: ASCII text
 ```
@@ -15336,7 +15336,7 @@ ${workdir}/dos2unix/1.txt: ASCII text
 - Fixture file `dos2unix/1.txt` is created.
 #### Inputs
 _Fixture `dos2unix/1.txt`:_
-```
+```text
 abc
 def
 ghi
@@ -15350,7 +15350,7 @@ dos2unix "${workdir}/dos2unix/1.txt"
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 dos2unix: converting file ${workdir}/dos2unix/1.txt to Unix format...
 ```
 ### Scenario: convert three CRLF files at once and reclassify each
@@ -15360,19 +15360,19 @@ dos2unix: converting file ${workdir}/dos2unix/1.txt to Unix format...
 - Fixture file `dos2unix/3.txt` is created.
 #### Inputs
 _Fixture `dos2unix/1.txt`:_
-```
+```text
 abc
 def
 ghi
 ```
 _Fixture `dos2unix/2.txt`:_
-```
+```text
 abc
 def
 ghi
 ```
 _Fixture `dos2unix/3.txt`:_
-```
+```text
 abc
 def
 ghi
@@ -15389,7 +15389,7 @@ file "${workdir}/dos2unix/3.txt"
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 dos2unix: converting file ${workdir}/dos2unix/1.txt to Unix format...
 dos2unix: converting file ${workdir}/dos2unix/2.txt to Unix format...
 dos2unix: converting file ${workdir}/dos2unix/3.txt to Unix format...
@@ -15404,19 +15404,19 @@ ${workdir}/dos2unix/3.txt: ASCII text
 - Fixture file `dos2unix/3.txt` is created.
 #### Inputs
 _Fixture `dos2unix/1.txt`:_
-```
+```text
 abc
 def
 ghi
 ```
 _Fixture `dos2unix/2.txt`:_
-```
+```text
 abc
 def
 ghi
 ```
 _Fixture `dos2unix/3.txt`:_
-```
+```text
 abc
 def
 ghi
@@ -15430,7 +15430,7 @@ dos2unix "${workdir}/dos2unix/1.txt" "${workdir}/dos2unix/2.txt" "${workdir}/dos
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 dos2unix: converting file ${workdir}/dos2unix/1.txt to Unix format...
 dos2unix: converting file ${workdir}/dos2unix/2.txt to Unix format...
 dos2unix: converting file ${workdir}/dos2unix/3.txt to Unix format...
@@ -15440,7 +15440,7 @@ dos2unix: converting file ${workdir}/dos2unix/3.txt to Unix format...
 - Fixture file `dos2unix/1.txt` is created.
 #### Inputs
 _Fixture `dos2unix/1.txt`:_
-```
+```text
 abc
 def
 ghi
@@ -15458,13 +15458,13 @@ dos2unix ${workdir}/dos2unix
 - Fixture file `dos2unix/3.txt` is created.
 #### Inputs
 _Fixture `dos2unix/1.txt`:_
-```
+```text
 abc
 def
 ghi
 ```
 _Fixture `dos2unix/3.txt`:_
-```
+```text
 abc
 def
 ghi
@@ -15479,7 +15479,7 @@ dos2unix ${workdir}/dos2unix/1.txt ${workdir}/dos2unix ${workdir}/dos2unix/3.txt
 - stderr equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 dos2unix: converting file ${workdir}/dos2unix/1.txt to Unix format...
 dos2unix: converting file ${workdir}/dos2unix/3.txt to Unix format...
 ```
@@ -15506,7 +15506,7 @@ printf 'a\tb\n' | expand -t 4
 - Fixture file `expand.txt` is created.
 #### Inputs
 _Fixture `expand.txt`:_
-```
+```text
 a	b
 ```
 #### When
@@ -15536,7 +15536,7 @@ printf 'aa bb cc dd\n' | fmt -w 5
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 aa bb
 cc dd
 ```
@@ -15552,7 +15552,7 @@ printf 'abcdefgh\n' | fold -w 3
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 abc
 def
 gh
@@ -15564,7 +15564,7 @@ Source: `test/e2e/tools/mimixbox/textutils/head.atago.yaml`
 - Fixture file `head.txt` is created.
 #### Inputs
 _Fixture `head.txt`:_
-```
+```text
 1
 2
 3
@@ -15587,7 +15587,7 @@ head head.txt
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 1
 2
 3
@@ -15604,7 +15604,7 @@ _expected stdout:_
 - Fixture file `head.txt` is created.
 #### Inputs
 _Fixture `head.txt`:_
-```
+```text
 1
 2
 3
@@ -15627,7 +15627,7 @@ head -n 3 head.txt
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 1
 2
 3
@@ -15650,7 +15650,7 @@ printf 'a\nb\nc\nd\n' | head -n 2
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 a
 b
 ```
@@ -15674,7 +15674,7 @@ printf 'a\nb\0c\nd\0' | head -z -n 1 | tr '\0' '|'
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 a
 b|
 ```
@@ -15688,7 +15688,7 @@ printf 'a\nb\0c\nd\0' | head --zero-terminated -n 2 | tr '\0' '|'
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 a
 b|c
 d|
@@ -15750,7 +15750,7 @@ Source: `test/e2e/tools/mimixbox/textutils/man.atago.yaml`
 - Fixture file `man/man1/foo.1` is created.
 #### Inputs
 _Fixture `man/man1/foo.1`:_
-```
+```text
 FOO(1)
 the foo page
 ```
@@ -15763,7 +15763,7 @@ man -M "${workdir}/man" foo
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 FOO(1)
 the foo page
 ```
@@ -15779,7 +15779,7 @@ man -M "${workdir}/man" bar
   - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 BAR(1)
 the bar page
 ```
@@ -15788,7 +15788,7 @@ the bar page
 - Fixture file `man/man1/foo.1` is created.
 #### Inputs
 _Fixture `man/man1/foo.1`:_
-```
+```text
 FOO(1)
 the foo page
 ```
@@ -15806,7 +15806,7 @@ Source: `test/e2e/tools/mimixbox/textutils/md5sum.atago.yaml`
 - Fixture file `md5sum/1.txt` is created.
 #### Inputs
 _Fixture `md5sum/1.txt`:_
-```
+```text
 Dungeon of Regalias
 ```
 #### When
@@ -15821,7 +15821,7 @@ md5sum ${workdir}/md5sum/1.txt
 - Fixture file `md5sum/1.txt` is created.
 #### Inputs
 _Fixture `md5sum/1.txt`:_
-```
+```text
 Dungeon of Regalias
 ```
 #### When
@@ -15846,15 +15846,15 @@ md5sum /not_exist_file
 - Fixture file `md5sum/3.txt` is created.
 #### Inputs
 _Fixture `md5sum/1.txt`:_
-```
+```text
 Dungeon of Regalias
 ```
 _Fixture `md5sum/2.txt`:_
-```
+```text
 DEMONION
 ```
 _Fixture `md5sum/3.txt`:_
-```
+```text
 Dungeon Crusadearz
 ```
 #### When
@@ -15866,7 +15866,7 @@ md5sum ${workdir}/md5sum/1.txt ${workdir}/md5sum/2.txt ${workdir}/md5sum/3.txt
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 d0d8ffef81b3c7160ac655d5939548c5  ${workdir}/md5sum/1.txt
 07e280ad4bd77b9321f0ce3386775019  ${workdir}/md5sum/2.txt
 15e924f84517598e828f49dc85765bc5  ${workdir}/md5sum/3.txt
@@ -15879,19 +15879,19 @@ d0d8ffef81b3c7160ac655d5939548c5  ${workdir}/md5sum/1.txt
 - Fixture file `md5sum/checksum.txt` is created.
 #### Inputs
 _Fixture `md5sum/1.txt`:_
-```
+```text
 Dungeon of Regalias
 ```
 _Fixture `md5sum/2.txt`:_
-```
+```text
 DEMONION
 ```
 _Fixture `md5sum/3.txt`:_
-```
+```text
 Dungeon Crusadearz
 ```
 _Fixture `md5sum/checksum.txt`:_
-```
+```text
 d0d8ffef81b3c7160ac655d5939548c5  ${workdir}/md5sum/1.txt
 07e280ad4bd77b9321f0ce3386775019  ${workdir}/md5sum/2.txt
 15e924f84517598e828f49dc85765bc5  ${workdir}/md5sum/3.txt
@@ -15905,7 +15905,7 @@ md5sum -c ${workdir}/md5sum/checksum.txt
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 ${workdir}/md5sum/1.txt: OK
 ${workdir}/md5sum/2.txt: OK
 ${workdir}/md5sum/3.txt: OK
@@ -15923,7 +15923,7 @@ echo "test" | md5sum
 - Fixture file `md5sum/1.txt` is created.
 #### Inputs
 _Fixture `md5sum/1.txt`:_
-```
+```text
 Dungeon of Regalias
 ```
 #### When
@@ -15940,7 +15940,7 @@ Source: `test/e2e/tools/mimixbox/textutils/nl.atago.yaml`
 - Fixture file `nl.txt` is created.
 #### Inputs
 _Fixture `nl.txt`:_
-```
+```text
 sh
 ash
 csh
@@ -15955,7 +15955,7 @@ nl nl.txt
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
      1	sh
      2	ash
      3	csh
@@ -15966,7 +15966,7 @@ _expected stdout:_
 - Fixture file `nl.txt` is created.
 #### Inputs
 _Fixture `nl.txt`:_
-```
+```text
 sh
 ash
 csh
@@ -15984,7 +15984,7 @@ echo "${workdir}/nl.txt" | nl
 - Fixture file `nl.txt` is created.
 #### Inputs
 _Fixture `nl.txt`:_
-```
+```text
 sh
 ash
 csh
@@ -15999,7 +15999,7 @@ echo "${workdir}/nl.txt" | nl nl.txt
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
      1	sh
      2	ash
      3	csh
@@ -16011,14 +16011,14 @@ _expected stdout:_
 - Fixture file `nl2.txt` is created.
 #### Inputs
 _Fixture `nl.txt`:_
-```
+```text
 sh
 ash
 csh
 bash
 ```
 _Fixture `nl2.txt`:_
-```
+```text
 fish
 zsh
 ```
@@ -16031,7 +16031,7 @@ nl nl.txt nl2.txt
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
      1	sh
      2	ash
      3	csh
@@ -16044,7 +16044,7 @@ _expected stdout:_
 - Fixture file `nl.txt` is created.
 #### Inputs
 _Fixture `nl.txt`:_
-```
+```text
 sh
 ash
 csh
@@ -16063,7 +16063,7 @@ cat nl2.txt
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
      1	fish
      2	zsh
      3	sh
@@ -16076,7 +16076,7 @@ _expected stdout:_
 - Fixture file `nl.txt` is created.
 #### Inputs
 _Fixture `nl.txt`:_
-```
+```text
 sh
 ash
 csh
@@ -16096,7 +16096,7 @@ cat nl2.txt
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
      1	fish
      2	zsh
      3	sh
@@ -16119,7 +16119,7 @@ Source: `test/e2e/tools/mimixbox/textutils/nl_sections.atago.yaml`
 - Fixture file `nl_sec.txt` is created.
 #### Inputs
 _Fixture `nl_sec.txt`:_
-```
+```text
 H1
 \:\:\:
 HDR
@@ -16137,7 +16137,7 @@ nl -h a -b a -f a nl_sec.txt
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
      1	H1
 
      1	HDR
@@ -16151,7 +16151,7 @@ _expected stdout:_
 - Fixture file `nl_sec.txt` is created.
 #### Inputs
 _Fixture `nl_sec.txt`:_
-```
+```text
 H1
 \:\:\:
 HDR
@@ -16169,7 +16169,7 @@ nl -h a -b t -f n nl_sec.txt
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
      1	H1
 
      1	HDR
@@ -16183,7 +16183,7 @@ _expected stdout:_
 - Fixture file `nl_blank.txt` is created.
 #### Inputs
 _Fixture `nl_blank.txt`:_
-```
+```text
 a
 
 
@@ -16200,7 +16200,7 @@ nl -b a -l 2 nl_blank.txt
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
      1	a
        
      2	
@@ -16235,7 +16235,7 @@ Source: `test/e2e/tools/mimixbox/textutils/sha1sum.atago.yaml`
 - Fixture file `sha1sum/1.txt` is created.
 #### Inputs
 _Fixture `sha1sum/1.txt`:_
-```
+```text
 Dungeon of Regalias
 ```
 #### When
@@ -16247,7 +16247,7 @@ sha1sum ${workdir}/sha1sum/1.txt
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 9dc2936d38932f9ffc6738cb677e4a8722116070  ${workdir}/sha1sum/1.txt
 ```
 ### Scenario: cannot get sha1sum of one directory
@@ -16255,7 +16255,7 @@ _expected stdout:_
 - Fixture file `sha1sum/1.txt` is created.
 #### Inputs
 _Fixture `sha1sum/1.txt`:_
-```
+```text
 Dungeon of Regalias
 ```
 #### When
@@ -16280,15 +16280,15 @@ sha1sum /not_exist_file
 - Fixture file `sha1sum/3.txt` is created.
 #### Inputs
 _Fixture `sha1sum/1.txt`:_
-```
+```text
 Dungeon of Regalias
 ```
 _Fixture `sha1sum/2.txt`:_
-```
+```text
 DEMONION
 ```
 _Fixture `sha1sum/3.txt`:_
-```
+```text
 Dungeon Crusadearz
 ```
 #### When
@@ -16300,7 +16300,7 @@ sha1sum ${workdir}/sha1sum/1.txt ${workdir}/sha1sum/2.txt ${workdir}/sha1sum/3.t
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 9dc2936d38932f9ffc6738cb677e4a8722116070  ${workdir}/sha1sum/1.txt
 317e30648976d62fae4662fe4435e6568648e8a7  ${workdir}/sha1sum/2.txt
 d4e9619d949de0c0182a09757346ad22e80114b3  ${workdir}/sha1sum/3.txt
@@ -16313,19 +16313,19 @@ d4e9619d949de0c0182a09757346ad22e80114b3  ${workdir}/sha1sum/3.txt
 - Fixture file `sha1sum/checksum.txt` is created.
 #### Inputs
 _Fixture `sha1sum/1.txt`:_
-```
+```text
 Dungeon of Regalias
 ```
 _Fixture `sha1sum/2.txt`:_
-```
+```text
 DEMONION
 ```
 _Fixture `sha1sum/3.txt`:_
-```
+```text
 Dungeon Crusadearz
 ```
 _Fixture `sha1sum/checksum.txt`:_
-```
+```text
 9dc2936d38932f9ffc6738cb677e4a8722116070  ${workdir}/sha1sum/1.txt
 317e30648976d62fae4662fe4435e6568648e8a7  ${workdir}/sha1sum/2.txt
 d4e9619d949de0c0182a09757346ad22e80114b3  ${workdir}/sha1sum/3.txt
@@ -16339,7 +16339,7 @@ sha1sum -c ${workdir}/sha1sum/checksum.txt
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 ${workdir}/sha1sum/1.txt: OK
 ${workdir}/sha1sum/2.txt: OK
 ${workdir}/sha1sum/3.txt: OK
@@ -16357,7 +16357,7 @@ echo "test" | sha1sum
 - Fixture file `sha1sum/1.txt` is created.
 #### Inputs
 _Fixture `sha1sum/1.txt`:_
-```
+```text
 Dungeon of Regalias
 ```
 #### When
@@ -16369,7 +16369,7 @@ echo "test" | sha1sum ${workdir}/sha1sum/1.txt
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 9dc2936d38932f9ffc6738cb677e4a8722116070  ${workdir}/sha1sum/1.txt
 ```
 ## mimixbox sha256sum
@@ -16379,7 +16379,7 @@ Source: `test/e2e/tools/mimixbox/textutils/sha256sum.atago.yaml`
 - Fixture file `sha256sum/1.txt` is created.
 #### Inputs
 _Fixture `sha256sum/1.txt`:_
-```
+```text
 Dungeon of Regalias
 ```
 #### When
@@ -16391,7 +16391,7 @@ sha256sum ${workdir}/sha256sum/1.txt
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 5f2864b5833190b07b0b95228682ff5ec43a13a2a3f31514c57d5c92aa3fb2e7  ${workdir}/sha256sum/1.txt
 ```
 ### Scenario: cannot get sha256sum of one directory
@@ -16399,7 +16399,7 @@ _expected stdout:_
 - Fixture file `sha256sum/1.txt` is created.
 #### Inputs
 _Fixture `sha256sum/1.txt`:_
-```
+```text
 Dungeon of Regalias
 ```
 #### When
@@ -16424,15 +16424,15 @@ sha256sum /not_exist_file
 - Fixture file `sha256sum/3.txt` is created.
 #### Inputs
 _Fixture `sha256sum/1.txt`:_
-```
+```text
 Dungeon of Regalias
 ```
 _Fixture `sha256sum/2.txt`:_
-```
+```text
 DEMONION
 ```
 _Fixture `sha256sum/3.txt`:_
-```
+```text
 Dungeon Crusadearz
 ```
 #### When
@@ -16444,7 +16444,7 @@ sha256sum ${workdir}/sha256sum/1.txt ${workdir}/sha256sum/2.txt ${workdir}/sha25
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 5f2864b5833190b07b0b95228682ff5ec43a13a2a3f31514c57d5c92aa3fb2e7  ${workdir}/sha256sum/1.txt
 833d8136112b60552a0f83165a2ebffeac4b0c0249480d651ea58b9073ec925b  ${workdir}/sha256sum/2.txt
 8e774f75a5a23c83e6f7d5e92863a2615e0335e06aec18d9c3ec1c5315d1a777  ${workdir}/sha256sum/3.txt
@@ -16457,19 +16457,19 @@ _expected stdout:_
 - Fixture file `sha256sum/checksum.txt` is created.
 #### Inputs
 _Fixture `sha256sum/1.txt`:_
-```
+```text
 Dungeon of Regalias
 ```
 _Fixture `sha256sum/2.txt`:_
-```
+```text
 DEMONION
 ```
 _Fixture `sha256sum/3.txt`:_
-```
+```text
 Dungeon Crusadearz
 ```
 _Fixture `sha256sum/checksum.txt`:_
-```
+```text
 5f2864b5833190b07b0b95228682ff5ec43a13a2a3f31514c57d5c92aa3fb2e7  ${workdir}/sha256sum/1.txt
 833d8136112b60552a0f83165a2ebffeac4b0c0249480d651ea58b9073ec925b  ${workdir}/sha256sum/2.txt
 8e774f75a5a23c83e6f7d5e92863a2615e0335e06aec18d9c3ec1c5315d1a777  ${workdir}/sha256sum/3.txt
@@ -16483,7 +16483,7 @@ sha256sum -c ${workdir}/sha256sum/checksum.txt
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 ${workdir}/sha256sum/1.txt: OK
 ${workdir}/sha256sum/2.txt: OK
 ${workdir}/sha256sum/3.txt: OK
@@ -16498,7 +16498,7 @@ echo "test" | sha256sum
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 f2ca1bb6c7e907d06dafe4687e579fce76b37e4e93b7605022da52e6ccc26fd2  -
 ```
 ### Scenario: get sha256sum for pipe data and file at same time
@@ -16506,7 +16506,7 @@ f2ca1bb6c7e907d06dafe4687e579fce76b37e4e93b7605022da52e6ccc26fd2  -
 - Fixture file `sha256sum/1.txt` is created.
 #### Inputs
 _Fixture `sha256sum/1.txt`:_
-```
+```text
 Dungeon of Regalias
 ```
 #### When
@@ -16518,7 +16518,7 @@ echo "test" | sha256sum ${workdir}/sha256sum/1.txt
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 5f2864b5833190b07b0b95228682ff5ec43a13a2a3f31514c57d5c92aa3fb2e7  ${workdir}/sha256sum/1.txt
 ```
 ## mimixbox sha384sum
@@ -16535,7 +16535,7 @@ sha384sum --help
 ### Scenario: prints the SHA-384 digest of stdin
 #### Inputs
 _stdin for `sha384sum`:_
-```
+```text
 hello
 ```
 #### When
@@ -16547,7 +16547,7 @@ sha384sum
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 1d0f284efe3edea4b9ca3bd514fa134b17eae361ccc7a1eefeff801b9bd6604e01f21f6bf249ef030599f0c218f2ba8c  -
 ```
 ## mimixbox sha3sum
@@ -16562,7 +16562,7 @@ printf 'hello\n' | sha3sum | cut -d' ' -f1
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 b314e28493eae9dab57ac4f0c6d887bddbbeb810e900d818395ace558e96516d
 ```
 ### Scenario: selects SHA3-512 with -a
@@ -16580,7 +16580,7 @@ Source: `test/e2e/tools/mimixbox/textutils/sha512sum.atago.yaml`
 - Fixture file `sha512sum/1.txt` is created.
 #### Inputs
 _Fixture `sha512sum/1.txt`:_
-```
+```text
 Dungeon of Regalias
 ```
 #### When
@@ -16592,7 +16592,7 @@ sha512sum ${workdir}/sha512sum/1.txt
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 05eec7dcf412f63d5a291d019f6b3d62d4f8f5236592815ed171f7d6d0a7969f65a589a092740bd04a2f181d7d5a27ff36808e04a69bd84a854aad0a01da3612  ${workdir}/sha512sum/1.txt
 ```
 ### Scenario: cannot get sha512sum of one directory
@@ -16600,7 +16600,7 @@ _expected stdout:_
 - Fixture file `sha512sum/1.txt` is created.
 #### Inputs
 _Fixture `sha512sum/1.txt`:_
-```
+```text
 Dungeon of Regalias
 ```
 #### When
@@ -16625,15 +16625,15 @@ sha512sum /not_exist_file
 - Fixture file `sha512sum/3.txt` is created.
 #### Inputs
 _Fixture `sha512sum/1.txt`:_
-```
+```text
 Dungeon of Regalias
 ```
 _Fixture `sha512sum/2.txt`:_
-```
+```text
 DEMONION
 ```
 _Fixture `sha512sum/3.txt`:_
-```
+```text
 Dungeon Crusadearz
 ```
 #### When
@@ -16645,7 +16645,7 @@ sha512sum ${workdir}/sha512sum/1.txt ${workdir}/sha512sum/2.txt ${workdir}/sha51
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 05eec7dcf412f63d5a291d019f6b3d62d4f8f5236592815ed171f7d6d0a7969f65a589a092740bd04a2f181d7d5a27ff36808e04a69bd84a854aad0a01da3612  ${workdir}/sha512sum/1.txt
 cb2389a103184f607973b1acd073dc15310c8172b03f340a52bdc3843621cf9fbc6263c7dbbd786ceb0244f5147a83aa32ce09a485f544093b7fc5c7533e564f  ${workdir}/sha512sum/2.txt
 3dafa5f1ec7f09cbe551dc0d4bdb153dedb81104b7e930b7c20733965f7ebb86ee2abea64b6bfa1c54045032865044a3feca5dcc89c28def410b2954094a1890  ${workdir}/sha512sum/3.txt
@@ -16658,19 +16658,19 @@ cb2389a103184f607973b1acd073dc15310c8172b03f340a52bdc3843621cf9fbc6263c7dbbd786c
 - Fixture file `sha512sum/checksum.txt` is created.
 #### Inputs
 _Fixture `sha512sum/1.txt`:_
-```
+```text
 Dungeon of Regalias
 ```
 _Fixture `sha512sum/2.txt`:_
-```
+```text
 DEMONION
 ```
 _Fixture `sha512sum/3.txt`:_
-```
+```text
 Dungeon Crusadearz
 ```
 _Fixture `sha512sum/checksum.txt`:_
-```
+```text
 05eec7dcf412f63d5a291d019f6b3d62d4f8f5236592815ed171f7d6d0a7969f65a589a092740bd04a2f181d7d5a27ff36808e04a69bd84a854aad0a01da3612  ${workdir}/sha512sum/1.txt
 cb2389a103184f607973b1acd073dc15310c8172b03f340a52bdc3843621cf9fbc6263c7dbbd786ceb0244f5147a83aa32ce09a485f544093b7fc5c7533e564f  ${workdir}/sha512sum/2.txt
 3dafa5f1ec7f09cbe551dc0d4bdb153dedb81104b7e930b7c20733965f7ebb86ee2abea64b6bfa1c54045032865044a3feca5dcc89c28def410b2954094a1890  ${workdir}/sha512sum/3.txt
@@ -16684,7 +16684,7 @@ sha512sum -c ${workdir}/sha512sum/checksum.txt
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 ${workdir}/sha512sum/1.txt: OK
 ${workdir}/sha512sum/2.txt: OK
 ${workdir}/sha512sum/3.txt: OK
@@ -16699,7 +16699,7 @@ echo "test" | sha512sum
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 0e3e75234abc68f4378a86b3f4b32a198ba301845b0cd6e50106e874345700cc6663a86c1ea125dc5e92be17c98f9a0f85ca9d5f595db2012f7cc3571945c123  -
 ```
 ### Scenario: get sha512sum for pipe data and file at same time
@@ -16707,7 +16707,7 @@ _expected stdout:_
 - Fixture file `sha512sum/1.txt` is created.
 #### Inputs
 _Fixture `sha512sum/1.txt`:_
-```
+```text
 Dungeon of Regalias
 ```
 #### When
@@ -16719,7 +16719,7 @@ echo "test" | sha512sum ${workdir}/sha512sum/1.txt
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 05eec7dcf412f63d5a291d019f6b3d62d4f8f5236592815ed171f7d6d0a7969f65a589a092740bd04a2f181d7d5a27ff36808e04a69bd84a854aad0a01da3612  ${workdir}/sha512sum/1.txt
 ```
 ## mimixbox shuf
@@ -16744,7 +16744,7 @@ printf '1\n2\n3\n' | split -l 2 - "${workdir}/part-"; cat "${workdir}/part-aa"
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 1
 2
 ```
@@ -16768,7 +16768,7 @@ printf '1\n2\n3\n4\n5\n' | split -l 2 -d - "${workdir}/num-"; cat "${workdir}/nu
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 1
 2
 ```
@@ -16912,7 +16912,7 @@ printf 'hi\000hello\000world' | strings
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 hello
 world
 ```
@@ -16938,7 +16938,7 @@ sum --help
 ### Scenario: prints a BSD checksum and block count for stdin
 #### Inputs
 _stdin for `sum`:_
-```
+```text
 hello
 ```
 #### When
@@ -16955,7 +16955,7 @@ Source: `test/e2e/tools/mimixbox/textutils/tac.atago.yaml`
 - Fixture file `tac.txt` is created.
 #### Inputs
 _Fixture `tac.txt`:_
-```
+```text
 first
 second
 third
@@ -16969,7 +16969,7 @@ tac tac.txt
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 third
 second
 first
@@ -16984,7 +16984,7 @@ printf 'a\nb\nc\n' | tac
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 c
 b
 a
@@ -17004,7 +17004,7 @@ Source: `test/e2e/tools/mimixbox/textutils/tail.atago.yaml`
 - Fixture file `tail.txt` is created.
 #### Inputs
 _Fixture `tail.txt`:_
-```
+```text
 1
 2
 3
@@ -17027,7 +17027,7 @@ tail tail.txt
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 3
 4
 5
@@ -17044,7 +17044,7 @@ _expected stdout:_
 - Fixture file `tail.txt` is created.
 #### Inputs
 _Fixture `tail.txt`:_
-```
+```text
 1
 2
 3
@@ -17067,7 +17067,7 @@ tail -n 3 tail.txt
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 10
 11
 12
@@ -17090,7 +17090,7 @@ printf 'a\nb\nc\nd\n' | tail -n 2
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 c
 d
 ```
@@ -17107,7 +17107,7 @@ tail /no_exist_file
 - Fixture file `follow.txt` is created.
 #### Inputs
 _Fixture `follow.txt`:_
-```
+```text
 start
 ```
 #### When
@@ -17126,7 +17126,7 @@ Source: `test/e2e/tools/mimixbox/textutils/tail_pid.atago.yaml`
 - Fixture file `follow_pid.txt` is created.
 #### Inputs
 _Fixture `follow_pid.txt`:_
-```
+```text
 start
 ```
 #### When
@@ -17152,7 +17152,7 @@ printf 'a\nb\0c\nd\0' | tail -z -n 1 | tr '\0' '|'
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 c
 d|
 ```
@@ -17166,7 +17166,7 @@ printf 'a\nb\0c\nd\0' | tail --zero-terminated -n 2 | tr '\0' '|'
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 a
 b|c
 d|
@@ -17232,7 +17232,7 @@ Source: `test/e2e/tools/mimixbox/textutils/unix2dos.atago.yaml`
 - Fixture file `unix2dos/1.txt` is created.
 #### Inputs
 _Fixture `unix2dos/1.txt`:_
-```
+```text
 abc
 def
 ghi
@@ -17247,7 +17247,7 @@ file "${workdir}/unix2dos/1.txt"
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 unix2dos: converting file ${workdir}/unix2dos/1.txt to DOS format...
 ${workdir}/unix2dos/1.txt: ASCII text, with CRLF line terminators
 ```
@@ -17256,7 +17256,7 @@ ${workdir}/unix2dos/1.txt: ASCII text, with CRLF line terminators
 - Fixture file `unix2dos/1.txt` is created.
 #### Inputs
 _Fixture `unix2dos/1.txt`:_
-```
+```text
 abc
 def
 ghi
@@ -17270,7 +17270,7 @@ unix2dos "${workdir}/unix2dos/1.txt"
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 unix2dos: converting file ${workdir}/unix2dos/1.txt to DOS format...
 ```
 ### Scenario: convert three LF files at once and reclassify each
@@ -17280,19 +17280,19 @@ unix2dos: converting file ${workdir}/unix2dos/1.txt to DOS format...
 - Fixture file `unix2dos/3.txt` is created.
 #### Inputs
 _Fixture `unix2dos/1.txt`:_
-```
+```text
 abc
 def
 ghi
 ```
 _Fixture `unix2dos/2.txt`:_
-```
+```text
 abc
 def
 ghi
 ```
 _Fixture `unix2dos/3.txt`:_
-```
+```text
 abc
 def
 ghi
@@ -17309,7 +17309,7 @@ file "${workdir}/unix2dos/3.txt"
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 unix2dos: converting file ${workdir}/unix2dos/1.txt to DOS format...
 unix2dos: converting file ${workdir}/unix2dos/2.txt to DOS format...
 unix2dos: converting file ${workdir}/unix2dos/3.txt to DOS format...
@@ -17324,19 +17324,19 @@ ${workdir}/unix2dos/3.txt: ASCII text, with CRLF line terminators
 - Fixture file `unix2dos/3.txt` is created.
 #### Inputs
 _Fixture `unix2dos/1.txt`:_
-```
+```text
 abc
 def
 ghi
 ```
 _Fixture `unix2dos/2.txt`:_
-```
+```text
 abc
 def
 ghi
 ```
 _Fixture `unix2dos/3.txt`:_
-```
+```text
 abc
 def
 ghi
@@ -17350,7 +17350,7 @@ unix2dos "${workdir}/unix2dos/1.txt" "${workdir}/unix2dos/2.txt" "${workdir}/uni
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 unix2dos: converting file ${workdir}/unix2dos/1.txt to DOS format...
 unix2dos: converting file ${workdir}/unix2dos/2.txt to DOS format...
 unix2dos: converting file ${workdir}/unix2dos/3.txt to DOS format...
@@ -17360,7 +17360,7 @@ unix2dos: converting file ${workdir}/unix2dos/3.txt to DOS format...
 - Fixture file `unix2dos/1.txt` is created.
 #### Inputs
 _Fixture `unix2dos/1.txt`:_
-```
+```text
 abc
 def
 ghi
@@ -17378,13 +17378,13 @@ unix2dos ${workdir}/unix2dos
 - Fixture file `unix2dos/3.txt` is created.
 #### Inputs
 _Fixture `unix2dos/1.txt`:_
-```
+```text
 abc
 def
 ghi
 ```
 _Fixture `unix2dos/3.txt`:_
-```
+```text
 abc
 def
 ghi
@@ -17399,7 +17399,7 @@ unix2dos ${workdir}/unix2dos/1.txt ${workdir}/unix2dos ${workdir}/unix2dos/3.txt
 - stderr equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 unix2dos: converting file ${workdir}/unix2dos/1.txt to DOS format...
 unix2dos: converting file ${workdir}/unix2dos/3.txt to DOS format...
 ```
@@ -17460,7 +17460,7 @@ uuencode --help
 ### Scenario: uuencodes stdin with a begin header
 #### Inputs
 _stdin for `uuencode`:_
-```
+```text
 hello
 ```
 #### When
@@ -17477,7 +17477,7 @@ Source: `test/e2e/tools/mimixbox/textutils/wc.atago.yaml`
 - Fixture file `game.txt` is created.
 #### Inputs
 _Fixture `game.txt`:_
-```
+```text
 NieR Replicant ver.1.22474487139...
 NieR:Automata
 The Legend of Zelda: Majora's Mask
@@ -17497,7 +17497,7 @@ wc game.txt
 - Fixture file `game.txt` is created.
 #### Inputs
 _Fixture `game.txt`:_
-```
+```text
 NieR Replicant ver.1.22474487139...
 NieR:Automata
 The Legend of Zelda: Majora's Mask
@@ -17517,7 +17517,7 @@ wc -l game.txt
 - Fixture file `game.txt` is created.
 #### Inputs
 _Fixture `game.txt`:_
-```
+```text
 NieR Replicant ver.1.22474487139...
 NieR:Automata
 The Legend of Zelda: Majora's Mask
@@ -17537,7 +17537,7 @@ wc -c game.txt
 - Fixture file `game.txt` is created.
 #### Inputs
 _Fixture `game.txt`:_
-```
+```text
 NieR Replicant ver.1.22474487139...
 NieR:Automata
 The Legend of Zelda: Majora's Mask
@@ -17569,7 +17569,7 @@ wc empty.txt
 - Fixture file `metal.txt` is created.
 #### Inputs
 _Fixture `game.txt`:_
-```
+```text
 NieR Replicant ver.1.22474487139...
 NieR:Automata
 The Legend of Zelda: Majora's Mask
@@ -17578,7 +17578,7 @@ DARK SOULS
 SHADOW HEARTS
 ```
 _Fixture `metal.txt`:_
-```
+```text
 MEGADETH
 GALNERYUS
 SYSTEM OF A DOWN
@@ -17592,7 +17592,7 @@ wc empty.txt game.txt metal.txt
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
   0   0   0 empty.txt
   6  16 126 game.txt
   3   6  36 metal.txt
@@ -17611,7 +17611,7 @@ echo "${workdir}/game.txt" | wc
 - Fixture file `game.txt` is created.
 #### Inputs
 _Fixture `game.txt`:_
-```
+```text
 NieR Replicant ver.1.22474487139...
 NieR:Automata
 The Legend of Zelda: Majora's Mask
@@ -17640,7 +17640,7 @@ wc "${workdir}"
 - Fixture file `game.txt` is created.
 #### Inputs
 _Fixture `game.txt`:_
-```
+```text
 NieR Replicant ver.1.22474487139...
 NieR:Automata
 The Legend of Zelda: Majora's Mask
@@ -17658,7 +17658,7 @@ wc "${workdir}" "${workdir}/game.txt"
 - stderr equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
       0       0       0 ${workdir}
       6      16     126 ${workdir}/game.txt
       6      16     126 total
@@ -17679,13 +17679,13 @@ Source: `test/e2e/tools/mimixbox/textutils/wc_gnu.atago.yaml`
 - Fixture file `wc_b.txt` is created.
 #### Inputs
 _Fixture `wc_a.txt`:_
-```
+```text
 a
 b
 c
 ```
 _Fixture `wc_b.txt`:_
-```
+```text
 x
 ```
 #### When
@@ -17701,13 +17701,13 @@ wc --total=only wc_a.txt wc_b.txt
 - Fixture file `wc_b.txt` is created.
 #### Inputs
 _Fixture `wc_a.txt`:_
-```
+```text
 a
 b
 c
 ```
 _Fixture `wc_b.txt`:_
-```
+```text
 x
 ```
 #### When
@@ -17719,7 +17719,7 @@ wc --total=never "${workdir}/wc_a.txt" "${workdir}/wc_b.txt"
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 3 3 6 ${workdir}/wc_a.txt
 1 1 2 ${workdir}/wc_b.txt
 ```
@@ -17728,7 +17728,7 @@ _expected stdout:_
 - Fixture file `wc_a.txt` is created.
 #### Inputs
 _Fixture `wc_a.txt`:_
-```
+```text
 a
 b
 c
@@ -17742,7 +17742,7 @@ wc --total=always "${workdir}/wc_a.txt"
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 3 3 6 ${workdir}/wc_a.txt
 3 3 6 total
 ```
@@ -17752,13 +17752,13 @@ _expected stdout:_
 - Fixture file `wc_b.txt` is created.
 #### Inputs
 _Fixture `wc_a.txt`:_
-```
+```text
 a
 b
 c
 ```
 _Fixture `wc_b.txt`:_
-```
+```text
 x
 ```
 #### When
@@ -17772,7 +17772,7 @@ wc --files0-from=wc_list.nul
   - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 3 3 6 ${workdir}/wc_a.txt
 1 1 2 ${workdir}/wc_b.txt
 4 4 8 total
@@ -17783,13 +17783,13 @@ _expected stdout:_
 - Fixture file `wc_b.txt` is created.
 #### Inputs
 _Fixture `wc_a.txt`:_
-```
+```text
 a
 b
 c
 ```
 _Fixture `wc_b.txt`:_
-```
+```text
 x
 ```
 #### When
@@ -17801,7 +17801,7 @@ printf '%s\0%s\0' "${workdir}/wc_a.txt" "${workdir}/wc_b.txt" | wc --files0-from
 - stdout equals an exact value
 #### Expected output
 _expected stdout:_
-```
+```text
 3 3 6 ${workdir}/wc_a.txt
 1 1 2 ${workdir}/wc_b.txt
 4 4 8 total
@@ -17812,13 +17812,13 @@ _expected stdout:_
 - Fixture file `wc_b.txt` is created.
 #### Inputs
 _Fixture `wc_a.txt`:_
-```
+```text
 a
 b
 c
 ```
 _Fixture `wc_b.txt`:_
-```
+```text
 x
 ```
 #### When
@@ -18223,7 +18223,7 @@ hd --help
 ### Scenario: hexdumps stdin in canonical form
 #### Inputs
 _stdin for `hd`:_
-```
+```text
 hi
 ```
 #### When
@@ -19000,7 +19000,7 @@ Source: `test/e2e/tools/mimixbox/util-linux/tune2fs.atago.yaml`
 - Fixture file `bad.img` is created.
 #### Inputs
 _Fixture `bad.img`:_
-```
+```text
 not a filesystem
 ```
 #### When

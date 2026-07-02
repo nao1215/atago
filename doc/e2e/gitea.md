@@ -22,7 +22,7 @@ gitea --version
 - Fixture file `app.ini` is created.
 #### Inputs
 _Fixture `app.ini`:_
-```
+```text
 [server]
 HTTP_ADDR = 127.0.0.1
 HTTP_PORT = 18140
@@ -62,7 +62,7 @@ ROOT = data/repos
 - Fixture file `app.ini` is created.
 #### Inputs
 _Fixture `app.ini`:_
-```
+```text
 [server]
 HTTP_ADDR = 127.0.0.1
 HTTP_PORT = 18141

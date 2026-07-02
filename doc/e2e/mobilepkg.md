@@ -180,7 +180,7 @@ mobilepkg inspect --format xml app.apk
 - Fixture file `notapkg.apk` is created.
 #### Inputs
 _Fixture `notapkg.apk`:_
-```
+```text
 this is not a zip archive
 ```
 #### When

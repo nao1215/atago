@@ -27,11 +27,11 @@ rclone version
 - Fixture file `src/sub/table.csv` is created.
 #### Inputs
 _Fixture `src/hello.txt`:_
-```
+```text
 hello rclone
 ```
 _Fixture `src/sub/table.csv`:_
-```
+```text
 a,b
 1,2
 ```
@@ -55,11 +55,11 @@ rclone check src dst
 - Fixture file `dst/hello.txt` is created.
 #### Inputs
 _Fixture `src/hello.txt`:_
-```
+```text
 hello rclone
 ```
 _Fixture `dst/hello.txt`:_
-```
+```text
 corrupted replica
 ```
 #### When
@@ -78,11 +78,11 @@ rclone check src dst
 - Fixture file `src/sub/table.csv` is created.
 #### Inputs
 _Fixture `src/hello.txt`:_
-```
+```text
 hello rclone
 ```
 _Fixture `src/sub/table.csv`:_
-```
+```text
 a,b
 1,2
 ```
@@ -108,11 +108,11 @@ rclone size --json src
 - Fixture file `dst/extraneous.txt` is created.
 #### Inputs
 _Fixture `src/keep.txt`:_
-```
+```text
 stays
 ```
 _Fixture `dst/extraneous.txt`:_
-```
+```text
 must be deleted by sync
 ```
 #### When
@@ -145,11 +145,11 @@ rclone reveal ${obscured}
 - Fixture file `src/api/data.json` is created.
 #### Inputs
 _Fixture `src/hello.txt`:_
-```
+```text
 hello over http
 ```
 _Fixture `src/api/data.json`:_
-```
+```text
 {"source":"rclone","ok":true}
 ```
 #### When

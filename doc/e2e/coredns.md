@@ -25,14 +25,14 @@ coredns -version
 - Fixture file `zones/example.test.zone` is created.
 #### Inputs
 _Fixture `Corefile`:_
-```
+```text
 example.test:18150 {
     bind 127.0.0.1
     file zones/example.test.zone
 }
 ```
 _Fixture `zones/example.test.zone`:_
-```
+```text
 $ORIGIN example.test.
 @   3600 IN SOA ns.example.test. admin.example.test. (2026070201 7200 3600 1209600 3600)
 @   3600 IN NS  ns.example.test.
@@ -66,14 +66,14 @@ dig @127.0.0.1 -p 18150 alias.example.test A +short
 - Fixture file `zones/example.test.zone` is created.
 #### Inputs
 _Fixture `Corefile`:_
-```
+```text
 example.test:18151 {
     bind 127.0.0.1
     file zones/example.test.zone
 }
 ```
 _Fixture `zones/example.test.zone`:_
-```
+```text
 $ORIGIN example.test.
 @   3600 IN SOA ns.example.test. admin.example.test. (2026070201 7200 3600 1209600 3600)
 @   3600 IN NS  ns.example.test.
@@ -99,7 +99,7 @@ dig @127.0.0.1 -p 18151 www.example.com A +noall +comments
 - Fixture file `zones/example.test.zone` is created.
 #### Inputs
 _Fixture `Corefile`:_
-```
+```text
 example.test:18152 {
     bind 127.0.0.1
     file zones/example.test.zone
@@ -107,7 +107,7 @@ example.test:18152 {
 }
 ```
 _Fixture `zones/example.test.zone`:_
-```
+```text
 $ORIGIN example.test.
 @   3600 IN SOA ns.example.test. admin.example.test. (2026070201 7200 3600 1209600 3600)
 @   3600 IN NS  ns.example.test.
@@ -131,7 +131,7 @@ dig @127.0.0.1 -p 18152 www.example.test A +short
 - Fixture file `Corefile` is created.
 #### Inputs
 _Fixture `Corefile`:_
-```
+```text
 example.test:18159 {
     no_such_plugin_xyz
 }
