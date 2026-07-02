@@ -7,6 +7,12 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-07-03
+
+The first release of atago: an end-to-end test runner for command-line tools
+driven by plain-YAML specs, with HTTP, DB, SSH, gRPC, and headless-browser
+peers, snapshot testing, and Markdown doc generation.
+
 ### Added
 
 - Scenario `teardown:` steps — cleanup that always runs after the steps (pass,
