@@ -46,7 +46,7 @@ func Main(args []string, stdout, stderr io.Writer) int {
 	case "snapshot":
 		return snapshotCmd(rest, stdout, stderr)
 	case "version", "-version", "--version":
-		fmt.Fprintf(stdout, "atago %s\n", buildinfo.Version)
+		fmt.Fprintf(stdout, "atago %s\n", buildinfo.Get())
 		return ExitOK
 	case "help", "-h", "--help":
 		usage(stdout)
