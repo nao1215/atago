@@ -56,6 +56,30 @@ func TestRunCmd_Passing(t *testing.T) {
 	}
 }
 
+// TestRunCmd_SelectionMatchesNothingWarns proves a --filter/--tag that selects
+// zero scenarios warns on stderr (a typo'd selection in CI must not greenlight
+// in silence), while still exiting 0.
+func TestRunCmd_SelectionMatchesNothingWarns(t *testing.T) {
+	dir := t.TempDir()
+	p := writeSpec(t, dir, "ok.atago.yaml", passingSpec)
+	var out, errb bytes.Buffer
+	if got := Main([]string{"run", "--filter", "no-such-name", p}, &out, &errb); got != ExitOK {
+		t.Fatalf("exit = %d, want %d (stderr=%s)", got, ExitOK, errb.String())
+	}
+	if !strings.Contains(errb.String(), `no scenarios matched --filter "no-such-name"`) {
+		t.Errorf("stderr = %q, want a no-match warning", errb.String())
+	}
+	// A matching selection stays quiet.
+	errb.Reset()
+	out.Reset()
+	if got := Main([]string{"run", "--filter", "exit 0", p}, &out, &errb); got != ExitOK {
+		t.Fatalf("exit = %d, want %d (stderr=%s)", got, ExitOK, errb.String())
+	}
+	if strings.Contains(errb.String(), "no scenarios matched") {
+		t.Errorf("stderr = %q, want no warning for a matching filter", errb.String())
+	}
+}
+
 func TestRunCmd_Failing(t *testing.T) {
 	dir := t.TempDir()
 	p := writeSpec(t, dir, "fail.atago.yaml", failingSpec)

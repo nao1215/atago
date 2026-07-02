@@ -163,6 +163,29 @@ func runCmd(args []string, stdout, stderr io.Writer) int {
 		return exit
 	}
 
+	// A selection that matches nothing still exits 0 (nothing ran, nothing
+	// failed), but stay loud about it: a typo'd --filter/--tag in CI would
+	// otherwise greenlight silently.
+	if *filter != "" || *tag != "" || *skipTag != "" {
+		total := 0
+		for _, r := range results {
+			total += len(r.Scenarios)
+		}
+		if total == 0 && ctx.Err() == nil {
+			var sel []string
+			if *filter != "" {
+				sel = append(sel, fmt.Sprintf("--filter %q", *filter))
+			}
+			if *tag != "" {
+				sel = append(sel, fmt.Sprintf("--tag %q", *tag))
+			}
+			if *skipTag != "" {
+				sel = append(sel, fmt.Sprintf("--skip-tag %q", *skipTag))
+			}
+			fmt.Fprintf(stderr, "atago run: warning: no scenarios matched %s (name matching is a case-sensitive substring)\n", strings.Join(sel, " "))
+		}
+	}
+
 	if err := report.Render(stdout, format, results); err != nil {
 		fmt.Fprintf(stderr, "atago run: failed to write report: %v\n", err)
 		return worseExit(exit, ExitInternal)
