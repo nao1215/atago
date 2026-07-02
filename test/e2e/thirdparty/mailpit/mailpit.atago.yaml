@@ -1,0 +1,275 @@
+version: "1"
+
+suite:
+  name: mailpit (self-hosted email testing server)
+
+# Exercises Mailpit (https://mailpit.axllent.org/, from awesome-selfhosted's
+# email corner) as a third-party target — a protocol pairing nothing else in
+# this directory covers: real messages are delivered over SMTP with the stock
+# curl client (smtp://), then asserted through Mailpit's REST API — capture,
+# full-text search, MIME attachments, and mailbox teardown. Install with:
+#   go install github.com/axllent/mailpit@latest
+#
+# Each scenario binds its own SMTP+HTTP port pair so the suite runs under the
+# default scenario concurrency.
+
+permissions:
+  network:
+    allow: [127.0.0.1]
+
+runners:
+  api:
+    type: http
+    base_url: http://127.0.0.1:18171
+    timeout: 10s
+  api2:
+    type: http
+    base_url: http://127.0.0.1:18173
+    timeout: 10s
+  api3:
+    type: http
+    base_url: http://127.0.0.1:18175
+    timeout: 10s
+  api4:
+    type: http
+    base_url: http://127.0.0.1:18177
+    timeout: 10s
+
+scenarios:
+  - name: the binary reports its version
+    steps:
+      - run:
+          command: mailpit version
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: mailpit
+
+  - name: a message sent over real SMTP is captured and readable via the API
+    services:
+      - name: mailpit
+        command: mailpit --smtp 127.0.0.1:18170 --listen 127.0.0.1:18171 --database data.db
+        ready:
+          port: 127.0.0.1:18171
+          timeout: 15s
+    steps:
+      - fixture:
+          file: mail.txt
+          content: |
+            From: Alice <alice@example.test>
+            To: Bob <bob@example.test>
+            Subject: Deploy finished
+
+            The deploy pipeline completed successfully.
+      # The stock curl client speaks SMTP; no bespoke tooling involved.
+      - run:
+          command: curl -s --url smtp://127.0.0.1:18170 --mail-from alice@example.test --mail-rcpt bob@example.test --upload-file mail.txt
+      - assert:
+          exit_code: 0
+      # Delivery is asynchronous; poll the API until the message lands.
+      - http:
+          runner: api
+          method: GET
+          path: /api/v1/messages
+          retry:
+            times: 20
+            interval: 250ms
+            until:
+              body:
+                json:
+                  path: "$.total"
+                  equals: 1
+      - assert:
+          status: 200
+          body:
+            json:
+              path: "$.messages[0].Subject"
+              equals: Deploy finished
+      - assert:
+          body:
+            json:
+              path: "$.messages[0].From.Address"
+              equals: alice@example.test
+      - store:
+          name: msg_id
+          from:
+            body:
+              json:
+                path: "$.messages[0].ID"
+      - http:
+          runner: api
+          method: GET
+          path: /api/v1/message/${msg_id}
+      - assert:
+          status: 200
+          body:
+            json:
+              path: "$.Text"
+              matches: deploy pipeline completed successfully
+
+  - name: full-text search finds exactly the matching message
+    services:
+      - name: mailpit
+        command: mailpit --smtp 127.0.0.1:18172 --listen 127.0.0.1:18173 --database data.db
+        ready:
+          port: 127.0.0.1:18173
+          timeout: 15s
+    steps:
+      - fixture:
+          file: mail1.txt
+          content: |
+            From: ci@example.test
+            To: team@example.test
+            Subject: nightly build report
+
+            All tests were green tonight.
+      - fixture:
+          file: mail2.txt
+          content: |
+            From: ci@example.test
+            To: team@example.test
+            Subject: invoice reminder
+
+            Please pay the hosting invoice.
+      - run:
+          command: curl -s --url smtp://127.0.0.1:18172 --mail-from ci@example.test --mail-rcpt team@example.test --upload-file mail1.txt
+      - run:
+          command: curl -s --url smtp://127.0.0.1:18172 --mail-from ci@example.test --mail-rcpt team@example.test --upload-file mail2.txt
+      - http:
+          runner: api2
+          method: GET
+          path: /api/v1/messages
+          retry:
+            times: 20
+            interval: 250ms
+            until:
+              body:
+                json:
+                  path: "$.total"
+                  equals: 2
+      - http:
+          runner: api2
+          method: GET
+          path: /api/v1/search?query=nightly
+      - assert:
+          status: 200
+          body:
+            json:
+              path: "$.messages_count"
+              equals: 1
+      - assert:
+          body:
+            json:
+              path: "$.messages[0].Subject"
+              equals: nightly build report
+
+  - name: a MIME attachment survives delivery intact
+    services:
+      - name: mailpit
+        command: mailpit --smtp 127.0.0.1:18174 --listen 127.0.0.1:18175 --database data.db
+        ready:
+          port: 127.0.0.1:18175
+          timeout: 15s
+    steps:
+      - fixture:
+          file: mail.txt
+          content: |
+            From: reports@example.test
+            To: audit@example.test
+            Subject: weekly numbers
+            MIME-Version: 1.0
+            Content-Type: multipart/mixed; boundary="atago-boundary"
+
+            --atago-boundary
+            Content-Type: text/plain
+
+            Numbers attached as CSV.
+            --atago-boundary
+            Content-Type: text/csv; name="data.csv"
+            Content-Disposition: attachment; filename="data.csv"
+
+            region,total
+            east,42
+            --atago-boundary--
+      - run:
+          command: curl -s --url smtp://127.0.0.1:18174 --mail-from reports@example.test --mail-rcpt audit@example.test --upload-file mail.txt
+      - http:
+          runner: api3
+          method: GET
+          path: /api/v1/messages
+          retry:
+            times: 20
+            interval: 250ms
+            until:
+              body:
+                json:
+                  path: "$.total"
+                  equals: 1
+      - store:
+          name: msg_id
+          from:
+            body:
+              json:
+                path: "$.messages[0].ID"
+      - http:
+          runner: api3
+          method: GET
+          path: /api/v1/message/${msg_id}
+      - assert:
+          status: 200
+          body:
+            json:
+              path: "$.Attachments"
+              length: 1
+      - assert:
+          body:
+            json:
+              path: "$.Attachments[0].FileName"
+              equals: data.csv
+
+  - name: deleting all messages empties the mailbox
+    services:
+      - name: mailpit
+        command: mailpit --smtp 127.0.0.1:18176 --listen 127.0.0.1:18177 --database data.db
+        ready:
+          port: 127.0.0.1:18177
+          timeout: 15s
+    steps:
+      - fixture:
+          file: mail.txt
+          content: |
+            From: temp@example.test
+            To: trash@example.test
+            Subject: ephemeral
+
+            Delete me.
+      - run:
+          command: curl -s --url smtp://127.0.0.1:18176 --mail-from temp@example.test --mail-rcpt trash@example.test --upload-file mail.txt
+      - http:
+          runner: api4
+          method: GET
+          path: /api/v1/messages
+          retry:
+            times: 20
+            interval: 250ms
+            until:
+              body:
+                json:
+                  path: "$.total"
+                  equals: 1
+      - http:
+          runner: api4
+          method: DELETE
+          path: /api/v1/messages
+      - assert:
+          status: 200
+      - http:
+          runner: api4
+          method: GET
+          path: /api/v1/messages
+      - assert:
+          status: 200
+          body:
+            json:
+              path: "$.total"
+              equals: 0

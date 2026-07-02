@@ -1,0 +1,67 @@
+# Migrated from iso8583tool's ShellSpec spec/autodetect_spec.sh.
+# Input auto-detection: view, validate and convert default to --encoding auto, so
+# a raw *.bin capture (the kanmu-like packed-BCD message) or an all-numeric raw
+# ASCII message is read correctly without an explicit --encoding raw.
+#
+# The raw fixtures are byte-exact: raw.bin is write_kanmu_like_message()'s output
+# (printf '\001\000\160\004...'), num.bin is the 52-char numeric ASCII capture.
+# Both are inlined as base64 so no trailing newline corrupts the message length.
+# Run with: make dogfood-iso8583tool
+version: "1"
+
+suite:
+  name: iso8583tool input auto-detection
+
+scenarios:
+  - name: views a raw binary capture without --encoding raw
+    steps:
+      - fixture: &raw_bin
+          file: raw.bin
+          base64: AQBwBAAAAAAAABBAGSSZmZmZmTJzJwAAAAAROCIE
+      - run:
+          command: iso8583tool view raw.bin --spec spec87bcd-starter
+      - assert:
+          exit_code: 0
+          stdout:
+            not_contains: "decode hex"
+      - assert:
+          stdout:
+            contains: "MTI"
+
+  - name: validates a raw binary capture without --encoding raw
+    steps:
+      - fixture: *raw_bin
+      - run:
+          command: iso8583tool validate raw.bin --spec spec87bcd-starter
+      - assert:
+          exit_code: 0
+          stdout:
+            not_contains: "decode hex"
+
+  - name: converts a raw binary capture without --encoding raw
+    steps:
+      - fixture: *raw_bin
+      - run:
+          command: iso8583tool convert raw.bin --spec spec87bcd-starter
+      - assert:
+          exit_code: 0
+          stdout:
+            not_contains: "decode hex"
+      - assert:
+          stdout:
+            contains: '"mti"'
+
+  - name: reads an all-numeric raw ASCII capture as raw, not packed hex
+    steps:
+      - fixture:
+          file: num.bin
+          base64: MDgwMDAyMjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDYwNDE2MTYxNjY1NDMyMQ==
+      - run:
+          command: iso8583tool view num.bin
+      - assert:
+          exit_code: 0
+          stdout:
+            not_contains: "not enough data"
+      - assert:
+          stdout:
+            contains: "0800"

@@ -1,0 +1,99 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / init templates
+
+scenarios:
+  - name: every template scaffolds a schema-valid spec
+    matrix:
+      - template: cli
+      - template: http
+      - template: db
+      - template: grpc
+      - template: ssh
+      - template: browser
+      - template: services
+    steps:
+      - run:
+          command: ${atago} init --template ${template} gen.atago.yaml
+      - assert:
+          exit_code: 0
+          file:
+            path: gen.atago.yaml
+            exists: true
+      # explain loads and validates the spec without executing it, so a schema
+      # break in any template fails here.
+      - run:
+          command: ${atago} explain gen.atago.yaml
+      - assert:
+          exit_code: 0
+
+  - name: list-templates names every runner family with a description
+    steps:
+      - run:
+          command: ${atago} init --list-templates
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - cli
+              - http
+              - db
+              - grpc
+              - ssh
+              - browser
+              - services
+      # Not just bare names: the listing tells the user what each template is
+      # for and whether it runs without editing.
+      - assert:
+          stdout:
+            contains:
+              - runs as-is
+              - edit base_url first
+
+  - name: unknown template is a configuration error
+    steps:
+      - run:
+          command: ${atago} init --template nope gen.atago.yaml
+      - assert:
+          exit_code: 3
+          stderr:
+            contains: unknown template
+
+  # The templates that promise "runs as-is" must actually run green on a fresh
+  # scaffold — the first-run experience is part of the contract, not just
+  # schema validity.
+  - name: the default cli template runs green
+    steps:
+      - run:
+          command: ${atago} init --template cli cli.atago.yaml
+      - assert:
+          exit_code: 0
+      - run:
+          command: ${atago} run cli.atago.yaml
+      - assert:
+          exit_code: 0
+
+  - name: the db template runs green with the bundled sqlite driver
+    steps:
+      - run:
+          command: ${atago} init --template db db.atago.yaml
+      - assert:
+          exit_code: 0
+      - run:
+          command: ${atago} run db.atago.yaml
+      - assert:
+          exit_code: 0
+
+  - name: the services template runs green and exercises readiness + retry
+    skip:
+      os: windows   # the stand-in service uses POSIX shell commands
+    steps:
+      - run:
+          command: ${atago} init --template services services.atago.yaml
+      - assert:
+          exit_code: 0
+      - run:
+          command: ${atago} run services.atago.yaml
+      - assert:
+          exit_code: 0

@@ -1,0 +1,52 @@
+version: "1"
+
+# fixture writes input files into the scenario's isolated workdir before your
+# command runs; file and dir assertions check what the command produced.
+# Runs green as-is: atago run examples/files_and_fixtures.atago.yaml
+
+suite:
+  name: files and fixtures
+
+scenarios:
+  - name: create inputs, then assert on outputs
+    steps:
+      - fixture:
+          file: users.csv
+          content: |
+            id,name
+            1,Alice
+            2,Bob
+      # Binary fixtures use base64 instead of content (here: a 1x1 PNG).
+      - fixture:
+          file: logo.png
+          base64: iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNocFBoAAADhQFhC+q+qAAAAABJRU5ErkJggg==
+      - assert:
+          file:
+            path: users.csv
+            exists: true
+      - assert:
+          file:
+            path: users.csv
+            contains:
+              - Alice
+              - Bob
+
+  - name: dir asserts on a directory tree
+    steps:
+      - fixture:
+          file: site/index.html
+          content: "<html></html>"
+      - fixture:
+          file: site/assets/app.css
+          content: "body {}"
+      # Every set field is an independent constraint; all must hold.
+      - assert:
+          dir:
+            path: site
+            exists: true
+            contains:
+              - index.html
+              - assets/app.css
+            not_contains:
+              - secret.key
+            glob: "*.html"

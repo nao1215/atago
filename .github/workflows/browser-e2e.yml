@@ -1,0 +1,49 @@
+name: BrowserE2E
+
+# The browser (CDP) runner is one of atago's most visible differentiators, but
+# the live browser specs skip when Chrome is unavailable, so they could silently
+# stop running in CI (#76). This dedicated job provisions Chrome explicitly and
+# sets ATAGO_REQUIRE_BROWSER=1, which turns the browser test harness's "skip when
+# no Chrome" into a hard failure. A broken browser environment therefore turns
+# the build red instead of quietly demoting browser coverage to "best effort".
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: "go.mod"
+
+      # ubuntu-latest ships Google Chrome; assert it is present so a missing
+      # browser fails here with a clear message rather than mid-test.
+      - name: Verify Chrome is provisioned
+        run: |
+          set -e
+          if command -v google-chrome-stable; then
+            google-chrome-stable --version
+          elif command -v google-chrome; then
+            google-chrome --version
+          else
+            echo "no Chrome binary found on the runner" >&2
+            exit 1
+          fi
+
+      # ATAGO_REQUIRE_BROWSER makes the live browser specs non-skippable: if Chrome
+      # cannot launch, the test fails instead of skipping.
+      - name: Run the live browser smoke (non-skippable)
+        env:
+          ATAGO_REQUIRE_BROWSER: "1"
+        run: go test -v -run 'TestEngine_CDP' ./internal/engine/

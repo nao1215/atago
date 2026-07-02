@@ -1,0 +1,85 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / db runner
+
+# Exercises the DB runner end-to-end through the real atago binary (ADR-0026),
+# using an in-memory SQLite database (pure-Go modernc driver, no cgo, no external
+# server). Live multi-driver behavior is covered by Go tests
+# (internal/runner/db, internal/engine/db_test.go).
+scenarios:
+  - name: query workflow (create, insert, select, row assert, value binding) passes
+    steps:
+      - fixture:
+          file: db.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner-db
+            runners:
+              store:
+                type: db
+                dsn: "sqlite::memory:"
+            scenarios:
+              - name: seed then query with row assertions and binding
+                steps:
+                  - query:
+                      runner: store
+                      sql: "CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, role TEXT)"
+                  - query:
+                      runner: store
+                      sql: "INSERT INTO users (name, role) VALUES ('alice','admin'), ('bob','user')"
+                  - query:
+                      runner: store
+                      sql: "SELECT id, name, role FROM users ORDER BY id"
+                  - assert:
+                      rows:
+                        json:
+                          path: "$"
+                          length: 2
+                  - assert:
+                      rows:
+                        json:
+                          path: "$[0].name"
+                          equals: alice
+                  - store:
+                      name: admin_id
+                      from:
+                        rows:
+                          json:
+                            path: "$[0].id"
+                  - query:
+                      runner: store
+                      sql: "SELECT role FROM users WHERE id = ${admin_id}"
+                  - assert:
+                      rows:
+                        json:
+                          path: "$[0].role"
+                          equals: admin
+      - run:
+          command: ${atago} run db.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: passed
+
+  - name: a query against an unknown runner errors (exit 4)
+    steps:
+      - fixture:
+          file: norunner.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner-db
+            scenarios:
+              - name: references a db runner that is not declared
+                steps:
+                  - query:
+                      runner: missing
+                      sql: "SELECT 1"
+      - run:
+          command: ${atago} run norunner.atago.yaml
+      - assert:
+          exit_code: 4
+          stdout:
+            contains: unknown runner

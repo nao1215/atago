@@ -1,0 +1,224 @@
+version: "1"
+
+suite:
+  name: gotify (self-hosted notification server)
+
+# Exercises Gotify (https://gotify.net/, from awesome-selfhosted's
+# notification corner) as a third-party target: the real server booted with
+# SQLite, an application provisioned over the REST API, messages pushed with
+# the app token and read back with admin credentials, the failure mode for
+# missing credentials — and the app icon uploaded as a real multipart
+# form-data request (`files:`), then downloaded back (`body_to`) and verified
+# as a PNG with the image assertion target. Install (prebuilt release; the UI
+# is compiled in, so `go install` cannot build it):
+#   see .github/workflows/thirdparty.yml for the download-and-verify step
+#
+# Each server scenario binds its own port so the suite runs under the default
+# scenario concurrency. admin/admin is Gotify's out-of-the-box default user,
+# used here against throwaway per-scenario databases.
+
+permissions:
+  network:
+    allow: [127.0.0.1]
+
+runners:
+  gotify:
+    type: http
+    base_url: http://127.0.0.1:18190
+    timeout: 15s
+  gotify2:
+    type: http
+    base_url: http://127.0.0.1:18191
+    timeout: 15s
+  gotify3:
+    type: http
+    base_url: http://127.0.0.1:18192
+    timeout: 15s
+
+defaults:
+  scenario:
+    env:
+      GOTIFY_SERVER_LISTENADDR: 127.0.0.1
+      GOTIFY_DATABASE_DIALECT: sqlite3
+      GOTIFY_DATABASE_CONNECTION: data/gotify.db
+
+scenarios:
+  - name: the server reports health and version
+    services:
+      - name: gotify
+        command: gotify
+        env:
+          GOTIFY_SERVER_PORT: "18190"
+        ready:
+          port: 127.0.0.1:18190
+          timeout: 30s
+    steps:
+      - fixture:
+          file: data/.keep
+          content: ""
+      - http:
+          runner: gotify
+          method: GET
+          path: /health
+      - assert:
+          status: 200
+          body:
+            json:
+              path: "$.health"
+              equals: green
+      - http:
+          runner: gotify
+          method: GET
+          path: /version
+      - assert:
+          status: 200
+          body:
+            json:
+              path: "$.version"
+              matches: "^[0-9]+\\.[0-9]+\\.[0-9]+"
+
+  - name: an application pushes and the admin reads it back
+    services:
+      - name: gotify
+        command: gotify
+        env:
+          GOTIFY_SERVER_PORT: "18191"
+        ready:
+          port: 127.0.0.1:18191
+          timeout: 30s
+    steps:
+      - fixture:
+          file: data/.keep
+          content: ""
+      # Credentials are required: no token, no API.
+      - http:
+          runner: gotify2
+          method: GET
+          path: /message
+      - assert:
+          status: 401
+      # Provision an application (admin/admin is the default first user).
+      - http:
+          runner: gotify2
+          method: POST
+          path: /application
+          header:
+            Authorization: Basic YWRtaW46YWRtaW4=
+          json:
+            name: atago-pipeline
+            description: created by an atago behavior spec
+      - assert:
+          status: 200
+          body:
+            json:
+              path: "$.name"
+              equals: atago-pipeline
+      - store:
+          name: app_token
+          from:
+            body:
+              json:
+                path: "$.token"
+      # Push with the app token, read back with the admin credentials.
+      - http:
+          runner: gotify2
+          method: POST
+          path: /message
+          header:
+            X-Gotify-Key: ${app_token}
+          json:
+            title: Deploy done
+            message: pipeline finished
+            priority: 5
+      - assert:
+          status: 200
+          body:
+            json:
+              path: "$.title"
+              equals: Deploy done
+      - http:
+          runner: gotify2
+          method: GET
+          path: /message
+          header:
+            Authorization: Basic YWRtaW46YWRtaW4=
+      - assert:
+          status: 200
+          body:
+            json:
+              path: "$.messages"
+              length: 1
+      - assert:
+          body:
+            json:
+              path: "$.messages[0].priority"
+              equals: 5
+
+  - name: the app icon round-trips through a multipart upload
+    services:
+      - name: gotify
+        command: gotify
+        env:
+          GOTIFY_SERVER_PORT: "18192"
+        ready:
+          port: 127.0.0.1:18192
+          timeout: 30s
+    steps:
+      - fixture:
+          file: data/.keep
+          content: ""
+      - fixture:
+          file: icon.png
+          base64: iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNocFBoAAADhQFhC+q+qAAAAABJRU5ErkJggg==
+      - http:
+          runner: gotify3
+          method: POST
+          path: /application
+          header:
+            Authorization: Basic YWRtaW46YWRtaW4=
+          json:
+            name: atago-icon-app
+      - assert:
+          status: 200
+      - store:
+          name: app_id
+          from:
+            body:
+              json:
+                path: "$.id"
+      # The browser-style upload most web apps expect: multipart/form-data.
+      - http:
+          runner: gotify3
+          method: POST
+          path: /application/${app_id}/image
+          header:
+            Authorization: Basic YWRtaW46YWRtaW4=
+          files:
+            - field: file
+              path: icon.png
+              content_type: image/png
+      - assert:
+          status: 200
+          body:
+            json:
+              path: "$.image"
+              matches: "^image/"
+      - store:
+          name: image_path
+          from:
+            body:
+              json:
+                path: "$.image"
+      # Download the stored icon back and prove it is still a real 1x1 PNG.
+      - http:
+          runner: gotify3
+          method: GET
+          path: /${image_path}
+          body_to: fetched-icon.png
+      - assert:
+          status: 200
+          image:
+            path: fetched-icon.png
+            format: png
+            width: 1
+            height: 1

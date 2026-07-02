@@ -1,0 +1,59 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / pdf assertion
+
+scenarios:
+  - name: pdf assertions cover page count, metadata, and text
+    steps:
+      # A tiny, uncompressed PDF written as an input fixture. atago's PDF
+      # inspector is black-box and lenient (no xref required).
+      - fixture:
+          file: report.pdf
+          content: |
+            %PDF-1.4
+            1 0 obj
+            << /Type /Catalog /Pages 2 0 R >>
+            endobj
+            2 0 obj
+            << /Type /Pages /Kids [3 0 R] /Count 1 >>
+            endobj
+            3 0 obj
+            << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R >>
+            endobj
+            4 0 obj
+            << /Length 46 >>
+            stream
+            BT /F1 24 Tf 72 700 Td (Hello atago report) Tj ET
+            endstream
+            endobj
+            6 0 obj
+            << /Title (Quarterly Report) /Author (atago) >>
+            endobj
+            trailer
+            << /Root 1 0 R /Info 6 0 R >>
+            %%EOF
+      # Like dir/image, a pdf assert is multi-constraint: page count and bounds,
+      # Info metadata, and extracted text are all independent checks that hold
+      # together in one block.
+      - assert:
+          pdf:
+            path: report.pdf
+            pages: 1
+            min_pages: 1
+            max_pages: 3
+            metadata:
+              title: Quarterly
+              author: atago
+            text:
+              contains: Hello atago report
+
+  - name: a non-pdf file fails the pdf target
+    steps:
+      - fixture:
+          file: notpdf.txt
+          content: "just text"
+      - run:
+          command: ${atago} version
+      - assert:
+          exit_code: 0

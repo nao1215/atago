@@ -1,0 +1,98 @@
+version: 2
+project_name: atago
+env:
+  - GO111MODULE=on
+before:
+  hooks:
+    - go mod tidy
+builds:
+  - main: .
+    ldflags:
+      - -s -w -X github.com/nao1215/atago/internal/buildinfo.Version=v{{ .Version }}
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+archives:
+  - name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+checksum:
+  name_template: "checksums.txt"
+
+# Homebrew distribution (#79). On a real tagged release GoReleaser publishes a
+# cask to the shared nao1215/homebrew-tap (the same tap that ships gup), using a
+# tap-scoped token. This block is skipped by `--skip=publish` (release-smoke), so
+# snapshot builds stay hermetic and need no token.
+homebrew_casks:
+  - name: atago
+    repository:
+      owner: nao1215
+      name: homebrew-tap
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
+    directory: Casks
+    homepage: "https://github.com/nao1215/atago"
+    description: "YAML-based black-box behavior spec runner for CLIs, APIs, and generated artifacts"
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+release:
+  header: |
+    ## atago {{ .Tag }}
+
+    atago release.
+
+    Every artifact is signed and ships with an SBOM and build provenance — see
+    [Verifying release integrity](https://github.com/nao1215/atago#verifying-release-integrity).
+  footer: |
+    **Full changelog**: https://github.com/nao1215/atago/compare/{{ .PreviousTag }}...{{ .Tag }}
+changelog:
+  sort: asc
+  use: github
+  groups:
+    - title: "Breaking changes"
+      regexp: '^.*?[a-zA-Z]+(\(.+\))??!:.+$'
+      order: 0
+    - title: "Features"
+      regexp: '^.*?feat(\(.+\))??!?:.+$'
+      order: 1
+    - title: "Bug fixes"
+      regexp: '^.*?fix(\(.+\))??!?:.+$'
+      order: 2
+    - title: "Performance"
+      regexp: '^.*?perf(\(.+\))??!?:.+$'
+      order: 3
+    - title: "Documentation"
+      regexp: '^.*?docs(\(.+\))??!?:.+$'
+      order: 4
+    - title: "Others"
+      order: 999
+  filters:
+    exclude:
+      - "^tests?(\\(.+\\))?!?:"
+      - "^chore(\\(.+\\))?!?:"
+      - "^style(\\(.+\\))?!?:"
+      - "^ci(\\(.+\\))?!?:"
+      - "Merge pull request"
+      - "Merge branch"
+sboms:
+  - artifacts: archive
+    documents:
+      - "${artifact}.sbom.json"
+signs:
+  - cmd: cosign
+    signature: "${artifact}.sigstore.json"
+    args:
+      - sign-blob
+      - "--bundle=${signature}"
+      - "${artifact}"
+      - "--yes"
+    artifacts: checksum
+    output: true

@@ -1,0 +1,144 @@
+# Migrated from iso8583tool's ShellSpec spec/edge_cases_spec.sh.
+# Adversarial input: malformed hex, truncated messages, empty input, missing
+# files, a directory where a file is expected, ambiguous input selection, and
+# mismatched convert directions. These try to break the binary, and every one
+# must fail cleanly (non-zero status, a message, no panic) rather than crash.
+# The oversized-input cases regenerate ~1.05 MiB of '0' with head/tr in a
+# shell: true setup. Run with: make dogfood-iso8583tool
+version: "1"
+
+suite:
+  name: iso8583tool edge cases
+
+scenarios:
+  - name: rejects non-hex characters under --encoding hex
+    # The default --encoding auto reads non-hex input as raw; an explicit hex
+    # encoding still reports the bad input as a hex error.
+    steps:
+      - run:
+          command: "iso8583tool view --encoding hex --raw zzzz"
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            contains: "hex"
+
+  - name: rejects odd-length hex
+    steps:
+      - run:
+          command: "iso8583tool view --raw 0100712"
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            empty: false
+
+  - name: reports the failing field for a truncated message
+    steps:
+      - run:
+          command: "iso8583tool validate --raw 01007220"
+      - assert:
+          exit_code: { not: 0 }
+          stdout:
+            contains: "[error]"
+
+  - name: fails on empty inline input
+    steps:
+      - run:
+          command: "iso8583tool view --raw ''"
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            empty: false
+
+  - name: fails when the file does not exist
+    steps:
+      - run:
+          command: "iso8583tool view /no/such/message.hex"
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            empty: false
+
+  - name: fails when a directory is passed instead of a file
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool view $ISO_EXAMPLES/basei"
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            empty: false
+
+  - name: refuses both a file argument and --raw
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool view $ISO_EXAMPLES/basei/0110-auth-response.hex --raw 0100"
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            empty: false
+
+  - name: fails to pack a document with no mti
+    steps:
+      - run:
+          shell: true
+          command: 'printf "%s" "{\"fields\":{}}" | iso8583tool convert --to hex'
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            contains: "mti"
+
+  - name: fails to pack a document with an invalid TLV tag
+    steps:
+      - run:
+          shell: true
+          command: 'printf "%s" "{\"mti\":\"0100\",\"binary_fields\":{\"55.ZZ\":\"00\"}}" | iso8583tool convert --to hex'
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            empty: false
+
+  - name: oversized input - rejects an oversized file with a clear limit error
+    # ~1.05 MiB of '0' (valid, even-length hex) just over the 1 MiB source cap.
+    steps:
+      - run:
+          shell: true
+          command: "head -c 1100000 /dev/zero | tr '\\0' '0' > big.hex"
+      - run:
+          command: "iso8583tool view big.hex"
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            contains: "limit"
+
+  - name: oversized input - rejects oversized stdin with a clear limit error
+    steps:
+      - run:
+          shell: true
+          command: "head -c 1100000 /dev/zero | tr '\\0' '0' | iso8583tool view -"
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            contains: "limit"
+
+  - name: oversized input - cleanly fails a truncated field 55 TLV without panic
+    # MTI + bitmap selecting F55 + a BER-TLV length that overruns the body.
+    steps:
+      - run:
+          command: "iso8583tool validate --raw 010000000000000008000103DF"
+      - assert:
+          exit_code: { not: 0 }
+          stdout:
+            contains: "[error]"
+          stderr:
+            not_contains: "panic"
+
+  - name: oversized input - does not panic on a length-spoofed variable-length field
+    # MTI + bitmap selecting F2 (LLVAR) with a length prefix larger than the data.
+    steps:
+      - run:
+          command: "iso8583tool view --raw 0100400000000000000099"
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            not_contains: "panic"

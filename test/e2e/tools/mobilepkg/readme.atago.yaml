@@ -1,0 +1,80 @@
+# Runs the representative commands shown in mobilepkg's README against the
+# committed AndroGoat fixture so the documented examples cannot silently rot.
+# Run with:
+#   make dogfood-mobilepkg   (or test/e2e/tools/mobilepkg/run.sh)
+#
+# README CLI section:
+#   mobilepkg inspect app.apk                       # JSON output (default)
+#   mobilepkg inspect --format markdown app.apk     # Markdown summary
+#   mobilepkg inspect --fail-on warn app.apk        # CI: exit 1 if severity >= warn
+#   mobilepkg inspect --baseline prev.json app.apk  # diff against previous result
+#   mobilepkg compare old.apk new.apk               # compare two packages
+version: "1"
+
+suite:
+  name: mobilepkg README examples
+
+scenarios:
+  - name: "inspect app.apk (default JSON)"
+    steps:
+      - run:
+          shell: true
+          command: cp "$MOBILEPKG_TESTDATA/android/androgoat_rich.apk" app.apk
+      - run:
+          command: mobilepkg inspect app.apk
+      - assert:
+          exit_code: 0
+          stdout:
+            json: { path: "$.result.platform", equals: "android" }
+
+  - name: "inspect --format markdown app.apk"
+    steps:
+      - run:
+          shell: true
+          command: cp "$MOBILEPKG_TESTDATA/android/androgoat_rich.apk" app.apk
+      - run:
+          command: mobilepkg inspect --format markdown app.apk
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "# mobilepkg Inspection Report"
+
+  - name: "inspect --fail-on warn app.apk (CI gate trips on AndroGoat)"
+    steps:
+      - run:
+          shell: true
+          command: cp "$MOBILEPKG_TESTDATA/android/androgoat_rich.apk" app.apk
+      - run:
+          command: mobilepkg inspect --fail-on warn app.apk
+      - assert:
+          exit_code: 1
+
+  - name: "inspect --baseline prev.json app.apk"
+    steps:
+      - run:
+          shell: true
+          command: cp "$MOBILEPKG_TESTDATA/android/androgoat_rich.apk" app.apk
+      - run:
+          shell: true
+          command: mobilepkg inspect app.apk > prev.json
+      - run:
+          command: mobilepkg inspect --baseline prev.json app.apk
+      - assert:
+          exit_code: 0
+          stdout:
+            json: { path: "$.result.diff.identity_changed", equals: false }
+
+  - name: "compare old.apk new.apk"
+    steps:
+      - run:
+          shell: true
+          command: cp "$MOBILEPKG_TESTDATA/android/androgoat_rich.apk" old.apk
+      - run:
+          shell: true
+          command: cp "$MOBILEPKG_TESTDATA/android/androgoat_rich.apk" new.apk
+      - run:
+          command: mobilepkg compare old.apk new.apk
+      - assert:
+          exit_code: 0
+          stdout:
+            json: { path: "$.identity_changed", equals: false }

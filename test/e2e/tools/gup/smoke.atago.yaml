@@ -1,0 +1,27 @@
+# Dogfood spec: exercises atago against the real `gup` CLI (github.com/nao1215/gup).
+# Requires `gup` on PATH. Run with: make dogfood
+version: "1"
+
+suite:
+  name: gup
+
+scenarios:
+  - name: version reports a semver string
+    steps:
+      - run:
+          command: gup version
+      - assert:
+          exit_code: 0
+          stdout:
+            matches: "gup version v[0-9]+\\.[0-9]+\\.[0-9]+"
+          stderr:
+            empty: true
+
+  - name: help describes the tool and exits zero
+    steps:
+      - run:
+          command: gup help
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "gup"

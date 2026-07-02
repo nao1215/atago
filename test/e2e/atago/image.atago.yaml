@@ -1,0 +1,152 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / image
+
+# Exercises the `image` assertion target (ADR-0030) end-to-end through the real
+# binary: a generated image's format/dimensions/alpha are checked, and a pixel
+# comparison against a baseline image passes or fails as expected. Images are
+# materialized from base64 fixtures so the spec stays hermetic (no image tool on
+# PATH required).
+
+scenarios:
+  - name: format, dimension and alpha assertions pass on a PNG
+    steps:
+      - fixture:
+          file: img.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: sample
+            scenarios:
+              - name: a red 2x2 png
+                steps:
+                  - fixture:
+                      file: red.png
+                      base64: iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFElEQVR4nGL5zwACTGCSARAAAP//DUcBBkxXt5sAAAAASUVORK5CYII=
+                  - assert:
+                      image:
+                        path: red.png
+                        format: png
+                        width: 2
+                        height: 2
+                        min_width: 1
+                        max_width: 100
+                        # This is an opaque truecolor (color-type 2) PNG with no
+                        # alpha channel, so alpha is false (issue #13).
+                        alpha: false
+      - run:
+          command: ${atago} run img.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: PASSED
+
+  - name: a pixel comparison against an identical baseline passes
+    steps:
+      - fixture:
+          file: baseline.png
+          base64: iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAGUlEQVR4nGJJSUlhwAaYsIoOWglAAAAA///xaAE/jf0lQAAAAABJRU5ErkJggg==
+      - fixture:
+          file: sim.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: sample
+            scenarios:
+              - name: output matches the committed baseline
+                steps:
+                  - fixture:
+                      file: out.png
+                      base64: iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAGUlEQVR4nGJJSUlhwAaYsIoOWglAAAAA///xaAE/jf0lQAAAAABJRU5ErkJggg==
+                  - assert:
+                      image:
+                        path: out.png
+                        similar_to: ${workdir}/baseline.png
+      - run:
+          command: ${atago} run sim.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: PASSED
+
+  - name: a wrong dimension assertion fails with a clear diff
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: sample
+            scenarios:
+              - name: width does not match
+                steps:
+                  - fixture:
+                      file: red.png
+                      base64: iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFElEQVR4nGL5zwACTGCSARAAAP//DUcBBkxXt5sAAAAASUVORK5CYII=
+                  - assert:
+                      image:
+                        path: red.png
+                        width: 999
+      - run:
+          command: ${atago} run bad.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: FAILED
+
+  - name: a failing similar_to writes visual diff artifacts
+    steps:
+      - fixture:
+          file: baseline.png
+          base64: iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAFUlEQVR4nGL5z4AATAxEcQABAAD//zRtAQqfxpGAAAAAAElFTkSuQmCC
+      - fixture:
+          file: diff.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: sample
+            scenarios:
+              - name: output differs from the baseline
+                steps:
+                  - fixture:
+                      file: out.png
+                      base64: iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAGElEQVR4nGJhYPjPAANMDEgANwcQAAD//zJvAQo6fkx6AAAAAElFTkSuQmCC
+                  - assert:
+                      image:
+                        path: out.png
+                        similar_to: ${workdir}/baseline.png
+      - run:
+          command: ${atago} run --report json --artifacts-dir arts diff.atago.yaml
+      - assert:
+          exit_code: 1
+      # The JSON report references the diff artifacts.
+      - assert:
+          stdout:
+            contains: "\"artifacts\""
+      # The actual, baseline, and a deterministic diff heatmap are all preserved.
+      - assert:
+          file:
+            path: arts
+            exists: true
+      - run:
+          shell: true
+          command: ls arts/*/*/
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - image.actual.png
+              - image.baseline.png
+              - image.diff.png
+              - image.metadata.json
+      # The metadata explains the comparison and that a diff was generated.
+      - run:
+          shell: true
+          command: cat arts/*/*/*image.metadata.json
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              path: $.diff_generated
+              equals: true

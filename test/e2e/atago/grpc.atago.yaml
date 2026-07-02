@@ -1,0 +1,55 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / grpc runner
+
+# Exercises the gRPC runner's wiring through the real atago binary (ADR-0028).
+# Live unary calls (reflection-resolved, status/message asserts, value binding)
+# are covered hermetically by a Go test with an in-process grpcstub server
+# (internal/engine/grpc_test.go); these scenarios pin the binary's config
+# validation and dispatch errors, which need no server.
+scenarios:
+  - name: a grpc runner without a target fails validation (exit 2)
+    steps:
+      - fixture:
+          file: badgrpc.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: grpc
+            runners:
+              g:
+                type: grpc
+            scenarios:
+              - name: call
+                steps:
+                  - grpc:
+                      runner: g
+                      method: pkg.Service/Method
+      - run:
+          command: ${atago} run badgrpc.atago.yaml
+      - assert:
+          exit_code: 2
+          stderr:
+            contains: requires a target
+
+  - name: a grpc step naming an unknown runner errors (exit 4)
+    steps:
+      - fixture:
+          file: norunner.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: grpc
+            scenarios:
+              - name: call
+                steps:
+                  - grpc:
+                      runner: missing
+                      method: pkg.Service/Method
+      - run:
+          command: ${atago} run norunner.atago.yaml
+      - assert:
+          exit_code: 4
+          stdout:
+            contains: unknown runner

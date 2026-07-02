@@ -1,0 +1,50 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / completion
+
+scenarios:
+  - name: bash completion emits a recognizable script
+    steps:
+      - run:
+          command: ${atago} completion bash
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: complete -F _atago atago
+
+  - name: zsh completion emits a compdef script
+    steps:
+      - run:
+          command: ${atago} completion zsh
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "#compdef atago"
+
+  - name: fish completion emits complete directives
+    steps:
+      - run:
+          command: ${atago} completion fish
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: complete -c atago
+
+  - name: powershell completion registers an argument completer
+    steps:
+      - run:
+          command: ${atago} completion powershell
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: Register-ArgumentCompleter
+
+  - name: unknown shell is a configuration error
+    steps:
+      - run:
+          command: ${atago} completion tcsh
+      - assert:
+          exit_code: 3
+          stderr:
+            contains: unknown shell

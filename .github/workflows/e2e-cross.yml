@@ -1,0 +1,85 @@
+name: CrossPlatformE2E
+
+# atago's unit tests run on Linux/macOS/Windows; the PR-gating E2E baseline
+# (e2e.yml) runs the full suite on Ubuntu plus the portable subset on Windows.
+# This workflow adds the missing coverage on a schedule: the FULL suite on
+# macOS, and the portable Windows subset again as a drift check, so OS-specific
+# regressions in path handling, shell semantics, and report generation surface
+# before release.
+#
+# Linux and macOS are POSIX and run the FULL self-hosted suite. Windows runs an
+# explicit, portable SUBSET — the atago-invoking-atago specs that use no
+# POSIX-only external commands — so the Windows story is intentional rather than
+# accidental. It is scheduled and on-demand (not a push gate) so the required
+# push checks stay fast and deterministic while cross-platform drift is still
+# caught continuously.
+on:
+  workflow_dispatch:
+  schedule:
+    # 05:00 UTC daily, before the dogfood matrix.
+    - cron: "0 5 * * *"
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    # bash is available on all three runner OSes (Git Bash on Windows), so the
+    # spec targets and `go run` invocation are written once.
+    shell: bash
+
+jobs:
+  e2e:
+    name: e2e (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            targets: "./test/e2e/atago ./test/e2e/thirdparty/git"
+          - os: macos-latest
+            targets: "./test/e2e/atago ./test/e2e/thirdparty/git"
+          # Portable subset: specs whose commands are shell builtins of both
+          # /bin/sh and cmd.exe, or that only drive atago itself. Keep this
+          # list in sync with the e2e-windows job in e2e.yml.
+          - os: windows-latest
+            targets: >-
+              ./test/e2e/atago/version.atago.yaml
+              ./test/e2e/atago/completion.atago.yaml
+              ./test/e2e/atago/list.atago.yaml
+              ./test/e2e/atago/manifest.atago.yaml
+              ./test/e2e/atago/doc.atago.yaml
+              ./test/e2e/atago/explain.atago.yaml
+              ./test/e2e/atago/init.atago.yaml
+              ./test/e2e/atago/init_templates.atago.yaml
+              ./test/e2e/atago/edge.atago.yaml
+              ./test/e2e/atago/matrix.atago.yaml
+              ./test/e2e/atago/parallel.atago.yaml
+              ./test/e2e/atago/run.atago.yaml
+              ./test/e2e/atago/select.atago.yaml
+              ./test/e2e/atago/skip_command.atago.yaml
+              ./test/e2e/atago/rerun.atago.yaml
+              ./test/e2e/atago/db.atago.yaml
+              ./test/e2e/atago/http.atago.yaml
+              ./test/e2e/atago/grpc.atago.yaml
+              ./test/e2e/atago/ssh.atago.yaml
+              ./test/e2e/atago/cdp.atago.yaml
+              ./test/e2e/atago/pdf.atago.yaml
+              ./test/e2e/thirdparty/git
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: "go.mod"
+
+      # `go run .` compiles atago and runs it; os.Executable() (which seeds the
+      # ${atago} spec variable) points at that binary, so specs self-invoke atago
+      # correctly on every OS without per-platform binary-name handling.
+      - name: Run the self-hosted E2E specs
+        run: go run . run ${{ matrix.targets }}

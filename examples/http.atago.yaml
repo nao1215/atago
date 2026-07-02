@@ -1,0 +1,141 @@
+version: "1"
+
+# An http runner makes requests with http steps; assert on status, header, and
+# body. Values captured from one response flow into the next via ${name}, so a
+# log-in-then-use-the-token workflow stays declarative.
+# Before running: point base_url at your API.
+
+suite:
+  name: http
+
+permissions:
+  network:
+    allow: [api.example.com]   # egress to any other host is a policy violation (exit 6)
+
+runners:
+  api:
+    type: http
+    base_url: https://api.example.com   # <-- edit: your API's base URL
+    timeout: 10s
+
+scenarios:
+  - name: log in, then read the profile with the bound token
+    steps:
+      - http:
+          runner: api
+          method: POST
+          path: /login
+          json:
+            user: alice
+            password: secret
+      - assert:
+          status: 200
+      - store:
+          name: token
+          from:
+            body:
+              json:
+                path: "$.token"
+      - http:
+          runner: api
+          method: GET
+          path: /me
+          header:
+            Authorization: "Bearer ${token}"
+      - assert:
+          status: 200
+          body:
+            json:
+              path: "$.name"
+              equals: alice
+
+  - name: poll an eventually-consistent endpoint with retry
+    steps:
+      # retry re-issues the request until `until` passes — the http analogue of
+      # run.retry. For async jobs, metrics that appear after a scrape, or any
+      # endpoint that converges after a delay. The last response is what later
+      # steps observe.
+      - http:
+          runner: api
+          method: GET
+          path: /jobs/42
+          retry:
+            times: 20
+            interval: 500ms
+            until:
+              body:
+                json:
+                  path: "$.state"
+                  equals: done
+      - assert:
+          status: 200
+
+  - name: upload a file the way a browser would
+    steps:
+      # form + files sends multipart/form-data: form fields become regular
+      # parts, each files entry a file part read from the workdir. form alone
+      # (no files) is sent application/x-www-form-urlencoded. body_file sends
+      # one file's raw bytes as the whole body instead (PUT-style uploads).
+      - fixture:
+          file: avatar.png
+          base64: iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNocFBoAAADhQFhC+q+qAAAAABJRU5ErkJggg==
+      - http:
+          runner: api
+          method: POST
+          path: /profile/avatar
+          form:
+            title: profile picture
+          files:
+            - field: upload
+              path: avatar.png
+              content_type: image/png
+      - assert:
+          status: 201
+
+  - name: assert a redirect instead of following it
+    steps:
+      # Clients follow redirects by default (and so does atago). Turning that
+      # off surfaces the 3xx itself, so the status and Location are assertable.
+      - http:
+          runner: api
+          method: GET
+          path: /
+          follow_redirects: false
+      - assert:
+          status: 302
+      - assert:
+          header:
+            name: Location
+            contains: /login
+
+  - name: download a file and inspect it as an artifact
+    steps:
+      # body_to writes the response body into the workdir (the http analogue
+      # of run's stdout_to), so file/image/pdf assertions can inspect it.
+      - http:
+          runner: api
+          method: GET
+          path: /report.pdf
+          body_to: downloads/report.pdf
+      - assert:
+          status: 200
+          pdf:
+            path: downloads/report.pdf
+            min_pages: 1
+
+  - name: text-first APIs take a raw body
+    steps:
+      # body: sends the string verbatim (Content-Type text/plain by default,
+      # override via header) — for metrics exposition, message publishing,
+      # paste endpoints. json: and body: are mutually exclusive.
+      - http:
+          runner: api
+          method: POST
+          path: /ingest
+          header:
+            Content-Type: application/x-ndjson
+          body: |
+            {"event":"deploy"}
+            {"event":"restart"}
+      - assert:
+          status: 202

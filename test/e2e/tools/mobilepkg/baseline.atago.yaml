@@ -1,0 +1,44 @@
+# `mobilepkg inspect --baseline <report.json>` diffs the current package
+# against a previously saved report and embeds the diff under result.diff.
+# Diffing a report against the SAME package must report no identity/version
+# change. Run with:
+#   make dogfood-mobilepkg   (or test/e2e/tools/mobilepkg/run.sh)
+version: "1"
+
+suite:
+  name: mobilepkg inspect --baseline
+
+scenarios:
+  - name: diffing a package against its own baseline reports no changes
+    steps:
+      - run:
+          shell: true
+          command: cp "$MOBILEPKG_TESTDATA/android/androgoat_rich.apk" app.apk
+      # Save a baseline report, then inspect the same APK against it.
+      - run:
+          shell: true
+          command: mobilepkg inspect app.apk > base.json
+      - run:
+          command: mobilepkg inspect --baseline base.json app.apk
+      - assert:
+          exit_code: 0
+          stdout:
+            json: { path: "$.result.diff.identity_changed", equals: false }
+      - assert:
+          stdout:
+            json: { path: "$.result.diff.version_changed", equals: false }
+      - assert:
+          stdout:
+            json: { path: "$.result.diff.entry_changed", equals: false }
+
+  - name: a missing baseline file is an error
+    steps:
+      - run:
+          shell: true
+          command: cp "$MOBILEPKG_TESTDATA/android/androgoat_rich.apk" app.apk
+      - run:
+          command: mobilepkg inspect --baseline no_such_baseline.json app.apk
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            contains: "baseline"

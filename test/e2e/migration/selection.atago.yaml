@@ -1,0 +1,70 @@
+version: "1"
+
+# Migration guide fixture: skip / focus / tags.
+#
+# ShellSpec: Skip / Skip if / xIt / fIt, and `Describe ... tag:` + `--tag`.
+# Bats:      `skip "reason"`, `bats --filter-tags`, `# bats test_tags=...`.
+# runn:      `if:` conditions, `--label` selection.
+#
+# atago maps these to declarative gates (`skip:` / `only:`) and `tags:` +
+# `--tag` / `--skip-tag` / `--filter`. All scenarios below run green under a
+# plain `atago run` (no flags): the gates decide whether a scenario executes,
+# and the tagged scenarios still pass when selected.
+suite:
+  name: migration / selection — skip, focus, tags
+
+scenarios:
+  # ShellSpec: Skip if "not linux" ... ; Bats: skip on non-linux
+  # atago: skip: { os: windows } declaratively skips POSIX-only scenarios.
+  - name: skip on an OS maps to skip os
+    skip: { os: windows }
+    steps:
+      - run:
+          shell: true
+          command: "test -d /"        # POSIX filesystem probe
+      - assert:
+          exit_code: 0
+
+  # ShellSpec: fIt / Bats: bats --filter-tags smoke
+  # atago: tag a scenario, then `atago run --tag smoke` to focus on it.
+  - name: a smoke-tagged scenario is selectable with --tag
+    tags: [smoke]
+    steps:
+      - run:
+          shell: true
+          command: echo smoke ok
+      - assert:
+          stdout:
+            contains: ok
+
+  # ShellSpec/Bats: mark slow tests so CI can drop them with --skip-tag slow.
+  - name: a slow-tagged scenario is droppable with --skip-tag
+    tags: [slow]
+    steps:
+      - run:
+          shell: true
+          command: echo slow but still green
+      - assert:
+          exit_code: 0
+
+  # runn: `if: env.CI != ""` — atago's `only: { env: CI }` runs only in CI.
+  # Under a local `atago run` (no CI env) this scenario is skipped, not failed.
+  - name: only-in-CI maps to only env
+    only: { env: CI_ONLY_UNSET_MARKER }
+    steps:
+      - run:
+          shell: true
+          command: echo would only run in CI
+      - assert:
+          exit_code: 0
+
+  # ShellSpec: Skip if "<probe>" ; atago: skip when a probe command exits 0.
+  # The probe below fails (false), so this scenario is NOT skipped and runs.
+  - name: skip on a probe command maps to skip command
+    skip: { command: "false" }
+    steps:
+      - run:
+          shell: true
+          command: echo probe did not match, so we run
+      - assert:
+          exit_code: 0

@@ -1,0 +1,36 @@
+version: "1"
+
+# defaults declares shared fragments once instead of repeating them in every
+# scenario: defaults.run merges into every run step, defaults.scenario.env into
+# every scenario's env, defaults.service into every service. An explicitly
+# authored value always wins.
+# Runs green as-is: atago run examples/defaults.atago.yaml
+
+suite:
+  name: defaults
+
+defaults:
+  run:
+    shell: true          # every run step goes through the shell
+  scenario:
+    env:
+      GREETING: hello    # every scenario sees this environment variable
+
+scenarios:
+  - name: run steps inherit shell true
+    steps:
+      - run:
+          command: echo no per-step shell needed
+      - assert:
+          stdout:
+            contains: no per-step shell needed
+
+  - name: scenarios inherit the shared env
+    skip:
+      os: windows   # $GREETING is POSIX expansion; use %GREETING% on Windows
+    steps:
+      - run:
+          command: echo $GREETING world
+      - assert:
+          stdout:
+            contains: hello world

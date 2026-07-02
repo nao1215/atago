@@ -1,0 +1,95 @@
+package loader
+
+import (
+	"maps"
+
+	"github.com/nao1215/atago/internal/spec"
+)
+
+// applyDefaults expands the top-level `defaults:` block into the concrete
+// scenario model (ADR-0039). It runs after matrix expansion and before
+// validation, so the merged result is validated and the engine only ever sees
+// fully-resolved scenarios — `defaults` is pure authoring sugar with no runtime
+// model of its own.
+//
+// Merge rules: an explicitly-authored value always wins; maps shallow-merge (the
+// authored key wins per key); a nil pointer / empty string counts as "unset" and
+// takes the default; a boolean default is OR-ed in because a Go bool has no unset
+// state (so a defaulted `shell: true` cannot be turned off per element).
+func applyDefaults(s *spec.Spec) {
+	d := s.Defaults
+	if d == nil {
+		return
+	}
+	for i := range s.Scenarios {
+		sc := &s.Scenarios[i]
+		if d.Scenario != nil {
+			sc.Env = mergeStringMap(d.Scenario.Env, sc.Env)
+		}
+		if d.Service != nil {
+			for j := range sc.Services {
+				mergeServiceDefaults(d.Service, &sc.Services[j])
+			}
+		}
+		if d.Run != nil {
+			for j := range sc.Steps {
+				if sc.Steps[j].Run != nil {
+					mergeRunDefaults(d.Run, sc.Steps[j].Run)
+				}
+			}
+		}
+	}
+}
+
+// mergeStringMap returns a shallow merge of def under own: every default key is
+// present unless own overrides it. It returns own unchanged when there is nothing
+// to add, and never mutates either input.
+func mergeStringMap(def, own map[string]string) map[string]string {
+	if len(def) == 0 {
+		return own
+	}
+	out := make(map[string]string, len(def)+len(own))
+	maps.Copy(out, def)
+	maps.Copy(out, own)
+	return out
+}
+
+// mergeRunDefaults layers def beneath an authored run step. Command and Retry are
+// intentionally not merged (they are per-step; the validator rejects them on
+// defaults.run so a stray value is never silently ignored).
+func mergeRunDefaults(def, r *spec.Run) {
+	if r.Runner == "" {
+		r.Runner = def.Runner
+	}
+	if def.Shell {
+		r.Shell = true
+	}
+	if r.Cwd == "" {
+		r.Cwd = def.Cwd
+	}
+	if r.Timeout == "" {
+		r.Timeout = def.Timeout
+	}
+	if r.Stdin == "" {
+		r.Stdin = def.Stdin
+	}
+	r.Env = mergeStringMap(def.Env, r.Env)
+}
+
+// mergeServiceDefaults layers def beneath an authored service. Name and Command
+// identify a service and are never defaulted (the validator rejects them on
+// defaults.service). A whole Ready probe is copied in when the service declares
+// none, so shared readiness (e.g. `ready.store`/`ready.timeout`) need not repeat.
+func mergeServiceDefaults(def, svc *spec.Service) {
+	if def.Shell {
+		svc.Shell = true
+	}
+	if svc.Cwd == "" {
+		svc.Cwd = def.Cwd
+	}
+	svc.Env = mergeStringMap(def.Env, svc.Env)
+	if svc.Ready == nil && def.Ready != nil {
+		ready := *def.Ready
+		svc.Ready = &ready
+	}
+}

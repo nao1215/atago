@@ -1,0 +1,133 @@
+# Dogfood spec: exercises atago's `image` assertion (ADR-0030) against the real
+# `truss` image-transform CLI (github.com/nao1215/truss). Requires `truss` on
+# PATH; run with: make dogfood. Each scenario is gated on truss being present so
+# the suite skips cleanly where it is not installed.
+#
+# The input image is a committed 16x16 PNG (testdata/sample.png). `fixture.from`
+# copies it into the per-scenario workdir; `similar_to` baselines resolve against
+# this spec's directory, so they point straight at the committed testdata file.
+version: "1"
+
+suite:
+  name: truss image conversion
+
+scenarios:
+  - name: inspect reports PNG format and dimensions as JSON
+    only:
+      command: truss --version
+    steps:
+      - fixture:
+          file: in.png
+          from: testdata/sample.png
+      - run:
+          command: truss inspect in.png
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              path: $.format
+              equals: png
+      - assert:
+          stdout:
+            json:
+              path: $.width
+              equals: 16
+      - assert:
+          stdout:
+            json:
+              path: $.height
+              equals: 16
+
+  - name: convert PNG to JPEG yields a same-size opaque JPEG
+    only:
+      command: truss --version
+    steps:
+      - fixture:
+          file: in.png
+          from: testdata/sample.png
+      - run:
+          command: truss convert in.png -o out.jpg
+      - assert:
+          exit_code: 0
+          image:
+            path: out.jpg
+            format: jpeg
+            width: 16
+            height: 16
+            alpha: false
+
+  - name: resize with fit=fill produces the requested dimensions
+    only:
+      command: truss --version
+    steps:
+      - fixture:
+          file: in.png
+          from: testdata/sample.png
+      - run:
+          command: truss convert in.png -o thumb.png --width 8 --height 8 --fit fill
+      - assert:
+          exit_code: 0
+          image:
+            path: thumb.png
+            format: png
+            width: 8
+            height: 8
+
+  - name: convert to WebP yields a WebP of the same dimensions
+    only:
+      command: truss --version
+    steps:
+      - fixture:
+          file: in.png
+          from: testdata/sample.png
+      - run:
+          command: truss convert in.png -o out.webp --format webp
+      - assert:
+          exit_code: 0
+          image:
+            path: out.webp
+            format: webp
+            width: 16
+            height: 16
+
+  - name: a high-quality JPEG stays visually close to the source
+    only:
+      command: truss --version
+    steps:
+      - fixture:
+          file: in.png
+          from: testdata/sample.png
+      - run:
+          command: truss convert in.png -o out.jpg --quality 100
+      - assert:
+          exit_code: 0
+          image:
+            path: out.jpg
+            similar_to: testdata/sample.png
+            max_diff: 0.05
+
+  - name: a lossless PNG re-encode is pixel-identical to the source
+    only:
+      command: truss --version
+    steps:
+      - fixture:
+          file: in.png
+          from: testdata/sample.png
+      - run:
+          command: truss convert in.png -o copy.png
+      - assert:
+          exit_code: 0
+          image:
+            path: copy.png
+            similar_to: testdata/sample.png
+
+  - name: a missing input file exits with the I/O error code
+    only:
+      command: truss --version
+    steps:
+      - run:
+          command: truss convert does-not-exist.png -o out.jpg
+      - assert:
+          exit_code: 2
+          stderr:
+            contains: does-not-exist.png

@@ -1,0 +1,212 @@
+version: "1"
+
+suite:
+  name: prometheus (self-hosted monitoring system)
+
+# Exercises Prometheus (https://prometheus.io/, from awesome-selfhosted's
+# monitoring corner) as a third-party target: promtool as a pure CLI (config
+# validation both ways, plus unit-testing alerting rules), and the real server
+# booted from an authored config — health endpoints, the query API as JSON,
+# and a self-scrape polled with http retry until the sample is ingested.
+# Install (prebuilt release; `go install` is blocked by replace directives):
+#   see .github/workflows/thirdparty.yml for the download-and-unpack step
+#
+# Each server scenario binds its own port so the suite runs under the default
+# scenario concurrency.
+
+permissions:
+  network:
+    allow: [127.0.0.1]
+
+runners:
+  prom:
+    type: http
+    base_url: http://127.0.0.1:18130
+    timeout: 10s
+  prom2:
+    type: http
+    base_url: http://127.0.0.1:18131
+    timeout: 10s
+
+scenarios:
+  - name: promtool accepts a valid config and rejects a broken one
+    steps:
+      - fixture:
+          file: prometheus.yml
+          content: |
+            global:
+              scrape_interval: 15s
+            scrape_configs:
+              - job_name: self
+                static_configs:
+                  - targets: ["127.0.0.1:9090"]
+      - run:
+          command: promtool check config prometheus.yml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "SUCCESS: prometheus.yml is valid prometheus config file syntax"
+      - fixture:
+          file: broken.yml
+          content: |
+            global:
+              scrape_interval: not-a-duration
+      - run:
+          command: promtool check config broken.yml
+      - assert:
+          exit_code:
+            not: 0
+          stderr:
+            contains: not a valid duration string
+
+  - name: promtool unit-tests an alerting rule
+    steps:
+      - fixture:
+          file: rules.yml
+          content: |
+            groups:
+              - name: atago
+                rules:
+                  - record: job:up:count
+                    expr: count(up)
+                  - alert: InstanceDown
+                    expr: up == 0
+                    for: 1m
+                    labels:
+                      severity: page
+                    annotations:
+                      summary: "Instance down"
+      - run:
+          command: promtool check rules rules.yml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "SUCCESS: 2 rules found"
+      - fixture:
+          file: rules_test.yml
+          content: |
+            rule_files:
+              - rules.yml
+            evaluation_interval: 1m
+            tests:
+              - interval: 1m
+                input_series:
+                  - series: 'up{job="api",instance="a:9100"}'
+                    values: "0 0 0"
+                alert_rule_test:
+                  - eval_time: 2m
+                    alertname: InstanceDown
+                    exp_alerts:
+                      - exp_labels:
+                          severity: page
+                          job: api
+                          instance: a:9100
+                        exp_annotations:
+                          summary: "Instance down"
+      - run:
+          command: promtool test rules rules_test.yml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: SUCCESS
+
+  - name: the server boots from an authored config and answers the query API
+    services:
+      - name: prometheus
+        command: prometheus --config.file=prometheus.yml --storage.tsdb.path=data --web.listen-address=127.0.0.1:18130
+        ready:
+          port: 127.0.0.1:18130
+          timeout: 30s
+    steps:
+      - fixture:
+          file: prometheus.yml
+          content: |
+            global:
+              scrape_interval: 15s
+            scrape_configs: []
+      - http:
+          runner: prom
+          method: GET
+          path: /-/healthy
+      - assert:
+          status: 200
+          body:
+            contains: Prometheus Server is Healthy.
+      # The port opens before the TSDB finishes replaying; poll readiness.
+      - http:
+          runner: prom
+          method: GET
+          path: /-/ready
+          retry:
+            times: 30
+            interval: 500ms
+            until:
+              status: 200
+      - assert:
+          status: 200
+          body:
+            contains: Prometheus Server is Ready.
+      - http:
+          runner: prom
+          method: GET
+          path: /api/v1/status/buildinfo
+      - assert:
+          status: 200
+          body:
+            json:
+              path: "$.status"
+              equals: success
+      - assert:
+          body:
+            json:
+              path: "$.data.version"
+              matches: "^[0-9]+\\.[0-9]+\\.[0-9]+"
+      # PromQL evaluation through the instant-query API.
+      - http:
+          runner: prom
+          method: GET
+          path: /api/v1/query?query=vector(42)
+      - assert:
+          status: 200
+          body:
+            json:
+              path: "$.data.result[0].value[1]"
+              equals: "42"
+
+  - name: a self-scrape is ingested and queryable as up == 1
+    services:
+      - name: prometheus
+        command: prometheus --config.file=prometheus.yml --storage.tsdb.path=data --web.listen-address=127.0.0.1:18131
+        ready:
+          port: 127.0.0.1:18131
+          timeout: 30s
+    steps:
+      - fixture:
+          file: prometheus.yml
+          content: |
+            global:
+              scrape_interval: 1s
+            scrape_configs:
+              - job_name: self
+                static_configs:
+                  - targets: ["127.0.0.1:18131"]
+      # The first sample lands only after a scrape cycle completes; poll the
+      # query API with http retry until it is ingested.
+      - http:
+          runner: prom2
+          method: GET
+          path: /api/v1/query?query=up{job="self"}
+          retry:
+            times: 30
+            interval: 500ms
+            until:
+              body:
+                json:
+                  path: "$.data.result[0].value[1]"
+                  equals: "1"
+      - assert:
+          status: 200
+          body:
+            json:
+              path: "$.data.result[0].metric.job"
+              equals: self

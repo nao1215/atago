@@ -1,0 +1,55 @@
+# `mobilepkg compare <old> <new>` (alias: `diff`) diffs two packages and emits
+# JSON. The only committed fixture is the AndroGoat APK, so the hermetic case
+# compares it against itself: identity/version/entry must be unchanged and the
+# platform/format echoed back. Run with:
+#   make dogfood-mobilepkg   (or test/e2e/tools/mobilepkg/run.sh)
+version: "1"
+
+suite:
+  name: mobilepkg compare
+
+scenarios:
+  - name: comparing a package with itself reports no identity or version change
+    steps:
+      - run:
+          shell: true
+          command: cp "$MOBILEPKG_TESTDATA/android/androgoat_rich.apk" app.apk
+      - run:
+          command: mobilepkg compare app.apk app.apk
+      - assert:
+          exit_code: 0
+          stdout:
+            json: { path: "$.identity_changed", equals: false }
+      - assert:
+          stdout:
+            json: { path: "$.version_changed", equals: false }
+      - assert:
+          stdout:
+            json: { path: "$.old_platform", equals: "android" }
+      - assert:
+          stdout:
+            json: { path: "$.new_format", equals: "apk" }
+
+  - name: diff is an alias for compare
+    steps:
+      - run:
+          shell: true
+          command: cp "$MOBILEPKG_TESTDATA/android/androgoat_rich.apk" app.apk
+      - run:
+          command: mobilepkg diff app.apk app.apk
+      - assert:
+          exit_code: 0
+          stdout:
+            json: { path: "$.identity_changed", equals: false }
+
+  - name: compare requires two files
+    steps:
+      - run:
+          shell: true
+          command: cp "$MOBILEPKG_TESTDATA/android/androgoat_rich.apk" app.apk
+      - run:
+          command: mobilepkg compare app.apk
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            contains: "Usage: mobilepkg compare"

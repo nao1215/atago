@@ -1,0 +1,19 @@
+coverage:
+  paths:
+    - cover.out
+  acceptable: 80%
+  exclude:
+    # The process entrypoint just wires os.Args into cli.Main; it has no logic
+    # worth a test and is exercised end-to-end by the binary itself.
+    - "github.com/nao1215/atago/main.go"
+  badge:
+    path: doc/coverage.svg
+diff:
+  datastores:
+    - artifact://${GITHUB_REPOSITORY}
+comment:
+  if: is_pull_request
+report:
+  if: is_default_branch
+  datastores:
+    - artifact://${GITHUB_REPOSITORY}

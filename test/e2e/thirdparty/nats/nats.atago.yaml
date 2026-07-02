@@ -1,0 +1,175 @@
+version: "1"
+
+suite:
+  name: nats (self-hosted messaging system)
+
+# Exercises NATS (https://nats.io/, from awesome-selfhosted's messaging
+# corner) as a third-party target — a messaging workload unlike anything else
+# in this directory: the real broker runs as a background service and is
+# driven with the official nats CLI through request/reply (a second background
+# service answers), JetStream persistence (stream create → publish → counted
+# state → purge), and the JetStream KV store, while the monitoring endpoint is
+# asserted through the http runner. Install with:
+#   go install github.com/nats-io/nats-server/v2@latest
+#   go install github.com/nats-io/natscli/nats@latest
+#
+# Each scenario binds its own port so the suite runs under the default
+# scenario concurrency.
+
+permissions:
+  network:
+    allow: [127.0.0.1]
+
+runners:
+  monitor:
+    type: http
+    base_url: http://127.0.0.1:18161
+    timeout: 10s
+
+scenarios:
+  - name: the binary reports its version
+    steps:
+      - run:
+          command: nats-server --version
+      - assert:
+          exit_code: 0
+          stdout:
+            matches: "nats-server: v[0-9]+\\.[0-9]+\\.[0-9]+"
+
+  - name: the monitoring endpoint reports a healthy JetStream server
+    services:
+      - name: nats-server
+        command: nats-server -js -sd store -a 127.0.0.1 -p 18160 -m 18161
+        ready:
+          port: 127.0.0.1:18160
+          timeout: 15s
+    steps:
+      - http:
+          runner: monitor
+          method: GET
+          path: /healthz
+      - assert:
+          status: 200
+          body:
+            json:
+              path: "$.status"
+              equals: ok
+      - http:
+          runner: monitor
+          method: GET
+          path: /varz
+      - assert:
+          status: 200
+          body:
+            json:
+              path: "$.version"
+              matches: "^[0-9]+\\.[0-9]+\\.[0-9]+"
+      - assert:
+          body:
+            json:
+              path: "$.port"
+              equals: 18160
+
+  - name: request/reply round-trips through the broker
+    services:
+      - name: nats-server
+        command: nats-server -a 127.0.0.1 -p 18162
+        ready:
+          port: 127.0.0.1:18162
+          timeout: 15s
+      # A second real client process answers requests — readiness is its own
+      # "Listening on" log line, so the request below cannot race the responder.
+      - name: responder
+        command: nats -s nats://127.0.0.1:18162 reply help.please "OK I CAN HELP"
+        ready:
+          log: "Listening on"
+          timeout: 15s
+    steps:
+      - run:
+          command: nats -s nats://127.0.0.1:18162 request help.please "help me"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: OK I CAN HELP
+
+  - name: a JetStream stream persists, counts, and purges messages
+    services:
+      - name: nats-server
+        command: nats-server -js -sd store -a 127.0.0.1 -p 18163
+        ready:
+          port: 127.0.0.1:18163
+          timeout: 15s
+    steps:
+      - run:
+          command: nats -s nats://127.0.0.1:18163 stream add ORDERS --subjects "orders.>" --defaults
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: Stream ORDERS was created
+      - run:
+          command: nats -s nats://127.0.0.1:18163 pub orders.new "order-1"
+      - assert:
+          exit_code: 0
+      - run:
+          command: nats -s nats://127.0.0.1:18163 pub orders.priority "order-2"
+      - assert:
+          exit_code: 0
+      - run:
+          command: nats -s nats://127.0.0.1:18163 stream info ORDERS --json
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              path: "$.state.messages"
+              equals: 2
+      - assert:
+          stdout:
+            json:
+              path: "$.config.subjects[0]"
+              equals: "orders.>"
+      - run:
+          command: nats -s nats://127.0.0.1:18163 stream purge ORDERS --force
+      - assert:
+          exit_code: 0
+      - run:
+          command: nats -s nats://127.0.0.1:18163 stream info ORDERS --json
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              path: "$.state.messages"
+              equals: 0
+
+  - name: the JetStream KV bucket stores and serves configuration
+    services:
+      - name: nats-server
+        command: nats-server -js -sd store -a 127.0.0.1 -p 18164
+        ready:
+          port: 127.0.0.1:18164
+          timeout: 15s
+    steps:
+      - run:
+          command: nats -s nats://127.0.0.1:18164 kv add CONFIG
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "Bucket Name: CONFIG"
+      - run:
+          command: nats -s nats://127.0.0.1:18164 kv put CONFIG greeting "hello from atago"
+      - assert:
+          exit_code: 0
+      - run:
+          command: nats -s nats://127.0.0.1:18164 kv get CONFIG greeting --raw
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: hello from atago
+      - run:
+          command: nats -s nats://127.0.0.1:18164 kv del CONFIG greeting --force
+      - assert:
+          exit_code: 0
+      - run:
+          command: nats -s nats://127.0.0.1:18164 kv get CONFIG greeting --raw
+      - assert:
+          exit_code:
+            not: 0

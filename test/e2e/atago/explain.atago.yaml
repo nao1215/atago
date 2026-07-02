@@ -1,0 +1,33 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / explain
+
+scenarios:
+  - name: explain summarizes a spec without running it
+    steps:
+      - fixture:
+          file: target.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: sample
+            scenarios:
+              - name: list as json
+                steps:
+                  - run:
+                      command: echo "[]"
+                  - assert:
+                      exit_code: 0
+                      stdout:
+                        contains: "["
+      - run:
+          command: ${atago} explain target.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "Suite: sample"
+              - "Scenario: list as json"
+              - "Commands:"
+              - "Network policy:"

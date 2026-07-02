@@ -1,0 +1,74 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / yaml stream matcher
+
+scenarios:
+  - name: a yaml stream matcher selects and asserts a decoded value (#9)
+    steps:
+      - fixture:
+          file: yaml_ok.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: yaml-matcher
+            scenarios:
+              - name: command emits yaml and the matcher reads it
+                steps:
+                  - fixture:
+                      file: data.yaml
+                      content: |
+                        name: alice
+                        items:
+                          - id: 1
+                          - id: 2
+                  - run:
+                      command: cat data.yaml
+                  - assert:
+                      stdout:
+                        yaml:
+                          path: "$.name"
+                          equals: alice
+                  - assert:
+                      stdout:
+                        yaml:
+                          path: "$.items"
+                          length: 2
+      - run:
+          command: ${atago} run yaml_ok.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: PASS
+      - assert:
+          stdout:
+            not_contains: matcher not supported yet
+
+  - name: a yaml matcher mismatch fails the inner spec (#9)
+    steps:
+      - fixture:
+          file: yaml_fail.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: yaml-matcher-fail
+            scenarios:
+              - name: wrong expected value
+                steps:
+                  - fixture:
+                      file: data.yaml
+                      content: |
+                        name: alice
+                  - run:
+                      command: cat data.yaml
+                  - assert:
+                      stdout:
+                        yaml:
+                          path: "$.name"
+                          equals: bob
+      - run:
+          command: ${atago} run yaml_fail.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: FAILED

@@ -1,0 +1,60 @@
+name: Dogfood
+
+# atago's strongest product proof is its dogfood matrix — running the real
+# hermetic atago binary against real third-party CLIs (#77). The hermetic
+# self-hosted suite runs on every push (e2e.yml); this workflow continuously
+# exercises the go-installable dogfood slices (gup, sqly, truss) so real-world
+# regressions surface on a dedicated, clearly-owned workflow instead of only when
+# a maintainer runs `make dogfood` by hand.
+#
+# It is intentionally NOT gated on push: it depends on external tools whose
+# availability atago does not control, so it runs on a schedule and on demand to
+# keep the required push checks fast and deterministic. Each tool is its own
+# matrix leg so a failure localizes to one external CLI.
+on:
+  workflow_dispatch:
+  schedule:
+    # 06:00 UTC daily.
+    - cron: "0 6 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  dogfood:
+    name: dogfood (${{ matrix.tool.name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        tool:
+          - { name: gup, module: "github.com/nao1215/gup@latest", dir: "./test/e2e/tools/gup" }
+          - { name: sqly, module: "github.com/nao1215/sqly@latest", dir: "./test/e2e/tools/sqly" }
+          - { name: truss, module: "github.com/nao1215/truss@latest", dir: "./test/e2e/tools/truss" }
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: "go.mod"
+
+      - name: Build atago
+        run: go build -o ./dist/atago .
+
+      - name: Install ${{ matrix.tool.name }} onto PATH
+        run: |
+          set -e
+          go install "${{ matrix.tool.module }}"
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Report the dogfood target
+        run: |
+          echo "Running the ${{ matrix.tool.name }} dogfood slice: ${{ matrix.tool.dir }}"
+          command -v "${{ matrix.tool.name }}" && "${{ matrix.tool.name }}" --version || true
+
+      - name: Run the ${{ matrix.tool.name }} dogfood specs
+        run: ./dist/atago run "${{ matrix.tool.dir }}"

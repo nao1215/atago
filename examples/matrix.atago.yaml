@@ -1,0 +1,24 @@
+version: "1"
+
+# A matrix turns one template scenario into one concrete scenario per row; each
+# row's variables are available as ${name}, including in the scenario name.
+# Runs green as-is: atago run examples/matrix.atago.yaml
+
+suite:
+  name: matrix
+
+scenarios:
+  - name: "greets ${who} in ${lang}"
+    matrix:
+      - who: Alice
+        lang: en
+      - who: Bob
+        lang: fr
+    steps:
+      - run:
+          shell: true
+          command: echo ${lang} greeting for ${who}
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: ${who}

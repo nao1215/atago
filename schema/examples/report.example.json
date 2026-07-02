@@ -1,0 +1,24 @@
+{
+  "schema_version": "1",
+  "suites": [
+    {
+      "suite": "atago self-hosting / version",
+      "spec_path": "test/e2e/atago/version.atago.yaml",
+      "status": "passed",
+      "duration_ms": 0,
+      "scenarios": [
+        {
+          "name": "version command prints the binary name",
+          "status": "passed",
+          "duration_ms": 0
+        },
+        {
+          "name": "unknown command is a configuration error",
+          "status": "passed",
+          "duration_ms": 0
+        }
+      ],
+      "failures": []
+    }
+  ]
+}

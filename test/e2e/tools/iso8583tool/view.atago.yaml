@@ -1,0 +1,157 @@
+# Migrated from iso8583tool's ShellSpec spec/view_spec.sh.
+# view: decoding, the one-line summary, PAN masking, --filter, JSON output, and
+# reading from stdin. Nested Describes are flattened into the scenario names.
+#
+# Env: ISO_EXAMPLES ($EXAMPLES == $ISO_EXAMPLES/basei). The kanmu-like raw
+# message is reproduced with the same printf octal escapes the ShellSpec helper
+# write_kanmu_like_message used. PACKED_BCD_SPEC == spec87bcd-starter.
+# Run with: make dogfood-iso8583tool
+version: "1"
+
+suite:
+  name: iso8583tool view
+
+scenarios:
+  - name: describe output - decodes codes and prints a summary
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool view $ISO_EXAMPLES/basei/0110-auth-response.hex"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "Summary:"
+              - "Approved"
+              - "JPY 5000"
+              - "06-04 12:34:56"
+
+  - name: describe output - masks the PAN
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool view $ISO_EXAMPLES/basei/0110-auth-response.hex"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "411111******1111"
+      - assert:
+          stdout:
+            not_contains: "4111111111111111"
+
+  - name: json output - emits a decoded array and stays uncolored
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool view $ISO_EXAMPLES/basei/0110-auth-response.hex --format json --color always"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - '"decoded"'
+              - '"meaning": "Approved"'
+
+  - name: --filter prints only the requested fields
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool view $ISO_EXAMPLES/basei/0110-auth-response.hex --filter 39 --filter 55.8A"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "Approved"
+      - assert:
+          stdout:
+            not_contains: "Primary Account Number"
+
+  - name: --filter marks a field that is not present
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool view $ISO_EXAMPLES/basei/0110-auth-response.hex --filter 90"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "not present"
+
+  - name: --filter emits object-shaped JSON with an explicit missing_filters list
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool view $ISO_EXAMPLES/basei/0110-auth-response.hex --filter 39 --filter 90 --format json"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - '"mti"'
+              - '"missing_filters"'
+              - '"90"'
+              - '"meaning": "Approved"'
+
+  - name: --filter always emits missing_filters as an array even when nothing is missing
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool view $ISO_EXAMPLES/basei/0110-auth-response.hex --filter 39 --format json"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: '"missing_filters": []'
+
+  - name: stdin - reads a message piped in via -
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool sample 0110-auth-response --format hex | iso8583tool view -"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "MTI"
+              - "Approved"
+
+  - name: stdin - reads from stdin when the target is omitted
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool sample 0110-auth-response --format hex | iso8583tool view"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "MTI"
+
+  - name: raw binary + packed BCD - views a kanmu-like raw message with the packed-BCD starter preset
+    steps:
+      - run:
+          shell: true
+          command: "printf '\\001\\000\\160\\004\\000\\000\\000\\000\\000\\000\\020\\100\\031\\044\\231\\231\\231\\231\\231\\062\\163\\047\\000\\000\\000\\000\\021\\070\\042\\004' > message.bin"
+      - run:
+          command: iso8583tool view message.bin --encoding raw --spec spec87bcd-starter
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "401924******9999"
+              - "327327"
+              - "1138"
+              - "2204"
+
+  - name: private-field safety - masks a PAN embedded in a free-form private field by default
+    steps:
+      - run:
+          shell: true
+          command: 'printf "%s" "{\"mti\":\"0110\",\"fields\":{\"11\":\"123456\",\"39\":\"00\",\"63\":\"PAN=4111111111111111\"}}" | iso8583tool convert --to hex | iso8583tool view - --format json'
+      - assert:
+          exit_code: 0
+          stdout:
+            not_contains: "4111111111111111"
+
+  - name: private-field safety - reveals the raw private-field value with --unsafe
+    steps:
+      - run:
+          shell: true
+          command: 'printf "%s" "{\"mti\":\"0110\",\"fields\":{\"11\":\"123456\",\"39\":\"00\",\"63\":\"PAN=4111111111111111\"}}" | iso8583tool convert --to hex | iso8583tool view - --format json --unsafe'
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "4111111111111111"

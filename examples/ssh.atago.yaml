@@ -1,0 +1,29 @@
+version: "1"
+
+# An ssh runner executes run steps on a remote host; exit_code / stdout /
+# stderr assertions work exactly like a local run.
+# Before running: set host, user, and key_file (or password) to a machine you
+# can reach.
+
+suite:
+  name: ssh
+
+runners:
+  box:
+    type: ssh
+    host: deploy.example.com          # <-- edit: host or host:port (default 22)
+    user: deploy                      # <-- edit: login user
+    key_file: ~/.ssh/id_ed25519       # <-- edit: private key (or password: ...)
+    known_hosts: ~/.ssh/known_hosts   # verifies the host key (recommended)
+    # insecure_host_key: true         # test/lab only: skip host-key checks
+
+scenarios:
+  - name: the service is healthy on the box
+    steps:
+      - run:
+          runner: box
+          command: systemctl is-active myservice
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: active

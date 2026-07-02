@@ -1,0 +1,126 @@
+# Migrated from jose's ShellSpec spec/jwk_spec.sh.
+# jwk generate: key types, the curve matrix, the bit-sized oct key, and the
+# overwrite regression that left garbage trailing a shorter key. Each scenario
+# runs the real jose binary inside its isolated ${workdir}. Run with:
+#   make dogfood-jose   (or test/e2e/tools/jose/run.sh)
+version: "1"
+
+suite:
+  name: jose jwk generate
+
+scenarios:
+  - name: generates an RSA key as JSON
+    steps:
+      - run:
+          command: jose jwk generate --type RSA --size 2048
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - '"kty"'
+              - "RSA"
+
+  - name: generates an EC key in PEM format
+    steps:
+      - run:
+          command: jose jwk generate --type EC --curve P-256 --output-format pem
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "BEGIN"
+              - "PRIVATE KEY"
+
+  - name: generates an OKP Ed25519 key
+    steps:
+      - run:
+          command: jose jwk generate --type OKP --curve Ed25519
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "OKP"
+
+  - name: generates an oct key
+    steps:
+      - run:
+          command: jose jwk generate --type oct --size 256
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "oct"
+
+  - name: emits a public key without private fields
+    steps:
+      - run:
+          command: jose jwk generate --type EC --curve P-256 --public-key
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: '"kty"'
+      - assert:
+          stdout:
+            not_contains: '"d"'
+
+  - name: rejects the unsupported OKP X448 curve
+    steps:
+      - run:
+          command: jose jwk generate --type OKP --curve X448
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            contains: "OKP supports"
+
+  - name: rejects the unsupported OKP Ed448 curve
+    steps:
+      - run:
+          command: jose jwk generate --type OKP --curve Ed448
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            contains: "OKP supports"
+
+  - name: requires a curve for EC keys
+    steps:
+      - run:
+          command: jose jwk generate --type EC
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            contains: "require --curve"
+
+  - name: rejects PEM output for oct keys
+    steps:
+      - run:
+          command: jose jwk generate --type oct --size 256 --output-format pem
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            contains:
+              - "oct"
+              - "json"
+
+  - name: rejects --public-key for oct keys
+    steps:
+      - run:
+          command: jose jwk generate --type oct --size 256 --public-key
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            contains: "public key"
+
+  - name: leaves a parseable EC key after overwriting a longer RSA key
+    # Writing a short EC key over a long RSA key must leave a single parseable
+    # key, not RSA bytes trailing the EC JSON. Signing with the file proves it
+    # parses, because jwk.ReadFile rejects trailing garbage.
+    steps:
+      - run:
+          shell: true
+          command: |
+            jose jwk generate --type RSA --size 4096 --output key.jwk
+            jose jwk generate --type EC --curve P-256 --output key.jwk
+            printf 'hello' > msg.txt
+            jose jws sign --algorithm ES256 --key key.jwk msg.txt
+      - assert:
+          exit_code: 0
+          stdout:
+            empty: false

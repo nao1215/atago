@@ -1,0 +1,97 @@
+# Migrated from iso8583tool's ShellSpec spec/validate_spec.sh.
+# validate: exit codes (0 for warnings, 1 for errors), the field that broke, and
+# the unknown-TLV warning.
+#
+# Env (exported by run.sh): ISO_EXAMPLES (examples dir). In the ShellSpec source
+# $EXAMPLES == $ISO_EXAMPLES/basei, referenced from shell: true commands.
+# Run with: make dogfood-iso8583tool
+version: "1"
+
+suite:
+  name: iso8583tool validate
+
+scenarios:
+  - name: passes a good message with exit 0
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool validate $ISO_EXAMPLES/basei/0110-auth-response.hex"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "Validation: ok"
+              - "MTI: 0110"
+
+  - name: reports unknown TLV tags as a warning but still exits 0
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool validate $ISO_EXAMPLES/basei/0100-auth-request-unknown-tlv.hex"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "warning"
+              - "55.DF8129"
+
+  - name: fails a broken message with exit 1 and names the field
+    steps:
+      - run:
+          command: iso8583tool validate --raw 01007220
+      - assert:
+          exit_code:
+            not: 0
+          stdout:
+            contains:
+              - "Validation: failed"
+              - "[error]"
+              - "input was"
+
+  - name: emits a JSON report with --format json
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool validate $ISO_EXAMPLES/basei/0110-auth-response.hex --format json"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - '"valid": true'
+              - '"summary"'
+
+  - name: accepts a complete sample under --strict
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool validate $ISO_EXAMPLES/basei/0110-auth-response.hex --strict"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "Validation: ok"
+
+  - name: flags a hollow response under --strict
+    steps:
+      # A 0110 carrying only a STAN unpacks, but is not a well-formed response.
+      - run:
+          shell: true
+          command: 'printf "%s" "{\"mti\":\"0110\",\"fields\":{\"11\":\"123456\"}}" | iso8583tool convert --to hex | iso8583tool validate - --strict'
+      - assert:
+          exit_code:
+            not: 0
+          stdout:
+            contains:
+              - "Validation: failed"
+              - "39"
+
+  - name: omits the Decoded Fields heading when only the MTI decoded
+    steps:
+      # A message whose only decoded entry is the MTI must not print an empty
+      # "Decoded Fields:" section (the MTI is shown on its own line above).
+      - run:
+          shell: true
+          command: 'printf "%s" "{\"mti\":\"0500\",\"fields\":{\"11\":\"123456\"}}" | iso8583tool convert --to hex | iso8583tool validate - --strict'
+      - assert:
+          exit_code: 0
+          stdout:
+            not_contains: "Decoded Fields:"

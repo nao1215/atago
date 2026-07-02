@@ -1,0 +1,23 @@
+version: "1"
+
+# snapshot compares output against a committed golden file. Volatile details
+# (ANSI colors, temp paths, home dir, UUIDs, timestamps, ports, CRLF) are
+# normalized, so snapshots stay stable across machines.
+#
+#   atago run examples/snapshot.atago.yaml               # compare
+#   atago snapshot update examples/snapshot.atago.yaml   # (re)record
+#
+# Runs green as-is: the golden file is committed next to this spec.
+
+suite:
+  name: snapshot
+
+scenarios:
+  - name: stdout matches the committed golden file
+    steps:
+      - run:
+          shell: true
+          command: echo stable greeting
+      - assert:
+          stdout:
+            snapshot: snapshots/greeting.txt

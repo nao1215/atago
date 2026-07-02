@@ -1,0 +1,57 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / not_equals matcher
+
+# Exercises the negative exact-text matcher `not_equals` (ADR-0023), the
+# symmetric counterpart of `equals`. Modeled on ShellSpec's `should not equal`,
+# which procps/util-linux ports had to work around with contains/matches.
+scenarios:
+  - name: not_equals passes when stdout differs from the given text
+    steps:
+      - run:
+          command: echo Bob
+      - assert:
+          stdout:
+            not_equals: Alice
+
+  - name: not_equals is trailing-newline tolerant like equals
+    steps:
+      - run:
+          command: echo hello
+      - assert:
+          stdout:
+            not_equals: goodbye
+
+  - name: not_equals composes with a line selector
+    steps:
+      - run:
+          shell: true
+          command: "printf 'first\\nsecond\\n'"
+      - assert:
+          stdout:
+            line: 2
+            not_equals: first
+
+  - name: not_equals fails the inner spec when the text matches exactly
+    steps:
+      - fixture:
+          file: ne.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: stdout equals the forbidden text
+                steps:
+                  - run:
+                      command: echo same
+                  - assert:
+                      stdout:
+                        not_equals: same
+      - run:
+          command: ${atago} run ne.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: unexpectedly equaled

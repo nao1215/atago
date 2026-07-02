@@ -1,0 +1,71 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / fixture symlink+mode+mtime, file executable, env skip
+
+# Exercises the features added so no ShellSpec case needs excluding:
+#   fixture.symlink / fixture.mode / fixture.mtime, file.executable, and
+#   env-conditional skip/only.
+scenarios:
+  - name: a symlink fixture resolves to its target
+    steps:
+      - fixture:
+          file: target.txt
+          content: payload
+      - fixture:
+          file: alias.txt
+          symlink: "${workdir}/target.txt"
+      - run:
+          shell: true
+          command: "cat alias.txt"
+      - assert:
+          stdout:
+            equals: payload
+
+  - name: fixture.mode sets permissions and file.executable reads them
+    steps:
+      - fixture:
+          file: run.sh
+          content: "echo hi"
+          mode: "0755"
+      - assert:
+          file:
+            path: run.sh
+            executable: true
+      - fixture:
+          file: data.txt
+          content: plain
+          mode: "0444"
+      - assert:
+          file:
+            path: data.txt
+            executable: false
+
+  - name: fixture.mtime pins the modification time
+    steps:
+      - fixture:
+          file: stamped.txt
+          content: x
+          mtime: "2021-06-30T12:00:00Z"
+      - run:
+          shell: true
+          command: "date -u -r stamped.txt +%Y"
+      - assert:
+          stdout:
+            contains: "2021"
+
+  - name: only.env skips when the variable is unset
+    only:
+      env: ATAGO_DEFINITELY_UNSET
+    steps:
+      - run:
+          command: "false"   # would fail if it ran; the scenario must be skipped
+
+  - name: skip.env runs when the variable is unset
+    skip:
+      env: ATAGO_DEFINITELY_UNSET
+    steps:
+      - run:
+          command: "true"
+      - assert:
+          exit_code: 0

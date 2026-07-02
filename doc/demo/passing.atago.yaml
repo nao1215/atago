@@ -1,0 +1,43 @@
+version: "1"
+
+suite:
+  name: demo
+
+scenarios:
+  - name: echo greets the world
+    steps:
+      - run:
+          command: echo "hello atago"
+      - assert:
+          exit_code: 0
+      - assert:
+          stdout:
+            contains: atago
+
+  - name: query JSON output by path
+    steps:
+      - run:
+          shell: true
+          command: printf '{"items":[{"id":1},{"id":2}]}'
+      - assert:
+          stdout:
+            json:
+              path: "$.items[0].id"
+              equals: 1
+      - assert:
+          stdout:
+            json:
+              path: "$.items"
+              length: 2
+
+  - name: fixtures create files to assert on
+    steps:
+      - fixture:
+          file: users.csv
+          content: |
+            id,name
+            1,Alice
+      - assert:
+          file:
+            path: users.csv
+            contains: Alice

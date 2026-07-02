@@ -1,0 +1,106 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / run
+
+scenarios:
+  - name: a passing spec exits zero and reports PASS
+    steps:
+      - fixture:
+          file: passing.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: sample
+            scenarios:
+              - name: exit 0 succeeds
+                steps:
+                  - run:
+                      shell: true
+                      command: "exit 0"
+                  - assert:
+                      exit_code: 0
+                      stderr:
+                        empty: true
+      - run:
+          command: ${atago} run passing.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: PASS
+          stderr:
+            empty: true
+
+  - name: a failing assertion exits one and reports the failure
+    steps:
+      - fixture:
+          file: failing.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: sample
+            scenarios:
+              - name: exit 1 should pass
+                steps:
+                  - run:
+                      shell: true
+                      command: "exit 1"
+                  - assert:
+                      exit_code: 0
+      - run:
+          command: ${atago} run failing.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - FAILED
+              - expected exit code 0
+
+  - name: a parse error exits with code two
+    steps:
+      - fixture:
+          file: broken.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              : not valid yaml
+      - run:
+          command: ${atago} run broken.atago.yaml
+      - assert:
+          exit_code: 2
+
+  - name: JSON report is valid JSON with a passed status
+    steps:
+      - fixture:
+          file: ok.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: sample
+            scenarios:
+              - name: echo
+                steps:
+                  - run:
+                      shell: true
+                      command: echo hello
+                  - assert:
+                      stdout:
+                        contains: hello
+      - run:
+          command: ${atago} run --report json ok.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              path: "$.schema_version"
+              equals: "1"
+      - assert:
+          stdout:
+            json:
+              path: "$.suites[0].status"
+              equals: passed
+      - assert:
+          stdout:
+            json:
+              path: "$.suites[0].scenarios"
+              length: 1

@@ -1,0 +1,148 @@
+# Migrated from iso8583tool's ShellSpec spec/masking_custom_spec.sh.
+# Masking under custom specs: a PAN/track carried in a binary field, in a TLV
+# tag the spec makes "known", in a non-55 TLV container, or nested inside a
+# constructed TLV template must still be masked by view and redact — without
+# over-masking a harmless custom field. The ShellSpec `build` helper
+# (spec.json + doc.json -> convert --to hex --output m.hex) is ported as two
+# fixture steps plus a setup `run`. Run with: make dogfood-iso8583tool
+version: "1"
+
+suite:
+  name: iso8583tool masking under custom specs
+
+scenarios:
+  - name: masks a PAN in a binary field 63
+    steps:
+      - fixture:
+          file: spec.json
+          content: '{"name":"B63","fields":{"0":{"type":"String","length":4,"description":"MTI","enc":"ASCII","prefix":"ASCII.Fixed"},"1":{"type":"Bitmap","length":16,"description":"Bitmap","enc":"HexToASCII","prefix":"Hex.Fixed"},"11":{"type":"String","length":6,"description":"STAN","enc":"ASCII","prefix":"ASCII.Fixed"},"63":{"type":"Binary","length":999,"description":"Private","enc":"Binary","prefix":"ASCII.LLL"}}}'
+      - fixture:
+          file: doc.json
+          content: '{"mti":"0110","fields":{"11":"123456"},"binary_fields":{"63":"50414E3D34313131313131313131313131313131"}}'
+      - run:
+          command: "iso8583tool convert doc.json --to hex --spec spec.json --output m.hex"
+      - run:
+          command: "iso8583tool view m.hex --spec spec.json --format json"
+      - assert:
+          exit_code: 0
+          stdout:
+            not_contains: "50414E3D"
+
+  - name: masks a known 9F6B track2-equivalent tag in view
+    steps:
+      - fixture:
+          file: spec.json
+          content: '{"name":"9F6B","fields":{"0":{"type":"String","length":4,"description":"MTI","enc":"ASCII","prefix":"ASCII.Fixed"},"1":{"type":"Bitmap","length":16,"description":"Bitmap","enc":"HexToASCII","prefix":"Hex.Fixed"},"11":{"type":"String","length":6,"description":"STAN","enc":"ASCII","prefix":"ASCII.Fixed"},"55":{"type":"Composite","length":999,"description":"ICC","prefix":"ASCII.LLL","tag":{"enc":"BerTLVTag","sort":"StringsByHex","skipUnknownTLVTags":true,"storeUnknownTLVTags":true},"subfields":{"9F6B":{"type":"Binary","length":19,"description":"Track 2 Equivalent","enc":"Binary","prefix":"BerTLV"}}}}}'
+      - fixture:
+          file: doc.json
+          content: '{"mti":"0110","fields":{"11":"123456"},"binary_fields":{"55.9F6B":"4111111111111111D29122011234567890"}}'
+      - run:
+          command: "iso8583tool convert doc.json --to hex --spec spec.json --output m.hex"
+      - run:
+          command: "iso8583tool view m.hex --spec spec.json --format json"
+      - assert:
+          exit_code: 0
+          stdout:
+            not_contains: "4111111111111111"
+
+  - name: masks a known 9F6B track2-equivalent tag in redact
+    steps:
+      - fixture:
+          file: spec.json
+          content: '{"name":"9F6B","fields":{"0":{"type":"String","length":4,"description":"MTI","enc":"ASCII","prefix":"ASCII.Fixed"},"1":{"type":"Bitmap","length":16,"description":"Bitmap","enc":"HexToASCII","prefix":"Hex.Fixed"},"11":{"type":"String","length":6,"description":"STAN","enc":"ASCII","prefix":"ASCII.Fixed"},"55":{"type":"Composite","length":999,"description":"ICC","prefix":"ASCII.LLL","tag":{"enc":"BerTLVTag","sort":"StringsByHex","skipUnknownTLVTags":true,"storeUnknownTLVTags":true},"subfields":{"9F6B":{"type":"Binary","length":19,"description":"Track 2 Equivalent","enc":"Binary","prefix":"BerTLV"}}}}}'
+      - fixture:
+          file: doc.json
+          content: '{"mti":"0110","fields":{"11":"123456"},"binary_fields":{"55.9F6B":"4111111111111111D29122011234567890"}}'
+      - run:
+          command: "iso8583tool convert doc.json --to hex --spec spec.json --output m.hex"
+      - run:
+          command: "iso8583tool redact m.hex --spec spec.json --format json"
+      - assert:
+          exit_code: 0
+          stdout:
+            not_contains: "4111111111111111"
+
+  - name: masks a track2-equivalent tag in a non-55 container (127.57)
+    steps:
+      - fixture:
+          file: spec.json
+          content: '{"name":"T127","fields":{"0":{"type":"String","length":4,"description":"MTI","enc":"ASCII","prefix":"ASCII.Fixed"},"1":{"type":"Bitmap","length":16,"description":"Bitmap","enc":"HexToASCII","prefix":"Hex.Fixed"},"11":{"type":"String","length":6,"description":"STAN","enc":"ASCII","prefix":"ASCII.Fixed"},"127":{"type":"Composite","length":999,"description":"Private TLV","prefix":"ASCII.LLL","tag":{"enc":"BerTLVTag","sort":"StringsByHex","skipUnknownTLVTags":true,"storeUnknownTLVTags":true},"subfields":{"57":{"type":"Binary","length":18,"description":"Track2Eq","enc":"Binary","prefix":"BerTLV"}}}}}'
+      - fixture:
+          file: doc.json
+          content: '{"mti":"0110","fields":{"11":"123456"},"binary_fields":{"127.57":"4111111111111111D29122011234567890"}}'
+      - run:
+          command: "iso8583tool convert doc.json --to hex --spec spec.json --output m.hex"
+      - run:
+          command: "iso8583tool view m.hex --spec spec.json --format json"
+      - assert:
+          exit_code: 0
+          stdout:
+            not_contains: "4111111111111111"
+
+  - name: masks a sensitive tag nested in a constructed TLV (55.70.57)
+    steps:
+      - fixture:
+          file: spec.json
+          content: '{"name":"C57","fields":{"0":{"type":"String","length":4,"description":"MTI","enc":"ASCII","prefix":"ASCII.Fixed"},"1":{"type":"Bitmap","length":16,"description":"Bitmap","enc":"HexToASCII","prefix":"Hex.Fixed"},"11":{"type":"String","length":6,"description":"STAN","enc":"ASCII","prefix":"ASCII.Fixed"},"55":{"type":"Composite","length":999,"description":"ICC","prefix":"ASCII.LLL","tag":{"enc":"BerTLVTag","sort":"StringsByHex","skipUnknownTLVTags":true,"storeUnknownTLVTags":true},"subfields":{"70":{"type":"Composite","length":255,"description":"Template","prefix":"BerTLV","tag":{"enc":"BerTLVTag","sort":"StringsByHex","skipUnknownTLVTags":true,"storeUnknownTLVTags":true},"subfields":{"57":{"type":"Binary","length":18,"description":"Track2Eq","enc":"Binary","prefix":"BerTLV"}}}}}}}'
+      - fixture:
+          file: doc.json
+          content: '{"mti":"0110","fields":{"11":"123456"},"binary_fields":{"55.70.57":"4111111111111111D29122011234567890"}}'
+      - run:
+          command: "iso8583tool convert doc.json --to hex --spec spec.json --output m.hex"
+      - run:
+          command: "iso8583tool redact m.hex --spec spec.json --format json"
+      - assert:
+          exit_code: 0
+          stdout:
+            not_contains: "4111111111111111"
+
+  - name: does not over-mask a harmless custom field 35
+    steps:
+      - fixture:
+          file: spec.json
+          content: '{"name":"F35","fields":{"0":{"type":"String","length":4,"description":"MTI","enc":"ASCII","prefix":"ASCII.Fixed"},"1":{"type":"Bitmap","length":16,"description":"Bitmap","enc":"HexToASCII","prefix":"Hex.Fixed"},"11":{"type":"String","length":6,"description":"STAN","enc":"ASCII","prefix":"ASCII.Fixed"},"35":{"type":"String","length":37,"description":"Partner Reference","enc":"ASCII","prefix":"ASCII.LL"}}}'
+      - fixture:
+          file: doc.json
+          content: '{"mti":"0110","fields":{"11":"123456","35":"REF-ORDER-ABC-0001"}}'
+      - run:
+          command: "iso8583tool convert doc.json --to hex --spec spec.json --output m.hex"
+      - run:
+          command: "iso8583tool view m.hex --spec spec.json --format json"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "REF-ORDER-ABC-0001"
+
+  - name: does not over-mask a harmless custom field 52
+    steps:
+      - fixture:
+          file: spec.json
+          content: '{"name":"F52","fields":{"0":{"type":"String","length":4,"description":"MTI","enc":"ASCII","prefix":"ASCII.Fixed"},"1":{"type":"Bitmap","length":16,"description":"Bitmap","enc":"HexToASCII","prefix":"Hex.Fixed"},"11":{"type":"String","length":6,"description":"STAN","enc":"ASCII","prefix":"ASCII.Fixed"},"52":{"type":"String","length":8,"description":"Partner Status","enc":"ASCII","prefix":"ASCII.Fixed"}}}'
+      - fixture:
+          file: doc.json
+          content: '{"mti":"0110","fields":{"11":"123456","52":"ABCDEFGH"}}'
+      - run:
+          command: "iso8583tool convert doc.json --to hex --spec spec.json --output m.hex"
+      - run:
+          command: "iso8583tool view m.hex --spec spec.json --format json"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "ABCDEFGH"
+
+  - name: still masks a real PAN in a custom field 2
+    steps:
+      - fixture:
+          file: spec.json
+          content: '{"name":"F2","fields":{"0":{"type":"String","length":4,"description":"MTI","enc":"ASCII","prefix":"ASCII.Fixed"},"1":{"type":"Bitmap","length":16,"description":"Bitmap","enc":"HexToASCII","prefix":"Hex.Fixed"},"2":{"type":"String","length":19,"description":"Account","enc":"ASCII","prefix":"ASCII.LL"},"11":{"type":"String","length":6,"description":"STAN","enc":"ASCII","prefix":"ASCII.Fixed"}}}'
+      - fixture:
+          file: doc.json
+          content: '{"mti":"0110","fields":{"2":"4111111111111111","11":"123456"}}'
+      - run:
+          command: "iso8583tool convert doc.json --to hex --spec spec.json --output m.hex"
+      - run:
+          command: "iso8583tool view m.hex --spec spec.json --format json"
+      - assert:
+          exit_code: 0
+          stdout:
+            not_contains: "4111111111111111"

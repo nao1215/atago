@@ -1,0 +1,54 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / ssh runner
+
+# Exercises the SSH runner's wiring through the real atago binary (ADR-0027).
+# Live remote execution is covered hermetically by a Go test with an in-process
+# SSH server (internal/engine/ssh_test.go); these scenarios pin the binary's
+# config validation and dispatch errors, which need no server.
+scenarios:
+  - name: an ssh runner without host/user fails validation (exit 2)
+    steps:
+      - fixture:
+          file: badssh.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: ssh
+            runners:
+              box:
+                type: ssh
+            scenarios:
+              - name: remote run
+                steps:
+                  - run:
+                      runner: box
+                      command: uptime
+      - run:
+          command: ${atago} run badssh.atago.yaml
+      - assert:
+          exit_code: 2
+          stderr:
+            contains: requires a host
+
+  - name: a run step naming an unknown runner errors (exit 4)
+    steps:
+      - fixture:
+          file: norunner.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: ssh
+            scenarios:
+              - name: remote run
+                steps:
+                  - run:
+                      runner: missing
+                      command: uptime
+      - run:
+          command: ${atago} run norunner.atago.yaml
+      - assert:
+          exit_code: 4
+          stdout:
+            contains: unknown runner

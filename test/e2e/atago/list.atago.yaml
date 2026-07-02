@@ -1,0 +1,64 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / list
+
+scenarios:
+  - name: list surfaces suites, scenarios, tags, and gates
+    steps:
+      - fixture:
+          file: sample.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: demo
+            scenarios:
+              - name: tagged scenario
+                tags: [smoke, fast]
+                steps:
+                  - run: {command: "true"}
+                  - assert: {exit_code: 0}
+              - name: gated scenario
+                skip: {env: ATAGO_SKIP_DEMO}
+                steps:
+                  - run: {shell: true, command: "echo hi > out.txt"}
+                  - assert: {file: {path: out.txt, exists: true}}
+      - run:
+          command: ${atago} list sample.atago.yaml
+      - assert:
+          exit_code: 0
+      # One `contains` list replaces three separate contains assertions: every
+      # element must be present in stdout.
+      - assert:
+          stdout:
+            contains:
+              - tagged scenario
+              - smoke
+              - skip:env=ATAGO_SKIP_DEMO
+
+  - name: list --json is a stable machine contract
+    steps:
+      - fixture:
+          file: sample.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: demo
+            scenarios:
+              - name: only scenario
+                steps:
+                  - run: {command: "true"}
+                  - assert: {exit_code: 0}
+      - run:
+          command: ${atago} list --json sample.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              path: $.schema_version
+              equals: "1"
+      - assert:
+          stdout:
+            json:
+              path: $.scenarios[0].scenario
+              equals: only scenario

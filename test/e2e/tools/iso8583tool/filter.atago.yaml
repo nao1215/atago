@@ -1,0 +1,69 @@
+# Migrated from iso8583tool's ShellSpec spec/filter_spec.sh.
+# filter ergonomics: view and diff normalize the case of hex EMV tag paths,
+# accept both "0" and "mti" for the MTI, and tell the user when a diff filter
+# matched nothing. $EXAMPLES == $ISO_EXAMPLES/basei in the staged env, so the
+# fixture paths are referenced via $ISO_EXAMPLES from shell: true commands.
+# Run with: make dogfood-iso8583tool
+version: "1"
+
+suite:
+  name: iso8583tool filter normalization
+
+scenarios:
+  - name: matches a lowercase EMV tag in view
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool view $ISO_EXAMPLES/basei/0100-auth-request.hex --filter 55.9f02 --no-color"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "55.9F02"
+      - assert:
+          stdout:
+            not_contains: "<not present>"
+
+  - name: matches a lowercase EMV tag in diff
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool diff $ISO_EXAMPLES/basei/0100-auth-request.hex $ISO_EXAMPLES/basei/0110-auth-response.hex --filter 55.8a"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "55.8A"
+      - assert:
+          stdout:
+            not_contains: "No field matched"
+
+  - name: accepts "0" as an MTI alias in diff
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool diff $ISO_EXAMPLES/basei/0100-auth-request.hex $ISO_EXAMPLES/basei/0110-auth-response.hex --filter 0"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "MTI changed"
+
+  - name: reports an unmatched diff filter
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool diff $ISO_EXAMPLES/basei/0100-auth-request.hex $ISO_EXAMPLES/basei/0110-auth-response.hex --filter 999"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "No field matched filter: 999"
+
+  - name: reports an unmatched filter in JSON
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool diff $ISO_EXAMPLES/basei/0100-auth-request.hex $ISO_EXAMPLES/basei/0110-auth-response.hex --filter 999 --format json"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - '"missing_filters"'
+              - "999"

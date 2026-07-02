@@ -1,0 +1,57 @@
+version: "1"
+
+# Run a command and assert on what a user observes: exit code, stdout, stderr.
+# Runs green as-is: atago run examples/run_and_assert.atago.yaml
+
+suite:
+  name: run and assert
+
+scenarios:
+  - name: one assert can check several targets at once
+    steps:
+      - run:
+          shell: true
+          command: echo hello atago
+      # Each target is an independent check; all must hold.
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: hello
+          stderr:
+            empty: true
+
+  - name: matchers beyond contains
+    steps:
+      - run:
+          shell: true
+          command: echo alpha beta
+      - assert:
+          stdout:
+            equals: alpha beta
+      - assert:
+          stdout:
+            matches: "a.+a"
+      # A list is a single matcher: every element must be present (contains)
+      # or absent (not_contains).
+      - assert:
+          stdout:
+            contains:
+              - alpha
+              - beta
+      - assert:
+          stdout:
+            not_contains: [panic, fatal]
+
+  - name: negative exit code and line selection
+    steps:
+      - run:
+          shell: true
+          command: echo first
+      - assert:
+          exit_code:
+            not: 1
+      # line narrows the stream to a single 1-based line before matching.
+      - assert:
+          stdout:
+            line: 1
+            equals: first

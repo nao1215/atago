@@ -1,0 +1,50 @@
+version: "1"
+
+# tags label scenarios for --tag / --skip-tag selection. skip/only gate a
+# scenario by os, by an environment variable, or by a probe command's exit
+# status. Also try: atago run --filter greet, --parallel 4, --fail-fast,
+# --rerun-failed.
+# Runs green as-is: atago run examples/select_skip_only.atago.yaml
+
+suite:
+  name: selection and gating
+
+scenarios:
+  - name: tagged for selection
+    tags: [smoke, fast]
+    steps:
+      - run:
+          shell: true
+          command: echo tagged
+      - assert:
+          exit_code: 0
+
+  - name: linux only
+    only:
+      os: linux
+    steps:
+      - run:
+          shell: true
+          command: echo runs only on linux
+      - assert:
+          exit_code: 0
+
+  - name: skipped while an env var is set
+    skip:
+      env: ATAGO_EXAMPLE_SKIP   # skips when the variable is non-empty
+    steps:
+      - run:
+          shell: true
+          command: echo runs unless ATAGO_EXAMPLE_SKIP is set
+      - assert:
+          exit_code: 0
+
+  - name: gated by a probe command
+    only:
+      command: "exit 0"   # runs only when the probe exits 0
+    steps:
+      - run:
+          shell: true
+          command: echo probe passed
+      - assert:
+          exit_code: 0

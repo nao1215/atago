@@ -1,0 +1,60 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / line selector
+
+# Exercises the 1-based `line:` selector (spec.md §16.2). Modeled on sqly's
+# ShellSpec `The line N should equal '...'` output-format tests, which is the
+# feature this selector was added to migrate.
+scenarios:
+  - name: line selector narrows stdout to a single 1-based line
+    steps:
+      - run:
+          shell: true
+          command: "printf '[\\n  {\"id\":1}\\n]\\n'"
+      - assert:
+          stdout:
+            line: 1
+            equals: "["
+      - assert:
+          stdout:
+            line: 2
+            contains: '"id":1'
+      - assert:
+          stdout:
+            line: 3
+            equals: "]"
+
+  - name: a trailing newline does not add a phantom final line
+    steps:
+      - run:
+          shell: true
+          command: "printf 'only-line\\n'"
+      - assert:
+          stdout:
+            line: 1
+            equals: only-line
+
+  - name: an out-of-range line fails the inner spec
+    steps:
+      - fixture:
+          file: oor.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: line 5 of a one-line stream
+                steps:
+                  - run:
+                      command: echo single
+                  - assert:
+                      stdout:
+                        line: 5
+                        equals: nope
+      - run:
+          command: ${atago} run oor.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: out of range

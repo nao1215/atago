@@ -1,0 +1,23 @@
+# fish completion for atago
+# Install: atago completion fish > ~/.config/fish/completions/atago.fish
+complete -c atago -f
+complete -c atago -n '__fish_use_subcommand' -a completion
+complete -c atago -n '__fish_use_subcommand' -a doc
+complete -c atago -n '__fish_use_subcommand' -a explain
+complete -c atago -n '__fish_use_subcommand' -a help
+complete -c atago -n '__fish_use_subcommand' -a init
+complete -c atago -n '__fish_use_subcommand' -a list
+complete -c atago -n '__fish_use_subcommand' -a manifest
+complete -c atago -n '__fish_use_subcommand' -a run
+complete -c atago -n '__fish_use_subcommand' -a snapshot
+complete -c atago -n '__fish_use_subcommand' -a version
+complete -c atago -n '__fish_seen_subcommand_from run' -l artifacts-dir
+complete -c atago -n '__fish_seen_subcommand_from run' -l ci
+complete -c atago -n '__fish_seen_subcommand_from run' -l fail-fast
+complete -c atago -n '__fish_seen_subcommand_from run' -l filter
+complete -c atago -n '__fish_seen_subcommand_from run' -l parallel
+complete -c atago -n '__fish_seen_subcommand_from run' -l report
+complete -c atago -n '__fish_seen_subcommand_from run' -l rerun-failed
+complete -c atago -n '__fish_seen_subcommand_from run' -l skip-tag
+complete -c atago -n '__fish_seen_subcommand_from run' -l tag
+complete -c atago -n '__fish_seen_subcommand_from run' -l update-snapshots

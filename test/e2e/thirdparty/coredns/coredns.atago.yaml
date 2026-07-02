@@ -1,0 +1,188 @@
+version: "1"
+
+suite:
+  name: coredns (self-hosted DNS server)
+
+# Exercises CoreDNS (https://coredns.io/, from awesome-selfhosted's DNS
+# corner) as a third-party target — a protocol atago has no built-in runner
+# for, which is the point: the real server is booted from an authored Corefile
+# and zone file, queried with the stock `dig` client over actual DNS (A, TXT,
+# CNAME chasing, NXDOMAIN, and the REFUSED answer for out-of-zone names), and
+# its health plugin is probed through the http runner. Install with:
+#   go install github.com/coredns/coredns@latest
+# (`dig` ships with bind9-dnsutils, preinstalled on GitHub runners.)
+#
+# Each server scenario binds its own port so the suite runs under the default
+# scenario concurrency.
+
+permissions:
+  network:
+    allow: [127.0.0.1]
+
+runners:
+  health:
+    type: http
+    base_url: http://127.0.0.1:18153
+    timeout: 10s
+
+scenarios:
+  - name: the binary reports its version
+    steps:
+      - run:
+          command: coredns -version
+      - assert:
+          exit_code: 0
+          stdout:
+            matches: "CoreDNS-[0-9]+\\.[0-9]+\\.[0-9]+"
+
+  - name: an authored zone is served authoritatively
+    services:
+      - name: coredns
+        command: coredns -conf Corefile
+        ready:
+          port: 127.0.0.1:18150
+          timeout: 15s
+    steps:
+      - fixture:
+          file: Corefile
+          content: |
+            example.test:18150 {
+                bind 127.0.0.1
+                file zones/example.test.zone
+            }
+      - fixture:
+          file: zones/example.test.zone
+          content: |
+            $ORIGIN example.test.
+            @   3600 IN SOA ns.example.test. admin.example.test. (2026070201 7200 3600 1209600 3600)
+            @   3600 IN NS  ns.example.test.
+            ns  3600 IN A   127.0.0.1
+            www 3600 IN A   192.0.2.10
+            txt 3600 IN TXT "issued-by=atago"
+            alias 3600 IN CNAME www.example.test.
+      - run:
+          command: dig @127.0.0.1 -p 18150 www.example.test A +noall +comments +answer
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "status: NOERROR"
+      # The aa flag proves this answer came from the authored zone, not a cache.
+      - assert:
+          stdout:
+            matches: "flags:[^;]*\\baa\\b"
+      - assert:
+          stdout:
+            contains: "192.0.2.10"
+      - run:
+          command: dig @127.0.0.1 -p 18150 txt.example.test TXT +short
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: issued-by=atago
+      # CNAME chasing: the alias resolves through www to its address.
+      - run:
+          command: dig @127.0.0.1 -p 18150 alias.example.test A +short
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - www.example.test.
+              - 192.0.2.10
+
+  - name: missing names and foreign zones get the right RCODEs
+    services:
+      - name: coredns
+        command: coredns -conf Corefile
+        ready:
+          port: 127.0.0.1:18151
+          timeout: 15s
+    steps:
+      - fixture:
+          file: Corefile
+          content: |
+            example.test:18151 {
+                bind 127.0.0.1
+                file zones/example.test.zone
+            }
+      - fixture:
+          file: zones/example.test.zone
+          content: |
+            $ORIGIN example.test.
+            @   3600 IN SOA ns.example.test. admin.example.test. (2026070201 7200 3600 1209600 3600)
+            @   3600 IN NS  ns.example.test.
+            ns  3600 IN A   127.0.0.1
+            www 3600 IN A   192.0.2.10
+      # A name missing from the zone is NXDOMAIN, not an empty success.
+      - run:
+          command: dig @127.0.0.1 -p 18151 no-such-name.example.test A +noall +comments
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "status: NXDOMAIN"
+      # A zone this server is not authoritative for is REFUSED, not resolved.
+      - run:
+          command: dig @127.0.0.1 -p 18151 www.example.com A +noall +comments
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "status: REFUSED"
+
+  - name: the health plugin answers over HTTP while DNS serves
+    services:
+      - name: coredns
+        command: coredns -conf Corefile
+        ready:
+          port: 127.0.0.1:18152
+          timeout: 15s
+    steps:
+      - fixture:
+          file: Corefile
+          content: |
+            example.test:18152 {
+                bind 127.0.0.1
+                file zones/example.test.zone
+                health 127.0.0.1:18153
+            }
+      - fixture:
+          file: zones/example.test.zone
+          content: |
+            $ORIGIN example.test.
+            @   3600 IN SOA ns.example.test. admin.example.test. (2026070201 7200 3600 1209600 3600)
+            @   3600 IN NS  ns.example.test.
+            ns  3600 IN A   127.0.0.1
+            www 3600 IN A   192.0.2.10
+      - http:
+          runner: health
+          method: GET
+          path: /health
+          retry:
+            times: 15
+            interval: 500ms
+            until:
+              status: 200
+      - assert:
+          status: 200
+          body:
+            contains: OK
+      - run:
+          command: dig @127.0.0.1 -p 18152 www.example.test A +short
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: 192.0.2.10
+
+  - name: a broken Corefile is rejected at startup
+    steps:
+      - fixture:
+          file: Corefile
+          content: |
+            example.test:18159 {
+                no_such_plugin_xyz
+            }
+      - run:
+          command: coredns -conf Corefile
+      - assert:
+          exit_code:
+            not: 0
+          stderr:
+            contains: Unknown directive 'no_such_plugin_xyz'

@@ -1,0 +1,44 @@
+name: MultiPlatformUnitTest
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  unit_test:
+    name: Unit test
+    strategy:
+      matrix:
+        os:
+          - "ubuntu-latest"
+          - "windows-latest"
+          - "macos-latest"
+        go:
+          # go.mod requires go >= 1.26; the CI uses GOTOOLCHAIN=local, so an older
+          # toolchain cannot build the module. Test the declared minimum and latest.
+          - "1"
+          - "1.26"
+      fail-fast: false
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version: ${{ matrix.go }}
+
+      - name: Run tests
+        # Force bash on every OS. The default Windows shell is PowerShell, which
+        # mis-parses `-coverprofile=coverage.out ./...` and injects a phantom
+        # `.out` package ("FAIL .out [setup failed]"), failing only the Windows
+        # legs while the tests themselves pass. Git Bash ships on the windows
+        # runner, so the command parses identically across all three OSes.
+        shell: bash
+        run: go test -v -cover -coverprofile=coverage.out ./...

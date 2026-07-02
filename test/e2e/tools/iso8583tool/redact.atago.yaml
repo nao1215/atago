@@ -1,0 +1,119 @@
+# Migrated from iso8583tool's ShellSpec spec/redact_spec.sh.
+# redact: deterministic masking of cardholder data and secrets for safe sharing,
+# JSON (default) and text output, jq compatibility, and stdin. $EXAMPLES ==
+# $ISO_EXAMPLES/basei in the staged env, referenced via $ISO_EXAMPLES from
+# shell: true commands. The ShellSpec write_kanmu_like_message helper (a raw
+# binary capture built with printf octal escapes) is inlined into a setup `run`.
+# PACKED_BCD_SPEC is the built-in spec id "spec87bcd-starter".
+# Run with: make dogfood-iso8583tool
+version: "1"
+
+suite:
+  name: iso8583tool redact
+
+scenarios:
+  - name: masks the PAN in JSON output
+    steps:
+      - run:
+          shell: true
+          command: |
+            iso8583tool redact $ISO_EXAMPLES/basei/0100-auth-request.hex | jq -r '.fields["2"]'
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "411111******1111"
+
+  - name: never leaks the full PAN
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool redact $ISO_EXAMPLES/basei/0100-auth-request.hex"
+      - assert:
+          exit_code: 0
+          stdout:
+            not_contains: "4111111111111111"
+
+  - name: fully masks the EMV application cryptogram
+    steps:
+      - run:
+          shell: true
+          command: |
+            iso8583tool redact $ISO_EXAMPLES/basei/0100-auth-request.hex | jq -r '.binary_fields["55.9F26"]'
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "****************"
+
+  - name: supports a human-readable text format
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool redact $ISO_EXAMPLES/basei/0100-auth-request.hex --format text"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "Redacted:"
+              - "411111******1111"
+
+  - name: orders text output by MTI then numeric field id
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool redact $ISO_EXAMPLES/basei/0100-auth-request.hex --format text --color never"
+      - assert:
+          exit_code: 0
+          stdout:
+            line: 1
+            contains: "MTI:"
+      - assert:
+          stdout:
+            line: 2
+            contains: "F2 ="
+
+  - name: reads from stdin for a Slack-safe pipe
+    steps:
+      - run:
+          shell: true
+          command: "cat $ISO_EXAMPLES/basei/0100-auth-request.hex | iso8583tool redact -"
+      - assert:
+          exit_code: 0
+          stdout:
+            not_contains: "4111111111111111"
+
+  - name: masks a PAN embedded in a free-form private field (F63)
+    steps:
+      - run:
+          shell: true
+          command: |
+            printf '%s' '{"mti":"0110","fields":{"11":"123456","39":"00","63":"PAN=4111111111111111"}}' | iso8583tool convert --to hex | iso8583tool redact -
+      - assert:
+          exit_code: 0
+          stdout:
+            not_contains: "4111111111111111"
+
+  - name: auto-detected input encoding redacts a raw binary capture without --encoding
+    steps:
+      - run:
+          shell: true
+          command: 'printf ''\001\000\160\004\000\000\000\000\000\000\020\100\031\044\231\231\231\231\231\062\163\047\000\000\000\000\021\070\042\004'' > message.bin'
+      - run:
+          command: "iso8583tool redact message.bin --spec spec87bcd-starter"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: '"mti"'
+
+  - name: auto-detected input encoding still masks the PAN in a raw binary capture
+    steps:
+      - run:
+          shell: true
+          command: 'printf ''\001\000\160\004\000\000\000\000\000\000\020\100\031\044\231\231\231\231\231\062\163\047\000\000\000\000\021\070\042\004'' > message.bin'
+      - run:
+          shell: true
+          command: |
+            iso8583tool redact message.bin --spec spec87bcd-starter | jq -r '.fields["2"]'
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "*"

@@ -1,0 +1,32 @@
+version: "1"
+
+# Migration guide fixture: parameterized cases.
+#
+# ShellSpec: `Parameters` / `Parameters:dynamic` blocks feeding `%1 %2 ...`.
+# Bats:      a bash loop generating tests, or bats_test_function tricks.
+# runn:      `loop:` over `vars`.
+#
+# atago maps these to a declarative `matrix:` — one template scenario expands
+# into one concrete scenario per row, each row's keys available as ${name}.
+suite:
+  name: migration / matrix — one row per parameter set
+
+scenarios:
+  # ShellSpec Parameters:
+  #   Parameters
+  #     Alice en
+  #     Bob   fr
+  #   Example "greets $1 in $2" ...
+  - name: "greets ${who} in ${lang}"
+    matrix:
+      - { who: Alice, lang: en }
+      - { who: Bob,   lang: fr }
+    steps:
+      - run:
+          shell: true
+          command: echo "hello ${who} (${lang})"
+      - assert:
+          stdout:
+            contains:
+              - ${who}
+              - ${lang}

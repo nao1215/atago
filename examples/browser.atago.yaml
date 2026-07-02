@@ -1,0 +1,40 @@
+version: "1"
+
+# A browser runner drives a headless Chrome with a cdp step's ordered actions.
+# The last capturing action (text/eval/title/attribute) feeds the value target.
+# A screenshot writes a PNG into the workdir, so image assertions can inspect
+# it. Needs a Chrome/Chromium binary on PATH and network access to the URL.
+
+suite:
+  name: browser
+
+runners:
+  web:
+    type: browser
+    # headless: false   # uncomment to watch the browser while debugging
+
+scenarios:
+  - name: the landing page greets the user
+    steps:
+      - cdp:
+          runner: web
+          actions:
+            - navigate: https://example.com
+            - wait_visible: h1
+            - text: h1
+      - assert:
+          value:
+            contains: Example Domain
+
+  - name: screenshot feeds the image assertion
+    steps:
+      - cdp:
+          runner: web
+          actions:
+            - navigate: https://example.com
+            - screenshot:
+                path: home.png
+      - assert:
+          image:
+            path: home.png
+            format: png

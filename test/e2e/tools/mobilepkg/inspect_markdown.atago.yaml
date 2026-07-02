@@ -1,0 +1,50 @@
+# `mobilepkg inspect --format markdown` renders the report designed for
+# $GITHUB_STEP_SUMMARY / PR comments. These assertions pin the section
+# structure and the leading package facts so the documented Markdown layout
+# cannot silently rot. Run with:
+#   make dogfood-mobilepkg   (or test/e2e/tools/mobilepkg/run.sh)
+version: "1"
+
+suite:
+  name: mobilepkg inspect --format markdown
+
+scenarios:
+  - name: renders the report heading and package table
+    steps:
+      - run:
+          shell: true
+          command: cp "$MOBILEPKG_TESTDATA/android/androgoat_rich.apk" app.apk
+      - run:
+          command: mobilepkg inspect --format markdown app.apk
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "# mobilepkg Inspection Report"
+              - "| Platform | android |"
+              - "| Identifier | owasp.sat.agoat |"
+
+  - name: includes the Top Findings and Exported Components sections
+    steps:
+      - run:
+          shell: true
+          command: cp "$MOBILEPKG_TESTDATA/android/androgoat_rich.apk" app.apk
+      - run:
+          command: mobilepkg inspect --format markdown app.apk
+      - assert:
+          stdout:
+            contains:
+              - "## Top Findings"
+              - "## Exported Components"
+
+  - name: md is accepted as an alias for markdown
+    steps:
+      - run:
+          shell: true
+          command: cp "$MOBILEPKG_TESTDATA/android/androgoat_rich.apk" app.apk
+      - run:
+          command: mobilepkg inspect --format md app.apk
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "# mobilepkg Inspection Report"

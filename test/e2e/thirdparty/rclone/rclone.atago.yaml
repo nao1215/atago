@@ -1,0 +1,227 @@
+version: "1"
+
+suite:
+  name: rclone (self-hosted file sync program)
+
+# Exercises rclone (https://rclone.org/, from awesome-selfhosted's file
+# transfer corner) as a third-party target. The local backend keeps every
+# scenario hermetic: copy/sync semantics, machine-readable listings, integrity
+# checks and their failure mode, the obscure/reveal password round-trip, and
+# `rclone serve http` as a real background server queried through the http
+# runner. Install with:
+#   go install github.com/rclone/rclone@latest
+
+permissions:
+  network:
+    allow: [127.0.0.1]
+
+runners:
+  files:
+    type: http
+    base_url: http://127.0.0.1:18110
+    timeout: 10s
+
+# rclone warns on stderr when no config file exists; give every scenario an
+# empty one so assertions never race that NOTICE line.
+defaults:
+  scenario:
+    env:
+      RCLONE_CONFIG: rclone.conf
+
+scenarios:
+  - name: version prints a semantic version
+    steps:
+      - run:
+          command: rclone version
+      - assert:
+          exit_code: 0
+          stdout:
+            matches: "rclone v[0-9]+\\.[0-9]+\\.[0-9]+"
+
+  - name: copy replicates a tree and check certifies the replica
+    steps:
+      - fixture:
+          file: rclone.conf
+          content: ""
+      - fixture:
+          file: src/hello.txt
+          content: "hello rclone"
+      - fixture:
+          file: src/sub/table.csv
+          content: |
+            a,b
+            1,2
+      - run:
+          command: rclone copy src dst
+      - assert:
+          exit_code: 0
+      - assert:
+          dir:
+            path: dst
+            contains:
+              - hello.txt
+              - sub/table.csv
+      - assert:
+          file:
+            path: dst/hello.txt
+            contains: hello rclone
+      # check reports on stderr; a clean replica is "0 differences found".
+      - run:
+          command: rclone check src dst
+      - assert:
+          exit_code: 0
+          stderr:
+            contains: 0 differences found
+
+  - name: check fails loudly once the replica is corrupted
+    steps:
+      - fixture:
+          file: rclone.conf
+          content: ""
+      - fixture:
+          file: src/hello.txt
+          content: "hello rclone"
+      - run:
+          command: rclone copy src dst
+      - fixture:
+          file: dst/hello.txt
+          content: "corrupted replica"
+      - run:
+          command: rclone check src dst
+      - assert:
+          exit_code:
+            not: 0
+          stderr:
+            contains: 1 differences found
+
+  - name: lsjson emits a machine-readable listing
+    steps:
+      - fixture:
+          file: rclone.conf
+          content: ""
+      - fixture:
+          file: src/hello.txt
+          content: "hello rclone"
+      - fixture:
+          file: src/sub/table.csv
+          content: |
+            a,b
+            1,2
+      - run:
+          command: rclone lsjson src
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              path: "$"
+              length: 2
+      - assert:
+          stdout:
+            json:
+              path: "$[0].Name"
+              equals: hello.txt
+      - assert:
+          stdout:
+            json:
+              path: "$[0].Size"
+              equals: 12
+      - assert:
+          stdout:
+            json:
+              path: "$[1].IsDir"
+              equals: true
+      - run:
+          command: rclone size --json src
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              path: "$.count"
+              equals: 2
+
+  - name: sync makes the destination mirror the source, deletions included
+    steps:
+      - fixture:
+          file: rclone.conf
+          content: ""
+      - fixture:
+          file: src/keep.txt
+          content: "stays"
+      - fixture:
+          file: dst/extraneous.txt
+          content: "must be deleted by sync"
+      - run:
+          command: rclone sync src dst
+      - assert:
+          exit_code: 0
+      - assert:
+          dir:
+            path: dst
+            contains:
+              - keep.txt
+            not_contains:
+              - extraneous.txt
+
+  - name: obscure and reveal round-trip a secret
+    steps:
+      - fixture:
+          file: rclone.conf
+          content: ""
+      - run:
+          command: rclone obscure atago-test-secret
+      - assert:
+          exit_code: 0
+      - store:
+          name: obscured
+          from:
+            stdout:
+              matches: "\\S+"
+      - run:
+          command: rclone reveal ${obscured}
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: atago-test-secret
+
+  - name: serve http publishes the tree over real HTTP
+    services:
+      - name: rclone-http
+        command: rclone serve http src --addr 127.0.0.1:18110
+        ready:
+          port: 127.0.0.1:18110
+          timeout: 15s
+    steps:
+      - fixture:
+          file: rclone.conf
+          content: ""
+      - fixture:
+          file: src/hello.txt
+          content: "hello over http"
+      - fixture:
+          file: src/api/data.json
+          content: |
+            {"source":"rclone","ok":true}
+      - http:
+          runner: files
+          method: GET
+          path: /hello.txt
+      - assert:
+          status: 200
+          body:
+            contains: hello over http
+      - http:
+          runner: files
+          method: GET
+          path: /api/data.json
+      - assert:
+          status: 200
+          body:
+            json:
+              path: "$.source"
+              equals: rclone
+      - http:
+          runner: files
+          method: GET
+          path: /no-such-file.txt
+      - assert:
+          status: 404

@@ -1,0 +1,89 @@
+version: "1"
+
+suite:
+  name: pushgateway (self-hosted metrics gateway)
+
+# Exercises Prometheus Pushgateway (from awesome-selfhosted's monitoring
+# corner) as a third-party target. Its push API takes the raw text exposition
+# format — the workload the http step's `body:` payload exists for. Install:
+#   go install github.com/prometheus/pushgateway@latest
+#
+# Each scenario binds its own port so the suite runs under the default
+# scenario concurrency.
+
+permissions:
+  network:
+    allow: [127.0.0.1]
+
+runners:
+  push:
+    type: http
+    base_url: http://127.0.0.1:18092
+    timeout: 10s
+  push2:
+    type: http
+    base_url: http://127.0.0.1:18093
+    timeout: 10s
+
+scenarios:
+  - name: a pushed metric appears on the scrape endpoint
+    services:
+      - name: pushgateway
+        command: pushgateway --web.listen-address=127.0.0.1:18092
+        ready:
+          port: 127.0.0.1:18092
+          timeout: 15s
+    steps:
+      # The push API takes the raw Prometheus text exposition format.
+      - http:
+          runner: push
+          method: POST
+          path: /metrics/job/atago_e2e
+          body: |
+            # TYPE atago_e2e_metric gauge
+            atago_e2e_metric 3.14
+      - assert:
+          status: 200
+      - http:
+          runner: push
+          method: GET
+          path: /metrics
+      - assert:
+          status: 200
+          body:
+            contains: job="atago_e2e"
+      # The scrape output decorates the metric with its group labels.
+      - assert:
+          body:
+            matches: "atago_e2e_metric\\{[^}]*job=\"atago_e2e\"[^}]*\\} 3.14"
+
+  - name: deleting a job group removes its metrics
+    services:
+      - name: pushgateway
+        command: pushgateway --web.listen-address=127.0.0.1:18093
+        ready:
+          port: 127.0.0.1:18093
+          timeout: 15s
+    steps:
+      - http:
+          runner: push2
+          method: POST
+          path: /metrics/job/ephemeral
+          body: |
+            ephemeral_metric 1
+      - assert:
+          status: 200
+      - http:
+          runner: push2
+          method: DELETE
+          path: /metrics/job/ephemeral
+      - assert:
+          status: 202
+      - http:
+          runner: push2
+          method: GET
+          path: /metrics
+      - assert:
+          status: 200
+          body:
+            not_contains: ephemeral_metric

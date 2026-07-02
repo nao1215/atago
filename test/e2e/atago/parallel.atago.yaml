@@ -1,0 +1,49 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / parallel
+
+scenarios:
+  - name: parallel run passes and stays deterministic
+    steps:
+      - fixture:
+          file: many.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: many
+            scenarios:
+              - name: a
+                steps: [{run: {shell: true, command: echo a}}, {assert: {stdout: {contains: a}}}]
+              - name: b
+                steps: [{run: {shell: true, command: echo b}}, {assert: {stdout: {contains: b}}}]
+              - name: c
+                steps: [{run: {shell: true, command: echo c}}, {assert: {stdout: {contains: c}}}]
+      - run:
+          command: ${atago} run --parallel 3 many.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "3 passed"
+
+  - name: fail-fast stops after the first failure
+    steps:
+      - fixture:
+          file: ff.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: ff
+            scenarios:
+              - name: boom
+                steps: [{run: {shell: true, command: "exit 1"}}, {assert: {exit_code: 0}}]
+              - name: never
+                steps: [{run: {shell: true, command: echo hi}}, {assert: {exit_code: 0}}]
+      # --parallel 1 pins serial scheduling: with the CPU-count default both
+      # scenarios would start before the first failure could skip anything.
+      - run:
+          command: ${atago} run --parallel 1 --fail-fast ff.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: "1 skipped"

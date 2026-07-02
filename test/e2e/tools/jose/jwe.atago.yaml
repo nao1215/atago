@@ -1,0 +1,79 @@
+# Migrated from jose's ShellSpec spec/jwe_spec.sh.
+# jwe encrypt / decrypt round trip (file, stdin pipe, and --compress) plus the
+# missing-key and invalid-content-encryption errors. The ShellSpec `setup` seeds
+# an EC P-256 key (ec.jwk) and a payload (payload.json); here that seed is a
+# shared `&setup` run step replayed at the start of every scenario inside its
+# isolated ${workdir}. Run with:
+#   make dogfood-jose   (or test/e2e/tools/jose/run.sh)
+version: "1"
+
+suite:
+  name: jose jwe
+
+scenarios:
+  - name: round-trips a payload through encrypt and decrypt
+    steps:
+      - &setup
+        run:
+          shell: true
+          command: |
+            printf '{"sub":"alice"}' > payload.json
+            jose jwk generate --type EC --curve P-256 --output ec.jwk >/dev/null
+      - run:
+          shell: true
+          command: |
+            jose jwe encrypt --key ec.jwk --key-encryption ECDH-ES \
+              --content-encryption A256GCM payload.json > secret.jwe
+            jose jwe decrypt --key ec.jwk secret.jwe
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: '{"sub":"alice"}'
+
+  - name: round-trips a payload piped through stdin
+    steps:
+      - *setup
+      - run:
+          shell: true
+          command: |
+            cat payload.json | jose jwe encrypt --key ec.jwk \
+              --key-encryption ECDH-ES --content-encryption A256GCM > secret.jwe
+            cat secret.jwe | jose jwe decrypt --key ec.jwk
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: '{"sub":"alice"}'
+
+  - name: round-trips with compression enabled
+    steps:
+      - *setup
+      - run:
+          shell: true
+          command: |
+            jose jwe encrypt --key ec.jwk --key-encryption ECDH-ES \
+              --content-encryption A256GCM --compress payload.json > secret.jwe
+            jose jwe decrypt --key ec.jwk secret.jwe
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: '{"sub":"alice"}'
+
+  - name: fails to encrypt without a key
+    steps:
+      - *setup
+      - run:
+          command: jose jwe encrypt --key-encryption ECDH-ES --content-encryption A256GCM payload.json
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            contains: "key file required"
+
+  - name: fails to encrypt with an invalid content encryption
+    steps:
+      - *setup
+      - run:
+          command: jose jwe encrypt --key ec.jwk --key-encryption ECDH-ES --content-encryption BOGUS payload.json
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            contains: "content encryption"

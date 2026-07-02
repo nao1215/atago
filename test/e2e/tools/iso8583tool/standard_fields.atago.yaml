@@ -1,0 +1,53 @@
+# Migrated from iso8583tool's ShellSpec spec/standard_fields_spec.sh.
+# Standard secondary-bitmap fields: the built-in preset must define the common
+# high-numbered ISO 8583 fields (95, 96, 100, 102-104) and the reserved range
+# 123-128, so a representative document packs and round-trips instead of failing
+# with "field N is not defined in the spec".
+# Run with: make dogfood-iso8583tool
+version: "1"
+
+suite:
+  name: iso8583tool standard high-numbered fields
+
+scenarios:
+  - name: packs and round-trips fields 95/96/100/102/103/104
+    steps:
+      - fixture:
+          file: hi.json
+          content: '{"mti":"0200","fields":{"11":"123456","95":"000000000000000000000000000000000000000000","100":"12345678901","102":"1234567890123456789012345678","103":"8765432109876543210987654321","104":"DESCRIPTION"},"binary_fields":{"96":"A1B2C3D4E5F60708"}}'
+      - run:
+          command: iso8583tool convert hi.json --to hex --output hi.hex
+      - run:
+          command: iso8583tool view hi.hex --format json
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - '"100": "12345678901"'
+              - '"104": "DESCRIPTION"'
+
+  - name: packs the reserved fields 123-127
+    steps:
+      - fixture:
+          file: r.json
+          content: '{"mti":"0100","fields":{"11":"123456","123":"AAA","124":"BBB","125":"CCC","126":"DDD","127":"EEE"}}'
+      - run:
+          command: iso8583tool convert r.json --to hex
+      - assert:
+          exit_code: 0
+          stdout:
+            not_contains: "not defined"
+
+  - name: packs and round-trips the binary MAC field 128
+    steps:
+      - fixture:
+          file: m.json
+          content: '{"mti":"0100","binary_fields":{"128":"A1B2C3D4E5F60708"}}'
+      - run:
+          command: iso8583tool convert m.json --to hex --output m.hex
+      - run:
+          command: iso8583tool view m.hex --unsafe --format json
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: '"128": "A1B2C3D4E5F60708"'

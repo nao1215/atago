@@ -1,0 +1,62 @@
+# `mobilepkg inspect --fail-on <sev>` is the CI gate: it exits 1 when any
+# finding meets the severity threshold and embeds a verdict in the JSON. The
+# AndroGoat fixture carries error-severity findings, so every threshold trips
+# the gate. Run with:
+#   make dogfood-mobilepkg   (or test/e2e/tools/mobilepkg/run.sh)
+version: "1"
+
+suite:
+  name: mobilepkg inspect --fail-on
+
+scenarios:
+  - name: "--fail-on error exits 1 on an app with error findings"
+    steps:
+      - run:
+          shell: true
+          command: cp "$MOBILEPKG_TESTDATA/android/androgoat_rich.apk" app.apk
+      - run:
+          command: mobilepkg inspect --fail-on error app.apk
+      - assert:
+          exit_code: 1
+
+  - name: "--fail-on warn also exits 1 (warnings present)"
+    steps:
+      - run:
+          shell: true
+          command: cp "$MOBILEPKG_TESTDATA/android/androgoat_rich.apk" app.apk
+      - run:
+          command: mobilepkg inspect --fail-on warn app.apk
+      - assert:
+          exit_code: 1
+
+  - name: "--fail-on embeds a failing verdict with triggering findings"
+    steps:
+      - run:
+          shell: true
+          command: cp "$MOBILEPKG_TESTDATA/android/androgoat_rich.apk" app.apk
+      # The nonzero exit is expected; capture stdout so the JSON can be asserted.
+      - run:
+          shell: true
+          command: mobilepkg inspect --fail-on error app.apk || true
+      - assert:
+          stdout:
+            json: { path: "$.verdict.passed", equals: false }
+      - assert:
+          stdout:
+            json:
+              path: "$.verdict.triggering_findings[?(@.id=='manifest.debuggable')].severity"
+              equals: "error"
+
+  # NOTE: an unrecognised --fail-on value is currently NOT rejected — mobilepkg
+  # ranks the unknown severity below "info", so every finding meets the
+  # threshold and the gate trips (exit 1). This pins today's behaviour; if
+  # mobilepkg later validates the flag and errors instead, update this scenario.
+  - name: an unknown --fail-on threshold still trips the gate (lenient today)
+    steps:
+      - run:
+          shell: true
+          command: cp "$MOBILEPKG_TESTDATA/android/androgoat_rich.apk" app.apk
+      - run:
+          command: mobilepkg inspect --fail-on bogus app.apk
+      - assert:
+          exit_code: { not: 0 }

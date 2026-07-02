@@ -1,0 +1,159 @@
+name: ThirdParty
+
+# Runs atago against third-party programs nobody here maintains: self-hosted
+# servers from awesome-selfhosted (started as background services and queried
+# through the http runner) and other programs installable with one command.
+# The git suite is push-gated in e2e.yml and a pinned caddy runs in the PR
+# gate (e2e.yml e2e-representative); these depend on external modules/releases,
+# so like the dogfood matrix they run on a schedule and on demand to keep the
+# required push checks fast and deterministic. Each program is its own matrix
+# leg so a failure localizes to one external dependency. `go install` legs
+# track @latest (integrity comes from the Go checksum database); prebuilt
+# binary legs (prometheus, gitea) are pinned to a version + SHA256 instead,
+# since a raw CDN download has no implicit integrity check.
+on:
+  workflow_dispatch:
+  schedule:
+    # 06:30 UTC daily, after the dogfood matrix.
+    - cron: "30 6 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  thirdparty:
+    name: thirdparty (${{ matrix.program.name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        program:
+          - name: caddy
+            dir: ./test/e2e/thirdparty/caddy
+            install: go install github.com/caddyserver/caddy/v2/cmd/caddy@latest
+          - name: pushgateway
+            dir: ./test/e2e/thirdparty/pushgateway
+            install: go install github.com/prometheus/pushgateway@latest
+          - name: webhook
+            dir: ./test/e2e/thirdparty/webhook
+            install: go install github.com/adnanh/webhook@latest
+          - name: restic
+            dir: ./test/e2e/thirdparty/restic
+            install: go install github.com/restic/restic/cmd/restic@latest
+          - name: rclone
+            dir: ./test/e2e/thirdparty/rclone
+            install: go install github.com/rclone/rclone@latest
+          - name: minio
+            dir: ./test/e2e/thirdparty/minio
+            install: |
+              go install github.com/minio/minio@latest
+              go install github.com/minio/mc@latest
+          # The suite queries the DNS server with dig (bind9-dnsutils); most
+          # runner images ship it, but install it if absent.
+          - name: coredns
+            dir: ./test/e2e/thirdparty/coredns
+            install: |
+              go install github.com/coredns/coredns@latest
+              command -v dig >/dev/null || (sudo apt-get update && sudo apt-get install -y bind9-dnsutils)
+          - name: nats
+            dir: ./test/e2e/thirdparty/nats
+            install: |
+              go install github.com/nats-io/nats-server/v2@latest
+              go install github.com/nats-io/natscli/nats@latest
+          - name: mailpit
+            dir: ./test/e2e/thirdparty/mailpit
+            install: go install github.com/axllent/mailpit@latest
+          - name: transfersh
+            dir: ./test/e2e/thirdparty/transfersh
+            install: go install github.com/dutchcoders/transfer.sh@latest
+          # Gotify compiles its web UI into the binary, so `go install` cannot
+          # build it; pinned release zip + SHA256. Gotify publishes no checksum
+          # sidecars, so this SHA was recorded from a verified download
+          # (trust-on-first-use) — a changed artifact fails loudly here.
+          - name: gotify
+            dir: ./test/e2e/thirdparty/gotify
+            install: |
+              ver="2.9.1"
+              sha256="34707b68f6e2b1be69458a7974e9d0e1acbfaa7a95d7349eed9219c9f215c4b3"
+              curl -fsSL "https://github.com/gotify/server/releases/download/v${ver}/gotify-linux-amd64.zip" -o gotify.zip
+              echo "${sha256}  gotify.zip" | sha256sum -c -
+              unzip -o gotify.zip gotify-linux-amd64
+              install gotify-linux-amd64 "$(go env GOPATH)/bin/gotify"
+          # Grafana ships its runtime assets next to the binary, so the whole
+          # distribution is extracted and GF_PATHS_HOME points at it (the suite
+          # passes it as --homepath). Pinned version + SHA256 (upstream
+          # publishes the .sha256 next to the tarball).
+          - name: grafana
+            dir: ./test/e2e/thirdparty/grafana
+            install: |
+              ver="13.1.0"
+              sha256="4f562bb224b8bb758b47789381babb284cb41687da8d714f2ff0e118e945e775"
+              curl -fsSL "https://dl.grafana.com/oss/release/grafana-${ver}.linux-amd64.tar.gz" -o grafana.tar.gz
+              echo "${sha256}  grafana.tar.gz" | sha256sum -c -
+              tar -xzf grafana.tar.gz -C "$HOME"
+              echo "GF_PATHS_HOME=$HOME/grafana-${ver}" >> "$GITHUB_ENV"
+              echo "$HOME/grafana-${ver}/bin" >> "$GITHUB_PATH"
+          # Prometheus cannot be `go install`ed (its go.mod uses replace
+          # directives), so the official release tarball provides prometheus
+          # and promtool. Unlike the `go install` legs (whose module downloads
+          # the Go toolchain hash-verifies against the checksum database),
+          # a raw binary download has no implicit integrity check — so the
+          # version AND its SHA256 are pinned here, and the download must
+          # match before it touches PATH. Bump both together (the SHA lives in
+          # the upstream release's sha256sums.txt).
+          - name: prometheus
+            dir: ./test/e2e/thirdparty/prometheus
+            install: |
+              ver="3.13.0"
+              sha256="744d93324cc024d82089921737bd797474d7f1e5dbbfd1c6b387bad258538cb9"
+              curl -fsSL "https://github.com/prometheus/prometheus/releases/download/v${ver}/prometheus-${ver}.linux-amd64.tar.gz" -o prometheus.tar.gz
+              echo "${sha256}  prometheus.tar.gz" | sha256sum -c -
+              tar -xzf prometheus.tar.gz
+              install "prometheus-${ver}.linux-amd64/prometheus" "prometheus-${ver}.linux-amd64/promtool" "$(go env GOPATH)/bin/"
+          # Gitea ships a single prebuilt binary (building from source needs a
+          # frontend toolchain). Same rule as prometheus: pinned version +
+          # pinned SHA256, verified before install (upstream publishes
+          # gitea-<ver>-linux-amd64.sha256 next to the binary).
+          - name: gitea
+            dir: ./test/e2e/thirdparty/gitea
+            install: |
+              ver="1.26.4"
+              sha256="0faa36d151918f8f7d6e0f3ae67597d1c338583d695add146ac393109d0fc44a"
+              curl -fsSL "https://dl.gitea.com/gitea/${ver}/gitea-${ver}-linux-amd64" -o gitea
+              echo "${sha256}  gitea" | sha256sum -c -
+              install gitea "$(go env GOPATH)/bin/gitea"
+          # ntfy cannot be `go install`ed either (replace directives); pinned
+          # release tarball + SHA256 (from the upstream checksums.txt), same
+          # rule as prometheus/gitea.
+          - name: ntfy
+            dir: ./test/e2e/thirdparty/ntfy
+            install: |
+              ver="2.25.0"
+              sha256="628bc8d3ad73778484ae1c6116e7745ef5fa414619567e6b4c2581927c355b1e"
+              curl -fsSL "https://github.com/binwiederhier/ntfy/releases/download/v${ver}/ntfy_${ver}_linux_amd64.tar.gz" -o ntfy.tar.gz
+              echo "${sha256}  ntfy.tar.gz" | sha256sum -c -
+              tar -xzf ntfy.tar.gz
+              install "ntfy_${ver}_linux_amd64/ntfy" "$(go env GOPATH)/bin/"
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: "go.mod"
+
+      - name: Build atago
+        run: go build -o ./dist/atago .
+
+      - name: Install ${{ matrix.program.name }} onto PATH
+        run: |
+          set -e
+          mkdir -p "$(go env GOPATH)/bin"
+          ${{ matrix.program.install }}
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Run the ${{ matrix.program.name }} suite
+        run: ./dist/atago run "${{ matrix.program.dir }}"

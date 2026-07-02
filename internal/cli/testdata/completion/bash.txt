@@ -1,0 +1,26 @@
+# bash completion for atago
+# Install: atago completion bash > /etc/bash_completion.d/atago
+#      or: source <(atago completion bash)
+_atago() {
+    local cur prev words cword
+    _init_completion 2>/dev/null || {
+        cur="${COMP_WORDS[COMP_CWORD]}"
+        prev="${COMP_WORDS[COMP_CWORD-1]}"
+    }
+    local commands="completion doc explain help init list manifest run snapshot version"
+    local run_flags="--artifacts-dir --ci --fail-fast --filter --parallel --report --rerun-failed --skip-tag --tag --update-snapshots"
+    if [ "${COMP_CWORD}" -eq 1 ]; then
+        COMPREPLY=( $(compgen -W "${commands}" -- "${cur}") )
+        return 0
+    fi
+    case "${COMP_WORDS[1]}" in
+        run)
+            COMPREPLY=( $(compgen -W "${run_flags}" -- "${cur}") $(compgen -f -- "${cur}") )
+            ;;
+        *)
+            COMPREPLY=( $(compgen -f -- "${cur}") )
+            ;;
+    esac
+    return 0
+}
+complete -F _atago atago

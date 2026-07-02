@@ -1,0 +1,159 @@
+# Migrated from jose's ShellSpec spec/jws_spec.sh.
+# jws sign / verify / parse end to end, including input-path equivalence (file,
+# stdin, inline argument) and the required-algorithm behavior. The ShellSpec
+# `setup` seeds an EC P-256 key (ec.jwk), a payload (payload.json) and a signed
+# token (token.jws); here that seed is a shared `&setup` run step replayed at the
+# start of every scenario inside its isolated ${workdir}. Run with:
+#   make dogfood-jose   (or test/e2e/tools/jose/run.sh)
+version: "1"
+
+suite:
+  name: jose jws
+
+scenarios:
+  - name: sign requires an algorithm
+    steps:
+      - &setup
+        run:
+          shell: true
+          command: |
+            printf '{"sub":"alice"}' > payload.json
+            jose jwk generate --type EC --curve P-256 --output ec.jwk >/dev/null
+            jose jws sign --algorithm ES256 --key ec.jwk payload.json > token.jws
+      - run:
+          command: jose jws sign --key ec.jwk payload.json
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            contains: "signature algorithm"
+
+  - name: sign signs a payload into a compact JWS
+    steps:
+      - *setup
+      - run:
+          command: jose jws sign --algorithm ES256 --key ec.jwk payload.json
+      - assert:
+          exit_code: 0
+      # Compact JWS has two dots.
+      - assert:
+          stdout:
+            contains: "."
+
+  - name: sign signs a payload read from stdin via a pipe
+    steps:
+      - *setup
+      - run:
+          shell: true
+          command: cat payload.json | jose jws sign --algorithm ES256 --key ec.jwk
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "."
+
+  - name: verify verifies and prints the payload
+    steps:
+      - *setup
+      - run:
+          command: jose jws verify --algorithm ES256 --key ec.jwk token.jws
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: '{"sub":"alice"}'
+
+  - name: verify verifies a token passed directly as an argument
+    steps:
+      - *setup
+      - run:
+          shell: true
+          command: jose jws verify --algorithm ES256 --key ec.jwk "$(cat token.jws)"
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: '{"sub":"alice"}'
+
+  - name: verify verifies a token read from stdin via a pipe
+    steps:
+      - *setup
+      - run:
+          shell: true
+          command: cat token.jws | jose jws verify --algorithm ES256 --key ec.jwk
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: '{"sub":"alice"}'
+
+  - name: verify reports a missing file instead of a parse error
+    steps:
+      - *setup
+      - run:
+          command: jose jws verify --algorithm ES256 --key ec.jwk does-not-exist.jws
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            contains: "failed to open file"
+
+  - name: verify fails with the wrong key
+    steps:
+      - *setup
+      - run:
+          command: jose jwk generate --type EC --curve P-256 --output other.jwk
+      - run:
+          command: jose jws verify --algorithm ES256 --key other.jwk token.jws
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            contains: "verify"
+
+  - name: parse prints the payload from a file
+    steps:
+      - *setup
+      - run:
+          command: jose jws parse token.jws
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: '{"sub":"alice"}'
+
+  - name: parse prints the payload from an inline token argument
+    steps:
+      - *setup
+      - run:
+          shell: true
+          command: jose jws parse "$(cat token.jws)"
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: '{"sub":"alice"}'
+
+  - name: parse prints the payload from stdin
+    steps:
+      - *setup
+      - run:
+          shell: true
+          command: cat token.jws | jose jws parse -
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: '{"sub":"alice"}'
+
+  - name: parse prints all parts with --all
+    steps:
+      - *setup
+      - run:
+          command: jose jws parse --all token.jws
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "Payload:"
+              - "Signature 0:"
+
+  - name: parse reports a missing file instead of a parse error
+    steps:
+      - *setup
+      - run:
+          command: jose jws parse does-not-exist.jws
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            contains: "failed to open file"

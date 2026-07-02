@@ -1,0 +1,41 @@
+# Migrated from iso8583tool's ShellSpec spec/specs_spec.sh.
+# specs: list the built-in spec presets in text and JSON.
+# Run with: make dogfood-iso8583tool
+version: "1"
+
+suite:
+  name: iso8583tool specs
+
+scenarios:
+  - name: lists the built-in presets with the default marked
+    steps:
+      - run:
+          command: iso8583tool specs
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "basei-starter (default)"
+              - "spec87ascii"
+              - "spec87bcd-starter"
+
+  - name: emits a JSON array with --format json
+    steps:
+      - run:
+          command: iso8583tool specs --format json
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - '"name": "basei-starter"'
+              - '"default": true'
+
+  - name: rejects an unexpected positional argument
+    steps:
+      - run:
+          command: iso8583tool specs extra
+      - assert:
+          exit_code:
+            not: 0
+          stderr:
+            contains: "Usage:"

@@ -1,0 +1,128 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / reports
+
+scenarios:
+  - name: JUnit report is XML with a testsuite and testcase
+    steps:
+      - fixture:
+          file: ok.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: sample
+            scenarios:
+              - name: echo
+                steps:
+                  - run:
+                      command: echo hi
+                  - assert:
+                      stdout:
+                        contains: hi
+      - run:
+          command: ${atago} run --report junit ok.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "<testsuites"
+              - "<testcase"
+
+  - name: GitHub Actions annotations are emitted on failure
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: sample
+            scenarios:
+              - name: nope
+                steps:
+                  - run:
+                      command: echo Bob
+                  - assert:
+                      stdout:
+                        contains: Alice
+      - run:
+          command: ${atago} run --report gha bad.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: "::error"
+
+  - name: TAP report is a numbered TAP 13 stream with ok / not ok points
+    steps:
+      - fixture:
+          file: mixed.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: sample
+            scenarios:
+              - name: good
+                steps:
+                  - run:
+                      command: echo hi
+                  - assert:
+                      stdout:
+                        contains: hi
+              - name: bad
+                steps:
+                  - run:
+                      command: echo Bob
+                  - assert:
+                      stdout:
+                        contains: Alice
+      - run:
+          command: ${atago} run --report tap mixed.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            line: 1
+            equals: "TAP version 13"
+      - assert:
+          stdout:
+            line: 2
+            equals: "1..2"
+      - assert:
+          stdout:
+            contains:
+              - "ok 1 - sample / good"
+              - "not ok 2 - sample / bad"
+
+  - name: failure artifacts are written and referenced in the JSON report
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: sample
+            scenarios:
+              - name: nope
+                steps:
+                  - run:
+                      command: echo Bob
+                  - assert:
+                      stdout:
+                        contains: Alice
+      - run:
+          command: ${atago} run --report json --artifacts-dir arts bad.atago.yaml
+      - assert:
+          exit_code: 1
+      # The JSON report references the durable sidecar under a stable field.
+      - assert:
+          stdout:
+            contains:
+              - "\"artifacts\""
+              - ".actual.txt"
+      # The referenced sidecar exists on disk and holds the full actual payload.
+      - run:
+          shell: true
+          command: cat arts/*/*/step-*-stdout.actual.txt
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: Bob

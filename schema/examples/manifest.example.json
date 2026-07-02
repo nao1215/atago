@@ -1,0 +1,54 @@
+{
+  "schema_version": "1",
+  "specs": [
+    {
+      "spec_path": "test/e2e/atago/version.atago.yaml",
+      "suite": "atago self-hosting / version",
+      "network": {
+        "policy": "unrestricted"
+      },
+      "scenarios": [
+        {
+          "name": "version command prints the binary name",
+          "steps": [
+            {
+              "index": 0,
+              "kind": "run",
+              "action": "run ${atago} version",
+              "command": "${atago} version"
+            },
+            {
+              "index": 1,
+              "kind": "assert",
+              "action": "assert exit_code+stdout+stderr",
+              "target": "exit_code+stdout+stderr"
+            }
+          ],
+          "variables": [
+            "atago"
+          ]
+        },
+        {
+          "name": "unknown command is a configuration error",
+          "steps": [
+            {
+              "index": 0,
+              "kind": "run",
+              "action": "run ${atago} frobnicate",
+              "command": "${atago} frobnicate"
+            },
+            {
+              "index": 1,
+              "kind": "assert",
+              "action": "assert exit_code+stderr",
+              "target": "exit_code+stderr"
+            }
+          ],
+          "variables": [
+            "atago"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/nao1215/atago/schema/report.schema.json",
+  "title": "atago run --report json",
+  "description": "Machine-readable report emitted by `atago run --report json` (#43). It carries per-suite/per-scenario status plus enough failure context for an agent to act on. `schema_version` gates compatibility: it is a string bumped only on a breaking change to this document shape, so consumers should branch on it before reading the rest of the document. Note: `duration_ms` fields are wall-clock and therefore non-deterministic; the committed example zeroes them.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "suites"],
+  "properties": {
+    "schema_version": {
+      "description": "Stable top-level version of the report document. Currently \"1\".",
+      "const": "1"
+    },
+    "suites": {
+      "description": "One entry per suite run, regardless of how many suites were requested.",
+      "type": "array",
+      "items": {"$ref": "#/$defs/report"}
+    }
+  },
+  "$defs": {
+    "report": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["suite", "spec_path", "status", "duration_ms", "scenarios", "failures"],
+      "properties": {
+        "suite": {"type": "string"},
+        "spec_path": {"type": "string"},
+        "status": {
+          "description": "Aggregate suite status.",
+          "type": "string"
+        },
+        "duration_ms": {
+          "description": "Suite wall-clock duration in milliseconds (non-deterministic).",
+          "type": "integer"
+        },
+        "scenarios": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/scenario"}
+        },
+        "failures": {
+          "description": "Flat list of failures across all scenarios; empty on success.",
+          "type": "array",
+          "items": {"$ref": "#/$defs/failure"}
+        }
+      }
+    },
+    "scenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "status", "duration_ms"],
+      "properties": {
+        "name": {"type": "string"},
+        "status": {"type": "string"},
+        "duration_ms": {
+          "description": "Scenario wall-clock duration in milliseconds (non-deterministic).",
+          "type": "integer"
+        },
+        "skip_reason": {
+          "description": "Present only for skipped scenarios.",
+          "type": "string"
+        },
+        "service_logs": {
+          "description": "Preserved background-service log artifacts (#51); omitted when none.",
+          "type": "array",
+          "items": {"$ref": "#/$defs/service_log"}
+        }
+      }
+    },
+    "service_log": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "path"],
+      "properties": {
+        "name": {"type": "string"},
+        "path": {"type": "string"}
+      }
+    },
+    "failure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scenario", "step"],
+      "properties": {
+        "scenario": {"type": "string"},
+        "step": {"type": "string"},
+        "command": {"type": "string"},
+        "expected": {"type": "string"},
+        "actual": {"type": "string"},
+        "hint": {"type": "string"},
+        "error": {"type": "string"},
+        "artifacts": {
+          "description": "Durable sidecar files written for a failed assertion when --artifacts-dir is set (#48); omitted when none.",
+          "type": "array",
+          "items": {"$ref": "#/$defs/artifact"}
+        }
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "path"],
+      "properties": {
+        "role": {"type": "string"},
+        "path": {
+          "description": "Stable path relative to the artifacts-dir root.",
+          "type": "string"
+        }
+      }
+    }
+  }
+}

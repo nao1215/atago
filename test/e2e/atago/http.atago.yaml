@@ -1,0 +1,62 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / http runner
+
+# Exercises the HTTP runner end-to-end through the real atago binary (ADR-0025).
+# Live request/response behavior is covered by Go httptest integration tests
+# (internal/runner/http, internal/engine/http_test.go); these self-host scenarios
+# pin the binary's wiring and exit codes for the paths that need no live server:
+# a network-policy denial (decided before connecting) and an unknown runner.
+scenarios:
+  - name: a denied host is a security policy violation (exit 6)
+    steps:
+      - fixture:
+          file: denied.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: api
+            permissions:
+              network:
+                allow:
+                  - allowed.example
+            runners:
+              api:
+                type: http
+                base_url: http://127.0.0.1:1
+            scenarios:
+              - name: request to a non-allowlisted host
+                steps:
+                  - http:
+                      runner: api
+                      method: GET
+                      path: /ping
+      - run:
+          command: ${atago} run denied.atago.yaml
+      - assert:
+          exit_code: 6
+          stdout:
+            contains: network policy denies
+
+  - name: an http step with an unknown runner errors (exit 4)
+    steps:
+      - fixture:
+          file: norunner.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: api
+            scenarios:
+              - name: references a runner that is not declared
+                steps:
+                  - http:
+                      runner: missing
+                      method: GET
+                      path: /ping
+      - run:
+          command: ${atago} run norunner.atago.yaml
+      - assert:
+          exit_code: 4
+          stdout:
+            contains: unknown runner

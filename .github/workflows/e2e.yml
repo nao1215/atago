@@ -1,0 +1,125 @@
+name: SelfHostedE2E
+
+# atago must be tested by atago (spec.md §5/§6). This builds the real binary
+# and runs the self-hosted spec suite against it. A release must not be tagged
+# unless this passes.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: "go.mod"
+
+      - name: Build atago
+        run: go build -o ./dist/atago .
+
+      - name: Run self-hosted E2E specs
+        # Only the hermetic atago suite runs in CI. The dogfood suites under
+        # test/e2e/tools/* (gup, sqly, truss, iso8583tool, jose, career,
+        # mobilepkg, gup-offline, mimixbox) build the real third-party CLIs from
+        # their checkouts and run locally via `make dogfood` /
+        # `make dogfood-iso8583tool` / `make dogfood-jose` / `make dogfood-career`
+        # / `make dogfood-gup` / `make dogfood-mimixbox` / `make dogfood-mobilepkg`.
+        run: ./dist/atago run ./test/e2e/atago
+
+      - name: Run the git suite (a third-party CLI, no build required)
+        # Proof that atago tests a CLI nobody here wrote: git is preinstalled
+        # on every runner, so this suite runs everywhere without a build step.
+        run: ./dist/atago run ./test/e2e/thirdparty/git
+
+  # The README leads with real-world proof (dogfood + third-party suites), so a
+  # representative slice of that proof must gate every PR, not only the daily
+  # schedules. One flagship self-hosted server (caddy) and one dogfood CLI
+  # (sqly) run here at PINNED versions so the required check stays
+  # deterministic; the daily thirdparty.yml / dogfood.yml matrices keep
+  # tracking @latest to catch upstream drift.
+  e2e-representative:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: "go.mod"
+
+      - name: Build atago
+        run: go build -o ./dist/atago .
+
+      - name: Install pinned representative programs
+        run: |
+          set -e
+          go install github.com/caddyserver/caddy/v2/cmd/caddy@v2.11.4
+          go install github.com/nao1215/sqly@v0.26.0
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Run the caddy suite (self-hosted web server, awesome-selfhosted)
+        run: ./dist/atago run ./test/e2e/thirdparty/caddy
+
+      - name: Run the sqly dogfood suite
+        run: ./dist/atago run ./test/e2e/tools/sqly
+
+  # Windows regressions must fail a PR, not surface days later in the daily
+  # cross-platform run (#78 follow-up). This job runs the portable subset —
+  # specs whose commands are shell builtins of both /bin/sh and cmd.exe, or
+  # that only drive atago itself. Keep this list in sync with the Windows
+  # matrix entry in e2e-cross.yml.
+  e2e-windows:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: "go.mod"
+
+      # `go run .` compiles atago and runs it; os.Executable() (which seeds the
+      # ${atago} spec variable) points at that binary, so specs self-invoke
+      # atago correctly without per-platform binary-name handling.
+      - name: Run the portable self-hosted E2E subset
+        shell: bash
+        run: >-
+          go run . run
+          ./test/e2e/atago/version.atago.yaml
+          ./test/e2e/atago/completion.atago.yaml
+          ./test/e2e/atago/list.atago.yaml
+          ./test/e2e/atago/manifest.atago.yaml
+          ./test/e2e/atago/doc.atago.yaml
+          ./test/e2e/atago/explain.atago.yaml
+          ./test/e2e/atago/init.atago.yaml
+          ./test/e2e/atago/init_templates.atago.yaml
+          ./test/e2e/atago/edge.atago.yaml
+          ./test/e2e/atago/matrix.atago.yaml
+          ./test/e2e/atago/parallel.atago.yaml
+          ./test/e2e/atago/run.atago.yaml
+          ./test/e2e/atago/select.atago.yaml
+          ./test/e2e/atago/skip_command.atago.yaml
+          ./test/e2e/atago/rerun.atago.yaml
+          ./test/e2e/atago/db.atago.yaml
+          ./test/e2e/atago/http.atago.yaml
+          ./test/e2e/atago/grpc.atago.yaml
+          ./test/e2e/atago/ssh.atago.yaml
+          ./test/e2e/atago/cdp.atago.yaml
+          ./test/e2e/atago/pdf.atago.yaml
+          ./test/e2e/thirdparty/git

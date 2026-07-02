@@ -1,0 +1,69 @@
+# Migrated from jose's ShellSpec spec/completion_spec.sh.
+# completion writes a shell script to stdout for an explicit shell and must not
+# create files or edit shell configuration. A missing or unknown shell is an
+# error. Each scenario runs the real jose binary inside its isolated ${workdir}.
+# Run with:
+#   make dogfood-jose   (or test/e2e/tools/jose/run.sh)
+version: "1"
+
+suite:
+  name: jose completion
+
+scenarios:
+  - name: writes a bash completion script to stdout
+    steps:
+      - run:
+          command: jose completion bash
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "bash completion"
+
+  - name: writes a zsh completion script to stdout
+    steps:
+      - run:
+          command: jose completion zsh
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "compdef"
+
+  - name: writes a fish completion script to stdout
+    steps:
+      - run:
+          command: jose completion fish
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "fish"
+
+  - name: requires a shell argument
+    steps:
+      - run:
+          command: jose completion
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            empty: false
+
+  - name: rejects an unknown shell
+    steps:
+      - run:
+          command: jose completion powershell
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            empty: false
+
+  - name: does not create files in the working directory
+    # completion writes only to stdout; the workdir must stay empty afterward.
+    steps:
+      - run:
+          shell: true
+          command: |
+            jose completion zsh > /dev/null
+            ls -A
+      - assert:
+          exit_code: 0
+          stdout:
+            empty: true

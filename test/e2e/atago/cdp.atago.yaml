@@ -1,0 +1,239 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / browser (cdp) runner
+
+# Exercises the browser/CDP runner's wiring through the real atago binary
+# (ADR-0029). Live browser automation needs a headless Chrome and is covered
+# hermetically by a Go test that launches one and serves test HTML
+# (internal/engine/browser_test.go, skipped when Chrome is unavailable); these
+# scenarios pin the binary's config validation and dispatch errors, which need
+# no browser.
+scenarios:
+  - name: a cdp step with no actions fails validation (exit 2)
+    steps:
+      - fixture:
+          file: badcdp.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: browser
+            runners:
+              web:
+                type: browser
+            scenarios:
+              - name: empty actions
+                steps:
+                  - cdp:
+                      runner: web
+                      actions: []
+      - run:
+          command: ${atago} run badcdp.atago.yaml
+      - assert:
+          exit_code: 2
+          stderr:
+            contains: at least one action
+
+  - name: a cdp step naming an unknown runner errors (exit 4)
+    steps:
+      - fixture:
+          file: norunner.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: browser
+            scenarios:
+              - name: missing runner
+                steps:
+                  - cdp:
+                      runner: missing
+                      actions:
+                        - navigate: http://example.com
+      - run:
+          command: ${atago} run norunner.atago.yaml
+      - assert:
+          exit_code: 4
+          stdout:
+            contains: unknown runner
+
+  - name: a screenshot action without a path fails validation (exit 2)
+    steps:
+      - fixture:
+          file: noshotpath.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: browser
+            runners:
+              web:
+                type: browser
+            scenarios:
+              - name: screenshot missing path
+                steps:
+                  - cdp:
+                      runner: web
+                      actions:
+                        - navigate: http://example.com
+                        - screenshot:
+                            selector: "#x"
+      - run:
+          command: ${atago} run noshotpath.atago.yaml
+      - assert:
+          exit_code: 2
+          stderr:
+            contains: screenshot requires a path
+
+  - name: explain lists the extended cdp actions
+    steps:
+      - fixture:
+          file: actions.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: browser
+            runners:
+              web:
+                type: browser
+            scenarios:
+              - name: a black-box ui flow
+                steps:
+                  - cdp:
+                      runner: web
+                      actions:
+                        - navigate: http://example.com
+                        - wait_hidden: "#spinner"
+                        - press: { selector: "#in", key: Enter }
+                        - select: { selector: "#s", value: b }
+                        - check: "#agree"
+                        - screenshot: { path: shot.png }
+                        - title: true
+                        - attribute: { selector: "#lnk", name: href }
+      - run:
+          command: ${atago} explain actions.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - wait_hidden
+              - screenshot shot.png
+              - attribute href
+
+  - name: a browser-only field on a non-browser runner fails validation (exit 2)
+    steps:
+      - fixture:
+          file: crosstype.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: browser
+            runners:
+              api:
+                type: http
+                base_url: http://x
+                headless: false
+            scenarios:
+              - name: misuse
+                steps:
+                  - run: { command: echo hi }
+      - run:
+          command: ${atago} run crosstype.atago.yaml
+      - assert:
+          exit_code: 2
+          stderr:
+            contains: cannot be set on a http runner
+
+  - name: manifest surfaces the browser-runner configuration
+    steps:
+      - fixture:
+          file: cfg.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: browser
+            runners:
+              web:
+                type: browser
+                headless: false
+                exec_path: /usr/bin/chromium
+                browser_args: ["disable-gpu", "window-size=1280,720"]
+            scenarios:
+              - name: ui
+                steps:
+                  - cdp:
+                      runner: web
+                      actions:
+                        - navigate: http://example.com
+                        - title: true
+      - run:
+          command: ${atago} manifest cfg.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              path: $.specs[0].runners[0].headless
+              equals: false
+      - assert:
+          stdout:
+            json:
+              path: $.specs[0].runners[0].exec_path
+              equals: /usr/bin/chromium
+
+  # NOTE: live browser automation (navigation, waits, title/text capture,
+  # screenshots, and the new upload/download actions) is exercised end-to-end by
+  # Go tests that launch a real headless Chrome and serve local HTML
+  # (internal/engine/browser_test.go: TestEngine_CDPWorkflow,
+  # TestEngine_CDPExtendedActions, TestEngine_CDPUploadDownload). Those are made
+  # non-skippable in CI by the dedicated BrowserE2E workflow (#76,
+  # ATAGO_REQUIRE_BROWSER=1). This self-hosted suite deliberately stays hermetic
+  # and only pins the binary's config validation and dispatch errors, which need
+  # no browser — so a slow/flaky headless Chrome cannot redden the hermetic E2E.
+
+  - name: an upload action without a file fails validation (exit 2)
+    steps:
+      - fixture:
+          file: badupload.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: browser
+            runners:
+              web:
+                type: browser
+            scenarios:
+              - name: upload missing file
+                steps:
+                  - cdp:
+                      runner: web
+                      actions:
+                        - upload: { selector: "#f" }
+      - run:
+          command: ${atago} run badupload.atago.yaml
+      - assert:
+          exit_code: 2
+          stderr:
+            contains: upload requires selector and file
+
+  - name: a download action without a click selector fails validation (exit 2)
+    steps:
+      - fixture:
+          file: baddownload.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: browser
+            runners:
+              web:
+                type: browser
+            scenarios:
+              - name: download missing click
+                steps:
+                  - cdp:
+                      runner: web
+                      actions:
+                        - download: { dir: out }
+      - run:
+          command: ${atago} run baddownload.atago.yaml
+      - assert:
+          exit_code: 2
+          stderr:
+            contains: download requires a click selector

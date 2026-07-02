@@ -1,0 +1,124 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / json numeric comparators
+
+# Exercises the numeric bound matchers gt/gte/lt/lte on a json target (ADR-0034).
+# They let a spec pin a non-deterministic-but-bounded metric — a processed-record
+# count, a coverage figure, a rate — where an exact `equals` is impossible but
+# "at least N" / "below N" is exactly the contract worth asserting. Surfaced
+# dogfooding runn's coverage/loadt metrics.
+scenarios:
+  - name: gt and gte pass on a value at or above the bound
+    steps:
+      - run:
+          shell: true
+          command: "echo '{\"count\":3,\"rate\":0.5}'"
+      - assert:
+          stdout:
+            json:
+              path: "$.count"
+              gt: 2
+      - assert:
+          stdout:
+            json:
+              path: "$.count"
+              gte: 3
+
+  - name: lt and lte pass on a value at or below the bound
+    steps:
+      - run:
+          shell: true
+          command: "echo '{\"count\":3,\"rate\":0.5}'"
+      - assert:
+          stdout:
+            json:
+              path: "$.rate"
+              lt: 1
+      - assert:
+          stdout:
+            json:
+              path: "$.count"
+              lte: 3
+
+  - name: comparators work on a numeric string
+    steps:
+      - run:
+          shell: true
+          command: "echo '{\"n\":\"7\"}'"
+      - assert:
+          stdout:
+            json:
+              path: "$.n"
+              gte: 7
+
+  - name: comparators apply to rows and file json targets too
+    steps:
+      - fixture:
+          file: metrics.json
+          content: |
+            {"processed": 1200, "errors": 0}
+      - assert:
+          file:
+            path: metrics.json
+            json:
+              path: "$.processed"
+              gt: 1000
+      - assert:
+          file:
+            path: metrics.json
+            json:
+              path: "$.errors"
+              lte: 0
+
+  - name: a value below the gt bound fails the inner spec
+    steps:
+      - fixture:
+          file: cmp.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: count must exceed 5
+                steps:
+                  - run:
+                      shell: true
+                      command: "echo '{\"count\":3}'"
+                  - assert:
+                      stdout:
+                        json:
+                          path: "$.count"
+                          gt: 5
+      - run:
+          command: ${atago} run cmp.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: "is not gt"
+
+  - name: a non-numeric value cannot be compared and fails
+    steps:
+      - fixture:
+          file: cmp.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: name is not a number
+                steps:
+                  - run:
+                      shell: true
+                      command: "echo '{\"name\":\"alice\"}'"
+                  - assert:
+                      stdout:
+                        json:
+                          path: "$.name"
+                          gt: 0
+      - run:
+          command: ${atago} run cmp.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: "not numeric"

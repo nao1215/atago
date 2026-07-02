@@ -1,0 +1,200 @@
+version: "1"
+
+suite:
+  name: restic (self-hosted backup program)
+
+# Exercises restic (https://restic.net/, from awesome-selfhosted's backup
+# corner) as a third-party target: a full backup lifecycle against a local
+# repository — init, backup, list snapshots as JSON, restore, diff, integrity
+# check, retention, and the failure mode a wrong password must produce.
+# Everything is hermetic: the repository and the data live in the scenario's
+# isolated workdir. Install with:
+#   go install github.com/restic/restic/cmd/restic@latest
+
+defaults:
+  scenario:
+    env:
+      RESTIC_PASSWORD: atago-e2e-pass
+      RESTIC_REPOSITORY: repo
+
+scenarios:
+  - name: version prints a semantic version
+    steps:
+      - run:
+          command: restic version
+      - assert:
+          exit_code: 0
+          stdout:
+            matches: "restic [0-9]+\\.[0-9]+\\.[0-9]+"
+
+  - name: init creates an encrypted repository on disk
+    steps:
+      - run:
+          command: restic init
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: created restic repository
+      # The on-disk layout restic documents: config plus the object dirs.
+      - assert:
+          dir:
+            path: repo
+            exists: true
+            contains:
+              - config
+              - keys
+              - snapshots
+
+  - name: backup, list as JSON, and restore round-trip user data
+    steps:
+      - fixture:
+          file: data/hello.txt
+          content: "hello from atago"
+      - fixture:
+          file: data/sub/notes.md
+          content: "# notes kept safe"
+      - run:
+          command: restic init
+      - run:
+          command: restic backup data
+      - assert:
+          exit_code: 0
+          stdout:
+            matches: "snapshot [0-9a-f]{8} saved"
+      # The machine-readable listing drives the rest of the scenario.
+      - run:
+          command: restic snapshots --json
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              path: "$"
+              length: 1
+      - assert:
+          stdout:
+            json:
+              path: "$[0].summary.total_files_processed"
+              equals: 2
+      - store:
+          name: snap
+          from:
+            stdout:
+              json:
+                path: "$[0].short_id"
+      - run:
+          command: restic restore ${snap} --target restored
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "Restored"
+      - assert:
+          file:
+            path: restored/data/hello.txt
+            contains: hello from atago
+      - assert:
+          file:
+            path: restored/data/sub/notes.md
+            contains: "# notes kept safe"
+
+  - name: diff names exactly the file added between two snapshots
+    steps:
+      - fixture:
+          file: data/base.txt
+          content: "first generation"
+      - run:
+          command: restic init
+      - run:
+          command: restic backup data
+      - fixture:
+          file: data/added-later.txt
+          content: "second generation"
+      - run:
+          command: restic backup data
+      - run:
+          command: restic snapshots --json
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              path: "$"
+              length: 2
+      - store:
+          name: first
+          from:
+            stdout:
+              json:
+                path: "$[0].short_id"
+      - store:
+          name: second
+          from:
+            stdout:
+              json:
+                path: "$[1].short_id"
+      - run:
+          command: restic diff ${first} ${second}
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "+    /data/added-later.txt"
+      - assert:
+          stdout:
+            not_contains: "/data/base.txt"
+
+  - name: check reports a healthy repository as error-free
+    steps:
+      - fixture:
+          file: data/precious.txt
+          content: "verify me"
+      - run:
+          command: restic init
+      - run:
+          command: restic backup data
+      - run:
+          command: restic check
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: no errors were found
+
+  - name: forget --keep-last 1 --prune drops the older snapshot
+    steps:
+      - fixture:
+          file: data/gen.txt
+          content: "one"
+      - run:
+          command: restic init
+      - run:
+          command: restic backup data
+      - fixture:
+          file: data/gen.txt
+          content: "two"
+      - run:
+          command: restic backup data
+      - run:
+          command: restic forget --keep-last 1 --prune
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: remove 1 snapshots
+      - run:
+          command: restic snapshots --json
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              path: "$"
+              length: 1
+
+  - name: the wrong password cannot unlock the repository
+    steps:
+      - run:
+          command: restic init
+      - run:
+          command: restic snapshots
+          env:
+            RESTIC_PASSWORD: not-the-password
+      - assert:
+          exit_code:
+            not: 0
+          stderr:
+            contains: wrong password or no key found

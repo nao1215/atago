@@ -1,0 +1,22 @@
+#compdef atago
+# zsh completion for atago
+# Install: atago completion zsh > "${fpath[1]}/_atago"
+_atago() {
+    local -a commands run_flags
+    commands=(completion doc explain help init list manifest run snapshot version)
+    run_flags=(--artifacts-dir --ci --fail-fast --filter --parallel --report --rerun-failed --skip-tag --tag --update-snapshots)
+    if (( CURRENT == 2 )); then
+        compadd -- ${commands}
+        return
+    fi
+    case ${words[2]} in
+        run)
+            compadd -- ${run_flags}
+            _files
+            ;;
+        *)
+            _files
+            ;;
+    esac
+}
+compdef _atago atago

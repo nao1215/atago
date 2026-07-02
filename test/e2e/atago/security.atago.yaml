@@ -1,0 +1,85 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / security
+
+scenarios:
+  - name: declared secrets are masked in failure output
+    steps:
+      - fixture:
+          file: sec.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            secrets:
+              - DEMO_TOKEN
+            scenarios:
+              - name: leaky
+                steps:
+                  - run:
+                      shell: true
+                      command: echo "token=$DEMO_TOKEN"
+                  - assert:
+                      stdout:
+                        contains: NOPE
+      - run:
+          command: ${atago} run sec.atago.yaml
+          env:
+            DEMO_TOKEN: s3cr3t-abc-12345
+      - assert:
+          exit_code: 1
+      # Masking replaces every occurrence, so seeing the placeholder proves the
+      # raw secret was substituted out of the output.
+      - assert:
+          stdout:
+            contains: "token=***"
+
+  - name: a file assertion path may not escape the scenario workdir
+    steps:
+      - fixture:
+          file: escape.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: traversal
+                steps:
+                  - run:
+                      shell: true
+                      command: echo hi
+                  - assert:
+                      file:
+                        path: ../../../etc/hosts
+                        exists: true
+      - run:
+          command: ${atago} run escape.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: "escapes the scenario workdir"
+
+  - name: a snapshot path may not escape the spec directory
+    steps:
+      - fixture:
+          file: snap_escape.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: traversal
+                steps:
+                  - run:
+                      shell: true
+                      command: echo hi
+                  - assert:
+                      stdout:
+                        snapshot: ../../../tmp/leak.snap
+      - run:
+          command: ${atago} run snap_escape.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: "escapes the spec directory"

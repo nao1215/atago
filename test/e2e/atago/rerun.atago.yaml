@@ -1,0 +1,69 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / rerun-failed
+
+scenarios:
+  - name: a failing run is recorded and rerun-failed selects only it
+    steps:
+      - fixture:
+          file: inner.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: always-green
+                steps:
+                  - run: {shell: true, command: "exit 0"}
+                  - assert: {exit_code: 0}
+              - name: always-red
+                steps:
+                  - run: {shell: true, command: "exit 1"}
+                  - assert: {exit_code: 0}
+      # First run: one scenario fails, so the run exits 1 and records the failure.
+      - run:
+          command: ${atago} run inner.atago.yaml
+      - assert:
+          exit_code: 1
+      # The state file is an explicit, documented JSON contract.
+      - assert:
+          file:
+            path: .atago/last-failed.json
+            exists: true
+      - assert:
+          file:
+            path: .atago/last-failed.json
+            json:
+              path: $.failed[0].scenario
+              equals: always-red
+      # Rerun only the previously-failed scenario. It still fails, and the report
+      # must mention it.
+      - run:
+          command: ${atago} run --rerun-failed inner.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: always-red
+
+  - name: rerun-failed with nothing recorded is a no-op success
+    steps:
+      - fixture:
+          file: green.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: green
+            scenarios:
+              - name: passes
+                steps:
+                  - run: {shell: true, command: "exit 0"}
+                  - assert: {exit_code: 0}
+      # A clean workdir has no recorded failures, so --rerun-failed exits 0 and
+      # reports that there is nothing to rerun.
+      - run:
+          command: ${atago} run --rerun-failed green.atago.yaml
+      - assert:
+          exit_code: 0
+          stderr:
+            contains: nothing to rerun

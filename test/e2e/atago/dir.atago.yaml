@@ -1,0 +1,36 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / dir assertion
+
+scenarios:
+  - name: directory/tree assertions cover a multi-file generator
+    skip: {os: windows}
+    steps:
+      # A tiny "generator": build a small static-site tree.
+      - run:
+          shell: true
+          command: mkdir -p site/assets && printf '<html>' > site/index.html && printf '<html>' > site/about.html && printf 'body{}' > site/assets/app.css
+      - assert:
+          exit_code: 0
+      # A dir assert is not a one-of matcher: every field it sets is an
+      # independent constraint and all must hold, so one block covers existence,
+      # expected/forbidden children (including a nested path), the direct-entry
+      # count and its bounds, and glob coverage.
+      - assert:
+          dir:
+            path: site
+            exists: true
+            contains: [index.html, about.html, assets/app.css]
+            not_contains: [secret.txt]
+            count: 3
+            min_count: 1
+            max_count: 10
+            glob: "*.html"
+
+  - name: a missing directory can be asserted absent
+    steps:
+      - assert:
+          dir:
+            path: never-created
+            exists: false

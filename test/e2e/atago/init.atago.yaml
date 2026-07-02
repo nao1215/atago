@@ -1,0 +1,43 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / init
+
+scenarios:
+  - name: init scaffolds a runnable spec
+    steps:
+      - run:
+          command: ${atago} init starter.atago.yaml
+      - assert:
+          exit_code: 0
+          file:
+            path: starter.atago.yaml
+            exists: true
+      # The scaffold must be valid enough for atago to run it green.
+      - run:
+          command: ${atago} run starter.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: PASSED
+
+  - name: init refuses to overwrite without --force
+    steps:
+      - fixture:
+          file: taken.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: keep
+            scenarios:
+              - name: keep me
+                steps:
+                  - run:
+                      shell: true
+                      command: "exit 0"
+      - run:
+          command: ${atago} init taken.atago.yaml
+      - assert:
+          exit_code: 3
+          stderr:
+            contains: already exists

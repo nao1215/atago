@@ -1,0 +1,53 @@
+# Migrated from gup's ShellSpec e2e/spec/list_spec.sh (the env-light cases only).
+# Requires `gup` on PATH. Run with: make dogfood
+#
+# gup's e2e harness builds a private HOME/GOBIN/GOPATH and a local Go module
+# proxy per example so it can `install_fixture` real modules offline. atago's
+# declarative model does not reproduce that proxy, so the install_fixture cases
+# ("lists an installed binary") cannot migrate — see the migration report.
+#
+# The empty-environment cases DO migrate: point GOBIN at an isolated, otherwise
+# empty directory inside the per-scenario workdir. A relative GOBIN resolves
+# against the workdir (where the command runs), and the `.keep` fixture makes the
+# directory exist while reading as "no binaries installed".
+version: "1"
+
+suite:
+  name: gup list (isolated empty environment)
+
+scenarios:
+  - name: reports a friendly note on an empty environment (#350)
+    steps:
+      - fixture:
+          file: emptybin/.keep
+          content: ""
+      - run:
+          command: gup list
+          env:
+            GOBIN: emptybin
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "no binaries are installed"
+
+  - name: emits a valid empty JSON array on an empty environment with --json
+    steps:
+      - fixture:
+          file: emptybin/.keep
+          content: ""
+      - run:
+          command: gup list --json
+          env:
+            GOBIN: emptybin
+      - assert:
+          exit_code: 0
+      # The output should equal '[]'
+      - assert:
+          stdout:
+            equals: "[]"
+      # ...and it is well-formed JSON of length zero.
+      - assert:
+          stdout:
+            json:
+              path: "$"
+              length: 0

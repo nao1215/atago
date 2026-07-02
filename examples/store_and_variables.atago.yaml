@@ -1,0 +1,60 @@
+version: "1"
+
+# store captures a value from a previous step (JSONPath or regex on stdout, a
+# file, an HTTP header, ...) and later steps reference it as ${name}.
+# ${workdir} is built in: the scenario's isolated temp directory.
+# Runs green as-is: atago run examples/store_and_variables.atago.yaml
+
+suite:
+  name: store and variables
+
+scenarios:
+  - name: capture a value and reuse it
+    steps:
+      - fixture:
+          file: user.json
+          content: |
+            {"id":7,"name":"ada"}
+      - store:
+          name: user_id
+          from:
+            file:
+              path: user.json
+              json:
+                path: "$.id"
+      - run:
+          shell: true
+          command: echo fetched user ${user_id}
+      - assert:
+          stdout:
+            contains: fetched user 7
+
+  - name: capture by regex from stdout
+    steps:
+      - run:
+          shell: true
+          command: echo build 1.2.3 done
+      - store:
+          name: version
+          from:
+            stdout:
+              matches: "[0-9]+\\.[0-9]+\\.[0-9]+"
+      - run:
+          shell: true
+          command: echo releasing ${version}
+      - assert:
+          stdout:
+            equals: releasing 1.2.3
+
+  - name: write a literal ${...} with the $$ escape
+    steps:
+      # $${name} renders as the literal text ${name} without expansion — for a
+      # fixture that is itself a template (or another atago spec).
+      - fixture:
+          file: template.txt
+          content: |
+            greeting is $${greeting}
+      - assert:
+          file:
+            path: template.txt
+            contains: greeting is ${greeting}

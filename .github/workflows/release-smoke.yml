@@ -1,0 +1,48 @@
+name: ReleaseSmoke
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: Release smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: "go.mod"
+
+      - name: Install Syft (SBOM generator)
+        uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+
+      # Signing stays skipped on purpose: keyless cosign needs an OIDC id-token,
+      # which fork PRs cannot mint, and a PR-signed cert identity would differ
+      # from the release.yml identity users verify against. Everything else the
+      # release promises — SBOMs, checksums, runnable archives — builds here.
+      - name: Build artifacts for smoke test
+        uses: goreleaser/goreleaser-action@5daf1e915a5f0af01ddbcd89a43b8061ff4f1a89 # v7.2.2
+        with:
+          version: "v2.16.0"
+          args: release --snapshot --clean --skip=publish,sign
+
+      # Not just "does an archive exist": verifies every hash in checksums.txt,
+      # requires a valid SPDX SBOM per archive, checks archive layout for all
+      # six OS/arch targets, then extracts the host archive and runs the real
+      # binary through version -> init -> run.
+      - name: Smoke-test artifacts before publishing
+        run: ./scripts/smoke_artifacts.sh dist

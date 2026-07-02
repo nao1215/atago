@@ -1,0 +1,49 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / fixture from (copy committed testdata)
+
+# Exercises `fixture: { from }` — copying a committed file (resolved relative to
+# the spec's directory) into the scenario workdir. This is how binary testdata
+# (parquet/xlsx/images) that cannot be inlined as text reaches a command.
+scenarios:
+  - name: a committed binary blob is copied verbatim into the workdir
+    steps:
+      - fixture:
+          file: copied.bin
+          from: testdata/blob.bin
+      # 21 bytes including NUL and 0xff — proves a byte-exact copy, not text.
+      - run:
+          shell: true
+          command: "wc -c < copied.bin"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "21"
+          file:
+            path: copied.bin
+            contains: "binary-marker"
+
+  - name: copying from a missing source errors the scenario
+    steps:
+      - fixture:
+          file: copied.bin
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: missing source
+                steps:
+                  - fixture:
+                      file: x.bin
+                      from: testdata/does-not-exist.bin
+                  - run:
+                      command: "true"
+      - run:
+          command: ${atago} run copied.bin
+      # A fixture copy from a non-existent source is an execution error (exit 4).
+      - assert:
+          exit_code: 4
+          stdout:
+            contains: "copy from"

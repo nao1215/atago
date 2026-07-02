@@ -1,0 +1,118 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / manifest
+
+scenarios:
+  - name: manifest emits a stable JSON summary without running the spec
+    steps:
+      - fixture:
+          file: sample.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: demo
+            secrets:
+              - TOKEN
+            scenarios:
+              - name: "greets ${who}"
+                tags: [smoke]
+                matrix:
+                  - { who: Alice }
+                  - { who: Bob }
+                steps:
+                  - run:
+                      command: echo ${who}
+                  - assert:
+                      stdout:
+                        contains: ${who}
+                      file:
+                        path: out.txt
+                        exists: true
+      - run:
+          command: ${atago} manifest sample.atago.yaml
+      - assert:
+          exit_code: 0
+      # Stable top-level fields.
+      - assert:
+          stdout:
+            json:
+              path: $.schema_version
+              equals: "1"
+      - assert:
+          stdout:
+            json:
+              path: $.specs[0].suite
+              equals: demo
+      - assert:
+          stdout:
+            json:
+              path: $.specs[0].secrets[0]
+              equals: TOKEN
+      # The matrix expands into two concrete scenarios, each with its bound row.
+      - assert:
+          stdout:
+            json:
+              path: $.specs[0].scenarios
+              length: 2
+      - assert:
+          stdout:
+            json:
+              path: $.specs[0].scenarios[0].vars.who
+              equals: Alice
+      # Generated artifacts are surfaced from file exists=true assertions.
+      - assert:
+          stdout:
+            json:
+              path: $.specs[0].scenarios[0].generates[0]
+              equals: out.txt
+      # Source locations point tooling straight at the authored YAML (#80). The
+      # suite name is on line 3 of the fixture content above.
+      - assert:
+          stdout:
+            json:
+              path: $.specs[0].source.line
+              equals: 3
+      # Both matrix instances trace back to the authored scenario on line 7.
+      - assert:
+          stdout:
+            json:
+              path: $.specs[0].scenarios[0].source.line
+              equals: 7
+      - assert:
+          stdout:
+            json:
+              path: $.specs[0].scenarios[1].source.line
+              equals: 7
+      # The first step (run) is on line 13.
+      - assert:
+          stdout:
+            json:
+              path: $.specs[0].scenarios[0].steps[0].source.line
+              equals: 13
+
+  - name: manifest does not execute the spec's commands
+    steps:
+      - fixture:
+          file: side_effect.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: side
+            scenarios:
+              - name: would write a file
+                steps:
+                  - run:
+                      shell: true
+                      command: touch executed.marker
+                  - assert:
+                      exit_code: 0
+      - run:
+          command: ${atago} manifest side_effect.atago.yaml
+      - assert:
+          exit_code: 0
+      # The command must not have run, so its side-effect file must not exist.
+      - assert:
+          file:
+            path: executed.marker
+            exists: false

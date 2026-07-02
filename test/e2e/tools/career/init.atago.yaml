@@ -1,0 +1,64 @@
+# Migrated from career's ShellSpec spec/init_spec.sh.
+# `career init` scaffolds a starter resume YAML: writes it, refuses to clobber
+# without --force, overwrites with --force, and the scaffold must be a file that
+# `career generate` accepts. Run with:
+#   make dogfood-career   (or test/e2e/tools/career/run.sh)
+#
+# ShellSpec mapping:
+#   * BeforeEach 'setup' (mktemp -d) -> atago's per-scenario temp workdir; the
+#     init/output paths are relative so they land in and are cleaned with it.
+#   * `The path X should be exist` -> file: { path: X, exists: true }.
+version: "1"
+
+suite:
+  name: career init
+
+scenarios:
+  - name: writes a starter file
+    steps:
+      - run:
+          command: career init resume.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "wrote"
+          file:
+            path: resume.yaml
+            exists: true
+
+  - name: refuses to overwrite without --force
+    steps:
+      # Precondition: a resume already exists on disk.
+      - run:
+          command: career init resume.yaml
+      - run:
+          command: career init resume.yaml
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            contains: "already exists"
+
+  - name: overwrites with --force
+    steps:
+      - run:
+          command: career init resume.yaml
+      - run:
+          command: career init resume.yaml --force
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "wrote"
+
+  - name: produces a file that generate accepts
+    steps:
+      - run:
+          command: career init resume.yaml
+      - run:
+          command: career generate resume.yaml -t cv -o cv.pdf
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "wrote"
+          file:
+            path: cv.pdf
+            exists: true

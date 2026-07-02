@@ -1,0 +1,151 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / doc
+
+scenarios:
+  - name: doc generates Markdown to a file
+    steps:
+      - fixture:
+          file: target.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: sample
+            scenarios:
+              - name: greet
+                steps:
+                  - run:
+                      command: echo hello
+                  - assert:
+                      stdout:
+                        contains: hello
+      - run:
+          command: ${atago} doc --out specs.md target.atago.yaml
+      - assert:
+          exit_code: 0
+          file:
+            path: specs.md
+            contains: "# atago Behavior Specs"
+      - assert:
+          file:
+            path: specs.md
+            contains: "### Scenario: greet"
+
+  - name: doc writes Markdown to stdout without --out
+    steps:
+      - fixture:
+          file: t2.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: sample2
+            scenarios:
+              - name: g2
+                steps:
+                  - run:
+                      command: echo hi
+                  - assert:
+                      exit_code: 0
+      - run:
+          command: ${atago} doc t2.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "## sample2"
+
+  - name: doc emits a summary, table of contents, and input previews
+    steps:
+      - fixture:
+          file: rich.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: rich
+            scenarios:
+              - name: seeded query
+                tags: [smoke]
+                steps:
+                  - fixture:
+                      file: data.csv
+                      content: "id,name\n1,ada\n"
+                  - run:
+                      command: cat data.csv
+                  - assert:
+                      exit_code: 0
+      - run:
+          command: ${atago} doc rich.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "## Summary"
+              - "1 suite · 1 scenario"
+              - "## Contents"
+              - "(#scenario-seeded-query)"
+              - "#### Inputs"
+              - "id,name"
+
+  - name: doc --split-by-spec writes one file per spec and an index
+    steps:
+      - fixture:
+          file: one.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: suite-one
+            scenarios:
+              - name: a
+                steps:
+                  - run: {command: "true"}
+                  - assert: {exit_code: 0}
+      - fixture:
+          file: two.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: suite-two
+            scenarios:
+              - name: b
+                steps:
+                  - run: {command: "true"}
+                  - assert: {exit_code: 0}
+      - run:
+          command: ${atago} doc --split-by-spec --out-dir generated one.atago.yaml two.atago.yaml
+      - assert:
+          exit_code: 0
+          file:
+            path: generated/one.md
+            exists: true
+      - assert:
+          file:
+            path: generated/two.md
+            exists: true
+      - assert:
+          file:
+            path: generated/index.md
+            contains: "atago Behavior Specs — Index"
+      - assert:
+          file:
+            path: generated/index.md
+            contains: "(one.md)"
+
+  - name: doc --split-by-spec requires --out-dir
+    steps:
+      - fixture:
+          file: solo.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: solo
+            scenarios:
+              - name: only
+                steps:
+                  - run: {command: "true"}
+                  - assert: {exit_code: 0}
+      - run:
+          command: ${atago} doc --split-by-spec solo.atago.yaml
+      - assert:
+          exit_code: 3
+          stderr:
+            contains: requires --out-dir

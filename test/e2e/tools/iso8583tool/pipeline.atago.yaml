@@ -1,0 +1,61 @@
+# Migrated from iso8583tool's ShellSpec spec/pipeline_spec.sh.
+# Real user workflows, end to end: chaining commands through pipes, editing an
+# EMV tag and packing it back, preserving an unknown tag across a round trip,
+# and extracting a single field value for a script. $EXAMPLES == $ISO_EXAMPLES/
+# basei in the staged env, referenced via $ISO_EXAMPLES from shell: true
+# commands. Run with: make dogfood-iso8583tool
+version: "1"
+
+suite:
+  name: iso8583tool workflows
+
+scenarios:
+  - name: streams sample -> convert -> view
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool sample 0100-auth-request --format hex | iso8583tool convert | iso8583tool convert | iso8583tool view -"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "MTI"
+
+  - name: editing an EMV tag edits one tag and packs it back
+    steps:
+      - run:
+          shell: true
+          command: |
+            iso8583tool convert $ISO_EXAMPLES/basei/0100-auth-request.hex > msg.json
+            sed 's/"55.9F02": "000000005000"/"55.9F02": "000000010000"/' msg.json > edited.json
+      - run:
+          shell: true
+          command: "iso8583tool convert edited.json | iso8583tool view - --filter 55.9F02"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "000000010000"
+
+  - name: editing an EMV tag keeps an unknown tag through the round trip
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool convert $ISO_EXAMPLES/basei/0100-auth-request-unknown-tlv.hex > u.json"
+      - run:
+          shell: true
+          command: "iso8583tool convert u.json | iso8583tool validate -"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "55.DF8129"
+
+  - name: extracts a single field value with --filter
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool view $ISO_EXAMPLES/basei/0110-auth-response.hex --filter 39"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "00"
+              - "Approved"

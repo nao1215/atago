@@ -1,0 +1,47 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / harness shell is not shadowed by the program PATH
+
+# Regression for the mimixbox migration: atago sets up PATH for the *program
+# under test*, and a CLI may legitimately ship its own `sh` (e.g. mimixbox's sh
+# applet). If `shell: true` resolved its shell through that PATH, the program
+# under test would hijack atago's shell and change pipe/redirect/exit
+# semantics. The runner therefore invokes an absolute shell (ADR-0018), so a
+# PATH-resident `sh` cannot take over.
+scenarios:
+  - name: a PATH-resident fake sh does not hijack shell:true
+    env:
+      # PATH points ONLY at the workdir, where a sabotaged `sh` lives. If the
+      # runner resolved "sh" through PATH it would find this fake; an absolute
+      # /bin/sh ignores it. echo is a shell builtin, so no other PATH is needed.
+      PATH: "${workdir}"
+    steps:
+      - fixture:
+          file: sh
+          mode: "0755"
+          content: |
+            #!/bin/sh
+            echo HIJACKED
+            exit 0
+      - run:
+          shell: true
+          command: "echo real-shell"
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: real-shell
+      - assert:
+          stdout:
+            not_contains: HIJACKED
+
+  - name: ATAGO_SHELL overrides the shell used for shell:true
+    env:
+      ATAGO_SHELL: /bin/sh
+    steps:
+      - run:
+          shell: true
+          command: "printf '%s\\n' ok"
+      - assert:
+          stdout:
+            equals: ok

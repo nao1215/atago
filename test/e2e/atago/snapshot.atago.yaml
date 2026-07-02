@@ -1,0 +1,93 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / snapshot
+
+scenarios:
+  - name: a snapshot assertion passes against a committed snapshot
+    steps:
+      - fixture:
+          file: snap.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: sample
+            scenarios:
+              - name: stable output
+                steps:
+                  - run:
+                      command: echo stable
+                  - assert:
+                      stdout:
+                        snapshot: out.snap
+      - fixture:
+          file: out.snap
+          content: |
+            stable
+      - run:
+          command: ${atago} run snap.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: PASSED
+
+  - name: snapshot update creates the snapshot file
+    steps:
+      - fixture:
+          file: gen.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: sample
+            scenarios:
+              - name: stable output
+                steps:
+                  - run:
+                      command: echo stable
+                  - assert:
+                      stdout:
+                        snapshot: created.snap
+      - run:
+          command: ${atago} snapshot update gen.atago.yaml
+      - assert:
+          exit_code: 0
+          file:
+            path: created.snap
+            contains: stable
+
+  - name: a snapshot mismatch writes the normalized actual as an artifact
+    steps:
+      - fixture:
+          file: drift.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: sample
+            scenarios:
+              - name: drifted output
+                steps:
+                  - run:
+                      command: echo changed
+                  - assert:
+                      stdout:
+                        snapshot: committed.snap
+      - fixture:
+          file: committed.snap
+          content: |
+            original
+      - run:
+          command: ${atago} run --artifacts-dir arts drift.atago.yaml
+      - assert:
+          exit_code: 1
+      # The console references the sidecar rather than dumping the payload inline.
+      - assert:
+          stdout:
+            contains: "Artifacts:"
+      # The normalized actual that atago compared is preserved for review.
+      - run:
+          shell: true
+          command: cat arts/*/*/step-*-snapshot.actual.txt
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: changed

@@ -1,0 +1,77 @@
+version: "2"
+run:
+  go: "1.26"
+linters:
+  enable:
+    - asciicheck
+    - bidichk
+    - bodyclose
+    - copyloopvar
+    - durationcheck
+    - errcheck
+    - errname
+    - errorlint
+    - gocheckcompilerdirectives
+    - gochecknoinits
+    - gosec
+    - govet
+    - ineffassign
+    - misspell
+    - nilerr
+    - noctx
+    - nolintlint
+    - staticcheck
+    - tagliatelle
+    - thelper
+    - unconvert
+    - unused
+    - usestdlibvars
+    - wastedassign
+    - whitespace
+  settings:
+    errcheck:
+      disable-default-exclusions: false
+      check-type-assertions: true
+      check-blank: false
+      exclude-functions:
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+        - fmt.Print
+        - fmt.Printf
+        - fmt.Println
+    tagliatelle:
+      case:
+        rules:
+          # atago's YAML/JSON spec format uses snake_case keys by design
+          # (e.g. exit_code, base_url); they are an external contract, not Go style.
+          json: snake
+          yaml: snake
+        use-field-name: true
+  exclusions:
+    generated: lax
+    rules:
+      - linters:
+          - errcheck
+        source: defer
+      # Tests legitimately read files via computed temp paths and embed sample
+      # spec text; gosec's G304/G101 are noise there.
+      - linters:
+          - gosec
+        path: _test\.go
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+issues:
+  max-same-issues: 0
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

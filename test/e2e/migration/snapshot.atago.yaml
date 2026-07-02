@@ -1,0 +1,28 @@
+version: "1"
+
+# Migration guide fixture: snapshot / approval testing.
+#
+# ShellSpec: no built-in snapshotting (hand-rolled with committed fixtures).
+# Bats:      no built-in; community `bats-assert` compares against a file.
+# runn:      no snapshotting.
+#
+# atago has first-class, normalized snapshots: assert stdout against a committed
+# golden file, record/refresh it with `atago snapshot update`, and volatile
+# details (ANSI colors, temp paths, home dir, UUIDs, timestamps, local ports)
+# are normalized so the golden stays stable across machines.
+#
+# The golden lives next to this spec as snapshots/greeting.txt (committed).
+# To refresh after an intended change:
+#   atago snapshot update ./test/e2e/migration/snapshot.atago.yaml
+suite:
+  name: migration / snapshot — approval testing
+
+scenarios:
+  - name: stdout matches a committed snapshot
+    steps:
+      - run:
+          shell: true
+          command: echo hello from atago
+      - assert:
+          stdout:
+            snapshot: snapshots/greeting.txt

@@ -1,0 +1,52 @@
+version: "1"
+
+# A db runner executes SQL via query steps; the rows target asserts on the
+# result set as a JSON array. Only pure-Go drivers are linked: SQLite,
+# PostgreSQL, MySQL. A sqlite:${workdir}/... dsn gives every scenario its own
+# isolated database.
+# Runs green as-is (the sqlite driver is bundled): atago run examples/db.atago.yaml
+
+suite:
+  name: db
+
+runners:
+  store:
+    type: db
+    dsn: sqlite:${workdir}/app.db   # or postgres://... / mysql://...
+
+scenarios:
+  - name: seed, query, and bind a row value into the next statement
+    steps:
+      - query:
+          runner: store
+          sql: "CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, role TEXT)"
+      - query:
+          runner: store
+          sql: "INSERT INTO users (name, role) VALUES ('alice','admin')"
+      - query:
+          runner: store
+          sql: "SELECT id, name, role FROM users ORDER BY id"
+      - assert:
+          rows:
+            json:
+              path: "$"
+              length: 1
+      - assert:
+          rows:
+            json:
+              path: "$[0].name"
+              equals: alice
+      - store:
+          name: admin_id
+          from:
+            rows:
+              json:
+                path: "$[0].id"
+      - query:
+          runner: store
+          sql: "SELECT role FROM users WHERE id = ${admin_id}"
+      - assert:
+          rows:
+            json:
+              path: "$[0].role"
+              equals: admin

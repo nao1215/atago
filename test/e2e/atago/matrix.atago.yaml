@@ -1,0 +1,67 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / matrix scenarios
+
+# Exercises declarative parameterized scenarios via `matrix:` (ADR-0020): one
+# template scenario expands into a concrete scenario per row, with each row's
+# variables seeded for ${name} substitution. This is atago's answer to
+# ShellSpec `Parameters`, staying declarative with no expression language.
+scenarios:
+  - name: matrix expands into one scenario per row
+    steps:
+      - fixture:
+          file: matrix.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: greetings
+            scenarios:
+              - name: "greets ${who}"
+                matrix:
+                  - { who: Alice }
+                  - { who: Bob }
+                steps:
+                  - run:
+                      shell: true
+                      command: echo ${who}
+                  - assert:
+                      stdout:
+                        contains: ${who}
+      - run:
+          command: ${atago} run --report junit matrix.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - 'name="greets Alice"'
+              - 'name="greets Bob"'
+
+  - name: matrix without a templated name gets a deterministic suffix
+    steps:
+      - fixture:
+          file: suffix.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: suffixed
+            scenarios:
+              - name: row
+                matrix:
+                  - { n: "1" }
+                  - { n: "2" }
+                steps:
+                  - run:
+                      shell: true
+                      command: echo ${n}
+                  - assert:
+                      stdout:
+                        contains: ${n}
+      - run:
+          command: ${atago} run --report junit suffix.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - 'name="row [n=1]"'
+              - 'name="row [n=2]"'

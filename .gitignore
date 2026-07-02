@@ -13,9 +13,14 @@
 
 # Code coverage profiles and other test artifacts
 *.out
-coverage.*
+# Narrow: `coverage.*` also swallowed .github/workflows/coverage.yml. `*.out`
+# already ignores coverage.out; only ignore the rendered report artifacts here.
+coverage.html
+coverage.xml
+coverage.txt
 *.coverprofile
 profile.cov
+cover.html
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
@@ -30,3 +35,12 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# Build artifacts
+/atago
+/dist/
+/CLAUDE.md
+/doc/spec.md
+
+# `atago run --rerun-failed` state (records the previous run's failing scenarios)
+.atago/

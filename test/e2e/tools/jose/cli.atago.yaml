@@ -1,0 +1,126 @@
+# Migrated from jose's ShellSpec spec/cli_spec.sh.
+# CLI surface: root help, --help, version, unknown command, and `jwa` algorithm
+# listings (key types / signatures / curves / key-encryption) plus the
+# missing-option error. None of these need files; each runs the real jose binary
+# directly inside its isolated ${workdir}. Run with:
+#   make dogfood-jose   (or test/e2e/tools/jose/run.sh)
+version: "1"
+
+suite:
+  name: jose CLI surface
+
+scenarios:
+  - name: root help prints usage with no arguments
+    steps:
+      - run:
+          command: jose
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "JSON Object Signing and Encryption"
+              - "Available Commands:"
+              - "jwk"
+              - "jws"
+              - "jwe"
+
+  - name: root help prints usage with --help
+    steps:
+      - run:
+          command: jose --help
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "Usage:"
+              - "jwa"
+
+  - name: version prints the version
+    steps:
+      - run:
+          command: jose version
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "jose version"
+              - "MIT LICENSE"
+
+  - name: unknown command fails and reports the unknown command
+    steps:
+      - run:
+          command: jose frobnicate
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            contains: "unknown command"
+
+  - name: jwa lists the key types
+    steps:
+      - run:
+          command: jose jwa --key-type
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "RSA"
+              - "oct"
+
+  - name: jwa lists only key types jose can generate
+    # AKP is advertised by the library but jose cannot generate it.
+    steps:
+      - run:
+          command: jose jwa --key-type
+      - assert:
+          exit_code: 0
+          stdout:
+            not_contains: "AKP"
+
+  - name: jwa lists only signature algorithms jose accepts
+    steps:
+      - run:
+          command: jose jwa --signature
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "EdDSA"
+      - assert:
+          stdout:
+            not_contains:
+              - "Ed25519"
+              - "none"
+
+  - name: jwa lists only elliptic curves jose can generate
+    steps:
+      - run:
+          command: jose jwa --elliptic-curve
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "X25519"
+      - assert:
+          stdout:
+            not_contains: "X448"
+
+  - name: jwa lists only key encryption algorithms jose accepts
+    steps:
+      - run:
+          command: jose jwa --key-encryption
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "RSA-OAEP"
+      - assert:
+          stdout:
+            not_contains:
+              - "RSA-OAEP-384"
+              - "HPKE"
+
+  - name: jwa fails when no option is given
+    steps:
+      - run:
+          command: jose jwa
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            empty: false

@@ -1,0 +1,144 @@
+version: "1"
+
+suite:
+  name: transfer.sh (self-hosted file sharing)
+
+# Exercises transfer.sh (https://github.com/dutchcoders/transfer.sh, from
+# awesome-selfhosted's file-transfer corner) as a third-party target. This is
+# the suite the binary-payload spec features exist for: a PNG is uploaded as
+# the raw request body (`body_file`), the returned share URL is captured from
+# the response, the file is downloaded back to disk (`body_to`), and the
+# round-tripped bytes are verified with the image assertion target plus a
+# byte-for-byte cmp. The browser-style multipart upload path is exercised too
+# (`files:`). Install with:
+#   go install github.com/dutchcoders/transfer.sh@latest
+#
+# Each server scenario binds its own port so the suite runs under the default
+# scenario concurrency.
+
+permissions:
+  network:
+    allow: [127.0.0.1]
+
+runners:
+  share:
+    type: http
+    base_url: http://127.0.0.1:18210
+    timeout: 15s
+  share2:
+    type: http
+    base_url: http://127.0.0.1:18211
+    timeout: 15s
+
+scenarios:
+  - name: the binary reports its version
+    steps:
+      - run:
+          command: transfer.sh version
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: transfer.sh
+
+  - name: a binary upload round-trips byte-for-byte
+    services:
+      - name: transfersh
+        command: transfer.sh --provider local --basedir storage --temp-path tmp --listener 127.0.0.1:18210
+        ready:
+          port: 127.0.0.1:18210
+          timeout: 15s
+    steps:
+      # The service reads these directories at startup; leading fixtures are
+      # applied before it boots.
+      - fixture:
+          file: storage/.keep
+          content: ""
+      - fixture:
+          file: tmp/.keep
+          content: ""
+      # A real 1x1 PNG — binary content that would not survive a string body.
+      - fixture:
+          file: pixel.png
+          base64: iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNocFBoAAADhQFhC+q+qAAAAABJRU5ErkJggg==
+      # Upload: the file's raw bytes are the request body (curl --upload-file).
+      - http:
+          runner: share
+          method: PUT
+          path: /pixel.png
+          body_file: pixel.png
+      - assert:
+          status: 200
+          body:
+            contains: http://127.0.0.1:18210/
+      # The response body is the share URL; capture it and download it back.
+      - store:
+          name: share_url
+          from:
+            body:
+              matches: "http://[^\\s]+"
+      - http:
+          runner: share
+          method: GET
+          path: ${share_url}
+          body_to: downloaded.png
+      - assert:
+          status: 200
+          image:
+            path: downloaded.png
+            format: png
+            width: 1
+            height: 1
+      # Byte-for-byte: what came back is exactly what went up.
+      - run:
+          command: cmp pixel.png downloaded.png
+      - assert:
+          exit_code: 0
+
+  - name: a browser-style multipart upload is accepted too
+    services:
+      - name: transfersh
+        command: transfer.sh --provider local --basedir storage --temp-path tmp --listener 127.0.0.1:18211
+        ready:
+          port: 127.0.0.1:18211
+          timeout: 15s
+    steps:
+      - fixture:
+          file: storage/.keep
+          content: ""
+      - fixture:
+          file: tmp/.keep
+          content: ""
+      - fixture:
+          file: notes.txt
+          content: "shared through a multipart form"
+      - http:
+          runner: share2
+          method: POST
+          path: /
+          files:
+            - field: file
+              path: notes.txt
+      - assert:
+          status: 200
+          body:
+            contains: http://127.0.0.1:18211/
+      - store:
+          name: share_url
+          from:
+            body:
+              matches: "http://[^\\s]+"
+      - http:
+          runner: share2
+          method: GET
+          path: ${share_url}
+      - assert:
+          status: 200
+          body:
+            contains: shared through a multipart form
+      # An unknown token serves nothing.
+      - http:
+          runner: share2
+          method: GET
+          path: /no-such-token/notes.txt
+      - assert:
+          status: 404

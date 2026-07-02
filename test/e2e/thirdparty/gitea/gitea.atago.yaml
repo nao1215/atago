@@ -1,0 +1,244 @@
+version: "1"
+
+suite:
+  name: gitea (self-hosted git service)
+
+# Exercises Gitea (https://about.gitea.com/, from awesome-selfhosted's
+# software-development corner) as a third-party target: the real server booted
+# from an authored app.ini with SQLite, administered through its CLI (user +
+# access token), then driven over the REST API — repository creation, file
+# commits, issues — and finally cloned with real git over HTTP, proving two
+# third-party programs interoperate under one spec. Install (prebuilt binary):
+#   see .github/workflows/thirdparty.yml for the download step
+#
+# Each server scenario binds its own port so the suite runs under the default
+# scenario concurrency.
+
+permissions:
+  network:
+    allow: [127.0.0.1]
+
+runners:
+  gitea:
+    type: http
+    base_url: http://127.0.0.1:18140
+    timeout: 15s
+  gitea2:
+    type: http
+    base_url: http://127.0.0.1:18141
+    timeout: 15s
+
+defaults:
+  scenario:
+    env:
+      GITEA_WORK_DIR: ${workdir}/work
+
+scenarios:
+  - name: the binary reports its version
+    steps:
+      - run:
+          command: gitea --version
+      - assert:
+          exit_code: 0
+          stdout:
+            matches: "gitea version [0-9]+\\.[0-9]+\\.[0-9]+"
+
+  - name: the server boots from an authored app.ini and reports healthy
+    services:
+      - name: gitea
+        command: gitea web --config app.ini
+        ready:
+          port: 127.0.0.1:18140
+          timeout: 60s
+    steps:
+      - fixture:
+          file: app.ini
+          content: |
+            [server]
+            HTTP_ADDR = 127.0.0.1
+            HTTP_PORT = 18140
+            ROOT_URL = http://127.0.0.1:18140/
+            DISABLE_SSH = true
+            OFFLINE_MODE = true
+
+            [database]
+            DB_TYPE = sqlite3
+            PATH = data/gitea.db
+
+            [security]
+            INSTALL_LOCK = true
+
+            [log]
+            MODE = console
+            LEVEL = Warn
+
+            [repository]
+            ROOT = data/repos
+
+            [mailer]
+            ENABLED = false
+      # First boot runs DB migrations; poll until the health check passes.
+      - http:
+          runner: gitea
+          method: GET
+          path: /api/healthz
+          retry:
+            times: 30
+            interval: 1s
+            until:
+              status: 200
+      - assert:
+          status: 200
+      - http:
+          runner: gitea
+          method: GET
+          path: /api/v1/version
+      - assert:
+          status: 200
+          body:
+            json:
+              path: "$.version"
+              matches: "^[0-9]+\\.[0-9]+\\.[0-9]+"
+
+  - name: admin CLI, REST API, and a real git clone interoperate
+    services:
+      - name: gitea
+        command: gitea web --config app.ini
+        ready:
+          port: 127.0.0.1:18141
+          timeout: 60s
+    steps:
+      - fixture:
+          file: app.ini
+          content: |
+            [server]
+            HTTP_ADDR = 127.0.0.1
+            HTTP_PORT = 18141
+            ROOT_URL = http://127.0.0.1:18141/
+            DISABLE_SSH = true
+            OFFLINE_MODE = true
+
+            [database]
+            DB_TYPE = sqlite3
+            PATH = data/gitea.db
+
+            [security]
+            INSTALL_LOCK = true
+
+            [log]
+            MODE = console
+            LEVEL = Warn
+
+            [repository]
+            ROOT = data/repos
+
+            [mailer]
+            ENABLED = false
+      - http:
+          runner: gitea2
+          method: GET
+          path: /api/healthz
+          retry:
+            times: 30
+            interval: 1s
+            until:
+              status: 200
+      # Administer the instance through Gitea's own CLI.
+      - run:
+          command: gitea --config app.ini admin user create --username atago --password atago-e2e-pass1 --email atago@example.com --admin --must-change-password=false
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: successfully created
+      - run:
+          command: gitea --config app.ini admin user generate-access-token --username atago --token-name e2e --scopes all --raw
+      - assert:
+          exit_code: 0
+          stdout:
+            matches: "^[0-9a-f]{40}\\s*$"
+      - store:
+          name: token
+          from:
+            stdout:
+              matches: "[0-9a-f]{40}"
+      # Create a repository over the REST API with the bound token.
+      - http:
+          runner: gitea2
+          method: POST
+          path: /api/v1/user/repos
+          header:
+            Authorization: "token ${token}"
+          json:
+            name: demo
+            auto_init: true
+            description: created by an atago behavior spec
+      - assert:
+          status: 201
+          body:
+            json:
+              path: "$.name"
+              equals: demo
+      - assert:
+          body:
+            json:
+              path: "$.owner.login"
+              equals: atago
+      # Commit a file through the contents API (payload is base64).
+      - http:
+          runner: gitea2
+          method: POST
+          path: /api/v1/repos/atago/demo/contents/hello.txt
+          header:
+            Authorization: "token ${token}"
+          json:
+            content: aGVsbG8gZnJvbSBhdGFnbwo=
+            message: add hello.txt
+      - assert:
+          status: 201
+          body:
+            json:
+              path: "$.content.path"
+              equals: hello.txt
+      # File an issue and read it back.
+      - http:
+          runner: gitea2
+          method: POST
+          path: /api/v1/repos/atago/demo/issues
+          header:
+            Authorization: "token ${token}"
+          json:
+            title: found by atago
+            body: filed through the behavior spec
+      - assert:
+          status: 201
+          body:
+            json:
+              path: "$.number"
+              equals: 1
+      - http:
+          runner: gitea2
+          method: GET
+          path: /api/v1/repos/atago/demo/issues/1
+          header:
+            Authorization: "token ${token}"
+      - assert:
+          status: 200
+          body:
+            json:
+              path: "$.state"
+              equals: open
+      # Finally: a real `git clone` over HTTP sees the API-created commit.
+      - run:
+          command: git clone http://atago:atago-e2e-pass1@127.0.0.1:18141/atago/demo.git checkout
+      - assert:
+          exit_code: 0
+      - assert:
+          file:
+            path: checkout/hello.txt
+            contains: hello from atago
+      - assert:
+          dir:
+            path: checkout
+            contains:
+              - README.md
+              - hello.txt

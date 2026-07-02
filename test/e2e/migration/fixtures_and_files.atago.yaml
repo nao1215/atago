@@ -1,0 +1,73 @@
+version: "1"
+
+# Migration guide fixture: setup/teardown vs fixtures, and checking generated
+# files & JSON output.
+#
+# ShellSpec: BeforeEach/AfterEach + `setup()`/`teardown()` shell helpers that
+#            write scratch files; AfterAll cleanup.
+# Bats:      setup()/teardown()/setup_file()/teardown_file() writing to
+#            "$BATS_TMPDIR"; manual `rm` in teardown.
+# runn:      no per-CLI file fixtures.
+#
+# atago replaces imperative setup/teardown with a declarative `fixture` step
+# that seeds an input file into the scenario's isolated temp workdir. There is
+# NO teardown to write: every scenario runs in a fresh temp dir that atago
+# removes automatically. `file` assertions inspect what the command produced.
+suite:
+  name: migration / fixtures — setup files, generated files, JSON
+
+scenarios:
+  # BeforeEach writes input.txt -> fixture step. The command consumes it and
+  # writes an output; we assert on the produced file instead of a teardown rm.
+  - name: a fixture seeds input and a file assertion checks the output
+    skip: { os: windows }        # cp/redirect below are POSIX-only
+    steps:
+      - fixture:
+          file: input.txt
+          content: |
+            id,name
+            1,Alice
+      - run:
+          shell: true
+          command: "cp input.txt output.txt"
+      - assert:
+          file:
+            path: output.txt
+            exists: true
+      - assert:
+          file:
+            path: output.txt
+            contains: Alice
+
+  # A JSON-emitting command: assert structured values by JSONPath instead of a
+  # brittle substring — atago's answer to piping through jq in ShellSpec/Bats.
+  - name: json output is asserted by path, and a value is stored and reused
+    skip: { os: windows }        # printf here-payload uses POSIX shell quoting
+    steps:
+      - run:
+          shell: true
+          command: "printf '%s' '{\"items\":[{\"id\":7,\"name\":\"Alice\"}],\"count\":1}'"
+      - assert:
+          stdout:
+            json:
+              path: "$.items[0].name"
+              equals: Alice
+      - assert:
+          stdout:
+            json:
+              path: "$.count"
+              gte: 1
+      # ShellSpec/Bats would capture with `id=$(... | jq)`. atago's `store`
+      # binds a captured value into ${name} for a later step — declaratively.
+      - store:
+          name: first_id
+          from:
+            stdout:
+              json:
+                path: "$.items[0].id"
+      - run:
+          shell: true
+          command: echo "picked ${first_id}"
+      - assert:
+          stdout:
+            contains: "picked 7"

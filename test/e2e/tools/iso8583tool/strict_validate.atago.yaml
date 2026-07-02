@@ -1,0 +1,189 @@
+# Migrated from iso8583tool's ShellSpec spec/strict_validate_spec.sh.
+# validate --strict must not pass a hollow advice or network-management message:
+# an advice carries the same core data elements as the request it stands in for,
+# and every network-management message identifies its purpose with field 70.
+#
+# The ShellSpec `hollow` helper packs a near-empty JSON document to hex and runs
+# validate --strict on it. Here each scenario writes the JSON as a fixture,
+# packs it to <name>.hex with `convert --output`, then validates that file.
+# Env: ISO_EXAMPLES ($EXAMPLES == $ISO_EXAMPLES/basei).
+# Run with: make dogfood-iso8583tool
+version: "1"
+
+suite:
+  name: iso8583tool validate --strict advice and network rules
+
+scenarios:
+  - name: fails a hollow authorization advice (0120)
+    steps:
+      - fixture:
+          file: h0120.json
+          content: '{"mti":"0120","fields":{"11":"123456"}}'
+      - run:
+          command: iso8583tool convert h0120.json --to hex --output h0120.hex
+      - run:
+          command: iso8583tool validate h0120.hex --strict
+      - assert:
+          exit_code:
+            not: 0
+          stdout:
+            contains: "failed"
+
+  - name: fails a hollow financial advice (0220)
+    steps:
+      - fixture:
+          file: h0220.json
+          content: '{"mti":"0220","fields":{"11":"123456"}}'
+      - run:
+          command: iso8583tool convert h0220.json --to hex --output h0220.hex
+      - run:
+          command: iso8583tool validate h0220.hex --strict
+      - assert:
+          exit_code:
+            not: 0
+          stdout:
+            contains: "failed"
+
+  - name: fails a hollow network advice (0820)
+    steps:
+      - fixture:
+          file: h0820.json
+          content: '{"mti":"0820","fields":{"11":"123456"}}'
+      - run:
+          command: iso8583tool convert h0820.json --to hex --output h0820.hex
+      - run:
+          command: iso8583tool validate h0820.hex --strict
+      - assert:
+          exit_code:
+            not: 0
+          stdout:
+            contains: "failed"
+
+  - name: fails a hollow network response (0810)
+    steps:
+      - fixture:
+          file: h0810.json
+          content: '{"mti":"0810","fields":{"11":"123456","39":"00"}}'
+      - run:
+          command: iso8583tool convert h0810.json --to hex --output h0810.hex
+      - run:
+          command: iso8583tool validate h0810.hex --strict
+      - assert:
+          exit_code:
+            not: 0
+          stdout:
+            contains: "failed"
+
+  - name: fails a hollow network advice response (0830)
+    steps:
+      - fixture:
+          file: h0830.json
+          content: '{"mti":"0830","fields":{"11":"123456","39":"00"}}'
+      - run:
+          command: iso8583tool convert h0830.json --to hex --output h0830.hex
+      - run:
+          command: iso8583tool validate h0830.hex --strict
+      - assert:
+          exit_code:
+            not: 0
+          stdout:
+            contains: "failed"
+
+  - name: still accepts the bundled network echo under --strict
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool validate $ISO_EXAMPLES/basei/0800-network-echo.hex --strict"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "ok"
+
+  - name: fails a hollow authorization notification (0140)
+    steps:
+      - fixture:
+          file: h0140.json
+          content: '{"mti":"0140","fields":{"11":"123456"}}'
+      - run:
+          command: iso8583tool convert h0140.json --to hex --output h0140.hex
+      - run:
+          command: iso8583tool validate h0140.hex --strict
+      - assert:
+          exit_code:
+            not: 0
+          stdout:
+            contains: "failed"
+
+  - name: fails a hollow financial instruction ack (0270)
+    steps:
+      - fixture:
+          file: h0270.json
+          content: '{"mti":"0270","fields":{"11":"123456"}}'
+      - run:
+          command: iso8583tool convert h0270.json --to hex --output h0270.hex
+      - run:
+          command: iso8583tool validate h0270.hex --strict
+      - assert:
+          exit_code:
+            not: 0
+          stdout:
+            contains: "failed"
+
+  - name: fails a hollow file-action request (0300)
+    steps:
+      - fixture:
+          file: h0300.json
+          content: '{"mti":"0300","fields":{"11":"123456"}}'
+      - run:
+          command: iso8583tool convert h0300.json --to hex --output h0300.hex
+      - run:
+          command: iso8583tool validate h0300.hex --strict
+      - assert:
+          exit_code:
+            not: 0
+          stdout:
+            contains: "failed"
+
+  - name: requires a PAN source for a reversal request (0400)
+    steps:
+      - fixture:
+          file: h0400.json
+          content: '{"mti":"0400","fields":{"4":"000000001000","7":"0605123456","11":"123456","90":"020022334406041301050000000000000000000000"}}'
+      - run:
+          command: iso8583tool convert h0400.json --to hex --output h0400.hex
+      - run:
+          command: iso8583tool validate h0400.hex --strict
+      - assert:
+          exit_code:
+            not: 0
+          stdout:
+            contains: "PAN source"
+
+  - name: warns that reconciliation (0500) rules are not implemented
+    steps:
+      - fixture:
+          file: h0500.json
+          content: '{"mti":"0500","fields":{"11":"123456"}}'
+      - run:
+          command: iso8583tool convert h0500.json --to hex --output h0500.hex
+      - run:
+          command: iso8583tool validate h0500.hex --strict
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "class 5"
+
+  - name: rejects an alphabetic value in a numeric field (70)
+    steps:
+      - fixture:
+          file: hc0800.json
+          content: '{"mti":"0800","fields":{"11":"123456","70":"ABC"}}'
+      - run:
+          command: iso8583tool convert hc0800.json --to hex --output hc0800.hex
+      - run:
+          command: iso8583tool validate hc0800.hex --strict
+      - assert:
+          exit_code:
+            not: 0
+          stdout:
+            contains: "must be numeric"

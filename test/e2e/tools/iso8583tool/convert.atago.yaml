@@ -1,0 +1,242 @@
+# Migrated from iso8583tool's ShellSpec spec/convert_spec.sh.
+# convert: direction auto-detection, --to override, document-path validation
+# (rejecting reserved/duplicate/malformed paths fed on stdin), round-trip
+# stability, raw+packed-BCD round-trip, writing to a file, and the unmasked
+# output warning. The kanmu-like raw message is inlined as base64.
+# Run with: make dogfood-iso8583tool
+version: "1"
+
+suite:
+  name: iso8583tool convert
+
+scenarios:
+  - name: auto-detected direction packs a JSON document to hex
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool convert $ISO_EXAMPLES/basei/0100-auth-request.json"
+      - assert:
+          exit_code: 0
+          stdout:
+            matches: "^3031"
+
+  - name: auto-detected direction unpacks a message to a JSON document
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool convert $ISO_EXAMPLES/basei/0100-auth-request.hex"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - '"mti": "0100"'
+              - '"55.9F02"'
+
+  - name: --to override forces json output from a message
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool convert $ISO_EXAMPLES/basei/0110-auth-response.hex --to json"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: '"mti"'
+
+  - name: --to override rejects an unknown direction
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool convert $ISO_EXAMPLES/basei/0100-auth-request.json --to sideways"
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            contains: "unsupported --to"
+
+  - name: rejects a path present in both fields and binary_fields
+    steps:
+      - run:
+          command: iso8583tool convert --to hex
+          stdin: '{"mti":"0100","fields":{"55.8A":"00"},"binary_fields":{"55.8A":"3035"}}'
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            contains: "55.8A"
+
+  - name: rejects a parent path that also has nested children
+    steps:
+      - run:
+          command: iso8583tool convert --to hex
+          stdin: '{"mti":"0100","binary_fields":{"55":"9F0206000000005000","55.9F02":"000000009999"}}'
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            contains: "55.9F02"
+
+  - name: rejects field id 0 (reserved for the MTI)
+    steps:
+      - run:
+          command: iso8583tool convert --to hex
+          stdin: '{"mti":"0100","fields":{"0":"9999"}}'
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            contains: "mti"
+
+  - name: rejects field id 1 (the bitmap)
+    steps:
+      - run:
+          command: iso8583tool convert --to hex
+          stdin: '{"mti":"0100","fields":{"1":"1234"}}'
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            contains: "bitmap"
+
+  - name: rejects field id 0 set through binary_fields
+    steps:
+      - run:
+          command: iso8583tool convert --to hex
+          stdin: '{"mti":"0100","binary_fields":{"0":"31323334"}}'
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            contains: "mti"
+
+  - name: rejects an out-of-range field id
+    steps:
+      - run:
+          command: iso8583tool convert --to hex
+          stdin: '{"mti":"0100","fields":{"129":"x"}}'
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            contains: "invalid field id"
+
+  - name: rejects a non-numeric field id
+    steps:
+      - run:
+          command: iso8583tool convert --to hex
+          stdin: '{"mti":"0100","fields":{"A.1":"x"}}'
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            contains: "invalid field id"
+
+  - name: rejects a malformed dotted path
+    steps:
+      - run:
+          command: iso8583tool convert --to hex
+          stdin: '{"mti":"0100","binary_fields":{"55..9F02":"00"}}'
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            contains: "empty segment"
+
+  - name: rejects leading whitespace in a path key
+    steps:
+      - run:
+          command: iso8583tool convert --to hex
+          stdin: '{"mti":"0100","fields":{" 2":"4111111111111111"}}'
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            contains: "whitespace"
+
+  - name: rejects a leading-zero duplicate alias (02 vs 2)
+    steps:
+      - run:
+          command: iso8583tool convert --to hex
+          stdin: '{"mti":"0100","fields":{"02":"4111111111111111","2":"4222222222222222"}}'
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            contains: "address field"
+
+  - name: rejects a case-different duplicate TLV alias (9f02 vs 9F02)
+    steps:
+      - run:
+          command: iso8583tool convert --to hex
+          stdin: '{"mti":"0100","binary_fields":{"55.9f02":"000000001000","55.9F02":"000000005000"}}'
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            contains: "address field"
+
+  - name: rejects raw bytes routed to a text field via binary_fields
+    steps:
+      - run:
+          command: iso8583tool convert --to hex
+          stdin: '{"mti":"0100","binary_fields":{"11":"000102030405"}}'
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            contains: "text field"
+
+  - name: round-trip is stable through hex -> json -> hex
+    steps:
+      - run:
+          shell: true
+          command: |
+            h="$(iso8583tool sample 0100-auth-request --format hex)"
+            back="$(printf "%s" "$h" | iso8583tool convert | iso8583tool convert)"
+            [ "$(printf "%s" "$h")" = "$(printf "%s" "$back")" ] && echo SAME || echo DIFF
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "SAME"
+
+  - name: is stable through raw -> json -> raw with the packed-BCD starter preset
+    steps:
+      - fixture:
+          file: message.bin
+          base64: AQBwBAAAAAAAABBAGSSZmZmZmTJzJwAAAAAROCIE
+      - run:
+          shell: true
+          command: |
+            iso8583tool convert message.bin --encoding raw --spec spec87bcd-starter > doc.json &&
+            iso8583tool convert doc.json --to hex --encoding raw --spec spec87bcd-starter --output back.bin >/dev/null &&
+            cmp -s message.bin back.bin &&
+            echo SAME
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "SAME"
+
+  - name: to a file writes the result and reports it
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool convert $ISO_EXAMPLES/basei/0100-auth-request.json --output out.hex"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "Converted with"
+              - "unmasked"
+              - "sensitive"
+          file:
+            path: out.hex
+            exists: true
+
+  - name: unmasked-output warning is documented in help
+    steps:
+      - run:
+          command: iso8583tool convert --help
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "UNMASKED"
+              - "redact"
+
+  - name: stays byte-clean on stderr when piped (stdout not a TTY)
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool convert $ISO_EXAMPLES/basei/0100-auth-request.hex"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: '"mti": "0100"'
+          stderr:
+            equals: ""

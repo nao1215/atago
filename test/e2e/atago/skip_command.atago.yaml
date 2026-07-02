@@ -1,0 +1,86 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / skip-only command predicate
+
+# Exercises the runtime probe-command skip/only predicate (ADR-0021): a scenario
+# is gated by whether a probe command succeeds (exits 0). This is atago's
+# declarative answer to ShellSpec's `Skip if <shell test>`.
+scenarios:
+  - name: skip command that succeeds skips the scenario
+    steps:
+      - fixture:
+          file: skip.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: gated by a succeeding probe
+                skip:
+                  command: "exit 0"
+                steps:
+                  - run:
+                      shell: true
+                      command: echo should-not-run
+                  - assert:
+                      stdout:
+                        contains: never-checked
+      - run:
+          command: ${atago} run skip.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: skipped
+
+  - name: only command that fails skips the scenario
+    steps:
+      - fixture:
+          file: only.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: gated by a failing probe
+                only:
+                  command: "exit 1"
+                steps:
+                  - run:
+                      shell: true
+                      command: echo should-not-run
+                  - assert:
+                      stdout:
+                        contains: never-checked
+      - run:
+          command: ${atago} run only.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: skipped
+
+  - name: only command that succeeds runs the scenario
+    steps:
+      - fixture:
+          file: run.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: gated by a succeeding probe
+                only:
+                  command: "exit 0"
+                steps:
+                  - run:
+                      shell: true
+                      command: echo ran
+                  - assert:
+                      stdout:
+                        contains: ran
+      - run:
+          command: ${atago} run run.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: passed

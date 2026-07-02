@@ -1,0 +1,25 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / version
+
+scenarios:
+  - name: version command prints the binary name
+    steps:
+      - run:
+          command: ${atago} version
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: atago
+          stderr:
+            empty: true
+
+  - name: unknown command is a configuration error
+    steps:
+      - run:
+          command: ${atago} frobnicate
+      - assert:
+          exit_code: 3
+          stderr:
+            contains: unknown command

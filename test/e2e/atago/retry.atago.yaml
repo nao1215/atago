@@ -1,0 +1,63 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / retry until
+
+# Exercises declarative retry/until polling on a run step (ADR-0022): the command
+# is re-run until the `until` assertion passes or the attempt budget is spent.
+# This is atago's answer to runn's retry for async behavior, with no hand-rolled
+# shell `timeout` loops.
+scenarios:
+  - name: retry polls until the condition becomes true
+    steps:
+      - fixture:
+          file: ready.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: becomes ready on a later attempt
+                steps:
+                  - run:
+                      shell: true
+                      command: "if [ -f marker ]; then echo ready; else touch marker; echo waiting; fi"
+                      retry:
+                        times: 5
+                        interval: 10ms
+                        until:
+                          stdout:
+                            contains: ready
+                  - assert:
+                      stdout:
+                        contains: ready
+      - run:
+          command: ${atago} run ready.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: passed
+
+  - name: retry fails the inner spec when until never holds
+    steps:
+      - fixture:
+          file: never.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: never ready
+                steps:
+                  - run:
+                      command: echo waiting
+                      retry:
+                        times: 3
+                        interval: 1ms
+                        until:
+                          stdout:
+                            contains: ready
+      - run:
+          command: ${atago} run never.atago.yaml
+      - assert:
+          exit_code: 1

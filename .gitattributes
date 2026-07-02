@@ -1,0 +1,18 @@
+# Normalize line endings to LF on checkout across every platform. atago has
+# golden/drift tests that regenerate files (the behavior docs under doc/e2e/, the
+# schema examples under schema/examples/, and the docs-site samples under site/)
+# with LF and compare them byte-for-byte against the committed copies. On Windows
+# CI, git's autocrlf would otherwise check those files out with CRLF, so the
+# regenerated LF output would never match. Forcing eol=lf keeps the comparison
+# deterministic on Linux, macOS, and Windows alike.
+* text=auto eol=lf
+
+# Binary assets must never be EOL-translated (would corrupt them and break the
+# image-diff drift test and the image assertions).
+*.png -text
+*.gif -text
+*.jpg -text
+*.jpeg -text
+*.ico -text
+*.bin -text
+*.pdf -text

@@ -1,0 +1,133 @@
+# `mobilepkg inspect` JSON output against the committed AndroGoat fixture
+# (an intentionally-vulnerable APK). The assertions pin the stable package
+# facts and the security findings AndroGoat is known to trigger, so a
+# regression in manifest/DEX/signing analysis is caught. Run with:
+#   make dogfood-mobilepkg   (or test/e2e/tools/mobilepkg/run.sh)
+#
+# The fixture is copied into the per-scenario ${workdir} from $MOBILEPKG_TESTDATA
+# (mobilepkg's checkout testdata/), then inspected by bare relative name.
+version: "1"
+
+suite:
+  name: mobilepkg inspect (AndroGoat APK)
+
+scenarios:
+  - name: reports platform and format for an APK
+    steps:
+      - run:
+          shell: true
+          command: cp "$MOBILEPKG_TESTDATA/android/androgoat_rich.apk" app.apk
+      - run:
+          command: mobilepkg inspect app.apk
+      - assert:
+          exit_code: 0
+          stdout:
+            json: { path: "$.result.platform", equals: "android" }
+      - assert:
+          stdout:
+            json: { path: "$.result.format", equals: "apk" }
+
+  - name: extracts identity and version from the manifest
+    steps:
+      - run:
+          shell: true
+          command: cp "$MOBILEPKG_TESTDATA/android/androgoat_rich.apk" app.apk
+      - run:
+          command: mobilepkg inspect app.apk
+      - assert:
+          stdout:
+            json: { path: "$.result.identity.identifier", equals: "owasp.sat.agoat" }
+      - assert:
+          stdout:
+            json: { path: "$.result.version.marketing", equals: "1.0" }
+      - assert:
+          stdout:
+            json: { path: "$.result.entry.name", equals: "owasp.sat.agoat.SplashActivity" }
+
+  - name: reports the debuggable and allow_backup manifest flags
+    steps:
+      - run:
+          shell: true
+          command: cp "$MOBILEPKG_TESTDATA/android/androgoat_rich.apk" app.apk
+      - run:
+          command: mobilepkg inspect app.apk
+      - assert:
+          stdout:
+            json: { path: "$.result.debuggable", equals: true }
+      - assert:
+          stdout:
+            json: { path: "$.result.allow_backup", equals: true }
+
+  - name: flags a debug-signed APK
+    steps:
+      - run:
+          shell: true
+          command: cp "$MOBILEPKG_TESTDATA/android/androgoat_rich.apk" app.apk
+      - run:
+          command: mobilepkg inspect app.apk
+      - assert:
+          stdout:
+            json: { path: "$.result.signing.certificates[0].subject", equals: "Android Debug" }
+      - assert:
+          stdout:
+            json: { path: "$.result.findings[?(@.id=='signing.debug_cert')].severity", equals: "error" }
+
+  - name: raises an error finding for the debuggable manifest
+    steps:
+      - run:
+          shell: true
+          command: cp "$MOBILEPKG_TESTDATA/android/androgoat_rich.apk" app.apk
+      - run:
+          command: mobilepkg inspect app.apk
+      - assert:
+          stdout:
+            json: { path: "$.result.findings[?(@.id=='manifest.debuggable')].severity", equals: "error" }
+
+  - name: flags an unguarded exported content provider
+    steps:
+      - run:
+          shell: true
+          command: cp "$MOBILEPKG_TESTDATA/android/androgoat_rich.apk" app.apk
+      - run:
+          command: mobilepkg inspect app.apk
+      - assert:
+          stdout:
+            json:
+              path: "$.result.findings[?(@.id=='exported.provider.owasp.sat.agoat.ContentProviderActivity')].severity"
+              equals: "error"
+
+  - name: warns about backup being allowed
+    steps:
+      - run:
+          shell: true
+          command: cp "$MOBILEPKG_TESTDATA/android/androgoat_rich.apk" app.apk
+      - run:
+          command: mobilepkg inspect app.apk
+      - assert:
+          stdout:
+            json: { path: "$.result.findings[?(@.id=='manifest.allow_backup')].severity", equals: "warn" }
+
+  - name: emits schema_version and tool_version envelope fields
+    steps:
+      - run:
+          shell: true
+          command: cp "$MOBILEPKG_TESTDATA/android/androgoat_rich.apk" app.apk
+      - run:
+          command: mobilepkg inspect app.apk
+      - assert:
+          stdout:
+            json: { path: "$.schema_version", matches: "^[0-9]+\\.[0-9]+\\.[0-9]+$" }
+      - assert:
+          stdout:
+            json: { path: "$.tool_version", matches: "^v?[0-9]" }
+
+  - name: does not emit a verdict without --fail-on
+    steps:
+      - run:
+          shell: true
+          command: cp "$MOBILEPKG_TESTDATA/android/androgoat_rich.apk" app.apk
+      - run:
+          command: mobilepkg inspect app.apk
+      - assert:
+          stdout:
+            not_contains: "verdict"

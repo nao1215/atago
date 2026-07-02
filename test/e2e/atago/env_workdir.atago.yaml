@@ -1,0 +1,119 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / workdir + scenario env + not_contains
+
+# Exercises three features added to make environment-heavy CLIs (e.g. gup's
+# isolated HOME/GOBIN e2e) fully expressible:
+#   * ${workdir}  — absolute path of the scenario's isolated temp dir
+#   * scenario-level env: — a base environment shared by every run step
+#   * not_contains: — a negative stream matcher
+scenarios:
+  - name: run.stdout_to redirects stdout to a workdir file without a shell
+    steps:
+      # No shell needed for a simple redirect: stdout_to writes the command's
+      # captured stdout to a workdir-relative file (create/truncate). This
+      # replaces the old `shell: true` + `> ${workdir}/marker.txt` form.
+      - run:
+          command: printf marked
+          stdout_to: marker.txt
+      - assert:
+          exit_code: 0
+          file:
+            path: marker.txt
+            contains: marked
+
+  - name: scenario env is shared by every run step and overridable per step
+    env:
+      SHARED: from-scenario
+      OVERRIDE_ME: base
+    steps:
+      - run:
+          shell: true
+          command: "printf '%s\\n' \"$SHARED\""
+      - assert:
+          stdout:
+            equals: from-scenario
+      - run:
+          shell: true
+          command: "printf '%s\\n' \"$OVERRIDE_ME\""
+          env:
+            OVERRIDE_ME: from-step
+      - assert:
+          stdout:
+            equals: from-step
+
+  - name: scenario env can reference ${workdir} for isolated paths
+    env:
+      ISO_HOME: "${workdir}/home"
+    steps:
+      - run:
+          shell: true
+          command: "printf '%s\\n' \"$ISO_HOME\""
+      - assert:
+          stdout:
+            contains: "/home"
+      - assert:
+          stdout:
+            not_contains: "${workdir}/home/extra"
+
+  - name: file not_contains passes when the substring is absent
+    steps:
+      - fixture:
+          file: data.txt
+          content: |
+            alpha
+            beta
+      - assert:
+          file:
+            path: data.txt
+            not_contains: gamma
+
+  - name: not_contains fails when the substring is present
+    steps:
+      - fixture:
+          file: inner.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: stdout unexpectedly contains hello
+                steps:
+                  - run:
+                      command: echo hello world
+                  - assert:
+                      stdout:
+                        not_contains: hello
+      - run:
+          command: ${atago} run inner.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: "unexpectedly present"
+
+  - name: a shell metacharacter without shell is a load-time error
+    steps:
+      # A run step that writes `> out.txt` but forgets `shell: true` is rejected
+      # at load time rather than silently passing `>` as a literal argument.
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: bad
+            scenarios:
+              - name: forgot shell true
+                steps:
+                  - run:
+                      command: echo hi > out.txt
+      - run:
+          command: ${atago} run bad.atago.yaml
+      # A spec-content (validation) error exits 2 (spec.md §34).
+      - assert:
+          exit_code: 2
+          stderr:
+            contains:
+              - "shell is not enabled"
+              - "shell: true"
+              - "stdout_to"

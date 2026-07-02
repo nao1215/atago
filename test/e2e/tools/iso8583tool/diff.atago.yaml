@@ -1,0 +1,152 @@
+# Migrated from iso8583tool's ShellSpec spec/diff_spec.sh.
+# diff: field-level comparison, JSON output (jq), filtering, stdin, and the
+# identical-message case. The ShellSpec setup_pair helper (copy before.hex, then
+# convert | sed | convert into after.hex with field 4 / 55.9F02 bumped) is
+# inlined as a shell: true setup run in each scenario that needs it.
+# Run with: make dogfood-iso8583tool
+version: "1"
+
+suite:
+  name: iso8583tool diff
+
+scenarios:
+  - name: reports changed fields in text form
+    steps:
+      - run:
+          shell: true
+          command: |
+            cp "$ISO_EXAMPLES/basei/0100-auth-request.hex" before.hex
+            iso8583tool convert "$ISO_EXAMPLES/basei/0100-auth-request.hex" | sed 's/"000000005000"/"000000009999"/' | iso8583tool convert > after.hex
+      - run:
+          command: "iso8583tool diff before.hex after.hex"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "Field 4 changed"
+              - "- 000000005000"
+              - "+ 000000009999"
+
+  - name: emits jq-compatible JSON
+    steps:
+      - run:
+          shell: true
+          command: |
+            cp "$ISO_EXAMPLES/basei/0100-auth-request.hex" before.hex
+            iso8583tool convert "$ISO_EXAMPLES/basei/0100-auth-request.hex" | sed 's/"000000005000"/"000000009999"/' | iso8583tool convert > after.hex
+      - run:
+          shell: true
+          command: 'iso8583tool diff before.hex after.hex --format json | jq -r ".changes[0].kind"'
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "changed"
+
+  - name: reports no differences for identical messages
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool diff $ISO_EXAMPLES/basei/0110-auth-response.hex $ISO_EXAMPLES/basei/0110-auth-response.hex"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "No differences."
+
+  - name: filters to a field subtree
+    steps:
+      - run:
+          shell: true
+          command: |
+            cp "$ISO_EXAMPLES/basei/0100-auth-request.hex" before.hex
+            iso8583tool convert "$ISO_EXAMPLES/basei/0100-auth-request.hex" | sed 's/"000000005000"/"000000009999"/' | iso8583tool convert > after.hex
+      - run:
+          command: "iso8583tool diff before.hex after.hex --filter 55"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "55.9F02"
+      - assert:
+          stdout:
+            not_contains: "Field 4 "
+
+  - name: reads one side from stdin
+    steps:
+      - run:
+          shell: true
+          command: |
+            cp "$ISO_EXAMPLES/basei/0100-auth-request.hex" before.hex
+            iso8583tool convert "$ISO_EXAMPLES/basei/0100-auth-request.hex" | sed 's/"000000005000"/"000000009999"/' | iso8583tool convert > after.hex
+      - run:
+          shell: true
+          command: 'cat after.hex | iso8583tool diff before.hex -'
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "changed"
+
+  - name: rejects two stdin sides
+    steps:
+      - run:
+          command: "iso8583tool diff - -"
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            contains: "stdin"
+
+  - name: masks track data by default
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool diff $ISO_EXAMPLES/basei/0100-auth-request.hex $ISO_EXAMPLES/basei/0110-auth-response.hex --color never"
+      - assert:
+          exit_code: 0
+          stdout:
+            not_contains: "4111111111111111D"
+
+  - name: reveals raw values with --unsafe
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool diff $ISO_EXAMPLES/basei/0100-auth-request.hex $ISO_EXAMPLES/basei/0110-auth-response.hex --color never --unsafe"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "4111111111111111D"
+
+  - name: rejects an unknown --format value
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool diff $ISO_EXAMPLES/basei/0100-auth-request.hex $ISO_EXAMPLES/basei/0110-auth-response.hex --format bogus"
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            contains: "unsupported format"
+
+  - name: private-field safety - masks an embedded PAN by default
+    steps:
+      - run:
+          shell: true
+          command: |
+            printf '%s' '{"mti":"0110","fields":{"11":"123456","39":"00","63":"PAN=4111111111111111"}}' | iso8583tool convert --to hex > pa.hex
+            printf '%s' '{"mti":"0110","fields":{"11":"123456","39":"00","63":"PAN=4222222222222222"}}' | iso8583tool convert --to hex > pb.hex
+      - run:
+          command: "iso8583tool diff pa.hex pb.hex --color never"
+      - assert:
+          exit_code: 0
+          stdout:
+            not_contains: "4111111111111111"
+
+  - name: private-field safety - reveals the embedded PAN with --unsafe
+    steps:
+      - run:
+          shell: true
+          command: |
+            printf '%s' '{"mti":"0110","fields":{"11":"123456","39":"00","63":"PAN=4111111111111111"}}' | iso8583tool convert --to hex > pa.hex
+            printf '%s' '{"mti":"0110","fields":{"11":"123456","39":"00","63":"PAN=4222222222222222"}}' | iso8583tool convert --to hex > pb.hex
+      - run:
+          command: "iso8583tool diff pa.hex pb.hex --color never --unsafe"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "4111111111111111"

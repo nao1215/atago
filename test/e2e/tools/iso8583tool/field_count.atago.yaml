@@ -1,0 +1,25 @@
+# Migrated from iso8583tool's ShellSpec spec/field_count_spec.sh.
+# convert --output summary: the "packed N fields" count must report top-level
+# ISO fields, the same number doctor reports as field_count, instead of counting
+# every TLV subtag as a separate field. The ShellSpec `When call test "$a" = "$b"`
+# is ported as a single shell: true run that computes both sides and echoes
+# OK only when they are equal, asserted via stdout equals.
+# Run with: make dogfood-iso8583tool
+version: "1"
+
+suite:
+  name: iso8583tool convert field count
+
+scenarios:
+  - name: reports the top-level field count matching doctor
+    steps:
+      - run:
+          shell: true
+          command: |
+            summary=$(iso8583tool convert "$ISO_EXAMPLES/basei/0100-auth-request.json" --output out.hex | head -1)
+            count=$(iso8583tool doctor out.hex --format json | sed -n 's/.*"field_count": \([0-9]*\).*/\1/p' | head -1)
+            [ "$summary" = "Converted with basei-starter (packed $count fields to hex)." ] && echo OK || echo MISMATCH
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "OK"

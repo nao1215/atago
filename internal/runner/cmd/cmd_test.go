@@ -1,0 +1,321 @@
+package cmd
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/nao1215/atago/internal/spec"
+)
+
+// argvCommand returns a command string for the no-shell (argv-tokenized) path
+// that works on every OS: POSIX gets the bare utility, Windows spells out the
+// cmd.exe invocation explicitly (echo/exit are cmd builtins, not executables).
+func argvCommand(posix, windows string) string {
+	if runtime.GOOS == "windows" {
+		return windows
+	}
+	return posix
+}
+
+func TestRun_BasicCapture(t *testing.T) {
+	t.Parallel()
+	r := New()
+	res, err := r.Run(context.Background(), &spec.Run{Command: argvCommand("echo hello", "cmd /c echo hello")}, t.TempDir())
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if res.ExitCode != 0 {
+		t.Errorf("exit code = %d, want 0", res.ExitCode)
+	}
+	if strings.TrimSpace(string(res.Stdout)) != "hello" {
+		t.Errorf("stdout = %q, want hello", res.Stdout)
+	}
+}
+
+// TestRun_StdoutToStderrTo proves stdout_to / stderr_to write the captured
+// streams to workdir-relative files (no shell needed) while the streams remain
+// captured for assertions on the same step.
+func TestRun_StdoutToStderrTo(t *testing.T) {
+	t.Parallel()
+	wd := t.TempDir()
+	r := New()
+	res, err := r.Run(context.Background(), &spec.Run{
+		Command:  argvCommand("sh -c 'echo out; echo err 1>&2'", "echo out& echo err 1>&2"),
+		Shell:    true,
+		StdoutTo: "out.txt",
+		StderrTo: "err.txt",
+	}, wd)
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	// Files are written with the captured stream contents.
+	if got := readTrim(t, filepath.Join(wd, "out.txt")); got != "out" {
+		t.Errorf("out.txt = %q, want out", got)
+	}
+	if got := readTrim(t, filepath.Join(wd, "err.txt")); got != "err" {
+		t.Errorf("err.txt = %q, want err", got)
+	}
+	// The streams are still captured internally for assertions.
+	if strings.TrimSpace(string(res.Stdout)) != "out" {
+		t.Errorf("captured stdout = %q, want out", res.Stdout)
+	}
+}
+
+// TestRun_StdoutToConfinedToWorkdir proves a redirect path may not escape the
+// scenario workdir.
+func TestRun_StdoutToConfinedToWorkdir(t *testing.T) {
+	t.Parallel()
+	r := New()
+	_, err := r.Run(context.Background(), &spec.Run{
+		Command:  argvCommand("echo hi", "cmd /c echo hi"),
+		StdoutTo: "../escape.txt",
+	}, t.TempDir())
+	if err == nil {
+		t.Fatal("expected a workdir-confinement error, got nil")
+	}
+}
+
+func readTrim(t *testing.T, path string) string {
+	t.Helper()
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile(%s) error = %v", path, err)
+	}
+	return strings.TrimSpace(string(b))
+}
+
+func TestRun_NonZeroExit(t *testing.T) {
+	t.Parallel()
+	r := New()
+	res, err := r.Run(context.Background(), &spec.Run{Command: argvCommand("false", "cmd /c exit 1")}, t.TempDir())
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if res.ExitCode != 1 {
+		t.Errorf("exit code = %d, want 1", res.ExitCode)
+	}
+}
+
+func TestRun_ShellAndEnvAndCwd(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	sub := filepath.Join(dir, "sub")
+	if err := os.Mkdir(sub, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	r := New()
+	res, err := r.Run(context.Background(), &spec.Run{
+		Shell: true,
+		// Both print "<env value> in <cwd>"; POSIX prints the basename, cmd.exe
+		// the absolute path, so the assertion checks prefix and suffix.
+		Command: argvCommand("echo $GREETING in $(basename $PWD)", "echo %GREETING% in %CD%"),
+		Cwd:     "sub",
+		Env:     map[string]string{"GREETING": "hi"},
+	}, dir)
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	got := strings.TrimSpace(string(res.Stdout))
+	if !strings.HasPrefix(got, "hi in ") || !strings.HasSuffix(got, "sub") {
+		t.Errorf("stdout = %q, want %q", got, "hi in .../sub")
+	}
+}
+
+func TestRun_Stdin(t *testing.T) {
+	t.Parallel()
+	r := New()
+	// cat / findstr both copy the matching stdin lines to stdout.
+	res, err := r.Run(context.Background(), &spec.Run{
+		Command: argvCommand("cat", "findstr piped"),
+		Stdin:   "piped\n",
+	}, t.TempDir())
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if got := strings.TrimSpace(string(res.Stdout)); got != "piped" {
+		t.Errorf("stdout = %q, want %q", got, "piped")
+	}
+}
+
+func TestRun_Timeout(t *testing.T) {
+	t.Parallel()
+	r := New()
+	// ping -n 6 pauses ~5s between its echoes — the portable stand-in for sleep.
+	res, err := r.Run(context.Background(), &spec.Run{
+		Command: argvCommand("sleep 5", "ping -n 6 127.0.0.1"),
+		Timeout: "50ms",
+	}, t.TempDir())
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if !res.TimedOut {
+		t.Errorf("TimedOut = false, want true")
+	}
+}
+
+// Regression for issue #30: a parent-context cancellation (Ctrl-C / suite cancel)
+// killed the process but was reported as a normal exit (ExitCode -1, nil error).
+// It must now surface as an error and NOT be flagged as a step timeout.
+func TestRun_ParentCancelIsNotNormalExit(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		cancel()
+	}()
+	res, err := New().Run(ctx, &spec.Run{Command: argvCommand("sleep 5", "ping -n 6 127.0.0.1")}, t.TempDir())
+	if err == nil {
+		t.Fatal("Run() error = nil; a parent-cancel kill must be reported as an error, not a normal exit")
+	}
+	if res != nil && res.TimedOut {
+		t.Error("TimedOut = true; a parent cancel is not a step-timeout deadline")
+	}
+}
+
+// TestRun_ShellCancelKillsChildPromptly is the regression for the pipe-orphan
+// hang: a cancelled `sh -c "sleep 30"` used to block cmd.Wait for the full 30s
+// because the orphaned sleep kept the captured stdout pipe open. Killing the
+// whole process group (POSIX) or force-closing the pipes after WaitDelay
+// (Windows) must let Run return in well under the sleep duration.
+func TestRun_ShellCancelKillsChildPromptly(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		cancel()
+	}()
+	// Not t.TempDir(): on Windows the orphaned child (no process groups) may
+	// briefly outlive the kill while holding the workdir open, and TempDir's
+	// cleanup would fail the test on that unrelated race. Best-effort cleanup.
+	wd, err := os.MkdirTemp("", "atago-cancel-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(wd) })
+	start := time.Now()
+	_, err = New().Run(ctx, &spec.Run{Shell: true, Command: argvCommand("sleep 30", "ping -n 31 127.0.0.1")}, wd)
+	elapsed := time.Since(start)
+	if err == nil {
+		t.Fatal("Run() error = nil; a parent-cancel kill must be reported as an error")
+	}
+	if elapsed > 5*time.Second {
+		t.Fatalf("Run() took %v; the orphaned child kept the pipe open — process group was not killed", elapsed)
+	}
+}
+
+// TestRun_ShellEmbeddedQuotes: a shell command carrying double quotes must
+// reach the shell verbatim. On Windows, Go's MSVCRT-style argv escaping used to
+// turn the quotes into literal \" because cmd.exe never unescapes them; the raw
+// command line (ConfigureShell) fixes that.
+func TestRun_ShellEmbeddedQuotes(t *testing.T) {
+	t.Parallel()
+	res, err := New().Run(context.Background(), &spec.Run{
+		Shell:   true,
+		Command: `echo {"id":7}`,
+	}, t.TempDir())
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	got := strings.TrimSpace(string(res.Stdout))
+	// Each shell's own quote handling applies — sh strips the quotes, cmd.exe
+	// echoes them verbatim — but neither may see injected backslashes.
+	want := "{id:7}"
+	if runtime.GOOS == "windows" {
+		want = `{"id":7}`
+	}
+	if got != want {
+		t.Errorf("stdout = %q, want %q (argv escaping must not alter the shell command)", got, want)
+	}
+}
+
+// TestWindowsFields pins the Windows argv tokenizer: backslashes are literal
+// (they are path separators, not escapes) and double quotes group fields.
+func TestWindowsFields(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		in   string
+		want []string
+	}{
+		{`C:\bin\atago.exe run spec.yaml`, []string{`C:\bin\atago.exe`, "run", "spec.yaml"}},
+		{`tool "a b" c`, []string{"tool", "a b", "c"}},
+		{`tool --path "C:\Program Files\x"`, []string{"tool", "--path", `C:\Program Files\x`}},
+		{"  spaced   out  ", []string{"spaced", "out"}},
+		{`empty ""`, []string{"empty", ""}},
+	}
+	for _, tt := range tests {
+		got, err := windowsFields(tt.in)
+		if err != nil {
+			t.Errorf("windowsFields(%q) error = %v", tt.in, err)
+			continue
+		}
+		if len(got) != len(tt.want) {
+			t.Errorf("windowsFields(%q) = %#v, want %#v", tt.in, got, tt.want)
+			continue
+		}
+		for i := range got {
+			if got[i] != tt.want[i] {
+				t.Errorf("windowsFields(%q)[%d] = %q, want %q", tt.in, i, got[i], tt.want[i])
+			}
+		}
+	}
+	if _, err := windowsFields(`broken "quote`); err == nil {
+		t.Error("windowsFields with an unclosed quote should error")
+	}
+}
+
+func TestRun_CommandNotFound(t *testing.T) {
+	t.Parallel()
+	r := New()
+	_, err := r.Run(context.Background(), &spec.Run{Command: "definitely-not-a-real-binary-xyz"}, t.TempDir())
+	if err == nil {
+		t.Fatal("Run() error = nil, want execution error")
+	}
+}
+
+// TestRun_ShellNotShadowedByPath verifies that a `sh` placed first on PATH does
+// not hijack the harness shell (ADR-0018). A sabotaged `sh` that always prints
+// HIJACKED and exits 0 sits in the workdir; with PATH pointing only at it, a
+// PATH-resolved shell would run it, but the absolute /bin/sh must be used.
+func TestRun_ShellNotShadowedByPath(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shellPath applies only to POSIX; Windows runs shell steps via cmd.exe")
+	}
+	dir := t.TempDir()
+	fake := filepath.Join(dir, "sh")
+	if err := os.WriteFile(fake, []byte("#!/bin/sh\necho HIJACKED\nexit 0\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+	t.Setenv("ATAGO_SHELL", "") // ensure no override interferes
+	r := New()
+	res, err := r.Run(context.Background(), &spec.Run{Shell: true, Command: "echo real"}, dir)
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if got := strings.TrimSpace(string(res.Stdout)); got != "real" {
+		t.Errorf("stdout = %q, want %q (the PATH-resident sh hijacked the harness shell)", got, "real")
+	}
+}
+
+func TestShellPath(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shellPath applies only to POSIX; Windows runs shell steps via cmd.exe")
+	}
+	t.Run("honors ATAGO_SHELL override", func(t *testing.T) {
+		t.Setenv("ATAGO_SHELL", "/custom/shell")
+		if got := shellPath(); got != "/custom/shell" {
+			t.Errorf("shellPath() = %q, want /custom/shell", got)
+		}
+	})
+	t.Run("defaults to an absolute path", func(t *testing.T) {
+		t.Setenv("ATAGO_SHELL", "")
+		if got := shellPath(); !filepath.IsAbs(got) {
+			t.Errorf("shellPath() = %q, want an absolute path", got)
+		}
+	})
+}

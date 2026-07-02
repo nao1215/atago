@@ -1,0 +1,133 @@
+# Migrated from iso8583tool's ShellSpec spec/nested_describe_spec.sh.
+# The full describe view keeps the parent path of any nested composite and
+# annotates a known leaf tag at any depth: a nested positional composite shows
+# F48.2 / 48.2.1, and a constructed EMV tag (ARC 8A, date 9A) inside a template
+# resolves its meaning even when nested several levels deep. The ShellSpec
+# *_setup helpers (spec.json + msg.json -> convert --to hex) are ported as
+# fixture steps plus a setup `run`. Run with: make dogfood-iso8583tool
+version: "1"
+
+suite:
+  name: iso8583tool view nested composites
+
+scenarios:
+  - name: nested positional composite keeps the nested positional path
+    steps:
+      - fixture:
+          file: spec.json
+          content: |
+            {
+              "name": "F48 nested positional",
+              "fields": {
+                "0": {"type":"String","length":4,"description":"MTI","enc":"ASCII","prefix":"ASCII.Fixed"},
+                "1": {"type":"Bitmap","length":16,"description":"Bitmap","enc":"HexToASCII","prefix":"Hex.Fixed"},
+                "11": {"type":"String","length":6,"description":"STAN","enc":"ASCII","prefix":"ASCII.Fixed"},
+                "48": {
+                  "type":"Composite","length":999,"description":"Private Data","prefix":"ASCII.LLL",
+                  "tag":{"sort":"StringsByInt"},
+                  "subfields": {
+                    "1": {"type":"String","length":2,"description":"A","enc":"ASCII","prefix":"ASCII.Fixed"},
+                    "2": {
+                      "type":"Composite","length":6,"description":"B","prefix":"ASCII.Fixed",
+                      "tag":{"sort":"StringsByInt"},
+                      "subfields": {"1": {"type":"String","length":6,"description":"Nested","enc":"ASCII","prefix":"ASCII.Fixed"}}
+                    }
+                  }
+                }
+              }
+            }
+      - fixture:
+          file: msg.json
+          content: '{"mti":"0100","fields":{"11":"123456","48.1":"AB","48.2.1":"260604"}}'
+      - run:
+          command: "iso8583tool convert msg.json --to hex --spec spec.json --output msg.hex"
+      - run:
+          command: "iso8583tool view msg.hex --spec spec.json --encoding hex --no-color"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "F48.2"
+              - "48.2.1"
+
+  - name: nested EMV tag annotation annotates a nested ARC tag as Approved
+    steps:
+      - fixture:
+          file: spec.json
+          content: |
+            {
+              "name": "Constructed TLV 8A",
+              "fields": {
+                "0": {"type":"String","length":4,"description":"MTI","enc":"ASCII","prefix":"ASCII.Fixed"},
+                "1": {"type":"Bitmap","length":16,"description":"Bitmap","enc":"HexToASCII","prefix":"Hex.Fixed"},
+                "11": {"type":"String","length":6,"description":"STAN","enc":"ASCII","prefix":"ASCII.Fixed"},
+                "55": {
+                  "type":"Composite","length":999,"description":"ICC","prefix":"ASCII.LLL",
+                  "tag":{"enc":"BerTLVTag","sort":"StringsByHex","skipUnknownTLVTags":true,"storeUnknownTLVTags":true},
+                  "subfields": {
+                    "70": {
+                      "type":"Composite","length":255,"description":"Template","prefix":"BerTLV",
+                      "tag":{"enc":"BerTLVTag","sort":"StringsByHex","skipUnknownTLVTags":true,"storeUnknownTLVTags":true},
+                      "subfields": {
+                        "8A": {"type":"Binary","length":2,"description":"ARC","enc":"Binary","prefix":"BerTLV"},
+                        "9A": {"type":"Binary","length":3,"description":"Txn Date","enc":"Binary","prefix":"BerTLV"}
+                      }
+                    }
+                  }
+                }
+              }
+            }
+      - fixture:
+          file: msg.json
+          content: '{"mti":"0110","fields":{"11":"123456"},"binary_fields":{"55.70.8A":"3030","55.70.9A":"260605"}}'
+      - run:
+          command: "iso8583tool convert msg.json --to hex --spec spec.json --output msg.hex"
+      - run:
+          command: "iso8583tool view msg.hex --spec spec.json --encoding hex --no-color"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "55.70.8A"
+              - "Approved"
+
+  - name: nested EMV tag annotation decodes nested leaf tags in validate --format json
+    steps:
+      - fixture:
+          file: spec.json
+          content: |
+            {
+              "name": "Constructed TLV 8A",
+              "fields": {
+                "0": {"type":"String","length":4,"description":"MTI","enc":"ASCII","prefix":"ASCII.Fixed"},
+                "1": {"type":"Bitmap","length":16,"description":"Bitmap","enc":"HexToASCII","prefix":"Hex.Fixed"},
+                "11": {"type":"String","length":6,"description":"STAN","enc":"ASCII","prefix":"ASCII.Fixed"},
+                "55": {
+                  "type":"Composite","length":999,"description":"ICC","prefix":"ASCII.LLL",
+                  "tag":{"enc":"BerTLVTag","sort":"StringsByHex","skipUnknownTLVTags":true,"storeUnknownTLVTags":true},
+                  "subfields": {
+                    "70": {
+                      "type":"Composite","length":255,"description":"Template","prefix":"BerTLV",
+                      "tag":{"enc":"BerTLVTag","sort":"StringsByHex","skipUnknownTLVTags":true,"storeUnknownTLVTags":true},
+                      "subfields": {
+                        "8A": {"type":"Binary","length":2,"description":"ARC","enc":"Binary","prefix":"BerTLV"},
+                        "9A": {"type":"Binary","length":3,"description":"Txn Date","enc":"Binary","prefix":"BerTLV"}
+                      }
+                    }
+                  }
+                }
+              }
+            }
+      - fixture:
+          file: msg.json
+          content: '{"mti":"0110","fields":{"11":"123456"},"binary_fields":{"55.70.8A":"3030","55.70.9A":"260605"}}'
+      - run:
+          command: "iso8583tool convert msg.json --to hex --spec spec.json --output msg.hex"
+      - run:
+          command: "iso8583tool validate msg.hex --spec spec.json --encoding hex --format json"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "55.70.9A"
+              - "2026-06-05"

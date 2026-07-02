@@ -1,0 +1,71 @@
+# Migrated from career's ShellSpec spec/cli_spec.sh.
+# CLI surface: root help, version, template listing (and the Japanese aliases),
+# subcommand help, and the unknown-command error. Run with:
+#   make dogfood-career   (or test/e2e/tools/career/run.sh)
+version: "1"
+
+suite:
+  name: career CLI
+
+scenarios:
+  - name: prints root help with no arguments
+    steps:
+      - run:
+          command: career
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "Usage:"
+              - "generate"
+
+  - name: prints the version
+    steps:
+      - run:
+          command: career version
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "career"
+
+  - name: lists the available templates
+    steps:
+      - run:
+          command: career templates
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "cv"
+              - "japanese-resume"
+              - "work-history"
+
+  - name: documents the aliases generate accepts
+    steps:
+      - run:
+          command: career templates
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "履歴書"
+              - "職務経歴書"
+              - "career-history"
+
+  - name: describes the generate command
+    steps:
+      - run:
+          command: career help generate
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "--template"
+
+  - name: unknown command fails with a helpful message
+    steps:
+      - run:
+          command: career frobnicate
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            contains: "unknown command"

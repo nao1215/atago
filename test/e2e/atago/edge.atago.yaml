@@ -1,0 +1,58 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / edge cases
+
+scenarios:
+  # Regression: a JSON assertion against empty stdout must report that the
+  # stream was empty (not a misleading "no match"). Found by dogfooding
+  # `gup list --json`, which prints nothing when no tools are installed.
+  - name: JSON assertion on empty stdout reports an empty stream
+    steps:
+      - fixture:
+          file: empty.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: json on empty
+                steps:
+                  - run:
+                      shell: true
+                      command: "exit 0"
+                  - assert:
+                      stdout:
+                        json:
+                          path: "$.x"
+                          equals: 1
+      - run:
+          command: ${atago} run empty.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: "was empty"
+
+  # An unsupported matcher must be a clean parse error (exit 2), never a crash.
+  - name: an unsupported matcher is a parse error
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: csv matcher
+                steps:
+                  - run:
+                      shell: true
+                      command: echo hi
+                  - assert:
+                      stdout:
+                        csv:
+                          column: name
+      - run:
+          command: ${atago} run bad.atago.yaml
+      - assert:
+          exit_code: 2

@@ -1,0 +1,30 @@
+version: "1"
+
+# Migration guide fixture: polling for async behavior with retry.
+#
+# ShellSpec: a hand-rolled `while ! ...; do sleep; done` loop in a helper.
+# Bats:      a bash retry loop, or the community `bats-retry`.
+# runn:      `loop:` with `until:` and `interval:` on a step.
+#
+# atago maps these to a `run.retry` block: re-run the command until an `until`
+# assertion passes (or the attempt budget is spent). The command below is
+# deterministic (prints "ready" immediately), so the first attempt satisfies
+# `until` and the scenario passes green without any real waiting.
+suite:
+  name: migration / retry — poll until ready
+
+scenarios:
+  - name: retry re-runs the command until until passes
+    steps:
+      - run:
+          shell: true
+          command: echo ready
+          retry:
+            times: 5
+            interval: 10ms
+            until:
+              stdout:
+                contains: ready
+      - assert:
+          stdout:
+            contains: ready

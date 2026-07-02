@@ -1,0 +1,225 @@
+version: "1"
+
+suite:
+  name: grafana (self-hosted observability platform)
+
+# Exercises Grafana (https://grafana.com/oss/grafana/, one of the most-starred
+# projects on awesome-selfhosted) as a third-party target: the real server
+# booted per scenario with SQLite, health and build info over the API, the
+# login redirect asserted with `follow_redirects: false` (the feature this
+# suite motivated — a followed 302 is unassertable), the anonymous-access
+# failure mode, and a dashboard + datasource lifecycle over the REST API.
+# Install (prebuilt release; see .github/workflows/thirdparty.yml): extract
+# the tarball, put bin/ on PATH, and export GF_PATHS_HOME pointing at the
+# extracted directory — grafana needs its bundled assets at runtime.
+#
+# Each scenario binds its own port and keeps its state (data/logs) in the
+# scenario workdir, so the suite runs under the default scenario concurrency.
+
+permissions:
+  network:
+    allow: [127.0.0.1]
+
+runners:
+  grafana:
+    type: http
+    base_url: http://127.0.0.1:18220
+    timeout: 15s
+  grafana2:
+    type: http
+    base_url: http://127.0.0.1:18221
+    timeout: 15s
+  grafana3:
+    type: http
+    base_url: http://127.0.0.1:18222
+    timeout: 15s
+
+defaults:
+  scenario:
+    env:
+      GF_PATHS_DATA: ${workdir}/data
+      GF_PATHS_LOGS: ${workdir}/logs
+      GF_PATHS_PLUGINS: ${workdir}/plugins
+      GF_SERVER_HTTP_ADDR: 127.0.0.1
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_LOG_LEVEL: error
+
+scenarios:
+  - name: the server boots and reports health and build info
+    services:
+      - name: grafana
+        # The shell expands $GF_PATHS_HOME (set by the CI install step / the
+        # developer) into --homepath; grafana's init does not read the env var.
+        shell: true
+        command: grafana server --homepath "$GF_PATHS_HOME"
+        env:
+          GF_SERVER_HTTP_PORT: "18220"
+        ready:
+          port: 127.0.0.1:18220
+          timeout: 90s
+    steps:
+      # First boot runs database migrations; poll until the API answers.
+      - http:
+          runner: grafana
+          method: GET
+          path: /api/health
+          retry:
+            times: 60
+            interval: 1s
+            until:
+              status: 200
+      - assert:
+          status: 200
+          body:
+            json:
+              path: "$.database"
+              equals: ok
+      - assert:
+          body:
+            json:
+              path: "$.version"
+              matches: "^[0-9]+\\.[0-9]+\\.[0-9]+"
+
+  - name: anonymous visitors are redirected to the login page
+    services:
+      - name: grafana
+        # The shell expands $GF_PATHS_HOME (set by the CI install step / the
+        # developer) into --homepath; grafana's init does not read the env var.
+        shell: true
+        command: grafana server --homepath "$GF_PATHS_HOME"
+        env:
+          GF_SERVER_HTTP_PORT: "18221"
+        ready:
+          port: 127.0.0.1:18221
+          timeout: 90s
+    steps:
+      - http:
+          runner: grafana2
+          method: GET
+          path: /api/health
+          retry:
+            times: 60
+            interval: 1s
+            until:
+              status: 200
+      # The redirect itself is the behavior under test — don't follow it.
+      - http:
+          runner: grafana2
+          method: GET
+          path: /
+          follow_redirects: false
+      - assert:
+          status: 302
+      - assert:
+          header:
+            name: Location
+            contains: /login
+      # And the API refuses anonymous access outright.
+      - http:
+          runner: grafana2
+          method: GET
+          path: /api/search
+      - assert:
+          status: 401
+
+  - name: a dashboard and datasource lifecycle over the REST API
+    services:
+      - name: grafana
+        # The shell expands $GF_PATHS_HOME (set by the CI install step / the
+        # developer) into --homepath; grafana's init does not read the env var.
+        shell: true
+        command: grafana server --homepath "$GF_PATHS_HOME"
+        env:
+          GF_SERVER_HTTP_PORT: "18222"
+        ready:
+          port: 127.0.0.1:18222
+          timeout: 90s
+    steps:
+      - http:
+          runner: grafana3
+          method: GET
+          path: /api/health
+          retry:
+            times: 60
+            interval: 1s
+            until:
+              status: 200
+      # admin/admin is Grafana's out-of-the-box first user, used here against
+      # a throwaway per-scenario database.
+      - http:
+          runner: grafana3
+          method: GET
+          path: /api/org
+          header:
+            Authorization: Basic YWRtaW46YWRtaW4=
+      - assert:
+          status: 200
+          body:
+            json:
+              path: "$.name"
+              equals: Main Org.
+      - http:
+          runner: grafana3
+          method: POST
+          path: /api/dashboards/db
+          header:
+            Authorization: Basic YWRtaW46YWRtaW4=
+          json:
+            dashboard:
+              title: atago e2e dashboard
+              panels: []
+            message: created by an atago behavior spec
+      - assert:
+          status: 200
+          body:
+            json:
+              path: "$.status"
+              equals: success
+      - store:
+          name: dash_uid
+          from:
+            body:
+              json:
+                path: "$.uid"
+      # Read the dashboard back by uid and find it through search.
+      - http:
+          runner: grafana3
+          method: GET
+          path: /api/dashboards/uid/${dash_uid}
+          header:
+            Authorization: Basic YWRtaW46YWRtaW4=
+      - assert:
+          status: 200
+          body:
+            json:
+              path: "$.dashboard.title"
+              equals: atago e2e dashboard
+      - http:
+          runner: grafana3
+          method: GET
+          path: /api/search?query=atago
+          header:
+            Authorization: Basic YWRtaW46YWRtaW4=
+      - assert:
+          status: 200
+          body:
+            json:
+              path: "$"
+              length: 1
+      - http:
+          runner: grafana3
+          method: POST
+          path: /api/datasources
+          header:
+            Authorization: Basic YWRtaW46YWRtaW4=
+          json:
+            name: atago-testdata
+            type: testdata
+            access: proxy
+      - assert:
+          status: 200
+          body:
+            json:
+              path: "$.message"
+              equals: Datasource added

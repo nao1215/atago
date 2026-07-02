@@ -1,0 +1,29 @@
+version: "1"
+
+# retry re-runs a command until an until-assertion passes (or the attempt
+# budget is spent) — declarative polling for async behavior: a daemon booting,
+# a file appearing, a port opening.
+# Runs green as-is: atago run examples/retry.atago.yaml
+
+suite:
+  name: retry
+
+scenarios:
+  - name: poll until the output is ready
+    skip:
+      os: windows   # the marker-file trick below uses POSIX shell syntax
+    steps:
+      # The first attempt creates a marker and prints "waiting"; the second
+      # sees the marker and prints "ready" — like a service warming up.
+      - run:
+          shell: true
+          command: "if [ -f marker ]; then echo ready; else touch marker; echo waiting; fi"
+          retry:
+            times: 10
+            interval: 50ms
+            until:
+              stdout:
+                contains: ready
+      - assert:
+          stdout:
+            contains: ready

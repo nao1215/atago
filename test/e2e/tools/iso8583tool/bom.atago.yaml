@@ -1,0 +1,78 @@
+# Migrated from iso8583tool's ShellSpec spec/bom_spec.sh.
+# convert/view/doctor/validate must tolerate a UTF-8 BOM (EF BB BF) at the start
+# of a file. bom.json is the BOM-prefixed JSON document {"mti":"0100",...},
+# inlined byte-exact as base64 (EF BB BF + JSON). The BOM-prefixed hex fixture is
+# built in a setup step: BOM bytes followed by the bundled 0110 response hex.
+# Run with: make dogfood-iso8583tool
+version: "1"
+
+suite:
+  name: iso8583tool convert with a UTF-8 BOM
+
+scenarios:
+  - name: auto-detects BOM-prefixed JSON as a document to pack
+    steps:
+      - fixture: &bom_json
+          file: bom.json
+          base64: 77u/eyJtdGkiOiIwMTAwIiwiZmllbGRzIjp7IjExIjoiMTIzNDU2In19
+      - run:
+          command: iso8583tool convert bom.json
+      - assert:
+          exit_code: 0
+          stdout:
+            not_contains:
+              - "invalid byte"
+              - "decode hex"
+
+  - name: packs BOM-prefixed JSON with an explicit --to hex
+    steps:
+      - fixture: *bom_json
+      - run:
+          command: iso8583tool convert bom.json --to hex
+      - assert:
+          exit_code: 0
+          stdout:
+            not_contains: "invalid character"
+
+  - name: views a BOM-prefixed hex file
+    steps:
+      - run: &build_bom_hex
+          shell: true
+          command: |
+            { printf '\357\273\277'; cat "$ISO_EXAMPLES/basei/0110-auth-response.hex"; } > bom.hex
+      - run:
+          command: iso8583tool view bom.hex --no-color
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "0110"
+
+  - name: doctors a BOM-prefixed hex file as hex, not raw
+    steps:
+      - run: *build_bom_hex
+      - run:
+          command: iso8583tool doctor bom.hex --no-color
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "hex input"
+
+  - name: validates a BOM-prefixed hex file
+    steps:
+      - run: *build_bom_hex
+      - run:
+          command: iso8583tool validate bom.hex --no-color
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "Validation: ok"
+
+  - name: converts a BOM-prefixed hex file to JSON
+    steps:
+      - run: *build_bom_hex
+      - run:
+          command: iso8583tool convert bom.hex --to json
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: '"mti"'

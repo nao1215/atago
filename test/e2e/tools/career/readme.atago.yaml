@@ -1,0 +1,84 @@
+# Migrated from career's ShellSpec spec/readme_spec.sh.
+# Runs the representative commands shown in the README against the bundled
+# examples/resume.yaml so the documented examples cannot silently rot. Run with:
+#   make dogfood-career   (or test/e2e/tools/career/run.sh)
+#
+# ShellSpec mapping:
+#   * setup copies examples/resume.yaml to $WORK/resume.yaml -> a `cp
+#     "$CAREER_EXAMPLES/resume.yaml" resume.yaml` setup step (shell: true to
+#     expand the host env var).
+#   * `sh -c "cd $WORK && career generate ..."` -> a plain run in the per-scenario
+#     workdir (no cd needed); relative output paths land in and are cleaned with it.
+version: "1"
+
+suite:
+  name: career README examples
+
+scenarios:
+  - name: "cv example: career generate resume.yaml -t cv -o cv.pdf"
+    steps:
+      - run:
+          shell: true
+          command: cp "$CAREER_EXAMPLES/resume.yaml" resume.yaml
+      - run:
+          command: career generate resume.yaml -t cv -o cv.pdf
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "wrote"
+          file:
+            path: cv.pdf
+            exists: true
+
+  - name: "japanese-resume example: -t japanese-resume -o rirekisho.pdf"
+    steps:
+      - run:
+          shell: true
+          command: cp "$CAREER_EXAMPLES/resume.yaml" resume.yaml
+      - run:
+          command: career generate resume.yaml -t japanese-resume -o rirekisho.pdf
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "wrote"
+          file:
+            path: rirekisho.pdf
+            exists: true
+
+  - name: "work-history example: -t work-history -o shokumukeirekisho.pdf"
+    steps:
+      - run:
+          shell: true
+          command: cp "$CAREER_EXAMPLES/resume.yaml" resume.yaml
+      - run:
+          command: career generate resume.yaml -t work-history -o shokumukeirekisho.pdf
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "wrote"
+          file:
+            path: shokumukeirekisho.pdf
+            exists: true
+
+  - name: "all example: -t all writes the three default file names"
+    steps:
+      - run:
+          shell: true
+          command: cp "$CAREER_EXAMPLES/resume.yaml" resume.yaml
+      - run:
+          command: career generate resume.yaml -t all
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "wrote"
+          file:
+            path: cv.pdf
+            exists: true
+      - assert:
+          file:
+            path: japanese-resume.pdf
+            exists: true
+      - assert:
+          file:
+            path: work-history.pdf
+            exists: true

@@ -1,0 +1,219 @@
+version: "1"
+
+suite:
+  name: minio (self-hosted object storage)
+
+# Exercises MinIO (https://min.io/, from awesome-selfhosted's object storage
+# corner) as a third-party target: the real S3-compatible server booted as a
+# background service per scenario, health probed over HTTP, driven end-to-end
+# with the mc client (bucket + object lifecycle, versioning, anonymous
+# policies), and the unauthenticated failure mode asserted as S3 XML. Install:
+#   go install github.com/minio/minio@latest
+#   go install github.com/minio/mc@latest
+#
+# Each scenario binds its own port so the suite runs under the default
+# scenario concurrency. MC_CONFIG_DIR is workdir-relative, so mc state is
+# isolated per scenario too.
+
+permissions:
+  network:
+    allow: [127.0.0.1]
+
+runners:
+  s3:
+    type: http
+    base_url: http://127.0.0.1:18120
+    timeout: 10s
+  s3_authz:
+    type: http
+    base_url: http://127.0.0.1:18121
+    timeout: 10s
+  s3_public:
+    type: http
+    base_url: http://127.0.0.1:18124
+    timeout: 10s
+
+defaults:
+  scenario:
+    env:
+      MINIO_ROOT_USER: atago
+      MINIO_ROOT_PASSWORD: atago-secret-key
+      MC_CONFIG_DIR: mcconfig
+
+scenarios:
+  - name: the server reports itself alive over the health API
+    services:
+      - name: minio
+        command: minio server data --address 127.0.0.1:18120
+        ready:
+          port: 127.0.0.1:18120
+          timeout: 30s
+    steps:
+      - http:
+          runner: s3
+          method: GET
+          path: /minio/health/live
+      - assert:
+          status: 200
+      - http:
+          runner: s3
+          method: GET
+          path: /minio/health/ready
+      - assert:
+          status: 200
+
+  - name: anonymous S3 access is denied with a proper S3 XML error
+    services:
+      - name: minio
+        command: minio server data --address 127.0.0.1:18121
+        ready:
+          port: 127.0.0.1:18121
+          timeout: 30s
+    steps:
+      - http:
+          runner: s3_authz
+          method: GET
+          path: /
+      - assert:
+          status: 403
+          body:
+            contains: <Code>AccessDenied</Code>
+
+  - name: a full object lifecycle through the mc client
+    services:
+      - name: minio
+        command: minio server data --address 127.0.0.1:18122
+        ready:
+          port: 127.0.0.1:18122
+          timeout: 30s
+    steps:
+      - run:
+          command: mc alias set local http://127.0.0.1:18122 atago atago-secret-key
+      - assert:
+          exit_code: 0
+      - run:
+          command: mc mb local/atago-bucket
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: Bucket created successfully
+      - fixture:
+          file: upload.txt
+          content: "hello object storage"
+      - run:
+          command: mc cp upload.txt local/atago-bucket/
+      - assert:
+          exit_code: 0
+      - run:
+          command: mc ls --json local/atago-bucket
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              path: "$.key"
+              equals: upload.txt
+      - assert:
+          stdout:
+            json:
+              path: "$.size"
+              equals: 20
+      - run:
+          command: mc cat local/atago-bucket/upload.txt
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: hello object storage
+      - run:
+          command: mc cp local/atago-bucket/upload.txt downloaded.txt
+      - assert:
+          exit_code: 0
+      - assert:
+          file:
+            path: downloaded.txt
+            contains: hello object storage
+      - run:
+          command: mc rm local/atago-bucket/upload.txt
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: Removed
+      - run:
+          command: mc ls local/atago-bucket
+      - assert:
+          exit_code: 0
+          stdout:
+            empty: true
+
+  - name: bucket versioning can be enabled and reported
+    services:
+      - name: minio
+        command: minio server data --address 127.0.0.1:18123
+        ready:
+          port: 127.0.0.1:18123
+          timeout: 30s
+    steps:
+      - run:
+          command: mc alias set local http://127.0.0.1:18123 atago atago-secret-key
+      - run:
+          command: mc mb local/versioned
+      - run:
+          command: mc version enable local/versioned
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: versioning is enabled
+      - run:
+          command: mc version info --json local/versioned
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              path: "$.versioning.status"
+              equals: Enabled
+
+  - name: an anonymous download policy publishes a bucket read-only
+    services:
+      - name: minio
+        command: minio server data --address 127.0.0.1:18124
+        ready:
+          port: 127.0.0.1:18124
+          timeout: 30s
+    steps:
+      - run:
+          command: mc alias set local http://127.0.0.1:18124 atago atago-secret-key
+      - run:
+          command: mc mb local/public-bucket
+      - fixture:
+          file: page.txt
+          content: "published via bucket policy"
+      - run:
+          command: mc cp page.txt local/public-bucket/
+      # Before the policy: anonymous reads are denied.
+      - http:
+          runner: s3_public
+          method: GET
+          path: /public-bucket/page.txt
+      - assert:
+          status: 403
+      - run:
+          command: mc anonymous set download local/public-bucket
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: is set to `download`
+      # After the policy: the same anonymous read succeeds; writes stay denied.
+      - http:
+          runner: s3_public
+          method: GET
+          path: /public-bucket/page.txt
+      - assert:
+          status: 200
+          body:
+            contains: published via bucket policy
+      - http:
+          runner: s3_public
+          method: PUT
+          path: /public-bucket/forbidden.txt
+          body: "anonymous write must fail"
+      - assert:
+          status: 403

@@ -1,0 +1,105 @@
+# Migrated from iso8583tool's ShellSpec spec/bcd_starter_spec.sh.
+# spec87bcd-starter (PACKED_BCD_SPEC): the packed-BCD preset for raw-binary
+# captures must pack and round-trip the EMV TLV field (55), the raw PIN (52) and
+# MAC (64) secret fields, and variable-length fields without leaking an ASCII
+# length prefix. Each scenario writes a one-field JSON document (fixture), packs
+# it to hex, then views/round-trips it back. Run with: make dogfood-iso8583tool
+version: "1"
+
+suite:
+  name: iso8583tool spec87bcd-starter preset
+
+scenarios:
+  - name: packs and round-trips an EMV TLV tag (55.9F02)
+    steps:
+      - fixture:
+          file: emv.json
+          content: '{"mti":"0100","fields":{"2":"4019249999999999","3":"000000","4":"000000001000","7":"0605123456","11":"123456","41":"TERMID01"},"binary_fields":{"55.9F02":"000000001000"}}'
+      - run:
+          shell: true
+          command: |
+            iso8583tool convert emv.json --to hex --encoding hex --spec spec87bcd-starter > emv.hex
+            iso8583tool view emv.hex --encoding hex --spec spec87bcd-starter --format json
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - '"55.9F02"'
+              - "000000001000"
+
+  - name: packs a raw PIN field (52)
+    steps:
+      - fixture:
+          file: pin.json
+          content: '{"mti":"0100","fields":{"2":"4019249999999999","3":"000000","4":"000000001000","7":"0605123456","11":"123456","41":"TERMID01"},"binary_fields":{"52":"A1B2C3D4E5F60708"}}'
+      - run:
+          command: iso8583tool convert pin.json --to hex --encoding hex --spec spec87bcd-starter
+      - assert:
+          exit_code: 0
+          stdout:
+            not_contains: "should be fixed"
+
+  - name: packs and round-trips a raw MAC field (64)
+    steps:
+      - fixture:
+          file: mac.json
+          content: '{"mti":"0100","fields":{"2":"4019249999999999","3":"000000","4":"000000001000","7":"0605123456","11":"123456","41":"TERMID01"},"binary_fields":{"64":"A1B2C3D4E5F60708"}}'
+      - run:
+          shell: true
+          command: |
+            iso8583tool convert mac.json --to hex --encoding hex --spec spec87bcd-starter > mac.hex
+            iso8583tool view mac.hex --encoding hex --spec spec87bcd-starter --unsafe --format json
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "A1B2C3D4E5F60708"
+
+  - name: round-trips a variable-length field with a BCD length prefix (32)
+    steps:
+      - fixture:
+          file: f32.json
+          content: '{"mti":"0100","fields":{"2":"4019249999999999","3":"000000","4":"000000001000","7":"0605123456","11":"123456","32":"123456","41":"TERMID01"}}'
+      - run:
+          shell: true
+          command: |
+            iso8583tool convert f32.json --to hex --encoding hex --spec spec87bcd-starter > f32.hex
+            iso8583tool view f32.hex --encoding hex --spec spec87bcd-starter --format json
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: '"32": "123456"'
+
+  - name: packs a secondary numeric field (71) as packed BCD, not ASCII
+    # "1234" must pack to the two BCD bytes 0x12 0x34 (hex "1234"), never the four
+    # ASCII bytes 0x31..0x34 (hex "31323334").
+    steps:
+      - fixture:
+          file: f71.json
+          content: '{"mti":"0800","fields":{"11":"123456","70":"301","71":"1234"}}'
+      - run:
+          command: iso8583tool convert f71.json --to hex --spec spec87bcd-starter
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "1234"
+      - assert:
+          stdout:
+            not_contains: "31323334"
+
+  - name: round-trips secondary numeric fields (74, 99, 100)
+    steps:
+      - fixture:
+          file: sec.json
+          content: '{"mti":"0800","fields":{"11":"123456","70":"301","74":"0000000001","99":"12345678901","100":"98765432109"}}'
+      - run:
+          shell: true
+          command: |
+            iso8583tool convert sec.json --to hex --spec spec87bcd-starter > sec.hex
+            iso8583tool convert sec.hex --spec spec87bcd-starter --encoding hex --to json
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - '"74": "0000000001"'
+              - '"99": "12345678901"'
+              - '"100": "98765432109"'

@@ -1,0 +1,364 @@
+# Migrated from iso8583tool's ShellSpec spec/readme_spec.sh.
+# README command snippets. Keep these aligned with README.md so the documented
+# examples are exercised in CI and stay copy-pasteable. Nested Describes are
+# flattened into the scenario names.
+#
+# Env (exported by run.sh): ISO_EXAMPLES (examples dir), REPLY_HEX (0810 reply).
+# In the ShellSpec source $EXAMPLES == $ISO_EXAMPLES/basei and
+# $PROJECT_ROOT/examples == $ISO_EXAMPLES. The README `send` snippets drive the
+# in-repo single-shot mock (iso-mock) via a scenario-level `services` block,
+# exactly as send.atago.yaml does. jq is available for the jq-pipeline cases.
+# Run with: make dogfood-iso8583tool
+version: "1"
+
+suite:
+  name: iso8583tool README examples
+
+scenarios:
+  - name: quick start - lists the bundled samples
+    steps:
+      - run:
+          command: iso8583tool sample
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "0100-auth-request"
+
+  - name: quick start - views the BASE I auth response
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool view $ISO_EXAMPLES/basei/0110-auth-response.hex"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "Summary:"
+
+  - name: quick start - validates the unknown-TLV sample
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool validate $ISO_EXAMPLES/basei/0100-auth-request-unknown-tlv.hex"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "55.DF8129"
+
+  - name: quick start - converts the BASE I request to JSON
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool convert $ISO_EXAMPLES/basei/0100-auth-request.hex"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: '"mti": "0100"'
+
+  - name: view - shows JSON output
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool view $ISO_EXAMPLES/basei/0110-auth-response.hex --format json"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: '"fields"'
+
+  - name: view - filters the requested fields
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool view $ISO_EXAMPLES/basei/0110-auth-response.hex --filter 39 --filter 55.8A"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "Approved"
+
+  - name: view - reads a message from stdin
+    steps:
+      - run:
+          shell: true
+          command: "cat $ISO_EXAMPLES/basei/0110-auth-response.hex | iso8583tool view -"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "MTI"
+
+  - name: view - is jq-compatible for fields
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool view $ISO_EXAMPLES/basei/0110-auth-response.hex --format json | jq -r '.fields[\"39\"]'"
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "00"
+
+  - name: diff - compares a request and a response
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool diff $ISO_EXAMPLES/basei/0100-auth-request.hex $ISO_EXAMPLES/basei/0110-auth-response.hex"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "changed"
+
+  - name: diff - is jq-compatible for changes
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool diff $ISO_EXAMPLES/basei/0100-auth-request.hex $ISO_EXAMPLES/basei/0110-auth-response.hex --format json | jq -r '.changes[].path' | head -n1"
+      - assert:
+          exit_code: 0
+          stdout:
+            empty: false
+
+  - name: redact - masks the PAN for safe sharing
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool redact $ISO_EXAMPLES/basei/0100-auth-request.hex"
+      - assert:
+          exit_code: 0
+          stdout:
+            not_contains: "4111111111111111"
+
+  - name: redact - supports a text format
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool redact $ISO_EXAMPLES/basei/0100-auth-request.hex --format text"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "Redacted:"
+
+  - name: convert - packs the BASE I request to hex
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool convert $ISO_EXAMPLES/basei/0100-auth-request.json"
+      - assert:
+          exit_code: 0
+          stdout:
+            matches: "^3031"
+
+  - name: convert - converts a sample through stdin
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool sample 0100-auth-request --format hex | iso8583tool convert"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: '"mti": "0100"'
+
+  - name: convert - writes converted output to a file
+    steps:
+      - run:
+          shell: true
+          command: 'tmp="$(mktemp)"; iso8583tool convert $ISO_EXAMPLES/basei/0100-auth-request.json --output "$tmp" && test -s "$tmp"'
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "Converted with"
+
+  - name: validate - reports a broken inline message as an error
+    steps:
+      - run:
+          command: iso8583tool validate --raw 01007220
+      - assert:
+          exit_code:
+            not: 0
+          stdout:
+            contains: "[error]"
+
+  - name: validate - emits JSON when asked
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool validate $ISO_EXAMPLES/basei/0110-auth-response.hex --format json"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: '"valid": true'
+
+  - name: doctor - recommends a preset for the BASE I sample
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool doctor $ISO_EXAMPLES/basei/0110-auth-response.hex"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "Recommended: --spec basei-starter"
+
+  - name: doctor - is jq-compatible for the recommendation
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool doctor $ISO_EXAMPLES/basei/0110-auth-response.hex --format json | jq -r .recommended"
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "basei-starter"
+
+  - name: specs - lists the presets
+    steps:
+      - run:
+          command: iso8583tool specs
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "basei-starter (default)"
+
+  - name: specs - is jq-compatible for preset names
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool specs --format json | jq -r '.[].name' | head -n1"
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "basei-starter"
+
+  - name: sample - prints a sample as JSON
+    steps:
+      - run:
+          command: iso8583tool sample 0100-auth-request
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: '"mti": "0100"'
+
+  - name: sample - writes a sample as hex
+    steps:
+      - run:
+          shell: true
+          command: 'tmp="$(mktemp)"; iso8583tool sample 0100-auth-request --format hex --output "$tmp" && test -s "$tmp"'
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "Wrote sample"
+
+  - name: send (default 2byte-binary framing) - sends a packed 0800 and decodes the 0810 reply
+    services: &mock_2byte
+      - name: mock
+        shell: true
+        command: "iso-mock --framing 2byte-binary --reply-hex $REPLY_HEX --ready-file ready.txt"
+        ready:
+          file: ready.txt
+          store: addr
+          timeout: 5s
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool send ${addr} $ISO_EXAMPLES/basei/0800-network-echo.hex"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "0810"
+
+  - name: send (default 2byte-binary framing) - reads the message from stdin and is jq-compatible for the response MTI
+    services: *mock_2byte
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool sample 0800-network-echo --format hex | iso8583tool send ${addr} - --format json | jq -r '.response_view.mti'"
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "0810"
+
+  - name: send (default 2byte-binary framing) - asserts the reply with --expect-mti / --expect-field (no jq needed)
+    services: *mock_2byte
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool send ${addr} $ISO_EXAMPLES/basei/0800-network-echo.hex --expect-mti 0810 --expect-field 39=00"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "0810"
+
+  - name: send (default 2byte-binary framing) - accepts an inline message via --raw
+    services: *mock_2byte
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool send ${addr} --raw '{\"mti\":\"0800\",\"fields\":{\"70\":\"301\",\"11\":\"654321\",\"41\":\"TERMNET1\"}}' --format json"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: '"mti": "0810"'
+
+  - name: send (4-digit ASCII framing) - packs a JSON document and sends it with a 4-digit header
+    services:
+      - name: mock
+        shell: true
+        command: "iso-mock --framing 4digit-ascii --reply-hex $REPLY_HEX --ready-file ready.txt"
+        ready:
+          file: ready.txt
+          store: addr
+          timeout: 5s
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool send ${addr} $ISO_EXAMPLES/basei/0100-auth-request.json --framing 4digit-ascii --format json"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - '"framing": "4digit-ascii"'
+              - '"mti": "0810"'
+
+  - name: unknown TLV round-trip - preserves the unknown tag when unpacking and packing again
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool convert $ISO_EXAMPLES/basei/0100-auth-request-unknown-tlv.hex | iso8583tool convert | iso8583tool view - --filter 55.DF8129"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "DF8129"
+
+  - name: other specs - validates the spec87ascii sample
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool validate $ISO_EXAMPLES/spec87ascii/0800-network-echo.hex --spec spec87ascii"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "Spec: spec87ascii"
+
+  - name: other specs - strict-validates the spec87ascii sample under its intended preset
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool validate $ISO_EXAMPLES/spec87ascii/0800-network-echo.hex --spec spec87ascii --strict"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "ok"
+
+  - name: other specs - views the spec87ascii sample
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool view $ISO_EXAMPLES/spec87ascii/0800-network-echo.hex --spec spec87ascii"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "0800"
+
+  - name: other specs - converts the spec87ascii sample to JSON
+    steps:
+      - run:
+          shell: true
+          command: "iso8583tool convert $ISO_EXAMPLES/spec87ascii/0800-network-echo.hex --spec spec87ascii"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: '"mti": "0800"'

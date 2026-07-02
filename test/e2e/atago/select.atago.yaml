@@ -1,0 +1,47 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / selection
+
+scenarios:
+  - name: --filter runs only matching scenarios
+    steps:
+      - fixture:
+          file: many.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: many
+            scenarios:
+              - name: keep this one
+                steps: [{run: {shell: true, command: echo a}}, {assert: {exit_code: 0}}]
+              - name: drop that one
+                steps: [{run: {shell: true, command: echo b}}, {assert: {exit_code: 0}}]
+      - run:
+          command: ${atago} run --filter keep many.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "1 passed"
+
+  - name: --skip-tag drops tagged scenarios
+    steps:
+      - fixture:
+          file: tagged.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: tagged
+            scenarios:
+              - name: quick
+                tags: [fast]
+                steps: [{run: {shell: true, command: echo a}}, {assert: {exit_code: 0}}]
+              - name: heavy
+                tags: [slow]
+                steps: [{run: {shell: true, command: echo b}}, {assert: {exit_code: 0}}]
+      - run:
+          command: ${atago} run --skip-tag slow tagged.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "1 passed"

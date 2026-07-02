@@ -1,0 +1,13 @@
+version: "1"
+
+suite:
+  name: demo
+
+scenarios:
+  - name: expect Alice but the command prints Bob
+    steps:
+      - run:
+          command: echo Bob
+      - assert:
+          stdout:
+            contains: Alice

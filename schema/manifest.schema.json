@@ -1,0 +1,346 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/nao1215/atago/schema/manifest.schema.json",
+  "title": "atago manifest",
+  "description": "Stable, machine-readable summary emitted by `atago manifest` (#49). It describes what one or more specs declare, without executing them. `schema_version` gates compatibility: it is a string bumped only on a breaking change to this document shape, so consumers should branch on it before reading the rest of the document.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "specs"
+  ],
+  "properties": {
+    "schema_version": {
+      "description": "Stable top-level version of the manifest document. Currently \"1\".",
+      "const": "1"
+    },
+    "specs": {
+      "description": "One entry per spec file, in the order the files were supplied.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/spec"
+      }
+    }
+  },
+  "$defs": {
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "spec_path",
+        "suite",
+        "network",
+        "scenarios"
+      ],
+      "properties": {
+        "spec_path": {
+          "description": "Path the spec was read from.",
+          "type": "string"
+        },
+        "suite": {
+          "description": "Suite name declared by the spec.",
+          "type": "string"
+        },
+        "secrets": {
+          "description": "Declared secret names (omitted when none).",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "network": {
+          "$ref": "#/$defs/network"
+        },
+        "runners": {
+          "description": "Named runner declarations, reduced to identifying fields (omitted when none).",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/runner"
+          }
+        },
+        "scenarios": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/scenario"
+          }
+        },
+        "source": {
+          "$ref": "#/$defs/source"
+        }
+      }
+    },
+    "network": {
+      "description": "Summary of the spec's network policy.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy"
+      ],
+      "properties": {
+        "policy": {
+          "description": "\"allowlist\" when hosts are restricted, else \"unrestricted\".",
+          "type": "string",
+          "enum": [
+            "allowlist",
+            "unrestricted"
+          ]
+        },
+        "allow": {
+          "description": "Allowed hosts (omitted when the policy is unrestricted).",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "runner": {
+      "description": "A named runner declaration, reduced to its identifying fields. Credentials such as a db DSN are never exposed; `has_dsn` reports only that one is declared.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "base_url": {
+          "type": "string"
+        },
+        "target": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "has_dsn": {
+          "description": "True when a db runner declares a dsn; the dsn value itself is never emitted.",
+          "type": "boolean"
+        },
+        "headless": {
+          "description": "Browser-runner headless flag. Present only when explicitly set.",
+          "type": "boolean"
+        },
+        "exec_path": {
+          "type": "string"
+        },
+        "browser_args": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "source": {
+          "$ref": "#/$defs/source"
+        }
+      }
+    },
+    "scenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "steps"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "vars": {
+          "description": "Bound matrix row for a scenario expanded from a matrix (omitted otherwise).",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "only": {
+          "$ref": "#/$defs/condition"
+        },
+        "skip": {
+          "$ref": "#/$defs/condition"
+        },
+        "services": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/service"
+          }
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/step"
+          }
+        },
+        "variables": {
+          "description": "Variable names referenced anywhere in the scenario, sorted (omitted when none).",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "generates": {
+          "description": "Artifacts the scenario generates (omitted when none).",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "security": {
+          "description": "Security-relevant notes derived from the scenario (omitted when none).",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "source": {
+          "$ref": "#/$defs/source"
+        }
+      }
+    },
+    "condition": {
+      "description": "A skip/only gate. Present only when at least one field is set.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "os": {
+          "type": "string"
+        },
+        "env": {
+          "type": "string"
+        },
+        "command": {
+          "type": "string"
+        }
+      }
+    },
+    "service": {
+      "description": "A background service.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "command"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "command": {
+          "type": "string"
+        },
+        "shell": {
+          "type": "boolean"
+        },
+        "ready": {
+          "description": "Readiness signal kind, or empty when steps start as soon as the process spawns.",
+          "type": "string",
+          "enum": [
+            "file",
+            "port",
+            "log",
+            "delay"
+          ]
+        },
+        "store": {
+          "type": "string"
+        }
+      }
+    },
+    "step": {
+      "description": "One step, reduced to its kind and salient declarative fields.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "index",
+        "kind"
+      ],
+      "properties": {
+        "index": {
+          "description": "Zero-based position of the step within the scenario.",
+          "type": "integer"
+        },
+        "kind": {
+          "description": "Step kind.",
+          "type": "string"
+        },
+        "action": {
+          "description": "One-line human-oriented summary of the step.",
+          "type": "string"
+        },
+        "command": {
+          "type": "string"
+        },
+        "shell": {
+          "type": "boolean"
+        },
+        "runner": {
+          "type": "string"
+        },
+        "method": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "sql": {
+          "type": "string"
+        },
+        "file": {
+          "type": "string"
+        },
+        "target": {
+          "description": "Assert target or store name.",
+          "type": "string"
+        },
+        "retry": {
+          "$ref": "#/$defs/retry"
+        },
+        "source": {
+          "$ref": "#/$defs/source"
+        }
+      }
+    },
+    "retry": {
+      "description": "A run step's retry policy.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "times"
+      ],
+      "properties": {
+        "times": {
+          "type": "integer"
+        },
+        "interval": {
+          "type": "string"
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "description": "Authored source location (1-based). Emitted only when known (#80). Matrix-expanded scenario instances share their template's location.",
+      "additionalProperties": false,
+      "required": [
+        "line"
+      ],
+      "properties": {
+        "line": {
+          "type": "integer"
+        },
+        "column": {
+          "type": "integer"
+        }
+      }
+    }
+  }
+}

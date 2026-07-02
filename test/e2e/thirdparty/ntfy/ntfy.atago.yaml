@@ -1,0 +1,208 @@
+version: "1"
+
+suite:
+  name: ntfy (self-hosted push notification service)
+
+# Exercises ntfy (https://ntfy.sh/, from awesome-selfhosted's notification
+# corner) as a third-party target: publish/subscribe push notifications over
+# plain HTTP — publishing with headers (title, priority, tags), polling the
+# JSON feed, topic isolation, the bundled CLI publishing against the same
+# server, and access control (deny-all default, user + grant via the admin
+# CLI, then authorized publish). Install (prebuilt release; `go install` is
+# blocked by replace directives):
+#   see .github/workflows/thirdparty.yml for the download-and-verify step
+#
+# Each server scenario binds its own port so the suite runs under the default
+# scenario concurrency.
+
+permissions:
+  network:
+    allow: [127.0.0.1]
+
+runners:
+  ntfy:
+    type: http
+    base_url: http://127.0.0.1:18180
+    timeout: 10s
+  ntfy2:
+    type: http
+    base_url: http://127.0.0.1:18181
+    timeout: 10s
+  ntfy3:
+    type: http
+    base_url: http://127.0.0.1:18182
+    timeout: 10s
+
+scenarios:
+  - name: the binary reports its version
+    steps:
+      - run:
+          command: ntfy --version
+      - assert:
+          exit_code: 0
+          stdout:
+            matches: "ntfy version [0-9]+\\.[0-9]+\\.[0-9]+"
+
+  - name: a published notification comes back through the JSON poll feed
+    services:
+      - name: ntfy
+        command: ntfy serve --listen-http 127.0.0.1:18180 --base-url http://127.0.0.1:18180 --cache-file data/cache.db
+        ready:
+          port: 127.0.0.1:18180
+          timeout: 15s
+    steps:
+      # ntfy requires its cache/auth directory to exist before it boots; this
+      # leading fixture is applied before the service starts.
+      - fixture:
+          file: data/.keep
+          content: ""
+      - http:
+          runner: ntfy
+          method: GET
+          path: /v1/health
+      - assert:
+          status: 200
+          body:
+            json:
+              path: "$.healthy"
+              equals: true
+      # Publish with the header-based API: title, priority, and tags ride along.
+      - http:
+          runner: ntfy
+          method: POST
+          path: /atago-alerts
+          header:
+            Title: Backup done
+            Priority: high
+            Tags: white_check_mark
+          body: nightly backup finished
+      - assert:
+          status: 200
+          body:
+            json:
+              path: "$.event"
+              equals: message
+      - http:
+          runner: ntfy
+          method: GET
+          path: /atago-alerts/json?poll=1
+      - assert:
+          status: 200
+          body:
+            json:
+              path: "$.title"
+              equals: Backup done
+      - assert:
+          body:
+            json:
+              path: "$.message"
+              equals: nightly backup finished
+      # "high" maps to priority 4 on the wire.
+      - assert:
+          body:
+            json:
+              path: "$.priority"
+              equals: 4
+      # Topic isolation: a different topic has seen nothing.
+      - http:
+          runner: ntfy
+          method: GET
+          path: /other-topic/json?poll=1
+      - assert:
+          status: 200
+          body:
+            empty: true
+
+  - name: the bundled CLI publishes against the same server
+    services:
+      - name: ntfy
+        command: ntfy serve --listen-http 127.0.0.1:18181 --base-url http://127.0.0.1:18181 --cache-file data/cache.db
+        ready:
+          port: 127.0.0.1:18181
+          timeout: 15s
+    steps:
+      # ntfy requires its cache/auth directory to exist before it boots; this
+      # leading fixture is applied before the service starts.
+      - fixture:
+          file: data/.keep
+          content: ""
+      - run:
+          command: ntfy publish http://127.0.0.1:18181/atago-deploys "deploy one"
+      - assert:
+          exit_code: 0
+      - run:
+          command: ntfy publish http://127.0.0.1:18181/atago-deploys "deploy two"
+      - assert:
+          exit_code: 0
+      # since=all returns the cached history as NDJSON, one message per line.
+      - http:
+          runner: ntfy2
+          method: GET
+          path: /atago-deploys/json?poll=1&since=all
+      - assert:
+          status: 200
+          body:
+            contains:
+              - deploy one
+              - deploy two
+
+  - name: deny-all access control locks a topic until a user is granted
+    services:
+      - name: ntfy
+        command: ntfy serve --listen-http 127.0.0.1:18182 --base-url http://127.0.0.1:18182 --cache-file data/cache.db --auth-file data/auth.db --auth-default-access deny-all
+        ready:
+          port: 127.0.0.1:18182
+          timeout: 15s
+    env:
+      # The admin CLI below administers the same auth database the server uses.
+      NTFY_AUTH_FILE: data/auth.db
+      NTFY_AUTH_DEFAULT_ACCESS: deny-all
+    steps:
+      # ntfy requires its cache/auth directory to exist before it boots; this
+      # leading fixture is applied before the service starts.
+      - fixture:
+          file: data/.keep
+          content: ""
+      # Anonymous publishing is denied outright.
+      - http:
+          runner: ntfy3
+          method: POST
+          path: /secure-topic
+          body: unauthorized attempt
+      - assert:
+          status: 403
+      # Provision a user and grant the topic through ntfy's own admin CLI.
+      - run:
+          command: ntfy user add phil
+          env:
+            NTFY_PASSWORD: atago-pass1
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: user phil added
+      - run:
+          command: ntfy access phil secure-topic rw
+      - assert:
+          exit_code: 0
+      # The same publish succeeds once authenticated (phil:atago-pass1).
+      - http:
+          runner: ntfy3
+          method: POST
+          path: /secure-topic
+          header:
+            Authorization: Basic cGhpbDphdGFnby1wYXNzMQ==
+          body: authorized message
+      - assert:
+          status: 200
+      - http:
+          runner: ntfy3
+          method: GET
+          path: /secure-topic/json?poll=1
+          header:
+            Authorization: Basic cGhpbDphdGFnby1wYXNzMQ==
+      - assert:
+          status: 200
+          body:
+            json:
+              path: "$.message"
+              equals: authorized message

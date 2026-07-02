@@ -1,0 +1,56 @@
+# mobilepkg top-level CLI contract (cmd/mobilepkg/main.go).
+# mobilepkg has no ShellSpec suite, so this is a fresh atago suite written from
+# the CLI's documented behaviour. Run with:
+#   make dogfood-mobilepkg   (or test/e2e/tools/mobilepkg/run.sh)
+version: "1"
+
+suite:
+  name: mobilepkg CLI
+
+scenarios:
+  - name: version prints the tool version
+    steps:
+      - run:
+          command: mobilepkg version
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "mobilepkg"
+
+  - name: --version is an alias for version
+    steps:
+      - run:
+          command: mobilepkg --version
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "mobilepkg"
+
+  - name: help lists the commands
+    steps:
+      - run:
+          command: mobilepkg --help
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "inspect"
+              - "compare"
+
+  - name: no arguments prints usage and fails
+    steps:
+      - run:
+          command: mobilepkg
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            contains: "Usage"
+
+  - name: unknown command fails with a helpful message
+    steps:
+      - run:
+          command: mobilepkg bogus
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            contains: "unknown command"

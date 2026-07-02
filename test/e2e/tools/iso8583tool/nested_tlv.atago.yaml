@@ -1,0 +1,134 @@
+# Migrated from iso8583tool's ShellSpec spec/nested_tlv_spec.sh.
+# Constructed (nested) TLV: a TLV tag whose value is itself a TLV template must
+# round-trip to its leaf dot-path (55.70.9F02), be selectable with view --filter,
+# and diff at the leaf tag, instead of collapsing into the parent tag's raw blob.
+# The ShellSpec setup (spec.json + a.json/b.json -> a.hex/b.hex) is ported as
+# fixture steps plus a setup `run`; the shared spec.json content uses a YAML
+# anchor (&spec_tlv). Run with: make dogfood-iso8583tool
+version: "1"
+
+suite:
+  name: iso8583tool nested TLV
+
+scenarios:
+  - name: unpacks a nested TLV to its leaf path
+    steps:
+      - fixture:
+          file: spec.json
+          content: &spec_tlv |
+            {
+              "name": "Constructed TLV",
+              "fields": {
+                "0": {"type":"String","length":4,"description":"MTI","enc":"ASCII","prefix":"ASCII.Fixed"},
+                "1": {"type":"Bitmap","length":16,"description":"Bitmap","enc":"HexToASCII","prefix":"Hex.Fixed"},
+                "11": {"type":"String","length":6,"description":"STAN","enc":"ASCII","prefix":"ASCII.Fixed"},
+                "55": {
+                  "type":"Composite","length":999,"description":"ICC","prefix":"ASCII.LLL",
+                  "tag":{"enc":"BerTLVTag","sort":"StringsByHex","skipUnknownTLVTags":true,"storeUnknownTLVTags":true},
+                  "subfields": {
+                    "70": {
+                      "type":"Composite","length":255,"description":"Template","prefix":"BerTLV",
+                      "tag":{"enc":"BerTLVTag","sort":"StringsByHex","skipUnknownTLVTags":true,"storeUnknownTLVTags":true},
+                      "subfields": {"9F02": {"type":"Binary","length":6,"description":"Amount","enc":"Binary","prefix":"BerTLV"}}
+                    }
+                  }
+                }
+              }
+            }
+      - fixture:
+          file: a.json
+          content: '{"mti":"0110","fields":{"11":"123456"},"binary_fields":{"55.70.9F02":"000000005000"}}'
+      - run:
+          command: "iso8583tool convert a.json --to hex --spec spec.json --output a.hex"
+      - run:
+          command: "iso8583tool convert a.hex --spec spec.json"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: '"55.70.9F02"'
+      - assert:
+          stdout:
+            not_contains: '"55.70":'
+
+  - name: selects a nested TLV leaf with --filter
+    steps:
+      - fixture:
+          file: spec.json
+          content: *spec_tlv
+      - fixture:
+          file: a.json
+          content: '{"mti":"0110","fields":{"11":"123456"},"binary_fields":{"55.70.9F02":"000000005000"}}'
+      - run:
+          command: "iso8583tool convert a.json --to hex --spec spec.json --output a.hex"
+      - run:
+          command: "iso8583tool view a.hex --spec spec.json --filter 55.70.9F02 --no-color"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "55.70.9F02"
+      - assert:
+          stdout:
+            not_contains: "<not present>"
+
+  - name: diffs at the nested TLV leaf tag
+    steps:
+      - fixture:
+          file: spec.json
+          content: *spec_tlv
+      - fixture:
+          file: a.json
+          content: '{"mti":"0110","fields":{"11":"123456"},"binary_fields":{"55.70.9F02":"000000005000"}}'
+      - fixture:
+          file: b.json
+          content: '{"mti":"0110","fields":{"11":"123456"},"binary_fields":{"55.70.9F02":"000000009999"}}'
+      - run:
+          command: "iso8583tool convert a.json --to hex --spec spec.json --output a.hex"
+      - run:
+          command: "iso8583tool convert b.json --to hex --spec spec.json --output b.hex"
+      - run:
+          command: "iso8583tool diff a.hex b.hex --spec spec.json --no-color"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "Field 55.70.9F02 changed"
+
+  - name: keeps a top-level tag and a nested tag set on the same field
+    # A message that mixes "55.82" (top-level) with "55.70.9F02" (constructed)
+    # must round-trip both; the flat tag previously overwrote the whole composite.
+    steps:
+      - fixture:
+          file: spec.json
+          content: *spec_tlv
+      - run:
+          shell: true
+          command: |
+            printf '%s' '{"mti":"0110","fields":{"11":"123456"},"binary_fields":{"55.82":"3900","55.70.9F02":"000000005000"}}' > mix.json
+            iso8583tool convert mix.json --to hex --spec spec.json --output mix.hex
+            iso8583tool convert mix.hex --spec spec.json
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - '"55.82"'
+              - '"55.70.9F02"'
+
+  - name: shows the full nested path in the describe output
+    # The full describe view must keep the parent path of a constructed TLV: the
+    # nested header as F55.70 and the leaf as 55.70.9F02, not F70 / 70.9F02.
+    steps:
+      - fixture:
+          file: spec.json
+          content: *spec_tlv
+      - fixture:
+          file: a.json
+          content: '{"mti":"0110","fields":{"11":"123456"},"binary_fields":{"55.70.9F02":"000000005000"}}'
+      - run:
+          command: "iso8583tool convert a.json --to hex --spec spec.json --output a.hex"
+      - run:
+          command: "iso8583tool view a.hex --spec spec.json --no-color"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "F55.70"
+              - "55.70.9F02"

@@ -1,0 +1,12 @@
+TAP version 13
+1..2
+ok 1 - demo / echo greets the world
+not ok 2 - demo / detects a wrong greeting
+  ---
+  message: "assert stdout contains \"Alice\""
+  data: |
+    Step: assert stdout contains "Alice"
+    Expected: stdout contains "Alice"
+    Actual: Bob
+    Hint: the substring "Alice" was not present in stdout
+  ...

@@ -1,0 +1,157 @@
+version: "1"
+
+suite:
+  name: caddy (self-hosted web server)
+
+# Exercises Caddy (https://caddyserver.com/, from awesome-selfhosted) as a
+# third-party target: pure CLI behavior (version/adapt/fmt/validate), and the
+# real server started as a background service with a TCP readiness probe and
+# queried through the http runner. Install with:
+#   go install github.com/caddyserver/caddy/v2/cmd/caddy@latest
+
+permissions:
+  network:
+    allow: [127.0.0.1, localhost]
+
+runners:
+  web:
+    type: http
+    base_url: http://127.0.0.1:18080
+    timeout: 10s
+  web2:
+    type: http
+    base_url: http://127.0.0.1:18081
+    timeout: 10s
+
+scenarios:
+  - name: the standard module set is compiled in
+    steps:
+      # `caddy version` prints "unknown" for go-installed builds, so assert on
+      # the module list instead — the functional surface this suite relies on.
+      - run:
+          command: caddy list-modules
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - http.handlers.file_server
+              - http.handlers.static_response
+
+  - name: adapt turns a Caddyfile into canonical JSON
+    steps:
+      - fixture:
+          file: Caddyfile
+          content: |
+            :18080
+            respond "hello from caddy"
+      - run:
+          command: caddy adapt --config Caddyfile
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              path: "$.apps.http.servers.srv0.listen[0]"
+              equals: ":18080"
+
+  - name: fmt normalizes a messy Caddyfile in place
+    steps:
+      - fixture:
+          file: Caddyfile
+          content: |
+            :18080   {
+                    respond    "ok"
+              }
+      - run:
+          command: caddy fmt --overwrite Caddyfile
+      - assert:
+          exit_code: 0
+          file:
+            path: Caddyfile
+            contains: respond "ok"
+
+  - name: validate rejects a broken Caddyfile
+    steps:
+      - fixture:
+          file: Caddyfile
+          content: |
+            :18080
+            no_such_directive_xyz
+      - run:
+          command: caddy validate --config Caddyfile --adapter caddyfile
+      - assert:
+          exit_code:
+            not: 0
+          stderr:
+            contains: no_such_directive_xyz
+
+  - name: a config-driven server boots from an authored Caddyfile
+    services:
+      - name: caddy
+        # The leading fixture below is applied before the service starts, so
+        # the daemon can read its config file at startup like any real server.
+        command: caddy run --config Caddyfile --adapter caddyfile
+        ready:
+          port: 127.0.0.1:18081
+          timeout: 15s
+    steps:
+      - fixture:
+          file: Caddyfile
+          content: |
+            {
+            	admin off
+            }
+            http://127.0.0.1:18081
+
+            respond "configured response" 200
+      - http:
+          runner: web2
+          method: GET
+          path: /
+      - assert:
+          status: 200
+          body:
+            contains: configured response
+
+  - name: the file server serves fixtures over real HTTP
+    services:
+      - name: caddy
+        command: caddy file-server --listen 127.0.0.1:18080 --root site
+        ready:
+          port: 127.0.0.1:18080
+          timeout: 15s
+    steps:
+      - fixture:
+          file: site/index.html
+          content: "<html><body>hello from caddy</body></html>"
+      - fixture:
+          file: site/api/status.json
+          content: |
+            {"status":"ok","service":"caddy"}
+      - http:
+          runner: web
+          method: GET
+          path: /index.html
+      - assert:
+          status: 200
+          body:
+            contains: hello from caddy
+      - assert:
+          header:
+            name: Content-Type
+            contains: text/html
+      - http:
+          runner: web
+          method: GET
+          path: /api/status.json
+      - assert:
+          status: 200
+          body:
+            json:
+              path: "$.status"
+              equals: ok
+      - http:
+          runner: web
+          method: GET
+          path: /no-such-file
+      - assert:
+          status: 404

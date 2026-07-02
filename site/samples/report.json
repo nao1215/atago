@@ -1,0 +1,33 @@
+{
+  "schema_version": "1",
+  "suites": [
+    {
+      "suite": "demo",
+      "spec_path": "demo.atago.yaml",
+      "status": "failed",
+      "duration_ms": 0,
+      "scenarios": [
+        {
+          "name": "echo greets the world",
+          "status": "passed",
+          "duration_ms": 0
+        },
+        {
+          "name": "detects a wrong greeting",
+          "status": "failed",
+          "duration_ms": 0
+        }
+      ],
+      "failures": [
+        {
+          "scenario": "detects a wrong greeting",
+          "step": "assert stdout contains \"Alice\"",
+          "command": "echo Bob",
+          "expected": "stdout contains \"Alice\"",
+          "actual": "Bob",
+          "hint": "the substring \"Alice\" was not present in stdout"
+        }
+      ]
+    }
+  ]
+}

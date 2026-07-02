@@ -1,0 +1,67 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / store
+
+scenarios:
+  - name: a stored JSON value is reusable in later commands
+    steps:
+      - fixture:
+          file: store.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: capture id and greet
+                steps:
+                  - run:
+                      shell: true
+                      command: printf '{"id":99,"name":"Bob"}'
+                  - store:
+                      name: user_id
+                      from:
+                        stdout:
+                          json:
+                            path: "$.id"
+                  - run:
+                      shell: true
+                      command: echo "user is ${user_id}"
+                  - assert:
+                      stdout:
+                        contains: "user is 99"
+      - run:
+          command: ${atago} run store.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: PASSED
+
+  - name: storing from a missing JSON path is an execution error
+    steps:
+      - fixture:
+          file: bad-store.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: capture nonexistent
+                steps:
+                  - run:
+                      shell: true
+                      command: printf '{}'
+                  - store:
+                      name: missing
+                      from:
+                        stdout:
+                          json:
+                            path: "$.nope"
+                  - assert:
+                      exit_code: 0
+      - run:
+          command: ${atago} run bad-store.atago.yaml
+      - assert:
+          exit_code: 4
+          stdout:
+            contains: ERROR

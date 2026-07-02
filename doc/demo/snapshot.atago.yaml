@@ -1,0 +1,13 @@
+version: "1"
+
+suite:
+  name: demo
+
+scenarios:
+  - name: help output stays stable
+    steps:
+      - run:
+          command: 'echo "Usage: mycli [options]"'
+      - assert:
+          stdout:
+            snapshot: snapshots/help.txt

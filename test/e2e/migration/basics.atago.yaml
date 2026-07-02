@@ -1,0 +1,113 @@
+version: "1"
+
+# Migration guide fixture: the everyday patterns you already know from
+# ShellSpec (`The status/output/error should ...`), Bats (`run`, `[ ... ]`,
+# `assert_output`), and runn (`test: ...` on stdout) — mapped 1:1 to atago's
+# declarative assertions on exit_code / stdout / stderr.
+#
+# Runs directly with: atago run ./test/e2e/migration
+# Uses only POSIX-portable builtins (echo/true/false/printf).
+suite:
+  name: migration / basics — exit code, stdout, stderr
+
+scenarios:
+  # ShellSpec: When run echo hello / The status should be success
+  # Bats:      run echo hello / [ "$status" -eq 0 ]
+  # runn:      test: current.res.status == 200 (HTTP) — for CLIs, exit-code check
+  - name: exit code success maps to exit_code 0
+    steps:
+      - run:
+          shell: true            # echo is a shell builtin on Windows too
+          command: echo hello
+      - assert:
+          exit_code: 0
+
+  # ShellSpec: The status should be failure
+  # Bats:      [ "$status" -ne 0 ]
+  - name: exit code failure maps to exit_code not 0
+    steps:
+      - run:
+          shell: true
+          command: "false"
+      - assert:
+          exit_code:
+            not: 0
+
+  # ShellSpec: The status should equal 3
+  # Bats:      [ "$status" -eq 3 ]
+  - name: an exact exit code maps to exit_code N
+    skip: { os: windows }        # `exit N` phrasing below is POSIX shell
+    steps:
+      - run:
+          shell: true
+          command: "exit 3"
+      - assert:
+          exit_code: 3
+
+  # ShellSpec: The output should include "world"
+  # Bats:      assert_output --partial world
+  # runn:      test: current.res.body contains "world"
+  - name: stdout contains maps to a substring match
+    steps:
+      - run:
+          shell: true
+          command: echo hello world
+      - assert:
+          stdout:
+            contains: world
+
+  # ShellSpec: The output should equal "exact"
+  # Bats:      assert_output exact   (a single trailing newline is ignored)
+  - name: stdout equals maps to an exact match
+    steps:
+      - run:
+          shell: true
+          command: echo exact
+      - assert:
+          stdout:
+            equals: exact
+
+  # ShellSpec: The output should not include "panic"
+  # Bats:      refute_output --partial panic
+  - name: stdout not_contains maps to a negative substring match
+    steps:
+      - run:
+          shell: true
+          command: echo all good
+      - assert:
+          stdout:
+            not_contains: panic
+
+  # ShellSpec: The output should match pattern '...'  (glob → Go regex)
+  # Bats:      [[ "$output" =~ ^v[0-9] ]]
+  - name: stdout matches maps to a regexp
+    steps:
+      - run:
+          shell: true
+          command: echo v1.2.3
+      - assert:
+          stdout:
+            matches: "^v[0-9]+\\.[0-9]+\\.[0-9]+"
+
+  # ShellSpec: The error should include "warn"
+  # Bats:      run --separate-stderr; assert_stderr --partial warn
+  - name: stderr contains maps to a stderr substring match
+    skip: { os: windows }        # `>&2` redirect is POSIX-only
+    steps:
+      - run:
+          shell: true
+          command: "echo warn: heads up >&2"
+      - assert:
+          stderr:
+            contains: warn
+
+  # ShellSpec: The error should be blank
+  # Bats:      assert_stderr ''
+  - name: stderr empty asserts a clean error stream
+    steps:
+      - run:
+          shell: true
+          command: echo quiet
+      - assert:
+          stderr:
+            empty: true

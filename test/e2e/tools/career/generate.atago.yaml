@@ -1,0 +1,223 @@
+# Migrated from career's ShellSpec spec/generate_spec.sh.
+# `career generate` renders the cv / japanese-resume / work-history templates
+# (and their Japanese + legacy aliases) to PDF, supports --input/--output and
+# --photo, the -t all fan-out, and reports clear errors. Run with:
+#   make dogfood-career   (or test/e2e/tools/career/run.sh)
+#
+# ShellSpec mapping:
+#   * BeforeEach 'make_workdir' copies examples/minimal.yaml to $WORK/resume.yaml;
+#     here each scenario re-creates that with a `cp "$CAREER_EXAMPLES/minimal.yaml"
+#     resume.yaml` setup step (shell: true to expand the host env var). Output
+#     paths are relative so they land in the per-scenario workdir.
+#   * nested Describe (cv / japanese-resume / ...) flattened into the name.
+#   * `When call pdf_magic FILE` (head -c 4) -> a shell `head -c 4` run asserting
+#     stdout equals "%PDF".
+#   * `sh -c "cd $WORK && career generate ... -t all"` -> a plain run in the
+#     workdir (no cd needed).
+#   * `--photo "$PROJECT_ROOT/image/..."` -> "$CAREER_EXAMPLES/../image/..." (the
+#     image dir is a sibling of examples/); needs shell: true to expand the var.
+version: "1"
+
+suite:
+  name: career generate
+
+scenarios:
+  - name: cv renders a PDF (default template) with an accent color
+    steps:
+      - run:
+          shell: true
+          command: cp "$CAREER_EXAMPLES/minimal.yaml" resume.yaml
+      - run:
+          command: career generate resume.yaml --accent "#2c6e6e" -o cv.pdf
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "wrote"
+          file:
+            path: cv.pdf
+            exists: true
+
+  - name: cv writes a valid PDF header
+    steps:
+      - run:
+          shell: true
+          command: cp "$CAREER_EXAMPLES/minimal.yaml" resume.yaml
+      - run:
+          command: career generate resume.yaml -t cv -o cv.pdf
+      - run:
+          shell: true
+          command: head -c 4 cv.pdf
+      - assert:
+          stdout:
+            equals: "%PDF"
+      # PDF-specific black-box check: the generated CV is a real, non-empty PDF
+      # document with at least one page (#73), not merely a file that exists.
+      - assert:
+          pdf:
+            path: cv.pdf
+            min_pages: 1
+
+  - name: japanese-resume renders a PDF from a positional input
+    steps:
+      - run:
+          shell: true
+          command: cp "$CAREER_EXAMPLES/minimal.yaml" resume.yaml
+      - run:
+          command: career generate resume.yaml -t japanese-resume -o out.pdf
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "wrote"
+          file:
+            path: out.pdf
+            exists: true
+
+  - name: japanese-resume accepts the 履歴書 alias
+    steps:
+      - run:
+          shell: true
+          command: cp "$CAREER_EXAMPLES/minimal.yaml" resume.yaml
+      - run:
+          command: career generate resume.yaml -t 履歴書 -o out.pdf
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "wrote"
+          file:
+            path: out.pdf
+            exists: true
+
+  - name: japanese-resume embeds the bundled sample portrait passed with --photo
+    steps:
+      - run:
+          shell: true
+          command: cp "$CAREER_EXAMPLES/minimal.yaml" resume.yaml
+      - run:
+          shell: true
+          command: career generate resume.yaml -t japanese-resume --photo "$CAREER_EXAMPLES/../image/sample_japanese_man.jpg" -o out.pdf
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "wrote"
+          file:
+            path: out.pdf
+            exists: true
+
+  - name: work-history renders a PDF using --input and the default output name
+    steps:
+      - run:
+          shell: true
+          command: cp "$CAREER_EXAMPLES/minimal.yaml" resume.yaml
+      - run:
+          command: career generate --input resume.yaml --template work-history --output ch.pdf
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "wrote"
+          file:
+            path: ch.pdf
+            exists: true
+
+  - name: work-history still accepts the legacy career-history alias
+    steps:
+      - run:
+          shell: true
+          command: cp "$CAREER_EXAMPLES/minimal.yaml" resume.yaml
+      - run:
+          command: career generate resume.yaml -t career-history -o legacy.pdf
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "work-history"
+          file:
+            path: legacy.pdf
+            exists: true
+
+  - name: work-history accepts the 職務経歴書 alias
+    steps:
+      - run:
+          shell: true
+          command: cp "$CAREER_EXAMPLES/minimal.yaml" resume.yaml
+      - run:
+          command: career generate resume.yaml -t 職務経歴書 -o ja.pdf
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "wrote"
+          file:
+            path: ja.pdf
+            exists: true
+
+  - name: multiple templates renders every template with -t all
+    steps:
+      - run:
+          shell: true
+          command: cp "$CAREER_EXAMPLES/minimal.yaml" resume.yaml
+      - run:
+          command: career generate resume.yaml -t all
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "cv"
+              - "japanese-resume"
+              - "work-history"
+          file:
+            path: cv.pdf
+            exists: true
+      - assert:
+          file:
+            path: japanese-resume.pdf
+            exists: true
+      - assert:
+          file:
+            path: work-history.pdf
+            exists: true
+
+  - name: errors fails when the input file is missing
+    steps:
+      - run:
+          shell: true
+          command: cp "$CAREER_EXAMPLES/minimal.yaml" resume.yaml
+      - run:
+          command: career generate nope.yaml -t cv -o out.pdf
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            empty: false
+
+  - name: errors fails on an unknown template
+    steps:
+      - run:
+          shell: true
+          command: cp "$CAREER_EXAMPLES/minimal.yaml" resume.yaml
+      - run:
+          command: career generate resume.yaml -t bogus -o out.pdf
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            contains: "unknown template"
+
+  - name: errors fails on an invalid accent color
+    steps:
+      - run:
+          shell: true
+          command: cp "$CAREER_EXAMPLES/minimal.yaml" resume.yaml
+      - run:
+          command: career generate resume.yaml -t cv --accent bogus -o out.pdf
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            contains: "hex color"
+
+  - name: errors fails when no input is given
+    steps:
+      - run:
+          shell: true
+          command: cp "$CAREER_EXAMPLES/minimal.yaml" resume.yaml
+      - run:
+          command: career generate -t cv
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            contains: "no input file"

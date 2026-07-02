@@ -1,0 +1,30 @@
+version: "1"
+
+# A grpc runner calls a unary method with a grpc step; the schema is resolved
+# via server reflection, so no compiled stubs are needed. Assert on grpc_status
+# (0 = OK) and the response message.
+# Before running: point target at a reflection-enabled gRPC server.
+
+suite:
+  name: grpc
+
+runners:
+  greeter:
+    type: grpc
+    target: localhost:50051   # <-- edit: host:port of your server
+
+scenarios:
+  - name: SayHello returns a greeting
+    steps:
+      - grpc:
+          runner: greeter
+          method: helloworld.Greeter/SayHello   # <-- edit: package.Service/Method
+          json:
+            name: Alice
+      - assert:
+          grpc_status: 0
+      - assert:
+          message:
+            json:
+              path: "$.message"
+              equals: Hello Alice

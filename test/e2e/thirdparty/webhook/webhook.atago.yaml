@@ -1,0 +1,63 @@
+version: "1"
+
+suite:
+  name: webhook (self-hosted webhook receiver)
+
+# Exercises adnanh/webhook (from awesome-selfhosted's automation corner) as a
+# third-party target: the daemon reads its hook definitions from a JSON config
+# — written as a leading fixture, applied before the service starts — and a
+# JSON POST triggers a command whose output flows back into the response.
+# Install:
+#   go install github.com/adnanh/webhook@latest
+
+permissions:
+  network:
+    allow: [127.0.0.1]
+
+runners:
+  hooks:
+    type: http
+    base_url: http://127.0.0.1:18094
+    timeout: 10s
+
+scenarios:
+  - name: a JSON post triggers the configured command
+    services:
+      - name: webhook
+        command: webhook -hooks hooks.json -ip 127.0.0.1 -port 18094
+        ready:
+          port: 127.0.0.1:18094
+          timeout: 15s
+    steps:
+      - fixture:
+          file: hooks.json
+          content: |
+            [
+              {
+                "id": "greet",
+                "execute-command": "/bin/echo",
+                "include-command-output-in-response": true,
+                "pass-arguments-to-command": [
+                  { "source": "payload", "name": "name" }
+                ]
+              }
+            ]
+      - http:
+          runner: hooks
+          method: POST
+          path: /hooks/greet
+          json:
+            name: Alice
+      - assert:
+          status: 200
+          body:
+            contains: Alice
+      # An unknown hook id is a 404, not an execution.
+      - http:
+          runner: hooks
+          method: POST
+          path: /hooks/nope
+          json:
+            name: Bob
+      - assert:
+          status: 404

@@ -1,0 +1,51 @@
+# mobilepkg error handling: bad usage, missing files, unknown formats, and
+# unrecognised package contents must fail with a nonzero exit and a message on
+# stderr (stdout stays clean for pipelines). Run with:
+#   make dogfood-mobilepkg   (or test/e2e/tools/mobilepkg/run.sh)
+version: "1"
+
+suite:
+  name: mobilepkg error handling
+
+scenarios:
+  - name: inspect with no file prints usage and fails
+    steps:
+      - run:
+          command: mobilepkg inspect
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            contains: "Usage: mobilepkg inspect"
+
+  - name: inspect on a missing file fails
+    steps:
+      - run:
+          command: mobilepkg inspect does_not_exist.apk
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            contains: "no such file"
+
+  - name: inspect rejects an unknown output format
+    steps:
+      - run:
+          shell: true
+          command: cp "$MOBILEPKG_TESTDATA/android/androgoat_rich.apk" app.apk
+      - run:
+          command: mobilepkg inspect --format xml app.apk
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            contains: "unknown format"
+
+  - name: inspect rejects a file that is not a mobile package
+    steps:
+      - fixture:
+          file: notapkg.apk
+          content: "this is not a zip archive"
+      - run:
+          command: mobilepkg inspect notapkg.apk
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            contains: "unsupported package format"

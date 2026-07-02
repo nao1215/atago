@@ -1,0 +1,35 @@
+version: "1"
+
+# By default a command is tokenized into argv and executed directly — no shell,
+# so |, >, && and $(...) are not special (atago rejects them unless you set
+# shell: true). For "write output to a file" you do not need a shell at all:
+# stdout_to / stderr_to redirect the captured streams to workdir-relative files.
+# Runs green as-is: atago run examples/shell_and_redirect.atago.yaml
+
+suite:
+  name: shell and redirect
+
+scenarios:
+  - name: shell true runs the command through the shell
+    steps:
+      - run:
+          shell: true   # /bin/sh on POSIX, cmd.exe on Windows
+          command: echo piped
+      - assert:
+          stdout:
+            contains: piped
+
+  - name: stdout_to writes the captured output to a file without a shell
+    steps:
+      - run:
+          shell: true
+          command: echo report line
+          stdout_to: report.txt
+          stderr_to: errors.log
+      # The stream stays captured, so stdout assertions keep working too.
+      - assert:
+          stdout:
+            contains: report line
+          file:
+            path: report.txt
+            contains: report line

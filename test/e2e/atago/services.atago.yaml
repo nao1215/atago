@@ -1,0 +1,186 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / background services
+
+# Exercises scenario-level `services` (ADR-0031) through the real atago binary:
+# a background process is started before the steps, its readiness is awaited via
+# file/log/delay probes, a dynamic value is captured from its ready file into a
+# ${var}, and the process group is torn down when the scenario ends. These
+# scenarios stay network-free (shell builtins only) so they run hermetically in
+# CI; the TCP path is covered by Go unit tests in internal/runner/service.
+scenarios:
+  - name: file readiness captures a dynamic value into a variable
+    services:
+      - name: publisher
+        shell: true
+        command: 'printf "127.0.0.1:5555" > ready.txt; sleep 30'
+        ready:
+          file: ready.txt
+          store: addr
+          timeout: 5s
+    steps:
+      - run:
+          command: echo ${addr}
+      - assert:
+          stdout:
+            equals: "127.0.0.1:5555"
+
+  - name: log readiness waits for a line on the service output
+    services:
+      - name: logger
+        shell: true
+        command: 'echo "ready: listening"; sleep 30'
+        ready:
+          log: "listening"
+          timeout: 5s
+    steps:
+      - run:
+          command: echo started
+      - assert:
+          stdout:
+            contains: started
+
+  - name: delay readiness waits a fixed duration
+    services:
+      - name: slow
+        shell: true
+        command: 'sleep 30'
+        ready:
+          delay: 50ms
+    steps:
+      - run:
+          command: echo ok
+      - assert:
+          stdout:
+            contains: ok
+
+  - name: multiple services start and capture independently
+    services:
+      - name: first
+        shell: true
+        command: 'printf alpha > a.txt; sleep 30'
+        ready:
+          file: a.txt
+          store: a
+      - name: second
+        shell: true
+        command: 'printf beta > b.txt; sleep 30'
+        ready:
+          file: b.txt
+          store: b
+    steps:
+      - run:
+          command: echo ${a}-${b}
+      - assert:
+          stdout:
+            equals: "alpha-beta"
+
+  - name: a readiness failure preserves the service log as an artifact
+    steps:
+      - fixture:
+          file: notready.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: sample
+            scenarios:
+              - name: service never ready
+                services:
+                  - name: chatty
+                    shell: true
+                    command: 'echo booting-up; sleep 30'
+                    ready:
+                      file: never.txt
+                      timeout: 200ms
+                steps:
+                  - run:
+                      command: echo unreached
+      - run:
+          command: ${atago} run --artifacts-dir arts notready.atago.yaml
+      - assert:
+          exit_code: 4
+      # The service's captured output is preserved under the artifacts dir.
+      - run:
+          shell: true
+          command: cat arts/*/*/service-chatty.log
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: booting-up
+
+  - name: a step failure after the service is ready preserves the service log
+    steps:
+      - fixture:
+          file: readythenfail.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: sample
+            scenarios:
+              - name: ready then fail
+                services:
+                  - name: peer
+                    shell: true
+                    command: 'echo peer-serving > ready.txt; echo peer-log-line; sleep 30'
+                    ready:
+                      file: ready.txt
+                      timeout: 2s
+                steps:
+                  - run:
+                      command: echo hello
+                  - assert:
+                      stdout:
+                        contains: goodbye
+      - run:
+          command: ${atago} run --report json --artifacts-dir arts readythenfail.atago.yaml
+      - assert:
+          exit_code: 1
+      # The JSON report references the preserved service log.
+      - assert:
+          stdout:
+            contains:
+              - "service_logs"
+              - service-peer.log
+      - run:
+          shell: true
+          command: cat arts/*/*/service-peer.log
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: peer-log-line
+
+  - name: a green run with a healthy service writes no service log
+    steps:
+      - fixture:
+          file: healthy.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: sample
+            scenarios:
+              - name: healthy service passes
+                services:
+                  - name: ok
+                    shell: true
+                    command: 'echo up > ready.txt; echo serving; sleep 30'
+                    ready:
+                      file: ready.txt
+                      timeout: 2s
+                steps:
+                  - run:
+                      command: echo hi
+                  - assert:
+                      stdout:
+                        contains: hi
+      - run:
+          command: ${atago} run --artifacts-dir arts healthy.atago.yaml
+      - assert:
+          exit_code: 0
+      # No artifacts should be written for a passing run (logs are opt-in).
+      - run:
+          shell: true
+          command: 'ls arts 2>/dev/null | wc -l | tr -d " "'
+      - assert:
+          stdout:
+            equals: "0"

@@ -1,0 +1,86 @@
+# Migrated from iso8583tool's ShellSpec spec/cli_spec.sh.
+# CLI surface: root help, version, unknown command, per-subcommand help, and the
+# root flags rejecting trailing arguments. No fixtures needed, so each runs the
+# binary directly. Run with: make dogfood-iso8583tool
+version: "1"
+
+suite:
+  name: iso8583tool CLI surface
+
+scenarios:
+  - name: root help prints help with no arguments
+    steps:
+      - run:
+          command: iso8583tool
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "Commands:"
+              - "view"
+              - "convert"
+              - "validate"
+
+  - name: version prints the version
+    steps:
+      - run:
+          command: iso8583tool version
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "iso8583tool"
+
+  - name: unknown command fails and shows the command list
+    steps:
+      - run:
+          command: iso8583tool frobnicate
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            contains:
+              - "unknown command"
+              - "Commands:"
+
+  - name: subcommand help describes convert and exits 0
+    steps:
+      - run:
+          command: iso8583tool help convert
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "Usage: iso8583tool convert"
+              - "--to"
+
+  - name: subcommand help describes view and lists --filter
+    steps:
+      - run:
+          command: iso8583tool view --help
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "Usage: iso8583tool view"
+              - "--filter"
+      # Successful help must go to stdout, not stderr.
+      - assert:
+          stderr:
+            equals: ""
+
+  - name: root flags reject --help with a trailing argument
+    steps:
+      - run:
+          command: iso8583tool --help view
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            contains: "takes no arguments"
+
+  - name: root flags reject --version with a trailing argument
+    steps:
+      - run:
+          command: iso8583tool --version view
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            contains: "takes no arguments"

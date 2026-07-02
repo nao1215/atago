@@ -1,0 +1,48 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / variable expansion in assertion matcher values
+
+# Regression for the mimixbox migration: ShellSpec specs embed paths in expected
+# output, e.g. `The output should equal "${MIMIXBOX_IT_ROOT}/cat.txt"`. atago
+# now expands ${name}/${workdir} in stream and file matcher values too
+# (ADR-0019), not just in commands and file.path.
+scenarios:
+  - name: stdout.equals expands ${workdir}
+    steps:
+      - run:
+          shell: true
+          command: 'printf "%s\n" "${workdir}/out.txt"'
+      - assert:
+          stdout:
+            equals: "${workdir}/out.txt"
+
+  - name: stdout.contains and not_contains expand a stored variable
+    steps:
+      - run:
+          shell: true
+          command: 'printf "%s" hello-123'
+      - store:
+          name: token
+          from:
+            stdout:
+              matches: "(hello-[0-9]+)"
+      - run:
+          shell: true
+          command: 'printf "%s\n" "hello-123 world"'
+      - assert:
+          stdout:
+            contains: "${token}"
+      - assert:
+          stdout:
+            not_contains: "${token}-absent"
+
+  - name: file.contains expands ${workdir}
+    steps:
+      - run:
+          shell: true
+          command: 'printf "%s\n" "${workdir}/marker" > note.txt'
+      - assert:
+          file:
+            path: note.txt
+            contains: "${workdir}/marker"

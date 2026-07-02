@@ -1,0 +1,50 @@
+version: "1"
+
+# services start a background process before the steps and tear it down when
+# the scenario ends. A ready probe (file / port / log / delay) gates the steps;
+# ready.store captures a value the service publishes — typically the address it
+# bound — into a ${var}.
+# Runs green as-is on POSIX: atago run examples/services.atago.yaml
+
+suite:
+  name: services
+
+scenarios:
+  - name: client waits for the service and reads its response
+    skip:
+      os: windows   # the stand-in service below uses POSIX shell commands
+    services:
+      - name: server
+        shell: true
+        # A stand-in server: publish the bound address, respond a moment
+        # later, keep running until teardown. A real server would be your
+        # binary, with ready: {port: 127.0.0.1:8080} or ready: {log: REGEXP}.
+        command: |
+          echo "127.0.0.1:8000" > addr.txt
+          sleep 1
+          echo "pong" > response.txt
+          sleep 30
+        ready:
+          file: addr.txt   # ready when this file exists and is non-empty
+          store: addr      # its trimmed content becomes ${addr}
+          timeout: 5s
+    steps:
+      - run:
+          shell: true
+          command: echo client would connect to ${addr}
+      - assert:
+          stdout:
+            contains: "127.0.0.1:8000"
+      # Poll the service's response the way you would poll a real endpoint.
+      - run:
+          shell: true
+          command: cat response.txt
+          retry:
+            times: 20
+            interval: 100ms
+            until:
+              stdout:
+                contains: pong
+      - assert:
+          stdout:
+            contains: pong

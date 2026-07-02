@@ -1,0 +1,81 @@
+version: "1"
+
+# JSON assertions select a value with standard JSONPath ($.a.b[0]) and match it.
+# They work on any stream (stdout, body, rows, ...) and on files. Numeric
+# bounds (gt/gte/lt/lte) cover values that are non-deterministic but bounded.
+# Runs green as-is: atago run examples/json_and_yaml.atago.yaml
+
+suite:
+  name: json and yaml
+
+scenarios:
+  - name: select values by JSONPath
+    steps:
+      - fixture:
+          file: data.json
+          content: |
+            {"name":"ada","items":[1,2,3],"rate":0.25}
+      - assert:
+          file:
+            path: data.json
+            json:
+              path: "$.name"
+              equals: ada
+      - assert:
+          file:
+            path: data.json
+            json:
+              path: "$.items"
+              length: 3
+      - assert:
+          file:
+            path: data.json
+            json:
+              path: "$.name"
+              matches: "a.+"
+
+  - name: numeric bounds for bounded but non-deterministic values
+    steps:
+      - fixture:
+          file: metrics.json
+          content: |
+            {"processed":42,"error_rate":0.01}
+      - assert:
+          file:
+            path: metrics.json
+            json:
+              path: "$.processed"
+              gt: 0
+      - assert:
+          file:
+            path: metrics.json
+            json:
+              path: "$.error_rate"
+              lte: 0.05
+
+  - name: the same matchers apply to a command's stdout
+    skip:
+      os: windows   # `cat` is POSIX; the matchers themselves work everywhere
+    steps:
+      - fixture:
+          file: out.json
+          content: |
+            {"status":"ok"}
+      - run:
+          shell: true
+          command: cat out.json
+      - assert:
+          stdout:
+            json:
+              path: "$.status"
+              equals: ok
+      # yaml selects with the same path syntax on YAML output.
+      - run:
+          shell: true
+          command: |
+            printf 'status: ok\ncount: 3\n'
+      - assert:
+          stdout:
+            yaml:
+              path: "$.count"
+              equals: 3
