@@ -33,9 +33,14 @@ The release workflow then:
 - publishes archives and `checksums.txt`
 - signs the checksums with cosign (keyless) and attaches SBOMs
 - attests build provenance via GitHub OIDC
+- publishes a Homebrew cask to [nao1215/homebrew-tap](https://github.com/nao1215/homebrew-tap)
 
 ## Required secrets
 - `GITHUB_TOKEN`: provided automatically; used to create the GitHub Release.
+- `TAP_GITHUB_TOKEN`: a repo-scoped token for `nao1215/homebrew-tap`; used by
+  GoReleaser to push the Homebrew cask on a tagged release. The push-time
+  release smoke skips publishing (`--skip=publish`), so only real tag releases
+  need it.
 
 ## After releasing
 - Check the [Releases page](https://github.com/nao1215/atago/releases) for the

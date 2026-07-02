@@ -28,7 +28,13 @@ atago run --report junit specs/  # emit a JUnit report for CI
 go install github.com/nao1215/atago@latest
 ```
 
-The [release page](https://github.com/nao1215/atago/releases) contains prebuilt binary archives for Linux, macOS, and Windows (amd64/arm64). Requires Go 1.26 or later when building from source.
+On macOS, Homebrew works too:
+
+```shell
+brew install --cask nao1215/tap/atago
+```
+
+The [release page](https://github.com/nao1215/atago/releases) contains prebuilt binary archives for Linux, macOS, and Windows (amd64/arm64; `.tar.gz`, or `.zip` on Windows). Requires Go 1.26 or later when building from source.
 
 Runs on Linux, macOS, and Windows. CI runs the unit tests on all three, the full E2E suite on Linux and macOS, and a portable E2E subset on Windows; specs that lean on POSIX-only shell tools are the remaining gap on Windows.
 
@@ -50,7 +56,7 @@ sha256sum --check --ignore-missing checksums.txt
 ```
 
 ```shell
-gh attestation verify atago_<version>_<os>_<arch>.tar.gz --repo nao1215/atago
+gh attestation verify atago_<version>_<os>_<arch>.tar.gz --repo nao1215/atago  # .zip on Windows
 ```
 
 ## Getting started
@@ -156,7 +162,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: nao1215/setup-atago@v1
+      - uses: nao1215/setup-atago@v0
       - run: atago run --ci --report gha ./specs
 ```
 

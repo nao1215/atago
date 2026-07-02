@@ -21,10 +21,11 @@ examples under [`examples/`](examples/) cover every feature.
 
 - §1–4 Overview and model
 - §5–6 Self-hosted testing (atago tested by atago)
+- §7 Shared `defaults`
 - §14 Runner families and step kinds
 - §15 Command execution; §15.1 stdin, retry, and readiness polling
 - §16 Assertions (§16.1 exit_code, §16.2 stdout, §16.3 stderr/JSON, §16.6 file,
-  §16.7 HTTP/gRPC targets, §16.10 snapshots)
+  image, dir, and pdf, §16.7 HTTP/gRPC targets, §16.10 snapshots)
 - §17 Fixtures, store, and the workdir
 - §18 Variables and value binding
 - §19 Selection: tags, skip/only conditions
@@ -34,7 +35,8 @@ examples under [`examples/`](examples/) cover every feature.
 - §24 `explain`
 - §25 / §35 Doc generation
 - §26 / §27 Reports; §27.1 failure output, §27.2 machine-readable report
-- §28 Security model (§28.2 network policy, §28.3 secret masking, §28.4 path confinement)
+- §28 Security model (§28.1 trust model, §28.2 network policy, §28.3 secret
+  masking, §28.4 path confinement)
 - §30 Isolation and concurrency
 - §31 Execution pipeline (§31.1 validation layers, §31.3 run results)
 - §34 Exit codes
@@ -62,11 +64,12 @@ suite:
 runners: { <name>: { type: ... } }   # optional
 permissions: { network: { allow: [...] } }  # optional
 secrets: [ ... ]                      # optional
+defaults: { run: ..., scenario: ..., service: ... }  # optional (§7)
 scenarios: [ ... ]
 ```
 
-`version` must be `"1"`; `suite.name` is required; `scenarios` must contain at
-least one scenario. Full field reference:
+`version` must be `"1"` (a bare `1` is accepted and coerced); `suite.name` is
+required; `scenarios` must contain at least one scenario. Full field reference:
 [`schema/atago.schema.json`](schema/atago.schema.json).
 
 ## §4 Design constraints
@@ -86,6 +89,22 @@ push/PR to `main`; a release must not be tagged unless it passes.
 `${atago}` resolves to the absolute path of the running atago binary, so a
 self-hosted spec can invoke atago from inside its isolated temporary workdir.
 This is how atago exercises its own CLI end to end.
+
+## §7 Shared `defaults`
+
+The top-level `defaults:` block (ADR-0039) declares shared fragments once
+instead of repeating them per scenario: `defaults.run` merges into every `run`
+step (`shell`, `runner`, `cwd`, `timeout`, `env`, `stdin`), `defaults.scenario.env`
+into every scenario's env, and `defaults.service` into every service (`shell`,
+`cwd`, `env`, and a whole `ready` probe when the service declares none).
+Defaults are pure authoring sugar: the loader expands them before validation,
+so the engine only ever sees fully-resolved scenarios.
+
+Merge rules: an explicitly authored value always wins — including `shell: false`
+under a defaulted `shell: true`; maps shallow-merge with the authored key
+winning per key. Per-element identity fields (`run.command`, `run.retry`,
+`service.name`, `service.command`) cannot be defaulted and are load-time errors
+under `defaults`. See [`examples/defaults.atago.yaml`](examples/defaults.atago.yaml).
 
 ---
 
@@ -126,8 +145,16 @@ exactly one type, and a cross-type field is a load-time error.
 
 A `run` step runs `command` and captures its exit code, stdout, and stderr. By
 default the command is tokenized and executed directly. `shell: true` opts into
-POSIX-shell execution (pipes, redirects, `${}`). Other fields: `runner`, `cwd`,
-`timeout`, `env`, `stdin`.
+POSIX-shell execution (pipes, redirects, `${}`) — `/bin/sh` on POSIX, `cmd.exe`
+on Windows; the `ATAGO_SHELL` environment variable overrides the shell binary
+(atago deliberately does not resolve its shell through the PATH it sets up for
+the program under test). Other fields: `runner`, `cwd`, `timeout` (a Go
+duration; a timed-out command is killed and reports exit code -1 with the
+timeout named in the failure context), `env`, `stdin`, and `stdout_to` /
+`stderr_to` — workdir-relative files the captured stdout/stderr are also
+written to (create/truncate), so a `shell: false` step gets redirection without
+borrowing the shell's `>`; the streams stay captured, so assertions on the same
+step keep working.
 
 ### §15.1 stdin, retry, and readiness polling
 
@@ -166,13 +193,22 @@ select a value by JSONPath `path` and apply one of `equals`, `matches`,
 `length`, or a numeric bound `gt`/`gte`/`lt`/`lte`. `equals` compares structures
 and is insensitive to map key ordering.
 
-### §16.6 file
+### §16.6 file, image, dir, and pdf
 
 `file` sets `path` plus exactly one of `exists`, `contains`, `not_contains`,
 `executable`, `json`, or `snapshot`. Relative paths resolve inside the scenario
-workdir. `image` (a related file-inspecting target) decodes a generated image
-and asserts `format`, dimensions/bounds, `alpha`, and `similar_to`; every set
-field is a constraint and all must hold.
+workdir. Three related file-inspecting targets share the path rules but treat
+every set field as an independent constraint (all must hold):
+
+- `image` decodes a generated image and asserts `format` (sniffed from
+  content), exact `width`/`height` plus `min_*`/`max_*` bounds, `alpha`, and
+  `similar_to` (a baseline pixel comparison with optional `max_diff`).
+- `dir` (#74) checks a generated directory tree: `exists`,
+  `contains`/`not_contains` children (including nested paths),
+  `count`/`min_count`/`max_count` of direct entries, and `glob` coverage.
+- `pdf` (#73) checks a generated PDF: `pages`/`min_pages`/`max_pages`,
+  Info-dictionary `metadata` (title/author/subject/keywords/creator/producer,
+  substring match), and `text` (the stream matchers over extracted text).
 
 ### §16.7 HTTP, gRPC, and stream targets
 
@@ -229,18 +265,23 @@ still relevant.
 ## §20 Subcommands and the CLI
 
 ```
-atago run       Run spec files and assert behavior
-atago init      Scaffold a starter spec file
-atago explain   Describe what a spec does without running it
-atago doc       Generate Markdown documentation from specs
-atago manifest  Emit a stable machine-readable JSON summary of specs
-atago snapshot  Manage snapshots (snapshot update <paths>)
-atago version   Print the atago version
-atago help      Show help
+atago run         Run spec files and assert behavior
+atago init        Scaffold a starter spec file (--template browser|cli|db|grpc|http|services|ssh)
+atago list        List suites, scenarios, tags, and generated artifacts (--json)
+atago explain     Describe what a spec does without running it
+atago doc         Generate Markdown documentation from specs
+atago manifest    Emit a stable machine-readable JSON summary of specs
+atago completion  Generate a shell completion script (bash|zsh|fish|powershell)
+atago snapshot    Manage snapshots (snapshot update <paths>)
+atago version     Print the atago version
+atago help        Show help
 ```
 
-A run/doc/manifest target may be a spec file or a directory; a directory is
-searched recursively for `*.atago.yaml`/`*.atago.yml`.
+A run/list/doc/manifest/explain target may be a spec file or a directory; a
+directory is searched recursively for `*.atago.yaml`/`*.atago.yml`; with no
+target, `run` searches the current directory. Every spec-reading command loads
+and validates first (exit 2 on a schema error), so `list`/`explain`/`doc`/
+`manifest` double as lint steps.
 
 ## §21 `run` options
 
@@ -251,8 +292,11 @@ searched recursively for `*.atago.yaml`/`*.atago.yml`.
   default. `--parallel 1` pins serial scheduling, e.g. for deterministic
   `--fail-fast` skip counts).
 - `--fail-fast` — stop scheduling new scenarios after the first failure.
-- `--filter S` — run only scenarios whose name contains S.
+- `--filter S` — run only scenarios whose name contains S (case-sensitive
+  substring). A selection matching nothing exits 0 but warns on stderr.
 - `--tag T` / `--skip-tag T` — comma-separated tag include/exclude.
+- `--rerun-failed` — run only the scenarios recorded as failing on the previous
+  run (state in `.atago/last-failed.json`; a green run clears it).
 - `--artifacts-dir DIR` — write deterministic failure artifacts under DIR.
 - `--ci` — CI-safe defaults (deterministic, `NO_COLOR`, secret masking).
 
@@ -307,19 +351,34 @@ enough failure context for an LLM agent to act on. Consumers branch on
 
 ## §28 Security model
 
-atago's security model is masking, network confinement, and path confinement.
+atago's security model is masking, network confinement, and path confinement —
+applied *within* a trust boundary stated explicitly in §28.1.
+
+### §28.1 Trust model
+
+**Spec files are trusted input.** A spec executes the commands it declares:
+`run` steps, `services`, and `skip`/`only` probe commands run real processes
+with the invoking user's privileges, and `shell: true` is full shell execution.
+Running a spec is equivalent to running a script — review specs from sources
+you would not run a script from. The policies below bound what a *reviewed*
+spec observably does (which hosts it may contact, where it may write, what its
+reports may leak); they are not a sandbox for hostile specs.
 
 ### §28.2 Network policy
 
 `permissions.network.allow` lists hosts scenarios may contact. An empty or absent
 allowlist is unrestricted. A denied host is a policy violation (exit 6), enforced
-for HTTP, gRPC, and SSH.
+for the declared network runners: HTTP, gRPC, and SSH. It does not apply to
+processes a `run` step spawns (a `curl` in a shell step can reach any host), to
+a `db` runner's DSN connection, or to browser navigation — those are covered by
+the trust model above, and `explain`/`manifest` surface them for review.
 
 ### §28.3 Secret masking
 
 Declared `secrets` are masked in every report and snapshot — including values
 injected via scenario `env` or a service's `env` — so a real credential never
-reaches logs, reports, or a committed snapshot.
+reaches logs, reports, or a committed snapshot. Values shorter than 4
+characters are not masked (masking them would redact ordinary text).
 
 ### §28.4 Path confinement
 
