@@ -42,7 +42,11 @@ type StepResult struct {
 
 // ScenarioResult aggregates the steps of one scenario.
 type ScenarioResult struct {
-	Name   string
+	Name string
+	// Suite is the owning suite's name, so per-scenario consumers (the
+	// OnScenario stream, verbose traces) can label output without threading
+	// the SuiteResult alongside.
+	Suite  string
 	Status Status
 	Steps  []StepResult
 	// Teardown records the scenario's teardown steps. They always run (pass,

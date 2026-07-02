@@ -35,8 +35,9 @@ func runCmd(args []string, stdout, stderr io.Writer) int {
 	skipTag := fs.String("skip-tag", "", "skip scenarios with any of these comma-separated tags")
 	artifactsDir := fs.String("artifacts-dir", "", "write deterministic failure artifacts (actual/expected payloads) under DIR for review tooling")
 	rerunFailed := fs.Bool("rerun-failed", false, "run only the scenarios that failed on the previous run (recorded in .atago/last-failed.json)")
+	verbose := fs.Bool("verbose", false, "trace every scenario as it finishes: commands, exit codes, captured output, and per-assertion verdicts — for passing scenarios too")
 	fs.Usage = func() {
-		fmt.Fprint(stderr, "Usage: atago run [--report console|json|junit|gha|tap] [--update-snapshots] [--parallel N] [--fail-fast] [--filter S] [--tag T] [--skip-tag T] [--rerun-failed] [--artifacts-dir DIR] [--ci] <path | dir>...\n  (directories are searched recursively)\n")
+		fmt.Fprint(stderr, "Usage: atago run [--report console|json|junit|gha|tap] [--update-snapshots] [--parallel N] [--fail-fast] [--filter S] [--tag T] [--skip-tag T] [--rerun-failed] [--artifacts-dir DIR] [--verbose] [--ci] <path | dir>...\n  (directories are searched recursively)\n")
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(args); err != nil {
@@ -108,8 +109,15 @@ func runCmd(args []string, stdout, stderr io.Writer) int {
 
 	// In console mode, stream a live dot per scenario as it finishes, so a run
 	// visibly zips along. JSON output stays pure (no dots on stdout).
+	// --verbose (#6) replaces the dots with a full per-scenario trace; with a
+	// machine report the trace goes to stderr so stdout stays machine-readable.
 	var progress *report.Progress
-	if format == report.FormatConsole {
+	switch {
+	case *verbose && format == report.FormatConsole:
+		eng.OnScenario = report.NewVerbose(stdout).Scenario
+	case *verbose:
+		eng.OnScenario = report.NewVerbose(stderr).Scenario
+	case format == report.FormatConsole:
 		progress = report.NewProgress(stdout)
 		eng.OnScenario = progress.Scenario
 	}

@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-39 suites · 129 scenarios
+40 suites · 133 scenarios
 ## Contents
 - [atago self-hosting / variable expansion in assertion matcher values](#atago-self-hosting--variable-expansion-in-assertion-matcher-values) — 3 scenarios
   - [stdout.equals expands ${workdir}](#scenario-stdoutequals-expands-workdir)
@@ -164,6 +164,11 @@
 - [atago self-hosting / store](#atago-self-hosting--store) — 2 scenarios
   - [a stored JSON value is reusable in later commands](#scenario-a-stored-json-value-is-reusable-in-later-commands)
   - [storing from a missing JSON path is an execution error](#scenario-storing-from-a-missing-json-path-is-an-execution-error)
+- [atago self-hosting / verbose](#atago-self-hosting--verbose) — 4 scenarios
+  - [verbose shows a passing scenario's command, output, and verdicts](#scenario-verbose-shows-a-passing-scenarios-command-output-and-verdicts)
+  - [without --verbose the trace is absent](#scenario-without---verbose-the-trace-is-absent)
+  - [verbose with a JSON report keeps stdout pure and traces to stderr](#scenario-verbose-with-a-json-report-keeps-stdout-pure-and-traces-to-stderr)
+  - [a failing run under --verbose renders the FAILED block exactly once](#scenario-a-failing-run-under---verbose-renders-the-failed-block-exactly-once)
 - [atago self-hosting / version](#atago-self-hosting--version) — 2 scenarios
   - [version command prints the binary name](#scenario-version-command-prints-the-binary-name)
   - [unknown command is a configuration error](#scenario-unknown-command-is-a-configuration-error)
@@ -2871,6 +2876,113 @@ ${atago} run bad-store.atago.yaml
 #### Then
 - exit code is `4`
 - stdout contains `ERROR`
+## atago self-hosting / verbose
+Source: `test/e2e/atago/verbose.atago.yaml`
+### Scenario: verbose shows a passing scenario's command, output, and verdicts
+#### Given
+- Fixture file `ok.atago.yaml` is created.
+#### Inputs
+_Fixture `ok.atago.yaml`:_
+```
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: greets
+    steps:
+      - run:
+          shell: true
+          command: echo hello-trace
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: hello-trace
+```
+#### When
+```shell
+${atago} run --verbose ok.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout contains `sample / greets`, `echo hello-trace`, `exit 0`, `ok   assert`
+### Scenario: without --verbose the trace is absent
+#### Given
+- Fixture file `ok.atago.yaml` is created.
+#### Inputs
+_Fixture `ok.atago.yaml`:_
+```
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: greets
+    steps:
+      - run:
+          shell: true
+          command: echo hello-trace
+      - assert:
+          exit_code: 0
+```
+#### When
+```shell
+${atago} run ok.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout does not contain `echo hello-trace`
+### Scenario: verbose with a JSON report keeps stdout pure and traces to stderr
+#### Given
+- Fixture file `ok.atago.yaml` is created.
+#### Inputs
+_Fixture `ok.atago.yaml`:_
+```
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: greets
+    steps:
+      - run:
+          shell: true
+          command: echo hello-trace
+      - assert:
+          exit_code: 0
+```
+#### When
+```shell
+${atago} run --verbose --report json ok.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout at `$.schema_version` equals `1`
+- stderr contains `exit 0`
+### Scenario: a failing run under --verbose renders the FAILED block exactly once
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: mismatch
+    steps:
+      - run:
+          shell: true
+          command: echo hello
+      - assert:
+          stdout:
+            contains: goodbye
+```
+#### When
+```shell
+${atago} run --verbose bad.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `FAIL assert`, `FAILED:`
+- stdout does not match `/(?s)FAILED:.*FAILED:/`
 ## atago self-hosting / version
 Source: `test/e2e/atago/version.atago.yaml`
 ### Scenario: version command prints the binary name

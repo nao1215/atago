@@ -7,6 +7,18 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- `atago run --verbose` (#6): trace every scenario as it finishes — the
+  expanded command, exit code / HTTP status, captured stdout/stderr (excerpted
+  at the same limit as failure output), skip reasons, teardown steps, and each
+  assertion's one-line verdict — for passing scenarios too, so authoring a
+  spec no longer requires breaking an assertion to see what a command printed.
+  Secrets stay masked; with a machine report (`--report json|junit|gha|tap`)
+  the trace goes to stderr so stdout stays machine-readable; failing checks
+  appear as one-line verdicts only (the full FAILED block is still rendered
+  exactly once by the report).
+
 ## [0.1.0] - 2026-07-03
 
 The first release of atago: an end-to-end test runner for command-line tools

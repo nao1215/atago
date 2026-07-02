@@ -21,3 +21,4 @@ complete -c atago -n '__fish_seen_subcommand_from run' -l rerun-failed
 complete -c atago -n '__fish_seen_subcommand_from run' -l skip-tag
 complete -c atago -n '__fish_seen_subcommand_from run' -l tag
 complete -c atago -n '__fish_seen_subcommand_from run' -l update-snapshots
+complete -c atago -n '__fish_seen_subcommand_from run' -l verbose

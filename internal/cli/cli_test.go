@@ -56,6 +56,115 @@ func TestRunCmd_Passing(t *testing.T) {
 	}
 }
 
+// TestRunCmd_Verbose covers the --verbose contract (#6): a passing scenario's
+// command, captured output, and assertion verdicts become visible; without the
+// flag the console stays dots-only; secrets are masked in traces; combining
+// --verbose with a machine report keeps stdout machine-readable by routing the
+// trace to stderr; and a failing run renders the full FAILED block exactly once.
+func TestRunCmd_Verbose(t *testing.T) {
+	dir := t.TempDir()
+	p := writeSpec(t, dir, "ok.atago.yaml", `
+version: "1"
+suite:
+  name: vdemo
+scenarios:
+  - name: greets
+    steps:
+      - run: {shell: true, command: echo hello-verbose}
+      - assert:
+          exit_code: 0
+          stdout: {contains: hello-verbose}
+`)
+
+	// --verbose shows the command, its output, and per-assert verdicts.
+	var out, errb bytes.Buffer
+	if got := Main([]string{"run", "--verbose", p}, &out, &errb); got != ExitOK {
+		t.Fatalf("exit = %d, want %d (stderr=%s)", got, ExitOK, errb.String())
+	}
+	for _, want := range []string{"echo hello-verbose", "hello-verbose", "ok   assert"} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("verbose stdout = %q, want %q", out.String(), want)
+		}
+	}
+
+	// Without --verbose the trace is absent (dots + summary only).
+	out.Reset()
+	errb.Reset()
+	if got := Main([]string{"run", p}, &out, &errb); got != ExitOK {
+		t.Fatalf("exit = %d, want %d", got, ExitOK)
+	}
+	if strings.Contains(out.String(), "echo hello-verbose") {
+		t.Errorf("non-verbose stdout = %q, must not contain the trace", out.String())
+	}
+}
+
+// TestRunCmd_VerboseMasksSecrets proves declared secrets never reach a verbose
+// trace — the same masking contract as failure output and snapshots (#6).
+func TestRunCmd_VerboseMasksSecrets(t *testing.T) {
+	t.Setenv("VTEST_TOKEN", "sup3r-s3cret-value")
+	dir := t.TempDir()
+	p := writeSpec(t, dir, "sec.atago.yaml", `
+version: "1"
+suite:
+  name: vsec
+secrets:
+  - VTEST_TOKEN
+scenarios:
+  - name: leaks a token to stdout
+    steps:
+      - run: {shell: true, command: "echo token=${env:VTEST_TOKEN}"}
+      - assert: {exit_code: 0}
+`)
+	var out, errb bytes.Buffer
+	if got := Main([]string{"run", "--verbose", p}, &out, &errb); got != ExitOK {
+		t.Fatalf("exit = %d, want %d (stderr=%s)", got, ExitOK, errb.String())
+	}
+	if strings.Contains(out.String(), "sup3r-s3cret-value") {
+		t.Error("verbose trace leaked the raw secret")
+	}
+	if !strings.Contains(out.String(), "***") {
+		t.Errorf("verbose stdout = %q, want the masked marker", out.String())
+	}
+}
+
+// TestRunCmd_VerboseWithJSONReportSeparatesStreams proves --verbose + --report
+// json keeps stdout pure JSON (schema_version intact) and puts the trace on
+// stderr (#6).
+func TestRunCmd_VerboseWithJSONReportSeparatesStreams(t *testing.T) {
+	dir := t.TempDir()
+	p := writeSpec(t, dir, "ok.atago.yaml", passingSpec)
+	var out, errb bytes.Buffer
+	if got := Main([]string{"run", "--verbose", "--report", "json", p}, &out, &errb); got != ExitOK {
+		t.Fatalf("exit = %d, want %d (stderr=%s)", got, ExitOK, errb.String())
+	}
+	var doc struct {
+		SchemaVersion string `json:"schema_version"`
+	}
+	if err := json.Unmarshal(out.Bytes(), &doc); err != nil {
+		t.Fatalf("stdout is not valid JSON under --verbose: %v\n%s", err, out.String())
+	}
+	if doc.SchemaVersion != "1" {
+		t.Errorf("schema_version = %q, want 1", doc.SchemaVersion)
+	}
+	if !strings.Contains(errb.String(), "exit 0") {
+		t.Errorf("stderr = %q, want the verbose trace there", errb.String())
+	}
+}
+
+// TestRunCmd_VerboseFailureBlockRenderedOnce proves the full FAILED block is
+// not duplicated between the trace and the console report (#6).
+func TestRunCmd_VerboseFailureBlockRenderedOnce(t *testing.T) {
+	dir := t.TempDir()
+	p := writeSpec(t, dir, "fail.atago.yaml", failingSpec)
+	var out, errb bytes.Buffer
+	if got := Main([]string{"run", "--verbose", p}, &out, &errb); got != ExitFailures {
+		t.Fatalf("exit = %d, want %d", got, ExitFailures)
+	}
+	if n := strings.Count(out.String(), "FAILED:"); n != 1 {
+		t.Errorf("stdout renders %d FAILED blocks, want exactly 1:\n%s", n, out.String())
+	}
+}
+
 // TestRunCmd_SelectionMatchesNothingWarns proves a --filter/--tag that selects
 // zero scenarios warns on stderr (a typo'd selection in CI must not greenlight
 // in silence), while still exiting 0.

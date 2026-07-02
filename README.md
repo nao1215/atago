@@ -149,7 +149,7 @@ Every feature has a commented, runnable spec under [examples/](examples/). The e
 | [grpc](examples/grpc.atago.yaml) | unary gRPC calls via server reflection |
 | [browser](examples/browser.atago.yaml) | headless-Chrome flows and screenshots |
 
-Selection flags compose with any spec: `--filter NAME`, `--tag T`, `--skip-tag T`, `--parallel N` (default: the number of CPUs — scenarios are isolated, so runs are concurrent out of the box), `--fail-fast`, and `--rerun-failed` (rerun only what failed last time).
+Selection flags compose with any spec: `--filter NAME`, `--tag T`, `--skip-tag T`, `--parallel N` (default: the number of CPUs — scenarios are isolated, so runs are concurrent out of the box), `--fail-fast`, and `--rerun-failed` (rerun only what failed last time). While authoring a spec, `--verbose` traces every scenario — the expanded command, exit code, captured stdout/stderr, and each assertion's verdict — for passing scenarios too, so you never have to break an assertion just to see what a command printed.
 
 ## Use it in CI
 
