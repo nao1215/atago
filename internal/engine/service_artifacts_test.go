@@ -71,9 +71,13 @@ scenarios:
     services:
       - name: peer
         shell: true
-        command: '`+publishEchoIdle("peer-serving", "ready.txt", "peer-log", 5)+`'
+        command: '`+echoThenIdle("peer-log", 5)+`'
         ready:
-          file: ready.txt
+          # A log probe, not a file probe: readiness then guarantees "peer-log"
+          # is already in the captured output buffer when the failing step tears
+          # the scenario down — a file probe left a window where the buffer was
+          # still empty and no artifact was written (flaked under -cover).
+          log: peer-log
           timeout: 2s
     steps:
       - run: {shell: true, command: "echo hello"}
