@@ -39,7 +39,17 @@ homebrew_casks:
       token: "{{ .Env.TAP_GITHUB_TOKEN }}"
     directory: Casks
     homepage: "https://github.com/nao1215/atago"
-    description: "YAML-based black-box behavior spec runner for CLIs, APIs, and generated artifacts"
+    description: "End-to-end test runner for CLI tools driven by plain-YAML specs"
+    # The binary is not signed/notarized, so strip the quarantine attribute on
+    # install — otherwise Gatekeeper blocks the cask-installed binary with
+    # "cannot verify the developer" (the pattern GoReleaser documents for
+    # unsigned Go binaries).
+    hooks:
+      post:
+        install: |
+          if system_command("/usr/bin/xattr", args: ["-h"]).exit_status == 0
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/atago"]
+          end
 
 snapshot:
   version_template: "{{ incpatch .Version }}-next"
