@@ -1,6 +1,6 @@
 // Package grpc implements the gRPC runner: a `grpc` step calls a unary method on
 // a target server and captures the response message (as JSON) and status code as
-// a runner.Result (spec.md §14, ADR-0028). It is the atago counterpart to runn's
+// a runner.Result (ADR-0028). It is the atago counterpart to runn's
 // gRPC runner and resolves the service schema dynamically via server reflection
 // (jhump/protoreflect/v2 + google.golang.org/grpc) — no compiled stubs, keeping
 // specs declarative.

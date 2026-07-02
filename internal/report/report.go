@@ -1,5 +1,5 @@
 // Package report renders SuiteResults in the supported output formats
-// (spec.md §26): console, JSON, JUnit XML, and GitHub Actions annotations.
+// : console, JSON, JUnit XML, and GitHub Actions annotations.
 package report
 
 // Format names a built-in report format.
@@ -8,13 +8,13 @@ type Format string
 const (
 	// FormatConsole is the default human-readable output.
 	FormatConsole Format = "console"
-	// FormatJSON is the machine-readable report (spec.md §26).
+	// FormatJSON is the machine-readable report.
 	FormatJSON Format = "json"
-	// FormatJUnit is a JUnit XML report (spec.md §26).
+	// FormatJUnit is a JUnit XML report.
 	FormatJUnit Format = "junit"
-	// FormatGHA emits GitHub Actions workflow-command annotations (spec.md §26).
+	// FormatGHA emits GitHub Actions workflow-command annotations.
 	FormatGHA Format = "gha"
-	// FormatTAP emits a Test Anything Protocol (TAP 13) stream (spec.md §26).
+	// FormatTAP emits a Test Anything Protocol (TAP 13) stream.
 	FormatTAP Format = "tap"
 )
 

@@ -327,7 +327,7 @@ func defaultInitFilename(template string) string {
 	return template + ".atago.yaml"
 }
 
-// initCmd implements `atago init` (spec.md §20): scaffold a starter spec file.
+// initCmd implements `atago init`: scaffold a starter spec file.
 // With --template it emits a runner-oriented starter (cli/http/db/grpc/ssh/
 // browser/services); without it, the portable cli starter.
 func initCmd(args []string, stdout, stderr io.Writer) int {

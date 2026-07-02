@@ -21,7 +21,7 @@ import (
 	"github.com/nao1215/atago/internal/report"
 )
 
-// runCmd implements `atago run` (spec.md §21).
+// runCmd implements `atago run`.
 func runCmd(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("atago run", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -337,7 +337,7 @@ func splitCSV(s string) []string {
 
 // exitForLoadError maps a spec load failure to an exit code. Both YAML-syntax
 // (KindParse) and schema/semantic validation (KindValidation) errors are
-// spec-content errors and exit 2 (spec.md §34); exit 3 is reserved for
+// spec-content errors and exit 2; exit 3 is reserved for
 // CLI-invocation problems (unknown command, bad flag, no files) handled by the
 // caller. This is why a `db` runner missing its `dsn` exits 2, not 3 — the
 // README documents 3 as CLI-invocation config, not spec content (issue #21).
@@ -348,7 +348,7 @@ func exitForLoadError(err error) int {
 
 func exitForSuite(res *engine.SuiteResult) int {
 	// A security policy violation (e.g. a denied network host) takes precedence
-	// over the generic execution-error code (spec.md §28/§34).
+	// over the generic execution-error code.
 	if res.SecurityViolation {
 		return ExitSecurity
 	}

@@ -1,6 +1,6 @@
 // Package engine orchestrates spec execution: it plans scenarios, isolates each
 // in its own temporary workdir, materializes fixtures, runs steps in order, and
-// aggregates results (spec.md §31 pipeline, §30 isolation).
+// aggregates results.
 package engine
 
 import (
@@ -39,15 +39,15 @@ type Engine struct {
 	OnScenario func(ScenarioResult)
 
 	// UpdateSnapshots makes snapshot assertions write the snapshot file instead
-	// of comparing against it (spec.md §16.10).
+	// of comparing against it.
 	UpdateSnapshots bool
 
-	// Parallel is the maximum number of scenarios to run concurrently (spec.md
-	// §30). Values < 1 mean sequential execution.
+	// Parallel is the maximum number of scenarios to run concurrently. Values
+	// < 1 mean sequential execution.
 	Parallel int
 
-	// FailFast stops scheduling new scenarios once one fails or errors (spec.md
-	// §30). In-flight scenarios are allowed to finish.
+	// FailFast stops scheduling new scenarios once one fails or errors.
+	// In-flight scenarios are allowed to finish.
 	FailFast bool
 
 	// Sem, if set, is a shared concurrency limiter acquired around every
@@ -56,7 +56,7 @@ type Engine struct {
 	// worker pool). When nil, only this suite's own Parallel workers bound it.
 	Sem chan struct{}
 
-	// FilterName, Tags, and SkipTags select which scenarios run (spec.md §19/§21).
+	// FilterName, Tags, and SkipTags select which scenarios run.
 	// FilterName is a substring match on the scenario name; Tags keeps only
 	// scenarios carrying at least one listed tag; SkipTags drops scenarios
 	// carrying any listed tag. Unselected scenarios are excluded entirely.
@@ -84,7 +84,7 @@ func New() *Engine {
 
 // builtinVars are variables seeded into every scenario's store. ${atago} is the
 // absolute path of the running atago binary, which lets self-hosted E2E specs
-// invoke atago from inside their isolated temp workdir (spec.md §5/§6).
+// invoke atago from inside their isolated temp workdir.
 func builtinVars() map[string]string {
 	m := make(map[string]string)
 	if exe, err := os.Executable(); err == nil {
@@ -95,7 +95,7 @@ func builtinVars() map[string]string {
 
 // Run executes every scenario in s and returns the aggregated suite result.
 // Scenarios run with up to e.Parallel workers, but the returned result and the
-// failure report stay in definition order for determinism (spec.md §30).
+// failure report stay in definition order for determinism.
 func (e *Engine) Run(ctx context.Context, s *spec.Spec, specPath string) *SuiteResult {
 	start := time.Now()
 	res := &SuiteResult{Suite: s.Suite.Name, SpecPath: specPath, Status: StatusPassed}
@@ -212,7 +212,7 @@ func (e *Engine) Run(ctx context.Context, s *spec.Spec, specPath string) *SuiteR
 }
 
 // selectScenarios returns the indices of scenarios that pass the filter/tag
-// selection (spec.md §19/§21), in definition order.
+// selection, in definition order.
 func (e *Engine) selectScenarios(s *spec.Spec, specPath string) []int {
 	var out []int
 	for i := range s.Scenarios {
@@ -291,10 +291,10 @@ func (e *Engine) runScenario(ctx context.Context, scenarioIdx int, sc *spec.Scen
 	}
 	// ${workdir} is the absolute path of this scenario's isolated temp dir, so
 	// specs can build absolute env paths (e.g. HOME=${workdir}/home,
-	// GOBIN=${workdir}/gobin) that child toolchains require (spec.md §17).
+	// GOBIN=${workdir}/gobin) that child toolchains require.
 	st.Set("workdir", workdir)
 	// Seed matrix row variables so ${name} references in commands, env, and
-	// assertions resolve to this instance's values (spec.md §22).
+	// assertions resolve to this instance's values.
 	for k, v := range sc.Vars {
 		st.Set(k, v)
 	}
@@ -396,7 +396,7 @@ func (e *Engine) runScenario(ctx context.Context, scenarioIdx int, sc *spec.Scen
 			}
 		case spec.StepRun:
 			// A ${name} that no variable defines is left verbatim so a shell can
-			// still expand it (spec.md §18) — but a local run without `shell: true`
+			// still expand it — but a local run without `shell: true`
 			// has no shell, so nothing could ever expand it and the literal text
 			// would leak into argv. That is almost always a typo; error with the
 			// reference named instead of running a garbled command (#UX).
@@ -421,10 +421,10 @@ func (e *Engine) runScenario(ctx context.Context, scenarioIdx int, sc *spec.Scen
 			}
 			current = r
 			// Assertions run against the real result (current); the copy kept for
-			// reporting is masked so secrets never reach logs/reports (spec.md §28.3).
+			// reporting is masked so secrets never reach logs/reports.
 			sr.Run = maskResult(masker, r)
 			// A retry's `until` condition is reported like an assertion; if it never
-			// passed within the budget, the run step fails (spec.md §15.1).
+			// passed within the budget, the run step fails.
 			if len(untilChecks) > 0 {
 				e.recordChecks(masker, untilChecks, rc.specPath, sc.Name, scenarioIdx, i)
 				sr.Checks = untilChecks
@@ -465,7 +465,7 @@ func (e *Engine) runScenario(ctx context.Context, scenarioIdx int, sc *spec.Scen
 			current = r
 			sr.Run = maskResult(masker, r)
 			// As with run retries, a never-satisfied `until` fails the step and is
-			// reported like an assertion (spec.md §15.1).
+			// reported like an assertion.
 			if len(untilChecks) > 0 {
 				e.recordChecks(masker, untilChecks, rc.specPath, sc.Name, scenarioIdx, i)
 				sr.Checks = untilChecks
@@ -532,8 +532,7 @@ func (e *Engine) runScenario(ctx context.Context, scenarioIdx int, sc *spec.Scen
 
 // skipReason reports whether a scenario should be skipped given its skip/only
 // conditions: the host OS, an environment variable's presence, and — last,
-// because it spawns a process — a probe command's exit status (spec.md §19,
-// ADR-0021). The cheap, side-effect-free checks run first so a probe only runs
+// because it spawns a process — a probe command's exit status (ADR-0021). The cheap, side-effect-free checks run first so a probe only runs
 // when nothing else already decided the outcome.
 func (e *Engine) skipReason(ctx context.Context, sc *spec.Scenario) (string, bool) {
 	if sc.Only != nil && sc.Only.OS != "" && !platform.Matches(sc.Only.OS) {
@@ -578,7 +577,7 @@ func (e *Engine) probeSucceeds(ctx context.Context, command string) bool {
 // returns the final observed result, the until CheckResult (nil when no retry is
 // configured), and an execution error. With retry, the command is re-run until
 // until passes or the attempt budget is spent; the last attempt's result is what
-// later steps observe (spec.md §15.1, ADR-0022).
+// later steps observe (ADR-0022).
 func (e *Engine) runStep(ctx context.Context, run *spec.Run, st *store.Store, workdir, specDir string, rc runConfig, sshConns map[string]*sshrunner.Runner) (*runner.Result, []*assert.CheckResult, error) {
 	// A run step naming an ssh runner executes remotely (ADR-0027); otherwise it
 	// runs locally via the cmd runner.
@@ -597,7 +596,7 @@ func (e *Engine) runStep(ctx context.Context, run *spec.Run, st *store.Store, wo
 				return conn.Run(ctx, run.Command)
 			case "cmd", "":
 				// Layer the runner's cwd/timeout beneath the step's own values
-				// (spec.md §14: type/cwd/timeout are common to every runner); the
+				//; the
 				// step wins. run is the caller's expanded copy, so mutating it is
 				// safe; cwd gets the same use-time ${name} expansion as the other
 				// runner families' fields.

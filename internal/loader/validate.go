@@ -15,7 +15,7 @@ import (
 
 var validOS = map[string]bool{"linux": true, "darwin": true, "windows": true}
 
-// validate runs schema and semantic checks (spec.md §31.1 layers 2–3) and
+// validate runs schema and semantic checks and
 // returns all problems found so the user can fix them in one pass.
 func validate(s *spec.Spec) []string {
 	var errs []string
@@ -133,7 +133,7 @@ func validateRunners(add func(string, ...any), runners map[string]spec.Runner) {
 			// no required fields; a browser runner launches a local headless Chrome.
 		}
 		// timeout is common to every runner type; catch a malformed value here
-		// instead of when the first step opens the connection (spec.md §14).
+		// instead of when the first step opens the connection.
 		if r.Timeout != "" {
 			if _, err := time.ParseDuration(r.Timeout); err != nil {
 				add("%s.timeout %q is not a valid duration (e.g. \"30s\")", where, r.Timeout)

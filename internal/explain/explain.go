@@ -1,5 +1,5 @@
 // Package explain renders a human- and LLM-readable summary of what a spec does
-// without executing it (spec.md §24): scenarios, commands, expected behavior,
+// without executing it: scenarios, commands, expected behavior,
 // fixtures, generated files, variables, and security-sensitive operations.
 package explain
 

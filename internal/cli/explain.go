@@ -10,7 +10,7 @@ import (
 	"github.com/nao1215/atago/internal/loader"
 )
 
-// explainCmd implements `atago explain` (spec.md §24): describe what one or more
+// explainCmd implements `atago explain`: describe what one or more
 // specs do without executing them.
 func explainCmd(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("atago explain", flag.ContinueOnError)

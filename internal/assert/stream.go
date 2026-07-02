@@ -35,7 +35,7 @@ func checkStream(name string, s *spec.StreamAssert, data []byte, hasData bool, e
 	}()
 
 	// A line selector narrows the stream to a single 1-based line before the
-	// matcher runs (spec.md §16.2). json/snapshot are excluded by the loader.
+	// matcher runs. json/snapshot are excluded by the loader.
 	if s.Line != nil {
 		line, ok := selectLine(got, *s.Line)
 		if !ok {

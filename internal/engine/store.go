@@ -13,7 +13,7 @@ import (
 	"github.com/nao1215/atago/internal/spec"
 )
 
-// extractValue resolves the value a store step captures (spec.md §18). MVP
+// extractValue resolves the value a store step captures. MVP
 // supports extracting from stdout (via JSON path or regex) and from a generated
 // file (via JSON path); `from.body` (HTTP) is post-MVP.
 func extractValue(sp *spec.Store, current *runner.Result, workdir string) (string, error) {

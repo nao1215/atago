@@ -5,7 +5,7 @@ import (
 	"github.com/nao1215/atago/internal/store"
 )
 
-// The expand* helpers apply ${name} variable substitution (spec.md §18) to the
+// The expand* helpers apply ${name} variable substitution to the
 // user-controllable string fields of a step before it executes. They return
 // shallow copies so the original spec is never mutated.
 
@@ -93,7 +93,7 @@ func expandAssert(st *store.Store, a *spec.Assert) *spec.Assert {
 
 // expandHTTP applies ${name} substitution to an http step's path, header values,
 // and JSON body so requests can reference stored values from earlier steps
-// (spec.md §18) — the declarative value-binding that lets a login response's
+// — the declarative value-binding that lets a login response's
 // token flow into a later authenticated request.
 func expandHTTP(st *store.Store, h *spec.HTTP) *spec.HTTP {
 	c := *h

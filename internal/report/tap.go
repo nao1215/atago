@@ -9,7 +9,7 @@ import (
 )
 
 // writeTAP emits a Test Anything Protocol (TAP version 13) stream, the format
-// several CI ecosystems and TAP consumers expect (spec.md §26, ADR-0024). One
+// several CI ecosystems and TAP consumers expect (ADR-0024). One
 // `ok`/`not ok` line per scenario across every suite, numbered from 1; failures
 // and errors carry a YAML diagnostic block, and skips use the `# SKIP` directive.
 // Rendered by Render (FormatTAP).

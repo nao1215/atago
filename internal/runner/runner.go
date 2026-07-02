@@ -10,7 +10,7 @@ import (
 	"github.com/nao1215/atago/internal/spec"
 )
 
-// Result is the externally observable outcome of a run step (spec.md §31.3).
+// Result is the externally observable outcome of a run step.
 //
 // A Result describes either a process run (the cmd runner: Command, ExitCode,
 // Stdout, Stderr) or an HTTP exchange (the http runner: IsHTTP, StatusCode,
@@ -57,7 +57,7 @@ type Result struct {
 
 // Runner executes a run step within a scenario workdir and returns the observed
 // Result. A non-nil error means the runner could not execute at all (an
-// execution error, spec.md §34 code 4); a command that runs but exits non-zero
+// execution error, exit code 4); a command that runs but exits non-zero
 // is a successful Run with Result.ExitCode set.
 type Runner interface {
 	Run(ctx context.Context, run *spec.Run, workdir string) (*Result, error)

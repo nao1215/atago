@@ -1,6 +1,6 @@
 // Package http implements the HTTP runner: it issues a request described by an
 // `http:` step and captures the response (status, headers, body) as a
-// runner.Result (spec.md §14/§16.7). It is the atago counterpart to runn's HTTP
+// runner.Result. It is the atago counterpart to runn's HTTP
 // runner, kept declarative — there is no expression language, only the `${name}`
 // substitution the engine applies before a step reaches this package.
 package http
@@ -26,7 +26,7 @@ import (
 )
 
 // PolicyError reports that a request targeted a host the spec's
-// `permissions.network.allow` list does not permit (spec.md §28.2). The engine
+// `permissions.network.allow` list does not permit. The engine
 // maps it to exit code 6 (security policy violation).
 type PolicyError struct {
 	Host  string

@@ -229,7 +229,7 @@ func TestCheck_HTTP_NoResponse(t *testing.T) {
 	}
 }
 
-// TestCheck_Line covers the 1-based line selector (spec.md §16.2), modeled on
+// TestCheck_Line covers the 1-based line selector, modeled on
 // sqly's ShellSpec `The line N should equal '...'` output-format tests.
 func TestCheck_Line(t *testing.T) {
 	t.Parallel()

@@ -1,4 +1,4 @@
-// Package docgen renders Markdown documentation from specs (spec.md §25/§35)
+// Package docgen renders Markdown documentation from specs
 // using github.com/nao1215/markdown. Each spec becomes a section with
 // Given / When / Then subsections per scenario.
 package docgen

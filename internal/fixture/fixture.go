@@ -1,5 +1,5 @@
 // Package fixture materializes input files declared by a spec into the scenario
-// workdir (spec.md §17).
+// workdir.
 package fixture
 
 import (
@@ -168,7 +168,7 @@ func writeNoFollow(dest string, data []byte, perm os.FileMode) error {
 }
 
 // safeJoin joins rel onto base and ensures the result stays within base, so a
-// fixture cannot write outside the scenario workdir (spec.md §28.4). It shares
+// fixture cannot write outside the scenario workdir. It shares
 // the workdir-containment policy used by file/store/service/browser/snapshot
 // paths so every path-taking feature enforces the same rule.
 func safeJoin(base, rel string) (string, error) {

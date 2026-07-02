@@ -1,5 +1,5 @@
 // Package loader reads a atago YAML file and turns it into a validated
-// *spec.Spec. Validation happens in layers (spec.md §31.1): YAML parse, then
+// *spec.Spec. Validation happens in layers: YAML parse, then
 // schema/semantic checks. Errors carry the file path and, for parse failures,
 // the line/column reported by goccy/go-yaml.
 package loader
@@ -16,7 +16,7 @@ import (
 )
 
 // Kind classifies why loading failed, so callers can map it to an exit code
-// (spec.md §34: 2 = spec parse error).
+// (exit 2 = spec parse error).
 type Kind int
 
 const (
@@ -63,7 +63,7 @@ func LoadBytes(path string, data []byte) (*spec.Spec, error) {
 	}
 	// Validate matrix shape on the raw spec, then expand each matrix scenario into
 	// concrete instances so the remaining validation and the engine only ever see
-	// plain scenarios (spec.md §22).
+	// plain scenarios.
 	if errs := validateMatrix(&s); len(errs) > 0 {
 		return nil, &Error{Path: path, Kind: KindValidation, Msg: joinErrors(errs)}
 	}

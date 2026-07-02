@@ -9,7 +9,7 @@ import (
 	"github.com/nao1215/atago/internal/engine"
 )
 
-// A JUnit XML report (spec.md §26), consumable by CI systems and test-result
+// A JUnit XML report, consumable by CI systems and test-result
 // viewers. Rendered by Render (FormatJUnit) via buildJUnit/writeJUnit.
 type junitTestsuites struct {
 	XMLName  xml.Name         `xml:"testsuites"`

@@ -114,7 +114,6 @@ func buildIndex(root string) ([]byte, error) {
 
 	b.WriteString("## Start here\n\n")
 	b.WriteString("- [Project README](../README.md)\n")
-	b.WriteString("- [Format & CLI specification (`spec.md`)](../spec.md)\n\n")
 
 	if err := writeLinkSection(&b, root, "## Behavior docs (generated from executable specs)", "doc/e2e", ".md", "../doc/e2e/"); err != nil {
 		return nil, err

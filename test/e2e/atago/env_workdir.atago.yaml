@@ -109,7 +109,7 @@ scenarios:
                       command: echo hi > out.txt
       - run:
           command: ${atago} run bad.atago.yaml
-      # A spec-content (validation) error exits 2 (spec.md §34).
+      # A spec-content (validation) error exits 2.
       - assert:
           exit_code: 2
           stderr:

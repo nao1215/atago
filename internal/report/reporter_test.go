@@ -50,7 +50,7 @@ func render(t *testing.T, f Format, res *engine.SuiteResult) string {
 	return b.String()
 }
 
-// TestRender_PerFormat exercises each format's rendering (spec.md §26) via the
+// TestRender_PerFormat exercises each format's rendering via the
 // single Render entry point, on both a failing and an errored suite.
 func TestRender_PerFormat(t *testing.T) {
 	t.Parallel()

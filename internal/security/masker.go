@@ -1,4 +1,4 @@
-// Package security implements atago's security model (spec.md §28): masking
+// Package security implements atago's security model: masking
 // secret values in reports and logs, and the safe defaults enabled by --ci.
 package security
 
@@ -12,7 +12,7 @@ import (
 )
 
 // PolicyError reports a network egress that permissions.network.allow does not
-// permit (spec.md §28.2). It is returned by CheckHost and lets the engine flag a
+// permit. It is returned by CheckHost and lets the engine flag a
 // security-policy violation for grpc/ssh steps, mirroring the HTTP runner.
 type PolicyError struct {
 	Host  string
@@ -67,7 +67,7 @@ func NewMasker(values []string) *Masker {
 
 // NewMaskerForSpec collects secret values for a spec from the process
 // environment and from per-step env overrides of the names listed under
-// `secrets:` (spec.md §28.3).
+// `secrets:`.
 func NewMaskerForSpec(s *spec.Spec) *Masker {
 	if len(s.Secrets) == 0 {
 		return NewMasker(nil)

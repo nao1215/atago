@@ -3,7 +3,7 @@ version: "1"
 suite:
   name: atago self-hosting / line selector
 
-# Exercises the 1-based `line:` selector (spec.md §16.2). Modeled on sqly's
+# Exercises the 1-based `line:` selector. Modeled on sqly's
 # ShellSpec `The line N should equal '...'` output-format tests, which is the
 # feature this selector was added to migrate.
 scenarios:

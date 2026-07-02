@@ -20,7 +20,7 @@ type jsonDocument struct {
 	Suites        []jsonReport `json:"suites"`
 }
 
-// A machine-readable report (spec.md §26, §27.2) carrying enough failure context
+// A machine-readable report carrying enough failure context
 // for an LLM agent to act on. Rendered by Render (FormatJSON) via buildJSON.
 type jsonReport struct {
 	Suite      string         `json:"suite"`

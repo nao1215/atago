@@ -9,7 +9,7 @@ import (
 )
 
 // checkStatus evaluates an HTTP `status` assertion against the response code
-// captured by the http runner (spec.md §16.7).
+// captured by the http runner.
 func checkStatus(want *int, res *runner.Result) *CheckResult {
 	if res == nil || !res.IsHTTP {
 		return &CheckResult{Desc: "assert status", Hint: "no HTTP request has run in this scenario yet"}
@@ -27,7 +27,7 @@ func checkStatus(want *int, res *runner.Result) *CheckResult {
 }
 
 // checkHeader evaluates an HTTP `header` assertion against a response header
-// (spec.md §16.7). The header name is matched case-insensitively per RFC 7230.
+// . The header name is matched case-insensitively per RFC 7230.
 func checkHeader(h *spec.HeaderMatch, res *runner.Result) *CheckResult {
 	if res == nil || !res.IsHTTP {
 		return &CheckResult{Desc: "assert header", Hint: "no HTTP request has run in this scenario yet"}
@@ -98,7 +98,7 @@ func cdpValue(res *runner.Result) []byte {
 }
 
 // checkGRPCStatus evaluates a `grpc_status` assertion against the numeric status
-// code captured by the grpc runner (spec.md §16.7, ADR-0028).
+// code captured by the grpc runner (ADR-0028).
 func checkGRPCStatus(want *int, res *runner.Result) *CheckResult {
 	if res == nil || !res.IsGRPC {
 		return &CheckResult{Desc: "assert grpc_status", Hint: "no gRPC call has run in this scenario yet"}

@@ -13,7 +13,7 @@ import (
 	"github.com/nao1215/atago/internal/loader"
 )
 
-// docCmd implements `atago doc` (spec.md §25): generate Markdown documentation
+// docCmd implements `atago doc`: generate Markdown documentation
 // from specs. Without --out it writes to stdout.
 func docCmd(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("atago doc", flag.ContinueOnError)

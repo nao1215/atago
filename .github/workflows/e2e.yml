@@ -1,6 +1,6 @@
 name: SelfHostedE2E
 
-# atago must be tested by atago (spec.md §5/§6). This builds the real binary
+# atago must be tested by atago. This builds the real binary
 # and runs the self-hosted spec suite against it. A release must not be tagged
 # unless this passes.
 on:

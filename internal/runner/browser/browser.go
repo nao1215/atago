@@ -1,6 +1,6 @@
 // Package browser implements the browser (CDP) runner: a `cdp` step drives a
 // headless Chrome via the Chrome DevTools Protocol and captures a value from the
-// page as a runner.Result (spec.md §14, ADR-0029). It is the atago counterpart
+// page as a runner.Result (ADR-0029). It is the atago counterpart
 // to runn's CDP runner and builds on github.com/chromedp/chromedp — the same
 // library runn uses. One browser session is shared across the cdp steps of a
 // scenario, so navigation state persists between them.

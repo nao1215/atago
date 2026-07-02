@@ -1,5 +1,5 @@
 // Command atago is a YAML-based black-box behavior spec runner for CLIs, APIs,
-// and generated artifacts. See spec.md for the format and CLI contract, and
+// and generated artifacts. See the README for the format and CLI contract, and
 // schema/atago.schema.json for the machine-readable spec file schema.
 package main
 

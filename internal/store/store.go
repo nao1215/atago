@@ -1,5 +1,5 @@
 // Package store holds scenario variables and performs ${name} expansion
-// (spec.md §18). Expansion is deliberately simple substitution — atago is not a
+// . Expansion is deliberately simple substitution — atago is not a
 // programming language.
 package store
 
@@ -10,7 +10,7 @@ import (
 // varRef matches an optional escaping `$` (group 1) followed by a `${name}`
 // reference (group 2). When the leading `$` is present — i.e. the source was
 // `$${name}` — the match is a literal escape that renders as `${name}` without
-// expansion (spec.md §18, issue #37). A bare `$$` not followed by `{name}` (a
+// expansion. A bare `$$` not followed by `{name}` (a
 // shell PID, a doubled currency sign) does not match and is left untouched.
 var varRef = regexp.MustCompile(`(\$?)\$\{([a-zA-Z_][a-zA-Z0-9_]*)\}`)
 
@@ -55,7 +55,7 @@ func (s *Store) Expand(in string) string {
 // variable resolves. Escaped $${name} literals are not reported — the author
 // explicitly asked for literal text. Callers use this to turn a reference that
 // nothing could ever expand into an explained failure instead of passing the
-// literal text on (spec.md §18).
+// literal text on.
 func (s *Store) Unresolved(in string) []string {
 	var names []string
 	for _, m := range varRef.FindAllStringSubmatch(in, -1) {

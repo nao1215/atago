@@ -1,7 +1,6 @@
-// Package assert evaluates assertion steps against the current run result
-// (spec.md §16). Each Check returns a CheckResult carrying enough structured
-// context (expected/actual/hint) for the §27.1 failure output and the JSON
-// report.
+// Package assert evaluates assertion steps against the current run result.
+// Each Check returns a CheckResult carrying enough structured context
+// (expected/actual/hint) for the console failure output and the JSON report.
 package assert
 
 import (

@@ -7,8 +7,6 @@ A browsable, repo-local index of atago's documentation, generated from repositor
 ## Start here
 
 - [Project README](../README.md)
-- [Format & CLI specification (`spec.md`)](../spec.md)
-
 ## Behavior docs (generated from executable specs)
 
 - [README.md](../doc/e2e/README.md)

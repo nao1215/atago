@@ -139,7 +139,7 @@ scenarios:
 }
 
 // TestEngine_CmdRunnerCwdAndTimeout proves a cmd runner's common cwd/timeout
-// fields reach the local command (spec.md §14) instead of being silently
+// fields reach the local command instead of being silently
 // dropped: cwd relocates the step, timeout bounds it, and the step's own value
 // still wins over the runner's.
 func TestEngine_CmdRunnerCwdAndTimeout(t *testing.T) {

@@ -8,7 +8,7 @@ import (
 	"github.com/nao1215/atago/internal/spec"
 )
 
-// checkFile evaluates a file assertion (spec.md §16.6). Relative paths resolve
+// checkFile evaluates a file assertion. Relative paths resolve
 // against the scenario workdir and may not escape it.
 func checkFile(f *spec.FileAssert, env Env) *CheckResult {
 	path, err := security.ResolveWorkdirPath("assert.file.path", env.Workdir, f.Path)

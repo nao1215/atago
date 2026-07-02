@@ -7,11 +7,11 @@ execution under `shell: true`) with the invoking user's privileges. Running a
 spec is equivalent to running a script — review specs from sources you would
 not run a script from. atago's security features (secret masking, the network
 allowlist for http/grpc/ssh runners, path confinement) bound what a reviewed
-spec observably does; they are not a sandbox for hostile specs. See
-[spec.md §28](./spec.md#28-security-model). "atago runs untrusted spec files
-unsafely" is therefore not a vulnerability by itself; escaping the documented
-confinement (a masked secret leaking into a report, a workdir-confined path
-escaping the workdir, an allowlisted-runner request reaching a denied host) is.
+spec observably does; they are not a sandbox for hostile specs. "atago runs
+untrusted spec files unsafely" is therefore not a vulnerability by itself;
+escaping the documented confinement (a masked secret leaking into a report, a
+workdir-confined path escaping the workdir, an allowlisted-runner request
+reaching a denied host) is.
 
 ## Supported versions
 Only the latest release of atago gets fixes, including security fixes. If you

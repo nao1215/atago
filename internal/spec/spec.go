@@ -1,7 +1,7 @@
 // Package spec defines the typed in-memory model for a atago YAML file.
 //
 // The model is intentionally decoupled from the raw YAML representation
-// (spec.md §31.1). Loading and validation live in internal/loader; this package
+// . Loading and validation live in internal/loader; this package
 // only declares the shapes and the custom unmarshalers needed for the few
 // polymorphic nodes in the format (see schema/atago.schema.json).
 package spec
@@ -106,7 +106,7 @@ type Runner struct {
 	BrowserArgs []string `yaml:"browser_args,omitempty"`
 }
 
-// Permissions carries the security policy for a spec (spec.md §28.2).
+// Permissions carries the security policy for a spec.
 type Permissions struct {
 	Network *NetworkPolicy `yaml:"network,omitempty"`
 }
@@ -124,7 +124,7 @@ type Scenario struct {
 	Only *Condition        `yaml:"only,omitempty"`
 	Env  map[string]string `yaml:"env,omitempty"`
 	// Matrix, when set, makes this scenario a template: the loader expands it into
-	// one concrete scenario per row before validation (spec.md §22, ADR-0020).
+	// one concrete scenario per row before validation (ADR-0020).
 	// Each row's key/value pairs are seeded as ${name} variables for that instance.
 	Matrix []map[string]string `yaml:"matrix,omitempty"`
 	// Vars holds the bound matrix row for an expanded scenario instance. It is
@@ -191,7 +191,7 @@ type Ready struct {
 }
 
 // Condition gates a scenario by platform, environment, or a probe command
-// (spec.md §19). For OS, skip/only compare against the host. For Env, the
+// . For OS, skip/only compare against the host. For Env, the
 // condition is true when the named environment variable is non-empty:
 // `skip: { env: X }` skips when X is set; `only: { env: X }` runs only when X is
 // set. For Command, the condition is true when the probe command succeeds (exits
@@ -316,7 +316,7 @@ type CDPAttribute struct {
 	Name     string `yaml:"name"`
 }
 
-// Fixture materializes an input file in the scenario workdir (spec.md §17).
+// Fixture materializes an input file in the scenario workdir.
 // Exactly one source is set: inline Content, inline Base64, or From (copy an
 // existing file — e.g. committed binary testdata — resolved relative to the
 // spec file's directory).
@@ -336,7 +336,7 @@ type Fixture struct {
 	Mtime string `yaml:"mtime,omitempty"`
 }
 
-// Run executes a command (spec.md §15).
+// Run executes a command.
 type Run struct {
 	Command string `yaml:"command"`
 	Runner  string `yaml:"runner,omitempty"`
@@ -356,7 +356,7 @@ type Run struct {
 	StdoutTo string `yaml:"stdout_to,omitempty"`
 	StderrTo string `yaml:"stderr_to,omitempty"`
 	// Retry, when set, re-runs the command until the Until assertion passes,
-	// polling declaratively for async behavior (spec.md §15.1, ADR-0022).
+	// polling declaratively for async behavior (ADR-0022).
 	Retry *Retry `yaml:"retry,omitempty"`
 }
 
@@ -383,7 +383,7 @@ type Retry struct {
 	Until *Assert `yaml:"until"`
 }
 
-// HTTP issues an HTTP request (post-MVP, spec.md §14/§16.7).
+// HTTP issues an HTTP request (post-MVP).
 type HTTP struct {
 	Runner string            `yaml:"runner,omitempty"`
 	Method string            `yaml:"method"`
@@ -417,7 +417,7 @@ type HTTP struct {
 	// Retry, when set, re-issues the request until the Until assertion passes,
 	// polling declaratively for eventually-consistent endpoints (a metric that
 	// appears after a scrape, an async job flipping to done) exactly like a run
-	// step's retry (spec.md §15.1, ADR-0022).
+	// step's retry (ADR-0022).
 	Retry *Retry `yaml:"retry,omitempty"`
 }
 
@@ -556,7 +556,7 @@ type ImageAssert struct {
 	MaxDiff *float64 `yaml:"max_diff,omitempty"`
 }
 
-// ExitCode accepts either a bare integer or {not: <int>} (spec.md §16.1).
+// ExitCode accepts either a bare integer or {not: <int>}.
 type ExitCode struct {
 	Equals *int
 	Not    *int
@@ -583,7 +583,7 @@ func (e *ExitCode) UnmarshalYAML(b []byte) error {
 
 // StreamAssert matches a captured text stream (stdout/stderr/body). One matcher.
 //
-// Line is an optional 1-based selector (spec.md §16.2): when set, the matcher is
+// Line is an optional 1-based selector: when set, the matcher is
 // applied to that single line of the stream instead of the whole stream. It is
 // not itself a matcher, so exactly one of empty/contains/matches/equals must
 // still be set. Line does not compose with json/snapshot (those operate on the
@@ -629,7 +629,7 @@ func (l *StringList) UnmarshalYAML(unmarshal func(any) error) error {
 	return nil
 }
 
-// FileAssert checks a generated file (spec.md §16.6).
+// FileAssert checks a generated file.
 type FileAssert struct {
 	Path        string      `yaml:"path"`
 	Exists      *bool       `yaml:"exists,omitempty"`
@@ -640,7 +640,7 @@ type FileAssert struct {
 	Snapshot    string      `yaml:"snapshot,omitempty"`
 }
 
-// JSONAssert matches a value selected by a JSONPath (spec.md §16.3). One matcher.
+// JSONAssert matches a value selected by a JSONPath. One matcher.
 //
 // Gt/Gte/Lt/Lte assert a numeric bound on the selected value (which must be a
 // number, or a numeric string). They exist because tools routinely emit
@@ -666,7 +666,7 @@ type HeaderMatch struct {
 	Equals   *string `yaml:"equals,omitempty"`
 }
 
-// Store captures a value into the variable store (post-MVP, spec.md §18).
+// Store captures a value into the variable store (post-MVP).
 type Store struct {
 	Name string     `yaml:"name"`
 	From *StoreFrom `yaml:"from"`

@@ -1,5 +1,5 @@
 // Package cli implements atago's command-line interface: subcommand dispatch
-// and the mapping from results to exit codes (spec.md §20, §34).
+// and the mapping from results to exit codes.
 package cli
 
 import (
@@ -9,7 +9,7 @@ import (
 	"github.com/nao1215/atago/internal/buildinfo"
 )
 
-// Exit codes (spec.md §34). These are part of the stable user-facing contract.
+// Exit codes. These are part of the stable user-facing contract.
 const (
 	ExitOK       = 0 // all scenarios passed
 	ExitFailures = 1 // one or more scenarios failed
@@ -101,7 +101,7 @@ func wantsHelp(args []string) bool {
 	return false
 }
 
-// snapshotCmd implements `atago snapshot <subcommand>` (spec.md §16.10, §20).
+// snapshotCmd implements `atago snapshot <subcommand>`.
 func snapshotCmd(args []string, stdout, stderr io.Writer) int {
 	if wantsHelp(args) {
 		fmt.Fprintln(stdout, "Usage: atago snapshot update <path | dir>...")

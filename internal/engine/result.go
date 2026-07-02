@@ -49,7 +49,7 @@ type ScenarioResult struct {
 	SkipReason string
 	// SecurityViolation marks a scenario that errored because it breached the
 	// spec's security policy (e.g. a network-allowlist denial). It maps to exit
-	// code 6 rather than the generic execution-error code (spec.md §28/§34).
+	// code 6 rather than the generic execution-error code.
 	SecurityViolation bool
 	// ServiceLogs lists the preserved combined stdout/stderr log artifacts for
 	// this scenario's background services, written only when --artifacts-dir is

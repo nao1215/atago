@@ -1,4 +1,4 @@
-// Package snapshot stores and compares golden output (spec.md §16.10). Captured
+// Package snapshot stores and compares golden output. Captured
 // output is normalized — volatile details such as ANSI codes, temp paths, the
 // home directory, UUIDs, timestamps, and local ports are masked — so snapshots
 // stay stable across machines and runs.

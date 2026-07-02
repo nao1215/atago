@@ -1,7 +1,7 @@
 // Package db implements the database runner: it runs a SQL statement from a
 // `query:` step through a named db runner and captures the result — rows (for a
 // SELECT) as a JSON array, or the affected-row count (for INSERT/UPDATE/DDL) —
-// as a runner.Result (spec.md §14, ADR-0026). It is the atago counterpart to
+// as a runner.Result (ADR-0026). It is the atago counterpart to
 // runn's DB runner. Only pure-Go drivers are linked in (no cgo): SQLite via
 // modernc.org/sqlite, PostgreSQL via lib/pq, MySQL via go-sql-driver/mysql.
 package db

@@ -1,4 +1,4 @@
-// Package platform reports the host OS for skip/only gating (spec.md §19).
+// Package platform reports the host OS for skip/only gating.
 package platform
 
 import "runtime"

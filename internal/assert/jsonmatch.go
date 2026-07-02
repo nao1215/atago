@@ -12,7 +12,7 @@ import (
 )
 
 // checkJSON parses data as JSON, selects nodes with a JSONPath, and applies the
-// configured matcher (spec.md §16.3).
+// configured matcher.
 func checkJSON(desc, name string, data []byte, j *spec.JSONAssert) *CheckResult {
 	// oj.Parse treats empty/whitespace input as a valid (nil) document, which
 	// would otherwise yield a misleading "selected no value" instead of telling

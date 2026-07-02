@@ -8,7 +8,7 @@ import (
 	"github.com/nao1215/atago/internal/engine"
 )
 
-// writeGHA emits GitHub Actions workflow-command annotations (spec.md §26), so
+// writeGHA emits GitHub Actions workflow-command annotations, so
 // failures surface inline in the Actions UI. One `::error::` line per failed or
 // errored scenario, plus a final `::notice::` summary. Rendered by Render
 // (FormatGHA).

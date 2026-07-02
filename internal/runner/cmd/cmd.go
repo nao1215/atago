@@ -1,5 +1,5 @@
 // Package cmd implements the command Runner: it executes a real process and
-// captures its exit code, stdout, and stderr (spec.md §15). Shell execution is
+// captures its exit code, stdout, and stderr. Shell execution is
 // opt-in via run.shell; the default tokenizes the command and execs directly.
 package cmd
 
@@ -138,13 +138,13 @@ func writeRedirects(run *spec.Run, workdir, stdout, stderr string) error {
 }
 
 // commandLine resolves the program and arguments for a run step, honoring the
-// explicit shell opt-in (spec.md §15).
+// explicit shell opt-in.
 func commandLine(run *spec.Run) (string, []string, error) {
 	return CommandLine(run.Command, run.ShellEnabled())
 }
 
 // CommandLine resolves the program and arguments for a command string, honoring
-// the explicit shell opt-in (spec.md §15). It is shared with the background
+// the explicit shell opt-in. It is shared with the background
 // service runner so services tokenize and shell-quote identically to run steps.
 //
 // A Windows shell command additionally needs ConfigureShell on the built
