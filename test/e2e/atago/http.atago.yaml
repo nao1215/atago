@@ -39,7 +39,7 @@ scenarios:
           stdout:
             contains: network policy denies
 
-  - name: an http step with an unknown runner errors (exit 4)
+  - name: an http step with an undeclared runner fails validation (exit 2)
     steps:
       - fixture:
           file: norunner.atago.yaml
@@ -57,6 +57,6 @@ scenarios:
       - run:
           command: ${atago} run norunner.atago.yaml
       - assert:
-          exit_code: 4
-          stdout:
-            contains: unknown runner
+          exit_code: 2
+          stderr:
+            contains: is not declared

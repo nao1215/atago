@@ -8,7 +8,7 @@
   - [file.contains expands ${workdir}](#scenario-filecontains-expands-workdir)
 - [atago self-hosting / browser (cdp) runner](#atago-self-hosting--browser-cdp-runner) — 8 scenarios
   - [a cdp step with no actions fails validation (exit 2)](#scenario-a-cdp-step-with-no-actions-fails-validation-exit-2)
-  - [a cdp step naming an unknown runner errors (exit 4)](#scenario-a-cdp-step-naming-an-unknown-runner-errors-exit-4)
+  - [a cdp step naming an undeclared runner fails validation (exit 2)](#scenario-a-cdp-step-naming-an-undeclared-runner-fails-validation-exit-2)
   - [a screenshot action without a path fails validation (exit 2)](#scenario-a-screenshot-action-without-a-path-fails-validation-exit-2)
   - [explain lists the extended cdp actions](#scenario-explain-lists-the-extended-cdp-actions)
   - [a browser-only field on a non-browser runner fails validation (exit 2)](#scenario-a-browser-only-field-on-a-non-browser-runner-fails-validation-exit-2)
@@ -23,7 +23,7 @@
   - [unknown shell is a configuration error](#scenario-unknown-shell-is-a-configuration-error)
 - [atago self-hosting / db runner](#atago-self-hosting--db-runner) — 2 scenarios
   - [query workflow (create, insert, select, row assert, value binding) passes](#scenario-query-workflow-create-insert-select-row-assert-value-binding-passes)
-  - [a query against an unknown runner errors (exit 4)](#scenario-a-query-against-an-unknown-runner-errors-exit-4)
+  - [a query against an undeclared runner fails validation (exit 2)](#scenario-a-query-against-an-undeclared-runner-fails-validation-exit-2)
 - [atago self-hosting / top-level defaults](#atago-self-hosting--top-level-defaults) — 3 scenarios
   - [defaults.run.shell applies to every run step without repeating it](#scenario-defaultsrunshell-applies-to-every-run-step-without-repeating-it)
   - [defaults.scenario.env is merged and an explicit scenario env wins](#scenario-defaultsscenarioenv-is-merged-and-an-explicit-scenario-env-wins)
@@ -60,10 +60,10 @@
   - [skip.env runs when the variable is unset](#scenario-skipenv-runs-when-the-variable-is-unset)
 - [atago self-hosting / grpc runner](#atago-self-hosting--grpc-runner) — 2 scenarios
   - [a grpc runner without a target fails validation (exit 2)](#scenario-a-grpc-runner-without-a-target-fails-validation-exit-2)
-  - [a grpc step naming an unknown runner errors (exit 4)](#scenario-a-grpc-step-naming-an-unknown-runner-errors-exit-4)
+  - [a grpc step naming an undeclared runner fails validation (exit 2)](#scenario-a-grpc-step-naming-an-undeclared-runner-fails-validation-exit-2)
 - [atago self-hosting / http runner](#atago-self-hosting--http-runner) — 2 scenarios
   - [a denied host is a security policy violation (exit 6)](#scenario-a-denied-host-is-a-security-policy-violation-exit-6)
-  - [an http step with an unknown runner errors (exit 4)](#scenario-an-http-step-with-an-unknown-runner-errors-exit-4)
+  - [an http step with an undeclared runner fails validation (exit 2)](#scenario-an-http-step-with-an-undeclared-runner-fails-validation-exit-2)
 - [atago self-hosting / image](#atago-self-hosting--image) — 4 scenarios
   - [format, dimension and alpha assertions pass on a PNG](#scenario-format-dimension-and-alpha-assertions-pass-on-a-png)
   - [a pixel comparison against an identical baseline passes](#scenario-a-pixel-comparison-against-an-identical-baseline-passes)
@@ -160,7 +160,7 @@
   - [a snapshot mismatch writes the normalized actual as an artifact](#scenario-a-snapshot-mismatch-writes-the-normalized-actual-as-an-artifact)
 - [atago self-hosting / ssh runner](#atago-self-hosting--ssh-runner) — 2 scenarios
   - [an ssh runner without host/user fails validation (exit 2)](#scenario-an-ssh-runner-without-hostuser-fails-validation-exit-2)
-  - [a run step naming an unknown runner errors (exit 4)](#scenario-a-run-step-naming-an-unknown-runner-errors-exit-4)
+  - [a run step naming an undeclared runner fails validation (exit 2)](#scenario-a-run-step-naming-an-undeclared-runner-fails-validation-exit-2)
 - [atago self-hosting / store](#atago-self-hosting--store) — 2 scenarios
   - [a stored JSON value is reusable in later commands](#scenario-a-stored-json-value-is-reusable-in-later-commands)
   - [storing from a missing JSON path is an execution error](#scenario-storing-from-a-missing-json-path-is-an-execution-error)
@@ -225,7 +225,7 @@ ${atago} run badcdp.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `at least one action`
-### Scenario: a cdp step naming an unknown runner errors (exit 4)
+### Scenario: a cdp step naming an undeclared runner fails validation (exit 2)
 #### Given
 - Fixture file `norunner.atago.yaml` is created.
 #### Inputs
@@ -247,8 +247,8 @@ scenarios:
 ${atago} run norunner.atago.yaml
 ```
 #### Then
-- exit code is `4`
-- stdout contains `unknown runner`
+- exit code is `2`
+- stderr contains `is not declared`
 ### Scenario: a screenshot action without a path fails validation (exit 2)
 #### Given
 - Fixture file `noshotpath.atago.yaml` is created.
@@ -503,7 +503,7 @@ ${atago} run db.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `passed`
-### Scenario: a query against an unknown runner errors (exit 4)
+### Scenario: a query against an undeclared runner fails validation (exit 2)
 #### Given
 - Fixture file `norunner.atago.yaml` is created.
 #### Inputs
@@ -524,8 +524,8 @@ scenarios:
 ${atago} run norunner.atago.yaml
 ```
 #### Then
-- exit code is `4`
-- stdout contains `unknown runner`
+- exit code is `2`
+- stderr contains `is not declared`
 ## atago self-hosting / top-level defaults
 Source: `test/e2e/atago/defaults.atago.yaml`
 ### Scenario: defaults.run.shell applies to every run step without repeating it
@@ -1073,7 +1073,7 @@ ${atago} run badgrpc.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `requires a target`
-### Scenario: a grpc step naming an unknown runner errors (exit 4)
+### Scenario: a grpc step naming an undeclared runner fails validation (exit 2)
 #### Given
 - Fixture file `norunner.atago.yaml` is created.
 #### Inputs
@@ -1094,8 +1094,8 @@ scenarios:
 ${atago} run norunner.atago.yaml
 ```
 #### Then
-- exit code is `4`
-- stdout contains `unknown runner`
+- exit code is `2`
+- stderr contains `is not declared`
 ## atago self-hosting / http runner
 Source: `test/e2e/atago/http.atago.yaml`
 ### Scenario: a denied host is a security policy violation (exit 6)
@@ -1130,7 +1130,7 @@ ${atago} run denied.atago.yaml
 #### Then
 - exit code is `6`
 - stdout contains `network policy denies`
-### Scenario: an http step with an unknown runner errors (exit 4)
+### Scenario: an http step with an undeclared runner fails validation (exit 2)
 #### Given
 - Fixture file `norunner.atago.yaml` is created.
 #### Inputs
@@ -1152,8 +1152,8 @@ scenarios:
 ${atago} run norunner.atago.yaml
 ```
 #### Then
-- exit code is `4`
-- stdout contains `unknown runner`
+- exit code is `2`
+- stderr contains `is not declared`
 ## atago self-hosting / image
 Source: `test/e2e/atago/image.atago.yaml`
 ### Scenario: format, dimension and alpha assertions pass on a PNG
@@ -2780,7 +2780,7 @@ ${atago} run badssh.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `requires a host`
-### Scenario: a run step naming an unknown runner errors (exit 4)
+### Scenario: a run step naming an undeclared runner fails validation (exit 2)
 #### Given
 - Fixture file `norunner.atago.yaml` is created.
 #### Inputs
@@ -2801,8 +2801,8 @@ scenarios:
 ${atago} run norunner.atago.yaml
 ```
 #### Then
-- exit code is `4`
-- stdout contains `unknown runner`
+- exit code is `2`
+- stderr contains `is not declared`
 ## atago self-hosting / store
 Source: `test/e2e/atago/store.atago.yaml`
 ### Scenario: a stored JSON value is reusable in later commands

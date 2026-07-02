@@ -82,9 +82,9 @@ func LoadBytes(path string, data []byte) (*spec.Spec, error) {
 func formatYAMLError(err error) string {
 	var yerr yaml.Error
 	if errors.As(err, &yerr) {
-		return suggestUnknownField(yaml.FormatError(err, false, true))
+		return suggestScalarMatcher(suggestUnknownField(yaml.FormatError(err, false, true)))
 	}
-	return suggestUnknownField(err.Error())
+	return suggestScalarMatcher(suggestUnknownField(err.Error()))
 }
 
 func joinErrors(errs []string) string {

@@ -187,7 +187,7 @@ func describeRun(r *spec.Run) string {
 	if len(r.Env) > 0 {
 		notes = append(notes, "env: "+strings.Join(sortedKeys(toSet(r.Env)), ", "))
 	}
-	if r.Shell {
+	if r.ShellEnabled() {
 		notes = append(notes, "shell")
 	}
 	desc := r.Command

@@ -138,6 +138,49 @@ scenarios:
 	}
 }
 
+// TestEngine_CmdRunnerCwdAndTimeout proves a cmd runner's common cwd/timeout
+// fields reach the local command (spec.md §14) instead of being silently
+// dropped: cwd relocates the step, timeout bounds it, and the step's own value
+// still wins over the runner's.
+func TestEngine_CmdRunnerCwdAndTimeout(t *testing.T) {
+	t.Parallel()
+	res := runSpec(t, `
+version: "1"
+suite:
+  name: s
+runners:
+  local:
+    type: cmd
+    cwd: sub
+  slow:
+    type: cmd
+    timeout: 150ms
+scenarios:
+  - name: runner cwd relocates the step
+    steps:
+      - fixture:
+          file: sub/here.txt
+          content: found-me
+      - run: {shell: true, runner: local, command: `+catCmd()+` here.txt}
+      - assert:
+          stdout: {contains: found-me}
+  - name: runner timeout bounds the step
+    steps:
+      - run: {shell: true, runner: slow, command: `+sleepCmd(5)+`}
+      - assert:
+          exit_code: {not: 0}
+  - name: step timeout wins over the runner timeout
+    steps:
+      - run: {shell: true, runner: slow, timeout: 5s, command: echo quick}
+      - assert:
+          exit_code: 0
+          stdout: {contains: quick}
+`)
+	if res.Status != StatusPassed {
+		t.Fatalf("status = %s, want passed: %+v", res.Status, res.Scenarios)
+	}
+}
+
 func TestEngine_ExecutionError(t *testing.T) {
 	t.Parallel()
 	res := runSpec(t, `

@@ -45,6 +45,29 @@ func TestLoadBytes_UnknownFieldSuggestion(t *testing.T) {
 	}
 }
 
+// TestLoadBytes_BareScalarMatcherHint proves the single most common first-spec
+// mistake — a bare scalar where a matcher mapping is required — earns a hint
+// showing the accepted shape, while a legitimate scalar `body:` on an http step
+// stays error-free.
+func TestLoadBytes_BareScalarMatcherHint(t *testing.T) {
+	t.Parallel()
+	src := "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n      - assert:\n          stdout: hello"
+	_, err := LoadBytes("t.atago.yaml", []byte(src))
+	if err == nil {
+		t.Fatal("LoadBytes() error = nil, want a scalar-where-mapping error")
+	}
+	want := `stdout must set a matcher mapping, e.g. stdout: {contains: "..."}`
+	if !strings.Contains(err.Error(), want) {
+		t.Errorf("error = %q, want hint %q", err.Error(), want)
+	}
+
+	// An http step's body is a real scalar field: no error, no hint.
+	ok := "version: \"1\"\nsuite:\n  name: x\nrunners:\n  api:\n    type: http\n    base_url: http://127.0.0.1:1\nscenarios:\n  - name: a\n    steps:\n      - http:\n          runner: api\n          method: POST\n          path: /\n          body: hello"
+	if _, err := LoadBytes("t.atago.yaml", []byte(ok)); err != nil {
+		t.Errorf("http body scalar should load cleanly, got %v", err)
+	}
+}
+
 // TestSuggest_NoWildGuess proves a token far from every field name gets no
 // suggestion — a wrong hint is worse than none.
 func TestSuggest_NoWildGuess(t *testing.T) {

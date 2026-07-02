@@ -6,7 +6,7 @@ import (
 )
 
 // TestApplyDefaults_RunAndScenarioEnv proves defaults.run and
-// defaults.scenario.env expand into the concrete model: shell OR-es in, scalar
+// defaults.scenario.env expand into the concrete model: shell fills when unset, scalar
 // fields fill only when unset, and env shallow-merges with the step/scenario
 // value winning per key.
 func TestApplyDefaults_RunAndScenarioEnv(t *testing.T) {
@@ -49,8 +49,8 @@ scenarios:
 		t.Errorf("scenario env SHARED = %q, want scenario value to win", sc.Env["SHARED"])
 	}
 	run := sc.Steps[0].Run
-	if !run.Shell {
-		t.Errorf("run.shell = false, want default OR-ed in")
+	if !run.ShellEnabled() {
+		t.Errorf("run.shell = false, want default applied")
 	}
 	if run.Timeout != "9s" {
 		t.Errorf("run.timeout = %q, want explicit 9s to win", run.Timeout)
@@ -60,6 +60,44 @@ scenarios:
 	}
 	if run.Env["B"] != "own" {
 		t.Errorf("run.env[B] = %q, want step value to win", run.Env["B"])
+	}
+}
+
+// TestApplyDefaults_ExplicitShellFalseWins proves an authored `shell: false`
+// beats a defaulted `shell: true` — the documented "an explicitly authored
+// value always wins" rule holds for booleans too (Shell is a *bool so unset
+// and false stay distinct).
+func TestApplyDefaults_ExplicitShellFalseWins(t *testing.T) {
+	t.Parallel()
+	src := `
+version: "1"
+suite:
+  name: sample
+defaults:
+  run:
+    shell: true
+  service:
+    shell: true
+scenarios:
+  - name: opts out per element
+    services:
+      - name: mock
+        shell: false
+        command: ./mock
+    steps:
+      - run:
+          shell: false
+          command: echo hi
+`
+	s, err := LoadBytes("sample.atago.yaml", []byte(src))
+	if err != nil {
+		t.Fatalf("LoadBytes() error = %v", err)
+	}
+	if s.Scenarios[0].Steps[0].Run.ShellEnabled() {
+		t.Errorf("run.shell = true, want the authored false to win over the default")
+	}
+	if s.Scenarios[0].Services[0].ShellEnabled() {
+		t.Errorf("service.shell = true, want the authored false to win over the default")
 	}
 }
 
@@ -102,8 +140,8 @@ scenarios:
 		t.Fatalf("LoadBytes() error = %v", err)
 	}
 	svc := s.Scenarios[0].Services[0]
-	if !svc.Shell {
-		t.Errorf("service.shell = false, want default OR-ed in")
+	if !svc.ShellEnabled() {
+		t.Errorf("service.shell = false, want default applied")
 	}
 	if svc.Ready == nil || svc.Ready.File != "ready.txt" || svc.Ready.Store != "addr" {
 		t.Fatalf("service.ready = %+v, want default probe copied in", svc.Ready)
@@ -143,7 +181,7 @@ scenarios:
 		t.Fatalf("got %d scenarios, want 2 matrix instances", len(s.Scenarios))
 	}
 	for _, sc := range s.Scenarios {
-		if !sc.Steps[0].Run.Shell {
+		if !sc.Steps[0].Run.ShellEnabled() {
 			t.Errorf("scenario %q: run.shell = false, want default applied", sc.Name)
 		}
 	}
@@ -215,7 +253,7 @@ scenarios:
 	if s.Defaults != nil {
 		t.Errorf("Defaults = %+v, want nil", s.Defaults)
 	}
-	if s.Scenarios[0].Steps[0].Run.Shell {
+	if s.Scenarios[0].Steps[0].Run.ShellEnabled() {
 		t.Errorf("run.shell = true, want unchanged false without defaults")
 	}
 }

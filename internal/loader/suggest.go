@@ -36,6 +36,32 @@ func suggestUnknownField(msg string) string {
 	return fmt.Sprintf("%s\nhint: did you mean %q?", msg, best)
 }
 
+// scalarWhereMappingRe matches the strict-decode error goccy emits when a
+// scalar (or sequence) sits where the model wants a mapping.
+var scalarWhereMappingRe = regexp.MustCompile(`(?:string|int|uint|float|bool|sequence) was used where mapping is expected`)
+
+// streamTargetRe finds a stream-assertion target on the snippet line the error
+// marker (`> N | ...`) points at, so surrounding context lines cannot trigger a
+// misleading hint.
+var streamTargetRe = regexp.MustCompile(`(?m)^>\s*\d+ \|.*?\b(stdout|stderr|body|rows|message|value)\s*:`)
+
+// suggestScalarMatcher appends a hint when a stream assertion was written as a
+// bare scalar — `stdout: hello` instead of `stdout: {contains: hello}` — which
+// is the single most common first-spec mistake. The generic decoder message
+// ("string was used where mapping is expected") is positionally accurate but
+// gives no clue what shape is wanted.
+func suggestScalarMatcher(msg string) string {
+	if !scalarWhereMappingRe.MatchString(msg) {
+		return msg
+	}
+	m := streamTargetRe.FindStringSubmatch(msg)
+	if m == nil {
+		return msg
+	}
+	t := m[1]
+	return fmt.Sprintf("%s\nhint: %s must set a matcher mapping, e.g. %s: {contains: \"...\"} or %s: {equals: \"...\"}", msg, t, t, t)
+}
+
 // isKnownField reports whether name is a field somewhere in the spec model.
 func isKnownField(name string) bool {
 	return slices.Contains(fieldVocabulary(), strings.ToLower(name))

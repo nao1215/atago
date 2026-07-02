@@ -48,14 +48,14 @@ func (p *Proc) Output() string { return p.out.String() }
 // as ${Ready.Store}. On any error the (partially started) process is stopped
 // before returning.
 func Start(ctx context.Context, svc *spec.Service, workdir string) (*Proc, string, error) {
-	name, args, err := cmd.CommandLine(svc.Command, svc.Shell)
+	name, args, err := cmd.CommandLine(svc.Command, svc.ShellEnabled())
 	if err != nil {
 		return nil, "", fmt.Errorf("service %q: %w", svc.Name, err)
 	}
 
 	out := &syncBuffer{}
 	pc := newProcessCmd(ctx, name, args)
-	if svc.Shell {
+	if svc.ShellEnabled() {
 		// On Windows this hands cmd.exe the raw command line; Go's default argv
 		// escaping would corrupt embedded quotes (see cmd.ConfigureShell).
 		cmd.ConfigureShell(pc.cmd, svc.Command)

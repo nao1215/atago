@@ -65,7 +65,7 @@ func SecurityNotes(sc *Scenario) []string {
 	}
 	for i := range sc.Services {
 		svc := &sc.Services[i]
-		if svc.Shell {
+		if svc.ShellEnabled() {
 			add("shell execution enabled (service " + svc.Name + "): " + svc.Command)
 		}
 		if NetworkCommand.MatchString(svc.Command) {
@@ -76,7 +76,7 @@ func SecurityNotes(sc *Scenario) []string {
 		step := &sc.Steps[i]
 		switch step.Kind() {
 		case StepRun:
-			if step.Run.Shell {
+			if step.Run.ShellEnabled() {
 				add("shell execution enabled: " + step.Run.Command)
 			}
 			if NetworkCommand.MatchString(step.Run.Command) {

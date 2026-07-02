@@ -10,6 +10,8 @@ import (
 	"testing"
 
 	sshd "github.com/gliderlabs/ssh"
+
+	"github.com/nao1215/atago/internal/loader"
 )
 
 // sshTestServer starts an in-process SSH server that interprets a few commands,
@@ -152,10 +154,10 @@ scenarios:
           runner: missing
           command: echo hi
 `
-	res := runHTTPSpec(t, src)
-	// A run step naming an unknown runner errors rather than silently running
-	// locally — a typo'd runner must not pass a remote test by accident.
-	if res.Status != StatusError {
-		t.Fatalf("status = %s, want error (unknown runner)", res.Status)
+	// A run step naming an unknown runner is rejected at load time rather than
+	// silently running locally — a typo'd runner must not pass a remote test by
+	// accident.
+	if _, err := loader.LoadBytes("t.atago.yaml", []byte(src)); err == nil || !strings.Contains(err.Error(), "is not declared") {
+		t.Fatalf("LoadBytes() error = %v, want an undeclared-runner validation error", err)
 	}
 }

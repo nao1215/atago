@@ -24,7 +24,7 @@ func TestLoadBytes_HTTPValidation(t *testing.T) {
 		},
 		{
 			name:    "store from.header is a valid source",
-			src:     "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - http:\n          runner: api\n          method: GET\n          path: /x\n      - store:\n          name: loc\n          from:\n            header: Location",
+			src:     "version: \"1\"\nsuite:\n  name: x\nrunners:\n  api:\n    type: http\n    base_url: http://localhost:8080\nscenarios:\n  - name: a\n    steps:\n      - http:\n          runner: api\n          method: GET\n          path: /x\n      - store:\n          name: loc\n          from:\n            header: Location",
 			wantMsg: "",
 		},
 		{
@@ -39,7 +39,7 @@ func TestLoadBytes_HTTPValidation(t *testing.T) {
 		},
 		{
 			name:    "http step with a raw body is valid",
-			src:     "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - http:\n          runner: api\n          method: POST\n          path: /x\n          body: \"metric 1\"",
+			src:     "version: \"1\"\nsuite:\n  name: x\nrunners:\n  api:\n    type: http\n    base_url: http://localhost:8080\nscenarios:\n  - name: a\n    steps:\n      - http:\n          runner: api\n          method: POST\n          path: /x\n          body: \"metric 1\"",
 			wantMsg: "",
 		},
 		{

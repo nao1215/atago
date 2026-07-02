@@ -14,8 +14,8 @@ import (
 //
 // Merge rules: an explicitly-authored value always wins; maps shallow-merge (the
 // authored key wins per key); a nil pointer / empty string counts as "unset" and
-// takes the default; a boolean default is OR-ed in because a Go bool has no unset
-// state (so a defaulted `shell: true` cannot be turned off per element).
+// takes the default — so an authored `shell: false` beats a defaulted
+// `shell: true` (Shell is a *bool precisely to keep unset and false distinct).
 func applyDefaults(s *spec.Spec) {
 	d := s.Defaults
 	if d == nil {
@@ -61,8 +61,8 @@ func mergeRunDefaults(def, r *spec.Run) {
 	if r.Runner == "" {
 		r.Runner = def.Runner
 	}
-	if def.Shell {
-		r.Shell = true
+	if r.Shell == nil {
+		r.Shell = def.Shell
 	}
 	if r.Cwd == "" {
 		r.Cwd = def.Cwd
@@ -81,8 +81,8 @@ func mergeRunDefaults(def, r *spec.Run) {
 // defaults.service). A whole Ready probe is copied in when the service declares
 // none, so shared readiness (e.g. `ready.store`/`ready.timeout`) need not repeat.
 func mergeServiceDefaults(def, svc *spec.Service) {
-	if def.Shell {
-		svc.Shell = true
+	if svc.Shell == nil {
+		svc.Shell = def.Shell
 	}
 	if svc.Cwd == "" {
 		svc.Cwd = def.Cwd

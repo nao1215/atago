@@ -2,10 +2,12 @@ package engine
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"testing"
 
 	"github.com/k1LoW/grpcstub"
+	"github.com/nao1215/atago/internal/loader"
 )
 
 // grpcRegMu serializes grpcstub.NewServer calls. grpcstub registers the proto
@@ -175,8 +177,9 @@ scenarios:
           runner: missing
           method: pkg.Service/Method
 `
-	res := runHTTPSpec(t, src)
-	if res.Status != StatusError {
-		t.Fatalf("status = %s, want error", res.Status)
+	// An undeclared runner is a load-time validation error (exit 2), not a
+	// mid-run execution error; the engine keeps a runtime check as a backstop.
+	if _, err := loader.LoadBytes("t.atago.yaml", []byte(src)); err == nil || !strings.Contains(err.Error(), "is not declared") {
+		t.Fatalf("LoadBytes() error = %v, want an undeclared-runner validation error", err)
 	}
 }

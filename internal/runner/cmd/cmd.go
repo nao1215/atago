@@ -44,7 +44,7 @@ func (r *Runner) Run(ctx context.Context, run *spec.Run, workdir string) (*runne
 	}
 
 	cmd := exec.CommandContext(ctx, name, args...) //nolint:gosec // executing user-declared commands is the purpose of atago
-	if run.Shell {
+	if run.ShellEnabled() {
 		// On Windows this hands cmd.exe the raw command line (see
 		// ConfigureShell); Go's default argv escaping follows MSVCRT rules that
 		// cmd.exe does not, so an embedded quote would reach the command as \".
@@ -140,7 +140,7 @@ func writeRedirects(run *spec.Run, workdir, stdout, stderr string) error {
 // commandLine resolves the program and arguments for a run step, honoring the
 // explicit shell opt-in (spec.md §15).
 func commandLine(run *spec.Run) (string, []string, error) {
-	return CommandLine(run.Command, run.Shell)
+	return CommandLine(run.Command, run.ShellEnabled())
 }
 
 // CommandLine resolves the program and arguments for a command string, honoring

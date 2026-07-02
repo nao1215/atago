@@ -57,7 +57,7 @@ func TestStart_FileReadinessCapturesContent(t *testing.T) {
 	wd := t.TempDir()
 	svc := &spec.Service{
 		Name:    "addr",
-		Shell:   true,
+		Shell:   spec.Bool(true),
 		Command: publishThenIdle("127.0.0.1:54321", "ready.txt", 5),
 		Ready:   &spec.Ready{File: "ready.txt", Store: "addr", Timeout: "5s"},
 	}
@@ -77,7 +77,7 @@ func TestStart_ReadyFileTraversalRejected(t *testing.T) {
 	wd := t.TempDir()
 	svc := &spec.Service{
 		Name:    "s",
-		Shell:   true,
+		Shell:   spec.Bool(true),
 		Command: sleepCmd(5),
 		Ready:   &spec.Ready{File: "../ready.txt", Timeout: "5s"},
 	}
@@ -99,7 +99,7 @@ func TestStart_ReadinessErrorOmitsEmptyOutput(t *testing.T) {
 	wd := t.TempDir()
 	svc := &spec.Service{
 		Name:    "silent",
-		Shell:   true,
+		Shell:   spec.Bool(true),
 		Command: sleepCmd(5), // prints nothing, never creates the ready file
 		Ready:   &spec.Ready{File: "never.txt", Timeout: "150ms"},
 	}
@@ -121,7 +121,7 @@ func TestStart_ReadinessFailureReturnsProcForLogCapture(t *testing.T) {
 	wd := t.TempDir()
 	svc := &spec.Service{
 		Name:    "chatty",
-		Shell:   true,
+		Shell:   spec.Bool(true),
 		Command: echoThenIdle("booting-up", 5),
 		Ready:   &spec.Ready{File: "never.txt", Timeout: "150ms"},
 	}
@@ -145,7 +145,7 @@ func TestStart_ReadinessErrorKeepsNonEmptyOutput(t *testing.T) {
 	wd := t.TempDir()
 	svc := &spec.Service{
 		Name:    "chatty",
-		Shell:   true,
+		Shell:   spec.Bool(true),
 		Command: echoThenIdle("starting up", 5),
 		Ready:   &spec.Ready{File: "never.txt", Timeout: "150ms"},
 	}
@@ -163,7 +163,7 @@ func TestStart_FileReadinessWithoutStore(t *testing.T) {
 	wd := t.TempDir()
 	svc := &spec.Service{
 		Name:    "f",
-		Shell:   true,
+		Shell:   spec.Bool(true),
 		Command: publishThenIdle("up", "ready.txt", 5),
 		Ready:   &spec.Ready{File: "ready.txt"},
 	}
@@ -182,7 +182,7 @@ func TestStart_LogReadiness(t *testing.T) {
 	wd := t.TempDir()
 	svc := &spec.Service{
 		Name:    "log",
-		Shell:   true,
+		Shell:   spec.Bool(true),
 		Command: echoThenIdle("now listening on 127.0.0.1", 5),
 		Ready:   &spec.Ready{Log: "listening on", Timeout: "5s"},
 	}
@@ -202,7 +202,7 @@ func TestStart_DelayReadiness(t *testing.T) {
 	start := time.Now()
 	svc := &spec.Service{
 		Name:    "d",
-		Shell:   true,
+		Shell:   spec.Bool(true),
 		Command: sleepCmd(5),
 		Ready:   &spec.Ready{Delay: "100ms"},
 	}
@@ -219,7 +219,7 @@ func TestStart_DelayReadiness(t *testing.T) {
 // TestStart_NoReadinessProbe returns as soon as the process is spawned.
 func TestStart_NoReadinessProbe(t *testing.T) {
 	wd := t.TempDir()
-	svc := &spec.Service{Name: "n", Shell: true, Command: sleepCmd(5)}
+	svc := &spec.Service{Name: "n", Shell: spec.Bool(true), Command: sleepCmd(5)}
 	p, captured, err := Start(context.Background(), svc, wd)
 	if err != nil {
 		t.Fatalf("Start() error = %v", err)
@@ -235,7 +235,7 @@ func TestStart_TimeoutWhenNeverReady(t *testing.T) {
 	wd := t.TempDir()
 	svc := &spec.Service{
 		Name:    "slow",
-		Shell:   true,
+		Shell:   spec.Bool(true),
 		Command: sleepCmd(5),
 		Ready:   &spec.Ready{File: "never.txt", Timeout: "150ms"},
 	}
@@ -252,7 +252,7 @@ func TestStart_ExitedBeforeReady(t *testing.T) {
 	start := time.Now()
 	svc := &spec.Service{
 		Name:    "dies",
-		Shell:   true,
+		Shell:   spec.Bool(true),
 		Command: `exit 1`,
 		Ready:   &spec.Ready{File: "ready.txt", Timeout: "10s"},
 	}
@@ -280,7 +280,7 @@ func TestStart_BadDuration(t *testing.T) {
 	wd := t.TempDir()
 	svc := &spec.Service{
 		Name:    "x",
-		Shell:   true,
+		Shell:   spec.Bool(true),
 		Command: sleepCmd(5),
 		Ready:   &spec.Ready{Delay: "notaduration"},
 	}
@@ -312,7 +312,7 @@ func TestStart_PortReadiness(t *testing.T) {
 	wd := t.TempDir()
 	svc := &spec.Service{
 		Name:    "port",
-		Shell:   true,
+		Shell:   spec.Bool(true),
 		Command: sleepCmd(5),
 		Ready:   &spec.Ready{Port: ln.Addr().String(), Timeout: "5s"},
 	}
@@ -328,7 +328,7 @@ func TestStart_PortReadinessTimeout(t *testing.T) {
 	wd := t.TempDir()
 	svc := &spec.Service{
 		Name:    "noport",
-		Shell:   true,
+		Shell:   spec.Bool(true),
 		Command: sleepCmd(5),
 		// Port 1 on localhost is not listening in the sandbox.
 		Ready: &spec.Ready{Port: "127.0.0.1:1", Timeout: "150ms"},
@@ -348,7 +348,7 @@ func TestStop_TerminatesChildren(t *testing.T) {
 	// the shell leader, the grandchild would keep ticking.
 	svc := &spec.Service{
 		Name:    "ticker",
-		Shell:   true,
+		Shell:   spec.Bool(true),
 		Command: `( while true; do echo tick >> tick; sleep 0.05; done ) & echo ready; wait`,
 		Ready:   &spec.Ready{Log: "ready", Timeout: "5s"},
 	}
@@ -375,7 +375,7 @@ func TestStop_EscalatesToKill(t *testing.T) {
 	wd := t.TempDir()
 	svc := &spec.Service{
 		Name:  "stubborn",
-		Shell: true,
+		Shell: spec.Bool(true),
 		// Ignore SIGTERM, then idle. Only SIGKILL can stop it.
 		Command: `trap '' TERM; echo ready; while true; do sleep 1; done`,
 		Ready:   &spec.Ready{Log: "ready", Timeout: "5s"},
@@ -399,7 +399,7 @@ func TestStop_Idempotent(t *testing.T) {
 	nilProc.Stop() // must not panic
 
 	wd := t.TempDir()
-	svc := &spec.Service{Name: "n", Shell: true, Command: sleepCmd(5)}
+	svc := &spec.Service{Name: "n", Shell: spec.Bool(true), Command: sleepCmd(5)}
 	p, _, err := Start(context.Background(), svc, wd)
 	if err != nil {
 		t.Fatalf("Start() error = %v", err)
@@ -412,7 +412,7 @@ func TestStop_Idempotent(t *testing.T) {
 func TestStart_ContextCancellation(t *testing.T) {
 	wd := t.TempDir()
 	ctx, cancel := context.WithCancel(context.Background())
-	svc := &spec.Service{Name: "c", Shell: true, Command: sleepCmd(30)}
+	svc := &spec.Service{Name: "c", Shell: spec.Bool(true), Command: sleepCmd(30)}
 	p, _, err := Start(ctx, svc, wd)
 	if err != nil {
 		t.Fatalf("Start() error = %v", err)

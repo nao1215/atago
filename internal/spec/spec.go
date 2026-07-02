@@ -155,8 +155,9 @@ type Service struct {
 	// directly unless Shell is set.
 	Command string `yaml:"command"`
 	// Shell runs Command through the POSIX shell (pipes/redirects/${}), matching
-	// run.shell semantics.
-	Shell bool `yaml:"shell,omitempty"`
+	// run.shell semantics. A pointer so an authored `shell: false` is
+	// distinguishable from "unset" when `defaults.service.shell` is layered in.
+	Shell *bool `yaml:"shell,omitempty"`
 	// Cwd is the working directory relative to the scenario workdir (default: the
 	// workdir itself).
 	Cwd string `yaml:"cwd,omitempty"`
@@ -337,9 +338,12 @@ type Fixture struct {
 
 // Run executes a command (spec.md §15).
 type Run struct {
-	Command string            `yaml:"command"`
-	Runner  string            `yaml:"runner,omitempty"`
-	Shell   bool              `yaml:"shell,omitempty"`
+	Command string `yaml:"command"`
+	Runner  string `yaml:"runner,omitempty"`
+	// Shell is a pointer so an authored `shell: false` is distinguishable from
+	// "unset" when `defaults.run.shell` is layered in (an authored value always
+	// wins over a default).
+	Shell   *bool             `yaml:"shell,omitempty"`
 	Cwd     string            `yaml:"cwd,omitempty"`
 	Timeout string            `yaml:"timeout,omitempty"`
 	Env     map[string]string `yaml:"env,omitempty"`
@@ -355,6 +359,16 @@ type Run struct {
 	// polling declaratively for async behavior (spec.md §15.1, ADR-0022).
 	Retry *Retry `yaml:"retry,omitempty"`
 }
+
+// Bool returns a pointer to v — sugar for authoring optional booleans (Shell)
+// in Go literals.
+func Bool(v bool) *bool { return &v }
+
+// ShellEnabled reports whether the step opts into shell execution.
+func (r *Run) ShellEnabled() bool { return r.Shell != nil && *r.Shell }
+
+// ShellEnabled reports whether the service opts into shell execution.
+func (s *Service) ShellEnabled() bool { return s.Shell != nil && *s.Shell }
 
 // Retry re-runs a command until Until passes or the attempt budget is exhausted.
 // The last attempt's result is what subsequent steps observe.

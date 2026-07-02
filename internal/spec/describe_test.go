@@ -39,10 +39,10 @@ func TestSecurityNotes(t *testing.T) {
 	t.Parallel()
 	sc := &Scenario{
 		Services: []Service{
-			{Name: "peer", Shell: true, Command: "curl https://api.example.com/serve"},
+			{Name: "peer", Shell: Bool(true), Command: "curl https://api.example.com/serve"},
 		},
 		Steps: []Step{
-			{Run: &Run{Command: "echo hi", Shell: true}},
+			{Run: &Run{Command: "echo hi", Shell: Bool(true)}},
 			{Run: &Run{Command: "wget https://example.com/file"}},
 			{HTTP: &HTTP{Method: "GET", Path: "/x"}},
 			{GRPC: &GRPC{Runner: "g", Method: "pkg.S/M"}},

@@ -400,7 +400,7 @@ func (e *Engine) runScenario(ctx context.Context, scenarioIdx int, sc *spec.Scen
 			// has no shell, so nothing could ever expand it and the literal text
 			// would leak into argv. That is almost always a typo; error with the
 			// reference named instead of running a garbled command (#UX).
-			if !step.Run.Shell && step.Run.Runner == "" {
+			if !step.Run.ShellEnabled() && step.Run.Runner == "" {
 				if names := st.Unresolved(step.Run.Command); len(names) > 0 {
 					sr.ErrMsg = fmt.Sprintf(
 						"run.command references ${%[1]s}, but no variable with that name is defined (builtins, matrix vars, store, ready.store) and shell is not enabled, so nothing would expand it; define the variable, set shell: true for shell expansion, or write $${%[1]s} for the literal text",
@@ -567,7 +567,7 @@ func (e *Engine) probeSucceeds(ctx context.Context, command string) bool {
 	if err == nil {
 		defer os.RemoveAll(dir)
 	}
-	res, err := e.cmd.Run(ctx, &spec.Run{Command: command, Shell: true}, dir)
+	res, err := e.cmd.Run(ctx, &spec.Run{Command: command, Shell: spec.Bool(true)}, dir)
 	if err != nil {
 		return false
 	}
@@ -596,6 +596,17 @@ func (e *Engine) runStep(ctx context.Context, run *spec.Run, st *store.Store, wo
 				}
 				return conn.Run(ctx, run.Command)
 			case "cmd", "":
+				// Layer the runner's cwd/timeout beneath the step's own values
+				// (spec.md §14: type/cwd/timeout are common to every runner); the
+				// step wins. run is the caller's expanded copy, so mutating it is
+				// safe; cwd gets the same use-time ${name} expansion as the other
+				// runner families' fields.
+				if run.Cwd == "" {
+					run.Cwd = st.Expand(rdef.Cwd)
+				}
+				if run.Timeout == "" {
+					run.Timeout = rdef.Timeout
+				}
 				// fall through to the local cmd runner
 			default:
 				return nil, fmt.Errorf("runner %q (type %q) cannot run a command step; use a step matching its type", run.Runner, rdef.Type)

@@ -46,7 +46,7 @@ func TestRun_StdoutToStderrTo(t *testing.T) {
 	r := New()
 	res, err := r.Run(context.Background(), &spec.Run{
 		Command:  argvCommand("sh -c 'echo out; echo err 1>&2'", "echo out& echo err 1>&2"),
-		Shell:    true,
+		Shell:    spec.Bool(true),
 		StdoutTo: "out.txt",
 		StderrTo: "err.txt",
 	}, wd)
@@ -110,7 +110,7 @@ func TestRun_ShellAndEnvAndCwd(t *testing.T) {
 	}
 	r := New()
 	res, err := r.Run(context.Background(), &spec.Run{
-		Shell: true,
+		Shell: spec.Bool(true),
 		// Both print "<env value> in <cwd>"; POSIX prints the basename, cmd.exe
 		// the absolute path, so the assertion checks prefix and suffix.
 		Command: argvCommand("echo $GREETING in $(basename $PWD)", "echo %GREETING% in %CD%"),
@@ -198,7 +198,7 @@ func TestRun_ShellCancelKillsChildPromptly(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = os.RemoveAll(wd) })
 	start := time.Now()
-	_, err = New().Run(ctx, &spec.Run{Shell: true, Command: argvCommand("sleep 30", "ping -n 31 127.0.0.1")}, wd)
+	_, err = New().Run(ctx, &spec.Run{Shell: spec.Bool(true), Command: argvCommand("sleep 30", "ping -n 31 127.0.0.1")}, wd)
 	elapsed := time.Since(start)
 	if err == nil {
 		t.Fatal("Run() error = nil; a parent-cancel kill must be reported as an error")
@@ -215,7 +215,7 @@ func TestRun_ShellCancelKillsChildPromptly(t *testing.T) {
 func TestRun_ShellEmbeddedQuotes(t *testing.T) {
 	t.Parallel()
 	res, err := New().Run(context.Background(), &spec.Run{
-		Shell:   true,
+		Shell:   spec.Bool(true),
 		Command: `echo {"id":7}`,
 	}, t.TempDir())
 	if err != nil {
@@ -293,7 +293,7 @@ func TestRun_ShellNotShadowedByPath(t *testing.T) {
 	t.Setenv("PATH", dir)
 	t.Setenv("ATAGO_SHELL", "") // ensure no override interferes
 	r := New()
-	res, err := r.Run(context.Background(), &spec.Run{Shell: true, Command: "echo real"}, dir)
+	res, err := r.Run(context.Background(), &spec.Run{Shell: spec.Bool(true), Command: "echo real"}, dir)
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}

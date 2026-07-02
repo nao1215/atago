@@ -52,7 +52,7 @@ func buildScenario(sc *spec.Scenario, src SourceLocator) Scenario {
 }
 
 func buildService(svc *spec.Service) Service {
-	out := Service{Name: svc.Name, Command: svc.Command, Shell: svc.Shell}
+	out := Service{Name: svc.Name, Command: svc.Command, Shell: svc.ShellEnabled()}
 	if svc.Ready != nil {
 		switch {
 		case svc.Ready.File != "":
@@ -83,7 +83,7 @@ func buildStep(index int, step *spec.Step, vars map[string]bool) Step {
 	case spec.StepRun:
 		r := step.Run
 		st.Command = r.Command
-		st.Shell = r.Shell
+		st.Shell = r.ShellEnabled()
 		st.Runner = r.Runner
 		st.Action = "run " + r.Command
 		if r.Retry != nil {

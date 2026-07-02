@@ -2,6 +2,10 @@ package loader
 
 import (
 	"fmt"
+	"maps"
+	"regexp"
+	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -52,7 +56,7 @@ func validate(s *spec.Spec) []string {
 			continue
 		}
 		for j := range sc.Steps {
-			validateStep(add, fmt.Sprintf("%s.steps[%d]", where, j), &sc.Steps[j])
+			validateStep(add, fmt.Sprintf("%s.steps[%d]", where, j), &sc.Steps[j], s.Runners)
 		}
 	}
 	return errs
@@ -73,6 +77,11 @@ func validateDefaults(add func(string, ...any), d *spec.Defaults) {
 		}
 		if r.Retry != nil {
 			add("defaults.run.retry is not supported (retry is per-step)")
+		}
+		if r.Timeout != "" {
+			if _, err := time.ParseDuration(r.Timeout); err != nil {
+				add("defaults.run.timeout %q is not a valid duration (e.g. \"30s\")", r.Timeout)
+			}
 		}
 	}
 	if sv := d.Service; sv != nil {
@@ -122,6 +131,13 @@ func validateRunners(add func(string, ...any), runners map[string]spec.Runner) {
 			}
 		case "browser":
 			// no required fields; a browser runner launches a local headless Chrome.
+		}
+		// timeout is common to every runner type; catch a malformed value here
+		// instead of when the first step opens the connection (spec.md §14).
+		if r.Timeout != "" {
+			if _, err := time.ParseDuration(r.Timeout); err != nil {
+				add("%s.timeout %q is not a valid duration (e.g. \"30s\")", where, r.Timeout)
+			}
 		}
 		validateRunnerFields(add, where, &r)
 	}
@@ -206,6 +222,11 @@ func validateReady(add func(string, ...any), where string, r *spec.Ready) {
 			}
 		}
 	}
+	if r.Log != "" {
+		if _, err := regexp.Compile(r.Log); err != nil {
+			add("%s.ready.log %q is not a valid regexp: %v", where, r.Log, err)
+		}
+	}
 }
 
 func validateCondition(add func(string, ...any), where, key string, c *spec.Condition) {
@@ -217,7 +238,42 @@ func validateCondition(add func(string, ...any), where, key string, c *spec.Cond
 	}
 }
 
-func validateStep(add func(string, ...any), where string, st *spec.Step) {
+// stepRunnerTypes maps a step action to the runner types it accepts, mirroring
+// the engine's dispatch so a wrong or missing runner reference fails at load
+// time (exit 2) instead of surfacing mid-run as an execution error.
+var stepRunnerTypes = map[string][]string{
+	"run":   {"cmd", "ssh"},
+	"http":  {"http"},
+	"query": {"db"},
+	"grpc":  {"grpc"},
+	"cdp":   {"browser"},
+}
+
+// validateRunnerRef checks that a step's named runner exists and has a type the
+// step can drive. An empty name is fine here: steps that require a runner
+// enforce that separately.
+func validateRunnerRef(add func(string, ...any), where, stepKind, name string, runners map[string]spec.Runner) {
+	if name == "" {
+		return
+	}
+	r, ok := runners[name]
+	if !ok {
+		declared := slices.Sorted(maps.Keys(runners))
+		if len(declared) == 0 {
+			add("%s.%s.runner %q is not declared (the spec has no runners: block)", where, stepKind, name)
+			return
+		}
+		add("%s.%s.runner %q is not declared under runners: (declared: %s)", where, stepKind, name, strings.Join(declared, ", "))
+		return
+	}
+	want := stepRunnerTypes[stepKind]
+	// An unknown/empty type is reported by validateRunners already.
+	if r.Type != "" && validRunnerType[r.Type] && !slices.Contains(want, r.Type) {
+		add("%s: runner %q is a %s runner; a %s step needs a %s runner", where, name, r.Type, stepKind, strings.Join(want, " or "))
+	}
+}
+
+func validateStep(add func(string, ...any), where string, st *spec.Step, runners map[string]spec.Runner) {
 	keys := st.SetKeys()
 	switch len(keys) {
 	case 0:
@@ -233,9 +289,15 @@ func validateStep(add func(string, ...any), where string, st *spec.Step) {
 	case spec.StepFixture:
 		validateFixture(add, where, st.Fixture)
 	case spec.StepRun:
+		validateRunnerRef(add, where, "run", st.Run.Runner, runners)
+		if st.Run.Timeout != "" {
+			if _, err := time.ParseDuration(st.Run.Timeout); err != nil {
+				add("%s.run.timeout %q is not a valid duration (e.g. \"30s\")", where, st.Run.Timeout)
+			}
+		}
 		if st.Run.Command == "" {
 			add("%s.run.command is required", where)
-		} else if !st.Run.Shell {
+		} else if !st.Run.ShellEnabled() {
 			// Without shell, the command is tokenized into argv, so shell operators
 			// (redirects, pipes, sequencing, substitution) are not honored. Rather
 			// than silently pass them as literal argv, flag them with a fix-forward
@@ -250,6 +312,7 @@ func validateStep(add func(string, ...any), where string, st *spec.Step) {
 	case spec.StepAssert:
 		validateAssert(add, where, st.Assert)
 	case spec.StepHTTP:
+		validateRunnerRef(add, where, "http", st.HTTP.Runner, runners)
 		if st.HTTP.Method == "" {
 			add("%s.http.method is required", where)
 		}
@@ -267,6 +330,7 @@ func validateStep(add func(string, ...any), where string, st *spec.Step) {
 		if st.Query.Runner == "" {
 			add("%s.query.runner is required", where)
 		}
+		validateRunnerRef(add, where, "query", st.Query.Runner, runners)
 		if st.Query.SQL == "" {
 			add("%s.query.sql is required", where)
 		}
@@ -274,6 +338,7 @@ func validateStep(add func(string, ...any), where string, st *spec.Step) {
 		if st.GRPC.Runner == "" {
 			add("%s.grpc.runner is required", where)
 		}
+		validateRunnerRef(add, where, "grpc", st.GRPC.Runner, runners)
 		if st.GRPC.Method == "" {
 			add("%s.grpc.method is required", where)
 		}
@@ -281,6 +346,7 @@ func validateStep(add func(string, ...any), where string, st *spec.Step) {
 		if st.CDP.Runner == "" {
 			add("%s.cdp.runner is required", where)
 		}
+		validateRunnerRef(add, where, "cdp", st.CDP.Runner, runners)
 		if len(st.CDP.Actions) == 0 {
 			add("%s.cdp.actions must contain at least one action", where)
 		}
@@ -412,6 +478,16 @@ func validateFixture(add func(string, ...any), where string, f *spec.Fixture) {
 	}
 	if f.Symlink != "" && f.Mode != "" {
 		add("%s.fixture: mode cannot be applied to a symlink", where)
+	}
+	if f.Mode != "" {
+		if _, err := strconv.ParseUint(f.Mode, 8, 32); err != nil {
+			add("%s.fixture.mode %q is not an octal file mode (e.g. \"0444\")", where, f.Mode)
+		}
+	}
+	if f.Mtime != "" {
+		if _, err := time.Parse(time.RFC3339, f.Mtime); err != nil {
+			add("%s.fixture.mtime %q is not an RFC3339 timestamp (e.g. \"2026-01-02T15:04:05Z\")", where, f.Mtime)
+		}
 	}
 }
 
@@ -627,6 +703,11 @@ func validateStream(add func(string, ...any), where string, s *spec.StreamAssert
 		if s.YAML != nil {
 			validateJSON(add, where+".yaml", s.YAML)
 		}
+		if s.Matches != nil {
+			if _, err := regexp.Compile(*s.Matches); err != nil {
+				add("%s.matches %q is not a valid regexp: %v", where, *s.Matches, err)
+			}
+		}
 	default:
 		add("%s: must set exactly one matcher, but set %v", where, matchers)
 	}
@@ -791,6 +872,9 @@ func validateJSON(add func(string, ...any), where string, j *spec.JSONAssert) {
 	}
 	if j.Matches != nil {
 		n++
+		if _, err := regexp.Compile(*j.Matches); err != nil {
+			add("%s.matches %q is not a valid regexp: %v", where, *j.Matches, err)
+		}
 	}
 	if j.Length != nil {
 		n++
