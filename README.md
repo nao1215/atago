@@ -245,6 +245,9 @@ Third-party programs ([test/e2e/thirdparty/](test/e2e/thirdparty/)). atago runs 
 | Program | Feature | License | Specs | Docs |
 |---------|---------|---------|-------|------|
 | [git](https://git-scm.com/) | Version control — runs in CI on all three OSes. | GPL-2.0 | [specs](test/e2e/thirdparty/git) | [docs](doc/e2e/git.md) |
+| [jq](https://jqlang.org/) | JSON processor: stdin-driven filters, --arg injection, and its documented exit-code contract (1 for -e false, 3 for a bad program, parse failures). | MIT | [specs](test/e2e/thirdparty/jq) | [docs](doc/e2e/jq.md) |
+| [openssl](https://www.openssl.org/) | Cryptography toolkit: exact digests, keygen → sign → verify (and tamper detection), encrypt/decrypt round-trips with the wrong-password failure mode, self-signed certificates. | Apache-2.0 | [specs](test/e2e/thirdparty/openssl) | [docs](doc/e2e/openssl.md) |
+| [sqlite3](https://sqlite.org/cli.html) | Embedded-database shell driven as a real binary: one-shot SQL, -json/-csv output modes, .dump → .read rebuilds, .import from CSV, bad-SQL diagnostics. | Public Domain | [specs](test/e2e/thirdparty/sqlite3) | [docs](doc/e2e/sqlite3.md) |
 | [caddy](https://caddyserver.com/) | Self-hosted web server, booted from an authored Caddyfile and queried over HTTP. | Apache-2.0 | [specs](test/e2e/thirdparty/caddy) | [docs](doc/e2e/caddy.md) |
 | [coredns](https://coredns.io/) | Self-hosted DNS server: an authored zone queried with real `dig` — authoritative answers, CNAME chasing, NXDOMAIN/REFUSED, and the health plugin over HTTP. | Apache-2.0 | [specs](test/e2e/thirdparty/coredns) | [docs](doc/e2e/coredns.md) |
 | [gitea](https://about.gitea.com/) | Self-hosted git service: booted with SQLite, administered via its CLI, driven over the REST API (repos, commits, issues), then cloned with real git. | MIT | [specs](test/e2e/thirdparty/gitea) | [docs](doc/e2e/gitea.md) |

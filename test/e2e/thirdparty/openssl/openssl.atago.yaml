@@ -1,0 +1,161 @@
+version: "1"
+
+suite:
+  name: openssl (third-party CLI, no build required)
+
+# openssl is the first cryptography tool in the third-party matrix. The suite
+# pins observable contracts a script would depend on: digests are exact and
+# stable, key generation produces working keys (proven by deriving the public
+# half and signing/verifying), encryption round-trips byte-for-byte, a WRONG
+# password fails loudly instead of producing garbage, and a self-signed
+# certificate carries the requested subject.
+scenarios:
+  - name: sha256 digest of a fixed input is exact and stable
+    steps:
+      - fixture:
+          file: msg.txt
+          content: |
+            the quick brown fox
+      - run:
+          command: openssl dgst -sha256 -r msg.txt
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: 6e459fed18ddb06d57c8e9f0d000c302c7e01389926db6e89884bfbe91a2a5df
+
+  - name: base64 encode and decode round-trip via stdin
+    steps:
+      - run:
+          command: openssl base64
+          stdin: "round-trip me"
+      - store:
+          name: encoded
+          from:
+            stdout:
+              matches: ".+"
+      # openssl base64 -d ignores a final unterminated line, so feed the
+      # captured value with an explicit trailing newline.
+      - run:
+          command: openssl base64 -d
+          stdin: "${encoded}\n"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: round-trip me
+
+  - name: rand -hex emits exactly the requested entropy
+    steps:
+      - run:
+          command: openssl rand -hex 16
+      - assert:
+          exit_code: 0
+          stdout:
+            matches: "^[0-9a-f]{32}\n?$"
+
+  - name: a generated private key is valid and yields its public half
+    steps:
+      - run:
+          command: openssl genpkey -algorithm ed25519 -out key.pem
+      - assert:
+          exit_code: 0
+          file:
+            path: key.pem
+            contains: BEGIN PRIVATE KEY
+      - run:
+          command: openssl pkey -in key.pem -check -noout
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: Key is valid
+      - run:
+          command: openssl pkey -in key.pem -pubout -out pub.pem
+      - assert:
+          exit_code: 0
+          file:
+            path: pub.pem
+            contains: BEGIN PUBLIC KEY
+
+  - name: symmetric encryption round-trips and a wrong password fails loudly
+    steps:
+      - fixture:
+          file: secret.txt
+          content: |
+            attack at dawn
+      - run:
+          command: openssl enc -aes-256-cbc -pbkdf2 -pass pass:correct-horse -in secret.txt -out secret.enc
+      - assert:
+          exit_code: 0
+          file:
+            path: secret.enc
+            exists: true
+      # The ciphertext must not contain the plaintext.
+      - assert:
+          file:
+            path: secret.enc
+            not_contains: attack at dawn
+      - run:
+          command: openssl enc -d -aes-256-cbc -pbkdf2 -pass pass:correct-horse -in secret.enc -out roundtrip.txt
+      - assert:
+          exit_code: 0
+          file:
+            path: roundtrip.txt
+            contains: attack at dawn
+      # Wrong password: loud non-zero failure, never silent garbage.
+      - run:
+          command: openssl enc -d -aes-256-cbc -pbkdf2 -pass pass:wrong-password -in secret.enc -out garbage.txt
+      - assert:
+          exit_code:
+            not: 0
+          stderr:
+            contains: bad decrypt
+
+  - name: a self-signed certificate carries the requested subject
+    steps:
+      - run:
+          command: openssl req -x509 -newkey ed25519 -keyout ca.key -out ca.crt -nodes -days 1 -subj /CN=atago-test
+      - assert:
+          exit_code: 0
+      - run:
+          command: openssl x509 -in ca.crt -noout -subject
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: atago-test
+      # The certificate verifies against itself (self-signed trust anchor).
+      - run:
+          command: openssl verify -CAfile ca.crt ca.crt
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "OK"
+
+  - name: signing with the private key verifies with the public key
+    steps:
+      - fixture:
+          file: payload.txt
+          content: |
+            sign me
+      - run:
+          command: openssl genpkey -algorithm ed25519 -out sk.pem
+      - run:
+          command: openssl pkey -in sk.pem -pubout -out vk.pem
+      - run:
+          command: openssl pkeyutl -sign -inkey sk.pem -rawin -in payload.txt -out payload.sig
+      - assert:
+          exit_code: 0
+      - run:
+          command: openssl pkeyutl -verify -pubin -inkey vk.pem -rawin -in payload.txt -sigfile payload.sig
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: Signature Verified Successfully
+      # Tampering with the payload must break verification.
+      - fixture:
+          file: payload.txt
+          content: |
+            sign me (tampered)
+      - run:
+          command: openssl pkeyutl -verify -pubin -inkey vk.pem -rawin -in payload.txt -sigfile payload.sig
+      - assert:
+          exit_code:
+            not: 0

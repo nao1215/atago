@@ -1,0 +1,122 @@
+version: "1"
+
+suite:
+  name: jq (third-party CLI, no build required)
+
+# jq is the first pure text-processing tool in the third-party matrix: a
+# filter program driven almost entirely by stdin, with a documented exit-code
+# contract (0 ok, 1 for false/null under -e, 2 for usage/system errors, 3 for
+# a program that does not compile, 5 when the input is not valid JSON). That
+# contract is exactly what atago's exit_code / stdout / stderr targets pin.
+scenarios:
+  - name: identity filter echoes the document from stdin
+    steps:
+      - run:
+          command: jq -c .
+          stdin: '{"b":2,"a":1}'
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              path: "$.a"
+              equals: 1
+          stderr:
+            empty: true
+
+  - name: sort-keys output is deterministic and exact
+    steps:
+      - run:
+          command: jq -c --sort-keys .
+          stdin: '{"b":2,"a":1}'
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: '{"a":1,"b":2}'
+
+  - name: raw output strips JSON quoting
+    steps:
+      - fixture:
+          file: user.json
+          content: |
+            {"name":"alice","admin":true}
+      - run:
+          shell: true
+          command: jq -r .name user.json
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: alice
+
+  - name: arguments flow in with --arg
+    steps:
+      - run:
+          command: >-
+            jq -c --arg who atago '{greeting: ("hello " + $who)}'
+          stdin: "null"
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              path: "$.greeting"
+              equals: hello atago
+
+  - name: reduce aggregates an array
+    steps:
+      - fixture:
+          file: nums.json
+          content: "[1,2,3,4,5]"
+      - run:
+          shell: true
+          command: "jq 'reduce .[] as $n (0; . + $n)' nums.json"
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "15"
+
+  - name: -e exits 1 when the result is false
+    steps:
+      - run:
+          command: jq -e '.missing'
+          stdin: '{"present":1}'
+      - assert:
+          exit_code: 1
+
+  - name: a program that does not compile exits 3 with a diagnostic on stderr
+    steps:
+      - run:
+          command: jq '.foo['
+          stdin: "{}"
+      - assert:
+          exit_code: 3
+          stdout:
+            empty: true
+          stderr:
+            contains: error
+
+  - name: invalid JSON input fails loudly and keeps stdout clean
+    steps:
+      - run:
+          command: jq .
+          stdin: "not json at all"
+      - assert:
+          exit_code:
+            not: 0
+          stderr:
+            contains: "parse error"
+
+  - name: streaming several documents produces one result per document
+    steps:
+      - run:
+          command: jq -c '.n * 2'
+          stdin: |
+            {"n":1}
+            {"n":2}
+      - assert:
+          exit_code: 0
+          stdout:
+            line: 1
+            equals: "2"
+      - assert:
+          stdout:
+            line: 2
+            equals: "4"

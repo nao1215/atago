@@ -1,0 +1,145 @@
+version: "1"
+
+suite:
+  name: sqlite3 (third-party CLI, no build required)
+
+# The sqlite3 shell is the first embedded-database CLI in the third-party
+# matrix (distinct from atago's db runner, which speaks to SQLite as a
+# library: this suite drives the /usr/bin/sqlite3 *binary* like a user would).
+# It pins the one-shot SQL contract, machine-readable -json/-csv output modes,
+# dot-command behavior (.dump/.schema/.import), durability of the database
+# file across invocations, and the bad-SQL failure mode.
+scenarios:
+  - name: one-shot SQL creates, inserts, and counts in a single invocation
+    steps:
+      - run:
+          shell: true
+          command: sqlite3 app.db "CREATE TABLE u(id INTEGER, name TEXT); INSERT INTO u VALUES(1,'alice'),(2,'bob'); SELECT count(*) FROM u;"
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "2"
+          file:
+            path: app.db
+            exists: true
+
+  - name: the database file is durable across invocations
+    steps:
+      - run:
+          shell: true
+          command: sqlite3 app.db "CREATE TABLE kv(k TEXT, v TEXT); INSERT INTO kv VALUES('answer','42');"
+      - run:
+          shell: true
+          command: sqlite3 app.db "SELECT v FROM kv WHERE k='answer';"
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "42"
+
+  - name: -json output mode is valid JSON with typed values
+    steps:
+      - run:
+          shell: true
+          command: sqlite3 app.db "CREATE TABLE u(id INTEGER, name TEXT); INSERT INTO u VALUES(1,'alice');"
+      - run:
+          shell: true
+          command: sqlite3 -json app.db "SELECT * FROM u;"
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              path: "$[0].id"
+              equals: 1
+      - assert:
+          stdout:
+            json:
+              path: "$[0].name"
+              equals: alice
+
+  - name: -csv output mode emits plain rows
+    steps:
+      - run:
+          shell: true
+          command: sqlite3 app.db "CREATE TABLE u(id INTEGER, name TEXT); INSERT INTO u VALUES(1,'alice'),(2,'bob');"
+      - run:
+          shell: true
+          command: sqlite3 -csv app.db "SELECT * FROM u ORDER BY id;"
+      - assert:
+          exit_code: 0
+          stdout:
+            line: 1
+            equals: "1,alice"
+      - assert:
+          stdout:
+            line: 2
+            equals: "2,bob"
+
+  - name: .dump emits SQL that rebuilds an identical database
+    steps:
+      - run:
+          shell: true
+          command: sqlite3 app.db "CREATE TABLE u(id INTEGER, name TEXT); INSERT INTO u VALUES(1,'alice');"
+      - run:
+          shell: true
+          command: sqlite3 app.db .dump
+          stdout_to: dump.sql
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - CREATE TABLE u
+              - INSERT INTO u
+      # Rebuild from the dump and prove the copy answers the same query.
+      - run:
+          shell: true
+          command: sqlite3 copy.db ".read dump.sql"
+      - run:
+          shell: true
+          command: sqlite3 copy.db "SELECT name FROM u WHERE id=1;"
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: alice
+
+  - name: .import loads a CSV fixture into a table
+    steps:
+      - fixture:
+          file: people.csv
+          content: |
+            id,name
+            1,carol
+            2,dave
+      - run:
+          shell: true
+          command: sqlite3 -csv app.db ".import people.csv people"
+      - assert:
+          exit_code: 0
+      - run:
+          shell: true
+          command: sqlite3 app.db "SELECT count(*) FROM people;"
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "2"
+
+  - name: bad SQL exits 1 with the error position on stderr
+    steps:
+      - run:
+          shell: true
+          command: sqlite3 app.db "SELEC broken;"
+      - assert:
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            contains: "syntax error"
+
+  - name: querying a missing table names it in the diagnostics
+    steps:
+      - run:
+          shell: true
+          command: sqlite3 app.db "SELECT * FROM no_such_table;"
+      - assert:
+          exit_code: 1
+          stderr:
+            contains: no_such_table

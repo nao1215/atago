@@ -38,6 +38,17 @@ jobs:
           - name: webhook
             dir: ./test/e2e/thirdparty/webhook
             install: go install github.com/adnanh/webhook@latest
+          # jq/openssl/sqlite3 ship on the runner image; the guard installs
+          # them only if a future image drops one.
+          - name: jq
+            dir: ./test/e2e/thirdparty/jq
+            install: command -v jq >/dev/null || (sudo apt-get update && sudo apt-get install -y jq)
+          - name: openssl
+            dir: ./test/e2e/thirdparty/openssl
+            install: command -v openssl >/dev/null || (sudo apt-get update && sudo apt-get install -y openssl)
+          - name: sqlite3
+            dir: ./test/e2e/thirdparty/sqlite3
+            install: command -v sqlite3 >/dev/null || (sudo apt-get update && sudo apt-get install -y sqlite3)
           - name: restic
             dir: ./test/e2e/thirdparty/restic
             install: go install github.com/restic/restic/cmd/restic@latest
