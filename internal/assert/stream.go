@@ -87,6 +87,22 @@ func checkStream(name string, s *spec.StreamAssert, data []byte, hasData bool, e
 			Hint:     fmt.Sprintf("regexp /%s/ did not match %s", *s.Matches, name),
 		}
 
+	case s.NotMatches != nil:
+		re, err := regexp.Compile(*s.NotMatches)
+		if err != nil {
+			return &CheckResult{Desc: "assert " + name, Hint: fmt.Sprintf("invalid regexp %q: %v", *s.NotMatches, err)}
+		}
+		desc := fmt.Sprintf("assert %s does not match %q", name, *s.NotMatches)
+		if loc := re.FindString(got); re.MatchString(got) {
+			return &CheckResult{
+				Desc:     desc,
+				Expected: fmt.Sprintf("%s without a match for /%s/", name, *s.NotMatches),
+				Actual:   excerpt(got),
+				Hint:     fmt.Sprintf("regexp /%s/ unexpectedly matched %q in %s", *s.NotMatches, loc, name),
+			}
+		}
+		return pass(desc)
+
 	case s.Equals != nil:
 		desc := fmt.Sprintf("assert %s equals exact text", name)
 		if equalsNormalized(got, *s.Equals) {

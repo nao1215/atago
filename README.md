@@ -130,11 +130,12 @@ Every feature has a commented, runnable spec under [examples/](examples/). The e
 
 | Example | Shows |
 |---------|-------|
-| [run_and_assert](examples/run_and_assert.atago.yaml) | exit code, stdout/stderr matchers (`contains`, `equals`, `matches`, lists, `line`), multi-target asserts |
+| [run_and_assert](examples/run_and_assert.atago.yaml) | exit code, stdout/stderr matchers (`contains`, `equals`, `matches`/`not_matches`, lists, `line`), multi-target asserts |
 | [shell_and_redirect](examples/shell_and_redirect.atago.yaml) | `shell: true` vs direct argv execution, `stdout_to`/`stderr_to` redirects |
 | [json_and_yaml](examples/json_and_yaml.atago.yaml) | JSONPath assertions, numeric bounds (`gt`/`lte`), the `yaml` matcher |
 | [files_and_fixtures](examples/files_and_fixtures.atago.yaml) | input fixtures (text and base64), `file` and `dir` assertions |
-| [store_and_variables](examples/store_and_variables.atago.yaml) | capturing values into `${name}`, `${workdir}`, the `$${...}` literal escape |
+| [store_and_variables](examples/store_and_variables.atago.yaml) | capturing values into `${name}`, `${workdir}`, `${env:NAME}` host-environment reads, the `$${...}` literal escape |
+| [teardown](examples/teardown.atago.yaml) | cleanup steps that always run — pass or fail — sharing the scenario's variables |
 | [matrix](examples/matrix.atago.yaml) | one template scenario expanded per parameter row |
 | [retry](examples/retry.atago.yaml) | polling a command until an assertion passes |
 | [snapshot](examples/snapshot.atago.yaml) | golden-file testing with normalized output |

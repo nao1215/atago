@@ -43,6 +43,12 @@ func buildScenario(sc *spec.Scenario, src SourceLocator) Scenario {
 		out.Steps = append(out.Steps, st)
 	}
 
+	// Teardown steps share the step shape; their variable references count
+	// toward the scenario's referenced-variable set like any other step's.
+	for i := range sc.Teardown {
+		out.Teardown = append(out.Teardown, buildStep(i, &sc.Teardown[i], vars))
+	}
+
 	out.Variables = sortedKeys(vars)
 	// Generated artifacts and security notes come from the shared spec model, so
 	// the manifest and the human-facing explain/doc summaries never drift (#56).

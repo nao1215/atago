@@ -208,6 +208,12 @@
           "type": "array",
           "minItems": 1,
           "items": { "$ref": "#/$defs/step" }
+        },
+        "teardown": {
+          "description": "Steps that always run after steps — pass, fail, error, or interrupt — sharing the scenario's variable store. For external side effects the isolated workdir cannot undo. A teardown failure is reported but does not change the scenario's verdict.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/step" }
         }
       }
     },
@@ -541,6 +547,7 @@
         { "required": ["contains"] },
         { "required": ["not_contains"] },
         { "required": ["matches"] },
+        { "required": ["not_matches"] },
         { "required": ["equals"] },
         { "required": ["not_equals"] },
         { "required": ["json"] },
@@ -553,6 +560,7 @@
         "contains": { "$ref": "#/$defs/stringOrList" },
         "not_contains": { "$ref": "#/$defs/stringOrList" },
         "matches": { "type": "string" },
+        "not_matches": { "type": "string" },
         "equals": { "type": "string" },
         "not_equals": { "type": "string" },
         "json": { "$ref": "#/$defs/jsonAssert" },

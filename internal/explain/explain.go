@@ -121,12 +121,42 @@ func explainScenario(b *strings.Builder, sc *spec.Scenario) {
 		}
 	}
 
+	// Teardown steps always run after the scenario — summarize them separately
+	// so a reviewer sees what cleanup a spec performs against external systems.
+	var teardown []string
+	for i := range sc.Teardown {
+		step := &sc.Teardown[i]
+		switch step.Kind() {
+		case spec.StepRun:
+			teardown = append(teardown, describeRun(step.Run))
+			collectVars(vars, step.Run.Command, step.Run.Cwd, step.Run.Stdin)
+		case spec.StepHTTP:
+			teardown = append(teardown, fmt.Sprintf("HTTP %s %s", step.HTTP.Method, step.HTTP.Path))
+			collectVars(vars, step.HTTP.Path, step.HTTP.Body)
+		case spec.StepQuery:
+			teardown = append(teardown, fmt.Sprintf("SQL query via %s: %s", step.Query.Runner, step.Query.SQL))
+			collectVars(vars, step.Query.SQL)
+		case spec.StepGRPC:
+			teardown = append(teardown, fmt.Sprintf("gRPC %s via %s", step.GRPC.Method, step.GRPC.Runner))
+			collectVars(vars, step.GRPC.Method)
+		case spec.StepCDP:
+			teardown = append(teardown, describeCDP(step.CDP))
+		case spec.StepFixture:
+			teardown = append(teardown, describeFixture(step.Fixture))
+		case spec.StepAssert:
+			teardown = append(teardown, describeAsserts(step.Assert)...)
+		case spec.StepStore:
+			teardown = append(teardown, "store "+step.Store.Name)
+		}
+	}
+
 	// Generated artifacts and security notes come from the shared spec model, so
 	// explain, doc, and manifest describe the same runtime surface (#56).
 	writeList(b, "Services", services)
 	writeList(b, "Fixtures", fixtures)
 	writeList(b, "Commands", commands)
 	writeList(b, "Expects", expects)
+	writeList(b, "Teardown (always runs)", teardown)
 	writeList(b, "Generates", spec.GeneratedArtifacts(sc))
 	writeList(b, "Stores", stores)
 	if used := sortedKeys(vars); len(used) > 0 {
@@ -398,6 +428,8 @@ func describeStream(s *spec.StreamAssert) string {
 		return "does not contain " + quoteList(s.NotContains)
 	case s.Matches != nil:
 		return fmt.Sprintf("matches /%s/", *s.Matches)
+	case s.NotMatches != nil:
+		return fmt.Sprintf("does not match /%s/", *s.NotMatches)
 	case s.Equals != nil:
 		return "equals exact text"
 	case s.NotEquals != nil:

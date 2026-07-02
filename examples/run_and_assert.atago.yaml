@@ -31,6 +31,11 @@ scenarios:
       - assert:
           stdout:
             matches: "a.+a"
+      # not_matches is the regexp negation: assert a pattern never appears —
+      # e.g. that output carries no warning/error lines.
+      - assert:
+          stdout:
+            not_matches: "(?i)warn|error"
       # A list is a single matcher: every element must be present (contains)
       # or absent (not_contains).
       - assert:

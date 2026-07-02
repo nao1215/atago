@@ -37,6 +37,13 @@ func applyDefaults(s *spec.Spec) {
 					mergeRunDefaults(d.Run, sc.Steps[j].Run)
 				}
 			}
+			// Teardown steps are steps too: shared run defaults (shell, env, ...)
+			// apply so cleanup does not need to re-declare them.
+			for j := range sc.Teardown {
+				if sc.Teardown[j].Run != nil {
+					mergeRunDefaults(d.Run, sc.Teardown[j].Run)
+				}
+			}
 		}
 	}
 }

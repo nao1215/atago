@@ -181,6 +181,13 @@
             "$ref": "#/$defs/step"
           }
         },
+        "teardown": {
+          "description": "Steps that always run after steps (pass, fail, error, or interrupt), sharing the scenario's variable store; their failures never change the verdict. Omitted when none.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/step"
+          }
+        },
         "variables": {
           "description": "Variable names referenced anywhere in the scenario, sorted (omitted when none).",
           "type": "array",

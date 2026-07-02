@@ -28,6 +28,11 @@ import (
 	"github.com/nao1215/atago/internal/store"
 )
 
+// teardownInterruptTimeout bounds teardown execution after the run itself was
+// cancelled (Ctrl-C / SIGTERM): cleanup of external resources still runs, but a
+// hung teardown cannot keep an interrupted process alive indefinitely.
+const teardownInterruptTimeout = 30 * time.Second
+
 // Engine executes specs.
 type Engine struct {
 	cmd      runner.Runner
@@ -374,25 +379,20 @@ func (e *Engine) runScenario(ctx context.Context, scenarioIdx int, sc *spec.Scen
 
 	var current *runner.Result
 
-	for i := leadingFixtures; i < len(sc.Steps); i++ {
-		step := &sc.Steps[i]
-
-		// Stop before running a step if the run was cancelled (Ctrl-C / parent
-		// cancel / deadline). Without this the loop would keep executing steps and
-		// evaluating assertions after a cancellation (issue #30).
-		if ctx.Err() != nil {
-			out.Status = StatusError
-			out.Steps = append(out.Steps, StepResult{Index: i, Kind: step.Kind(), ErrMsg: fmt.Sprintf("run cancelled: %v", ctx.Err())})
-			break
-		}
-
+	// execStep runs one step and returns its result, its status contribution
+	// (passed/failed/error), and whether it breached the security policy. It is
+	// shared by the Steps loop and the Teardown loop; only the caller decides
+	// whether the contribution affects the scenario's verdict.
+	execStep := func(ctx context.Context, i int, step *spec.Step) (StepResult, Status, bool) {
 		sr := StepResult{Index: i, Kind: step.Kind()}
+		status := StatusPassed
+		secViolation := false
 
 		switch step.Kind() {
 		case spec.StepFixture:
 			if err := fixture.Write(expandFixture(st, step.Fixture), workdir, specDir); err != nil {
 				sr.ErrMsg = err.Error()
-				out.Status = StatusError
+				status = StatusError
 			}
 		case spec.StepRun:
 			// A ${name} that no variable defines is left verbatim so a shell can
@@ -402,22 +402,22 @@ func (e *Engine) runScenario(ctx context.Context, scenarioIdx int, sc *spec.Scen
 			// reference named instead of running a garbled command (#UX).
 			if !step.Run.ShellEnabled() && step.Run.Runner == "" {
 				if names := st.Unresolved(step.Run.Command); len(names) > 0 {
-					sr.ErrMsg = fmt.Sprintf(
-						"run.command references ${%[1]s}, but no variable with that name is defined (builtins, matrix vars, store, ready.store) and shell is not enabled, so nothing would expand it; define the variable, set shell: true for shell expansion, or write $${%[1]s} for the literal text",
-						names[0])
-					out.Status = StatusError
-					break
+					if envName, isEnv := strings.CutPrefix(names[0], "env:"); isEnv {
+						sr.ErrMsg = fmt.Sprintf(
+							"run.command references ${env:%[1]s}, but the environment variable %[1]s is not set", envName)
+					} else {
+						sr.ErrMsg = fmt.Sprintf(
+							"run.command references ${%[1]s}, but no variable with that name is defined (builtins, matrix vars, store, ready.store, env:) and shell is not enabled, so nothing would expand it; define the variable, set shell: true for shell expansion, or write $${%[1]s} for the literal text",
+							names[0])
+					}
+					return sr, StatusError, false
 				}
 			}
 			run := mergeScenarioEnv(sc.Env, expandRun(st, step.Run), st)
 			r, untilChecks, err := e.runStep(ctx, run, st, workdir, specDir, rc, sshConns)
 			if err != nil {
 				sr.ErrMsg = err.Error()
-				out.Status = StatusError
-				if isPolicyViolation(err) {
-					out.SecurityViolation = true
-				}
-				break // sr is appended once after the switch
+				return sr, StatusError, isPolicyViolation(err)
 			}
 			current = r
 			// Assertions run against the real result (current); the copy kept for
@@ -429,7 +429,7 @@ func (e *Engine) runScenario(ctx context.Context, scenarioIdx int, sc *spec.Scen
 				e.recordChecks(masker, untilChecks, rc.specPath, sc.Name, scenarioIdx, i)
 				sr.Checks = untilChecks
 				if !assert.AllOK(untilChecks) {
-					out.Status = worseStatus(out.Status, StatusFailed)
+					status = StatusFailed
 				}
 			}
 		case spec.StepAssert:
@@ -442,13 +442,13 @@ func (e *Engine) runScenario(ctx context.Context, scenarioIdx int, sc *spec.Scen
 			e.recordChecks(masker, crs, rc.specPath, sc.Name, scenarioIdx, i)
 			sr.Checks = crs
 			if !assert.AllOK(crs) {
-				out.Status = worseStatus(out.Status, StatusFailed)
+				status = StatusFailed
 			}
 		case spec.StepStore:
 			val, err := extractValue(expandStore(st, step.Store), current, workdir)
 			if err != nil {
 				sr.ErrMsg = err.Error()
-				out.Status = StatusError
+				status = StatusError
 			} else {
 				st.Set(step.Store.Name, val)
 			}
@@ -456,11 +456,7 @@ func (e *Engine) runScenario(ctx context.Context, scenarioIdx int, sc *spec.Scen
 			r, untilChecks, secViolation, err := e.runHTTPStep(ctx, expandHTTP(st, step.HTTP), st, rc, workdir, specDir)
 			if err != nil {
 				sr.ErrMsg = err.Error()
-				out.Status = StatusError
-				if secViolation {
-					out.SecurityViolation = true
-				}
-				break // sr is appended once after the switch
+				return sr, StatusError, secViolation
 			}
 			current = r
 			sr.Run = maskResult(masker, r)
@@ -470,15 +466,14 @@ func (e *Engine) runScenario(ctx context.Context, scenarioIdx int, sc *spec.Scen
 				e.recordChecks(masker, untilChecks, rc.specPath, sc.Name, scenarioIdx, i)
 				sr.Checks = untilChecks
 				if !assert.AllOK(untilChecks) {
-					out.Status = worseStatus(out.Status, StatusFailed)
+					status = StatusFailed
 				}
 			}
 		case spec.StepQuery:
 			r, err := e.runQuery(ctx, step.Query, st, rc, dbConns)
 			if err != nil {
 				sr.ErrMsg = err.Error()
-				out.Status = StatusError
-				break // sr is appended once after the switch
+				return sr, StatusError, false
 			}
 			current = r
 			sr.Run = maskResult(masker, r)
@@ -486,11 +481,7 @@ func (e *Engine) runScenario(ctx context.Context, scenarioIdx int, sc *spec.Scen
 			r, err := e.runGRPC(ctx, expandGRPC(st, step.GRPC), st, rc, grpcConns)
 			if err != nil {
 				sr.ErrMsg = err.Error()
-				out.Status = StatusError
-				if isPolicyViolation(err) {
-					out.SecurityViolation = true
-				}
-				break // sr is appended once after the switch
+				return sr, StatusError, isPolicyViolation(err)
 			}
 			current = r
 			sr.Run = maskResult(masker, r)
@@ -498,23 +489,67 @@ func (e *Engine) runScenario(ctx context.Context, scenarioIdx int, sc *spec.Scen
 			r, err := e.runCDP(ctx, expandCDP(st, step.CDP), workdir, st, rc, browserConns)
 			if err != nil {
 				sr.ErrMsg = err.Error()
-				out.Status = StatusError
-				break // sr is appended once after the switch
+				return sr, StatusError, false
 			}
 			current = r
 			sr.Run = maskResult(masker, r)
 		default:
 			sr.ErrMsg = "step has no recognized action"
+			status = StatusError
+		}
+		return sr, status, secViolation
+	}
+
+	for i := leadingFixtures; i < len(sc.Steps); i++ {
+		step := &sc.Steps[i]
+
+		// Stop before running a step if the run was cancelled (Ctrl-C / parent
+		// cancel / deadline). Without this the loop would keep executing steps and
+		// evaluating assertions after a cancellation (issue #30).
+		if ctx.Err() != nil {
 			out.Status = StatusError
+			out.Steps = append(out.Steps, StepResult{Index: i, Kind: step.Kind(), ErrMsg: fmt.Sprintf("run cancelled: %v", ctx.Err())})
+			break
 		}
 
+		sr, status, secViolation := execStep(ctx, i, step)
+		if secViolation {
+			out.SecurityViolation = true
+		}
 		// Error messages can embed captured output (e.g. a failed service probe's
 		// raw stdout/stderr), so mask secrets before the message reaches any report
 		// (issue #12).
 		sr.ErrMsg = masker.Mask(sr.ErrMsg)
 		out.Steps = append(out.Steps, sr)
+		out.Status = worseStatus(out.Status, status)
 		if out.Status == StatusError {
 			break // stop the scenario on an execution error
+		}
+	}
+
+	// Teardown always runs — after a pass, a failure, an execution error, or an
+	// interrupt — because it exists for external side effects the isolated
+	// workdir cannot undo. It shares the scenario store (a `store`-captured
+	// resource id flows into the cleanup request) and runs while background
+	// services are still up. Failures are recorded on out.Teardown for the
+	// reports but never change the scenario's verdict: the behavior under test
+	// was decided by the steps above. Every teardown step runs even if an
+	// earlier one failed — cleanups of independent resources must not shadow
+	// each other.
+	if len(sc.Teardown) > 0 {
+		tctx := ctx
+		if ctx.Err() != nil {
+			// The run was interrupted: give cleanup its own bounded context so an
+			// interrupt still tears external resources down without letting a hung
+			// teardown keep the process alive.
+			var cancel context.CancelFunc
+			tctx, cancel = context.WithTimeout(context.Background(), teardownInterruptTimeout)
+			defer cancel()
+		}
+		for i := range sc.Teardown {
+			sr, _, _ := execStep(tctx, i, &sc.Teardown[i])
+			sr.ErrMsg = masker.Mask(sr.ErrMsg)
+			out.Teardown = append(out.Teardown, sr)
 		}
 	}
 

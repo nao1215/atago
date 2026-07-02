@@ -1,6 +1,11 @@
 package spec
 
-import "regexp"
+import (
+	"maps"
+	"regexp"
+	"slices"
+	"strings"
+)
 
 // NetworkCommand matches shell commands that reach the network. explain, doc, and
 // manifest share this single heuristic so their security notes never disagree
@@ -63,6 +68,26 @@ func SecurityNotes(sc *Scenario) []string {
 			out = append(out, s)
 		}
 	}
+	// A ${env:NAME} reference reads the invoking host environment — an input
+	// dependency worth surfacing for review alongside shell/network use.
+	addEnvRefs := func(fields ...string) {
+		for _, f := range fields {
+			for _, name := range VarRefs(f) {
+				if strings.HasPrefix(name, "env:") {
+					add("host environment read: ${" + name + "}")
+				}
+			}
+		}
+	}
+	// Values in sorted-key order: explain/doc/manifest output must stay
+	// deterministic, and Go map iteration is not.
+	envValues := func(m map[string]string) []string {
+		vals := make([]string, 0, len(m))
+		for _, k := range slices.Sorted(maps.Keys(m)) {
+			vals = append(vals, m[k])
+		}
+		return vals
+	}
 	for i := range sc.Services {
 		svc := &sc.Services[i]
 		if svc.ShellEnabled() {
@@ -71,6 +96,8 @@ func SecurityNotes(sc *Scenario) []string {
 		if NetworkCommand.MatchString(svc.Command) {
 			add("network access (service " + svc.Name + "): " + svc.Command)
 		}
+		addEnvRefs(svc.Command)
+		addEnvRefs(envValues(svc.Env)...)
 	}
 	for i := range sc.Steps {
 		step := &sc.Steps[i]
@@ -82,10 +109,17 @@ func SecurityNotes(sc *Scenario) []string {
 			if NetworkCommand.MatchString(step.Run.Command) {
 				add("network access: " + step.Run.Command)
 			}
+			addEnvRefs(step.Run.Command, step.Run.Stdin)
+			addEnvRefs(envValues(step.Run.Env)...)
 		case StepHTTP:
 			add("network access: HTTP request")
+			addEnvRefs(step.HTTP.Path, step.HTTP.Body)
+			addEnvRefs(envValues(step.HTTP.Header)...)
+		case StepQuery:
+			addEnvRefs(step.Query.SQL)
 		case StepGRPC:
 			add("network access: gRPC " + step.GRPC.Method)
+			addEnvRefs(envValues(step.GRPC.Header)...)
 		case StepCDP:
 			add("browser automation (CDP) via " + step.CDP.Runner)
 		}

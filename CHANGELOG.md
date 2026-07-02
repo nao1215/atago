@@ -9,6 +9,28 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Scenario `teardown:` steps — cleanup that always runs after the steps (pass,
+  fail, error, or interrupt), sharing the scenario's variable store so a
+  `store`-captured resource id flows into the cleanup request. Built for
+  external side effects the isolated workdir cannot undo (rows in a real
+  database, resources created via an API, containers started by a run step).
+  A teardown failure is reported — console `TEARDOWN FAILED` blocks and the
+  JSON report's `teardown_failures` — but never changes the scenario's
+  verdict; every teardown step runs even when an earlier one fails; after an
+  interrupt, teardown gets its own bounded context. Surfaced in the JSON
+  schema, `explain`, `doc`, and `manifest`.
+- `${env:NAME}` interpolation — read a host environment variable anywhere
+  `${name}` expands, including fields no shell ever touches (an http runner's
+  base_url and headers, a db dsn, ssh credentials), so a CI-provided token or
+  staging URL no longer needs a shell/store dance. An unset variable is an
+  explicit error, not an empty string; `$${env:NAME}` stays literal; values
+  listed under `secrets:` are masked as usual. `explain`/`manifest` surface
+  host-environment reads as security notes.
+- `not_matches` stream matcher — the regexp negation of `matches` on every
+  stream target (stdout/stderr/body/rows/message/value), for "no
+  warning/error lines" style assertions that `not_contains` (fixed strings)
+  cannot express. Validated at load time like `matches`.
+
 - Load-time validation for problems that previously escaped to runtime (exit 4)
   or silently misbehaved, all now exit 2 with a positioned message: a step's
   `runner:` must reference a declared runner of a compatible type (with the

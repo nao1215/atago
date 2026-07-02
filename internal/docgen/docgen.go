@@ -110,12 +110,19 @@ func writeScenario(md *markdown.Markdown, sc *spec.Scenario, specDir, outputDir 
 		writePreviews(md, inputs)
 	}
 
-	if cmds := commands(sc, expand); len(cmds) > 0 {
+	if cmds := commands(sc.Steps, expand); len(cmds) > 0 {
 		md.H4("When")
 		md.CodeBlocks(markdown.SyntaxHighlightShell, strings.Join(cmds, "\n"))
 	}
 
 	writeThen(md, sc, expand)
+
+	// Teardown always runs — pass, fail, error, or interrupt — so document the
+	// cleanup a scenario performs against external systems.
+	if td := commands(sc.Teardown, expand); len(td) > 0 {
+		md.H4("Finally (teardown, always runs)")
+		md.CodeBlocks(markdown.SyntaxHighlightShell, strings.Join(td, "\n"))
+	}
 
 	if exact := exactPreviews(sc, specDir, outputDir); len(exact) > 0 {
 		md.H4("Expected output")
@@ -202,10 +209,10 @@ func givenBullets(sc *spec.Scenario, expand func(string) string) []string {
 // just run steps, so HTTP/query/gRPC/CDP interactions are documented too (#41),
 // and store steps appear as comments so a later ${name} reference is explained
 // where it is born instead of appearing out of nowhere.
-func commands(sc *spec.Scenario, expand func(string) string) []string {
+func commands(steps []spec.Step, expand func(string) string) []string {
 	var out []string
-	for i := range sc.Steps {
-		step := &sc.Steps[i]
+	for i := range steps {
+		step := &steps[i]
 		switch step.Kind() {
 		case spec.StepRun:
 			out = append(out, expand(step.Run.Command))

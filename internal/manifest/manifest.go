@@ -107,14 +107,18 @@ type Scenario struct {
 	Tags []string `json:"tags,omitempty"`
 	// Vars holds the bound matrix row for a scenario expanded from a matrix,
 	// so tooling can see which parameterized instance this is.
-	Vars      map[string]string `json:"vars,omitempty"`
-	Only      *Condition        `json:"only,omitempty"`
-	Skip      *Condition        `json:"skip,omitempty"`
-	Services  []Service         `json:"services,omitempty"`
-	Steps     []Step            `json:"steps"`
-	Variables []string          `json:"variables,omitempty"`
-	Generates []string          `json:"generates,omitempty"`
-	Security  []string          `json:"security,omitempty"`
+	Vars     map[string]string `json:"vars,omitempty"`
+	Only     *Condition        `json:"only,omitempty"`
+	Skip     *Condition        `json:"skip,omitempty"`
+	Services []Service         `json:"services,omitempty"`
+	Steps    []Step            `json:"steps"`
+	// Teardown lists steps that always run after Steps (pass, fail, error, or
+	// interrupt), sharing the scenario's variable store. Their failures never
+	// change the scenario's verdict.
+	Teardown  []Step   `json:"teardown,omitempty"`
+	Variables []string `json:"variables,omitempty"`
+	Generates []string `json:"generates,omitempty"`
+	Security  []string `json:"security,omitempty"`
 	// Source is the authored location of this scenario (#80). Every instance
 	// expanded from one matrix template shares its template's location.
 	Source *Source `json:"source,omitempty"`

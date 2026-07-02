@@ -58,6 +58,9 @@ func validate(s *spec.Spec) []string {
 		for j := range sc.Steps {
 			validateStep(add, fmt.Sprintf("%s.steps[%d]", where, j), &sc.Steps[j], s.Runners)
 		}
+		for j := range sc.Teardown {
+			validateStep(add, fmt.Sprintf("%s.teardown[%d]", where, j), &sc.Teardown[j], s.Runners)
+		}
 	}
 	return errs
 }
@@ -695,7 +698,7 @@ func validateStream(add func(string, ...any), where string, s *spec.StreamAssert
 	matchers := s.SetMatchers()
 	switch len(matchers) {
 	case 0:
-		add("%s: must set exactly one matcher (empty/contains/not_contains/matches/equals/not_equals/json/yaml/snapshot)", where)
+		add("%s: must set exactly one matcher (empty/contains/not_contains/matches/not_matches/equals/not_equals/json/yaml/snapshot)", where)
 	case 1:
 		if s.JSON != nil {
 			validateJSON(add, where+".json", s.JSON)
@@ -706,6 +709,11 @@ func validateStream(add func(string, ...any), where string, s *spec.StreamAssert
 		if s.Matches != nil {
 			if _, err := regexp.Compile(*s.Matches); err != nil {
 				add("%s.matches %q is not a valid regexp: %v", where, *s.Matches, err)
+			}
+		}
+		if s.NotMatches != nil {
+			if _, err := regexp.Compile(*s.NotMatches); err != nil {
+				add("%s.not_matches %q is not a valid regexp: %v", where, *s.NotMatches, err)
 			}
 		}
 	default:

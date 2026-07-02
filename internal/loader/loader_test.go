@@ -179,6 +179,18 @@ func TestLoadBytes_Errors(t *testing.T) {
 			wantMsg:  "is not a valid regexp",
 		},
 		{
+			name:     "invalid not_matches regexp fails at load",
+			src:      "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n      - assert:\n          stdout:\n            not_matches: \"hi[\"",
+			wantKind: KindValidation,
+			wantMsg:  "not_matches \"hi[\" is not a valid regexp",
+		},
+		{
+			name:     "matches and not_matches together are rejected",
+			src:      "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n      - assert:\n          stdout:\n            matches: a\n            not_matches: b",
+			wantKind: KindValidation,
+			wantMsg:  "exactly one matcher",
+		},
+		{
 			name:     "invalid json matches regexp fails at load",
 			src:      "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n      - assert:\n          stdout:\n            json: {path: \"$.x\", matches: \"a(\"}",
 			wantKind: KindValidation,

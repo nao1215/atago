@@ -1,0 +1,39 @@
+version: "1"
+
+# teardown steps ALWAYS run after a scenario's steps — pass, fail, error, or
+# interrupt — and share its variable store, so a resource id captured with
+# `store` flows into the cleanup command. They exist for external side effects
+# the isolated workdir cannot undo: rows in a real database, resources created
+# via an API, containers started by a run step. A teardown failure is reported
+# (console + the JSON report's teardown_failures) but never changes the
+# scenario's verdict — the behavior under test is decided by the steps alone.
+# Runs green as-is: atago run examples/teardown.atago.yaml
+
+suite:
+  name: teardown
+
+scenarios:
+  - name: clean up an external resource by its captured id
+    steps:
+      # Stand-in for "create a resource against a real system" — imagine
+      # `mycli create` printing the id of what it made.
+      - run:
+          shell: true
+          command: echo created resource-42
+      - store:
+          name: rid
+          from:
+            stdout:
+              matches: "resource-[0-9]+"
+      - assert:
+          stdout:
+            contains: created
+    teardown:
+      # Runs even when an assert above fails, so the resource never leaks.
+      # ${rid} was captured during the steps; teardown shares the same store.
+      - run:
+          shell: true
+          command: "echo deleting ${rid}"
+      - assert:
+          stdout:
+            contains: deleting resource-42

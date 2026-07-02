@@ -142,6 +142,14 @@ type Scenario struct {
 	// peer for the duration of the scenario.
 	Services []Service `yaml:"services,omitempty"`
 	Steps    []Step    `yaml:"steps"`
+	// Teardown steps always run after Steps — whether the scenario passed,
+	// failed, errored, or was interrupted — and share its variable store, so a
+	// resource id captured with `store` flows into the cleanup request. They
+	// exist for external side effects the isolated workdir cannot undo (rows in
+	// a real database, resources created via an API, containers started by a run
+	// step). A teardown failure is reported but does not change the scenario's
+	// verdict: the behavior under test is decided by Steps alone.
+	Teardown []Step `yaml:"teardown,omitempty"`
 }
 
 // Service is a background process started before a scenario's steps run and
@@ -594,6 +602,7 @@ type StreamAssert struct {
 	Contains    StringList  `yaml:"contains,omitempty"`
 	NotContains StringList  `yaml:"not_contains,omitempty"`
 	Matches     *string     `yaml:"matches,omitempty"`
+	NotMatches  *string     `yaml:"not_matches,omitempty"`
 	Equals      *string     `yaml:"equals,omitempty"`
 	NotEquals   *string     `yaml:"not_equals,omitempty"`
 	JSON        *JSONAssert `yaml:"json,omitempty"`

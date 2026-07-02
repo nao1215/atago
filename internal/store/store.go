@@ -1,18 +1,27 @@
-// Package store holds scenario variables and performs ${name} expansion
-// . Expansion is deliberately simple substitution — atago is not a
+// Package store holds scenario variables and performs ${name} expansion.
+// Expansion is deliberately simple substitution — atago is not a
 // programming language.
 package store
 
 import (
+	"os"
 	"regexp"
 )
 
-// varRef matches an optional escaping `$` (group 1) followed by a `${name}`
-// reference (group 2). When the leading `$` is present — i.e. the source was
+// varRef matches an optional escaping `$` (group 1) followed by a `${name}` or
+// `${env:NAME}` reference (group 2 carries the name including the optional
+// `env:` prefix). When the leading `$` is present — i.e. the source was
 // `$${name}` — the match is a literal escape that renders as `${name}` without
-// expansion. A bare `$$` not followed by `{name}` (a
-// shell PID, a doubled currency sign) does not match and is left untouched.
-var varRef = regexp.MustCompile(`(\$?)\$\{([a-zA-Z_][a-zA-Z0-9_]*)\}`)
+// expansion. A bare `$$` not followed by `{name}` (a shell PID, a doubled
+// currency sign) does not match and is left untouched.
+var varRef = regexp.MustCompile(`(\$?)\$\{((?:env:)?[a-zA-Z_][a-zA-Z0-9_]*)\}`)
+
+// envPrefix marks a reference resolved from the host environment instead of
+// the scenario store: `${env:HOME}` expands to os.Getenv("HOME"). It exists
+// for fields no shell ever touches (an http runner's base_url or headers, a
+// db dsn, ssh credentials), where injecting a CI-provided value previously
+// required a three-step shell/store dance.
+const envPrefix = "env:"
 
 // Store is a per-scenario variable map.
 type Store struct {
@@ -31,8 +40,28 @@ func (s *Store) Get(name string) (string, bool) {
 	return v, ok
 }
 
-// Expand replaces ${name} references with stored values. Unknown references are
-// left verbatim so they surface as obvious failures rather than empty strings.
+// resolve looks up one reference name: an `env:`-prefixed name resolves from
+// the host environment (set-but-empty expands to ""), anything else from the
+// scenario store. Env names never fall back to store variables or vice versa.
+func (s *Store) resolve(name string) (string, bool) {
+	if envName, isEnv := cutEnvPrefix(name); isEnv {
+		return os.LookupEnv(envName)
+	}
+	v, ok := s.vars[name]
+	return v, ok
+}
+
+// cutEnvPrefix splits the `env:` marker off a reference name.
+func cutEnvPrefix(name string) (string, bool) {
+	if len(name) > len(envPrefix) && name[:len(envPrefix)] == envPrefix {
+		return name[len(envPrefix):], true
+	}
+	return name, false
+}
+
+// Expand replaces ${name} references with stored values and ${env:NAME}
+// references with host environment variables. Unknown references are left
+// verbatim so they surface as obvious failures rather than empty strings.
 func (s *Store) Expand(in string) string {
 	if s == nil || !varRef.MatchString(in) {
 		return in
@@ -44,7 +73,7 @@ func (s *Store) Expand(in string) string {
 			// $${name} → literal ${name}, never expanded.
 			return "${" + name + "}"
 		}
-		if v, ok := s.vars[name]; ok {
+		if v, ok := s.resolve(name); ok {
 			return v
 		}
 		return m
@@ -52,7 +81,8 @@ func (s *Store) Expand(in string) string {
 }
 
 // Unresolved returns the names of ${name} references in in that no stored
-// variable resolves. Escaped $${name} literals are not reported — the author
+// variable resolves, and of ${env:NAME} references whose environment variable
+// is not set. Escaped $${name} literals are not reported — the author
 // explicitly asked for literal text. Callers use this to turn a reference that
 // nothing could ever expand into an explained failure instead of passing the
 // literal text on.
@@ -63,7 +93,7 @@ func (s *Store) Unresolved(in string) []string {
 		if escaped != "" {
 			continue
 		}
-		if _, ok := s.vars[name]; !ok {
+		if _, ok := s.resolve(name); !ok {
 			names = append(names, name)
 		}
 	}

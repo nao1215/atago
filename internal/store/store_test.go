@@ -42,6 +42,40 @@ func TestExpand(t *testing.T) {
 	}
 }
 
+// TestExpand_EnvRefs proves ${env:NAME} resolves from the host environment:
+// set variables expand (including set-but-empty), unset ones stay verbatim so
+// they surface as failures, $${env:NAME} stays literal, and env names never
+// fall back to same-named store variables.
+func TestExpand_EnvRefs(t *testing.T) {
+	t.Setenv("ATAGO_STORE_TEST", "from-env")
+	t.Setenv("ATAGO_STORE_EMPTY", "")
+	s := New()
+	s.Set("ATAGO_STORE_UNSET", "from-store") // must NOT satisfy ${env:ATAGO_STORE_UNSET}
+
+	tests := []struct {
+		in, want string
+	}{
+		{"v is ${env:ATAGO_STORE_TEST}", "v is from-env"},
+		{"empty [${env:ATAGO_STORE_EMPTY}]", "empty []"},
+		{"unset ${env:ATAGO_STORE_UNSET} stays", "unset ${env:ATAGO_STORE_UNSET} stays"},
+		{"literal $${env:ATAGO_STORE_TEST}", "literal ${env:ATAGO_STORE_TEST}"},
+	}
+	for _, tt := range tests {
+		if got := s.Expand(tt.in); got != tt.want {
+			t.Errorf("Expand(%q) = %q, want %q", tt.in, got, tt.want)
+		}
+	}
+
+	// Unresolved reports the unset env reference with its env: prefix.
+	got := s.Unresolved("run ${env:ATAGO_STORE_UNSET}")
+	if len(got) != 1 || got[0] != "env:ATAGO_STORE_UNSET" {
+		t.Errorf("Unresolved = %v, want [env:ATAGO_STORE_UNSET]", got)
+	}
+	if got := s.Unresolved("run ${env:ATAGO_STORE_TEST}"); len(got) != 0 {
+		t.Errorf("Unresolved(set env) = %v, want none", got)
+	}
+}
+
 func TestExpandMap(t *testing.T) {
 	t.Parallel()
 	s := New()

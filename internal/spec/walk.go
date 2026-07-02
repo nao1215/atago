@@ -2,12 +2,13 @@ package spec
 
 import "regexp"
 
-// varRef matches an optional escaping `$` (group 1) followed by a `${name}`
-// interpolation reference (group 2). It is the single source of truth for what a
-// variable reference looks like, shared by the engine's expansion and explain
+// varRef matches an optional escaping `$` (group 1) followed by a `${name}` or
+// `${env:NAME}` interpolation reference (group 2, including the optional
+// `env:` prefix). It is the single source of truth for what a variable
+// reference looks like, shared by the engine's expansion and explain
 // (issue #23). It must stay in lockstep with
 // store.varRef, including the `$${name}` literal-escape handling (issue #37).
-var varRef = regexp.MustCompile(`(\$?)\$\{([a-zA-Z_][a-zA-Z0-9_]*)\}`)
+var varRef = regexp.MustCompile(`(\$?)\$\{((?:env:)?[a-zA-Z_][a-zA-Z0-9_]*)\}`)
 
 // VarRefs returns the variable names referenced by live ${name} occurrences in
 // s. Escaped `$${name}` references are literal text, not live references, and
@@ -79,6 +80,7 @@ func walkStream(s *StreamAssert, visit func(string) string) *StreamAssert {
 	c.Contains = walkList(s.Contains, visit)
 	c.NotContains = walkList(s.NotContains, visit)
 	c.Matches = walkPtr(s.Matches, visit)
+	c.NotMatches = walkPtr(s.NotMatches, visit)
 	c.Equals = walkPtr(s.Equals, visit)
 	c.NotEquals = walkPtr(s.NotEquals, visit)
 	c.JSON = walkJSONAssert(s.JSON, visit)

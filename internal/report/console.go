@@ -77,6 +77,26 @@ func writeDetail(b *strings.Builder, color bool, suite string, sc *engine.Scenar
 				colorize(color, cRed+cBold, "ERROR:"), suite, sc.Name, where, step.ErrMsg)
 		}
 	}
+	// A failed teardown never flips the verdict — the steps decide that — but
+	// incomplete cleanup of external resources must stay loud.
+	if sc.TeardownFailed() {
+		for _, step := range sc.Teardown {
+			for _, ck := range step.Checks {
+				if ck == nil || ck.OK {
+					continue
+				}
+				fmt.Fprintf(b, "\n%s %s / %s\n", colorize(color, cYellow+cBold, "TEARDOWN FAILED:"), suite, sc.Name)
+				fmt.Fprintf(b, "\nStep:\n  %s\n", ck.Desc)
+				if ck.Hint != "" {
+					fmt.Fprintf(b, "\nHint:\n  %s\n", ck.Hint)
+				}
+			}
+			if step.ErrMsg != "" {
+				fmt.Fprintf(b, "\n%s %s / %s\n  teardown step %d (%s): %s\n",
+					colorize(color, cYellow+cBold, "TEARDOWN FAILED:"), suite, sc.Name, step.Index, step.Kind, step.ErrMsg)
+			}
+		}
+	}
 	// Reference any preserved background-service logs by path (#51), keeping the
 	// console compact instead of dumping the captured output inline.
 	if len(sc.ServiceLogs) > 0 {

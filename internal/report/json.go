@@ -32,11 +32,16 @@ type jsonReport struct {
 }
 
 type jsonScenario struct {
-	Name        string           `json:"name"`
-	Status      string           `json:"status"`
-	DurationMS  int64            `json:"duration_ms"`
-	SkipReason  string           `json:"skip_reason,omitempty"`
-	ServiceLogs []jsonServiceLog `json:"service_logs,omitempty"`
+	Name       string `json:"name"`
+	Status     string `json:"status"`
+	DurationMS int64  `json:"duration_ms"`
+	SkipReason string `json:"skip_reason,omitempty"`
+	// TeardownFailures lists teardown steps that failed or errored. Teardown
+	// outcomes never change the scenario's status — the verdict is decided by
+	// the steps — but incomplete cleanup of external resources must stay
+	// visible to machine consumers.
+	TeardownFailures []jsonFailure    `json:"teardown_failures,omitempty"`
+	ServiceLogs      []jsonServiceLog `json:"service_logs,omitempty"`
 }
 
 // jsonServiceLog references a preserved background-service log artifact (#51).
@@ -79,11 +84,12 @@ func buildJSON(res *engine.SuiteResult) jsonReport {
 	for i := range res.Scenarios {
 		sc := &res.Scenarios[i]
 		out.Scenarios = append(out.Scenarios, jsonScenario{
-			Name:        sc.Name,
-			Status:      string(sc.Status),
-			DurationMS:  sc.Duration.Milliseconds(),
-			SkipReason:  sc.SkipReason,
-			ServiceLogs: serviceLogsOf(sc),
+			Name:             sc.Name,
+			Status:           string(sc.Status),
+			DurationMS:       sc.Duration.Milliseconds(),
+			SkipReason:       sc.SkipReason,
+			TeardownFailures: teardownFailuresOf(sc),
+			ServiceLogs:      serviceLogsOf(sc),
 		})
 		out.Failures = append(out.Failures, failuresOf(sc)...)
 	}
@@ -115,6 +121,36 @@ func serviceLogsOf(sc *engine.ScenarioResult) []jsonServiceLog {
 		out = append(out, jsonServiceLog{Name: sl.Name, Path: sl.Path})
 	}
 	return out
+}
+
+// teardownFailuresOf maps failed/errored teardown steps into the jsonFailure
+// shape. It returns nil for a clean (or absent) teardown so the field is
+// omitted.
+func teardownFailuresOf(sc *engine.ScenarioResult) []jsonFailure {
+	var fs []jsonFailure
+	for _, step := range sc.Teardown {
+		for _, ck := range step.Checks {
+			if ck == nil || ck.OK {
+				continue
+			}
+			fs = append(fs, jsonFailure{
+				Scenario:  sc.Name,
+				Step:      ck.Desc,
+				Expected:  ck.Expected,
+				Actual:    ck.Actual,
+				Hint:      ck.Hint,
+				Artifacts: artifactsOf(ck),
+			})
+		}
+		if step.ErrMsg != "" {
+			fs = append(fs, jsonFailure{
+				Scenario: sc.Name,
+				Step:     stepPhase(step),
+				Error:    step.ErrMsg,
+			})
+		}
+	}
+	return fs
 }
 
 func failuresOf(sc *engine.ScenarioResult) []jsonFailure {

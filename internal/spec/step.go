@@ -141,6 +141,9 @@ func (s *StreamAssert) SetMatchers() []string {
 	if s.Matches != nil {
 		m = append(m, "matches")
 	}
+	if s.NotMatches != nil {
+		m = append(m, "not_matches")
+	}
 	if s.Equals != nil {
 		m = append(m, "equals")
 	}

@@ -231,6 +231,8 @@ func describeStream(s *spec.StreamAssert) string {
 		return "does not contain " + codeList(s.NotContains)
 	case s.Matches != nil:
 		return "matches " + markdown.Code("/"+*s.Matches+"/")
+	case s.NotMatches != nil:
+		return "does not match " + markdown.Code("/"+*s.NotMatches+"/")
 	case s.Equals != nil:
 		return "equals an exact value"
 	case s.NotEquals != nil:

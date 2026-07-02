@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nao1215/atago/internal/assert"
 	"github.com/nao1215/atago/internal/loader"
 )
 
@@ -178,6 +179,150 @@ scenarios:
 `)
 	if res.Status != StatusPassed {
 		t.Fatalf("status = %s, want passed: %+v", res.Status, res.Scenarios)
+	}
+}
+
+// TestEngine_EnvInterpolation proves ${env:NAME} resolves from the host
+// environment (t.Setenv forbids t.Parallel): a set variable flows into a
+// command, and an unset one on a shell-less run errors naming the variable
+// instead of leaking the literal reference into argv.
+func TestEngine_EnvInterpolation(t *testing.T) {
+	t.Setenv("ATAGO_TEST_GREETING", "hello-env")
+	res := runSpec(t, `
+version: "1"
+suite:
+  name: s
+scenarios:
+  - name: env ref expands
+    steps:
+      - run: {shell: true, command: "echo ${env:ATAGO_TEST_GREETING}"}
+      - assert:
+          stdout: {contains: hello-env}
+`)
+	if res.Status != StatusPassed {
+		t.Fatalf("status = %s, want passed: %+v", res.Status, res.Scenarios)
+	}
+
+	res = runSpec(t, `
+version: "1"
+suite:
+  name: s
+scenarios:
+  - name: unset env ref errors
+    steps:
+      - run: {command: "echo ${env:ATAGO_TEST_DEFINITELY_UNSET}"}
+`)
+	if res.Status != StatusError {
+		t.Fatalf("status = %s, want error", res.Status)
+	}
+	if msg := res.Scenarios[0].Steps[0].ErrMsg; !strings.Contains(msg, "environment variable ATAGO_TEST_DEFINITELY_UNSET is not set") {
+		t.Errorf("ErrMsg = %q, want it to name the unset environment variable", msg)
+	}
+}
+
+// TestEngine_TeardownAlwaysRuns proves the teardown contract: teardown steps
+// run after a pass, after an assertion failure, and after an execution error;
+// they share the scenario store (a store-captured value flows into cleanup);
+// and a teardown failure is reported without changing the scenario's verdict.
+func TestEngine_TeardownAlwaysRuns(t *testing.T) {
+	t.Parallel()
+	res := runSpec(t, `
+version: "1"
+suite:
+  name: s
+scenarios:
+  - name: teardown runs after a pass and sees stored values
+    steps:
+      - run: {shell: true, command: echo resource-42}
+      - store:
+          name: rid
+          from:
+            stdout:
+              matches: "resource-[0-9]+"
+      - assert:
+          stdout: {contains: resource-42}
+    teardown:
+      - run: {shell: true, command: "echo deleting ${rid}"}
+      - assert:
+          stdout: {contains: deleting resource-42}
+
+  - name: teardown runs after a failed assertion
+    steps:
+      - run: {shell: true, command: echo hello}
+      - assert:
+          stdout: {contains: goodbye}
+    teardown:
+      - run: {shell: true, command: echo cleanup-ran}
+      - assert:
+          stdout: {contains: cleanup-ran}
+
+  - name: teardown runs after an execution error
+    steps:
+      - run: {command: definitely-not-a-real-binary-xyz}
+    teardown:
+      - run: {shell: true, command: echo cleanup-after-error}
+      - assert:
+          stdout: {contains: cleanup-after-error}
+`)
+	scs := res.Scenarios
+	if scs[0].Status != StatusPassed {
+		t.Errorf("scenario[0] status = %s, want passed: %+v", scs[0].Status, scs[0].Teardown)
+	}
+	if scs[1].Status != StatusFailed {
+		t.Errorf("scenario[1] status = %s, want failed (teardown must not rescue it)", scs[1].Status)
+	}
+	if scs[2].Status != StatusError {
+		t.Errorf("scenario[2] status = %s, want error", scs[2].Status)
+	}
+	for i, sc := range scs {
+		if len(sc.Teardown) != 2 {
+			t.Errorf("scenario[%d] ran %d teardown steps, want 2", i, len(sc.Teardown))
+		}
+		if sc.TeardownFailed() {
+			t.Errorf("scenario[%d] teardown failed unexpectedly: %+v", i, sc.Teardown)
+		}
+	}
+}
+
+// TestEngine_TeardownFailureDoesNotFlipVerdict proves a failing teardown is
+// recorded (TeardownFailed) while the scenario keeps its Steps-decided verdict,
+// and that every teardown step still runs after an earlier teardown failure.
+func TestEngine_TeardownFailureDoesNotFlipVerdict(t *testing.T) {
+	t.Parallel()
+	res := runSpec(t, `
+version: "1"
+suite:
+  name: s
+scenarios:
+  - name: passes with a failing teardown
+    steps:
+      - run: {shell: true, command: echo ok}
+      - assert:
+          stdout: {contains: ok}
+    teardown:
+      - run: {command: definitely-not-a-real-binary-xyz}
+      - run: {shell: true, command: echo second-cleanup}
+      - assert:
+          stdout: {contains: second-cleanup}
+`)
+	sc := res.Scenarios[0]
+	if sc.Status != StatusPassed {
+		t.Fatalf("status = %s, want passed (teardown failure must not flip the verdict)", sc.Status)
+	}
+	if res.Status != StatusPassed {
+		t.Fatalf("suite status = %s, want passed", res.Status)
+	}
+	if !sc.TeardownFailed() {
+		t.Error("TeardownFailed() = false, want true (first teardown step errored)")
+	}
+	if len(sc.Teardown) != 3 {
+		t.Fatalf("ran %d teardown steps, want all 3 despite the first failing", len(sc.Teardown))
+	}
+	if sc.Teardown[0].ErrMsg == "" {
+		t.Error("teardown[0].ErrMsg empty, want the execution error recorded")
+	}
+	if !assert.AllOK(sc.Teardown[2].Checks) {
+		t.Errorf("teardown[2] assert should pass, got %+v", sc.Teardown[2].Checks)
 	}
 }
 

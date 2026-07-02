@@ -42,9 +42,13 @@ type StepResult struct {
 
 // ScenarioResult aggregates the steps of one scenario.
 type ScenarioResult struct {
-	Name       string
-	Status     Status
-	Steps      []StepResult
+	Name   string
+	Status Status
+	Steps  []StepResult
+	// Teardown records the scenario's teardown steps. They always run (pass,
+	// fail, error, or interrupt) and their failures are reported here, but they
+	// never change Status: the verdict is decided by Steps alone.
+	Teardown   []StepResult
 	Duration   time.Duration
 	SkipReason string
 	// SecurityViolation marks a scenario that errored because it breached the
@@ -56,6 +60,18 @@ type ScenarioResult struct {
 	// set and the scenario failed or a service never became ready (#51). Paths are
 	// relative to the artifacts dir root.
 	ServiceLogs []ServiceLog
+}
+
+// TeardownFailed reports whether any teardown step failed or errored. Reports
+// use it to stay loud about incomplete cleanup without flipping the verdict.
+func (s *ScenarioResult) TeardownFailed() bool {
+	for i := range s.Teardown {
+		sr := &s.Teardown[i]
+		if sr.ErrMsg != "" || !assert.AllOK(sr.Checks) {
+			return true
+		}
+	}
+	return false
 }
 
 // ServiceLog references one background service's preserved log artifact (#51).

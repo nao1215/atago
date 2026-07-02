@@ -3,6 +3,8 @@ version: "1"
 # store captures a value from a previous step (JSONPath or regex on stdout, a
 # file, an HTTP header, ...) and later steps reference it as ${name}.
 # ${workdir} is built in: the scenario's isolated temp directory.
+# ${env:NAME} reads the host environment — for injecting a CI-provided value
+# (a token, a staging URL) into fields no shell ever touches.
 # Runs green as-is: atago run examples/store_and_variables.atago.yaml
 
 suite:
@@ -45,6 +47,19 @@ scenarios:
       - assert:
           stdout:
             equals: releasing 1.2.3
+
+  - name: read the host environment with env
+    steps:
+      # ${env:NAME} expands from the invoking environment — unlike shell `$VAR`
+      # it also works in fields no shell touches (an http runner's base_url or
+      # headers, a db dsn, ssh credentials). An unset variable is an error, not
+      # an empty string. PATH is set on every OS, so this runs green as-is.
+      - run:
+          shell: true
+          command: echo path is ${env:PATH}
+      - assert:
+          stdout:
+            not_matches: "^path is $"
 
   - name: write a literal ${...} with the $$ escape
     steps:

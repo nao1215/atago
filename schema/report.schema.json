@@ -59,6 +59,11 @@
           "description": "Present only for skipped scenarios.",
           "type": "string"
         },
+        "teardown_failures": {
+          "description": "Teardown steps that failed or errored. Teardown outcomes never change the scenario's status; omitted when clean or absent.",
+          "type": "array",
+          "items": {"$ref": "#/$defs/failure"}
+        },
         "service_logs": {
           "description": "Preserved background-service log artifacts (#51); omitted when none.",
           "type": "array",
