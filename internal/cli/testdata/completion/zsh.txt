@@ -4,7 +4,7 @@
 _atago() {
     local -a commands run_flags
     commands=(completion doc explain help init list manifest run snapshot version)
-    run_flags=(--artifacts-dir --ci --fail-fast --filter --parallel --report --rerun-failed --skip-tag --tag --update-snapshots)
+    run_flags=(--artifacts-dir --ci --fail-fast --filter --parallel --report --rerun-failed --skip-tag --tag --update-snapshots --verbose)
     if (( CURRENT == 2 )); then
         compadd -- ${commands}
         return

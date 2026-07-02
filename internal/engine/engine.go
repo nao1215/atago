@@ -175,6 +175,7 @@ func (e *Engine) Run(ctx context.Context, s *spec.Spec, specPath string) *SuiteR
 					}
 				}
 				sc := e.runScenario(ctx, idx, &s.Scenarios[idx], rc)
+				sc.Suite = s.Suite.Name
 				if e.Sem != nil {
 					<-e.Sem
 				}
@@ -204,7 +205,7 @@ func (e *Engine) Run(ctx context.Context, s *spec.Spec, specPath string) *SuiteR
 	res.Scenarios = make([]ScenarioResult, 0, len(selected))
 	for _, i := range selected {
 		if !done[i] {
-			results[i] = ScenarioResult{Name: s.Scenarios[i].Name, Status: StatusSkipped, SkipReason: unrunReason}
+			results[i] = ScenarioResult{Name: s.Scenarios[i].Name, Suite: s.Suite.Name, Status: StatusSkipped, SkipReason: unrunReason}
 		}
 		res.Scenarios = append(res.Scenarios, results[i])
 		res.Status = worseStatus(res.Status, results[i].Status)

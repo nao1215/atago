@@ -39,7 +39,7 @@ Source: `test/e2e/thirdparty/minio/minio.atago.yaml`
 - Fixture file `upload.txt` is created.
 #### Inputs
 _Fixture `upload.txt`:_
-```
+```text
 hello object storage
 ```
 #### When
@@ -100,7 +100,7 @@ mc version info --json local/versioned
 - Fixture file `page.txt` is created.
 #### Inputs
 _Fixture `page.txt`:_
-```
+```text
 published via bucket policy
 ```
 #### When

@@ -48,7 +48,7 @@ cmp pixel.png downloaded.png
 - Fixture file `notes.txt` is created.
 #### Inputs
 _Fixture `notes.txt`:_
-```
+```text
 shared through a multipart form
 ```
 #### When

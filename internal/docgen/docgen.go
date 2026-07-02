@@ -157,11 +157,17 @@ func matrixExpander(sc *spec.Scenario) func(string) string {
 func writePreviews(md *markdown.Markdown, blocks []previewBlock) {
 	for _, b := range blocks {
 		md.PlainTextf("_%s:_", b.label)
+		lang := b.lang
+		if lang == "" {
+			// "text" keeps the generated docs markdownlint-clean (MD040)
+			// without guessing the payload's real format.
+			lang = "text"
+		}
 		switch {
 		case b.image && b.body != "":
 			md.PlainTextf("![%s](%s)", b.label, b.body)
 		case b.body != "":
-			md.CodeBlocks(markdown.SyntaxHighlight(b.lang), b.body)
+			md.CodeBlocks(markdown.SyntaxHighlight(lang), b.body)
 		}
 	}
 }

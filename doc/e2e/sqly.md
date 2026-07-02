@@ -496,14 +496,14 @@ Source: `test/e2e/tools/sqly/batch.atago.yaml`
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 jenkins46,2
 grey07,3
 ```
 _stdin for `sqly`:_
-```
+```text
 SELECT user_name FROM user ORDER BY identifier LIMIT 1
 ```
 #### When
@@ -518,14 +518,14 @@ sqly user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 jenkins46,2
 grey07,3
 ```
 _stdin for `sqly`:_
-```
+```text
 .mode ndjson
 SELECT user_name FROM user ORDER BY identifier LIMIT 1
 ```
@@ -542,14 +542,14 @@ sqly user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 jenkins46,2
 grey07,3
 ```
 _stdin for `sqly`:_
-```
+```text
 SELECT user_name FROM user ORDER BY identifier LIMIT 1;
 SELECT * FROM no_such_table;
 ```
@@ -566,14 +566,14 @@ sqly user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 jenkins46,2
 grey07,3
 ```
 _stdin for `sqly`:_
-```
+```text
 SELECT user_name FROM user ORDER BY identifier LIMIT 1;
 SELECT 1;
 SELECT *
@@ -591,14 +591,14 @@ sqly user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 jenkins46,2
 grey07,3
 ```
 _stdin for `sqly`:_
-```
+```text
 .exit
 SELECT * FROM no_such_table
 ```
@@ -613,14 +613,14 @@ sqly user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 jenkins46,2
 grey07,3
 ```
 _stdin for `sqly`:_
-```
+```text
 SELECT * FROM no_such_table;
 .exit
 ```
@@ -636,14 +636,14 @@ sqly user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 jenkins46,2
 grey07,3
 ```
 _stdin for `sqly`:_
-```
+```text
 SELECT user_name
 FROM user
 ORDER BY identifier
@@ -661,14 +661,14 @@ sqly user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 jenkins46,2
 grey07,3
 ```
 _stdin for `sqly`:_
-```
+```text
 .mode csv
 SELECT 1 AS n
 UNION ALL
@@ -689,14 +689,14 @@ sqly user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 jenkins46,2
 grey07,3
 ```
 _stdin for `sqly`:_
-```
+```text
 WITH x AS (
   SELECT user_name FROM user ORDER BY identifier LIMIT 1
 )
@@ -714,14 +714,14 @@ sqly user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 jenkins46,2
 grey07,3
 ```
 _stdin for `sqly`:_
-```
+```text
 .tables
 SELECT COUNT(*) AS c FROM user;
 SELECT user_name FROM user ORDER BY identifier LIMIT 1;
@@ -738,14 +738,14 @@ sqly user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 jenkins46,2
 grey07,3
 ```
 _stdin for `sqly`:_
-```
+```text
 -- comment ;
 SELECT 'v' AS x;
 ```
@@ -761,14 +761,14 @@ sqly user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 jenkins46,2
 grey07,3
 ```
 _stdin for `sqly`:_
-```
+```text
 /* comment ; */
 SELECT 'v' AS x;
 ```
@@ -784,14 +784,14 @@ sqly user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 jenkins46,2
 grey07,3
 ```
 _stdin for `sqly`:_
-```
+```text
 SELECT 'first' AS x; -- trailing ; comment
 SELECT 'second' AS y;
 ```
@@ -807,14 +807,14 @@ sqly user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 jenkins46,2
 grey07,3
 ```
 _stdin for `sqly`:_
-```
+```text
 SELECT 'v' AS [a;b];
 ```
 #### When
@@ -829,14 +829,14 @@ sqly user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 jenkins46,2
 grey07,3
 ```
 _stdin for `sqly`:_
-```
+```text
 SELECT 'v' AS `a;b`;
 ```
 #### When
@@ -851,14 +851,14 @@ sqly user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 jenkins46,2
 grey07,3
 ```
 _stdin for `sqly`:_
-```
+```text
 SELECT * FROM (
 ```
 #### When
@@ -875,13 +875,13 @@ Source: `test/e2e/tools/sqly/batch_failfast.atago.yaml`
 - Fixture file `u.csv` is created.
 #### Inputs
 _Fixture `u.csv`:_
-```
+```text
 user_name,identifier,first_name
 booker12,1,Rachel
 jenkins46,2,Mary
 ```
 _stdin for `sqly`:_
-```
+```text
 SELECT * FROM no_such_table;
 SELECT 1 AS later;
 ```
@@ -898,13 +898,13 @@ sqly u.csv
 - Fixture file `u.csv` is created.
 #### Inputs
 _Fixture `u.csv`:_
-```
+```text
 user_name,identifier,first_name
 booker12,1,Rachel
 jenkins46,2,Mary
 ```
 _stdin for `sqly`:_
-```
+```text
 UPDATE u SET first_name = 'BROKEN' WHERE identifier = 1;
 SELECT * FROM no_such_table;
 .save --force
@@ -923,13 +923,13 @@ sqly u.csv
 - Fixture file `u.csv` is created.
 #### Inputs
 _Fixture `u.csv`:_
-```
+```text
 user_name,identifier,first_name
 booker12,1,Rachel
 jenkins46,2,Mary
 ```
 _stdin for `sqly`:_
-```
+```text
 SELECT * FROM no_such_table;
 .dump u out.csv
 ```
@@ -946,7 +946,7 @@ sqly u.csv
 - Fixture file `u.csv` is created.
 #### Inputs
 _Fixture `u.csv`:_
-```
+```text
 user_name,identifier,first_name
 booker12,1,Rachel
 jenkins46,2,Mary
@@ -967,7 +967,7 @@ Source: `test/e2e/tools/sqly/cache.atago.yaml`
 - Fixture file `data.csv` is created.
 #### Inputs
 _Fixture `data.csv`:_
-```
+```text
 id,name
 1,Alice
 2,Bob
@@ -989,14 +989,14 @@ sqly --cache snap.cache --sql "SELECT COUNT(*) AS n FROM data" data.csv
 - Fixture file `data.csv` is created.
 #### Inputs
 _Fixture `data.csv`:_
-```
+```text
 id,name
 1,Alice
 2,Bob
 3,Carol
 ```
 _Fixture `data.csv`:_
-```
+```text
 id,name
 1,Alice
 2,Bob
@@ -1018,7 +1018,7 @@ sqly --cache snap.cache --sql "SELECT COUNT(*) AS n FROM data" data.csv
 - Fixture file `data.csv` is created.
 #### Inputs
 _Fixture `data.csv`:_
-```
+```text
 id,name
 1,Alice
 2,Bob
@@ -1040,14 +1040,14 @@ sqly --cache snap.cache --cache-clear --sql "SELECT COUNT(*) AS n FROM data" dat
 - Fixture file `snap.cache/keep` is created.
 #### Inputs
 _Fixture `data.csv`:_
-```
+```text
 id,name
 1,Alice
 2,Bob
 3,Carol
 ```
 _Fixture `snap.cache/keep`:_
-```
+```text
 x
 ```
 #### When
@@ -1064,13 +1064,13 @@ sqly --cache snap.cache --sql "SELECT COUNT(*) AS n FROM data" data.csv
 - Fixture file `d.csv` is created.
 #### Inputs
 _Fixture `d.csv`:_
-```
+```text
 id,name
 1,Alice
 2,Bob
 ```
 _Fixture `d.csv`:_
-```
+```text
 id,name
 1,Carol
 2,Eve
@@ -1091,7 +1091,7 @@ sqly --cache snap.cache --sql "SELECT group_concat(name, ',') AS names FROM d" d
 - Fixture file `indir/data.csv` is created.
 #### Inputs
 _Fixture `indir/data.csv`:_
-```
+```text
 id,name
 1,Alice
 2,Bob
@@ -1115,16 +1115,16 @@ sqly --cache indir/snap.cache --sql "SELECT group_concat(name, ',') AS t FROM sq
 - Fixture file `indir/ignore.txt` is created.
 #### Inputs
 _Fixture `indir/data.csv`:_
-```
+```text
 id,name
 1,Alice
 ```
 _Fixture `indir/ignore.txt`:_
-```
+```text
 note
 ```
 _Fixture `indir/ignore.txt`:_
-```
+```text
 changed
 ```
 #### When
@@ -1144,16 +1144,16 @@ sqly --cache snap.cache --sql "SELECT COUNT(*) AS n FROM data" indir
 - Fixture file `indir/data.csv` is created.
 #### Inputs
 _Fixture `indir/data.csv`:_
-```
+```text
 id,name
 1,Alice
 ```
 _Fixture `indir/ignore.txt`:_
-```
+```text
 note
 ```
 _Fixture `indir/data.csv`:_
-```
+```text
 id,name
 1,Alice
 2,Bob
@@ -1199,7 +1199,7 @@ sqly --sql "SELECT 1" does_not_exist.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
@@ -1223,7 +1223,7 @@ sqly --no-such-flag
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
@@ -1240,13 +1240,13 @@ sqly --csv --json --sql "SELECT 1" user.csv
 - Fixture file `identifier.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 jenkins46,2
 ```
 _Fixture `identifier.csv`:_
-```
+```text
 id,position
 1,developrt
 2,manager
@@ -1264,7 +1264,7 @@ sqly --csv --sql "SELECT user_name, position FROM user INNER JOIN identifier ON 
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
@@ -1281,7 +1281,7 @@ sqly --json --output result.json --sql "SELECT user_name FROM user ORDER BY iden
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
@@ -1298,7 +1298,7 @@ sqly --sql "SELECT user_name FROM user ORDER BY identifier LIMIT 1" user.csv --c
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
@@ -1317,12 +1317,12 @@ Source: `test/e2e/tools/sqly/collision.atago.yaml`
 - Fixture file `a_b.csv` is created.
 #### Inputs
 _Fixture `a-b.csv`:_
-```
+```text
 id,name
 1,A
 ```
 _Fixture `a_b.csv`:_
-```
+```text
 id,name
 2,B
 ```
@@ -1341,14 +1341,14 @@ Source: `test/e2e/tools/sqly/compare.atago.yaml`
 - Fixture file `rev2.csv` is created.
 #### Inputs
 _Fixture `rev1.csv`:_
-```
+```text
 id,name,age
 1,Alice,30
 2,Bob,25
 3,Carol,40
 ```
 _Fixture `rev2.csv`:_
-```
+```text
 id,name,age
 1,Alice,31
 2,Bob,25
@@ -1370,14 +1370,14 @@ sqly --compare --compare-key id rev1.csv rev2.csv
 - Fixture file `rev2.csv` is created.
 #### Inputs
 _Fixture `rev1.csv`:_
-```
+```text
 id,name,age
 1,Alice,30
 2,Bob,25
 3,Carol,40
 ```
 _Fixture `rev2.csv`:_
-```
+```text
 id,name,age
 1,Alice,31
 2,Bob,25
@@ -1396,14 +1396,14 @@ sqly --compare --compare-key id --compare-format text rev1.csv rev2.csv
 - Fixture file `rev2.csv` is created.
 #### Inputs
 _Fixture `rev1.csv`:_
-```
+```text
 id,name,age
 1,Alice,30
 2,Bob,25
 3,Carol,40
 ```
 _Fixture `rev2.csv`:_
-```
+```text
 id,name,age
 1,Alice,31
 2,Bob,25
@@ -1422,14 +1422,14 @@ sqly --compare --compare-key ID rev1.csv rev2.csv
 - Fixture file `rev2.csv` is created.
 #### Inputs
 _Fixture `rev1.csv`:_
-```
+```text
 id,name,age
 1,Alice,30
 2,Bob,25
 3,Carol,40
 ```
 _Fixture `rev2.csv`:_
-```
+```text
 id,name,age
 1,Alice,31
 2,Bob,25
@@ -1448,13 +1448,13 @@ sqly --compare --compare-key nope rev1.csv rev2.csv
 - Fixture file `single.csv` is created.
 #### Inputs
 _Fixture `dupe.csv`:_
-```
+```text
 id,name
 1,Alice
 1,Bob
 ```
 _Fixture `single.csv`:_
-```
+```text
 id,name
 1,Alice
 ```
@@ -1471,14 +1471,14 @@ sqly --compare --compare-key id dupe.csv single.csv
 - Fixture file `rev2.csv` is created.
 #### Inputs
 _Fixture `rev1.csv`:_
-```
+```text
 id,name,age
 1,Alice,30
 2,Bob,25
 3,Carol,40
 ```
 _Fixture `rev2.csv`:_
-```
+```text
 id,name,age
 1,Alice,31
 2,Bob,25
@@ -1496,7 +1496,7 @@ sqly --compare --compare-tables "nope,rev2" rev1.csv rev2.csv
 - Fixture file `rev1.csv` is created.
 #### Inputs
 _Fixture `rev1.csv`:_
-```
+```text
 id,name,age
 1,Alice,30
 2,Bob,25
@@ -1515,12 +1515,12 @@ sqly --compare rev1.csv
 - Fixture file `ant.csv` is created.
 #### Inputs
 _Fixture `zebra.csv`:_
-```
+```text
 id,name
 1,Alice
 ```
 _Fixture `ant.csv`:_
-```
+```text
 id,name
 1,Alice
 ```
@@ -1537,12 +1537,12 @@ sqly --compare --compare-format text zebra.csv ant.csv
 - Fixture file `ant.csv` is created.
 #### Inputs
 _Fixture `zebra.csv`:_
-```
+```text
 id,name
 1,Alice
 ```
 _Fixture `ant.csv`:_
-```
+```text
 id,name
 1,Alice
 ```
@@ -1559,7 +1559,7 @@ sqly --compare --compare-format text ant.csv zebra.csv
 - Fixture file `big2.csv` is created.
 #### Inputs
 _Fixture `big1.csv`:_
-```
+```text
 id,name,score
 0,name0,0
 1,name1,1
@@ -1583,7 +1583,7 @@ id,name,score
 … (truncated, 31 more lines)
 ```
 _Fixture `big2.csv`:_
-```
+```text
 id,name,score
 0,name0,1
 1,name1,1
@@ -1621,7 +1621,7 @@ Source: `test/e2e/tools/sqly/cross_format.atago.yaml`
 - Fixture file `sales.csv` is created.
 #### Inputs
 _Fixture `sales.csv`:_
-```
+```text
 product_id,quantity
 1,3
 2,10
@@ -1642,12 +1642,12 @@ Source: `test/e2e/tools/sqly/empty_args.atago.yaml`
 - Fixture file `u.csv` is created.
 #### Inputs
 _Fixture `u.csv`:_
-```
+```text
 user_name,identifier,first_name
 booker12,1,Rachel
 ```
 _stdin for `sqly`:_
-```
+```text
 UPDATE u SET first_name = 'EMPTY' WHERE identifier = 1;
 .save ""
 ```
@@ -1665,12 +1665,12 @@ sqly u.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
 _stdin for `sqly`:_
-```
+```text
 .dump user ""
 ```
 #### When
@@ -1683,7 +1683,7 @@ sqly user.csv
 ### Scenario: rejects .import with an empty path
 #### Inputs
 _stdin for `sqly`:_
-```
+```text
 .import ""
 .tables
 ```
@@ -1701,7 +1701,7 @@ Source: `test/e2e/tools/sqly/excel_export.atago.yaml`
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
@@ -1721,12 +1721,12 @@ sqly --excel --output out.xlsx --sql "SELECT * FROM user LIMIT 1" user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
 _stdin for `sqly`:_
-```
+```text
 .mode excel
 .dump user dump.xlsx
 ```
@@ -1748,7 +1748,7 @@ Source: `test/e2e/tools/sqly/export_inference.atago.yaml`
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
@@ -1767,7 +1767,7 @@ sqly --sql "SELECT user_name FROM user ORDER BY identifier LIMIT 1" user.csv --o
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
@@ -1787,7 +1787,7 @@ sqly --sql "SELECT user_name FROM user ORDER BY identifier LIMIT 1" user.csv --o
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 jenkins46,2
@@ -1807,7 +1807,7 @@ sqly --csv --sql "SELECT user_name FROM result LIMIT 1" result.csv.gz
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
@@ -1828,7 +1828,7 @@ sqly --sql "SELECT user_name FROM user LIMIT 1" user.csv --output out.unknown
 - Fixture file `outdir/.keep` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
@@ -1846,12 +1846,12 @@ sqly --sql "SELECT identifier FROM user LIMIT 1" user.csv --output outdir
 - Fixture file `outdir/.keep` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
 _stdin for `sqly`:_
-```
+```text
 .dump user outdir
 ```
 #### When
@@ -1866,7 +1866,7 @@ sqly user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
@@ -1882,7 +1882,7 @@ sqly --json --sql "SELECT user_name FROM user LIMIT 1" user.csv --output result.
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
@@ -1898,7 +1898,7 @@ sqly --sql "SELECT user_name FROM user LIMIT 1" user.csv --output result.csv.bz2
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
@@ -1914,12 +1914,12 @@ sqly --sql "SELECT user_name FROM user LIMIT 1" user.csv --output result.parquet
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
 _stdin for `sqly`:_
-```
+```text
 .dump user dump.tsv
 ```
 #### When
@@ -1937,7 +1937,7 @@ sqly user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 jenkins46,2
@@ -1957,12 +1957,12 @@ Source: `test/e2e/tools/sqly/extra_args.atago.yaml`
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
 _stdin for `sqly`:_
-```
+```text
 .schema user extra
 ```
 #### When
@@ -1977,12 +1977,12 @@ sqly user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
 _stdin for `sqly`:_
-```
+```text
 .describe user extra
 ```
 #### When
@@ -1997,12 +1997,12 @@ sqly user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
 _stdin for `sqly`:_
-```
+```text
 .tables extra
 ```
 #### When
@@ -2017,12 +2017,12 @@ sqly user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
 _stdin for `sqly`:_
-```
+```text
 .mode csv extra
 ```
 #### When
@@ -2037,12 +2037,12 @@ sqly user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
 _stdin for `sqly`:_
-```
+```text
 .pwd extra
 ```
 #### When
@@ -2057,12 +2057,12 @@ sqly user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
 _stdin for `sqly`:_
-```
+```text
 .clear extra
 ```
 #### When
@@ -2077,12 +2077,12 @@ sqly user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
 _stdin for `sqly`:_
-```
+```text
 .exit extra
 SELECT 1;
 ```
@@ -2100,14 +2100,14 @@ Source: `test/e2e/tools/sqly/filesql_integration.atago.yaml`
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 jenkins46,2
 grey07,3
 ```
 _stdin for `sqly`:_
-```
+```text
 SELECT COUNT(*) FROM user
 ```
 #### When
@@ -2122,7 +2122,7 @@ sqly user.csv
 - Fixture file `sample.jsonl` is created.
 #### Inputs
 _stdin for `sqly`:_
-```
+```text
 SELECT COUNT(*) FROM sample
 ```
 #### When
@@ -2137,7 +2137,7 @@ sqly sample.jsonl
 - Fixture file `products.parquet` is created.
 #### Inputs
 _stdin for `sqly`:_
-```
+```text
 SELECT COUNT(*) FROM products
 ```
 #### When
@@ -2152,7 +2152,7 @@ sqly products.parquet
 - Fixture file `sample.xlsx` is created.
 #### Inputs
 _stdin for `sqly`:_
-```
+```text
 SELECT COUNT(*) FROM sample_test_sheet
 ```
 #### When
@@ -2167,7 +2167,7 @@ sqly sample.xlsx
 - Fixture file `ppd-debit.ach` is created.
 #### Inputs
 _stdin for `sqly`:_
-```
+```text
 SELECT COUNT(*) FROM ppd_debit_entries
 ```
 #### When
@@ -2182,7 +2182,7 @@ sqly ppd-debit.ach
 - Fixture file `customer-transfer.fed` is created.
 #### Inputs
 _stdin for `sqly`:_
-```
+```text
 SELECT COUNT(*) FROM customer_transfer_message
 ```
 #### When
@@ -2197,7 +2197,7 @@ sqly customer-transfer.fed
 - Fixture file `products.parquet` is created.
 #### Inputs
 _stdin for `sqly`:_
-```
+```text
 .describe products
 ```
 #### When
@@ -2212,11 +2212,11 @@ sqly products.parquet
 - Fixture file `ppd-debit.ach` is created.
 #### Inputs
 _stdin for `sqly`:_
-```
+```text
 .tables
 ```
 _stdin for `sqly`:_
-```
+```text
 .tables
 ```
 #### When
@@ -2234,7 +2234,7 @@ Source: `test/e2e/tools/sqly/helpers.atago.yaml`
 ### Scenario: .help groups commands, shows usage, and flags destructive save
 #### Inputs
 _stdin for `sqly`:_
-```
+```text
 .help
 ```
 #### When
@@ -2249,12 +2249,12 @@ sqly
 - Fixture file `testdata/x.csv` is created.
 #### Inputs
 _Fixture `testdata/x.csv`:_
-```
+```text
 id,name
 1,a
 ```
 _stdin for `sqly`:_
-```
+```text
 .cd testdata
 .pwd
 ```
@@ -2270,12 +2270,12 @@ sqly
 - Fixture file `home/sqly_tilde.csv` is created.
 #### Inputs
 _Fixture `home/sqly_tilde.csv`:_
-```
+```text
 id,name
 1,foo
 ```
 _stdin for `sqly`:_
-```
+```text
 .cd ~
 .pwd
 ```
@@ -2291,12 +2291,12 @@ sqly
 - Fixture file `home/sqly_tilde.csv` is created.
 #### Inputs
 _Fixture `home/sqly_tilde.csv`:_
-```
+```text
 id,name
 1,foo
 ```
 _stdin for `sqly`:_
-```
+```text
 .import ~/sqly_tilde.csv
 .tables
 ```
@@ -2310,7 +2310,7 @@ sqly
 ### Scenario: .clear emits no ANSI escapes to stdout in batch mode
 #### Inputs
 _stdin for `sqly`:_
-```
+```text
 .clear
 ```
 #### When
@@ -2325,12 +2325,12 @@ sqly
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
 _stdin for `sqly`:_
-```
+```text
 .clear
 SELECT 1 AS x;
 ```
@@ -2346,12 +2346,12 @@ sqly --json user.csv
 - Fixture file `sqly_e2e space.csv` is created.
 #### Inputs
 _Fixture `sqly_e2e space.csv`:_
-```
+```text
 id,name
 1,foo
 ```
 _stdin for `sqly`:_
-```
+```text
 .import "sqly_e2e space.csv"
 .tables
 ```
@@ -2367,12 +2367,12 @@ sqly
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
 _stdin for `sqly`:_
-```
+```text
 .mode
 ```
 #### When
@@ -2387,12 +2387,12 @@ sqly user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
 _stdin for `sqly`:_
-```
+```text
 .dump user out.tsv
 ```
 #### When
@@ -2425,7 +2425,7 @@ case "$SQLY_HISTORY_DB_PATH" in "$SQLY_E2E_SANDBOX"*) exit 0 ;; *) exit 1 ;; esa
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
@@ -2443,7 +2443,7 @@ Source: `test/e2e/tools/sqly/history_tolerance.atago.yaml`
 - Fixture file `actor.csv` is created.
 #### Inputs
 _Fixture `actor.csv`:_
-```
+```text
 actor
 Adam Sandler
 Harrison Ford
@@ -2461,13 +2461,13 @@ sqly --csv --sql "SELECT actor FROM actor ORDER BY actor LIMIT 1" actor.csv
 - Fixture file `actor.csv` is created.
 #### Inputs
 _Fixture `actor.csv`:_
-```
+```text
 actor
 Adam Sandler
 Harrison Ford
 ```
 _stdin for `sqly`:_
-```
+```text
 .tables
 SELECT actor FROM actor ORDER BY actor LIMIT 1
 ```
@@ -2485,7 +2485,7 @@ sqly actor.csv
 - Fixture file `h.db` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 jenkins46,2
@@ -2505,7 +2505,7 @@ sqly --sql "SELECT user_name FROM user ORDER BY identifier LIMIT 1" user.csv
 - Fixture file `h.db` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 jenkins46,2
@@ -2526,13 +2526,13 @@ sqly --inspect user.csv
 - Fixture file `h.db` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 jenkins46,2
 ```
 _stdin for `sqly`:_
-```
+```text
 SELECT user_name FROM user ORDER BY identifier LIMIT 1
 ```
 #### When
@@ -2552,7 +2552,7 @@ Source: `test/e2e/tools/sqly/import_failure.atago.yaml`
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
@@ -2578,7 +2578,7 @@ sqly --sql "SELECT 1" /no/such/a.csv /no/such/b.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
@@ -2595,12 +2595,12 @@ sqly --inspect user.csv /no/such/file.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
 _stdin for `sqly`:_
-```
+```text
 .import user.csv /no/such/file.csv
 .tables
 ```
@@ -2628,13 +2628,13 @@ Source: `test/e2e/tools/sqly/import_quoting.atago.yaml`
 - Fixture file `space name.csv` is created.
 #### Inputs
 _Fixture `space name.csv`:_
-```
+```text
 label,score
 alpha,1
 beta,2
 ```
 _stdin for `sqly`:_
-```
+```text
 .import space\ name.csv
 SELECT label FROM space_name ORDER BY score;
 ```
@@ -2650,13 +2650,13 @@ sqly
 - Fixture file `space name.csv` is created.
 #### Inputs
 _Fixture `space name.csv`:_
-```
+```text
 label,score
 alpha,1
 beta,2
 ```
 _stdin for `sqly`:_
-```
+```text
 .import "space name.csv"
 SELECT label FROM space_name ORDER BY score;
 ```
@@ -2672,13 +2672,13 @@ sqly
 - Fixture file `space name.csv` is created.
 #### Inputs
 _Fixture `space name.csv`:_
-```
+```text
 label,score
 alpha,1
 beta,2
 ```
 _stdin for `sqly`:_
-```
+```text
 .import 'space name.csv'
 SELECT label FROM space_name ORDER BY score;
 ```
@@ -2694,13 +2694,13 @@ sqly
 - Fixture file `space dir/nested.csv` is created.
 #### Inputs
 _Fixture `space dir/nested.csv`:_
-```
+```text
 label,score
 gamma,3
 delta,4
 ```
 _stdin for `sqly`:_
-```
+```text
 .import space\ dir/nested.csv
 SELECT label FROM nested ORDER BY score;
 ```
@@ -2716,13 +2716,13 @@ sqly
 - Fixture file `space name.csv` is created.
 #### Inputs
 _Fixture `space name.csv`:_
-```
+```text
 label,score
 alpha,1
 beta,2
 ```
 _stdin for `sqly`:_
-```
+```text
 .import space name.csv
 ```
 #### When
@@ -2739,7 +2739,7 @@ Source: `test/e2e/tools/sqly/inspect.atago.yaml`
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 jenkins46,2
@@ -2769,12 +2769,12 @@ sqly --inspect ppd-debit.ach
 - Fixture file `ins/b.csv` is created.
 #### Inputs
 _Fixture `ins/a.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
 _Fixture `ins/b.csv`:_
-```
+```text
 id,position
 1,developrt
 ```
@@ -2800,7 +2800,7 @@ sqly --inspect
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 jenkins46,2
@@ -2819,7 +2819,7 @@ sqly --inspect --inspect-sample 0 user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 jenkins46,2
@@ -2838,7 +2838,7 @@ sqly --inspect --inspect-sample 1 user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 jenkins46,2
@@ -2858,7 +2858,7 @@ Source: `test/e2e/tools/sqly/inspect_conflicts.atago.yaml`
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
@@ -2874,7 +2874,7 @@ sqly --inspect --sql "SELECT * FROM user LIMIT 1" user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
@@ -2891,7 +2891,7 @@ sqly --inspect --output out.csv user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
@@ -2928,7 +2928,7 @@ Source: `test/e2e/tools/sqly/metamorphic.atago.yaml`
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 jenkins46,2
@@ -2949,7 +2949,7 @@ sqly --csv --sql "SELECT user_name FROM user" user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 jenkins46,2
@@ -2970,7 +2970,7 @@ sqly --json --sql "SELECT user_name FROM user WHERE 1=0" user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 jenkins46,2
@@ -2989,7 +2989,7 @@ sqly --csv --sql "SELECT user_name FROM user ORDER BY user_name DESC" user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 jenkins46,2
@@ -3007,14 +3007,14 @@ sqly --ndjson --sql "SELECT user_name FROM user ORDER BY identifier" user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 jenkins46,2
 grey07,3
 ```
 _stdin for `sqly`:_
-```
+```text
 .dump user rt.csv
 ```
 #### When
@@ -3035,12 +3035,12 @@ Source: `test/e2e/tools/sqly/mode_banner.atago.yaml`
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
 _stdin for `sqly`:_
-```
+```text
 .mode json
 SELECT user_name FROM user LIMIT 1
 ```
@@ -3058,12 +3058,12 @@ sqly user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
 _stdin for `sqly`:_
-```
+```text
 .mode ndjson
 SELECT user_name FROM user LIMIT 1
 ```
@@ -3081,12 +3081,12 @@ sqly user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
 _stdin for `sqly`:_
-```
+```text
 .mode json-typed
 SELECT 7 AS n, 'x' AS s
 ```
@@ -3106,7 +3106,7 @@ Source: `test/e2e/tools/sqly/output_format.atago.yaml`
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 jenkins46,2
@@ -3126,7 +3126,7 @@ sqly --json --sql "SELECT user_name, identifier FROM user ORDER BY identifier LI
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
@@ -3142,7 +3142,7 @@ sqly --json --sql "SELECT user_name FROM user WHERE user_name = 'nobody'" user.c
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 jenkins46,2
@@ -3161,7 +3161,7 @@ sqly --ndjson --sql "SELECT user_name, identifier FROM user ORDER BY identifier 
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
@@ -3177,7 +3177,7 @@ sqly --ndjson --sql "SELECT user_name FROM user WHERE user_name = 'nobody'" user
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 jenkins46,2
@@ -3197,7 +3197,7 @@ Source: `test/e2e/tools/sqly/output_requires_sql.atago.yaml`
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
@@ -3214,12 +3214,12 @@ sqly user.csv --output out.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
 _stdin for `sqly`:_
-```
+```text
 SELECT user_name FROM user ORDER BY identifier LIMIT 1
 ```
 #### When
@@ -3237,7 +3237,7 @@ Source: `test/e2e/tools/sqly/output_status.atago.yaml`
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
@@ -3257,12 +3257,12 @@ sqly --sql "SELECT 1 AS x" --output out.csv user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
 _stdin for `sqly`:_
-```
+```text
 .dump user dump.csv
 ```
 #### When
@@ -3281,12 +3281,12 @@ sqly user.csv
 - Fixture file `u.csv` is created.
 #### Inputs
 _Fixture `u.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
 _stdin for `sqly`:_
-```
+```text
 UPDATE u SET user_name = 'X' WHERE identifier = 1;
 .save saved
 ```
@@ -3306,14 +3306,14 @@ Source: `test/e2e/tools/sqly/parquet_export.atago.yaml`
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 jenkins46,2
 grey07,3
 ```
 _stdin for `sqly`:_
-```
+```text
 .mode parquet
 .dump user user.parquet
 ```
@@ -3336,14 +3336,14 @@ sqly --csv --sql "SELECT COUNT(*) AS c FROM user" user.parquet
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 jenkins46,2
 grey07,3
 ```
 _stdin for `sqly`:_
-```
+```text
 .mode parquet
 .dump user result
 ```
@@ -3360,7 +3360,7 @@ sqly user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 jenkins46,2
@@ -3402,7 +3402,7 @@ sqly --json-typed --sql "SELECT * FROM n" n.parquet
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 jenkins46,2
@@ -3422,7 +3422,7 @@ Source: `test/e2e/tools/sqly/path_validation.atago.yaml`
 - Fixture file `a/b/c/d/e/f/g/h/i/j/k/user.csv` is created.
 #### Inputs
 _Fixture `a/b/c/d/e/f/g/h/i/j/k/user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 jenkins46,2
@@ -3440,7 +3440,7 @@ sqly --csv --sql "SELECT COUNT(*) AS c FROM user" a/b/c/d/e/f/g/h/i/j/k/user.csv
 - Fixture file `..%2fuser.csv` is created.
 #### Inputs
 _Fixture `..%2fuser.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
@@ -3470,7 +3470,7 @@ _skipped on windows_
 - Fixture file `user_alias.csv` is created.
 #### Inputs
 _Fixture `real.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
@@ -3488,7 +3488,7 @@ Source: `test/e2e/tools/sqly/profile.atago.yaml`
 - Fixture file `messy.csv` is created.
 #### Inputs
 _Fixture `messy.csv`:_
-```
+```text
 id,score,note
 1,10, hi
 2,abc,
@@ -3504,7 +3504,7 @@ sqly --profile messy.csv
 ### Scenario: profiles a stdin dataset
 #### Inputs
 _stdin for `sqly`:_
-```
+```text
 id,name
 1,Alice
 2,Bob
@@ -3522,14 +3522,14 @@ sqly --stdin csv --profile
 - Fixture file `orders.csv` is created.
 #### Inputs
 _Fixture `messy.csv`:_
-```
+```text
 id,score,note
 1,10, hi
 2,abc,
 3,30,N/A
 ```
 _Fixture `orders.csv`:_
-```
+```text
 oid,amount
 1,9.99
 2,5.00
@@ -3546,7 +3546,7 @@ sqly --profile messy.csv orders.csv
 - Fixture file `orders.csv` is created.
 #### Inputs
 _Fixture `orders.csv`:_
-```
+```text
 oid,amount
 1,9.99
 2,5.00
@@ -3563,7 +3563,7 @@ sqly --profile --profile-format text orders.csv
 - Fixture file `blank.csv` is created.
 #### Inputs
 _Fixture `blank.csv`:_
-```
+```text
 id,v
 x,
 x,A
@@ -3579,7 +3579,7 @@ sqly --profile blank.csv
 - Fixture file `blank.csv` is created.
 #### Inputs
 _Fixture `blank.csv`:_
-```
+```text
 id,v
 x,
 x,A
@@ -3595,7 +3595,7 @@ sqly --profile --profile-format text blank.csv
 - Fixture file `nullspace.csv` is created.
 #### Inputs
 _Fixture `nullspace.csv`:_
-```
+```text
 v
 " NULL "
 ```
@@ -3610,7 +3610,7 @@ sqly --profile nullspace.csv
 - Fixture file `padded.csv` is created.
 #### Inputs
 _Fixture `padded.csv`:_
-```
+```text
 v
 " hello "
 ```
@@ -3626,7 +3626,7 @@ sqly --profile padded.csv
 - Fixture file `commas.csv` is created.
 #### Inputs
 _Fixture `commas.csv`:_
-```
+```text
 amount
 "1,000"
 "2,500"
@@ -3643,7 +3643,7 @@ sqly --profile commas.csv
 - Fixture file `commas.csv` is created.
 #### Inputs
 _Fixture `commas.csv`:_
-```
+```text
 amount
 "1,000"
 "2,500"
@@ -3662,7 +3662,7 @@ Source: `test/e2e/tools/sqly/readme_examples.atago.yaml`
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 jenkins46,2,Mary,Jenkins
@@ -3681,14 +3681,14 @@ sqly --sql "SELECT * FROM user" user.csv
 - Fixture file `identifier.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 jenkins46,2,Mary,Jenkins
 smith79,3,Jamie,Smith
 ```
 _Fixture `identifier.csv`:_
-```
+```text
 id,position
 1,developrt
 2,manager
@@ -3749,7 +3749,7 @@ sqly --csv --sql "SELECT name FROM products ORDER BY CAST(price AS REAL) DESC LI
 - Fixture file `identifier.csv` is created.
 #### Inputs
 _Fixture `identifier.csv`:_
-```
+```text
 id,position
 1,developrt
 2,manager
@@ -3767,7 +3767,7 @@ sqly --csv --sql "SELECT user_name, position FROM user JOIN identifier ON user.i
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 jenkins46,2,Mary,Jenkins
@@ -3786,7 +3786,7 @@ sqly --csv --sql "SELECT user_name, identifier FROM user LIMIT 2" user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 jenkins46,2,Mary,Jenkins
@@ -3803,7 +3803,7 @@ sqly --json --sql "SELECT user_name, identifier FROM user LIMIT 2" user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 jenkins46,2,Mary,Jenkins
@@ -3821,7 +3821,7 @@ sqly --ndjson --sql "SELECT user_name, identifier FROM user LIMIT 2" user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 jenkins46,2,Mary,Jenkins
@@ -3839,7 +3839,7 @@ sqly --markdown --sql "SELECT user_name, identifier FROM user LIMIT 2" user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 jenkins46,2,Mary,Jenkins
@@ -3856,7 +3856,7 @@ sqly --ltsv --sql "SELECT user_name, identifier FROM user LIMIT 1" user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 jenkins46,2,Mary,Jenkins
@@ -3873,7 +3873,7 @@ sqly --sql "SELECT * FROM user" --output out.csv user.csv
 ### Scenario: queries piped CSV through the default stdin table
 #### Inputs
 _stdin for `sqly`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 jenkins46,2,Mary,Jenkins
@@ -3891,14 +3891,14 @@ sqly --stdin csv --sql "SELECT user_name FROM stdin LIMIT 1"
 - Fixture file `identifier.csv` is created.
 #### Inputs
 _Fixture `identifier.csv`:_
-```
+```text
 id,position
 1,developrt
 2,manager
 3,neet
 ```
 _stdin for `sqly`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 jenkins46,2,Mary,Jenkins
@@ -3916,14 +3916,14 @@ sqly --stdin csv --csv --sql "SELECT s.user_name, i.position FROM stdin s JOIN i
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 jenkins46,2,Mary,Jenkins
 smith79,3,Jamie,Smith
 ```
 _stdin for `sqly`:_
-```
+```text
 .tables
 SELECT COUNT(*) FROM user
 ```
@@ -3940,14 +3940,14 @@ sqly user.csv
 - Fixture file `join.sql` is created.
 #### Inputs
 _Fixture `identifier.csv`:_
-```
+```text
 id,position
 1,developrt
 2,manager
 3,neet
 ```
 _stdin for `sqly`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 jenkins46,2,Mary,Jenkins
@@ -3965,7 +3965,7 @@ sqly --stdin csv --sql-file join.sql identifier.csv
 - Fixture file `identifier.csv` is created.
 #### Inputs
 _Fixture `identifier.csv`:_
-```
+```text
 id,position
 1,developrt
 2,manager
@@ -3983,7 +3983,7 @@ sqly --inspect --inspect-sample 1 identifier.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 jenkins46,2,Mary,Jenkins
@@ -4001,14 +4001,14 @@ sqly --inspect --inspect-sample 0 user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 jenkins46,2,Mary,Jenkins
 smith79,3,Jamie,Smith
 ```
 _stdin for `sqly`:_
-```
+```text
 .schema user
 ```
 #### When
@@ -4023,14 +4023,14 @@ sqly user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 jenkins46,2,Mary,Jenkins
 smith79,3,Jamie,Smith
 ```
 _stdin for `sqly`:_
-```
+```text
 .describe user
 ```
 #### When
@@ -4045,7 +4045,7 @@ sqly user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 jenkins46,2,Mary,Jenkins
@@ -4066,7 +4066,7 @@ sqly --sql "UPDATE user SET first_name = 'Rachelle' WHERE identifier = 1" --save
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 jenkins46,2,Mary,Jenkins
@@ -4085,7 +4085,7 @@ sqly --sql "UPDATE user SET identifier = identifier + 100" --save user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 jenkins46,2,Mary,Jenkins
@@ -4104,7 +4104,7 @@ sqly --sql "CREATE TABLE backup AS SELECT * FROM user" --save-dir out user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 jenkins46,2,Mary,Jenkins
@@ -4125,17 +4125,17 @@ sqly --sql "UPDATE user SET identifier = identifier + 100" --save --force user.c
 - Fixture file `imp/identifier.csv` is created.
 #### Inputs
 _Fixture `imp/user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
 _Fixture `imp/identifier.csv`:_
-```
+```text
 id,position
 1,developrt
 ```
 _stdin for `sqly`:_
-```
+```text
 .tables
 ```
 #### When
@@ -4151,7 +4151,7 @@ sqly imp
 - Fixture file `ppd-debit.ach` is created.
 #### Inputs
 _stdin for `sqly`:_
-```
+```text
 .tables
 ```
 #### When
@@ -4176,7 +4176,7 @@ sqly --csv --sql "SELECT amount FROM ppd_debit_entries" ppd-debit.ach
 - Fixture file `customer-transfer.fed` is created.
 #### Inputs
 _stdin for `sqly`:_
-```
+```text
 .tables
 ```
 #### When
@@ -4193,7 +4193,7 @@ Source: `test/e2e/tools/sqly/save.atago.yaml`
 - Fixture file `u.csv` is created.
 #### Inputs
 _Fixture `u.csv`:_
-```
+```text
 user_name,identifier,first_name
 booker12,1,Rachel
 jenkins46,2,Mary
@@ -4213,7 +4213,7 @@ sqly --sql "UPDATE u SET first_name = 'CHANGED' WHERE identifier = 1" u.csv --sa
 - Fixture file `u.csv` is created.
 #### Inputs
 _Fixture `u.csv`:_
-```
+```text
 user_name,identifier,first_name
 booker12,1,Rachel
 jenkins46,2,Mary
@@ -4231,7 +4231,7 @@ sqly --sql "UPDATE u SET first_name = 'X'" u.csv --save
 - Fixture file `u.csv` is created.
 #### Inputs
 _Fixture `u.csv`:_
-```
+```text
 user_name,identifier,first_name
 booker12,1,Rachel
 jenkins46,2,Mary
@@ -4249,7 +4249,7 @@ sqly --sql "DELETE FROM u WHERE identifier > 1" u.csv --save --force
 - Fixture file `u.csv` is created.
 #### Inputs
 _Fixture `u.csv`:_
-```
+```text
 user_name,identifier,first_name
 booker12,1,Rachel
 jenkins46,2,Mary
@@ -4280,13 +4280,13 @@ sqly --csv --sql "SELECT first_name FROM c WHERE identifier = 1" c.csv.gz
 - Fixture file `u.csv` is created.
 #### Inputs
 _Fixture `u.csv`:_
-```
+```text
 user_name,identifier,first_name
 booker12,1,Rachel
 jenkins46,2,Mary
 ```
 _stdin for `sqly`:_
-```
+```text
 UPDATE u SET first_name = 'BATCH' WHERE identifier = 1;
 .save --force
 ```
@@ -4310,7 +4310,7 @@ sqly --save --force --sql "UPDATE foo SET x = 1"
 ### Scenario: guides a batch .save with no imported tables toward passing input
 #### Inputs
 _stdin for `sqly`:_
-```
+```text
 .save --force
 ```
 #### When
@@ -4327,12 +4327,12 @@ Source: `test/e2e/tools/sqly/schema.atago.yaml`
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
 _stdin for `sqly`:_
-```
+```text
 .schema user
 ```
 #### When
@@ -4347,12 +4347,12 @@ sqly user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
 _stdin for `sqly`:_
-```
+```text
 .mode json
 .schema user
 ```
@@ -4370,12 +4370,12 @@ sqly user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
 _stdin for `sqly`:_
-```
+```text
 CREATE VIEW v AS SELECT 1 AS x;
 .schema V
 ```
@@ -4392,12 +4392,12 @@ sqly user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
 _stdin for `sqly`:_
-```
+```text
 .schema no_such_table
 ```
 #### When
@@ -4412,12 +4412,12 @@ sqly user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
 _stdin for `sqly`:_
-```
+```text
 .describe user
 ```
 #### When
@@ -4432,12 +4432,12 @@ sqly user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
 _stdin for `sqly`:_
-```
+```text
 .mode json
 .describe user
 ```
@@ -4454,12 +4454,12 @@ sqly user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
 _stdin for `sqly`:_
-```
+```text
 .describe no_such_table
 ```
 #### When
@@ -4476,7 +4476,7 @@ Source: `test/e2e/tools/sqly/sheet_flag.atago.yaml`
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
@@ -4492,7 +4492,7 @@ sqly --sql "SELECT * FROM user" --sheet "A test" user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
@@ -4518,7 +4518,7 @@ sqly --csv --sql "SELECT * FROM sample_test_sheet" --sheet test_sheet sample.xls
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
@@ -4534,7 +4534,7 @@ sqly --inspect --sheet "" user.csv
 - Fixture file `dir/u.csv` is created.
 #### Inputs
 _Fixture `dir/u.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
@@ -4550,7 +4550,7 @@ sqly --inspect --sheet anything dir
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
@@ -4589,7 +4589,7 @@ Source: `test/e2e/tools/sqly/smoke.atago.yaml`
 - Fixture file `users.csv` is created.
 #### Inputs
 _Fixture `users.csv`:_
-```
+```text
 id,name
 1,Alice
 2,Bob
@@ -4606,7 +4606,7 @@ sqly --sql 'SELECT count(*) AS cnt FROM users' --csv users.csv
 - Fixture file `users.csv` is created.
 #### Inputs
 _Fixture `users.csv`:_
-```
+```text
 id,name
 1,Alice
 2,Bob
@@ -4623,7 +4623,7 @@ sqly --sql 'SELECT name FROM users WHERE id = 1' --csv users.csv
 - Fixture file `users.csv` is created.
 #### Inputs
 _Fixture `users.csv`:_
-```
+```text
 id,name
 1,Alice
 ```
@@ -4643,13 +4643,13 @@ Source: `test/e2e/tools/sqly/sql_file.atago.yaml`
 - Fixture file `q.sql` is created.
 #### Inputs
 _Fixture `actor.csv`:_
-```
+```text
 actor
 Adam Sandler
 Harrison Ford
 ```
 _Fixture `q.sql`:_
-```
+```text
 -- top actor by name
 SELECT actor
 FROM actor
@@ -4669,20 +4669,20 @@ sqly --csv --sql-file q.sql actor.csv
 - Fixture file `join.sql` is created.
 #### Inputs
 _Fixture `identifier.csv`:_
-```
+```text
 id,position
 1,developrt
 2,manager
 ```
 _Fixture `join.sql`:_
-```
+```text
 SELECT s.name, i.position
 FROM stdin s
 JOIN identifier i ON s.id = i.id
 ORDER BY s.id;
 ```
 _stdin for `sqly`:_
-```
+```text
 id,name
 1,alice
 2,bob
@@ -4700,13 +4700,13 @@ sqly --stdin csv --csv --sql-file join.sql identifier.csv
 - Fixture file `multi.sql` is created.
 #### Inputs
 _Fixture `actor.csv`:_
-```
+```text
 actor
 Adam Sandler
 Harrison Ford
 ```
 _Fixture `multi.sql`:_
-```
+```text
 SELECT 'first' AS x;
 SELECT 'second' AS x;
 ```
@@ -4723,13 +4723,13 @@ sqly --csv --sql-file multi.sql actor.csv
 - Fixture file `q.sql` is created.
 #### Inputs
 _Fixture `actor.csv`:_
-```
+```text
 actor
 Adam Sandler
 Harrison Ford
 ```
 _Fixture `q.sql`:_
-```
+```text
 SELECT 1;
 ```
 #### When
@@ -4744,7 +4744,7 @@ sqly --sql "SELECT 1" --sql-file q.sql actor.csv
 - Fixture file `actor.csv` is created.
 #### Inputs
 _Fixture `actor.csv`:_
-```
+```text
 actor
 Adam Sandler
 Harrison Ford
@@ -4762,7 +4762,7 @@ sqly --sql-file no_such.sql actor.csv
 - Fixture file `empty.sql` is created.
 #### Inputs
 _Fixture `actor.csv`:_
-```
+```text
 actor
 Adam Sandler
 Harrison Ford
@@ -4780,13 +4780,13 @@ sqly --sql-file empty.sql actor.csv
 - Fixture file `bad.sql` is created.
 #### Inputs
 _Fixture `actor.csv`:_
-```
+```text
 actor
 Adam Sandler
 Harrison Ford
 ```
 _Fixture `bad.sql`:_
-```
+```text
 SELECT 1;
 SELECT 2;
 SELECT * FROM no_such_table;
@@ -4806,13 +4806,13 @@ Source: `test/e2e/tools/sqly/sqlfile_output.atago.yaml`
 - Fixture file `q.sql` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 jenkins46,2
 ```
 _Fixture `q.sql`:_
-```
+```text
 SELECT user_name FROM user ORDER BY identifier LIMIT 1;
 ```
 #### When
@@ -4830,13 +4830,13 @@ sqly --sql-file q.sql --output out.csv user.csv
 - Fixture file `q.sql` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 jenkins46,2
 ```
 _Fixture `q.sql`:_
-```
+```text
 CREATE TEMP TABLE picked AS SELECT user_name FROM user;
 SELECT * FROM picked ORDER BY user_name LIMIT 1;
 ```
@@ -4857,13 +4857,13 @@ sqly --sql-file q.sql --output out.csv user.csv
 - Fixture file `q.sql` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 jenkins46,2
 ```
 _Fixture `q.sql`:_
-```
+```text
 CREATE TEMP TABLE t AS SELECT 1 AS x;
 ```
 #### When
@@ -4880,13 +4880,13 @@ sqly --sql-file q.sql --output out.csv user.csv
 - Fixture file `q.sql` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 jenkins46,2
 ```
 _Fixture `q.sql`:_
-```
+```text
 SELECT user_name FROM user LIMIT 1;
 SELECT identifier FROM user LIMIT 1;
 ```
@@ -4903,7 +4903,7 @@ Source: `test/e2e/tools/sqly/stdin_dataset.atago.yaml`
 ### Scenario: queries piped CSV through the default stdin table
 #### Inputs
 _stdin for `sqly`:_
-```
+```text
 id,name
 1,alice
 2,bob
@@ -4920,7 +4920,7 @@ sqly --stdin csv --csv --sql "SELECT name FROM stdin ORDER BY id"
 ### Scenario: queries piped TSV data
 #### Inputs
 _stdin for `sqly`:_
-```
+```text
 id	name
 1	alice
 ```
@@ -4934,7 +4934,7 @@ sqly --stdin tsv --csv --sql "SELECT COUNT(*) AS c FROM stdin"
 ### Scenario: queries piped JSONL data stored in a data column
 #### Inputs
 _stdin for `sqly`:_
-```
+```text
 {"id":1,"name":"alice"}
 {"id":2,"name":"bob"}
 ```
@@ -4948,7 +4948,7 @@ sqly --stdin jsonl --csv --sql "SELECT COUNT(*) AS c FROM stdin"
 ### Scenario: overrides the stdin table name with --stdin-name
 #### Inputs
 _stdin for `sqly`:_
-```
+```text
 id,name
 1,alice
 2,bob
@@ -4965,13 +4965,13 @@ sqly --stdin csv --stdin-name people --csv --sql "SELECT COUNT(*) FROM people"
 - Fixture file `identifier.csv` is created.
 #### Inputs
 _Fixture `identifier.csv`:_
-```
+```text
 id,position
 1,developrt
 2,manager
 ```
 _stdin for `sqly`:_
-```
+```text
 id,name
 1,alice
 2,bob
@@ -4986,7 +4986,7 @@ sqly --stdin csv --csv --sql "SELECT s.name, i.position FROM stdin s JOIN identi
 ### Scenario: reports a stable stdin source in --inspect, not a temp path
 #### Inputs
 _stdin for `sqly`:_
-```
+```text
 id,name
 1,alice
 ```
@@ -5001,7 +5001,7 @@ sqly --stdin csv --inspect
 ### Scenario: rejects --save --force for a stdin-backed table
 #### Inputs
 _stdin for `sqly`:_
-```
+```text
 id,name
 1,alice
 ```
@@ -5016,7 +5016,7 @@ sqly --stdin csv --sql "UPDATE stdin SET name = 'x'" --save --force
 ### Scenario: rejects a non-identifier --stdin-name so the name stays queryable
 #### Inputs
 _stdin for `sqly`:_
-```
+```text
 id,name
 1,alice
 ```
@@ -5030,7 +5030,7 @@ sqly --stdin csv --stdin-name "my data" --sql 'SELECT * FROM "my data"'
 ### Scenario: rejects a path-like --stdin-name
 #### Inputs
 _stdin for `sqly`:_
-```
+```text
 a
 1
 ```
@@ -5045,7 +5045,7 @@ sqly --stdin csv --stdin-name "../escaped" --sql "SELECT 1"
 ### Scenario: reports a clear error for an unsupported stdin format
 #### Inputs
 _stdin for `sqly`:_
-```
+```text
 a,b
 1,2
 ```
@@ -5061,12 +5061,12 @@ sqly --stdin xml --sql "SELECT 1"
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
 _stdin for `sqly`:_
-```
+```text
 .tables
 SELECT user_name FROM user ORDER BY identifier LIMIT 1
 ```
@@ -5106,7 +5106,7 @@ sqly --ndjson-typed --sql "SELECT 7 AS n, 't' AS s"
 - Fixture file `typed_bigint.csv` is created.
 #### Inputs
 _Fixture `typed_bigint.csv`:_
-```
+```text
 id,amount,flag
 1,9007199254740993,true
 2,42,false
@@ -5130,7 +5130,7 @@ sqly --json-typed --sql "SELECT '007' AS code"
 - Fixture file `typed_bigint.csv` is created.
 #### Inputs
 _Fixture `typed_bigint.csv`:_
-```
+```text
 id,amount,flag
 1,9007199254740993,true
 2,42,false
@@ -5146,7 +5146,7 @@ sqly --inspect --json-typed typed_bigint.csv
 - Fixture file `typed_bigint.csv` is created.
 #### Inputs
 _Fixture `typed_bigint.csv`:_
-```
+```text
 id,amount,flag
 1,9007199254740993,true
 2,42,false
@@ -5181,7 +5181,7 @@ sqly --sql-file ""
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
@@ -5195,7 +5195,7 @@ sqly --sql "SELECT 1" --save-dir "" user.csv
 ### Scenario: rejects an empty --stdin
 #### Inputs
 _stdin for `sqly`:_
-```
+```text
 id,name
 1,a
 ```
@@ -5219,7 +5219,7 @@ sqly --csv --json --sql "SELECT 1 AS x"
 - Fixture file `u.csv` is created.
 #### Inputs
 _Fixture `u.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
@@ -5236,7 +5236,7 @@ sqly --csv --sql "UPDATE u SET first_name='X' WHERE identifier=1 RETURNING ident
 - Fixture file `u.csv` is created.
 #### Inputs
 _Fixture `u.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
@@ -5253,7 +5253,7 @@ sqly --sql "UPDATE u SET first_name='X' WHERE identifier=1" --output out.csv u.c
 - Fixture file `u.csv` is created.
 #### Inputs
 _Fixture `u.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
@@ -5272,7 +5272,7 @@ sqly --csv --sql "UPDATE u SET first_name='X' WHERE identifier=1 RETURNING ident
 - Fixture file `q.sql` is created.
 #### Inputs
 _Fixture `q.sql`:_
-```
+```text
 -- header only
 /* block */
 ```
@@ -5289,7 +5289,7 @@ sqly --sql-file q.sql
 - Fixture file `q.sql` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
@@ -5305,12 +5305,12 @@ sqly --csv --sql-file q.sql user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
 _stdin for `sqly`:_
-```
+```text
 ﻿SELECT 7 AS z;
 ```
 #### When
@@ -5326,16 +5326,16 @@ sqly --csv user.csv
 - Fixture file `q.sql` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
 _Fixture `q.sql`:_
-```
+```text
 SELECT 1 AS x;
 ```
 _stdin for `sqly`:_
-```
+```text
 SELECT 999 AS y;
 ```
 #### When
@@ -5348,7 +5348,7 @@ sqly --sql-file q.sql user.csv
 ### Scenario: fails a --stdin dataset run with no query
 #### Inputs
 _stdin for `sqly`:_
-```
+```text
 id,name
 1,a
 ```
@@ -5364,7 +5364,7 @@ sqly --stdin csv
 - Fixture file `dir/2023-data.csv` is created.
 #### Inputs
 _Fixture `dir/2023-data.csv`:_
-```
+```text
 id,name
 1,a
 ```
@@ -5382,12 +5382,12 @@ sqly --inspect dir
 - Fixture file `dir/b/user.csv` is created.
 #### Inputs
 _Fixture `dir/a/user.csv`:_
-```
+```text
 id,name
 1,alpha
 ```
 _Fixture `dir/b/user.csv`:_
-```
+```text
 id,name
 2,beta
 ```
@@ -5405,17 +5405,17 @@ sqly --inspect dir
 - Fixture file `cmds.sql` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
 _Fixture `dir/user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 alt1,1,ALT,One
 ```
 _Fixture `cmds.sql`:_
-```
+```text
 .import dir
 SELECT user_name FROM user ORDER BY identifier;
 ```
@@ -5432,7 +5432,7 @@ sqly --sql-file cmds.sql user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
@@ -5448,7 +5448,7 @@ sqly --csv --sql "SELECT * FROM user WHERE identifier=1" --output user.csv user.
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
@@ -5465,12 +5465,12 @@ sqly --sql "UPDATE user SET first_name='P' WHERE identifier=1" --save-dir . user
 - Fixture file `out/user.csv` is created.
 #### Inputs
 _Fixture `src/user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
 _Fixture `out/user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
@@ -5487,7 +5487,7 @@ sqly --sql "UPDATE user SET first_name='Q' WHERE identifier=1" --save-dir out sr
 - Fixture file `sample.xlsx` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
@@ -5504,7 +5504,7 @@ sqly --sql "UPDATE user SET first_name='X' WHERE identifier=1" --save-dir out us
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
@@ -5592,7 +5592,7 @@ sqly --csv --sql "/* note */ SELECT 1 AS x"
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
@@ -5616,7 +5616,7 @@ sqly --csv --sql "VALUES (1), (2)"
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
@@ -5640,7 +5640,7 @@ sqly --sql "CREATE TABLE t(x)"
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
@@ -5656,7 +5656,7 @@ sqly --sql "ANALYZE" user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
@@ -5696,7 +5696,7 @@ sqly --force --sql "SELECT 1 AS x"
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
@@ -5712,7 +5712,7 @@ sqly --inspect --csv user.csv
 - Fixture file `empty.json` is created.
 #### Inputs
 _Fixture `empty.json`:_
-```
+```text
 []
 ```
 #### When
@@ -5737,7 +5737,7 @@ sqly --csv --sql "SELECT COUNT(*) AS n FROM empty" empty.jsonl
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
@@ -5753,7 +5753,7 @@ sqly --sql "SELECT 1 AS x" --output "outdir/" user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
@@ -5767,7 +5767,7 @@ sqly --sql "SELECT identifier FROM user LIMIT 1" --output out.ach user.csv
 ### Scenario: parses a helper command after a terminated statement
 #### Inputs
 _stdin for `sqly`:_
-```
+```text
 SELECT 1 AS x;
 .mode csv
 SELECT 2 AS y;
@@ -5783,7 +5783,7 @@ sqly
 ### Scenario: parses a helper command after a leading comment
 #### Inputs
 _stdin for `sqly`:_
-```
+```text
 -- header
 .mode csv
 SELECT 1 AS x;
@@ -5801,7 +5801,7 @@ sqly
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
@@ -5817,7 +5817,7 @@ sqly --sql "EXPLAIN UPDATE user SET first_name='X' WHERE identifier=1" --save-di
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
@@ -5847,7 +5847,7 @@ Source: `test/e2e/tools/sqly/v0_20_bugs.atago.yaml`
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
@@ -5864,7 +5864,7 @@ sqly --sql "ALTER TABLE user RENAME COLUMN first_name TO fname" --save --force u
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
@@ -5880,7 +5880,7 @@ sqly --sql "DROP TABLE user" --save --force user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
@@ -5896,7 +5896,7 @@ sqly --sql "CREATE VIEW v AS SELECT user_name FROM user" --save --force user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
@@ -5912,7 +5912,7 @@ sqly --sql "CREATE INDEX idx ON user(identifier)" --save --force user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
@@ -5928,7 +5928,7 @@ sqly --sql "CREATE TABLE backup (id INTEGER)" --save --force user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
@@ -5944,7 +5944,7 @@ sqly --sql "REINDEX" --save --force user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
@@ -5960,7 +5960,7 @@ sqly --sql "ANALYZE" --save --force user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
@@ -5978,12 +5978,12 @@ sqly --sql "CREATE TABLE backup AS SELECT * FROM user" --save-dir out user.csv
 - Fixture file `s.sql` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
 _Fixture `s.sql`:_
-```
+```text
 CREATE TABLE backup AS SELECT * FROM user;
 UPDATE user SET first_name='Z' WHERE identifier=1;
 ```
@@ -6000,12 +6000,12 @@ sqly --sql-file s.sql --save-dir out user.csv
 - Fixture file `imp.sql` is created.
 #### Inputs
 _Fixture `testdata/user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
 _Fixture `imp.sql`:_
-```
+```text
 .import testdata/user.csv
 UPDATE user SET first_name='Batch' WHERE identifier=1;
 ```
@@ -6048,7 +6048,7 @@ sqly --sql "ANALYZE"
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
@@ -6073,12 +6073,12 @@ sqly --sql "PRAGMA incremental_vacuum"
 - Fixture file `tx.sql` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
 _Fixture `tx.sql`:_
-```
+```text
 BEGIN IMMEDIATE;
 UPDATE user SET first_name='TX' WHERE identifier=1;
 COMMIT;
@@ -6112,7 +6112,7 @@ sqly --sql "VACUUM INTO 'dump.db'"
 - Fixture file `a.sql` is created.
 #### Inputs
 _Fixture `a.sql`:_
-```
+```text
 ATTACH DATABASE 'aux.db' AS aux;
 CREATE TABLE aux.t (id INTEGER);
 ```
@@ -6130,12 +6130,12 @@ sqly --sql-file a.sql
 - Fixture file `t.sql` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
 _Fixture `t.sql`:_
-```
+```text
 CREATE TRIGGER trig_user AFTER UPDATE ON user BEGIN
   UPDATE user SET last_name='Triggered' WHERE identifier=2;
 END;
@@ -6152,12 +6152,12 @@ sqly --sql-file t.sql user.csv
 - Fixture file `testdata/user.csv` is created.
 #### Inputs
 _Fixture `testdata/user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
 _stdin for `sqly`:_
-```
+```text
 .import testdata/user.csv
 .schema main.user
 ```
@@ -6173,12 +6173,12 @@ sqly
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
 _stdin for `sqly`:_
-```
+```text
 CREATE TEMP TABLE temp_t (id INTEGER);
 CREATE VIEW v_user AS SELECT user_name FROM user;
 .tables
@@ -6195,12 +6195,12 @@ sqly user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
 _stdin for `sqly`:_
-```
+```text
 CREATE VIEW v_user AS SELECT user_name FROM user;
 .schema v_user
 ```
@@ -6235,7 +6235,7 @@ sqly --sql "SELECT COUNT(*) AS c FROM empty" empty.jsonl.gz
 _skipped on windows_
 #### Inputs
 _stdin for `sqly`:_
-```
+```text
 name,score
 a,1
 b,2
@@ -6252,7 +6252,7 @@ sqly --csv --sql "SELECT COUNT(*) AS c FROM stdin" /dev/stdin
 _only on linux_
 #### Inputs
 _stdin for `sqly`:_
-```
+```text
 name,score
 a,1
 b,2
@@ -6270,7 +6270,7 @@ sqly --csv --sql "SELECT COUNT(*) AS c FROM sheet_0" /proc/self/fd/0
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
@@ -6287,12 +6287,12 @@ sqly --sql "SELECT * FROM user LIMIT 1" --output out.ach.gz.zst user.csv
 - Fixture file `testdata/user.csv` is created.
 #### Inputs
 _Fixture `testdata/user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
 _stdin for `sqly`:_
-```
+```text
 .import testdata/user.csv
 .dump user out.fed.gz.zst
 ```
@@ -6325,7 +6325,7 @@ sqly --ltsv --sql "SELECT 1 AS x, 2 AS x" --output out.ltsv
 - Fixture file `dup.ltsv` is created.
 #### Inputs
 _Fixture `dup.ltsv`:_
-```
+```text
 x:1	x:2
 ```
 #### When
@@ -6342,12 +6342,12 @@ Source: `test/e2e/tools/sqly/v0_21_bugs.atago.yaml`
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
 _stdin for `sqly`:_
-```
+```text
 CREATE TEMP TABLE user(id TEXT);
 .schema user
 ```
@@ -6364,12 +6364,12 @@ sqly user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
 _stdin for `sqly`:_
-```
+```text
 CREATE TEMP VIEW user AS SELECT 1 AS id;
 .schema user
 ```
@@ -6385,12 +6385,12 @@ sqly user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
 _stdin for `sqly`:_
-```
+```text
 CREATE TEMP TABLE user(id TEXT);
 .tables
 ```
@@ -6404,7 +6404,7 @@ sqly user.csv
 ### Scenario: targets a literal dotted table name in .schema
 #### Inputs
 _stdin for `sqly`:_
-```
+```text
 CREATE TABLE "a.b"(id INTEGER);
 .schema "a.b"
 ```
@@ -6418,7 +6418,7 @@ sqly
 ### Scenario: targets a literal dotted table name in .describe
 #### Inputs
 _stdin for `sqly`:_
-```
+```text
 CREATE TABLE "a.b"(id INTEGER);
 .describe "a.b"
 ```
@@ -6432,7 +6432,7 @@ sqly
 ### Scenario: targets a literal dotted table name in .header
 #### Inputs
 _stdin for `sqly`:_
-```
+```text
 CREATE TABLE "a.b"(id INTEGER);
 .header "a.b"
 ```
@@ -6446,7 +6446,7 @@ sqly
 ### Scenario: targets a literal dotted table name in .dump
 #### Inputs
 _stdin for `sqly`:_
-```
+```text
 CREATE TABLE "a.b"(id INTEGER);
 .dump "a.b" ab.csv
 ```
@@ -6460,7 +6460,7 @@ sqly
 ### Scenario: prints a paste-safe quoted identifier in .tables
 #### Inputs
 _stdin for `sqly`:_
-```
+```text
 CREATE TABLE "two words"(id INTEGER);
 .tables
 ```
@@ -6474,7 +6474,7 @@ sqly
 ### Scenario: keeps the full spaced table name in .header
 #### Inputs
 _stdin for `sqly`:_
-```
+```text
 CREATE TABLE "two words"(id INTEGER);
 .header "two words"
 ```
@@ -6488,7 +6488,7 @@ sqly
 ### Scenario: keeps the TEMP keyword for a temp-qualified table in .schema
 #### Inputs
 _stdin for `sqly`:_
-```
+```text
 CREATE TEMP TABLE t(id INTEGER PRIMARY KEY);
 .schema temp.t
 ```
@@ -6502,7 +6502,7 @@ sqly
 ### Scenario: keeps the TEMP keyword for a temp-qualified view in .schema
 #### Inputs
 _stdin for `sqly`:_
-```
+```text
 CREATE TEMP VIEW v AS SELECT 1 AS id;
 .schema temp.v
 ```
@@ -6518,7 +6518,7 @@ sqly
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
@@ -6534,7 +6534,7 @@ sqly --sql "SELECT 1 AS x; SELECT 2 AS y" user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
@@ -6559,7 +6559,7 @@ sqly --csv --sql "SELECT 1 AS x; SELECT 2 AS y" --output out.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
@@ -6576,7 +6576,7 @@ sqly --sql "PRAGMA user_version=1" --save --force user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
@@ -6593,7 +6593,7 @@ sqly --sql "PRAGMA incremental_vacuum" --save --force user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
@@ -6610,7 +6610,7 @@ sqly --sql "PRAGMA journal_mode=OFF" --save --force user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
@@ -6627,7 +6627,7 @@ sqly --sql "PRAGMA user_version=1" --save-dir out user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
@@ -6650,7 +6650,7 @@ sqly --sql "END"
 ### Scenario: rejects END in batch stdin
 #### Inputs
 _stdin for `sqly`:_
-```
+```text
 END;
 ```
 #### When
@@ -6665,7 +6665,7 @@ sqly
 - Fixture file `end.sql` is created.
 #### Inputs
 _Fixture `end.sql`:_
-```
+```text
 END;
 ```
 #### When
@@ -6704,12 +6704,12 @@ sqly --sql "SELECT 1 AS x" --output out.xlsx.gz.zst
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
 _stdin for `sqly`:_
-```
+```text
 .dump user d.csv.gz.zst
 ```
 #### When
@@ -6724,12 +6724,12 @@ sqly user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
 _stdin for `sqly`:_
-```
+```text
 .mode json
 .tables
 ```
@@ -6746,12 +6746,12 @@ sqly user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier,first_name,last_name
 booker12,1,Rachel,Booker
 ```
 _stdin for `sqly`:_
-```
+```text
 .mode ndjson
 .header user
 ```
@@ -6768,12 +6768,12 @@ sqly user.csv
 - Fixture file `ro.csv` is created.
 #### Inputs
 _Fixture `ro.csv`:_
-```
+```text
 user_name,identifier
 alice,1
 ```
 _stdin for `sqly`:_
-```
+```text
 .save --force
 ```
 #### When
@@ -6788,12 +6788,12 @@ sqly ro.csv
 - Fixture file `ro2.csv` is created.
 #### Inputs
 _Fixture `ro2.csv`:_
-```
+```text
 user_name,identifier
 alice,1
 ```
 _stdin for `sqly`:_
-```
+```text
 SELECT 1;
 .save out
 ```
@@ -6811,7 +6811,7 @@ Source: `test/e2e/tools/sqly/v0_22_bugs.atago.yaml`
 ### Scenario: inspects a literal "main.x" table with .schema
 #### Inputs
 _stdin for `sqly`:_
-```
+```text
 CREATE TABLE "main.x"(litcol INTEGER);
 .schema "main.x"
 ```
@@ -6825,7 +6825,7 @@ sqly
 ### Scenario: inspects a literal "temp.x" table with .describe
 #### Inputs
 _stdin for `sqly`:_
-```
+```text
 CREATE TABLE "temp.x"(litcol INTEGER);
 .describe "temp.x"
 ```
@@ -6839,7 +6839,7 @@ sqly
 ### Scenario: inspects a literal "main.v" view with .header
 #### Inputs
 _stdin for `sqly`:_
-```
+```text
 CREATE VIEW "main.v" AS SELECT 1 AS litcol;
 .header "main.v"
 ```
@@ -6853,7 +6853,7 @@ sqly
 ### Scenario: exports a literal "temp.v" view with .dump
 #### Inputs
 _stdin for `sqly`:_
-```
+```text
 CREATE VIEW "temp.v" AS SELECT 1 AS litcol;
 .dump "temp.v" tv.csv
 ```
@@ -6867,7 +6867,7 @@ sqly
 ### Scenario: prints a paste-safe literal "main.x" name in .tables
 #### Inputs
 _stdin for `sqly`:_
-```
+```text
 CREATE TABLE "main.x"(litcol INTEGER);
 .tables
 ```
@@ -6907,12 +6907,12 @@ sqly --sql "SELECT 1 AS x" --output fake.ach.gzip.zst
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
 _stdin for `sqly`:_
-```
+```text
 .dump user fake.parquet.gzip.zst
 ```
 #### When
@@ -6959,13 +6959,13 @@ sqly --sql ";ATTACH DATABASE 'x.db' AS aux"
 - Fixture file `temp_only.csv` is created.
 #### Inputs
 _Fixture `temp_only.csv`:_
-```
+```text
 name,age
 alice,30
 bob,25
 ```
 _stdin for `sqly`:_
-```
+```text
 CREATE TEMP TABLE scratch(id INTEGER);
 INSERT INTO scratch VALUES (1);
 .save --force
@@ -6984,12 +6984,12 @@ sqly temp_only.csv
 - Fixture file `data.jsonl` is created.
 #### Inputs
 _Fixture `data.jsonl`:_
-```
+```text
 {"id":1}
 {"id":2}
 ```
 _stdin for `sqly`:_
-```
+```text
 CREATE TABLE scratch(id INTEGER);
 INSERT INTO scratch VALUES (1);
 .save --force
@@ -7008,13 +7008,13 @@ sqly data.jsonl
 - Fixture file `netzero.csv` is created.
 #### Inputs
 _Fixture `netzero.csv`:_
-```
+```text
 name,age
 alice,30
 bob,25
 ```
 _stdin for `sqly`:_
-```
+```text
 UPDATE netzero SET age=99 WHERE name='alice';
 UPDATE netzero SET age=30 WHERE name='alice';
 .save --force
@@ -7034,13 +7034,13 @@ sqly netzero.csv
 - Fixture file `netzero.sql` is created.
 #### Inputs
 _Fixture `netzero_file.csv`:_
-```
+```text
 name,age
 alice,30
 bob,25
 ```
 _Fixture `netzero.sql`:_
-```
+```text
 UPDATE netzero_file SET age=99 WHERE name='alice';
 UPDATE netzero_file SET age=30 WHERE name='alice';
 ```
@@ -7057,13 +7057,13 @@ sqly --sql-file netzero.sql --save --force netzero_file.csv
 - Fixture file `genuine.csv` is created.
 #### Inputs
 _Fixture `genuine.csv`:_
-```
+```text
 name,age
 alice,30
 bob,25
 ```
 _stdin for `sqly`:_
-```
+```text
 UPDATE genuine SET age=999 WHERE name='alice';
 .save --force
 ```
@@ -7083,7 +7083,7 @@ Source: `test/e2e/tools/sqly/v0_25_bugs.atago.yaml`
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
@@ -7109,7 +7109,7 @@ sqly
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
@@ -7137,12 +7137,12 @@ sqly --stdin csv --sql "SELECT COUNT(*) FROM stdin"
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
 _stdin for `sqly`:_
-```
+```text
 .schema
 SELECT 1;
 ```
@@ -7158,12 +7158,12 @@ sqly user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
 _stdin for `sqly`:_
-```
+```text
 .header
 ```
 #### When
@@ -7178,12 +7178,12 @@ sqly user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
 _stdin for `sqly`:_
-```
+```text
 .describe
 ```
 #### When
@@ -7198,12 +7198,12 @@ sqly user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
 _stdin for `sqly`:_
-```
+```text
 .mode
 ```
 #### When
@@ -7218,12 +7218,12 @@ sqly user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
 _stdin for `sqly`:_
-```
+```text
 .dump
 ```
 #### When
@@ -7238,12 +7238,12 @@ sqly user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
 _stdin for `sqly`:_
-```
+```text
 .import
 ```
 #### When
@@ -7258,12 +7258,12 @@ sqly user.csv
 - Fixture file `user.csv` is created.
 #### Inputs
 _Fixture `user.csv`:_
-```
+```text
 user_name,identifier
 booker12,1
 ```
 _stdin for `sqly`:_
-```
+```text
 .save
 ```
 #### When
@@ -7278,7 +7278,7 @@ sqly user.csv
 - Fixture file `space dir/d.csv` is created.
 #### Inputs
 _Fixture `space dir/d.csv`:_
-```
+```text
 a
 1
 ```
@@ -7295,7 +7295,7 @@ sqly --inspect "space dir"
 - Fixture file `space dir/d.csv` is created.
 #### Inputs
 _Fixture `space dir/d.csv`:_
-```
+```text
 a
 1
 ```

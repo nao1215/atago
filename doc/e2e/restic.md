@@ -35,11 +35,11 @@ restic init
 - Fixture file `data/sub/notes.md` is created.
 #### Inputs
 _Fixture `data/hello.txt`:_
-```
+```text
 hello from atago
 ```
 _Fixture `data/sub/notes.md`:_
-```
+```text
 # notes kept safe
 ```
 #### When
@@ -69,11 +69,11 @@ restic restore ${snap} --target restored
 - Fixture file `data/added-later.txt` is created.
 #### Inputs
 _Fixture `data/base.txt`:_
-```
+```text
 first generation
 ```
 _Fixture `data/added-later.txt`:_
-```
+```text
 second generation
 ```
 #### When
@@ -99,7 +99,7 @@ restic diff ${first} ${second}
 - Fixture file `data/precious.txt` is created.
 #### Inputs
 _Fixture `data/precious.txt`:_
-```
+```text
 verify me
 ```
 #### When
@@ -118,11 +118,11 @@ restic check
 - Fixture file `data/gen.txt` is created.
 #### Inputs
 _Fixture `data/gen.txt`:_
-```
+```text
 one
 ```
 _Fixture `data/gen.txt`:_
-```
+```text
 two
 ```
 #### When

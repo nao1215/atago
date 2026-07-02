@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-39 suites · 129 scenarios
+40 suites · 133 scenarios
 ## Contents
 - [atago self-hosting / variable expansion in assertion matcher values](#atago-self-hosting--variable-expansion-in-assertion-matcher-values) — 3 scenarios
   - [stdout.equals expands ${workdir}](#scenario-stdoutequals-expands-workdir)
@@ -164,6 +164,11 @@
 - [atago self-hosting / store](#atago-self-hosting--store) — 2 scenarios
   - [a stored JSON value is reusable in later commands](#scenario-a-stored-json-value-is-reusable-in-later-commands)
   - [storing from a missing JSON path is an execution error](#scenario-storing-from-a-missing-json-path-is-an-execution-error)
+- [atago self-hosting / verbose](#atago-self-hosting--verbose) — 4 scenarios
+  - [verbose shows a passing scenario's command, output, and verdicts](#scenario-verbose-shows-a-passing-scenarios-command-output-and-verdicts)
+  - [without --verbose the trace is absent](#scenario-without---verbose-the-trace-is-absent)
+  - [verbose with a JSON report keeps stdout pure and traces to stderr](#scenario-verbose-with-a-json-report-keeps-stdout-pure-and-traces-to-stderr)
+  - [a failing run under --verbose renders the FAILED block exactly once](#scenario-a-failing-run-under---verbose-renders-the-failed-block-exactly-once)
 - [atago self-hosting / version](#atago-self-hosting--version) — 2 scenarios
   - [version command prints the binary name](#scenario-version-command-prints-the-binary-name)
   - [unknown command is a configuration error](#scenario-unknown-command-is-a-configuration-error)
@@ -204,7 +209,7 @@ Source: `test/e2e/atago/cdp.atago.yaml`
 - Fixture file `badcdp.atago.yaml` is created.
 #### Inputs
 _Fixture `badcdp.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: browser
@@ -230,7 +235,7 @@ ${atago} run badcdp.atago.yaml
 - Fixture file `norunner.atago.yaml` is created.
 #### Inputs
 _Fixture `norunner.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: browser
@@ -254,7 +259,7 @@ ${atago} run norunner.atago.yaml
 - Fixture file `noshotpath.atago.yaml` is created.
 #### Inputs
 _Fixture `noshotpath.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: browser
@@ -283,7 +288,7 @@ ${atago} run noshotpath.atago.yaml
 - Fixture file `actions.atago.yaml` is created.
 #### Inputs
 _Fixture `actions.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: browser
@@ -317,7 +322,7 @@ ${atago} explain actions.atago.yaml
 - Fixture file `crosstype.atago.yaml` is created.
 #### Inputs
 _Fixture `crosstype.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: browser
@@ -343,7 +348,7 @@ ${atago} run crosstype.atago.yaml
 - Fixture file `cfg.atago.yaml` is created.
 #### Inputs
 _Fixture `cfg.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: browser
@@ -375,7 +380,7 @@ ${atago} manifest cfg.atago.yaml
 - Fixture file `badupload.atago.yaml` is created.
 #### Inputs
 _Fixture `badupload.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: browser
@@ -402,7 +407,7 @@ ${atago} run badupload.atago.yaml
 - Fixture file `baddownload.atago.yaml` is created.
 #### Inputs
 _Fixture `baddownload.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: browser
@@ -473,7 +478,7 @@ Source: `test/e2e/atago/db.atago.yaml`
 - Fixture file `db.atago.yaml` is created.
 #### Inputs
 _Fixture `db.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: inner-db
@@ -508,7 +513,7 @@ ${atago} run db.atago.yaml
 - Fixture file `norunner.atago.yaml` is created.
 #### Inputs
 _Fixture `norunner.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: inner-db
@@ -533,7 +538,7 @@ Source: `test/e2e/atago/defaults.atago.yaml`
 - Fixture file `shell.atago.yaml` is created.
 #### Inputs
 _Fixture `shell.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: shelled
@@ -563,7 +568,7 @@ ${atago} run shell.atago.yaml
 - Fixture file `env.atago.yaml` is created.
 #### Inputs
 _Fixture `env.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: enved
@@ -597,7 +602,7 @@ ${atago} run env.atago.yaml
 - Fixture file `bad.atago.yaml` is created.
 #### Inputs
 _Fixture `bad.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: bad
@@ -638,7 +643,7 @@ Source: `test/e2e/atago/doc.atago.yaml`
 - Fixture file `target.atago.yaml` is created.
 #### Inputs
 _Fixture `target.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: sample
@@ -664,7 +669,7 @@ ${atago} doc --out specs.md target.atago.yaml
 - Fixture file `t2.atago.yaml` is created.
 #### Inputs
 _Fixture `t2.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: sample2
@@ -688,7 +693,7 @@ ${atago} doc t2.atago.yaml
 - Fixture file `rich.atago.yaml` is created.
 #### Inputs
 _Fixture `rich.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: rich
@@ -717,7 +722,7 @@ ${atago} doc rich.atago.yaml
 - Fixture file `two.atago.yaml` is created.
 #### Inputs
 _Fixture `one.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: suite-one
@@ -728,7 +733,7 @@ scenarios:
       - assert: {exit_code: 0}
 ```
 _Fixture `two.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: suite-two
@@ -756,7 +761,7 @@ ${atago} doc --split-by-spec --out-dir generated one.atago.yaml two.atago.yaml
 - Fixture file `solo.atago.yaml` is created.
 #### Inputs
 _Fixture `solo.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: solo
@@ -780,7 +785,7 @@ Source: `test/e2e/atago/edge.atago.yaml`
 - Fixture file `empty.atago.yaml` is created.
 #### Inputs
 _Fixture `empty.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: inner
@@ -808,7 +813,7 @@ ${atago} run empty.atago.yaml
 - Fixture file `bad.atago.yaml` is created.
 #### Inputs
 _Fixture `bad.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: inner
@@ -867,7 +872,7 @@ printf '%s\n' "$ISO_HOME"
 - Fixture file `data.txt` is created.
 #### Inputs
 _Fixture `data.txt`:_
-```
+```text
 alpha
 beta
 ```
@@ -878,7 +883,7 @@ beta
 - Fixture file `inner.atago.yaml` is created.
 #### Inputs
 _Fixture `inner.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: inner
@@ -903,7 +908,7 @@ ${atago} run inner.atago.yaml
 - Fixture file `bad.atago.yaml` is created.
 #### Inputs
 _Fixture `bad.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: bad
@@ -927,7 +932,7 @@ Source: `test/e2e/atago/explain.atago.yaml`
 - Fixture file `target.atago.yaml` is created.
 #### Inputs
 _Fixture `target.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: sample
@@ -966,7 +971,7 @@ wc -c < copied.bin
 - Fixture file `copied.bin` is created.
 #### Inputs
 _Fixture `copied.bin`:_
-```
+```text
 version: "1"
 suite:
   name: inner
@@ -994,7 +999,7 @@ Source: `test/e2e/atago/fixture_modes.atago.yaml`
 - Fixture file `alias.txt` is created.
 #### Inputs
 _Fixture `target.txt`:_
-```
+```text
 payload
 ```
 #### When
@@ -1009,11 +1014,11 @@ cat alias.txt
 - Fixture file `data.txt` is created.
 #### Inputs
 _Fixture `run.sh`:_
-```
+```text
 echo hi
 ```
 _Fixture `data.txt`:_
-```
+```text
 plain
 ```
 #### Then
@@ -1024,7 +1029,7 @@ plain
 - Fixture file `stamped.txt` is created.
 #### Inputs
 _Fixture `stamped.txt`:_
-```
+```text
 x
 ```
 #### When
@@ -1052,7 +1057,7 @@ Source: `test/e2e/atago/grpc.atago.yaml`
 - Fixture file `badgrpc.atago.yaml` is created.
 #### Inputs
 _Fixture `badgrpc.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: grpc
@@ -1078,7 +1083,7 @@ ${atago} run badgrpc.atago.yaml
 - Fixture file `norunner.atago.yaml` is created.
 #### Inputs
 _Fixture `norunner.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: grpc
@@ -1103,7 +1108,7 @@ Source: `test/e2e/atago/http.atago.yaml`
 - Fixture file `denied.atago.yaml` is created.
 #### Inputs
 _Fixture `denied.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: api
@@ -1135,7 +1140,7 @@ ${atago} run denied.atago.yaml
 - Fixture file `norunner.atago.yaml` is created.
 #### Inputs
 _Fixture `norunner.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: api
@@ -1161,7 +1166,7 @@ Source: `test/e2e/atago/image.atago.yaml`
 - Fixture file `img.atago.yaml` is created.
 #### Inputs
 _Fixture `img.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: sample
@@ -1196,7 +1201,7 @@ ${atago} run img.atago.yaml
 - Fixture file `sim.atago.yaml` is created.
 #### Inputs
 _Fixture `sim.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: sample
@@ -1223,7 +1228,7 @@ ${atago} run sim.atago.yaml
 - Fixture file `bad.atago.yaml` is created.
 #### Inputs
 _Fixture `bad.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: sample
@@ -1251,7 +1256,7 @@ ${atago} run bad.atago.yaml
 - Fixture file `diff.atago.yaml` is created.
 #### Inputs
 _Fixture `diff.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: sample
@@ -1307,7 +1312,7 @@ ${atago} run starter.atago.yaml
 - Fixture file `taken.atago.yaml` is created.
 #### Inputs
 _Fixture `taken.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: keep
@@ -1506,7 +1511,7 @@ echo '{"n":"7"}'
 - Fixture file `metrics.json` is created.
 #### Inputs
 _Fixture `metrics.json`:_
-```
+```text
 {"processed": 1200, "errors": 0}
 ```
 #### Then
@@ -1517,7 +1522,7 @@ _Fixture `metrics.json`:_
 - Fixture file `cmp.atago.yaml` is created.
 #### Inputs
 _Fixture `cmp.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: inner
@@ -1545,7 +1550,7 @@ ${atago} run cmp.atago.yaml
 - Fixture file `cmp.atago.yaml` is created.
 #### Inputs
 _Fixture `cmp.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: inner
@@ -1591,7 +1596,7 @@ printf 'only-line\n'
 - Fixture file `oor.atago.yaml` is created.
 #### Inputs
 _Fixture `oor.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: inner
@@ -1619,7 +1624,7 @@ Source: `test/e2e/atago/list.atago.yaml`
 - Fixture file `sample.atago.yaml` is created.
 #### Inputs
 _Fixture `sample.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: demo
@@ -1647,7 +1652,7 @@ ${atago} list sample.atago.yaml
 - Fixture file `sample.atago.yaml` is created.
 #### Inputs
 _Fixture `sample.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: demo
@@ -1672,7 +1677,7 @@ Source: `test/e2e/atago/manifest.atago.yaml`
 - Fixture file `sample.atago.yaml` is created.
 #### Inputs
 _Fixture `sample.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: demo
@@ -1715,7 +1720,7 @@ ${atago} manifest sample.atago.yaml
 - Fixture file `side_effect.atago.yaml` is created.
 #### Inputs
 _Fixture `side_effect.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: side
@@ -1742,7 +1747,7 @@ Source: `test/e2e/atago/matrix.atago.yaml`
 - Fixture file `matrix.atago.yaml` is created.
 #### Inputs
 _Fixture `matrix.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: greetings
@@ -1771,7 +1776,7 @@ ${atago} run --report junit matrix.atago.yaml
 - Fixture file `suffix.atago.yaml` is created.
 #### Inputs
 _Fixture `suffix.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: suffixed
@@ -1823,7 +1828,7 @@ printf 'first\nsecond\n'
 - Fixture file `ne.atago.yaml` is created.
 #### Inputs
 _Fixture `ne.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: inner
@@ -1850,7 +1855,7 @@ Source: `test/e2e/atago/parallel.atago.yaml`
 - Fixture file `many.atago.yaml` is created.
 #### Inputs
 _Fixture `many.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: many
@@ -1874,7 +1879,7 @@ ${atago} run --parallel 3 many.atago.yaml
 - Fixture file `ff.atago.yaml` is created.
 #### Inputs
 _Fixture `ff.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: ff
@@ -1898,7 +1903,7 @@ Source: `test/e2e/atago/pdf.atago.yaml`
 - Fixture file `report.pdf` is created.
 #### Inputs
 _Fixture `report.pdf`:_
-```
+```text
 %PDF-1.4
 1 0 obj
 << /Type /Catalog /Pages 2 0 R >>
@@ -1928,7 +1933,7 @@ trailer
 - Fixture file `notpdf.txt` is created.
 #### Inputs
 _Fixture `notpdf.txt`:_
-```
+```text
 just text
 ```
 #### When
@@ -1944,7 +1949,7 @@ Source: `test/e2e/atago/reports.atago.yaml`
 - Fixture file `ok.atago.yaml` is created.
 #### Inputs
 _Fixture `ok.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: sample
@@ -1969,7 +1974,7 @@ ${atago} run --report junit ok.atago.yaml
 - Fixture file `bad.atago.yaml` is created.
 #### Inputs
 _Fixture `bad.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: sample
@@ -1994,7 +1999,7 @@ ${atago} run --report gha bad.atago.yaml
 - Fixture file `mixed.atago.yaml` is created.
 #### Inputs
 _Fixture `mixed.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: sample
@@ -2028,7 +2033,7 @@ ${atago} run --report tap mixed.atago.yaml
 - Fixture file `bad.atago.yaml` is created.
 #### Inputs
 _Fixture `bad.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: sample
@@ -2060,7 +2065,7 @@ Source: `test/e2e/atago/rerun.atago.yaml`
 - Fixture file `inner.atago.yaml` is created.
 #### Inputs
 _Fixture `inner.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: inner
@@ -2094,7 +2099,7 @@ ${atago} run --rerun-failed inner.atago.yaml
 - Fixture file `green.atago.yaml` is created.
 #### Inputs
 _Fixture `green.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: green
@@ -2118,7 +2123,7 @@ Source: `test/e2e/atago/retry.atago.yaml`
 - Fixture file `ready.atago.yaml` is created.
 #### Inputs
 _Fixture `ready.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: inner
@@ -2150,7 +2155,7 @@ ${atago} run ready.atago.yaml
 - Fixture file `never.atago.yaml` is created.
 #### Inputs
 _Fixture `never.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: inner
@@ -2179,7 +2184,7 @@ Source: `test/e2e/atago/run.atago.yaml`
 - Fixture file `passing.atago.yaml` is created.
 #### Inputs
 _Fixture `passing.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: sample
@@ -2207,7 +2212,7 @@ ${atago} run passing.atago.yaml
 - Fixture file `failing.atago.yaml` is created.
 #### Inputs
 _Fixture `failing.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: sample
@@ -2232,7 +2237,7 @@ ${atago} run failing.atago.yaml
 - Fixture file `broken.atago.yaml` is created.
 #### Inputs
 _Fixture `broken.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   : not valid yaml
@@ -2248,7 +2253,7 @@ ${atago} run broken.atago.yaml
 - Fixture file `ok.atago.yaml` is created.
 #### Inputs
 _Fixture `ok.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: sample
@@ -2279,7 +2284,7 @@ Source: `test/e2e/atago/security.atago.yaml`
 - Environment variables are set: DEMO_TOKEN.
 #### Inputs
 _Fixture `sec.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: inner
@@ -2307,7 +2312,7 @@ ${atago} run sec.atago.yaml
 - Fixture file `escape.atago.yaml` is created.
 #### Inputs
 _Fixture `escape.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: inner
@@ -2334,7 +2339,7 @@ ${atago} run escape.atago.yaml
 - Fixture file `snap_escape.atago.yaml` is created.
 #### Inputs
 _Fixture `snap_escape.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: inner
@@ -2362,7 +2367,7 @@ Source: `test/e2e/atago/select.atago.yaml`
 - Fixture file `many.atago.yaml` is created.
 #### Inputs
 _Fixture `many.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: many
@@ -2384,7 +2389,7 @@ ${atago} run --filter keep many.atago.yaml
 - Fixture file `tagged.atago.yaml` is created.
 #### Inputs
 _Fixture `tagged.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: tagged
@@ -2447,7 +2452,7 @@ echo ${a}-${b}
 - Fixture file `notready.atago.yaml` is created.
 #### Inputs
 _Fixture `notready.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: sample
@@ -2480,7 +2485,7 @@ cat arts/*/*/service-chatty.log
 - Fixture file `readythenfail.atago.yaml` is created.
 #### Inputs
 _Fixture `readythenfail.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: sample
@@ -2517,7 +2522,7 @@ cat arts/*/*/service-peer.log
 - Fixture file `healthy.atago.yaml` is created.
 #### Inputs
 _Fixture `healthy.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: sample
@@ -2554,7 +2559,7 @@ Source: `test/e2e/atago/shell_path.atago.yaml`
 - Fixture file `sh` is created.
 #### Inputs
 _Fixture `sh`:_
-```
+```text
 #!/bin/sh
 echo HIJACKED
 exit 0
@@ -2581,7 +2586,7 @@ Source: `test/e2e/atago/skip_command.atago.yaml`
 - Fixture file `skip.atago.yaml` is created.
 #### Inputs
 _Fixture `skip.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: inner
@@ -2609,7 +2614,7 @@ ${atago} run skip.atago.yaml
 - Fixture file `only.atago.yaml` is created.
 #### Inputs
 _Fixture `only.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: inner
@@ -2637,7 +2642,7 @@ ${atago} run only.atago.yaml
 - Fixture file `run.atago.yaml` is created.
 #### Inputs
 _Fixture `run.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: inner
@@ -2668,7 +2673,7 @@ Source: `test/e2e/atago/snapshot.atago.yaml`
 - Fixture file `out.snap` is created.
 #### Inputs
 _Fixture `snap.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: sample
@@ -2682,7 +2687,7 @@ scenarios:
             snapshot: out.snap
 ```
 _Fixture `out.snap`:_
-```
+```text
 stable
 ```
 #### When
@@ -2697,7 +2702,7 @@ ${atago} run snap.atago.yaml
 - Fixture file `gen.atago.yaml` is created.
 #### Inputs
 _Fixture `gen.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: sample
@@ -2723,7 +2728,7 @@ ${atago} snapshot update gen.atago.yaml
 - Fixture file `committed.snap` is created.
 #### Inputs
 _Fixture `drift.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: sample
@@ -2737,7 +2742,7 @@ scenarios:
             snapshot: committed.snap
 ```
 _Fixture `committed.snap`:_
-```
+```text
 original
 ```
 #### When
@@ -2759,7 +2764,7 @@ Source: `test/e2e/atago/ssh.atago.yaml`
 - Fixture file `badssh.atago.yaml` is created.
 #### Inputs
 _Fixture `badssh.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: ssh
@@ -2785,7 +2790,7 @@ ${atago} run badssh.atago.yaml
 - Fixture file `norunner.atago.yaml` is created.
 #### Inputs
 _Fixture `norunner.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: ssh
@@ -2810,7 +2815,7 @@ Source: `test/e2e/atago/store.atago.yaml`
 - Fixture file `store.atago.yaml` is created.
 #### Inputs
 _Fixture `store.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: inner
@@ -2845,7 +2850,7 @@ ${atago} run store.atago.yaml
 - Fixture file `bad-store.atago.yaml` is created.
 #### Inputs
 _Fixture `bad-store.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: inner
@@ -2871,6 +2876,113 @@ ${atago} run bad-store.atago.yaml
 #### Then
 - exit code is `4`
 - stdout contains `ERROR`
+## atago self-hosting / verbose
+Source: `test/e2e/atago/verbose.atago.yaml`
+### Scenario: verbose shows a passing scenario's command, output, and verdicts
+#### Given
+- Fixture file `ok.atago.yaml` is created.
+#### Inputs
+_Fixture `ok.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: greets
+    steps:
+      - run:
+          shell: true
+          command: echo hello-trace
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: hello-trace
+```
+#### When
+```shell
+${atago} run --verbose ok.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout contains `sample / greets`, `echo hello-trace`, `exit 0`, `ok   assert`
+### Scenario: without --verbose the trace is absent
+#### Given
+- Fixture file `ok.atago.yaml` is created.
+#### Inputs
+_Fixture `ok.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: greets
+    steps:
+      - run:
+          shell: true
+          command: echo hello-trace
+      - assert:
+          exit_code: 0
+```
+#### When
+```shell
+${atago} run ok.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout does not contain `echo hello-trace`
+### Scenario: verbose with a JSON report keeps stdout pure and traces to stderr
+#### Given
+- Fixture file `ok.atago.yaml` is created.
+#### Inputs
+_Fixture `ok.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: greets
+    steps:
+      - run:
+          shell: true
+          command: echo hello-trace
+      - assert:
+          exit_code: 0
+```
+#### When
+```shell
+${atago} run --verbose --report json ok.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout at `$.schema_version` equals `1`
+- stderr contains `exit 0`
+### Scenario: a failing run under --verbose renders the FAILED block exactly once
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: mismatch
+    steps:
+      - run:
+          shell: true
+          command: echo hello
+      - assert:
+          stdout:
+            contains: goodbye
+```
+#### When
+```shell
+${atago} run --verbose bad.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `FAIL assert`, `FAILED:`
+- stdout does not match `/(?s)FAILED:.*FAILED:/`
 ## atago self-hosting / version
 Source: `test/e2e/atago/version.atago.yaml`
 ### Scenario: version command prints the binary name
@@ -2897,7 +3009,7 @@ Source: `test/e2e/atago/yaml.atago.yaml`
 - Fixture file `yaml_ok.atago.yaml` is created.
 #### Inputs
 _Fixture `yaml_ok.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: yaml-matcher
@@ -2933,7 +3045,7 @@ ${atago} run yaml_ok.atago.yaml
 - Fixture file `yaml_fail.atago.yaml` is created.
 #### Inputs
 _Fixture `yaml_fail.atago.yaml`:_
-```
+```text
 version: "1"
 suite:
   name: yaml-matcher-fail

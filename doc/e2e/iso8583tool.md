@@ -329,7 +329,7 @@ Source: `test/e2e/tools/iso8583tool/bcd_starter.atago.yaml`
 - Fixture file `emv.json` is created.
 #### Inputs
 _Fixture `emv.json`:_
-```
+```text
 {"mti":"0100","fields":{"2":"4019249999999999","3":"000000","4":"000000001000","7":"0605123456","11":"123456","41":"TERMID01"},"binary_fields":{"55.9F02":"000000001000"}}
 ```
 #### When
@@ -346,7 +346,7 @@ iso8583tool view emv.hex --encoding hex --spec spec87bcd-starter --format json
 - Fixture file `pin.json` is created.
 #### Inputs
 _Fixture `pin.json`:_
-```
+```text
 {"mti":"0100","fields":{"2":"4019249999999999","3":"000000","4":"000000001000","7":"0605123456","11":"123456","41":"TERMID01"},"binary_fields":{"52":"A1B2C3D4E5F60708"}}
 ```
 #### When
@@ -361,7 +361,7 @@ iso8583tool convert pin.json --to hex --encoding hex --spec spec87bcd-starter
 - Fixture file `mac.json` is created.
 #### Inputs
 _Fixture `mac.json`:_
-```
+```text
 {"mti":"0100","fields":{"2":"4019249999999999","3":"000000","4":"000000001000","7":"0605123456","11":"123456","41":"TERMID01"},"binary_fields":{"64":"A1B2C3D4E5F60708"}}
 ```
 #### When
@@ -378,7 +378,7 @@ iso8583tool view mac.hex --encoding hex --spec spec87bcd-starter --unsafe --form
 - Fixture file `f32.json` is created.
 #### Inputs
 _Fixture `f32.json`:_
-```
+```text
 {"mti":"0100","fields":{"2":"4019249999999999","3":"000000","4":"000000001000","7":"0605123456","11":"123456","32":"123456","41":"TERMID01"}}
 ```
 #### When
@@ -395,7 +395,7 @@ iso8583tool view f32.hex --encoding hex --spec spec87bcd-starter --format json
 - Fixture file `f71.json` is created.
 #### Inputs
 _Fixture `f71.json`:_
-```
+```text
 {"mti":"0800","fields":{"11":"123456","70":"301","71":"1234"}}
 ```
 #### When
@@ -411,7 +411,7 @@ iso8583tool convert f71.json --to hex --spec spec87bcd-starter
 - Fixture file `sec.json` is created.
 #### Inputs
 _Fixture `sec.json`:_
-```
+```text
 {"mti":"0800","fields":{"11":"123456","70":"301","74":"0000000001","99":"12345678901","100":"98765432109"}}
 ```
 #### When
@@ -621,7 +621,7 @@ iso8583tool convert $ISO_EXAMPLES/basei/0100-auth-request.json --to sideways
 ### Scenario: rejects a path present in both fields and binary_fields
 #### Inputs
 _stdin for `iso8583tool`:_
-```
+```text
 {"mti":"0100","fields":{"55.8A":"00"},"binary_fields":{"55.8A":"3035"}}
 ```
 #### When
@@ -634,7 +634,7 @@ iso8583tool convert --to hex
 ### Scenario: rejects a parent path that also has nested children
 #### Inputs
 _stdin for `iso8583tool`:_
-```
+```text
 {"mti":"0100","binary_fields":{"55":"9F0206000000005000","55.9F02":"000000009999"}}
 ```
 #### When
@@ -647,7 +647,7 @@ iso8583tool convert --to hex
 ### Scenario: rejects field id 0 (reserved for the MTI)
 #### Inputs
 _stdin for `iso8583tool`:_
-```
+```text
 {"mti":"0100","fields":{"0":"9999"}}
 ```
 #### When
@@ -660,7 +660,7 @@ iso8583tool convert --to hex
 ### Scenario: rejects field id 1 (the bitmap)
 #### Inputs
 _stdin for `iso8583tool`:_
-```
+```text
 {"mti":"0100","fields":{"1":"1234"}}
 ```
 #### When
@@ -673,7 +673,7 @@ iso8583tool convert --to hex
 ### Scenario: rejects field id 0 set through binary_fields
 #### Inputs
 _stdin for `iso8583tool`:_
-```
+```text
 {"mti":"0100","binary_fields":{"0":"31323334"}}
 ```
 #### When
@@ -686,7 +686,7 @@ iso8583tool convert --to hex
 ### Scenario: rejects an out-of-range field id
 #### Inputs
 _stdin for `iso8583tool`:_
-```
+```text
 {"mti":"0100","fields":{"129":"x"}}
 ```
 #### When
@@ -699,7 +699,7 @@ iso8583tool convert --to hex
 ### Scenario: rejects a non-numeric field id
 #### Inputs
 _stdin for `iso8583tool`:_
-```
+```text
 {"mti":"0100","fields":{"A.1":"x"}}
 ```
 #### When
@@ -712,7 +712,7 @@ iso8583tool convert --to hex
 ### Scenario: rejects a malformed dotted path
 #### Inputs
 _stdin for `iso8583tool`:_
-```
+```text
 {"mti":"0100","binary_fields":{"55..9F02":"00"}}
 ```
 #### When
@@ -725,7 +725,7 @@ iso8583tool convert --to hex
 ### Scenario: rejects leading whitespace in a path key
 #### Inputs
 _stdin for `iso8583tool`:_
-```
+```text
 {"mti":"0100","fields":{" 2":"4111111111111111"}}
 ```
 #### When
@@ -738,7 +738,7 @@ iso8583tool convert --to hex
 ### Scenario: rejects a leading-zero duplicate alias (02 vs 2)
 #### Inputs
 _stdin for `iso8583tool`:_
-```
+```text
 {"mti":"0100","fields":{"02":"4111111111111111","2":"4222222222222222"}}
 ```
 #### When
@@ -751,7 +751,7 @@ iso8583tool convert --to hex
 ### Scenario: rejects a case-different duplicate TLV alias (9f02 vs 9F02)
 #### Inputs
 _stdin for `iso8583tool`:_
-```
+```text
 {"mti":"0100","binary_fields":{"55.9f02":"000000001000","55.9F02":"000000005000"}}
 ```
 #### When
@@ -764,7 +764,7 @@ iso8583tool convert --to hex
 ### Scenario: rejects raw bytes routed to a text field via binary_fields
 #### Inputs
 _stdin for `iso8583tool`:_
-```
+```text
 {"mti":"0100","binary_fields":{"11":"000102030405"}}
 ```
 #### When
@@ -835,11 +835,11 @@ Source: `test/e2e/tools/iso8583tool/custom_spec.atago.yaml`
 - Fixture file `doc.json` is created.
 #### Inputs
 _Fixture `hex-top.json`:_
-```
+```text
 {"name":"Hex top","fields":{"0":{"type":"String","length":4,"description":"MTI","enc":"ASCII","prefix":"ASCII.Fixed"},"1":{"type":"Bitmap","length":16,"description":"Bitmap","enc":"HexToASCII","prefix":"Hex.Fixed"},"52":{"type":"Hex","length":8,"description":"PIN Data","enc":"Binary","prefix":"Binary.Fixed"}}}
 ```
 _Fixture `doc.json`:_
-```
+```text
 {"mti":"0100","binary_fields":{"52":"A1B2C3D4E5F60708"}}
 ```
 #### When
@@ -854,7 +854,7 @@ iso8583tool convert doc.json --to hex --spec hex-top.json
 - Fixture file `hex-sub.json` is created.
 #### Inputs
 _Fixture `hex-sub.json`:_
-```
+```text
 {"name":"TLV Hex","fields":{"0":{"type":"String","length":4,"description":"MTI","enc":"ASCII","prefix":"ASCII.Fixed"},"1":{"type":"Bitmap","length":16,"description":"Bitmap","enc":"HexToASCII","prefix":"Hex.Fixed"},"55":{"type":"Composite","length":999,"description":"ICC","prefix":"ASCII.LLL","tag":{"enc":"BerTLVTag","sort":"StringsByHex","skipUnknownTLVTags":true,"storeUnknownTLVTags":true},"subfields":{"9F02":{"type":"Hex","length":6,"description":"Amount","enc":"Binary","prefix":"BerTLV"}}}}}
 ```
 #### When
@@ -869,7 +869,7 @@ iso8583tool view $ISO_EXAMPLES/basei/0100-auth-request.hex --spec hex-sub.json
 - Fixture file `track1.json` is created.
 #### Inputs
 _Fixture `track1.json`:_
-```
+```text
 {"name":"Track1","fields":{"0":{"type":"String","length":4,"description":"MTI","enc":"ASCII","prefix":"ASCII.Fixed"},"1":{"type":"Bitmap","length":16,"description":"Bitmap","enc":"HexToASCII","prefix":"Hex.Fixed"},"45":{"type":"Track1","length":76,"description":"Track 1","enc":"ASCII","prefix":"ASCII.LL"}}}
 ```
 #### When
@@ -884,7 +884,7 @@ iso8583tool view $ISO_EXAMPLES/basei/0100-auth-request.hex --spec track1.json
 - Fixture file `track3.json` is created.
 #### Inputs
 _Fixture `track3.json`:_
-```
+```text
 {"name":"Track3","fields":{"0":{"type":"String","length":4,"description":"MTI","enc":"ASCII","prefix":"ASCII.Fixed"},"1":{"type":"Bitmap","length":16,"description":"Bitmap","enc":"HexToASCII","prefix":"Hex.Fixed"},"36":{"type":"Track3","length":104,"description":"Track 3","enc":"ASCII","prefix":"ASCII.LLL"}}}
 ```
 #### When
@@ -899,7 +899,7 @@ iso8583tool view $ISO_EXAMPLES/basei/0100-auth-request.hex --spec track3.json
 - Fixture file `indextag.json` is created.
 #### Inputs
 _Fixture `indextag.json`:_
-```
+```text
 {"name":"IndexTag","fields":{"0":{"type":"String","length":4,"description":"MTI","enc":"ASCII","prefix":"ASCII.Fixed"},"1":{"type":"Bitmap","length":16,"description":"Bitmap","enc":"HexToASCII","prefix":"Hex.Fixed"},"48":{"type":"Composite","length":999,"description":"IndexTag Composite","prefix":"ASCII.LLL","tag":{"sort":"StringsByInt","length":2,"enc":"ASCII"},"subfields":{"1":{"type":"IndexTag","length":2,"description":"Tag index","enc":"ASCII","prefix":"ASCII.Fixed"}}}}}
 ```
 #### When
@@ -914,7 +914,7 @@ iso8583tool view $ISO_EXAMPLES/basei/0100-auth-request.hex --spec indextag.json
 - Fixture file `nosort.json` is created.
 #### Inputs
 _Fixture `nosort.json`:_
-```
+```text
 {"name":"No sort","fields":{"0":{"type":"String","length":4,"description":"MTI","enc":"ASCII","prefix":"ASCII.Fixed"},"1":{"type":"Bitmap","length":16,"description":"Bitmap","enc":"HexToASCII","prefix":"Hex.Fixed"},"55":{"type":"Composite","length":999,"description":"ICC","prefix":"ASCII.LLL","tag":{"enc":"BerTLVTag","skipUnknownTLVTags":true,"storeUnknownTLVTags":true},"subfields":{"9F02":{"type":"Binary","length":6,"description":"Amount","enc":"Binary","prefix":"BerTLV"}}}}}
 ```
 #### When
@@ -1154,11 +1154,11 @@ iso8583tool doctor "with space.hex" --no-color
 - Fixture file `other.json` is created.
 #### Inputs
 _Fixture `spec.json`:_
-```
+```text
 {"name":"F48 positional","fields":{"0":{"type":"String","length":4,"description":"MTI","enc":"ASCII","prefix":"ASCII.Fixed"},"1":{"type":"Bitmap","length":16,"description":"Bitmap","enc":"HexToASCII","prefix":"Hex.Fixed"},"11":{"type":"String","length":6,"description":"STAN","enc":"ASCII","prefix":"ASCII.Fixed"},"48":{"type":"Composite","length":999,"description":"Private Data","prefix":"ASCII.LLL","tag":{"sort":"StringsByInt"},"subfields":{"1":{"type":"String","length":3,"description":"A","enc":"ASCII","prefix":"ASCII.Fixed"},"2":{"type":"String","length":2,"description":"B","enc":"ASCII","prefix":"ASCII.Fixed"}}}}}
 ```
 _Fixture `other.json`:_
-```
+```text
 {"name":"F127 bitmap","fields":{"0":{"type":"String","length":4,"description":"MTI","enc":"ASCII","prefix":"ASCII.Fixed"},"1":{"type":"Bitmap","length":16,"description":"Bitmap","enc":"HexToASCII","prefix":"Hex.Fixed"},"11":{"type":"String","length":6,"description":"STAN","enc":"ASCII","prefix":"ASCII.Fixed"},"127":{"type":"Composite","length":255,"description":"Private use field","prefix":"ASCII.LL","bitmap":{"type":"Bitmap","length":8,"description":"Bitmap","enc":"HexToASCII","prefix":"Hex.Fixed","disableAutoExpand":true},"subfields":{"1":{"type":"String","length":2,"description":"A","enc":"ASCII","prefix":"ASCII.Fixed"},"2":{"type":"String","length":2,"description":"B","enc":"ASCII","prefix":"ASCII.Fixed"}}}}}
 ```
 #### When
@@ -1353,7 +1353,7 @@ iso8583tool view -- -response.hex
 - Fixture file `cfg.json` is created.
 #### Inputs
 _Fixture `cfg.json`:_
-```
+```text
 {"spec":"basei-starter","extensions":[{"id":63,"name":"Acme Blob","strategy":"opaque"}]}
 ```
 #### When
@@ -1368,7 +1368,7 @@ iso8583tool validate $ISO_EXAMPLES/basei/0110-auth-response.hex --config cfg.jso
 - Fixture file `bad.json` is created.
 #### Inputs
 _Fixture `bad.json`:_
-```
+```text
 {"extensions":[{"id":1,"strategy":"nope"}]}
 ```
 #### When
@@ -1386,7 +1386,7 @@ Source: `test/e2e/tools/iso8583tool/extension_strategy.atago.yaml`
 - Fixture file `msg.json` is created.
 #### Inputs
 _Fixture `spec.json`:_
-```
+```text
 {
   "name": "F48 positional",
   "fields": {
@@ -1405,7 +1405,7 @@ _Fixture `spec.json`:_
 }
 ```
 _Fixture `msg.json`:_
-```
+```text
 {"mti":"0100","fields":{"11":"123456","48.1":"ABC","48.2":"DE"}}
 ```
 #### When
@@ -1422,7 +1422,7 @@ iso8583tool view msg.hex --spec spec.json --encoding hex --no-color
 - Fixture file `msg.json` is created.
 #### Inputs
 _Fixture `msg.json`:_
-```
+```text
 {"mti":"0100","fields":{"11":"123456","127":"EEE"}}
 ```
 #### When
@@ -1602,7 +1602,7 @@ printf '%s' '{"mti":"0110","fields":{"11":"123456","39":"00","63":"card number=4
 - Fixture file `msg.json` is created.
 #### Inputs
 _Fixture `spec.json`:_
-```
+```text
 {
   "name": "F48 positional",
   "fields": {
@@ -1621,7 +1621,7 @@ _Fixture `spec.json`:_
 }
 ```
 _Fixture `msg.json`:_
-```
+```text
 {"mti":"0100","fields":{"11":"123456","48.1":"ABC","48.2":"DE"}}
 ```
 #### When
@@ -1641,11 +1641,11 @@ Source: `test/e2e/tools/iso8583tool/masking_custom.atago.yaml`
 - Fixture file `doc.json` is created.
 #### Inputs
 _Fixture `spec.json`:_
-```
+```text
 {"name":"B63","fields":{"0":{"type":"String","length":4,"description":"MTI","enc":"ASCII","prefix":"ASCII.Fixed"},"1":{"type":"Bitmap","length":16,"description":"Bitmap","enc":"HexToASCII","prefix":"Hex.Fixed"},"11":{"type":"String","length":6,"description":"STAN","enc":"ASCII","prefix":"ASCII.Fixed"},"63":{"type":"Binary","length":999,"description":"Private","enc":"Binary","prefix":"ASCII.LLL"}}}
 ```
 _Fixture `doc.json`:_
-```
+```text
 {"mti":"0110","fields":{"11":"123456"},"binary_fields":{"63":"50414E3D34313131313131313131313131313131"}}
 ```
 #### When
@@ -1663,11 +1663,11 @@ iso8583tool view m.hex --spec spec.json --format json
 - Fixture file `doc.json` is created.
 #### Inputs
 _Fixture `spec.json`:_
-```
+```text
 {"name":"9F6B","fields":{"0":{"type":"String","length":4,"description":"MTI","enc":"ASCII","prefix":"ASCII.Fixed"},"1":{"type":"Bitmap","length":16,"description":"Bitmap","enc":"HexToASCII","prefix":"Hex.Fixed"},"11":{"type":"String","length":6,"description":"STAN","enc":"ASCII","prefix":"ASCII.Fixed"},"55":{"type":"Composite","length":999,"description":"ICC","prefix":"ASCII.LLL","tag":{"enc":"BerTLVTag","sort":"StringsByHex","skipUnknownTLVTags":true,"storeUnknownTLVTags":true},"subfields":{"9F6B":{"type":"Binary","length":19,"description":"Track 2 Equivalent","enc":"Binary","prefix":"BerTLV"}}}}}
 ```
 _Fixture `doc.json`:_
-```
+```text
 {"mti":"0110","fields":{"11":"123456"},"binary_fields":{"55.9F6B":"4111111111111111D29122011234567890"}}
 ```
 #### When
@@ -1685,11 +1685,11 @@ iso8583tool view m.hex --spec spec.json --format json
 - Fixture file `doc.json` is created.
 #### Inputs
 _Fixture `spec.json`:_
-```
+```text
 {"name":"9F6B","fields":{"0":{"type":"String","length":4,"description":"MTI","enc":"ASCII","prefix":"ASCII.Fixed"},"1":{"type":"Bitmap","length":16,"description":"Bitmap","enc":"HexToASCII","prefix":"Hex.Fixed"},"11":{"type":"String","length":6,"description":"STAN","enc":"ASCII","prefix":"ASCII.Fixed"},"55":{"type":"Composite","length":999,"description":"ICC","prefix":"ASCII.LLL","tag":{"enc":"BerTLVTag","sort":"StringsByHex","skipUnknownTLVTags":true,"storeUnknownTLVTags":true},"subfields":{"9F6B":{"type":"Binary","length":19,"description":"Track 2 Equivalent","enc":"Binary","prefix":"BerTLV"}}}}}
 ```
 _Fixture `doc.json`:_
-```
+```text
 {"mti":"0110","fields":{"11":"123456"},"binary_fields":{"55.9F6B":"4111111111111111D29122011234567890"}}
 ```
 #### When
@@ -1707,11 +1707,11 @@ iso8583tool redact m.hex --spec spec.json --format json
 - Fixture file `doc.json` is created.
 #### Inputs
 _Fixture `spec.json`:_
-```
+```text
 {"name":"T127","fields":{"0":{"type":"String","length":4,"description":"MTI","enc":"ASCII","prefix":"ASCII.Fixed"},"1":{"type":"Bitmap","length":16,"description":"Bitmap","enc":"HexToASCII","prefix":"Hex.Fixed"},"11":{"type":"String","length":6,"description":"STAN","enc":"ASCII","prefix":"ASCII.Fixed"},"127":{"type":"Composite","length":999,"description":"Private TLV","prefix":"ASCII.LLL","tag":{"enc":"BerTLVTag","sort":"StringsByHex","skipUnknownTLVTags":true,"storeUnknownTLVTags":true},"subfields":{"57":{"type":"Binary","length":18,"description":"Track2Eq","enc":"Binary","prefix":"BerTLV"}}}}}
 ```
 _Fixture `doc.json`:_
-```
+```text
 {"mti":"0110","fields":{"11":"123456"},"binary_fields":{"127.57":"4111111111111111D29122011234567890"}}
 ```
 #### When
@@ -1729,11 +1729,11 @@ iso8583tool view m.hex --spec spec.json --format json
 - Fixture file `doc.json` is created.
 #### Inputs
 _Fixture `spec.json`:_
-```
+```text
 {"name":"C57","fields":{"0":{"type":"String","length":4,"description":"MTI","enc":"ASCII","prefix":"ASCII.Fixed"},"1":{"type":"Bitmap","length":16,"description":"Bitmap","enc":"HexToASCII","prefix":"Hex.Fixed"},"11":{"type":"String","length":6,"description":"STAN","enc":"ASCII","prefix":"ASCII.Fixed"},"55":{"type":"Composite","length":999,"description":"ICC","prefix":"ASCII.LLL","tag":{"enc":"BerTLVTag","sort":"StringsByHex","skipUnknownTLVTags":true,"storeUnknownTLVTags":true},"subfields":{"70":{"type":"Composite","length":255,"description":"Template","prefix":"BerTLV","tag":{"enc":"BerTLVTag","sort":"StringsByHex","skipUnknownTLVTags":true,"storeUnknownTLVTags":true},"subfields":{"57":{"type":"Binary","length":18,"description":"Track2Eq","enc":"Binary","prefix":"BerTLV"}}}}}}}
 ```
 _Fixture `doc.json`:_
-```
+```text
 {"mti":"0110","fields":{"11":"123456"},"binary_fields":{"55.70.57":"4111111111111111D29122011234567890"}}
 ```
 #### When
@@ -1751,11 +1751,11 @@ iso8583tool redact m.hex --spec spec.json --format json
 - Fixture file `doc.json` is created.
 #### Inputs
 _Fixture `spec.json`:_
-```
+```text
 {"name":"F35","fields":{"0":{"type":"String","length":4,"description":"MTI","enc":"ASCII","prefix":"ASCII.Fixed"},"1":{"type":"Bitmap","length":16,"description":"Bitmap","enc":"HexToASCII","prefix":"Hex.Fixed"},"11":{"type":"String","length":6,"description":"STAN","enc":"ASCII","prefix":"ASCII.Fixed"},"35":{"type":"String","length":37,"description":"Partner Reference","enc":"ASCII","prefix":"ASCII.LL"}}}
 ```
 _Fixture `doc.json`:_
-```
+```text
 {"mti":"0110","fields":{"11":"123456","35":"REF-ORDER-ABC-0001"}}
 ```
 #### When
@@ -1773,11 +1773,11 @@ iso8583tool view m.hex --spec spec.json --format json
 - Fixture file `doc.json` is created.
 #### Inputs
 _Fixture `spec.json`:_
-```
+```text
 {"name":"F52","fields":{"0":{"type":"String","length":4,"description":"MTI","enc":"ASCII","prefix":"ASCII.Fixed"},"1":{"type":"Bitmap","length":16,"description":"Bitmap","enc":"HexToASCII","prefix":"Hex.Fixed"},"11":{"type":"String","length":6,"description":"STAN","enc":"ASCII","prefix":"ASCII.Fixed"},"52":{"type":"String","length":8,"description":"Partner Status","enc":"ASCII","prefix":"ASCII.Fixed"}}}
 ```
 _Fixture `doc.json`:_
-```
+```text
 {"mti":"0110","fields":{"11":"123456","52":"ABCDEFGH"}}
 ```
 #### When
@@ -1795,11 +1795,11 @@ iso8583tool view m.hex --spec spec.json --format json
 - Fixture file `doc.json` is created.
 #### Inputs
 _Fixture `spec.json`:_
-```
+```text
 {"name":"F2","fields":{"0":{"type":"String","length":4,"description":"MTI","enc":"ASCII","prefix":"ASCII.Fixed"},"1":{"type":"Bitmap","length":16,"description":"Bitmap","enc":"HexToASCII","prefix":"Hex.Fixed"},"2":{"type":"String","length":19,"description":"Account","enc":"ASCII","prefix":"ASCII.LL"},"11":{"type":"String","length":6,"description":"STAN","enc":"ASCII","prefix":"ASCII.Fixed"}}}
 ```
 _Fixture `doc.json`:_
-```
+```text
 {"mti":"0110","fields":{"2":"4111111111111111","11":"123456"}}
 ```
 #### When
@@ -1819,7 +1819,7 @@ Source: `test/e2e/tools/iso8583tool/nested_describe.atago.yaml`
 - Fixture file `msg.json` is created.
 #### Inputs
 _Fixture `spec.json`:_
-```
+```text
 {
   "name": "F48 nested positional",
   "fields": {
@@ -1838,7 +1838,7 @@ _Fixture `spec.json`:_
 … (truncated)
 ```
 _Fixture `msg.json`:_
-```
+```text
 {"mti":"0100","fields":{"11":"123456","48.1":"AB","48.2.1":"260604"}}
 ```
 #### When
@@ -1856,7 +1856,7 @@ iso8583tool view msg.hex --spec spec.json --encoding hex --no-color
 - Fixture file `msg.json` is created.
 #### Inputs
 _Fixture `spec.json`:_
-```
+```text
 {
   "name": "Constructed TLV 8A",
   "fields": {
@@ -1874,7 +1874,7 @@ _Fixture `spec.json`:_
 … (truncated, 2 more lines)
 ```
 _Fixture `msg.json`:_
-```
+```text
 {"mti":"0110","fields":{"11":"123456"},"binary_fields":{"55.70.8A":"3030","55.70.9A":"260605"}}
 ```
 #### When
@@ -1892,7 +1892,7 @@ iso8583tool view msg.hex --spec spec.json --encoding hex --no-color
 - Fixture file `msg.json` is created.
 #### Inputs
 _Fixture `spec.json`:_
-```
+```text
 {
   "name": "Constructed TLV 8A",
   "fields": {
@@ -1910,7 +1910,7 @@ _Fixture `spec.json`:_
 … (truncated, 2 more lines)
 ```
 _Fixture `msg.json`:_
-```
+```text
 {"mti":"0110","fields":{"11":"123456"},"binary_fields":{"55.70.8A":"3030","55.70.9A":"260605"}}
 ```
 #### When
@@ -1930,7 +1930,7 @@ Source: `test/e2e/tools/iso8583tool/nested_tlv.atago.yaml`
 - Fixture file `a.json` is created.
 #### Inputs
 _Fixture `spec.json`:_
-```
+```text
 {
   "name": "Constructed TLV",
   "fields": {
@@ -1948,7 +1948,7 @@ _Fixture `spec.json`:_
 … (truncated)
 ```
 _Fixture `a.json`:_
-```
+```text
 {"mti":"0110","fields":{"11":"123456"},"binary_fields":{"55.70.9F02":"000000005000"}}
 ```
 #### When
@@ -1967,7 +1967,7 @@ iso8583tool convert a.hex --spec spec.json
 - Fixture file `a.json` is created.
 #### Inputs
 _Fixture `spec.json`:_
-```
+```text
 {
   "name": "Constructed TLV",
   "fields": {
@@ -1985,7 +1985,7 @@ _Fixture `spec.json`:_
 … (truncated)
 ```
 _Fixture `a.json`:_
-```
+```text
 {"mti":"0110","fields":{"11":"123456"},"binary_fields":{"55.70.9F02":"000000005000"}}
 ```
 #### When
@@ -2005,7 +2005,7 @@ iso8583tool view a.hex --spec spec.json --filter 55.70.9F02 --no-color
 - Fixture file `b.json` is created.
 #### Inputs
 _Fixture `spec.json`:_
-```
+```text
 {
   "name": "Constructed TLV",
   "fields": {
@@ -2023,11 +2023,11 @@ _Fixture `spec.json`:_
 … (truncated)
 ```
 _Fixture `a.json`:_
-```
+```text
 {"mti":"0110","fields":{"11":"123456"},"binary_fields":{"55.70.9F02":"000000005000"}}
 ```
 _Fixture `b.json`:_
-```
+```text
 {"mti":"0110","fields":{"11":"123456"},"binary_fields":{"55.70.9F02":"000000009999"}}
 ```
 #### When
@@ -2045,7 +2045,7 @@ iso8583tool diff a.hex b.hex --spec spec.json --no-color
 - Fixture file `spec.json` is created.
 #### Inputs
 _Fixture `spec.json`:_
-```
+```text
 {
   "name": "Constructed TLV",
   "fields": {
@@ -2078,7 +2078,7 @@ iso8583tool convert mix.hex --spec spec.json
 - Fixture file `a.json` is created.
 #### Inputs
 _Fixture `spec.json`:_
-```
+```text
 {
   "name": "Constructed TLV",
   "fields": {
@@ -2096,7 +2096,7 @@ _Fixture `spec.json`:_
 … (truncated)
 ```
 _Fixture `a.json`:_
-```
+```text
 {"mti":"0110","fields":{"11":"123456"},"binary_fields":{"55.70.9F02":"000000005000"}}
 ```
 #### When
@@ -2515,7 +2515,7 @@ Source: `test/e2e/tools/iso8583tool/sanitize_output.atago.yaml`
 - Fixture file `bin41.json` is created.
 #### Inputs
 _Fixture `bin41.json`:_
-```
+```text
 {"name":"Bin41","fields":{"0":{"type":"String","length":4,"description":"MTI","enc":"ASCII","prefix":"ASCII.Fixed"},"1":{"type":"Bitmap","length":16,"description":"Bitmap","enc":"HexToASCII","prefix":"Hex.Fixed"},"41":{"type":"Binary","length":8,"description":"Terminal","enc":"Binary","prefix":"Binary.Fixed"}}}
 ```
 #### When
@@ -2533,7 +2533,7 @@ iso8583tool view a.hex --no-color
 - Fixture file `bin41.json` is created.
 #### Inputs
 _Fixture `bin41.json`:_
-```
+```text
 {"name":"Bin41","fields":{"0":{"type":"String","length":4,"description":"MTI","enc":"ASCII","prefix":"ASCII.Fixed"},"1":{"type":"Bitmap","length":16,"description":"Bitmap","enc":"HexToASCII","prefix":"Hex.Fixed"},"41":{"type":"Binary","length":8,"description":"Terminal","enc":"Binary","prefix":"Binary.Fixed"}}}
 ```
 #### When
@@ -2550,7 +2550,7 @@ iso8583tool validate a.hex --no-color
 - Fixture file `bin41.json` is created.
 #### Inputs
 _Fixture `bin41.json`:_
-```
+```text
 {"name":"Bin41","fields":{"0":{"type":"String","length":4,"description":"MTI","enc":"ASCII","prefix":"ASCII.Fixed"},"1":{"type":"Bitmap","length":16,"description":"Bitmap","enc":"HexToASCII","prefix":"Hex.Fixed"},"41":{"type":"Binary","length":8,"description":"Terminal","enc":"Binary","prefix":"Binary.Fixed"}}}
 ```
 #### When
@@ -2569,7 +2569,7 @@ iso8583tool diff a.hex b.hex --no-color
 - Fixture file `bin41.json` is created.
 #### Inputs
 _Fixture `bin41.json`:_
-```
+```text
 {"name":"Bin41","fields":{"0":{"type":"String","length":4,"description":"MTI","enc":"ASCII","prefix":"ASCII.Fixed"},"1":{"type":"Bitmap","length":16,"description":"Bitmap","enc":"HexToASCII","prefix":"Hex.Fixed"},"41":{"type":"Binary","length":8,"description":"Terminal","enc":"Binary","prefix":"Binary.Fixed"}}}
 ```
 #### When
@@ -2827,7 +2827,7 @@ Source: `test/e2e/tools/iso8583tool/standard_fields.atago.yaml`
 - Fixture file `hi.json` is created.
 #### Inputs
 _Fixture `hi.json`:_
-```
+```text
 {"mti":"0200","fields":{"11":"123456","95":"000000000000000000000000000000000000000000","100":"12345678901","102":"1234567890123456789012345678","103":"8765432109876543210987654321","104":"DESCRIPTION"},"binary_fields":{"96":"A1B2C3D4E5F60708"}}
 ```
 #### When
@@ -2844,7 +2844,7 @@ iso8583tool view hi.hex --format json
 - Fixture file `r.json` is created.
 #### Inputs
 _Fixture `r.json`:_
-```
+```text
 {"mti":"0100","fields":{"11":"123456","123":"AAA","124":"BBB","125":"CCC","126":"DDD","127":"EEE"}}
 ```
 #### When
@@ -2859,7 +2859,7 @@ iso8583tool convert r.json --to hex
 - Fixture file `m.json` is created.
 #### Inputs
 _Fixture `m.json`:_
-```
+```text
 {"mti":"0100","binary_fields":{"128":"A1B2C3D4E5F60708"}}
 ```
 #### When
@@ -2878,7 +2878,7 @@ Source: `test/e2e/tools/iso8583tool/strict_validate.atago.yaml`
 - Fixture file `h0120.json` is created.
 #### Inputs
 _Fixture `h0120.json`:_
-```
+```text
 {"mti":"0120","fields":{"11":"123456"}}
 ```
 #### When
@@ -2895,7 +2895,7 @@ iso8583tool validate h0120.hex --strict
 - Fixture file `h0220.json` is created.
 #### Inputs
 _Fixture `h0220.json`:_
-```
+```text
 {"mti":"0220","fields":{"11":"123456"}}
 ```
 #### When
@@ -2912,7 +2912,7 @@ iso8583tool validate h0220.hex --strict
 - Fixture file `h0820.json` is created.
 #### Inputs
 _Fixture `h0820.json`:_
-```
+```text
 {"mti":"0820","fields":{"11":"123456"}}
 ```
 #### When
@@ -2929,7 +2929,7 @@ iso8583tool validate h0820.hex --strict
 - Fixture file `h0810.json` is created.
 #### Inputs
 _Fixture `h0810.json`:_
-```
+```text
 {"mti":"0810","fields":{"11":"123456","39":"00"}}
 ```
 #### When
@@ -2946,7 +2946,7 @@ iso8583tool validate h0810.hex --strict
 - Fixture file `h0830.json` is created.
 #### Inputs
 _Fixture `h0830.json`:_
-```
+```text
 {"mti":"0830","fields":{"11":"123456","39":"00"}}
 ```
 #### When
@@ -2971,7 +2971,7 @@ iso8583tool validate $ISO_EXAMPLES/basei/0800-network-echo.hex --strict
 - Fixture file `h0140.json` is created.
 #### Inputs
 _Fixture `h0140.json`:_
-```
+```text
 {"mti":"0140","fields":{"11":"123456"}}
 ```
 #### When
@@ -2988,7 +2988,7 @@ iso8583tool validate h0140.hex --strict
 - Fixture file `h0270.json` is created.
 #### Inputs
 _Fixture `h0270.json`:_
-```
+```text
 {"mti":"0270","fields":{"11":"123456"}}
 ```
 #### When
@@ -3005,7 +3005,7 @@ iso8583tool validate h0270.hex --strict
 - Fixture file `h0300.json` is created.
 #### Inputs
 _Fixture `h0300.json`:_
-```
+```text
 {"mti":"0300","fields":{"11":"123456"}}
 ```
 #### When
@@ -3022,7 +3022,7 @@ iso8583tool validate h0300.hex --strict
 - Fixture file `h0400.json` is created.
 #### Inputs
 _Fixture `h0400.json`:_
-```
+```text
 {"mti":"0400","fields":{"4":"000000001000","7":"0605123456","11":"123456","90":"020022334406041301050000000000000000000000"}}
 ```
 #### When
@@ -3039,7 +3039,7 @@ iso8583tool validate h0400.hex --strict
 - Fixture file `h0500.json` is created.
 #### Inputs
 _Fixture `h0500.json`:_
-```
+```text
 {"mti":"0500","fields":{"11":"123456"}}
 ```
 #### When
@@ -3056,7 +3056,7 @@ iso8583tool validate h0500.hex --strict
 - Fixture file `hc0800.json` is created.
 #### Inputs
 _Fixture `hc0800.json`:_
-```
+```text
 {"mti":"0800","fields":{"11":"123456","70":"ABC"}}
 ```
 #### When

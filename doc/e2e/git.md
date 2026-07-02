@@ -27,7 +27,7 @@ git -C repo rev-parse HEAD
 - Fixture file `repo-src/hello.txt` is created.
 #### Inputs
 _Fixture `repo-src/hello.txt`:_
-```
+```text
 hello from atago
 ```
 #### When
@@ -51,7 +51,7 @@ git -C repo-src log --oneline
 - Fixture file `r/f.txt` is created.
 #### Inputs
 _Fixture `r/f.txt`:_
-```
+```text
 v1
 ```
 #### When

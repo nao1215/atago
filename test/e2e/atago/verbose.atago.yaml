@@ -1,0 +1,120 @@
+# --verbose (#6): trace every scenario as it finishes — expanded command, exit
+# code, captured output, per-assertion verdicts — for PASSING scenarios too.
+# Without the flag the console stays dots-only; with a machine report the trace
+# moves to stderr so stdout stays machine-readable.
+version: "1"
+
+suite:
+  name: atago self-hosting / verbose
+
+scenarios:
+  - name: verbose shows a passing scenario's command, output, and verdicts
+    steps:
+      - fixture:
+          file: ok.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: sample
+            scenarios:
+              - name: greets
+                steps:
+                  - run:
+                      shell: true
+                      command: echo hello-trace
+                  - assert:
+                      exit_code: 0
+                      stdout:
+                        contains: hello-trace
+      - run:
+          command: ${atago} run --verbose ok.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "sample / greets"
+              - "echo hello-trace"
+              - "exit 0"
+              - "ok   assert"
+
+  - name: without --verbose the trace is absent
+    steps:
+      - fixture:
+          file: ok.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: sample
+            scenarios:
+              - name: greets
+                steps:
+                  - run:
+                      shell: true
+                      command: echo hello-trace
+                  - assert:
+                      exit_code: 0
+      - run:
+          command: ${atago} run ok.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            not_contains: "echo hello-trace"
+
+  - name: verbose with a JSON report keeps stdout pure and traces to stderr
+    steps:
+      - fixture:
+          file: ok.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: sample
+            scenarios:
+              - name: greets
+                steps:
+                  - run:
+                      shell: true
+                      command: echo hello-trace
+                  - assert:
+                      exit_code: 0
+      - run:
+          command: ${atago} run --verbose --report json ok.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              path: "$.schema_version"
+              equals: "1"
+      - assert:
+          stderr:
+            contains: "exit 0"
+
+  - name: a failing run under --verbose renders the FAILED block exactly once
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: sample
+            scenarios:
+              - name: mismatch
+                steps:
+                  - run:
+                      shell: true
+                      command: echo hello
+                  - assert:
+                      stdout:
+                        contains: goodbye
+      - run:
+          command: ${atago} run --verbose bad.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - "FAIL assert"
+              - "FAILED:"
+      # Exactly one full FAILED block: the trace carries a one-line verdict
+      # only, so "FAILED:" must not appear twice.
+      - assert:
+          stdout:
+            not_matches: "(?s)FAILED:.*FAILED:"

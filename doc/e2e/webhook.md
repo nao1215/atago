@@ -12,7 +12,7 @@ Source: `test/e2e/thirdparty/webhook/webhook.atago.yaml`
 - Fixture file `hooks.json` is created.
 #### Inputs
 _Fixture `hooks.json`:_
-```
+```text
 [
   {
     "id": "greet",

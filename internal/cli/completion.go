@@ -37,6 +37,7 @@ var runFlags = []string{
 	"--skip-tag",
 	"--tag",
 	"--update-snapshots",
+	"--verbose",
 }
 
 // completionShells is the sorted set of shells `atago completion` supports.
