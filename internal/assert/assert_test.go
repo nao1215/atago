@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nao1215/atago/internal/runner"
 	"github.com/nao1215/atago/internal/spec"
@@ -37,6 +38,23 @@ func TestCheck_ExitCode(t *testing.T) {
 				t.Errorf("OK = %v, want %v (%s)", got.OK, tt.wantOK, got.Hint)
 			}
 		})
+	}
+}
+
+// TestCheck_ExitCode_TimedOut proves a timed-out command's failure says so
+// instead of presenting the synthetic -1 as a normal exit code.
+func TestCheck_ExitCode_TimedOut(t *testing.T) {
+	t.Parallel()
+	res := &runner.Result{ExitCode: -1, TimedOut: true, Duration: 200 * time.Millisecond}
+	got := Check(&spec.Assert{ExitCode: &spec.ExitCode{Equals: intp(0)}}, res, Env{})
+	if got.OK {
+		t.Fatal("OK = true, want a failure for a timed-out command")
+	}
+	if !strings.Contains(got.Actual, "timed out after 200ms") {
+		t.Errorf("Actual = %q, want it to mention the timeout", got.Actual)
+	}
+	if !strings.Contains(got.Hint, "run.timeout") {
+		t.Errorf("Hint = %q, want it to name run.timeout", got.Hint)
 	}
 }
 

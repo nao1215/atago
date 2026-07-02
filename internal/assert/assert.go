@@ -6,6 +6,7 @@ package assert
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/nao1215/atago/internal/runner"
 	"github.com/nao1215/atago/internal/spec"
@@ -170,17 +171,27 @@ func checkExitCode(e *spec.ExitCode, res *runner.Result) *CheckResult {
 	if res == nil {
 		return &CheckResult{Desc: "assert exit_code", Hint: "no command has run in this scenario yet"}
 	}
+	// A timed-out command was killed, not exited: say so instead of presenting
+	// the synthetic -1 as a normal exit code.
+	actual := fmt.Sprintf("exit code %d", res.ExitCode)
+	if res.TimedOut {
+		actual = fmt.Sprintf("exit code %d (the command timed out after %s and was killed)", res.ExitCode, res.Duration.Round(time.Millisecond))
+	}
 	switch {
 	case e.Equals != nil:
 		desc := fmt.Sprintf("assert exit_code is %d", *e.Equals)
 		if res.ExitCode == *e.Equals {
 			return pass(desc)
 		}
+		hint := fmt.Sprintf("expected exit code %d but the command exited with %d", *e.Equals, res.ExitCode)
+		if res.TimedOut {
+			hint = fmt.Sprintf("the command hit its run.timeout after %s and was killed before exiting", res.Duration.Round(time.Millisecond))
+		}
 		return &CheckResult{
 			Desc:     desc,
 			Expected: fmt.Sprintf("exit code %d", *e.Equals),
-			Actual:   fmt.Sprintf("exit code %d", res.ExitCode),
-			Hint:     fmt.Sprintf("expected exit code %d but the command exited with %d", *e.Equals, res.ExitCode),
+			Actual:   actual,
+			Hint:     hint,
 		}
 	case e.Not != nil:
 		desc := fmt.Sprintf("assert exit_code is not %d", *e.Not)
@@ -190,7 +201,7 @@ func checkExitCode(e *spec.ExitCode, res *runner.Result) *CheckResult {
 		return &CheckResult{
 			Desc:     desc,
 			Expected: fmt.Sprintf("exit code != %d", *e.Not),
-			Actual:   fmt.Sprintf("exit code %d", res.ExitCode),
+			Actual:   actual,
 			Hint:     fmt.Sprintf("expected any exit code except %d", *e.Not),
 		}
 	default:
