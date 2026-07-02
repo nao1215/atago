@@ -1,11 +1,17 @@
 name: gitleaks
 on: [pull_request]
 
+permissions:
+  contents: read
+
 jobs:
   scan:
     name: gitleaks
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # Dependabot-triggered runs get a read-only GITHUB_TOKEN, and the action's
+    # PR-commit listing 403s with it. Version bumps carry no secrets to scan.
+    if: github.actor != 'dependabot[bot]'
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:

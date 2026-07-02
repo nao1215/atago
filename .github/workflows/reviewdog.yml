@@ -1,11 +1,17 @@
 name: reviewdog
 on: [pull_request]
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   misspell:
     name: misspell
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # The github-pr-review reporter 403s under Dependabot's read-only token.
+    if: github.actor != 'dependabot[bot]'
     steps:
       - name: Check out code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -22,6 +28,7 @@ jobs:
   actionlint:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    if: github.actor != 'dependabot[bot]'
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
