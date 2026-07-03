@@ -96,7 +96,7 @@ func (e *Engine) runSuiteSteps(ctx context.Context, steps []spec.Step, rt *suite
 		failed := false
 
 		if ctx.Err() != nil {
-			sr.ErrMsg = fmt.Sprintf("run cancelled: %v", ctx.Err())
+			sr.ErrMsg = fmt.Sprintf("run canceled: %v", ctx.Err())
 			out = append(out, sr)
 			return out, false
 		}

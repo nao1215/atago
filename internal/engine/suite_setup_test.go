@@ -42,7 +42,7 @@ suite:
 scenarios:
   - name: first sees the shared store and env
     steps:
-      - run: {shell: true, command: "echo got ${token} flag=$SHARED_FLAG"}
+      - run: {shell: true, command: "echo got ${token} flag=` + envRef("SHARED_FLAG") + `"}
       - assert:
           exit_code: 0
           stdout:
@@ -88,13 +88,10 @@ version: "1"
 suite:
   name: s
   setup:
-    - run:
-        shell: true
-        command: "echo addr-127.0.0.1:7777 > ${suitedir}/seed.txt"
     - service:
         name: peer
         shell: true
-        command: '` + copyThenIdle("${suitedir}/seed.txt", "${suitedir}/ready.txt", 30) + `'
+        command: '` + publishEchoIdle("addr-127.0.0.1:7777", "${suitedir}/ready.txt", "serving", 30) + `'
         ready:
           file: "${suitedir}/ready.txt"
           store: addr
