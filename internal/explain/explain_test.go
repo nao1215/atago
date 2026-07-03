@@ -397,6 +397,14 @@ scenarios:
           clear_env: true
       - assert:
           exit_code: 0
+      - pty:
+          command: cat
+          clear_env: true
+          pass_env: [TERM]
+          session:
+            - send: ""
+      - assert:
+          exit_code: 0
 `
 	s, err := loader.LoadBytes("t.atago.yaml", []byte(src))
 	if err != nil {
@@ -411,6 +419,7 @@ scenarios:
 		"cleared environment (passes: PATH, HOME)",
 		"cleared environment)",
 		"[cleared environment, passes: PATH]",
+		"(cleared environment, passes: TERM)",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("explain output missing %q\n--- got ---\n%s", want, out)

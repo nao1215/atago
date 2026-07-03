@@ -127,7 +127,15 @@ func explainScenario(b *strings.Builder, sc *spec.Scenario) {
 			}
 		case spec.StepPTY:
 			if step.PTY != nil {
-				commands = append(commands, fmt.Sprintf("interactive (pty): %s  [%d session actions]", step.PTY.Command, len(step.PTY.Session)))
+				desc := fmt.Sprintf("interactive (pty): %s  [%d session actions]", step.PTY.Command, len(step.PTY.Session))
+				if step.PTY.ClearEnvEnabled() {
+					note := "  (cleared environment"
+					if len(step.PTY.PassEnv) > 0 {
+						note += ", passes: " + strings.Join(step.PTY.PassEnv, ", ")
+					}
+					desc += note + ")"
+				}
+				commands = append(commands, desc)
 				collectVars(vars, step.PTY.Command, step.PTY.Cwd)
 				for _, v := range step.PTY.Env {
 					collectVars(vars, v)

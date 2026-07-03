@@ -154,6 +154,12 @@ scenarios:
             GOBIN: ./tmp/bin
       - assert:
           exit_code: 0
+      - pty:
+          command: gup interactive
+          clear_env: true
+          pass_env: [TERM]
+          session:
+            - send: ""
       - assert:
           stdout:
             json:
@@ -181,6 +187,7 @@ scenarios:
 		"Fixture file `config.yaml` is created.",
 		"Environment variables are set: GOBIN.",
 		"The command runs with a cleared environment (passing through: PATH).",
+		"The command runs with a cleared environment (passing through: TERM).",
 		"#### When",
 		"```shell",
 		"gup list --json",

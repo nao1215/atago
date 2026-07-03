@@ -207,15 +207,25 @@ func givenBullets(sc *spec.Scenario, expand func(string) string) []string {
 				out = append(out, "Environment variables are set: "+strings.Join(sortedEnvKeys(step.Run.Env), ", ")+".")
 			}
 			if step.Run.ClearEnvEnabled() {
-				bullet := "The command runs with a cleared environment"
-				if len(step.Run.PassEnv) > 0 {
-					bullet += " (passing through: " + strings.Join(step.Run.PassEnv, ", ") + ")"
-				}
-				out = append(out, bullet+".")
+				out = append(out, clearedEnvBullet(step.Run.PassEnv))
+			}
+		case spec.StepPTY:
+			if step.PTY.ClearEnvEnabled() {
+				out = append(out, clearedEnvBullet(step.PTY.PassEnv))
 			}
 		}
 	}
 	return out
+}
+
+// clearedEnvBullet renders the hermetic-environment Given bullet shared by run
+// and pty steps (#16).
+func clearedEnvBullet(passEnv []string) string {
+	bullet := "The command runs with a cleared environment"
+	if len(passEnv) > 0 {
+		bullet += " (passing through: " + strings.Join(passEnv, ", ") + ")"
+	}
+	return bullet + "."
 }
 
 // commands renders the "When" narrative. It covers every action step kind, not
