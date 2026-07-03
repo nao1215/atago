@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/nao1215/atago/internal/runner"
+	"github.com/nao1215/atago/internal/runner/mock"
 	"github.com/nao1215/atago/internal/spec"
 )
 
@@ -88,6 +89,10 @@ type Env struct {
 	// snapshot is written or compared, so a real credential is never committed to
 	// a golden file (issue #11).
 	Secrets func([]byte) []byte
+	// MockRecords, when set, resolves a mock server's recorded requests by
+	// name for the `mock:` assertion target (#24). Nil in contexts with no
+	// mock servers (retry `until` asserts, direct API use).
+	MockRecords func(name string) ([]mock.Record, bool)
 }
 
 func pass(desc string) *CheckResult { return &CheckResult{OK: true, Desc: desc} }
@@ -164,6 +169,8 @@ func checkTarget(a *spec.Assert, target spec.AssertTarget, res *runner.Result, e
 		return checkDir(a.Dir, env)
 	case spec.AssertPDF:
 		return checkPDF(a.PDF, env)
+	case spec.AssertMock:
+		return checkMock(a.Mock, env)
 	default:
 		return &CheckResult{Desc: string(target), Hint: "assertion target not supported yet"}
 	}

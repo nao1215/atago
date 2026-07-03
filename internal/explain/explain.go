@@ -61,6 +61,8 @@ func explainSuiteBlock(b *strings.Builder, label string, steps []spec.Step) {
 			fmt.Fprintf(b, "  - %s\n", describeRun(step.Run))
 		case spec.StepService:
 			fmt.Fprintf(b, "  - start suite service %q: %s\n", step.Service.Name, step.Service.Command)
+		case spec.StepMockServer:
+			fmt.Fprintf(b, "  - %s\n", describeMockServer(step.MockServer))
 		case spec.StepFixture:
 			fmt.Fprintf(b, "  - %s\n", describeFixture(step.Fixture))
 		case spec.StepStore:
@@ -96,6 +98,9 @@ func explainScenario(b *strings.Builder, sc *spec.Scenario) {
 		if svc.Ready != nil && svc.Ready.Store != "" {
 			stores = append(stores, svc.Ready.Store)
 		}
+	}
+	for i := range sc.MockServers {
+		services = append(services, describeMockServer(&sc.MockServers[i]))
 	}
 
 	for i := range sc.Steps {
@@ -271,6 +276,11 @@ func describeCDP(c *spec.CDP) string {
 	return fmt.Sprintf("CDP via %s: %s", c.Runner, strings.Join(acts, " → "))
 }
 
+// describeMockServer renders a one-line summary of a stub HTTP server (#24).
+func describeMockServer(ms *spec.MockServer) string {
+	return fmt.Sprintf("mock server %s: %d canned route(s), serves ${%s.url}", ms.Name, len(ms.Routes), ms.Name)
+}
+
 // describeSignal renders a one-line summary of a signal step (#23).
 func describeSignal(sg *spec.Signal) string {
 	desc := "send SIG" + spec.NormalizeSignalName(sg.Signal) + " to service " + sg.Service
@@ -280,6 +290,20 @@ func describeSignal(sg *spec.Signal) string {
 			timeout = "5s"
 		}
 		desc += "  [wait up to " + timeout + " for exit]"
+	}
+	return desc
+}
+
+// describeMockAssert renders a one-line summary of a mock assertion (#24).
+func describeMockAssert(m *spec.MockAssert) string {
+	desc := "mock " + m.Name
+	if m.Method != "" || m.Path != "" {
+		desc += " received " + strings.TrimSpace(strings.ToUpper(m.Method)+" "+m.Path)
+	} else {
+		desc += " received a request"
+	}
+	if m.Count != nil {
+		desc += fmt.Sprintf(" x%d", *m.Count)
 	}
 	return desc
 }
@@ -350,6 +374,8 @@ func describeTarget(a *spec.Assert, target spec.AssertTarget) string {
 			return fmt.Sprintf("exit code is %d", *a.ExitCode.Equals)
 		}
 		return "exit code"
+	case spec.AssertMock:
+		return describeMockAssert(a.Mock)
 	case spec.AssertStdout:
 		return "stdout " + describeStream(a.Stdout)
 	case spec.AssertStderr:

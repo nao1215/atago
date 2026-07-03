@@ -121,7 +121,9 @@ type Scenario struct {
 	Only     *Condition        `json:"only,omitempty"`
 	Skip     *Condition        `json:"skip,omitempty"`
 	Services []Service         `json:"services,omitempty"`
-	Steps    []Step            `json:"steps"`
+	// MockServers summarizes the scenario's stub HTTP servers (#24).
+	MockServers []MockServer `json:"mock_servers,omitempty"`
+	Steps       []Step       `json:"steps"`
 	// Teardown lists steps that always run after Steps (pass, fail, error, or
 	// interrupt), sharing the scenario's variable store. Their failures never
 	// change the scenario's verdict.
@@ -139,6 +141,13 @@ type Condition struct {
 	OS      string `json:"os,omitempty"`
 	Env     string `json:"env,omitempty"`
 	Command string `json:"command,omitempty"`
+}
+
+// MockServer summarizes a stub HTTP server (#24).
+type MockServer struct {
+	Name string `json:"name"`
+	// Routes is the number of canned routes.
+	Routes int `json:"routes"`
 }
 
 // Service summarizes a background service.

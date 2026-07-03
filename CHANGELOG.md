@@ -19,6 +19,18 @@ and this project follows [Semantic Versioning](https://semver.org/).
   (`SystemRoot`, `SystemDrive`, `TEMP`, `TMP`, `PATHEXT`) is always retained.
   `pass_env` without `clear_env: true` is a load-time error (exit 2).
   See `examples/hermetic_env.atago.yaml`.
+- Mock HTTP servers (#24): `mock_servers:` (scenario level) and
+  suite.setup `mock_server:` steps start declarative stub HTTP servers on
+  ephemeral loopback ports — canned routes matched on exact method+path
+  (`json` / `body` / `body_file` payloads, optional `status`, `header`,
+  `delay`), every incoming request recorded (unmatched ones answer 404 and
+  stay visible). `${<name>.url}` / `${<name>.port}` are seeded into the
+  store, and the new `mock:` assertion target checks what the CLI under test
+  actually sent: request `count`, plus `header` / `body` matchers applied to
+  the last matching request. Header matchers (http and mock) also gain
+  `matches:` for regexp checks ("^Bearer "). Cross-platform (pure Go).
+  Scaffold with `atago init --template mock`; see
+  `examples/mock_server.atago.yaml`.
 - `signal:` step (#23): send a named POSIX signal (TERM, INT, HUP, USR1,
   USR2, KILL) to a managed service's whole process group — scenario services
   and suite services both — for declarative graceful-shutdown and

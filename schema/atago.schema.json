@@ -230,6 +230,11 @@
           "type": "array",
           "items": { "$ref": "#/$defs/service" }
         },
+        "mock_servers": {
+          "description": "Declarative stub HTTP servers (#24): canned routes on an ephemeral loopback port, every request recorded for the mock: assertion target; ${<name>.url} / ${<name>.port} are seeded before steps run.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/mockServer" }
+        },
         "steps": {
           "type": "array",
           "minItems": 1,
@@ -283,7 +288,8 @@
         { "required": ["store"] },
         { "required": ["service"] },
         { "required": ["pty"] },
-        { "required": ["signal"] }
+        { "required": ["signal"] },
+        { "required": ["mock_server"] }
       ],
       "properties": {
         "fixture": { "$ref": "#/$defs/fixture" },
@@ -297,6 +303,10 @@
           "description": "Starts a suite-wide background process at this point in the sequence. Valid only inside suite.setup; the loader rejects it anywhere else."
         },
         "signal": { "$ref": "#/$defs/signal" },
+        "mock_server": {
+          "$ref": "#/$defs/mockServer",
+          "description": "Starts a suite-wide stub HTTP server at this point in the sequence (#24). Valid only inside suite.setup."
+        },
         "pty": { "$ref": "#/$defs/pty" },
         "assert": { "$ref": "#/$defs/assert" },
         "store": { "$ref": "#/$defs/store" }
@@ -502,6 +512,49 @@
         }
       }
     },
+    "mockServer": {
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": false,
+      "description": "A declarative stub HTTP server (#24): routes match on exact method+path (query string excluded); an unmatched request answers 404 and is still recorded.",
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "routes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/mockRoute" }
+        }
+      }
+    },
+    "mockRoute": {
+      "type": "object",
+      "required": ["method", "path"],
+      "additionalProperties": false,
+      "description": "One canned response. At most one of json/body/body_file supplies the payload; status defaults to 200.",
+      "properties": {
+        "method": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "pattern": "^/" },
+        "status": { "type": "integer", "minimum": 100, "maximum": 599 },
+        "json": {},
+        "body": { "type": "string" },
+        "body_file": { "type": "string", "minLength": 1, "description": "Spec-relative response body file, confined to the spec directory." },
+        "header": { "type": "object", "additionalProperties": { "type": "string" } },
+        "delay": { "type": "string", "description": "Go duration to sleep before responding - for retry testing." }
+      }
+    },
+    "mockAssert": {
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": false,
+      "description": "Checks what the CLI under test sent to a mock server (#24): filter by path/method, pin the exact count (or require at least one match), and match header/body of the LAST matching request.",
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "path": { "type": "string" },
+        "method": { "type": "string" },
+        "count": { "type": "integer", "minimum": 0 },
+        "header": { "$ref": "#/$defs/headerMatch" },
+        "body": { "$ref": "#/$defs/stream" }
+      }
+    },
     "signal": {
       "type": "object",
       "required": ["service", "signal"],
@@ -582,7 +635,8 @@
         { "required": ["value"] },
         { "required": ["image"] },
         { "required": ["dir"] },
-        { "required": ["pdf"] }
+        { "required": ["pdf"] },
+        { "required": ["mock"] }
       ],
       "properties": {
         "exit_code": { "$ref": "#/$defs/exitCode" },
@@ -598,7 +652,8 @@
         "value": { "$ref": "#/$defs/stream" },
         "image": { "$ref": "#/$defs/image" },
         "dir": { "$ref": "#/$defs/dir" },
-        "pdf": { "$ref": "#/$defs/pdf" }
+        "pdf": { "$ref": "#/$defs/pdf" },
+        "mock": { "$ref": "#/$defs/mockAssert" }
       }
     },
     "pdf": {
@@ -767,12 +822,14 @@
       "additionalProperties": false,
       "oneOf": [
         { "required": ["contains"] },
-        { "required": ["equals"] }
+        { "required": ["equals"] },
+        { "required": ["matches"] }
       ],
       "properties": {
         "name": { "type": "string" },
         "contains": { "type": "string" },
-        "equals": { "type": "string" }
+        "equals": { "type": "string" },
+        "matches": { "type": "string", "description": "Regexp the header value must match - the natural shape for auth headers (^Bearer )." }
       }
     },
     "store": {

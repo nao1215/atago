@@ -21,6 +21,7 @@ import (
 	runnercmd "github.com/nao1215/atago/internal/runner/cmd"
 	dbrunner "github.com/nao1215/atago/internal/runner/db"
 	grpcrunner "github.com/nao1215/atago/internal/runner/grpc"
+	mockrunner "github.com/nao1215/atago/internal/runner/mock"
 	servicerunner "github.com/nao1215/atago/internal/runner/service"
 	sshrunner "github.com/nao1215/atago/internal/runner/ssh"
 	"github.com/nao1215/atago/internal/security"
@@ -161,6 +162,7 @@ func (e *Engine) Run(ctx context.Context, s *spec.Spec, specPath string) *SuiteR
 		rc.suiteVars = suiteRT.vars
 		rc.suiteEnv = suiteRT.env
 		rc.suiteServices = suiteRT.services
+		rc.suiteMocks = suiteRT.mocks
 		defer func() {
 			// Deferred after suiteRT.stop ⇒ runs before it, so teardown can
 			// still reach the suite services.
@@ -338,6 +340,9 @@ type runConfig struct {
 	// suite.setup service steps (#7), threaded here so a scenario's `signal:`
 	// step (#23) can target them by name alongside its own services.
 	suiteServices []*servicerunner.Proc
+	// suiteMocks are the suite-wide stub HTTP servers (#24), threaded here so
+	// scenario `mock:` asserts can read their recorded requests.
+	suiteMocks []*mockrunner.Server
 }
 
 func (e *Engine) runScenario(ctx context.Context, scenarioIdx int, sc *spec.Scenario, rc runConfig) ScenarioResult {
@@ -398,6 +403,29 @@ func (e *Engine) runScenario(ctx context.Context, scenarioIdx int, sc *spec.Scen
 			_ = c.Close()
 		}
 	}()
+	// Mock servers (#24) start before the leading fixtures and services, so
+	// fixture contents and service commands/env can reference ${<mock>.url}. Each binds an ephemeral loopback port and seeds
+	// ${<name>.url} / ${<name>.port} into the store; they stop LIFO with the
+	// scenario.
+	var mocks []*mockrunner.Server
+	defer func() {
+		for i := len(mocks) - 1; i >= 0; i-- {
+			mocks[i].Stop()
+		}
+	}()
+	for i := range sc.MockServers {
+		ms, err := mockrunner.Start(ctx, &sc.MockServers[i], specDir)
+		if err != nil {
+			out.Status = StatusError
+			out.Steps = append(out.Steps, StepResult{Kind: spec.StepNone, Setup: true, ErrMsg: masker.Mask(err.Error())})
+			out.Duration = time.Since(start)
+			return out
+		}
+		mocks = append(mocks, ms)
+		st.Set(ms.Name()+".url", ms.URL())
+		st.Set(ms.Name()+".port", ms.Port())
+	}
+
 	// Leading fixture steps — the uninterrupted prefix of steps that are all
 	// fixtures — are applied BEFORE services start, so a background server can
 	// consume authored input (its config file, seed data) the way a real daemon
@@ -453,6 +481,23 @@ func (e *Engine) runScenario(ctx context.Context, scenarioIdx int, sc *spec.Scen
 	}
 
 	var current *runner.Result
+
+	// mockRecords resolves a mock server's recorded requests for the `mock:`
+	// assertion target (#24): the scenario's own mocks first, then suite-wide
+	// ones, mirroring the store's scenario-over-suite precedence.
+	mockRecords := func(name string) ([]mockrunner.Record, bool) {
+		for _, m := range mocks {
+			if m.Name() == name {
+				return m.Records(), true
+			}
+		}
+		for _, m := range rc.suiteMocks {
+			if m.Name() == name {
+				return m.Records(), true
+			}
+		}
+		return nil, false
+	}
 
 	// execStep runs one step and returns its result, its status contribution
 	// (passed/failed/error), and whether it breached the security policy. It is
@@ -513,6 +558,7 @@ func (e *Engine) runScenario(ctx context.Context, scenarioIdx int, sc *spec.Scen
 				SpecDir:         specDir,
 				UpdateSnapshots: e.UpdateSnapshots,
 				Secrets:         masker.MaskBytes,
+				MockRecords:     mockRecords,
 			})
 			e.recordChecks(masker, crs, rc.specPath, sc.Name, scenarioIdx, i)
 			sr.Checks = crs

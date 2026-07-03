@@ -33,6 +33,9 @@ func buildScenario(sc *spec.Scenario, src SourceLocator) Scenario {
 			collectVars(vars, v)
 		}
 	}
+	for i := range sc.MockServers {
+		out.MockServers = append(out.MockServers, MockServer{Name: sc.MockServers[i].Name, Routes: len(sc.MockServers[i].Routes)})
+	}
 
 	for i := range sc.Steps {
 		step := &sc.Steps[i]
@@ -173,6 +176,11 @@ func buildStep(index int, step *spec.Step, vars map[string]bool) Step {
 				collectVars(vars, a.Download.Click, a.Download.Dir)
 			}
 		}
+
+	case spec.StepMockServer:
+		ms := step.MockServer
+		st.Target = ms.Name
+		st.Action = fmt.Sprintf("start suite mock server %s (%d routes)", ms.Name, len(ms.Routes))
 
 	case spec.StepSignal:
 		sg := step.Signal

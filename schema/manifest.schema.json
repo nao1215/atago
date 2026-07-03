@@ -179,6 +179,19 @@
             "$ref": "#/$defs/service"
           }
         },
+        "mock_servers": {
+          "description": "Stub HTTP servers declared by the scenario (#24).",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "routes"],
+            "properties": {
+              "name": { "type": "string" },
+              "routes": { "type": "integer" }
+            }
+          }
+        },
         "steps": {
           "type": "array",
           "items": {

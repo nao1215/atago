@@ -39,11 +39,16 @@ func validate(s *spec.Spec) []string {
 	validateSuiteBlock(add, "suite.setup", s.Suite.Setup, s.Runners, true)
 	validateSuiteBlock(add, "suite.teardown", s.Suite.Teardown, s.Runners, false)
 
-	// Suite services are legal signal targets from any scenario (#23).
+	// Suite services are legal signal targets from any scenario (#23), and
+	// suite mock servers are legal mock-assert targets (#24).
 	suiteServiceNames := map[string]bool{}
+	suiteMockNames := map[string]bool{}
 	for i := range s.Suite.Setup {
 		if svc := s.Suite.Setup[i].Service; svc != nil && svc.Name != "" {
 			suiteServiceNames[svc.Name] = true
+		}
+		if ms := s.Suite.Setup[i].MockServer; ms != nil && ms.Name != "" {
+			suiteMockNames[ms.Name] = true
 		}
 	}
 
@@ -69,18 +74,78 @@ func validate(s *spec.Spec) []string {
 				serviceNames[sc.Services[j].Name] = true
 			}
 		}
+		mockNames := maps.Clone(suiteMockNames)
+		validateMockServers(add, where, sc.MockServers, mockNames)
 		if len(sc.Steps) == 0 {
 			add("%s: steps must contain at least one step", where)
 			continue
 		}
 		for j := range sc.Steps {
-			validateStep(add, fmt.Sprintf("%s.steps[%d]", where, j), &sc.Steps[j], s.Runners, serviceNames)
+			validateStep(add, fmt.Sprintf("%s.steps[%d]", where, j), &sc.Steps[j], s.Runners, serviceNames, mockNames)
 		}
 		for j := range sc.Teardown {
-			validateStep(add, fmt.Sprintf("%s.teardown[%d]", where, j), &sc.Teardown[j], s.Runners, serviceNames)
+			validateStep(add, fmt.Sprintf("%s.teardown[%d]", where, j), &sc.Teardown[j], s.Runners, serviceNames, mockNames)
 		}
 	}
 	return errs
+}
+
+// validateMockServers checks a scenario's mock_servers block (#24) and adds
+// every declared name to mockNames (which arrives pre-seeded with the
+// suite-wide mock names).
+func validateMockServers(add func(string, ...any), where string, servers []spec.MockServer, mockNames map[string]bool) {
+	for i := range servers {
+		ms := &servers[i]
+		mw := fmt.Sprintf("%s.mock_servers[%d]", where, i)
+		if ms.Name == "" {
+			add("%s.name is required", mw)
+		} else {
+			if mockNames[ms.Name] {
+				add("%s: duplicate mock server name %q", where, ms.Name)
+			}
+			mockNames[ms.Name] = true
+			mw = fmt.Sprintf("%s mock server %q", where, ms.Name)
+		}
+		validateMockRoutes(add, mw, ms.Routes)
+	}
+}
+
+// validateMockRoutes checks each canned route (#24): method+path required, at
+// most one payload source, sane status, parseable delay.
+func validateMockRoutes(add func(string, ...any), where string, routes []spec.MockRoute) {
+	for i := range routes {
+		rt := &routes[i]
+		rw := fmt.Sprintf("%s.routes[%d]", where, i)
+		if rt.Method == "" {
+			add("%s.method is required", rw)
+		}
+		if rt.Path == "" {
+			add("%s.path is required", rw)
+		} else if !strings.HasPrefix(rt.Path, "/") {
+			add("%s.path %q must start with \"/\"", rw, rt.Path)
+		}
+		payloads := 0
+		if rt.JSON != nil {
+			payloads++
+		}
+		if rt.Body != "" {
+			payloads++
+		}
+		if rt.BodyFile != "" {
+			payloads++
+		}
+		if payloads > 1 {
+			add("%s: set at most one of json/body/body_file", rw)
+		}
+		if rt.Status != 0 && (rt.Status < 100 || rt.Status > 599) {
+			add("%s.status %d is not a valid HTTP status", rw, rt.Status)
+		}
+		if rt.Delay != "" {
+			if _, err := time.ParseDuration(rt.Delay); err != nil {
+				add("%s.delay %q is not a valid duration (e.g. \"500ms\")", rw, rt.Delay)
+			}
+		}
+	}
 }
 
 // validateDefaults checks the top-level `defaults:` block (ADR-0039). The merge only
@@ -318,6 +383,7 @@ func validateServices(add func(string, ...any), where string, services []spec.Se
 // rejected with a pointer to where they belong.
 func validateSuiteBlock(add func(string, ...any), where string, steps []spec.Step, runners map[string]spec.Runner, allowService bool) {
 	seenService := map[string]bool{}
+	seenMock := map[string]bool{}
 	for i := range steps {
 		st := &steps[i]
 		sw := fmt.Sprintf("%s[%d]", where, i)
@@ -345,7 +411,7 @@ func validateSuiteBlock(add func(string, ...any), where string, steps []spec.Ste
 		case spec.StepStore:
 			validateStore(add, sw, st.Store)
 		case spec.StepAssert:
-			validateAssert(add, sw, st.Assert)
+			validateAssert(add, sw, st.Assert, nil)
 		case spec.StepService:
 			if !allowService {
 				add("%s: service steps are only allowed in suite.setup", sw)
@@ -364,6 +430,22 @@ func validateSuiteBlock(add func(string, ...any), where string, steps []spec.Ste
 			}
 			validateHermeticEnv(add, sw+".service", svc.ClearEnv, svc.PassEnv)
 			validateReady(add, sw+".service", svc.Ready)
+		case spec.StepMockServer:
+			// Mock servers follow the service rule (#24): setup-only, so the
+			// position in the sequence controls ordering.
+			if !allowService {
+				add("%s: mock_server steps are only allowed in suite.setup", sw)
+				continue
+			}
+			ms := st.MockServer
+			if ms.Name == "" {
+				add("%s.mock_server.name is required", sw)
+			} else if seenMock[ms.Name] {
+				add("%s: duplicate suite mock server name %q", where, ms.Name)
+			} else {
+				seenMock[ms.Name] = true
+			}
+			validateMockRoutes(add, sw+".mock_server", ms.Routes)
 		default:
 			add("%s: %s steps are per-scenario (they need a scenario workdir and runners); move it into a scenario", sw, st.Kind())
 		}
@@ -446,7 +528,7 @@ func validateRunnerRef(add func(string, ...any), where, stepKind, name string, r
 	}
 }
 
-func validateStep(add func(string, ...any), where string, st *spec.Step, runners map[string]spec.Runner, serviceNames map[string]bool) {
+func validateStep(add func(string, ...any), where string, st *spec.Step, runners map[string]spec.Runner, serviceNames, mockNames map[string]bool) {
 	keys := st.SetKeys()
 	switch len(keys) {
 	case 0:
@@ -485,7 +567,7 @@ func validateStep(add func(string, ...any), where string, st *spec.Step, runners
 		validateStdin(add, where+".run", st.Run.Stdin)
 		validateRetry(add, where+".run", st.Run.Retry)
 	case spec.StepAssert:
-		validateAssert(add, where, st.Assert)
+		validateAssert(add, where, st.Assert, mockNames)
 	case spec.StepHTTP:
 		validateRunnerRef(add, where, "http", st.HTTP.Runner, runners)
 		if st.HTTP.Method == "" {
@@ -742,7 +824,7 @@ func validateFixture(add func(string, ...any), where string, f *spec.Fixture) {
 	}
 }
 
-func validateAssert(add func(string, ...any), where string, a *spec.Assert) {
+func validateAssert(add func(string, ...any), where string, a *spec.Assert, mockNames map[string]bool) {
 	targets := a.SetTargets()
 	if len(targets) == 0 {
 		add("%s.assert: must set at least one assertion target (got none)", where)
@@ -751,12 +833,12 @@ func validateAssert(add func(string, ...any), where string, a *spec.Assert) {
 	// Each set target is an independent check and all must hold, so validate every
 	// one of them (an assert may combine, e.g., exit_code + stdout + file).
 	for _, t := range targets {
-		validateAssertTarget(add, where, a, t)
+		validateAssertTarget(add, where, a, t, mockNames)
 	}
 }
 
 // validateAssertTarget checks the shape of a single assertion target family.
-func validateAssertTarget(add func(string, ...any), where string, a *spec.Assert, target spec.AssertTarget) {
+func validateAssertTarget(add func(string, ...any), where string, a *spec.Assert, target spec.AssertTarget, mockNames map[string]bool) {
 	switch target {
 	case spec.AssertExitCode:
 		// Scalar/mapping shape enforced by ExitCode.UnmarshalYAML; the one-of
@@ -782,6 +864,8 @@ func validateAssertTarget(add func(string, ...any), where string, a *spec.Assert
 		validateImage(add, where+".assert.image", a.Image)
 	case spec.AssertDir:
 		validateDir(add, where+".assert.dir", a.Dir)
+	case spec.AssertMock:
+		validateMockAssert(add, where+".assert.mock", a.Mock, mockNames)
 	case spec.AssertPDF:
 		validatePDF(add, where+".assert.pdf", a.PDF)
 	case spec.AssertGRPCStatus:
@@ -924,6 +1008,37 @@ func shellMetachar(cmd string) string {
 	return ""
 }
 
+// validateMockAssert checks a `mock:` assertion (#24): a declared server
+// name (listed on a miss, mirroring the unknown-runner message), a sane
+// count, and well-formed header/body matchers. A nil mockNames (retry.until)
+// skips the declared-name check.
+func validateMockAssert(add func(string, ...any), where string, m *spec.MockAssert, mockNames map[string]bool) {
+	switch {
+	case m.Name == "":
+		add("%s.name is required (the mock server whose recorded requests to check)", where)
+	case mockNames != nil && !mockNames[m.Name]:
+		declared := "none"
+		if len(mockNames) > 0 {
+			declared = strings.Join(slices.Sorted(maps.Keys(mockNames)), ", ")
+		}
+		add("%s.name %q is not a declared mock server (declared: %s)", where, m.Name, declared)
+	}
+	if m.Count != nil {
+		if *m.Count < 0 {
+			add("%s.count must be >= 0 (got %d)", where, *m.Count)
+		}
+		if *m.Count == 0 && (m.Header != nil || m.Body != nil) {
+			add("%s: count: 0 cannot be combined with header/body matchers (there is no request to match)", where)
+		}
+	}
+	if m.Header != nil {
+		validateHeaderMatch(add, where+".header", m.Header)
+	}
+	if m.Body != nil {
+		validateStream(add, where+".body", m.Body)
+	}
+}
+
 func validateHeaderMatch(add func(string, ...any), where string, h *spec.HeaderMatch) {
 	if h.Name == "" {
 		add("%s.name is required", where)
@@ -935,12 +1050,18 @@ func validateHeaderMatch(add func(string, ...any), where string, h *spec.HeaderM
 	if h.Equals != nil {
 		n++
 	}
+	if h.Matches != nil {
+		n++
+		if _, err := regexp.Compile(*h.Matches); err != nil {
+			add("%s.matches %q is not a valid regexp: %v", where, *h.Matches, err)
+		}
+	}
 	switch n {
 	case 0:
-		add("%s: must set one of contains/equals", where)
+		add("%s: must set one of contains/equals/matches", where)
 	case 1:
 	default:
-		add("%s: must set exactly one of contains/equals", where)
+		add("%s: must set exactly one of contains/equals/matches", where)
 	}
 }
 
@@ -1117,7 +1238,7 @@ func validateRetry(add func(string, ...any), where string, r *spec.Retry) {
 		add("%s.retry.until is required", where)
 		return
 	}
-	validateAssert(add, where+".retry.until", r.Until)
+	validateAssert(add, where+".retry.until", r.Until, nil)
 }
 
 func validateJSON(add func(string, ...any), where string, j *spec.JSONAssert) {

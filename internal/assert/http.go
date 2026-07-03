@@ -2,6 +2,7 @@ package assert
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/nao1215/atago/internal/runner"
@@ -32,7 +33,13 @@ func checkHeader(h *spec.HeaderMatch, res *runner.Result) *CheckResult {
 	if res == nil || !res.IsHTTP {
 		return &CheckResult{Desc: "assert header", Hint: "no HTTP request has run in this scenario yet"}
 	}
-	got := res.Header.Get(h.Name)
+	return checkHeaderValue(h, res.Header.Get(h.Name), "response")
+}
+
+// checkHeaderValue matches one header value; kind names the header's origin
+// ("response" for the http target, "recorded request" for the mock target,
+// #24) so failure hints read naturally in both contexts.
+func checkHeaderValue(h *spec.HeaderMatch, got, kind string) *CheckResult {
 	switch {
 	case h.Equals != nil:
 		desc := fmt.Sprintf("assert header %q equals %q", h.Name, *h.Equals)
@@ -43,7 +50,7 @@ func checkHeader(h *spec.HeaderMatch, res *runner.Result) *CheckResult {
 			Desc:     desc,
 			Expected: fmt.Sprintf("%s: %s", h.Name, *h.Equals),
 			Actual:   fmt.Sprintf("%s: %s", h.Name, got),
-			Hint:     fmt.Sprintf("response header %q did not equal the expected value", h.Name),
+			Hint:     fmt.Sprintf("%s header %q did not equal the expected value", kind, h.Name),
 		}
 	case h.Contains != nil:
 		desc := fmt.Sprintf("assert header %q contains %q", h.Name, *h.Contains)
@@ -54,10 +61,25 @@ func checkHeader(h *spec.HeaderMatch, res *runner.Result) *CheckResult {
 			Desc:     desc,
 			Expected: fmt.Sprintf("%s containing %q", h.Name, *h.Contains),
 			Actual:   fmt.Sprintf("%s: %s", h.Name, got),
-			Hint:     fmt.Sprintf("response header %q did not contain the substring", h.Name),
+			Hint:     fmt.Sprintf("%s header %q did not contain the substring", kind, h.Name),
+		}
+	case h.Matches != nil:
+		desc := fmt.Sprintf("assert header %q matches /%s/", h.Name, *h.Matches)
+		re, err := regexp.Compile(*h.Matches)
+		if err != nil {
+			return &CheckResult{Desc: desc, Hint: fmt.Sprintf("invalid regexp: %v", err)}
+		}
+		if re.MatchString(got) {
+			return pass(desc)
+		}
+		return &CheckResult{
+			Desc:     desc,
+			Expected: fmt.Sprintf("%s matching /%s/", h.Name, *h.Matches),
+			Actual:   fmt.Sprintf("%s: %s", h.Name, got),
+			Hint:     fmt.Sprintf("%s header %q did not match the pattern", kind, h.Name),
 		}
 	default:
-		return &CheckResult{Desc: "assert header", Hint: "header assertion must set contains or equals"}
+		return &CheckResult{Desc: "assert header", Hint: "header assertion must set contains, equals, or matches"}
 	}
 }
 

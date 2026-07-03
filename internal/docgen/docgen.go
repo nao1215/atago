@@ -197,6 +197,10 @@ func givenBullets(sc *spec.Scenario, expand func(string) string) []string {
 		svc := &sc.Services[i]
 		out = append(out, fmt.Sprintf("Background service `%s` is started: `%s`.", svc.Name, expand(svc.Command)))
 	}
+	for i := range sc.MockServers {
+		ms := &sc.MockServers[i]
+		out = append(out, fmt.Sprintf("Stub HTTP server `%s` serves %d canned route(s) at `${%s.url}` and records every request (#24).", ms.Name, len(ms.Routes), ms.Name))
+	}
 	for i := range sc.Steps {
 		step := &sc.Steps[i]
 		switch step.Kind() {

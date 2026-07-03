@@ -463,6 +463,147 @@ scenarios:
 	}
 }
 
+// TestValidate_MockServers proves the mock-server rules (#24): duplicate
+// names, route payload one-of, unknown mock names in asserts (listing the
+// declared ones), and count-0-with-matchers contradictions all fail at load.
+func TestValidate_MockServers(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name, src, wantMsg string
+	}{
+		{
+			name: "duplicate mock names",
+			src: `
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: s
+    mock_servers:
+      - name: api
+        routes: [{method: GET, path: /}]
+      - name: api
+        routes: [{method: GET, path: /}]
+    steps:
+      - run: {command: echo hi}
+`,
+			wantMsg: `duplicate mock server name "api"`,
+		},
+		{
+			name: "route with two payload sources",
+			src: `
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: s
+    mock_servers:
+      - name: api
+        routes:
+          - method: GET
+            path: /
+            body: inline
+            body_file: canned.json
+    steps:
+      - run: {command: echo hi}
+`,
+			wantMsg: "at most one of json/body/body_file",
+		},
+		{
+			name: "unknown mock name in assert lists declared",
+			src: `
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: s
+    mock_servers:
+      - name: api
+        routes: [{method: GET, path: /}]
+    steps:
+      - run: {command: echo hi}
+      - assert:
+          mock: {name: apo, count: 1}
+`,
+			wantMsg: `"apo" is not a declared mock server (declared: api)`,
+		},
+		{
+			name: "count zero with body matcher",
+			src: `
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: s
+    mock_servers:
+      - name: api
+        routes: [{method: GET, path: /}]
+    steps:
+      - run: {command: echo hi}
+      - assert:
+          mock:
+            name: api
+            count: 0
+            body: {contains: x}
+`,
+			wantMsg: "count: 0 cannot be combined",
+		},
+		{
+			name: "relative route path",
+			src: `
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: s
+    mock_servers:
+      - name: api
+        routes: [{method: GET, path: v1/x}]
+    steps:
+      - run: {command: echo hi}
+`,
+			wantMsg: `must start with "/"`,
+		},
+		{
+			name: "suite mock is a legal assert target",
+			src: `
+version: "1"
+suite:
+  name: sample
+  setup:
+    - mock_server:
+        name: shared
+        routes: [{method: GET, path: /}]
+scenarios:
+  - name: s
+    steps:
+      - run: {command: echo hi}
+      - assert:
+          mock: {name: shared, count: 0}
+`,
+			wantMsg: "",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			_, err := LoadBytes("sample.atago.yaml", []byte(tc.src))
+			if tc.wantMsg == "" {
+				if err != nil {
+					t.Fatalf("LoadBytes() error = %v, want clean load", err)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatal("LoadBytes() = nil error, want a mock validation error")
+			}
+			if !strings.Contains(err.Error(), tc.wantMsg) {
+				t.Errorf("error = %q, want substring %q", err, tc.wantMsg)
+			}
+		})
+	}
+}
+
 // TestValidate_SignalStep proves the signal-step rules (#23): the target must
 // be a declared service (with the declared names listed), the signal name
 // must be in the accepted set, and wait.timeout must parse.

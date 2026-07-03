@@ -1,0 +1,127 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / mock http server (offline API-client testing)
+
+# Exercises #24: mock_servers serve canned routes, record every request, and
+# the mock: assertion target checks what the client sent. The client here is
+# an INNER atago http runner (pure Go), so every scenario runs on Windows too
+# — this spec is in the Windows E2E allowlist on purpose.
+scenarios:
+  - name: count, header, and body-json asserts pass against a real client
+    mock_servers:
+      - name: api
+        routes:
+          - method: POST
+            path: /v1/reports
+            status: 201
+            json: { id: "r-1", ok: true }
+    steps:
+      - fixture:
+          file: client.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: client
+            runners:
+              api:
+                type: http
+                base_url: ${api.url}
+            scenarios:
+              - name: post a report
+                steps:
+                  - http:
+                      runner: api
+                      method: POST
+                      path: /v1/reports
+                      header: { Authorization: "Bearer tok-123" }
+                      json: { title: "report" }
+                  - assert:
+                      status: 201
+      - run:
+          command: ${atago} run client.atago.yaml
+      - assert:
+          exit_code: 0
+      - assert:
+          mock:
+            name: api
+            path: /v1/reports
+            method: POST
+            count: 1
+            header: { name: Authorization, matches: "^Bearer " }
+            body:
+              json: { path: "$.title", equals: "report" }
+
+  - name: a failing count summarizes the recorded requests
+    mock_servers:
+      - name: stub
+        routes:
+          - method: GET
+            path: /right
+            body: found
+    steps:
+      - fixture:
+          file: outer.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: outer
+            runners:
+              api:
+                type: http
+                base_url: ${stub.url}
+            scenarios:
+              - name: wrong path then failing count
+                mock_servers:
+                  - name: inner
+                    routes:
+                      - method: GET
+                        path: /right
+                steps:
+                  - http:
+                      runner: api
+                      method: GET
+                      path: /wrong
+                  - assert:
+                      status: 404
+                  - assert:
+                      mock:
+                        name: inner
+                        path: /right
+                        count: 1
+      # The inner spec asserts against ITS mock (zero matching requests: the
+      # http step above hit the OUTER stub), so the run fails and the block
+      # summarizes what was recorded. ${stub.url} interpolates the outer
+      # mock's URL into the inner spec via the fixture.
+      - run:
+          command: ${atago} run outer.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - "1 request for /right"
+              - "0 matching of 0 recorded"
+
+  - name: an unknown mock name in an assert is a load-time error
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: bad
+            scenarios:
+              - name: wrong name
+                mock_servers:
+                  - name: api
+                    routes: [{method: GET, path: /}]
+                steps:
+                  - run: {command: echo hi}
+                  - assert:
+                      mock: {name: apo, count: 1}
+      - run:
+          command: ${atago} run bad.atago.yaml
+      - assert:
+          exit_code: 2
+          stderr:
+            contains: 'not a declared mock server (declared: api)'

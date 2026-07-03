@@ -1,0 +1,100 @@
+version: "1"
+
+# Mock HTTP servers (#24): test API-client CLIs OFFLINE. `mock_servers:`
+# starts a stub HTTP server on an ephemeral loopback port before the steps
+# run, serves canned routes (matched on exact method + path; the query string
+# is excluded), and RECORDS every incoming request — including unmatched ones,
+# which answer 404. `${<name>.url}` / `${<name>.port}` are seeded into the
+# store, and the `mock:` assertion target checks what the client actually
+# sent: request count, and header/body matchers applied to the last matching
+# request. Response bodies come from `json:` (inline document), `body:`
+# (inline text), or `body_file:` (spec-relative file); `delay:` slows a route
+# down for retry testing.
+#
+# The client here is stock curl; single-quoted shell args are POSIX, so these
+# scenarios skip on Windows (the engine itself is pure Go and cross-platform —
+# see test/e2e/atago/mock_server.atago.yaml for an http-runner-driven variant).
+# Runs green as-is on Linux/macOS: atago run examples/mock_server.atago.yaml
+
+suite:
+  name: mock http server
+
+scenarios:
+  - name: the CLI posts a report and the mock records exactly what was sent
+    skip:
+      os: windows
+    mock_servers:
+      - name: api
+        routes:
+          - method: POST
+            path: /v1/reports
+            status: 201
+            json: { id: "r-1", ok: true }
+    steps:
+      - run:
+          shell: true
+          command: >-
+            curl -sf -X POST -H 'Authorization: Bearer tok-123'
+            -d '{"title":"report"}' ${api.url}/v1/reports
+      - assert:
+          exit_code: 0
+          stdout:
+            json: { path: "$.id", equals: "r-1" }
+      # The headline assertion: what did the CLI actually send?
+      - assert:
+          mock:
+            name: api
+            path: /v1/reports
+            method: POST
+            count: 1
+            header: { name: Authorization, matches: "^Bearer " }
+            body:
+              json: { path: "$.title", equals: "report" }
+
+  - name: an unmatched path answers 404 and is still recorded
+    skip:
+      os: windows
+    mock_servers:
+      - name: stub
+        routes:
+          - method: GET
+            path: /right
+            body: found
+    steps:
+      # curl without -f: the 404 response body is still printed, exit 0.
+      - run:
+          shell: true
+          command: curl -s ${stub.url}/wrong
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: no route for GET /wrong
+      # Without count, the mock assert requires at least one matching request.
+      - assert:
+          mock:
+            name: stub
+            path: /wrong
+            method: GET
+
+  - name: a delayed route exercises client retry loops
+    skip:
+      os: windows
+    mock_servers:
+      - name: slow
+        routes:
+          - method: GET
+            path: /ping
+            delay: 200ms
+            body: pong
+    steps:
+      - run:
+          shell: true
+          command: curl -s ${slow.url}/ping
+          retry:
+            times: 3
+            interval: 100ms
+            until:
+              stdout:
+                contains: pong
+      - assert:
+          exit_code: 0

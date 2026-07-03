@@ -164,7 +164,14 @@ type Scenario struct {
 	// CLI that talks to a peer (a TCP client, an API consumer) by standing up that
 	// peer for the duration of the scenario.
 	Services []Service `yaml:"services,omitempty"`
-	Steps    []Step    `yaml:"steps"`
+	// MockServers are declarative stub HTTP servers (#24): each serves canned
+	// routes on an ephemeral loopback port, records every incoming request
+	// for the `mock:` assertion target, and seeds ${<name>.url} /
+	// ${<name>.port} into the store before steps run — so an API-client CLI
+	// can be tested fully offline. Lifecycle mirrors services: started before
+	// steps, stopped LIFO at scenario end.
+	MockServers []MockServer `yaml:"mock_servers,omitempty"`
+	Steps       []Step       `yaml:"steps"`
 	// Teardown steps always run after Steps — whether the scenario passed,
 	// failed, errored, or was interrupted — and share its variable store, so a
 	// resource id captured with `store` flows into the cleanup request. They
@@ -206,6 +213,63 @@ type Service struct {
 	// Ready declares how to wait until the service is accepting work before the
 	// steps run. When omitted, the steps start as soon as the process is spawned.
 	Ready *Ready `yaml:"ready,omitempty"`
+}
+
+// MockServer is a declarative stub HTTP server (#24). It listens on
+// 127.0.0.1 with an ephemeral port, serves Routes matched on exact
+// method+path, and records every incoming request (matched or not — an
+// unmatched request answers 404 and is still recorded) for the `mock:`
+// assertion target.
+type MockServer struct {
+	// Name identifies the server for ${<name>.url} seeding and mock asserts;
+	// unique per scenario (and among suite-wide mock servers).
+	Name string `yaml:"name"`
+	// Routes are the canned responses, matched top-down on exact method+path
+	// (query string excluded; deliberately no patterns).
+	Routes []MockRoute `yaml:"routes,omitempty"`
+}
+
+// MockRoute is one canned response (#24). At most one of JSON/Body/BodyFile
+// supplies the payload; Status defaults to 200.
+type MockRoute struct {
+	// Method is the HTTP method to match (case-insensitive).
+	Method string `yaml:"method"`
+	// Path is the exact request path to match (query string excluded).
+	Path string `yaml:"path"`
+	// Status is the response status (default 200).
+	Status int `yaml:"status,omitempty"`
+	// JSON is an inline response document, marshaled with
+	// Content-Type: application/json.
+	JSON any `yaml:"json,omitempty"`
+	// Body is an inline text response body.
+	Body string `yaml:"body,omitempty"`
+	// BodyFile reads the response body from a spec-relative file (confined to
+	// the spec directory, like snapshot goldens), read at request time.
+	BodyFile string `yaml:"body_file,omitempty"`
+	// Header sets extra response headers.
+	Header map[string]string `yaml:"header,omitempty"`
+	// Delay sleeps this Go duration before responding — for retry testing.
+	Delay string `yaml:"delay,omitempty"`
+}
+
+// MockAssert checks what the CLI under test actually sent to a mock server
+// (#24). Records are filtered by the optional Path/Method, then Count pins
+// the exact number of matching requests (without Count, at least one must
+// exist); Header and Body apply to the LAST matching request.
+type MockAssert struct {
+	// Name references a declared mock server.
+	Name string `yaml:"name"`
+	// Path filters recorded requests by exact path.
+	Path string `yaml:"path,omitempty"`
+	// Method filters recorded requests by method (case-insensitive).
+	Method string `yaml:"method,omitempty"`
+	// Count asserts the exact number of matching requests.
+	Count *int `yaml:"count,omitempty"`
+	// Header matches a header of the last matching request.
+	Header *HeaderMatch `yaml:"header,omitempty"`
+	// Body matches the body of the last matching request with the stream
+	// matchers (json path, contains, ...).
+	Body *StreamAssert `yaml:"body,omitempty"`
 }
 
 // Ready is a service readiness probe (ADR-0031). Exactly one of File/Port/Log/
@@ -268,6 +332,11 @@ type Step struct {
 	// loader accepts the step everywhere and the engine reports a clear error
 	// on Windows.
 	Signal *Signal `yaml:"signal,omitempty"`
+	// MockServer starts a suite-wide stub HTTP server (#24). Like `service:`
+	// it is valid only inside suite.setup, so its position in the sequence
+	// controls ordering; its recorded requests and ${<name>.url} seed every
+	// scenario.
+	MockServer *MockServer `yaml:"mock_server,omitempty"`
 }
 
 // Signal targets a declared service (scenario or suite) by name and delivers
@@ -634,6 +703,11 @@ type Assert struct {
 	// surface for generated PDFs — page count, Info metadata fields, and extracted
 	// text — without depending on a specific layout engine.
 	PDF *PDFAssert `yaml:"pdf,omitempty"`
+
+	// Mock is the mock-server assertion target (#24): what the CLI under test
+	// actually sent to a declared mock server — request count, and header/body
+	// matchers applied to the last matching recorded request.
+	Mock *MockAssert `yaml:"mock,omitempty"`
 }
 
 // PDFAssert checks a generated PDF file (#73). Like ImageAssert/DirAssert, every
@@ -889,11 +963,15 @@ type JSONAssert struct {
 	Lte     *float64 `yaml:"lte,omitempty"`
 }
 
-// HeaderMatch checks an HTTP response header (post-MVP).
+// HeaderMatch checks an HTTP header (response headers on the `header` target,
+// recorded request headers on the `mock` target). Exactly one matcher.
 type HeaderMatch struct {
 	Name     string  `yaml:"name"`
 	Contains *string `yaml:"contains,omitempty"`
 	Equals   *string `yaml:"equals,omitempty"`
+	// Matches applies a regexp — the natural shape for auth headers
+	// ("^Bearer ") (#24).
+	Matches *string `yaml:"matches,omitempty"`
 }
 
 // Store captures a value into the variable store (post-MVP).

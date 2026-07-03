@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-47 suites · 161 scenarios
+48 suites · 164 scenarios
 ## Contents
 - [atago self-hosting / variable expansion in assertion matcher values](#atago-self-hosting--variable-expansion-in-assertion-matcher-values) — 3 scenarios
   - [stdout.equals expands ${workdir}](#scenario-stdoutequals-expands-workdir)
@@ -116,6 +116,10 @@
 - [atago self-hosting / matrix scenarios](#atago-self-hosting--matrix-scenarios) — 2 scenarios
   - [matrix expands into one scenario per row](#scenario-matrix-expands-into-one-scenario-per-row)
   - [matrix without a templated name gets a deterministic suffix](#scenario-matrix-without-a-templated-name-gets-a-deterministic-suffix)
+- [atago self-hosting / mock http server (offline API-client testing)](#atago-self-hosting--mock-http-server-offline-api-client-testing) — 3 scenarios
+  - [count, header, and body-json asserts pass against a real client](#scenario-count-header-and-body-json-asserts-pass-against-a-real-client)
+  - [a failing count summarizes the recorded requests](#scenario-a-failing-count-summarizes-the-recorded-requests)
+  - [an unknown mock name in an assert is a load-time error](#scenario-an-unknown-mock-name-in-an-assert-is-a-load-time-error)
 - [atago self-hosting / not_equals matcher](#atago-self-hosting--not_equals-matcher) — 4 scenarios
   - [not_equals passes when stdout differs from the given text](#scenario-not_equals-passes-when-stdout-differs-from-the-given-text)
   - [not_equals is trailing-newline tolerant like equals](#scenario-not_equals-is-trailing-newline-tolerant-like-equals)
@@ -2001,6 +2005,103 @@ ${atago} run --report junit suffix.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `name="row [n=1]"`, `name="row [n=2]"`
+## atago self-hosting / mock http server (offline API-client testing)
+Source: `test/e2e/atago/mock_server.atago.yaml`
+### Scenario: count, header, and body-json asserts pass against a real client
+#### Given
+- Stub HTTP server `api` serves 1 canned route(s) at `${api.url}` and records every request (#24).
+- Fixture file `client.atago.yaml` is created.
+#### Inputs
+_Fixture `client.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: client
+runners:
+  api:
+    type: http
+    base_url: ${api.url}
+scenarios:
+  - name: post a report
+    steps:
+      - http:
+          runner: api
+          method: POST
+          path: /v1/reports
+          header: { Authorization: "Bearer tok-123" }
+          json: { title: "report" }
+      - assert:
+          status: 201
+```
+#### When
+```shell
+${atago} run client.atago.yaml
+```
+#### Then
+- exit code is `0`
+- mock `api` received `POST /v1/reports` exactly 1 time(s)
+### Scenario: a failing count summarizes the recorded requests
+#### Given
+- Stub HTTP server `stub` serves 1 canned route(s) at `${stub.url}` and records every request (#24).
+- Fixture file `outer.atago.yaml` is created.
+#### Inputs
+_Fixture `outer.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: outer
+runners:
+  api:
+    type: http
+    base_url: ${stub.url}
+scenarios:
+  - name: wrong path then failing count
+    mock_servers:
+      - name: inner
+        routes:
+          - method: GET
+            path: /right
+    steps:
+      - http:
+          runner: api
+          method: GET
+          path: /wrong
+      - assert:
+… (truncated, 6 more lines)
+```
+#### When
+```shell
+${atago} run outer.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `1 request for /right`, `0 matching of 0 recorded`
+### Scenario: an unknown mock name in an assert is a load-time error
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: bad
+scenarios:
+  - name: wrong name
+    mock_servers:
+      - name: api
+        routes: [{method: GET, path: /}]
+    steps:
+      - run: {command: echo hi}
+      - assert:
+          mock: {name: apo, count: 1}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `not a declared mock server (declared: api)`
 ## atago self-hosting / not_equals matcher
 Source: `test/e2e/atago/not_equals.atago.yaml`
 ### Scenario: not_equals passes when stdout differs from the given text

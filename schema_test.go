@@ -205,6 +205,45 @@ scenarios:
 	}
 }
 
+// TestSchema_AcceptsMockServers confirms mock_servers, the suite mock_server
+// step, and the mock assert target (#24) are accepted.
+func TestSchema_AcceptsMockServers(t *testing.T) {
+	s := loadSchema(t)
+	src := `version: "1"
+suite:
+  name: x
+  setup:
+    - mock_server:
+        name: shared
+        routes: [{method: GET, path: /ping, body: pong}]
+scenarios:
+  - name: a
+    mock_servers:
+      - name: api
+        routes:
+          - method: POST
+            path: /v1/reports
+            status: 201
+            json: { id: "r-1" }
+          - method: GET
+            path: /file
+            body_file: canned.json
+            delay: 200ms
+    steps:
+      - run: {command: echo hi}
+      - assert:
+          mock:
+            name: api
+            path: /v1/reports
+            method: POST
+            count: 1
+            header: { name: Authorization, matches: "^Bearer " }
+            body: { contains: report }`
+	if err := s.Validate(yamlToAny(t, []byte(src))); err != nil {
+		t.Errorf("schema rejected valid mock-server spec:\n%v", err)
+	}
+}
+
 // TestSchema_RejectsInvalid confirms the schema actually catches bad specs.
 func TestSchema_RejectsInvalid(t *testing.T) {
 	s := loadSchema(t)

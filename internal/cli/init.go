@@ -263,6 +263,54 @@ scenarios:
             contains: pong
 `
 
+const mockTemplate = `version: "1"
+
+# Test an API-client CLI OFFLINE (#24): the mock server serves canned routes
+# on an ephemeral loopback port and records every request, so you can assert
+# what your CLI actually sent. Runs as-is with curl on PATH:
+#   atago run mock.atago.yaml
+# For your own CLI: replace the curl command with e.g.
+#   mycli push --endpoint ${api.url} report.txt
+
+suite:
+  name: mock-example
+
+scenarios:
+  - name: the client posts a report and the mock records it
+    mock_servers:
+      - name: api
+        routes:
+          - method: POST
+            path: /v1/reports
+            status: 201
+            json: { id: "r-1", ok: true }
+          - method: GET
+            path: /v1/reports/r-1
+            json: { id: "r-1", title: "report" }
+    steps:
+      # ${api.url} is the mock's base URL, seeded before steps run.
+      - run:
+          shell: true
+          command: >-
+            curl -sf -X POST -H 'Authorization: Bearer tok-123'
+            -d '{"title":"report"}' ${api.url}/v1/reports
+      - assert:
+          exit_code: 0
+          stdout:
+            json: { path: "$.id", equals: "r-1" }
+      # Assert what the CLI actually sent: exactly one POST, with the auth
+      # header and the JSON body it was supposed to carry.
+      - assert:
+          mock:
+            name: api
+            path: /v1/reports
+            method: POST
+            count: 1
+            header: { name: Authorization, matches: "^Bearer " }
+            body:
+              json: { path: "$.title", equals: "report" }
+`
+
 // initTemplate pairs a scaffold with the one-line summary shown by
 // --list-templates, so a user can pick a starting point without opening the
 // generated file first.
@@ -304,6 +352,10 @@ var initTemplates = map[string]initTemplate{
 	"services": {
 		body: servicesTemplate,
 		desc: "test against a background server: readiness, retry, teardown (runs as-is)",
+	},
+	"mock": {
+		body: mockTemplate,
+		desc: "stub an HTTP API offline and assert what the client sent (needs curl on PATH)",
 	},
 }
 

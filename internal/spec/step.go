@@ -4,18 +4,19 @@ package spec
 type StepKind string
 
 const (
-	StepNone    StepKind = ""
-	StepFixture StepKind = "fixture"
-	StepRun     StepKind = "run"
-	StepHTTP    StepKind = "http"
-	StepQuery   StepKind = "query"
-	StepGRPC    StepKind = "grpc"
-	StepCDP     StepKind = "cdp"
-	StepAssert  StepKind = "assert"
-	StepStore   StepKind = "store"
-	StepService StepKind = "service"
-	StepPTY     StepKind = "pty"
-	StepSignal  StepKind = "signal"
+	StepNone       StepKind = ""
+	StepFixture    StepKind = "fixture"
+	StepRun        StepKind = "run"
+	StepHTTP       StepKind = "http"
+	StepQuery      StepKind = "query"
+	StepGRPC       StepKind = "grpc"
+	StepCDP        StepKind = "cdp"
+	StepAssert     StepKind = "assert"
+	StepStore      StepKind = "store"
+	StepService    StepKind = "service"
+	StepPTY        StepKind = "pty"
+	StepSignal     StepKind = "signal"
+	StepMockServer StepKind = "mock_server"
 )
 
 // SetKeys returns the action keys that are present on the step. A valid step has
@@ -55,6 +56,9 @@ func (s *Step) SetKeys() []StepKind {
 	if s.Signal != nil {
 		keys = append(keys, StepSignal)
 	}
+	if s.MockServer != nil {
+		keys = append(keys, StepMockServer)
+	}
 	return keys
 }
 
@@ -86,6 +90,7 @@ const (
 	AssertImage      AssertTarget = "image"
 	AssertDir        AssertTarget = "dir"
 	AssertPDF        AssertTarget = "pdf"
+	AssertMock       AssertTarget = "mock"
 )
 
 // SetTargets returns the assertion target families present. A valid assert has
@@ -133,6 +138,9 @@ func (a *Assert) SetTargets() []AssertTarget {
 	}
 	if a.PDF != nil {
 		t = append(t, AssertPDF)
+	}
+	if a.Mock != nil {
+		t = append(t, AssertMock)
 	}
 	return t
 }

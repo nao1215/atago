@@ -120,6 +120,7 @@ cli       run a command; assert exit code/stdout/stderr (runs as-is)
 db        run SQL; assert on rows via bundled SQLite (runs as-is)
 grpc      call a unary gRPC method via server reflection (edit target first)
 http      call an HTTP API; assert status and JSON body (edit base_url first)
+mock      stub an HTTP API offline and assert what the client sent (needs curl on PATH)
 services  test against a background server: readiness, retry, teardown (runs as-is)
 ssh       run a command on a remote host over SSH (edit host/user first)
 ```
@@ -140,6 +141,7 @@ Every feature has a commented, runnable spec under [examples/](examples/). The e
 | [timeouts](examples/timeouts.atago.yaml) | the built-in 60s default step timeout, `suite.timeout`, per-step overrides, and the `timeout: "0"` escape hatch |
 | [stdin](examples/stdin.atago.yaml) | stdin sources: inline text, `stdin: {file: ...}` from a workdir file, and binary input via `stdin: {base64: ...}` |
 | [matrix](examples/matrix.atago.yaml) | one template scenario expanded per parameter row |
+| [mock_server](examples/mock_server.atago.yaml) | test API-client CLIs offline: `mock_servers` serve canned routes, record every request, and `mock:` asserts what the client actually sent |
 | [pty](examples/pty.atago.yaml) | interactive testing in a real pseudo-terminal: expect/send sessions, TTY-detection (POSIX-only) |
 | [retry](examples/retry.atago.yaml) | polling a command until an assertion passes |
 | [snapshot](examples/snapshot.atago.yaml) | golden-file testing with normalized output |
@@ -156,6 +158,10 @@ Every feature has a commented, runnable spec under [examples/](examples/). The e
 | [browser](examples/browser.atago.yaml) | headless-Chrome flows and screenshots |
 
 Selection flags compose with any spec: `--filter NAME`, `--tag T`, `--skip-tag T`, `--parallel N` (default: the number of CPUs — scenarios are isolated, so runs are concurrent out of the box), `--fail-fast`, and `--rerun-failed` (rerun only what failed last time). While authoring a spec, `--verbose` traces every scenario — the expanded command, exit code, captured stdout/stderr, and each assertion's verdict — for passing scenarios too, so you never have to break an assertion just to see what a command printed.
+
+## Test API-client CLIs offline
+
+Tools that talk to an API — gh-style CLIs, cloud CLIs, webhook senders, anything with an `--endpoint` flag — are testable without the real service: `mock_servers:` starts a stub HTTP server on an ephemeral loopback port, serves canned routes, and records every request, and the `mock:` assertion target then checks what your CLI actually sent (request count, auth header, JSON body). `${<name>.url}` carries the address into your command; unmatched requests answer 404 and stay visible in failures. See [examples/mock_server.atago.yaml](examples/mock_server.atago.yaml) or scaffold one with `atago init --template mock`.
 
 ## Use it in CI
 

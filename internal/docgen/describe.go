@@ -54,6 +54,18 @@ func describeTarget(a *spec.Assert, target spec.AssertTarget) string {
 			return fmt.Sprintf("exit code is %s", markdown.Code(fmt.Sprint(*a.ExitCode.Equals)))
 		}
 		return "exit code is checked"
+	case spec.AssertMock:
+		m := a.Mock
+		desc := "mock " + markdown.Code(m.Name) + " received"
+		if m.Method != "" || m.Path != "" {
+			desc += " " + markdown.Code(strings.TrimSpace(strings.ToUpper(m.Method)+" "+m.Path))
+		} else {
+			desc += " a request"
+		}
+		if m.Count != nil {
+			desc += fmt.Sprintf(" exactly %d time(s)", *m.Count)
+		}
+		return desc
 	case spec.AssertStdout:
 		return "stdout " + describeStream(a.Stdout)
 	case spec.AssertStderr:

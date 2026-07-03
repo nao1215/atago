@@ -14,7 +14,9 @@ import (
 // `$${name}` — the match is a literal escape that renders as `${name}` without
 // expansion. A bare `$$` not followed by `{name}` (a shell PID, a doubled
 // currency sign) does not match and is left untouched.
-var varRef = regexp.MustCompile(`(\$?)\$\{((?:env:)?[a-zA-Z_][a-zA-Z0-9_]*)\}`)
+// Dotted segments (${api.url}) exist for namespaced built-ins like the mock
+// server's url/port seeds (#24); a name never starts or ends with a dot.
+var varRef = regexp.MustCompile(`(\$?)\$\{((?:env:)?[a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z0-9_]+)*)\}`)
 
 // envPrefix marks a reference resolved from the host environment instead of
 // the scenario store: `${env:HOME}` expands to os.Getenv("HOME"). It exists

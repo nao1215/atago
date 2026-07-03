@@ -9,6 +9,7 @@ import (
 	"github.com/nao1215/atago/internal/assert"
 	"github.com/nao1215/atago/internal/fixture"
 	"github.com/nao1215/atago/internal/runner"
+	mockrunner "github.com/nao1215/atago/internal/runner/mock"
 	servicerunner "github.com/nao1215/atago/internal/runner/service"
 	sshrunner "github.com/nao1215/atago/internal/runner/ssh"
 	"github.com/nao1215/atago/internal/spec"
@@ -28,6 +29,10 @@ type suiteRuntime struct {
 	dir      string
 	st       *store.Store
 	services []*servicerunner.Proc
+	// mocks are the suite-wide stub HTTP servers started by suite.setup
+	// mock_server steps (#24); their ${<name>.url}/${<name>.port} vars flow to
+	// every scenario, and scenario `mock:` asserts can read their records.
+	mocks    []*mockrunner.Server
 	env      map[string]string // raw suite.env; expanded per use
 	vars     map[string]string // seeded into every scenario store
 	sshConns map[string]*sshrunner.Runner
@@ -46,6 +51,9 @@ func (rt *suiteRuntime) set(name, value string) {
 func (rt *suiteRuntime) stop() {
 	for i := len(rt.services) - 1; i >= 0; i-- {
 		rt.services[i].Stop()
+	}
+	for i := len(rt.mocks) - 1; i >= 0; i-- {
+		rt.mocks[i].Stop()
 	}
 	for _, c := range rt.sshConns {
 		_ = c.Close()
@@ -137,6 +145,14 @@ func (e *Engine) runSuiteSteps(ctx context.Context, steps []spec.Step, rt *suite
 				SpecDir:         rc.specDir,
 				UpdateSnapshots: e.UpdateSnapshots,
 				Secrets:         rc.masker.MaskBytes,
+				MockRecords: func(name string) ([]mockrunner.Record, bool) {
+					for _, m := range rt.mocks {
+						if m.Name() == name {
+							return m.Records(), true
+						}
+					}
+					return nil, false
+				},
 			})
 			sr.Checks = crs
 			if !assert.AllOK(crs) {
@@ -155,6 +171,16 @@ func (e *Engine) runSuiteSteps(ctx context.Context, steps []spec.Step, rt *suite
 			if step.Service.Ready != nil && step.Service.Ready.Store != "" {
 				rt.set(step.Service.Ready.Store, captured)
 			}
+		case spec.StepMockServer:
+			ms, err := mockrunner.Start(ctx, step.MockServer, rc.specDir)
+			if err != nil {
+				sr.ErrMsg = err.Error()
+				failed = true
+				break
+			}
+			rt.mocks = append(rt.mocks, ms)
+			rt.set(ms.Name()+".url", ms.URL())
+			rt.set(ms.Name()+".port", ms.Port())
 		default:
 			sr.ErrMsg = fmt.Sprintf("%s steps are not allowed at suite level", step.Kind())
 			failed = true
