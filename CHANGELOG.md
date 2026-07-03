@@ -25,6 +25,18 @@ and this project follows [Semantic Versioning](https://semver.org/).
   `setup_failures`/`teardown_failures`) but never change the verdict.
   Surfaced in the JSON schema, `explain`, `manifest`
   (`suite_env`/`suite_setup`/`suite_teardown`), and a runnable example.
+- Interactive terminal testing via `pty` steps (#8) — run one command inside a
+  REAL pseudo-terminal and drive it with a declarative expect/send session,
+  for CLIs that branch on TTY-ness or present interactive prompts (REPLs,
+  wizards). `expect` waits until the transcript matches a regexp; `send` types
+  into the terminal (an empty send transmits EOF/^D); the whole session is
+  bounded by `timeout` (default 30s). The transcript (terminal echo included)
+  becomes the step's stdout, so all stream matchers, snapshots (with their
+  ANSI normalization), and `store from.stdout` work unchanged; a
+  never-matching expect fails like an assertion with the pattern and
+  transcript in the failure block (and as an --artifacts-dir sidecar).
+  POSIX-only for now: the loader accepts the step everywhere, Windows reports
+  a clear execution error (gate with `skip: {os: windows}`).
 
 - `atago run --verbose` (#6): trace every scenario as it finishes — the
   expanded command, exit code / HTTP status, captured stdout/stderr (excerpted

@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-41 suites · 137 scenarios
+42 suites · 139 scenarios
 ## Contents
 - [atago self-hosting / variable expansion in assertion matcher values](#atago-self-hosting--variable-expansion-in-assertion-matcher-values) — 3 scenarios
   - [stdout.equals expands ${workdir}](#scenario-stdoutequals-expands-workdir)
@@ -116,6 +116,9 @@
 - [atago self-hosting / pdf assertion](#atago-self-hosting--pdf-assertion) — 2 scenarios
   - [pdf assertions cover page count, metadata, and text](#scenario-pdf-assertions-cover-page-count-metadata-and-text)
   - [a non-pdf file fails the pdf target](#scenario-a-non-pdf-file-fails-the-pdf-target)
+- [atago self-hosting / pty](#atago-self-hosting--pty) — 2 scenarios
+  - [a pty step sees a terminal where a run step sees a pipe](#scenario-a-pty-step-sees-a-terminal-where-a-run-step-sees-a-pipe)
+  - [a never-matching expect fails with the pattern in the block](#scenario-a-never-matching-expect-fails-with-the-pattern-in-the-block)
 - [atago self-hosting / reports](#atago-self-hosting--reports) — 4 scenarios
   - [JUnit report is XML with a testsuite and testcase](#scenario-junit-report-is-xml-with-a-testsuite-and-testcase)
   - [GitHub Actions annotations are emitted on failure](#scenario-github-actions-annotations-are-emitted-on-failure)
@@ -1947,6 +1950,62 @@ ${atago} version
 ```
 #### Then
 - exit code is `0`
+## atago self-hosting / pty
+Source: `test/e2e/atago/pty.atago.yaml`
+### Scenario: a pty step sees a terminal where a run step sees a pipe
+_skipped on windows_
+#### Given
+- Fixture file `tty.atago.yaml` is created.
+#### Inputs
+_Fixture `tty.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: tty
+    steps:
+      - pty:
+          shell: true
+          command: 'if [ -t 0 ]; then echo saw-a-tty; else echo saw-a-pipe; fi'
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: saw-a-tty
+```
+#### When
+```shell
+${atago} run tty.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout contains `1 passed`
+### Scenario: a never-matching expect fails with the pattern in the block
+_skipped on windows_
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: waits forever
+    steps:
+      - pty:
+          command: cat
+          timeout: 2s
+          session:
+            - expect: "prompt-that-never-comes"
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `pty expect /prompt-that-never-comes/`, `never appeared in the terminal transcript`
 ## atago self-hosting / reports
 Source: `test/e2e/atago/reports.atago.yaml`
 ### Scenario: JUnit report is XML with a testsuite and testcase

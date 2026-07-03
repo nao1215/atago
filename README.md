@@ -137,6 +137,7 @@ Every feature has a commented, runnable spec under [examples/](examples/). The e
 | [store_and_variables](examples/store_and_variables.atago.yaml) | capturing values into `${name}`, `${workdir}`, `${env:NAME}` host-environment reads, the `$${...}` literal escape |
 | [teardown](examples/teardown.atago.yaml) | cleanup steps that always run — pass or fail — sharing the scenario's variables |
 | [matrix](examples/matrix.atago.yaml) | one template scenario expanded per parameter row |
+| [pty](examples/pty.atago.yaml) | interactive testing in a real pseudo-terminal: expect/send sessions, TTY-detection (POSIX-only) |
 | [retry](examples/retry.atago.yaml) | polling a command until an assertion passes |
 | [snapshot](examples/snapshot.atago.yaml) | golden-file testing with normalized output |
 | [services](examples/services.atago.yaml) | background servers: readiness probes, `ready.store`, teardown |

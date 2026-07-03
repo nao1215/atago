@@ -243,6 +243,11 @@ type Step struct {
 	// position in the setup sequence controls ordering relative to the run
 	// steps around it (build the binary, then serve it, then warm a cache).
 	Service *Service `yaml:"service,omitempty"`
+	// PTY runs one command inside a real pseudo-terminal and drives it with a
+	// declarative expect/send session (#8) — for CLIs that branch on TTY-ness
+	// or present an interactive prompt. POSIX-only for now; the loader accepts
+	// the step everywhere and the engine reports a clear error on Windows.
+	PTY *PTY `yaml:"pty,omitempty"`
 }
 
 // Query runs a SQL statement through a named db runner (ADR-0026). The result
@@ -411,6 +416,41 @@ type Retry struct {
 	// Until is a single assertion polled after each attempt; the loop stops as
 	// soon as it passes. When it never passes, the run step fails.
 	Until *Assert `yaml:"until"`
+}
+
+// PTY runs a command inside a pseudo-terminal (#8). The captured transcript
+// (terminal echo included, ANSI intact) becomes the step's stdout, so every
+// stream matcher, snapshot (with its ANSI normalization), and
+// `store from.stdout` works unchanged.
+type PTY struct {
+	Command string `yaml:"command"`
+	// Shell runs Command through the shell like run.shell.
+	Shell *bool  `yaml:"shell,omitempty"`
+	Cwd   string `yaml:"cwd,omitempty"`
+	// Rows / Cols set the terminal size (default 24x80).
+	Rows int `yaml:"rows,omitempty"`
+	Cols int `yaml:"cols,omitempty"`
+	// Timeout bounds the WHOLE session as a Go duration (default "30s"): a
+	// prompt that never appears or a program that never exits fails loudly
+	// instead of hanging the run.
+	Timeout string            `yaml:"timeout,omitempty"`
+	Env     map[string]string `yaml:"env,omitempty"`
+	// Session is the ordered expect/send script. Each entry sets exactly one
+	// of Expect (wait until the accumulated transcript matches the regexp) or
+	// Send (write the string to the terminal; an empty send transmits EOF,
+	// i.e. ^D). Deliberately no branching — atago is not a scripting language.
+	Session []PTYAction `yaml:"session,omitempty"`
+}
+
+// PTYAction is one expect-or-send entry in a pty session (#8).
+type PTYAction struct {
+	// Expect waits until the transcript matches this regexp. A never-matching
+	// expect fails the step (reported like an assertion) when the session
+	// timeout elapses.
+	Expect string `yaml:"expect,omitempty"`
+	// Send writes this string to the terminal verbatim (include "\n" to press
+	// enter). The empty string sends EOF (^D). ${name} expansion applies.
+	Send *string `yaml:"send,omitempty"`
 }
 
 // HTTP issues an HTTP request (post-MVP).

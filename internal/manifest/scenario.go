@@ -170,6 +170,22 @@ func buildStep(index int, step *spec.Step, vars map[string]bool) Step {
 			}
 		}
 
+	case spec.StepPTY:
+		pt := step.PTY
+		st.Command = pt.Command
+		st.Shell = pt.Shell != nil && *pt.Shell
+		st.Action = "interactive (pty) " + pt.Command
+		collectVars(vars, pt.Command, pt.Cwd)
+		for _, v := range pt.Env {
+			collectVars(vars, v)
+		}
+		for _, a := range pt.Session {
+			if a.Send != nil {
+				collectVars(vars, *a.Send)
+			}
+			collectVars(vars, a.Expect)
+		}
+
 	case spec.StepAssert:
 		st.Target = assertTarget(step.Assert)
 		st.Action = "assert " + st.Target

@@ -544,6 +544,22 @@ func (e *Engine) runScenario(ctx context.Context, scenarioIdx int, sc *spec.Scen
 			}
 			current = r
 			sr.Run = maskResult(masker, r)
+		case spec.StepPTY:
+			r, ef, err := e.runPTY(ctx, step.PTY, st, scEnv, workdir)
+			if err != nil {
+				sr.ErrMsg = err.Error()
+				return sr, StatusError, false
+			}
+			current = r
+			sr.Run = maskResult(masker, r)
+			if ef != nil {
+				// A never-matching expect fails like an assertion: the pattern
+				// and the transcript excerpt land in the failure block.
+				ck := ptyExpectCheck(ef)
+				e.recordChecks(masker, []*assert.CheckResult{ck}, rc.specPath, sc.Name, scenarioIdx, i)
+				sr.Checks = []*assert.CheckResult{ck}
+				status = StatusFailed
+			}
 		case spec.StepCDP:
 			r, err := e.runCDP(ctx, expandCDP(st, step.CDP), workdir, st, rc, browserConns)
 			if err != nil {

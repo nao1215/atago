@@ -1,0 +1,61 @@
+# pty steps (#8): a real pseudo-terminal with a declarative expect/send
+# session. POSIX-only; every scenario here skips on Windows.
+version: "1"
+
+suite:
+  name: atago self-hosting / pty
+
+scenarios:
+  - name: a pty step sees a terminal where a run step sees a pipe
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: tty.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: tty
+                steps:
+                  - pty:
+                      shell: true
+                      command: 'if [ -t 0 ]; then echo saw-a-tty; else echo saw-a-pipe; fi'
+                  - assert:
+                      exit_code: 0
+                      stdout:
+                        contains: saw-a-tty
+      - run:
+          command: ${atago} run tty.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "1 passed"
+
+  - name: a never-matching expect fails with the pattern in the block
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: waits forever
+                steps:
+                  - pty:
+                      command: cat
+                      timeout: 2s
+                      session:
+                        - expect: "prompt-that-never-comes"
+      - run:
+          command: ${atago} run bad.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - "pty expect /prompt-that-never-comes/"
+              - "never appeared in the terminal transcript"

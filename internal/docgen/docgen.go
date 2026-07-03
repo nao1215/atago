@@ -234,6 +234,10 @@ func commands(steps []spec.Step, expand func(string) string) []string {
 			if step.GRPC != nil {
 				out = append(out, fmt.Sprintf("# gRPC %s via %s", step.GRPC.Method, step.GRPC.Runner))
 			}
+		case spec.StepPTY:
+			if step.PTY != nil {
+				out = append(out, fmt.Sprintf("# interactive (pty): %s", expand(step.PTY.Command)))
+			}
 		case spec.StepCDP:
 			if step.CDP != nil {
 				out = append(out, "# CDP via "+step.CDP.Runner+": "+cdpActions(step.CDP))
