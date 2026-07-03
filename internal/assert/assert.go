@@ -184,7 +184,13 @@ func checkExitCode(e *spec.ExitCode, res *runner.Result) *CheckResult {
 		}
 		hint := fmt.Sprintf("expected exit code %d but the command exited with %d", *e.Equals, res.ExitCode)
 		if res.TimedOut {
-			hint = fmt.Sprintf("the command hit its run.timeout after %s and was killed before exiting", res.Duration.Round(time.Millisecond))
+			// Name the level that supplied the timeout (step/runner/defaults/
+			// suite/built-in, #17) so the user knows which knob to adjust.
+			source := res.TimeoutSource
+			if source == "" {
+				source = "run.timeout"
+			}
+			hint = fmt.Sprintf("the command hit its %s after %s and was killed before exiting", source, res.Duration.Round(time.Millisecond))
 		}
 		return &CheckResult{
 			Desc:     desc,

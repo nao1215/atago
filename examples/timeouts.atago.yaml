@@ -1,0 +1,56 @@
+version: "1"
+
+# Step timeouts (#17). Every run/http/query/grpc step is bounded so a hanging
+# command fails loudly instead of stalling the run (or a CI job) forever.
+# Precedence, most specific wins:
+#
+#   step timeout > runner timeout > defaults.run.timeout > suite.timeout
+#   > built-in 60s default
+#
+# `timeout: "0"` (or "0s") at any level explicitly disables the bound — the
+# escape hatch for legitimately long-running commands. A step killed by a
+# timeout fails with "the command timed out after ... and was killed" and the
+# hint names WHICH level supplied the timeout (run.timeout / runner.timeout /
+# defaults.run.timeout / suite.timeout / built-in 60s default timeout).
+# Runs green as-is on every OS: atago run examples/timeouts.atago.yaml
+
+suite:
+  name: timeouts
+  # Suite-level default: every step without a more specific timeout gets 2m.
+  timeout: 2m
+
+scenarios:
+  - name: the suite timeout bounds every step by default
+    steps:
+      # No step timeout here, so the suite's 2m applies (instead of the
+      # built-in 60s that would apply if suite.timeout were absent).
+      - run:
+          command: echo bounded-by-suite
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: bounded-by-suite
+
+  - name: a step timeout overrides the suite default
+    steps:
+      # The most specific level wins: this step is bounded at 5s, not 2m.
+      - run:
+          command: echo bounded-by-step
+          timeout: 5s
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: bounded-by-step
+
+  - name: timeout zero disables the bound entirely
+    steps:
+      # "0" opts this step out of every level, including the built-in 60s
+      # default — use it for commands that legitimately run long (builds,
+      # downloads). Prefer a generous real bound where you can.
+      - run:
+          command: echo unbounded
+          timeout: "0"
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: unbounded

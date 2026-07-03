@@ -25,7 +25,7 @@ func (e *Engine) runQuery(ctx context.Context, q *spec.Query, st *store.Store, r
 // first use. Connections are scoped to a scenario (closed when it ends) so a dsn
 // referencing ${workdir} yields a fresh, isolated database per scenario.
 func dbConn(name string, st *store.Store, rc runConfig, conns map[string]*dbrunner.Runner) (*dbrunner.Runner, error) {
-	return resolveConn(name, "query step", "db", rc, conns, func(rdef spec.Runner, timeout time.Duration) (*dbrunner.Runner, error) {
+	return resolveConn(name, "query step", "db", rc, conns, true, func(rdef spec.Runner, timeout time.Duration) (*dbrunner.Runner, error) {
 		cfg, err := dbrunner.Resolve(rdef.Driver, st.Expand(rdef.DSN))
 		if err != nil {
 			return nil, err

@@ -87,9 +87,12 @@ func (r *Runner) Run(ctx context.Context, run *spec.Run, workdir string) (*runne
 	}
 
 	// A step's own timeout (run.timeout) is an observable outcome, not an error:
-	// mark it TimedOut and let assertions inspect it.
+	// mark it TimedOut and let assertions inspect it. TimeoutSource carries the
+	// engine-resolved level (step/runner/defaults/suite/built-in, #17) into the
+	// failure hint.
 	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 		res.TimedOut = true
+		res.TimeoutSource = run.TimeoutSource
 		res.ExitCode = -1
 		return res, nil
 	}

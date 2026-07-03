@@ -18,6 +18,9 @@ func Explain(w io.Writer, s *spec.Spec, path string) error {
 
 	fmt.Fprintf(&b, "Spec: %s\n", path)
 	fmt.Fprintf(&b, "Suite: %s\n", s.Suite.Name)
+	if s.Suite.Timeout != "" {
+		fmt.Fprintf(&b, "Default step timeout: %s (suite.timeout; a step or runner timeout overrides it)\n", s.Suite.Timeout)
+	}
 	if len(s.Secrets) > 0 {
 		fmt.Fprintf(&b, "Secrets declared: %s\n", strings.Join(s.Secrets, ", "))
 	}

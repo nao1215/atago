@@ -277,6 +277,58 @@ scenarios:
 	}
 }
 
+// TestValidate_SuiteTimeoutInvalid proves an unparsable suite.timeout is a
+// load-time validation error (exit 2) naming the field (#17).
+func TestValidate_SuiteTimeoutInvalid(t *testing.T) {
+	t.Parallel()
+	src := `
+version: "1"
+suite:
+  name: sample
+  timeout: fast
+scenarios:
+  - name: s
+    steps:
+      - run:
+          command: echo hi
+`
+	_, err := LoadBytes("sample.atago.yaml", []byte(src))
+	if err == nil {
+		t.Fatal("LoadBytes() = nil error, want a suite.timeout validation error")
+	}
+	if !strings.Contains(err.Error(), "suite.timeout") {
+		t.Errorf("error = %q, want it to mention suite.timeout", err)
+	}
+}
+
+// TestApplyDefaults_DoesNotMergeTimeout proves defaults.run.timeout is left to
+// the engine's precedence resolver instead of being string-merged into steps
+// (#17): the merged step keeps an empty timeout so the resolver can tell the
+// levels apart.
+func TestApplyDefaults_DoesNotMergeTimeout(t *testing.T) {
+	t.Parallel()
+	src := `
+version: "1"
+suite:
+  name: sample
+defaults:
+  run:
+    timeout: 5s
+scenarios:
+  - name: s
+    steps:
+      - run:
+          command: echo hi
+`
+	s, err := LoadBytes("sample.atago.yaml", []byte(src))
+	if err != nil {
+		t.Fatalf("LoadBytes() error = %v", err)
+	}
+	if got := s.Scenarios[0].Steps[0].Run.Timeout; got != "" {
+		t.Errorf("run.timeout = %q, want empty (the engine resolves defaults.run.timeout itself)", got)
+	}
+}
+
 // TestApplyDefaults_Service proves defaults.service fills shell/env and copies a
 // whole ready probe into a service that declares none, while a service with its
 // own ready keeps it.

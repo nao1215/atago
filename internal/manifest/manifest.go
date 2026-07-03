@@ -65,6 +65,9 @@ type Document struct {
 type Spec struct {
 	SpecPath string `json:"spec_path"`
 	Suite    string `json:"suite"`
+	// SuiteTimeout mirrors suite.timeout, the suite-level default step timeout
+	// (#17); empty when the built-in default applies.
+	SuiteTimeout string `json:"suite_timeout,omitempty"`
 	// Source is the authored location of the suite declaration (#80). Omitted
 	// when positions are unavailable.
 	Source  *Source  `json:"source,omitempty"`
@@ -198,12 +201,13 @@ func buildSpec(in Input) Spec {
 	out := Spec{
 		// Forward slashes keep spec_path stable across platforms (Windows
 		// filepath.Clean uses backslashes), so the manifest is a portable contract.
-		SpecPath:  filepath.ToSlash(in.Path),
-		Suite:     s.Suite.Name,
-		Secrets:   append([]string(nil), s.Secrets...),
-		Network:   buildNetwork(s),
-		Runners:   buildRunners(s.Runners, in.Source),
-		Scenarios: make([]Scenario, 0, len(s.Scenarios)),
+		SpecPath:     filepath.ToSlash(in.Path),
+		Suite:        s.Suite.Name,
+		SuiteTimeout: s.Suite.Timeout,
+		Secrets:      append([]string(nil), s.Secrets...),
+		Network:      buildNetwork(s),
+		Runners:      buildRunners(s.Runners, in.Source),
+		Scenarios:    make([]Scenario, 0, len(s.Scenarios)),
 	}
 	if in.Source != nil {
 		out.Source = sourceFrom(in.Source.SuitePos())

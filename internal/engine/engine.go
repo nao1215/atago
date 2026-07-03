@@ -105,11 +105,15 @@ func (e *Engine) Run(ctx context.Context, s *spec.Spec, specPath string) *SuiteR
 	start := time.Now()
 	res := &SuiteResult{Suite: s.Suite.Name, SpecPath: specPath, Status: StatusPassed}
 	rc := runConfig{
-		specDir:  filepath.Dir(specPath),
-		specPath: specPath,
-		masker:   security.NewMaskerForSpec(s),
-		runners:  s.Runners,
-		allow:    allowedHosts(s),
+		specDir:      filepath.Dir(specPath),
+		specPath:     specPath,
+		masker:       security.NewMaskerForSpec(s),
+		runners:      s.Runners,
+		allow:        allowedHosts(s),
+		suiteTimeout: s.Suite.Timeout,
+	}
+	if s.Defaults != nil && s.Defaults.Run != nil {
+		rc.defaultsRunTimeout = s.Defaults.Run.Timeout
 	}
 
 	workers := e.Parallel
@@ -322,6 +326,13 @@ type runConfig struct {
 	suiteVars map[string]string
 	// suiteEnv is the raw suite.env, layered beneath each scenario's env.
 	suiteEnv map[string]string
+	// suiteTimeout / defaultsRunTimeout feed the step-timeout precedence
+	// resolver (#17): step > runner > defaults.run > suite > built-in 60s.
+	// They stay separate strings (instead of being merged into each step at
+	// load time) so the resolver knows which level supplied the winning value
+	// and can name it in the timeout-kill hint.
+	suiteTimeout       string
+	defaultsRunTimeout string
 }
 
 func (e *Engine) runScenario(ctx context.Context, scenarioIdx int, sc *spec.Scenario, rc runConfig) ScenarioResult {
@@ -690,36 +701,46 @@ func (e *Engine) probeSucceeds(ctx context.Context, command string) bool {
 // later steps observe (ADR-0022).
 func (e *Engine) runStep(ctx context.Context, run *spec.Run, st *store.Store, workdir, specDir string, rc runConfig, sshConns map[string]*sshrunner.Runner) (*runner.Result, []*assert.CheckResult, error) {
 	// A run step naming an ssh runner executes remotely (ADR-0027); otherwise it
-	// runs locally via the cmd runner.
+	// runs locally via the cmd runner. The runner is resolved once (not per
+	// retry attempt) so the timeout precedence below sees the pristine authored
+	// step value.
+	remote := false
+	var runnerTimeout string
+	if run.Runner != "" {
+		rdef, ok := rc.runners[run.Runner]
+		if !ok {
+			return nil, nil, fmt.Errorf("run step references unknown runner %q", run.Runner)
+		}
+		switch rdef.Type {
+		case "ssh":
+			remote = true
+		case "cmd", "":
+			// Layer the runner's cwd beneath the step's own value; the step
+			// wins. run is the caller's expanded copy, so mutating it is safe;
+			// cwd gets the same use-time ${name} expansion as the other runner
+			// families' fields.
+			if run.Cwd == "" {
+				run.Cwd = st.Expand(rdef.Cwd)
+			}
+			runnerTimeout = rdef.Timeout
+		default:
+			return nil, nil, fmt.Errorf("runner %q (type %q) cannot run a command step; use a step matching its type", run.Runner, rdef.Type)
+		}
+	}
+	if !remote {
+		// Resolve the effective timeout across all five levels (#17) and
+		// remember which level supplied it so a timeout kill can name the knob
+		// in its hint. Remote (ssh) runs are bounded by the ssh runner's own
+		// connection timeout instead.
+		run.Timeout, run.TimeoutSource = resolveTimeout(run.Timeout, runnerTimeout, rc.defaultsRunTimeout, rc.suiteTimeout)
+	}
 	exec := func(ctx context.Context) (*runner.Result, error) {
-		if run.Runner != "" {
-			rdef, ok := rc.runners[run.Runner]
-			if !ok {
-				return nil, fmt.Errorf("run step references unknown runner %q", run.Runner)
+		if remote {
+			conn, err := sshConn(run.Runner, st, rc, sshConns)
+			if err != nil {
+				return nil, err
 			}
-			switch rdef.Type {
-			case "ssh":
-				conn, err := sshConn(run.Runner, st, rc, sshConns)
-				if err != nil {
-					return nil, err
-				}
-				return conn.Run(ctx, run.Command)
-			case "cmd", "":
-				// Layer the runner's cwd/timeout beneath the step's own values
-				//; the
-				// step wins. run is the caller's expanded copy, so mutating it is
-				// safe; cwd gets the same use-time ${name} expansion as the other
-				// runner families' fields.
-				if run.Cwd == "" {
-					run.Cwd = st.Expand(rdef.Cwd)
-				}
-				if run.Timeout == "" {
-					run.Timeout = rdef.Timeout
-				}
-				// fall through to the local cmd runner
-			default:
-				return nil, fmt.Errorf("runner %q (type %q) cannot run a command step; use a step matching its type", run.Runner, rdef.Type)
-			}
+			return conn.Run(ctx, run.Command)
 		}
 		return e.cmd.Run(ctx, run, workdir)
 	}

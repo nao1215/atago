@@ -142,6 +142,19 @@ scenarios:
 	}
 }
 
+// TestSchema_AcceptsSuiteTimeout confirms suite.timeout (#17) is accepted.
+func TestSchema_AcceptsSuiteTimeout(t *testing.T) {
+	s := loadSchema(t)
+	src := `version: "1"
+suite: {name: x, timeout: 2m}
+scenarios:
+  - name: a
+    steps: [{run: {command: echo, timeout: "0"}}]`
+	if err := s.Validate(yamlToAny(t, []byte(src))); err != nil {
+		t.Errorf("schema rejected valid suite.timeout spec:\n%v", err)
+	}
+}
+
 // TestSchema_RejectsInvalid confirms the schema actually catches bad specs.
 func TestSchema_RejectsInvalid(t *testing.T) {
 	s := loadSchema(t)
@@ -225,6 +238,12 @@ suite: {name: x}
 scenarios:
   - name: a
     steps: [{run: {command: env, clear_env: "yes"}}]`,
+		// Issue #17: suite.timeout is a Go duration string, not a number.
+		"suite timeout as number": `version: "1"
+suite: {name: x, timeout: 30}
+scenarios:
+  - name: a
+    steps: [{run: {command: echo}}]`,
 	}
 	for name, src := range bad {
 		t.Run(name, func(t *testing.T) {

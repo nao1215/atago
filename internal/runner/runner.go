@@ -25,6 +25,11 @@ type Result struct {
 	Duration time.Duration
 	Workdir  string
 	TimedOut bool
+	// TimeoutSource names the level that supplied the timeout that killed the
+	// command (run.timeout / runner.timeout / defaults.run.timeout /
+	// suite.timeout / built-in default), so the failure hint can say which
+	// knob to adjust (#17). Empty when TimedOut is false.
+	TimeoutSource string
 
 	// HTTP fields, set only by the http runner (IsHTTP reports which family is
 	// populated, since a zero StatusCode is indistinguishable from "no response").

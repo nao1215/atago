@@ -29,6 +29,7 @@ func validate(s *spec.Spec) []string {
 	if s.Suite.Name == "" {
 		add("suite.name is required")
 	}
+	validateSuiteTimeout(add, &s.Suite)
 	if len(s.Scenarios) == 0 {
 		add("scenarios must contain at least one scenario")
 	}
@@ -72,6 +73,16 @@ func validate(s *spec.Spec) []string {
 // ignore is reported here instead. Fields the loader does merge are validated on
 // the concrete elements after applyDefaults (and, for a shared readiness probe,
 // here too, so a wrong probe fails even when no scenario declares a service).
+// validateSuiteTimeout checks the suite-level default step timeout (#17).
+func validateSuiteTimeout(add func(string, ...any), s *spec.Suite) {
+	if s.Timeout == "" {
+		return
+	}
+	if _, err := time.ParseDuration(s.Timeout); err != nil {
+		add("suite.timeout %q is not a valid duration (e.g. \"2m\"); use \"0\" to disable the built-in default", s.Timeout)
+	}
+}
+
 func validateDefaults(add func(string, ...any), d *spec.Defaults) {
 	if d == nil {
 		return

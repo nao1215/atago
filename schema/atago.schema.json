@@ -17,6 +17,10 @@
       "additionalProperties": false,
       "properties": {
         "name": { "type": "string", "minLength": 1 },
+        "timeout": {
+          "type": "string",
+          "description": "Suite-level default step timeout (#17): every run/http/query/grpc step without a more specific timeout (step > runner > defaults.run > suite) is bounded by this Go duration. \"0\" disables. When no level configures one, a built-in 60s default applies."
+        },
         "env": {
           "description": "Environment exported to every scenario, setup, and teardown step (a scenario's own env wins per key).",
           "type": "object",
