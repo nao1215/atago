@@ -226,17 +226,31 @@ func checkDirSnapshot(d *spec.DirAssert, dirPath string, env Env) *CheckResult {
 // lists. A path present in both with a different line (hash or kind) counts
 // as changed.
 func manifestDiff(expected, actual string) string {
+	// Parse by the known line grammar (dir/file/link), not a whitespace
+	// split: relative paths may contain spaces.
 	parse := func(text string) map[string]string {
 		m := map[string]string{}
 		for _, line := range strings.Split(strings.TrimRight(text, "\n"), "\n") {
-			if line == "" {
+			var p string
+			switch {
+			case strings.HasPrefix(line, "dir "):
+				p = strings.TrimPrefix(line, "dir ")
+			case strings.HasPrefix(line, "file "):
+				rest := strings.TrimPrefix(line, "file ")
+				if i := strings.LastIndex(rest, " sha256:"); i >= 0 {
+					rest = rest[:i]
+				}
+				p = rest
+			case strings.HasPrefix(line, "link "):
+				rest := strings.TrimPrefix(line, "link ")
+				if i := strings.Index(rest, " -> "); i >= 0 {
+					rest = rest[:i]
+				}
+				p = rest
+			default:
 				continue
 			}
-			fields := strings.Fields(line)
-			if len(fields) < 2 {
-				continue
-			}
-			m[fields[1]] = line
+			m[p] = line
 		}
 		return m
 	}

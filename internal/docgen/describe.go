@@ -205,6 +205,9 @@ func dirConstraints(d *spec.DirAssert) []string {
 	if d.Recursive {
 		parts = append(parts, "(recursive)")
 	}
+	if len(d.Ignore) > 0 {
+		parts = append(parts, "ignoring "+strings.Join(d.Ignore, ", "))
+	}
 	return parts
 }
 
