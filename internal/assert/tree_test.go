@@ -115,6 +115,24 @@ func TestCheckDir_RecursiveMatchers(t *testing.T) {
 	}
 }
 
+// TestManifestDiff_PathsWithSpaces proves the diff parser follows the line
+// grammar instead of splitting on whitespace, so spaced filenames survive.
+func TestManifestDiff_PathsWithSpaces(t *testing.T) {
+	t.Parallel()
+	expected := "file My File.txt sha256:aaa\nlink my link -> some target\n"
+	actual := "file My File.txt sha256:bbb\ndir new dir\n"
+	got := manifestDiff(expected, actual)
+	for _, want := range []string{
+		"changed: My File.txt",
+		"added:   dir new dir",
+		"removed: link my link -> some target",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("diff = %q, want %q", got, want)
+		}
+	}
+}
+
 // TestCheckDir_SnapshotRoundTrip proves record → green compare → mutation
 // diff naming exactly the changed path (#25).
 func TestCheckDir_SnapshotRoundTrip(t *testing.T) {
