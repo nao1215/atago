@@ -59,6 +59,15 @@
           "description": "Present only for skipped scenarios.",
           "type": "string"
         },
+        "attempts": {
+          "description": "Execution count under --retry-failed (#29); status \"flaky\" means a re-run recovered.",
+          "type": "integer"
+        },
+        "iterations": {
+          "description": "Per-iteration statuses under --repeat (#29).",
+          "type": "array",
+          "items": {"type": "string"}
+        },
         "teardown_failures": {
           "description": "Teardown steps that failed or errored. Teardown outcomes never change the scenario's status; omitted when clean or absent.",
           "type": "array",

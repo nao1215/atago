@@ -16,8 +16,10 @@ complete -c atago -n '__fish_seen_subcommand_from run' -l ci
 complete -c atago -n '__fish_seen_subcommand_from run' -l fail-fast
 complete -c atago -n '__fish_seen_subcommand_from run' -l filter
 complete -c atago -n '__fish_seen_subcommand_from run' -l parallel
+complete -c atago -n '__fish_seen_subcommand_from run' -l repeat
 complete -c atago -n '__fish_seen_subcommand_from run' -l report
 complete -c atago -n '__fish_seen_subcommand_from run' -l rerun-failed
+complete -c atago -n '__fish_seen_subcommand_from run' -l retry-failed
 complete -c atago -n '__fish_seen_subcommand_from run' -l skip-tag
 complete -c atago -n '__fish_seen_subcommand_from run' -l tag
 complete -c atago -n '__fish_seen_subcommand_from run' -l update-snapshots

@@ -188,6 +188,13 @@ Tools that talk to an API — gh-style CLIs, cloud CLIs, webhook senders, anythi
 
 ## Use it in CI
 
+Real E2E suites flake (timing, ports, external tools). atago handles that in the runner, honestly: `--retry-failed N` re-runs failed scenarios in a fresh workdir and reports recovered ones as **flaky** — green for the exit code, but surfaced in the summary (`, 2 flaky`), the progress dots (`f`), the JSON report (`"status": "flaky"` + `attempts`), JUnit (`<flakyFailure>`), TAP, and GitHub annotations. Silent retries are explicitly a non-goal. `--repeat N` does the opposite job: run each scenario N times to detect flakiness before it reaches CI (`race prone: 18/20 passed`; any failing iteration fails the run).
+
+```shell
+atago run --ci --retry-failed 2 ./specs          # keep CI green, report instability loudly
+atago run --repeat 20 --filter "race prone" ./specs   # flake detection
+```
+
 [setup-atago](https://github.com/nao1215/setup-atago) installs a released binary:
 
 ```yaml

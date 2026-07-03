@@ -26,6 +26,10 @@ func writeGHA(w io.Writer, results []*engine.SuiteResult) error {
 			case engine.StatusError:
 				fmt.Fprintf(&b, "::error title=%s::%s\n",
 					ghaEscapeProp(res.Suite+" / "+sc.Name), ghaEscapeData(firstErrorMessage(sc)))
+			case engine.StatusFlaky:
+				// Green for the job, loud in the annotations (#29).
+				fmt.Fprintf(&b, "::warning title=%s::%s\n",
+					ghaEscapeProp(res.Suite+" / "+sc.Name), ghaEscapeData(fmt.Sprintf("flaky: passed after %d attempts", sc.Attempts)))
 			}
 		}
 		c := res.Counts()
@@ -33,11 +37,16 @@ func writeGHA(w io.Writer, results []*engine.SuiteResult) error {
 		agg.Failed += c.Failed
 		agg.Errored += c.Errored
 		agg.Skipped += c.Skipped
+		agg.Flaky += c.Flaky
 		total += len(res.Scenarios)
 	}
+	flaky := ""
+	if agg.Flaky > 0 {
+		flaky = fmt.Sprintf(", %d flaky", agg.Flaky)
+	}
 	fmt.Fprintf(&b, "::notice title=atago::%s\n", ghaEscapeData(fmt.Sprintf(
-		"%d scenarios: %d passed, %d failed, %d errored, %d skipped",
-		total, agg.Passed, agg.Failed, agg.Errored, agg.Skipped)))
+		"%d scenarios: %d passed, %d failed, %d errored, %d skipped%s",
+		total, agg.Passed, agg.Failed, agg.Errored, agg.Skipped, flaky)))
 	_, err := io.WriteString(w, b.String())
 	return err
 }

@@ -53,6 +53,8 @@ func (p *Progress) marker(status engine.Status) string {
 		return colorize(p.color, cBold+cRed, "E")
 	case engine.StatusSkipped:
 		return colorize(p.color, cYellow, "s")
+	case engine.StatusFlaky:
+		return colorize(p.color, cYellow, "f")
 	default:
 		return "?"
 	}

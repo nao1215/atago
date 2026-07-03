@@ -120,4 +120,13 @@ func TestColorizeDiff(t *testing.T) {
 	if strings.Contains(got, cRed+"--- expected") {
 		t.Errorf("file label wrongly red: %q", got)
 	}
+	// A removed content line starting with "--" (a YAML document separator
+	// becomes "---" after the diff marker) must stay red, not dim.
+	yaml := colorizeDiff(true, "-"+"--\n+"+"++")
+	if !strings.Contains(yaml, cRed+"---"+cReset) {
+		t.Errorf("removed YAML separator not red: %q", yaml)
+	}
+	if !strings.Contains(yaml, cGreen+"+++"+cReset) {
+		t.Errorf("added ++ content not green: %q", yaml)
+	}
 }

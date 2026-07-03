@@ -41,6 +41,11 @@ type jsonScenario struct {
 	Status     string `json:"status"`
 	DurationMS int64  `json:"duration_ms"`
 	SkipReason string `json:"skip_reason,omitempty"`
+	// Attempts is the execution count under --retry-failed (#29); omitted
+	// when the feature was off. Iterations lists each --repeat execution's
+	// status. Both additive, so schema_version stays "1".
+	Attempts   int      `json:"attempts,omitempty"`
+	Iterations []string `json:"iterations,omitempty"`
 	// TeardownFailures lists teardown steps that failed or errored. Teardown
 	// outcomes never change the scenario's status — the verdict is decided by
 	// the steps — but incomplete cleanup of external resources must stay
@@ -93,14 +98,21 @@ func buildJSON(res *engine.SuiteResult) jsonReport {
 	out.TeardownFailures = suiteStepFailures(res.Suite, res.Teardown)
 	for i := range res.Scenarios {
 		sc := &res.Scenarios[i]
-		out.Scenarios = append(out.Scenarios, jsonScenario{
+		js := jsonScenario{
 			Name:             sc.Name,
 			Status:           string(sc.Status),
 			DurationMS:       sc.Duration.Milliseconds(),
 			SkipReason:       sc.SkipReason,
 			TeardownFailures: teardownFailuresOf(sc),
 			ServiceLogs:      serviceLogsOf(sc),
-		})
+		}
+		if sc.Attempts > 1 {
+			js.Attempts = sc.Attempts
+		}
+		for _, it := range sc.Iterations {
+			js.Iterations = append(js.Iterations, string(it))
+		}
+		out.Scenarios = append(out.Scenarios, js)
 		out.Failures = append(out.Failures, failuresOf(sc)...)
 	}
 	return out

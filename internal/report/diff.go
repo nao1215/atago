@@ -228,7 +228,9 @@ func colorizeDiff(on bool, diff string) string {
 	lines := strings.Split(diff, "\n")
 	for i, l := range lines {
 		switch {
-		case strings.HasPrefix(l, "---") || strings.HasPrefix(l, "+++") || strings.HasPrefix(l, "@@"):
+		// The trailing space disambiguates structural lines from content
+		// lines that happen to start with --/++ (YAML document separators).
+		case strings.HasPrefix(l, "--- ") || strings.HasPrefix(l, "+++ ") || strings.HasPrefix(l, "@@ "):
 			lines[i] = colorize(true, cDim, l)
 		case strings.HasPrefix(l, "-"):
 			lines[i] = colorize(true, cRed, l)

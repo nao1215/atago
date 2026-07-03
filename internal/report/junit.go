@@ -37,6 +37,10 @@ type junitTestcase struct {
 	Failure *junitMessage `xml:"failure,omitempty"`
 	Error   *junitMessage `xml:"error,omitempty"`
 	Skipped *junitSkipped `xml:"skipped,omitempty"`
+	// FlakyFailure is the Maven-surefire convention for a test that failed
+	// and then passed on retry (#29): the testcase itself counts as passed,
+	// the element preserves the evidence.
+	FlakyFailure *junitMessage `xml:"flakyFailure,omitempty"`
 }
 
 type junitMessage struct {
@@ -65,6 +69,11 @@ func buildJUnit(results []*engine.SuiteResult) junitTestsuites {
 			case engine.StatusSkipped:
 				tc.Skipped = &junitSkipped{Message: sc.SkipReason}
 				ts.Skipped++
+			case engine.StatusFlaky:
+				tc.FlakyFailure = &junitMessage{
+					Message: fmt.Sprintf("flaky: passed after %d attempts", sc.Attempts),
+					Body:    detailText(sc),
+				}
 			}
 			ts.Testcases = append(ts.Testcases, tc)
 			ts.Tests++

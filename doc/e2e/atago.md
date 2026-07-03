@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-49 suites · 173 scenarios
+50 suites · 176 scenarios
 ## Contents
 - [atago self-hosting / variable expansion in assertion matcher values](#atago-self-hosting--variable-expansion-in-assertion-matcher-values) — 3 scenarios
   - [stdout.equals expands ${workdir}](#scenario-stdoutequals-expands-workdir)
@@ -67,6 +67,10 @@
   - [fixture.mtime pins the modification time](#scenario-fixturemtime-pins-the-modification-time)
   - [only.env skips when the variable is unset](#scenario-onlyenv-skips-when-the-variable-is-unset)
   - [skip.env runs when the variable is unset](#scenario-skipenv-runs-when-the-variable-is-unset)
+- [atago self-hosting / flaky tooling (--repeat, --retry-failed)](#atago-self-hosting--flaky-tooling---repeat---retry-failed) — 3 scenarios
+  - [retry-failed recovers a flaky scenario and reports it loudly](#scenario-retry-failed-recovers-a-flaky-scenario-and-reports-it-loudly)
+  - [repeat surfaces flakiness that a single run would miss](#scenario-repeat-surfaces-flakiness-that-a-single-run-would-miss)
+  - [repeat and retry-failed are mutually exclusive](#scenario-repeat-and-retry-failed-are-mutually-exclusive)
 - [atago self-hosting / grpc runner](#atago-self-hosting--grpc-runner) — 2 scenarios
   - [a grpc runner without a target fails validation (exit 2)](#scenario-a-grpc-runner-without-a-target-fails-validation-exit-2)
   - [a grpc step naming an undeclared runner fails validation (exit 2)](#scenario-a-grpc-step-naming-an-undeclared-runner-fails-validation-exit-2)
@@ -1297,6 +1301,109 @@ true
 ```
 #### Then
 - exit code is `0`
+## atago self-hosting / flaky tooling (--repeat, --retry-failed)
+Source: `test/e2e/atago/flaky.atago.yaml`
+### Scenario: retry-failed recovers a flaky scenario and reports it loudly
+_skipped on windows_
+#### Given
+- Fixture file `flaky.atago.yaml` is created.
+#### Inputs
+_Fixture `flaky.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: flaky once
+    steps:
+      - run:
+          shell: true
+          command: "if [ -f '${workdir}/seen.txt' ]; then echo recovered; else touch '${workdir}/seen.txt'; exit 1; fi"
+      - assert:
+          exit_code: 0
+```
+#### When
+```shell
+${atago} run flaky.atago.yaml
+rm -f seen.txt
+${atago} run --retry-failed 1 flaky.atago.yaml
+rm -f seen.txt
+${atago} run --retry-failed 1 --report json flaky.atago.yaml
+```
+#### Then
+- after `${atago} run flaky.atago.yaml`:
+  - exit code is `1`
+- after `${atago} run --retry-failed 1 flaky.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `FLAKY:`, `passed after 2 attempts`, `1 flaky`
+- after `${atago} run --retry-failed 1 --report json flaky.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `"status": "flaky"`, `"attempts": 2`
+### Scenario: repeat surfaces flakiness that a single run would miss
+_skipped on windows_
+#### Given
+- Fixture file `green.atago.yaml` is created.
+- Fixture file `flaky.atago.yaml` is created.
+#### Inputs
+_Fixture `green.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: steady
+    steps:
+      - run: {shell: true, command: echo ok}
+      - assert:
+          exit_code: 0
+```
+_Fixture `flaky.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: flaky once
+    steps:
+      - run:
+          shell: true
+          command: "if [ -f '${workdir}/seen.txt' ]; then echo recovered; else touch '${workdir}/seen.txt'; exit 1; fi"
+      - assert:
+          exit_code: 0
+```
+#### When
+```shell
+${atago} run --repeat 3 green.atago.yaml
+${atago} run --repeat 3 flaky.atago.yaml
+```
+#### Then
+- after `${atago} run --repeat 3 green.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `steady: 3/3 passed`
+- after `${atago} run --repeat 3 flaky.atago.yaml`:
+  - exit code is `1`
+  - stdout contains `flaky once: 2/3 passed`
+### Scenario: repeat and retry-failed are mutually exclusive
+#### Given
+- Fixture file `any.atago.yaml` is created.
+#### Inputs
+_Fixture `any.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: s
+    steps:
+      - run: {command: echo hi}
+```
+#### When
+```shell
+${atago} run --repeat 2 --retry-failed 1 any.atago.yaml
+```
+#### Then
+- exit code is `3`
+- stderr contains `mutually exclusive`
 ## atago self-hosting / grpc runner
 Source: `test/e2e/atago/grpc.atago.yaml`
 ### Scenario: a grpc runner without a target fails validation (exit 2)
