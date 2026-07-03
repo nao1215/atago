@@ -52,6 +52,9 @@ jobs:
           - name: fzf
             dir: ./test/e2e/thirdparty/fzf
             install: go install github.com/junegunn/fzf@latest
+          - name: redis
+            dir: ./test/e2e/thirdparty/redis
+            install: command -v redis-server >/dev/null || (sudo apt-get update && sudo apt-get install -y redis-server redis-tools)
           - name: restic
             dir: ./test/e2e/thirdparty/restic
             install: go install github.com/restic/restic/cmd/restic@latest

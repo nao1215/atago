@@ -1,0 +1,195 @@
+version: "1"
+
+suite:
+  name: redis (server + client, signal-step testbed)
+
+# Redis is a server+client pair in one package (#21): redis-server exercises
+# scenario services (readiness by log AND by port), redis-cli is a real-world
+# client with a crisp raw-output contract (PONG/OK/integers when stdout is a
+# pipe). Its clean shutdown semantics make it the proving ground for the
+# planned `signal:` step (#23) — until that lands, the shutdown scenario uses
+# SHUTDOWN NOSAVE plus a retry-polled PING as the declarative stand-in.
+# Every scenario probes for redis first so the suite skips cleanly where it
+# is absent; redis-server is POSIX-only, so the suite skips on Windows.
+# Install with: apt-get install redis-server redis-tools / brew install redis
+#
+# Each scenario binds its own port: scenarios run in parallel and must not
+# share a server.
+scenarios:
+  - name: server boots (log readiness) and answers PING
+    only:
+      command: redis-server --version
+    skip:
+      os: windows
+    services:
+      - name: redis
+        command: redis-server --port 16379 --save '' --appendonly no
+        ready:
+          log: "Ready to accept connections"
+          timeout: 15s
+    steps:
+      - run:
+          command: redis-cli -p 16379 PING
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: PONG
+
+  - name: server boots (port readiness) and round-trips SET/GET/INCR
+    only:
+      command: redis-server --version
+    skip:
+      os: windows
+    services:
+      - name: redis
+        command: redis-server --port 16380 --save '' --appendonly no
+        ready:
+          port: "127.0.0.1:16380"
+          timeout: 15s
+    steps:
+      - run:
+          command: redis-cli -p 16380 SET greeting hello
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: OK
+      - run:
+          command: redis-cli -p 16380 GET greeting
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: hello
+      # Raw (non-tty) output prints bare integers — the INCR sequence pins it.
+      - run:
+          command: redis-cli -p 16380 INCR counter
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "1"
+      - run:
+          command: redis-cli -p 16380 INCR counter
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "2"
+
+  - name: EXPIRE and TTL report lifetime state
+    only:
+      command: redis-server --version
+    skip:
+      os: windows
+    services:
+      - name: redis
+        command: redis-server --port 16381 --save '' --appendonly no
+        ready:
+          port: "127.0.0.1:16381"
+          timeout: 15s
+    steps:
+      - run:
+          command: redis-cli -p 16381 SET k v
+      - assert:
+          exit_code: 0
+      # No expiry yet: TTL is -1 by contract.
+      - run:
+          command: redis-cli -p 16381 TTL k
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "-1"
+      - run:
+          command: redis-cli -p 16381 EXPIRE k 100
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "1"
+      - run:
+          command: redis-cli -p 16381 TTL k
+      - assert:
+          exit_code: 0
+          stdout:
+            matches: "^(100|9[0-9])\\b"
+      # A missing key reports -2, distinct from "no expiry".
+      - run:
+          command: redis-cli -p 16381 TTL no-such-key
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "-2"
+
+  - name: connecting to a closed port fails loudly
+    only:
+      command: redis-cli --version
+    skip:
+      os: windows
+    steps:
+      # No service here on purpose: 16999 has no listener.
+      - run:
+          command: redis-cli -p 16999 PING
+      - assert:
+          exit_code: 1
+      - assert:
+          stderr:
+            contains: "Connection refused"
+
+  - name: an unknown command reports ERR without killing the server
+    only:
+      command: redis-server --version
+    skip:
+      os: windows
+    services:
+      - name: redis
+        command: redis-server --port 16382 --save '' --appendonly no
+        ready:
+          port: "127.0.0.1:16382"
+          timeout: 15s
+    steps:
+      - run:
+          shell: true
+          command: redis-cli -p 16382 NOSUCHCOMMAND arg; echo "rc=$?"
+      - assert:
+          stdout:
+            contains: "ERR unknown command"
+      # The server survives the bad command.
+      - run:
+          command: redis-cli -p 16382 PING
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: PONG
+
+  - name: SHUTDOWN NOSAVE stops the server and PING starts failing
+    only:
+      command: redis-server --version
+    skip:
+      os: windows
+    services:
+      - name: redis
+        command: redis-server --port 16383 --save '' --appendonly no
+        ready:
+          port: "127.0.0.1:16383"
+          timeout: 15s
+    steps:
+      - run:
+          command: redis-cli -p 16383 PING
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: PONG
+      # Graceful-shutdown testing, today's declarative stand-in: ask the
+      # server to exit, then poll until connections are refused. Once the
+      # `signal:` step (#23) lands, this becomes `signal: {service: redis,
+      # signal: SIGTERM}` + the same polled assertion.
+      - run:
+          command: redis-cli -p 16383 SHUTDOWN NOSAVE
+      - run:
+          command: redis-cli -p 16383 PING
+          retry:
+            times: 50
+            interval: 100ms
+            until:
+              exit_code: { not: 0 }
+      - assert:
+          exit_code: 1
+      - assert:
+          stderr:
+            contains: "Connection refused"

@@ -33,6 +33,7 @@ A browsable, repo-local index of atago's documentation, generated from repositor
 - [prometheus.md](../doc/e2e/prometheus.md)
 - [pushgateway.md](../doc/e2e/pushgateway.md)
 - [rclone.md](../doc/e2e/rclone.md)
+- [redis.md](../doc/e2e/redis.md)
 - [restic.md](../doc/e2e/restic.md)
 - [sqlite3.md](../doc/e2e/sqlite3.md)
 - [sqly.md](../doc/e2e/sqly.md)
