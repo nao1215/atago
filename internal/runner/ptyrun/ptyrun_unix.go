@@ -22,6 +22,11 @@ import (
 // pollInterval is how often an expect re-checks the accumulated transcript.
 const pollInterval = 10 * time.Millisecond
 
+// drainGrace bounds how long finish waits for the reader to hit EIO before
+// closing the master: an orphaned grandchild that inherited the slave can hold
+// the terminal open indefinitely, and its output is not worth hanging for.
+const drainGrace = 2 * time.Second
+
 // Run executes p.Command inside a pseudo-terminal in workdir, drives the
 // expect/send session, waits for the process to exit within the session
 // budget, and returns the transcript as the result's stdout. A never-matching
@@ -109,6 +114,14 @@ func Run(ctx context.Context, p *spec.PTY, workdir string, env []string) (*runne
 	}
 
 	finish := func(timedOut bool, waitErr error, ef *ExpectFailure) (*runner.Result, *ExpectFailure, error) {
+		// Drain before closing: a fast-exiting child's final output may still
+		// sit in the pty buffer, and closing the master discards it. Once the
+		// last slave fd is gone the reader hits EIO and readDone closes on its
+		// own; drainGrace bounds the wait in case a descendant kept the slave.
+		select {
+		case <-readDone:
+		case <-time.After(drainGrace):
+		}
 		_ = master.Close()
 		<-readDone
 		res := &runner.Result{
