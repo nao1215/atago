@@ -101,6 +101,7 @@ docs: ## Regenerate the committed behavior docs under doc/e2e/ from the specs
 	./dist/$(APP) doc --out doc/e2e/webhook.md     ./test/e2e/thirdparty/webhook
 	./dist/$(APP) doc --out doc/e2e/gitea.md       ./test/e2e/thirdparty/gitea
 	./dist/$(APP) doc --out doc/e2e/jq.md          ./test/e2e/thirdparty/jq
+	./dist/$(APP) doc --out doc/e2e/fzf.md         ./test/e2e/thirdparty/fzf
 	./dist/$(APP) doc --out doc/e2e/openssl.md     ./test/e2e/thirdparty/openssl
 	./dist/$(APP) doc --out doc/e2e/sqlite3.md     ./test/e2e/thirdparty/sqlite3
 	./dist/$(APP) doc --out doc/e2e/minio.md       ./test/e2e/thirdparty/minio

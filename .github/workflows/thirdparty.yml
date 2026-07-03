@@ -49,6 +49,9 @@ jobs:
           - name: sqlite3
             dir: ./test/e2e/thirdparty/sqlite3
             install: command -v sqlite3 >/dev/null || (sudo apt-get update && sudo apt-get install -y sqlite3)
+          - name: fzf
+            dir: ./test/e2e/thirdparty/fzf
+            install: go install github.com/junegunn/fzf@latest
           - name: restic
             dir: ./test/e2e/thirdparty/restic
             install: go install github.com/restic/restic/cmd/restic@latest

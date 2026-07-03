@@ -1,0 +1,139 @@
+version: "1"
+
+suite:
+  name: fzf (third-party CLI, pty testbed)
+
+# fzf is the archetype of a TTY-dependent CLI: it refuses to run without a
+# terminal, redraws the screen, and is driven entirely by keystrokes — the
+# perfect real-world testbed for the pty runner (#20). The non-interactive
+# --filter mode pins the plain-run contract; the pty scenarios drive the real
+# finder UI with expect/send. Every scenario probes for fzf first so the suite
+# skips cleanly where it is absent; the interactive scenarios are POSIX-only
+# (the pty runner does not support Windows).
+scenarios:
+  - name: version prints a semantic version
+    only:
+      command: fzf --version
+    steps:
+      - run:
+          command: fzf --version
+      - assert:
+          exit_code: 0
+          stdout:
+            matches: "^[0-9]+\\.[0-9]+"
+
+  - name: filter mode matches fuzzily on stdin without a terminal
+    only:
+      command: fzf --version
+    steps:
+      # --filter is fzf's non-interactive contract: no TTY needed, matching
+      # lines go to stdout. "bna" matches banana fuzzily (b..n..a in order).
+      - run:
+          command: fzf --filter=bna
+          stdin: "apple\nbanana\ncherry\n"
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: banana
+
+  - name: filter mode exits 1 when nothing matches
+    only:
+      command: fzf --version
+    steps:
+      - run:
+          command: fzf --filter=zzz
+          stdin: "apple\nbanana\ncherry\n"
+      - assert:
+          exit_code: 1
+          stdout:
+            empty: true
+
+  - name: interactive mode refuses to start without a terminal
+    # Interactive fzf needs /dev/tty. On a developer machine the atago process
+    # may HAVE a controlling terminal (fzf would start and wait for keys), so
+    # this scenario only runs on CI runners, which never do.
+    only:
+      env: CI
+    steps:
+      - run:
+          shell: true
+          command: printf 'apple\n' | fzf
+          timeout: 10s
+      - assert:
+          exit_code: 2
+      - assert:
+          stderr:
+            contains: ioctl
+
+  - name: interactive selection picks the queried line
+    only:
+      command: fzf --version
+    skip:
+      os: windows
+    steps:
+      # The finder UI paints on /dev/tty (the pty), while the SELECTION goes
+      # to fzf's stdout — redirected to a file so the assertion sees exactly
+      # what a shell pipeline would receive, not the screen repaints.
+      - pty:
+          shell: true
+          command: printf 'apple\nbanana\ncherry\n' | fzf > pick.txt
+          timeout: 20s
+          session:
+            - expect: "3/3"       # the match counter proves the list loaded
+            - send: "cher"        # type a query that narrows to one item
+            - expect: "1/3"
+            - send: "\r"          # Enter accepts the highlighted match
+      - assert:
+          exit_code: 0
+          file:
+            path: pick.txt
+            contains: cherry
+      - assert:
+          file:
+            path: pick.txt
+            not_contains: banana
+
+  - name: multi-select accepts several lines at once
+    only:
+      command: fzf --version
+    skip:
+      os: windows
+    steps:
+      # -m enables multi-select; ctrl-a (sent as the raw byte \x01 — a named
+      # key like {key: ctrl-a} does not exist yet, see #26) selects every
+      # match and Enter accepts them all.
+      - pty:
+          shell: true
+          command: printf 'apple\nbanana\ncherry\n' | fzf -m --bind ctrl-a:select-all > pick.txt
+          timeout: 20s
+          session:
+            - expect: "3/3"
+            - send: "\x01"
+            - expect: "\\(3\\)"   # the (3) selection counter appears
+            - send: "\r"
+      - assert:
+          exit_code: 0
+          file:
+            path: pick.txt
+            contains:
+              - apple
+              - banana
+              - cherry
+
+  - name: aborting the finder exits 130
+    only:
+      command: fzf --version
+    skip:
+      os: windows
+    steps:
+      # ESC (raw \x1b — named keys are #26) aborts; fzf documents exit 130
+      # for that, mirroring a SIGINT'd shell job.
+      - pty:
+          shell: true
+          command: printf 'apple\nbanana\ncherry\n' | fzf
+          timeout: 20s
+          session:
+            - expect: "3/3"
+            - send: "\x1b"
+      - assert:
+          exit_code: 130
