@@ -609,9 +609,136 @@ type PTYAction struct {
 	// expect fails the step (reported like an assertion) when the session
 	// timeout elapses.
 	Expect string `yaml:"expect,omitempty"`
-	// Send writes this string to the terminal verbatim (include "\n" to press
-	// enter). The empty string sends EOF (^D). ${name} expansion applies.
-	Send *string `yaml:"send,omitempty"`
+	// Send writes to the terminal: a scalar string verbatim (the empty string
+	// sends EOF/^D; ${name} expansion applies) or {key: <name>} for a named
+	// key (#26) — enter, tab, esc, arrows, f1-f12, ctrl-a..ctrl-z — so
+	// sessions stay readable instead of embedding \x1b escapes.
+	Send *PTYSend `yaml:"send,omitempty"`
+}
+
+// PTYSend is the polymorphic pty send payload (#26): exactly one of Text
+// (scalar form) or Key (mapping form) is set.
+type PTYSend struct {
+	// Text is sent verbatim; the empty string transmits EOF (^D).
+	Text *string
+	// Key is a named key, normalized to lower case.
+	Key string
+}
+
+// SendText is sugar for authoring the scalar form in Go literals (tests).
+func SendText(s string) *PTYSend { return &PTYSend{Text: &s} }
+
+// UnmarshalYAML decodes send as a scalar string or a {key: name} mapping,
+// rejecting unknown mapping keys (a custom unmarshaler bypasses the loader's
+// strict decode).
+func (p *PTYSend) UnmarshalYAML(unmarshal func(any) error) error {
+	var one string
+	if err := unmarshal(&one); err == nil {
+		p.Text = &one
+		return nil
+	}
+	var raw map[string]any
+	if err := unmarshal(&raw); err != nil {
+		return fmt.Errorf("send must be a string or {key: <name>} (e.g. {key: enter})")
+	}
+	for k, v := range raw {
+		if k != "key" {
+			return fmt.Errorf("send: unknown key %q (accepted: key)", k)
+		}
+		str, ok := v.(string)
+		if !ok {
+			return fmt.Errorf("send.key must be a string")
+		}
+		p.Key = strings.ToLower(strings.TrimSpace(str))
+	}
+	if p.Key == "" {
+		return fmt.Errorf("send: {key: <name>} requires a key name (e.g. enter, tab, ctrl-c)")
+	}
+	return nil
+}
+
+// ptyKeySequences maps each named key (#26) to the xterm byte sequence it
+// transmits. Documented bytes: enter=\r, tab=\t, esc=\x1b, space=" ",
+// backspace=\x7f (DEL, the modern erase), delete=\x1b[3~, arrows
+// up/down/right/left=\x1b[A/B/C/D, home=\x1b[H, end=\x1b[F,
+// pageup=\x1b[5~, pagedown=\x1b[6~, f1-f4=\x1bOP..\x1bOS,
+// f5..f12=\x1b[15~,[17~..[21~,[23~,[24~, ctrl-a..ctrl-z=0x01..0x1a
+// (ctrl-d is therefore the readable alias for the empty-send EOF rule).
+var ptyKeySequences = func() map[string]string {
+	m := map[string]string{
+		"enter":     "\r",
+		"tab":       "\t",
+		"esc":       "\x1b",
+		"space":     " ",
+		"backspace": "\x7f",
+		"delete":    "\x1b[3~",
+		"up":        "\x1b[A",
+		"down":      "\x1b[B",
+		"right":     "\x1b[C",
+		"left":      "\x1b[D",
+		"home":      "\x1b[H",
+		"end":       "\x1b[F",
+		"pageup":    "\x1b[5~",
+		"pagedown":  "\x1b[6~",
+		"f1":        "\x1bOP",
+		"f2":        "\x1bOQ",
+		"f3":        "\x1bOR",
+		"f4":        "\x1bOS",
+		"f5":        "\x1b[15~",
+		"f6":        "\x1b[17~",
+		"f7":        "\x1b[18~",
+		"f8":        "\x1b[19~",
+		"f9":        "\x1b[20~",
+		"f10":       "\x1b[21~",
+		"f11":       "\x1b[23~",
+		"f12":       "\x1b[24~",
+	}
+	for c := byte('a'); c <= 'z'; c++ {
+		m["ctrl-"+string(c)] = string([]byte{c - 'a' + 1})
+	}
+	return m
+}()
+
+// ValidPTYKey reports whether name is in the named-key vocabulary (#26).
+func ValidPTYKey(name string) bool {
+	_, ok := ptyKeySequences[strings.ToLower(strings.TrimSpace(name))]
+	return ok
+}
+
+// PTYKeyNames lists the vocabulary for error messages, compactly.
+func PTYKeyNames() string {
+	return "enter, tab, esc, space, backspace, delete, up, down, left, right, home, end, pageup, pagedown, f1-f12, ctrl-a..ctrl-z"
+}
+
+// Bytes resolves the send payload to the bytes written to the terminal: the
+// named key's xterm sequence, the verbatim text, or 0x04 (VEOF, ^D) for the
+// historical empty-string EOF rule.
+func (p *PTYSend) Bytes() []byte {
+	if p.Key != "" {
+		return []byte(ptyKeySequences[p.Key])
+	}
+	if p.Text != nil && *p.Text == "" {
+		return []byte{0x04}
+	}
+	if p.Text != nil {
+		return []byte(*p.Text)
+	}
+	return nil
+}
+
+// Label renders the send symbolically for explain/doc (#26): "press Enter"
+// for keys, a quoted excerpt for text, "EOF (^D)" for the empty string.
+func (p *PTYSend) Label() string {
+	switch {
+	case p.Key != "":
+		return "press " + p.Key
+	case p.Text != nil && *p.Text == "":
+		return "send EOF (^D)"
+	case p.Text != nil:
+		return fmt.Sprintf("type %q", *p.Text)
+	default:
+		return "send"
+	}
 }
 
 // HTTP issues an HTTP request (post-MVP).

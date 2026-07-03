@@ -59,3 +59,54 @@ scenarios:
             contains:
               - "pty expect /prompt-that-never-comes/"
               - "never appeared in the terminal transcript"
+
+  - name: named keys transmit their documented bytes and ctrl-c aborts
+    skip:
+      os: windows
+    steps:
+      # An arrow key received by `cat -v` renders as ^[[B — proof the named
+      # key (#26) transmitted the real xterm sequence.
+      - pty:
+          command: cat -v
+          timeout: 10s
+          session:
+            - send: { key: down }
+            - send: { key: enter }
+            - expect: '\^\[\[B'
+            - send: { key: ctrl-d }
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "^[[B"
+      # ctrl-c delivers a real SIGINT to the foreground process group.
+      - pty:
+          shell: true
+          command: "trap 'exit 130' INT; echo waiting; while true; do sleep 0.1; done"
+          timeout: 10s
+          session:
+            - expect: waiting
+            - send: { key: ctrl-c }
+      - assert:
+          exit_code: 130
+
+  - name: an unknown key name is a load-time error listing the vocabulary
+    steps:
+      - fixture:
+          file: badkey.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: typo'd key
+                steps:
+                  - pty:
+                      command: cat
+                      session:
+                        - send: { key: entr }
+      - run:
+          command: ${atago} run badkey.atago.yaml
+      - assert:
+          exit_code: 2
+          stderr:
+            contains: 'not a supported key (supported: enter, tab'

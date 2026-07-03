@@ -463,6 +463,50 @@ scenarios:
 	}
 }
 
+// TestValidate_PTYNamedKeys proves the #26 rules: an unknown key name lists
+// the vocabulary, malformed send mappings fail, and a valid key loads.
+func TestValidate_PTYNamedKeys(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name, send, wantMsg string
+	}{
+		{"unknown key lists vocabulary", "{key: entr}", "not a supported key (supported: enter, tab"},
+		{"unknown mapping field", "{kye: enter}", "unknown key"},
+		{"valid named key", "{key: ctrl-c}", ""},
+		{"valid scalar still works", `"hello"`, ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			src := `
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: s
+    steps:
+      - pty:
+          command: cat
+          session:
+            - send: ` + tc.send + `
+`
+			_, err := LoadBytes("sample.atago.yaml", []byte(src))
+			if tc.wantMsg == "" {
+				if err != nil {
+					t.Fatalf("LoadBytes() error = %v, want clean load", err)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatal("LoadBytes() = nil error, want a pty send validation error")
+			}
+			if !strings.Contains(err.Error(), tc.wantMsg) {
+				t.Errorf("error = %q, want substring %q", err, tc.wantMsg)
+			}
+		})
+	}
+}
+
 // TestValidate_DirTreeRules proves the #25 combination rules: snapshot is
 // exclusive with the matcher family, ignore needs recursive/snapshot, bad
 // ignore globs fail, and bare recursive needs a matcher.

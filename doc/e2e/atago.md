@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-49 suites · 167 scenarios
+49 suites · 169 scenarios
 ## Contents
 - [atago self-hosting / variable expansion in assertion matcher values](#atago-self-hosting--variable-expansion-in-assertion-matcher-values) — 3 scenarios
   - [stdout.equals expands ${workdir}](#scenario-stdoutequals-expands-workdir)
@@ -135,9 +135,11 @@
 - [atago self-hosting / pdf assertion](#atago-self-hosting--pdf-assertion) — 2 scenarios
   - [pdf assertions cover page count, metadata, and text](#scenario-pdf-assertions-cover-page-count-metadata-and-text)
   - [a non-pdf file fails the pdf target](#scenario-a-non-pdf-file-fails-the-pdf-target)
-- [atago self-hosting / pty](#atago-self-hosting--pty) — 2 scenarios
+- [atago self-hosting / pty](#atago-self-hosting--pty) — 4 scenarios
   - [a pty step sees a terminal where a run step sees a pipe](#scenario-a-pty-step-sees-a-terminal-where-a-run-step-sees-a-pipe)
   - [a never-matching expect fails with the pattern in the block](#scenario-a-never-matching-expect-fails-with-the-pattern-in-the-block)
+  - [named keys transmit their documented bytes and ctrl-c aborts](#scenario-named-keys-transmit-their-documented-bytes-and-ctrl-c-aborts)
+  - [an unknown key name is a load-time error listing the vocabulary](#scenario-an-unknown-key-name-is-a-load-time-error-listing-the-vocabulary)
 - [atago self-hosting / reports](#atago-self-hosting--reports) — 4 scenarios
   - [JUnit report is XML with a testsuite and testcase](#scenario-junit-report-is-xml-with-a-testsuite-and-testcase)
   - [GitHub Actions annotations are emitted on failure](#scenario-github-actions-annotations-are-emitted-on-failure)
@@ -2414,6 +2416,41 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `pty expect /prompt-that-never-comes/`, `never appeared in the terminal transcript`
+### Scenario: named keys transmit their documented bytes and ctrl-c aborts
+_skipped on windows_
+#### When
+```shell
+# interactive (pty): cat -v
+# interactive (pty): trap 'exit 130' INT; echo waiting; while true; do sleep 0.1; done
+```
+#### Then
+- exit code is `0`
+- stdout contains `^[[B`
+- exit code is `130`
+### Scenario: an unknown key name is a load-time error listing the vocabulary
+#### Given
+- Fixture file `badkey.atago.yaml` is created.
+#### Inputs
+_Fixture `badkey.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: typo'd key
+    steps:
+      - pty:
+          command: cat
+          session:
+            - send: { key: entr }
+```
+#### When
+```shell
+${atago} run badkey.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `not a supported key (supported: enter, tab`
 ## atago self-hosting / reports
 Source: `test/e2e/atago/reports.atago.yaml`
 ### Scenario: JUnit report is XML with a testsuite and testcase

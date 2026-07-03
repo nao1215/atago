@@ -47,3 +47,26 @@ scenarios:
           exit_code: 0
           stdout:
             contains: hello interactive world
+
+  - name: named keys keep sessions readable
+    skip:
+      os: windows
+    steps:
+      # {key: <name>} presses a named key (#26) instead of embedding raw
+      # \x1b escape bytes: enter, tab, esc, space, backspace, delete, the
+      # arrows, home/end, pageup/pagedown, f1-f12, and ctrl-a..ctrl-z.
+      # {key: ctrl-d} is the readable alias for the empty-send EOF rule.
+      # `cat -v` renders control bytes visibly, so the down arrow it received
+      # shows up as ^[[B in the transcript.
+      - pty:
+          command: cat -v
+          timeout: 10s
+          session:
+            - send: { key: down }
+            - send: { key: enter }
+            - expect: '\^\[\[B'
+            - send: { key: ctrl-d }
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "^[[B"

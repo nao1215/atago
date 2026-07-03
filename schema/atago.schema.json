@@ -503,10 +503,22 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "description": "Exactly one of expect (wait until the transcript matches the regexp) or send (write to the terminal; \"\" sends EOF/^D).",
+            "description": "Exactly one of expect (wait until the transcript matches the regexp) or send (write to the terminal; \"\" sends EOF/^D; {key: enter} presses a named key, #26).",
             "properties": {
               "expect": { "type": "string" },
-              "send": { "type": "string" }
+              "send": {
+                "oneOf": [
+                  { "type": "string" },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["key"],
+                    "properties": {
+                      "key": { "type": "string", "minLength": 1, "description": "Named key: enter, tab, esc, space, backspace, delete, arrows, home/end, pageup/pagedown, f1-f12, ctrl-a..ctrl-z." }
+                    }
+                  }
+                ]
+              }
             }
           }
         }

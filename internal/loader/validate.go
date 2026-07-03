@@ -686,6 +686,12 @@ func validatePTY(add func(string, ...any), where string, p *spec.PTY) {
 			if _, err := regexp.Compile(a.Expect); err != nil {
 				add("%s.expect %q is not a valid regexp: %v", aw, a.Expect, err)
 			}
+		case hasSend:
+			// A named key must be in the vocabulary (#26); a typo'd key would
+			// otherwise silently send nothing.
+			if a.Send.Key != "" && !spec.ValidPTYKey(a.Send.Key) {
+				add("%s.send.key %q is not a supported key (supported: %s)", aw, a.Send.Key, spec.PTYKeyNames())
+			}
 		}
 	}
 }

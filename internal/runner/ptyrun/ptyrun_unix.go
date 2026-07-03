@@ -188,14 +188,10 @@ func Run(ctx context.Context, p *spec.PTY, workdir string, env []string) (*runne
 			continue
 		}
 		if a.Send != nil {
-			if *a.Send == "" {
-				// EOF: ^D. Terminals deliver it as VEOF on an empty input line.
-				if _, werr := master.Write([]byte{0x04}); werr != nil {
-					return failHard(fmt.Errorf("pty: send EOF: %w", werr))
-				}
-				continue
-			}
-			if _, werr := master.Write([]byte(*a.Send)); werr != nil {
+			// Bytes resolves named keys to their xterm sequences and keeps the
+			// historical rule that an empty verbatim send transmits EOF (^D,
+			// delivered as VEOF on an empty input line) (#26).
+			if _, werr := master.Write(a.Send.Bytes()); werr != nil {
 				return failHard(fmt.Errorf("pty: send: %w", werr))
 			}
 		}

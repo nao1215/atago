@@ -142,7 +142,7 @@ Every feature has a commented, runnable spec under [examples/](examples/). The e
 | [stdin](examples/stdin.atago.yaml) | stdin sources: inline text, `stdin: {file: ...}` from a workdir file, and binary input via `stdin: {base64: ...}` |
 | [matrix](examples/matrix.atago.yaml) | one template scenario expanded per parameter row |
 | [mock_server](examples/mock_server.atago.yaml) | test API-client CLIs offline: `mock_servers` serve canned routes, record every request, and `mock:` asserts what the client actually sent |
-| [pty](examples/pty.atago.yaml) | interactive testing in a real pseudo-terminal: expect/send sessions, TTY-detection (POSIX-only) |
+| [pty](examples/pty.atago.yaml) | interactive testing in a real pseudo-terminal: expect/send sessions, named keys (`send: {key: enter}`), TTY-detection (POSIX-only) |
 | [retry](examples/retry.atago.yaml) | polling a command until an assertion passes |
 | [snapshot](examples/snapshot.atago.yaml) | golden-file testing with normalized output |
 | [dir_tree](examples/dir_tree.atago.yaml) | recursive dir assertions and directory-tree snapshots: pin a generator's whole output tree with one golden manifest |

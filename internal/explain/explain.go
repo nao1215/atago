@@ -149,11 +149,20 @@ func explainScenario(b *strings.Builder, sc *spec.Scenario) {
 				for _, v := range step.PTY.Env {
 					collectVars(vars, v)
 				}
+				var keys []string
 				for _, a := range step.PTY.Session {
 					collectVars(vars, a.Expect)
 					if a.Send != nil {
-						collectVars(vars, *a.Send)
+						if a.Send.Text != nil {
+							collectVars(vars, *a.Send.Text)
+						}
+						if a.Send.Key != "" {
+							keys = append(keys, a.Send.Key)
+						}
 					}
+				}
+				if len(keys) > 0 {
+					commands[len(commands)-1] += "  [keys: " + strings.Join(keys, ", ") + "]"
 				}
 			}
 		case spec.StepCDP:
