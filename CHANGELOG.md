@@ -7,6 +7,11 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-03
+
+Suite-level bootstrap, interactive terminal testing, and verbose scenario
+tracing — the three features real ShellSpec migrations were still missing.
+
 ### Added
 
 - Suite-level `setup:` / `teardown:` / `env:` (#7) — the bootstrap shell
