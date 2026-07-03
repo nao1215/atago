@@ -376,6 +376,93 @@ scenarios:
 	}
 }
 
+// TestValidate_ExitCodeIn proves the exit_code in-set rules (#19): one-of
+// violations, an empty set, duplicate values, and non-int entries all fail at
+// load time.
+func TestValidate_ExitCodeIn(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name, src, wantMsg string
+	}{
+		{
+			name: "not and in together",
+			src: `
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: s
+    steps:
+      - run:
+          command: echo hi
+      - assert:
+          exit_code: {not: 1, in: [0, 2]}
+`,
+			wantMsg: "exactly one of",
+		},
+		{
+			name: "empty in list",
+			src: `
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: s
+    steps:
+      - run:
+          command: echo hi
+      - assert:
+          exit_code: {in: []}
+`,
+			wantMsg: "at least one accepted exit code",
+		},
+		{
+			name: "duplicate values",
+			src: `
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: s
+    steps:
+      - run:
+          command: echo hi
+      - assert:
+          exit_code: {in: [0, 2, 0]}
+`,
+			wantMsg: "more than once",
+		},
+		{
+			name: "non-int entry",
+			src: `
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: s
+    steps:
+      - run:
+          command: echo hi
+      - assert:
+          exit_code: {in: [0, ok]}
+`,
+			wantMsg: "exit_code",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			_, err := LoadBytes("sample.atago.yaml", []byte(tc.src))
+			if err == nil {
+				t.Fatal("LoadBytes() = nil error, want an exit_code validation error")
+			}
+			if !strings.Contains(err.Error(), tc.wantMsg) {
+				t.Errorf("error = %q, want substring %q", err, tc.wantMsg)
+			}
+		})
+	}
+}
+
 // TestValidate_SuiteTimeoutInvalid proves an unparsable suite.timeout is a
 // load-time validation error (exit 2) naming the field (#17).
 func TestValidate_SuiteTimeoutInvalid(t *testing.T) {

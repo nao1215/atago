@@ -172,6 +172,22 @@ scenarios:
 	}
 }
 
+// TestSchema_AcceptsExitCodeIn confirms exit_code: {in: [...]} (#19) is
+// accepted.
+func TestSchema_AcceptsExitCodeIn(t *testing.T) {
+	s := loadSchema(t)
+	src := `version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    steps:
+      - run: {command: echo}
+      - assert: {exit_code: {in: [0, 2]}}`
+	if err := s.Validate(yamlToAny(t, []byte(src))); err != nil {
+		t.Errorf("schema rejected valid exit_code in-set:\n%v", err)
+	}
+}
+
 // TestSchema_RejectsInvalid confirms the schema actually catches bad specs.
 func TestSchema_RejectsInvalid(t *testing.T) {
 	s := loadSchema(t)
@@ -281,6 +297,22 @@ defaults:
 scenarios:
   - name: a
     steps: [{run: {command: cat}}]`,
+		// Issue #19: an empty in list is rejected (minItems 1).
+		"exit_code in empty list": `version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    steps:
+      - run: {command: echo}
+      - assert: {exit_code: {in: []}}`,
+		// Issue #19: not and in cannot be combined (oneOf shapes).
+		"exit_code not and in mixed": `version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    steps:
+      - run: {command: echo}
+      - assert: {exit_code: {not: 1, in: [0]}}`,
 	}
 	for name, src := range bad {
 		t.Run(name, func(t *testing.T) {

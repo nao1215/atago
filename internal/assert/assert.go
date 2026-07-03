@@ -5,11 +5,24 @@ package assert
 
 import (
 	"fmt"
+	"slices"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/nao1215/atago/internal/runner"
 	"github.com/nao1215/atago/internal/spec"
 )
+
+// intList renders an accepted exit-code set as "[0, 2]" for descriptions and
+// failure output (#19).
+func intList(ns []int) string {
+	parts := make([]string, len(ns))
+	for i, n := range ns {
+		parts[i] = strconv.Itoa(n)
+	}
+	return "[" + strings.Join(parts, ", ") + "]"
+}
 
 // CheckResult is the structured outcome of one assertion.
 type CheckResult struct {
@@ -176,27 +189,42 @@ func checkExitCode(e *spec.ExitCode, res *runner.Result) *CheckResult {
 	if res.TimedOut {
 		actual = fmt.Sprintf("exit code %d (the command timed out after %s and was killed)", res.ExitCode, res.Duration.Round(time.Millisecond))
 	}
+	// timeoutHint replaces the mismatch hint when the command was killed by a
+	// timeout, naming the level that supplied it (step/runner/defaults/suite/
+	// built-in, #17) so the user knows which knob to adjust.
+	timeoutHint := func(fallback string) string {
+		if !res.TimedOut {
+			return fallback
+		}
+		source := res.TimeoutSource
+		if source == "" {
+			source = "run.timeout"
+		}
+		return fmt.Sprintf("the command hit its %s after %s and was killed before exiting", source, res.Duration.Round(time.Millisecond))
+	}
 	switch {
 	case e.Equals != nil:
 		desc := fmt.Sprintf("assert exit_code is %d", *e.Equals)
 		if res.ExitCode == *e.Equals {
 			return pass(desc)
 		}
-		hint := fmt.Sprintf("expected exit code %d but the command exited with %d", *e.Equals, res.ExitCode)
-		if res.TimedOut {
-			// Name the level that supplied the timeout (step/runner/defaults/
-			// suite/built-in, #17) so the user knows which knob to adjust.
-			source := res.TimeoutSource
-			if source == "" {
-				source = "run.timeout"
-			}
-			hint = fmt.Sprintf("the command hit its %s after %s and was killed before exiting", source, res.Duration.Round(time.Millisecond))
-		}
 		return &CheckResult{
 			Desc:     desc,
 			Expected: fmt.Sprintf("exit code %d", *e.Equals),
 			Actual:   actual,
-			Hint:     hint,
+			Hint:     timeoutHint(fmt.Sprintf("expected exit code %d but the command exited with %d", *e.Equals, res.ExitCode)),
+		}
+	case len(e.In) > 0:
+		set := intList(e.In)
+		desc := fmt.Sprintf("assert exit_code in %s", set)
+		if slices.Contains(e.In, res.ExitCode) {
+			return pass(desc)
+		}
+		return &CheckResult{
+			Desc:     desc,
+			Expected: fmt.Sprintf("exit code in %s", set),
+			Actual:   actual,
+			Hint:     timeoutHint(fmt.Sprintf("expected the exit code to be one of %s but the command exited with %d", set, res.ExitCode)),
 		}
 	case e.Not != nil:
 		desc := fmt.Sprintf("assert exit_code is not %d", *e.Not)
@@ -210,6 +238,6 @@ func checkExitCode(e *spec.ExitCode, res *runner.Result) *CheckResult {
 			Hint:     fmt.Sprintf("expected any exit code except %d", *e.Not),
 		}
 	default:
-		return &CheckResult{Desc: "assert exit_code", Hint: "exit_code must be an int or {not: int}"}
+		return &CheckResult{Desc: "assert exit_code", Hint: "exit_code must be an int, {not: int}, or {in: [int, ...]}"}
 	}
 }

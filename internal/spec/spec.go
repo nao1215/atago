@@ -735,28 +735,34 @@ func (s *Stdin) UnmarshalYAML(unmarshal func(any) error) error {
 	return nil
 }
 
-// ExitCode accepts either a bare integer or {not: <int>}.
+// ExitCode accepts a bare integer, {not: <int>}, or {in: [<int>, ...]} (#19).
+// The `in` set is the contract shape real CLIs document (grep's 0/1,
+// terraform plan -detailed-exitcode's 0/2): membership in an accepted set.
 type ExitCode struct {
 	Equals *int
 	Not    *int
+	In     []int
 }
 
-// UnmarshalYAML decodes exit_code as a scalar int or a {not: int} map. Anything
-// else gets a purpose-built error: the generic decoder message ("string was
-// used where mapping is expected", positioned at the sub-node) reads like an
-// internal failure, and a spec author needs to know the two accepted shapes.
+// UnmarshalYAML decodes exit_code as a scalar int, a {not: int} map, or an
+// {in: [int, ...]} map. Anything else gets a purpose-built error: the generic
+// decoder message ("string was used where mapping is expected", positioned at
+// the sub-node) reads like an internal failure, and a spec author needs to
+// know the accepted shapes.
 func (e *ExitCode) UnmarshalYAML(b []byte) error {
 	if n, err := strconv.Atoi(trimYAMLScalar(string(b))); err == nil {
 		e.Equals = &n
 		return nil
 	}
 	var m struct {
-		Not *int `yaml:"not"`
+		Not *int  `yaml:"not"`
+		In  []int `yaml:"in"`
 	}
 	if err := yaml.Unmarshal(b, &m); err != nil {
-		return fmt.Errorf("exit_code must be an integer (exit_code: 0) or a negation (exit_code: {not: 0}), got %q", strings.TrimSpace(string(b)))
+		return fmt.Errorf("exit_code must be an integer (exit_code: 0), a negation (exit_code: {not: 0}), or a set (exit_code: {in: [0, 2]}), got %q", strings.TrimSpace(string(b)))
 	}
 	e.Not = m.Not
+	e.In = m.In
 	return nil
 }
 

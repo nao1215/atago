@@ -117,6 +117,42 @@ func validateDefaults(add func(string, ...any), d *spec.Defaults) {
 	}
 }
 
+// validateExitCode checks the exit_code assertion (#19): exactly one of the
+// bare-int / {not} / {in} forms, and an `in` set that is non-empty with unique
+// values — a duplicated code is authoring confusion, not a wider contract.
+func validateExitCode(add func(string, ...any), where string, e *spec.ExitCode) {
+	set := 0
+	if e.Equals != nil {
+		set++
+	}
+	if e.Not != nil {
+		set++
+	}
+	if e.In != nil {
+		set++
+	}
+	if set == 0 {
+		add("%s must be an int, {not: int}, or {in: [int, ...]}", where)
+		return
+	}
+	if set > 1 {
+		add("%s: set exactly one of a bare int, not, or in", where)
+		return
+	}
+	if e.In != nil {
+		if len(e.In) == 0 {
+			add("%s.in must list at least one accepted exit code", where)
+		}
+		seen := make(map[int]bool, len(e.In))
+		for _, n := range e.In {
+			if seen[n] {
+				add("%s.in lists %d more than once", where, n)
+			}
+			seen[n] = true
+		}
+	}
+}
+
 // validateStdin checks a run step's stdin source (#18): the mapping form must
 // set exactly one of file/base64, and a base64 payload must decode — at load
 // time, so a typo fails with a positioned message instead of mid-run.
@@ -676,7 +712,9 @@ func validateAssert(add func(string, ...any), where string, a *spec.Assert) {
 func validateAssertTarget(add func(string, ...any), where string, a *spec.Assert, target spec.AssertTarget) {
 	switch target {
 	case spec.AssertExitCode:
-		// exit_code shape already enforced by ExitCode.UnmarshalYAML.
+		// Scalar/mapping shape enforced by ExitCode.UnmarshalYAML; the one-of
+		// rule and the `in` set contents are semantic checks (#19).
+		validateExitCode(add, where+".assert.exit_code", a.ExitCode)
 	case spec.AssertStdout:
 		validateStream(add, where+".assert.stdout", a.Stdout)
 	case spec.AssertStderr:

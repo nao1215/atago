@@ -19,6 +19,12 @@ and this project follows [Semantic Versioning](https://semver.org/).
   (`SystemRoot`, `SystemDrive`, `TEMP`, `TMP`, `PATHEXT`) is always retained.
   `pass_env` without `clear_env: true` is a load-time error (exit 2).
   See `examples/hermetic_env.atago.yaml`.
+- `exit_code: {in: [0, 2]}` (#19): assert the exit code against a set of
+  accepted values — the contract shape of grep (0/1) or
+  `terraform plan -detailed-exitcode` (0/2). Exactly one of the bare-int /
+  `not` / `in` forms per assert; an empty or duplicated set is a load-time
+  error. Failure output lists the accepted codes, and a timeout kill keeps
+  its timeout hint.
 - stdin sources (#18): `run.stdin` now also accepts `{file: path}` (a
   workdir-relative, `${name}`-expanded, path-confined file whose bytes are fed
   to the child) and `{base64: data}` (binary stdin, validated at load time; no

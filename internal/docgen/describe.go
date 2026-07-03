@@ -43,6 +43,13 @@ func describeTarget(a *spec.Assert, target spec.AssertTarget) string {
 		if a.ExitCode.Not != nil {
 			return fmt.Sprintf("exit code is not %s", markdown.Code(fmt.Sprint(*a.ExitCode.Not)))
 		}
+		if len(a.ExitCode.In) > 0 {
+			codes := make([]string, len(a.ExitCode.In))
+			for i, n := range a.ExitCode.In {
+				codes[i] = markdown.Code(fmt.Sprint(n))
+			}
+			return "exit code is one of " + strings.Join(codes, ", ")
+		}
 		if a.ExitCode.Equals != nil {
 			return fmt.Sprintf("exit code is %s", markdown.Code(fmt.Sprint(*a.ExitCode.Equals)))
 		}

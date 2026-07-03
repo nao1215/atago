@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-45 suites · 153 scenarios
+46 suites · 157 scenarios
 ## Contents
 - [atago self-hosting / variable expansion in assertion matcher values](#atago-self-hosting--variable-expansion-in-assertion-matcher-values) — 3 scenarios
   - [stdout.equals expands ${workdir}](#scenario-stdoutequals-expands-workdir)
@@ -47,6 +47,11 @@
   - [file not_contains passes when the substring is absent](#scenario-file-not_contains-passes-when-the-substring-is-absent)
   - [not_contains fails when the substring is present](#scenario-not_contains-fails-when-the-substring-is-present)
   - [a shell metacharacter without shell is a load-time error](#scenario-a-shell-metacharacter-without-shell-is-a-load-time-error)
+- [atago self-hosting / exit_code in-set matcher](#atago-self-hosting--exit_code-in-set-matcher) — 4 scenarios
+  - [a listed exit code passes](#scenario-a-listed-exit-code-passes)
+  - [an unlisted exit code fails and the output lists the set](#scenario-an-unlisted-exit-code-fails-and-the-output-lists-the-set)
+  - [mixing not and in is a load-time error](#scenario-mixing-not-and-in-is-a-load-time-error)
+  - [an empty in list is a load-time error](#scenario-an-empty-in-list-is-a-load-time-error)
 - [atago self-hosting / explain](#atago-self-hosting--explain) — 1 scenario
   - [explain summarizes a spec without running it](#scenario-explain-summarizes-a-spec-without-running-it)
 - [atago self-hosting / fixture from (copy committed testdata)](#atago-self-hosting--fixture-from-copy-committed-testdata) — 2 scenarios
@@ -950,6 +955,94 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `shell is not enabled`, `shell: true`, `stdout_to`
+## atago self-hosting / exit_code in-set matcher
+Source: `test/e2e/atago/exit_code_in.atago.yaml`
+### Scenario: a listed exit code passes
+#### When
+```shell
+exit 2
+```
+#### Then
+- exit code is one of `0`, `2`
+### Scenario: an unlisted exit code fails and the output lists the set
+#### Given
+- Fixture file `inner.atago.yaml` is created.
+#### Inputs
+_Fixture `inner.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: exit 2 is not in the accepted set
+    steps:
+      - run:
+          shell: true
+          command: exit 2
+      - assert:
+          exit_code:
+            in: [0, 1]
+```
+#### When
+```shell
+${atago} run inner.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `exit code in [0, 1]`
+### Scenario: mixing not and in is a load-time error
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: bad
+scenarios:
+  - name: both forms
+    steps:
+      - run:
+          shell: true
+          command: exit 0
+      - assert:
+          exit_code:
+            not: 1
+            in: [0, 2]
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `exactly one of`
+### Scenario: an empty in list is a load-time error
+#### Given
+- Fixture file `empty.atago.yaml` is created.
+#### Inputs
+_Fixture `empty.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: empty
+scenarios:
+  - name: empty set
+    steps:
+      - run:
+          shell: true
+          command: exit 0
+      - assert:
+          exit_code:
+            in: []
+```
+#### When
+```shell
+${atago} run empty.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `at least one accepted exit code`
 ## atago self-hosting / explain
 Source: `test/e2e/atago/explain.atago.yaml`
 ### Scenario: explain summarizes a spec without running it
