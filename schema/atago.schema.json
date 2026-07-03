@@ -648,7 +648,8 @@
         { "required": ["image"] },
         { "required": ["dir"] },
         { "required": ["pdf"] },
-        { "required": ["mock"] }
+        { "required": ["mock"] },
+        { "required": ["screen"] }
       ],
       "properties": {
         "exit_code": { "$ref": "#/$defs/exitCode" },
@@ -665,7 +666,11 @@
         "image": { "$ref": "#/$defs/image" },
         "dir": { "$ref": "#/$defs/dir" },
         "pdf": { "$ref": "#/$defs/pdf" },
-        "mock": { "$ref": "#/$defs/mockAssert" }
+        "mock": { "$ref": "#/$defs/mockAssert" },
+        "screen": {
+          "$ref": "#/$defs/stream",
+          "description": "The rendered terminal screen of the preceding pty step (#27): the transcript replayed through a vt10x emulator, asserted as plain text (line.n = screen row)."
+        }
       }
     },
     "pdf": {

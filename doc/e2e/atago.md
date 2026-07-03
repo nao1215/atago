@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-49 suites · 169 scenarios
+49 suites · 172 scenarios
 ## Contents
 - [atago self-hosting / variable expansion in assertion matcher values](#atago-self-hosting--variable-expansion-in-assertion-matcher-values) — 3 scenarios
   - [stdout.equals expands ${workdir}](#scenario-stdoutequals-expands-workdir)
@@ -135,11 +135,14 @@
 - [atago self-hosting / pdf assertion](#atago-self-hosting--pdf-assertion) — 2 scenarios
   - [pdf assertions cover page count, metadata, and text](#scenario-pdf-assertions-cover-page-count-metadata-and-text)
   - [a non-pdf file fails the pdf target](#scenario-a-non-pdf-file-fails-the-pdf-target)
-- [atago self-hosting / pty](#atago-self-hosting--pty) — 4 scenarios
+- [atago self-hosting / pty](#atago-self-hosting--pty) — 7 scenarios
   - [a pty step sees a terminal where a run step sees a pipe](#scenario-a-pty-step-sees-a-terminal-where-a-run-step-sees-a-pipe)
   - [a never-matching expect fails with the pattern in the block](#scenario-a-never-matching-expect-fails-with-the-pattern-in-the-block)
   - [named keys transmit their documented bytes and ctrl-c aborts](#scenario-named-keys-transmit-their-documented-bytes-and-ctrl-c-aborts)
   - [an unknown key name is a load-time error listing the vocabulary](#scenario-an-unknown-key-name-is-a-load-time-error-listing-the-vocabulary)
+  - [screen asserts see the final frame where the transcript sees history](#scenario-screen-asserts-see-the-final-frame-where-the-transcript-sees-history)
+  - [a screen snapshot round-trips through update and compare](#scenario-a-screen-snapshot-round-trips-through-update-and-compare)
+  - [a screen assert without a pty step is a load-time error](#scenario-a-screen-assert-without-a-pty-step-is-a-load-time-error)
 - [atago self-hosting / reports](#atago-self-hosting--reports) — 4 scenarios
   - [JUnit report is XML with a testsuite and testcase](#scenario-junit-report-is-xml-with-a-testsuite-and-testcase)
   - [GitHub Actions annotations are emitted on failure](#scenario-github-actions-annotations-are-emitted-on-failure)
@@ -2451,6 +2454,73 @@ ${atago} run badkey.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `not a supported key (supported: enter, tab`
+### Scenario: screen asserts see the final frame where the transcript sees history
+_skipped on windows_
+#### When
+```shell
+# interactive (pty): printf 'loading...'; printf 'done.      
+'
+```
+#### Then
+- rendered screen equals an exact value
+- rendered screen does not contain `loading`
+- stdout contains `loading`
+### Scenario: a screen snapshot round-trips through update and compare
+_skipped on windows_
+#### Given
+- Fixture file `inner.atago.yaml` is created.
+#### Inputs
+_Fixture `inner.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: menu frame
+    steps:
+      - pty:
+          shell: true
+          command: "printf '\\033[2J\\033[HMain Menu\\r\\n> Settings\\r\\n'"
+          rows: 10
+          cols: 40
+      - assert:
+          screen:
+            snapshot: snapshots/menu.txt
+```
+#### When
+```shell
+${atago} run --update-snapshots inner.atago.yaml
+${atago} run inner.atago.yaml
+```
+#### Then
+- after `${atago} run --update-snapshots inner.atago.yaml`:
+  - exit code is `0`
+  - file `snapshots/menu.txt` contains `> Settings`
+- after `${atago} run inner.atago.yaml`:
+  - exit code is `0`
+### Scenario: a screen assert without a pty step is a load-time error
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: bad
+scenarios:
+  - name: no pty
+    steps:
+      - run: {command: echo hi}
+      - assert:
+          screen: {contains: hi}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `requires a preceding pty step`
 ## atago self-hosting / reports
 Source: `test/e2e/atago/reports.atago.yaml`
 ### Scenario: JUnit report is XML with a testsuite and testcase

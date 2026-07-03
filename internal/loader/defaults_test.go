@@ -463,6 +463,42 @@ scenarios:
 	}
 }
 
+// TestValidate_ScreenNeedsPTY proves a screen assert without a pty step in
+// the scenario is a load-time error (#27), and one after a pty loads.
+func TestValidate_ScreenNeedsPTY(t *testing.T) {
+	t.Parallel()
+	bad := `
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: s
+    steps:
+      - run: {command: echo hi}
+      - assert:
+          screen: {contains: hi}
+`
+	_, err := LoadBytes("sample.atago.yaml", []byte(bad))
+	if err == nil || !strings.Contains(err.Error(), "requires a preceding pty step") {
+		t.Errorf("error = %v, want the preceding-pty message", err)
+	}
+
+	good := `
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: s
+    steps:
+      - pty: {command: cat, session: [{send: ""}]}
+      - assert:
+          screen: {contains: x}
+`
+	if _, err := LoadBytes("sample.atago.yaml", []byte(good)); err != nil {
+		t.Errorf("screen after pty should load: %v", err)
+	}
+}
+
 // TestValidate_PTYNamedKeys proves the #26 rules: an unknown key name lists
 // the vocabulary, malformed send mappings fail, and a valid key loads.
 func TestValidate_PTYNamedKeys(t *testing.T) {

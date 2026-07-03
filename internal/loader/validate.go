@@ -81,11 +81,27 @@ func validate(s *spec.Spec) []string {
 			add("%s: steps must contain at least one step", where)
 			continue
 		}
+		// A screen assert renders a pty step's terminal (#27): reject one
+		// that no pty step in this scenario could ever feed.
+		ptySeen := false
 		for j := range sc.Steps {
-			validateStep(add, fmt.Sprintf("%s.steps[%d]", where, j), &sc.Steps[j], s.Runners, serviceNames, mockNames)
+			sw := fmt.Sprintf("%s.steps[%d]", where, j)
+			st := &sc.Steps[j]
+			if st.Kind() == spec.StepPTY {
+				ptySeen = true
+			}
+			if st.Assert != nil && st.Assert.Screen != nil && !ptySeen {
+				add("%s.assert.screen requires a preceding pty step (the screen is the pty step's rendered terminal)", sw)
+			}
+			validateStep(add, sw, st, s.Runners, serviceNames, mockNames)
 		}
 		for j := range sc.Teardown {
-			validateStep(add, fmt.Sprintf("%s.teardown[%d]", where, j), &sc.Teardown[j], s.Runners, serviceNames, mockNames)
+			tw := fmt.Sprintf("%s.teardown[%d]", where, j)
+			st := &sc.Teardown[j]
+			if st.Assert != nil && st.Assert.Screen != nil && !ptySeen {
+				add("%s.assert.screen requires a pty step in the scenario", tw)
+			}
+			validateStep(add, tw, st, s.Runners, serviceNames, mockNames)
 		}
 	}
 	return errs
@@ -873,6 +889,8 @@ func validateAssertTarget(add func(string, ...any), where string, a *spec.Assert
 		validateDir(add, where+".assert.dir", a.Dir)
 	case spec.AssertMock:
 		validateMockAssert(add, where+".assert.mock", a.Mock, mockNames)
+	case spec.AssertScreen:
+		validateStream(add, where+".assert.screen", a.Screen)
 	case spec.AssertPDF:
 		validatePDF(add, where+".assert.pdf", a.PDF)
 	case spec.AssertGRPCStatus:

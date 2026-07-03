@@ -66,6 +66,8 @@ func describeTarget(a *spec.Assert, target spec.AssertTarget) string {
 			desc += fmt.Sprintf(" exactly %d time(s)", *m.Count)
 		}
 		return desc
+	case spec.AssertScreen:
+		return "rendered screen " + describeStream(a.Screen)
 	case spec.AssertStdout:
 		return "stdout " + describeStream(a.Stdout)
 	case spec.AssertStderr:

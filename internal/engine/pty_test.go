@@ -224,3 +224,40 @@ scenarios:
 		t.Fatalf("status = %s, want passed: %+v", res.Status, res.Scenarios)
 	}
 }
+
+// TestEngine_PTY_ScreenAssert proves the screen target (#27): an overwritten
+// line asserts on its FINAL rendered text (the transcript still carries
+// both), line.n addresses screen rows, and a screen assert without a pty
+// step is a load-time error.
+func TestEngine_PTY_ScreenAssert(t *testing.T) {
+	skipOnWindows(t)
+	t.Parallel()
+	res := runSpec(t, `
+version: "1"
+suite:
+  name: s
+scenarios:
+  - name: the screen shows only the final overwrite
+    steps:
+      - pty:
+          shell: true
+          command: "printf 'loading...\r'; printf 'done.      \r\n'; printf 'row two\r\n'"
+      - assert:
+          screen:
+            contains: "done."
+      - assert:
+          screen:
+            not_contains: "loading"
+      - assert:
+          screen:
+            line: 2
+            equals: "row two"
+      # The raw transcript keeps BOTH versions - the emulator adds the value.
+      - assert:
+          stdout:
+            contains: "loading"
+`)
+	if res.Status != StatusPassed {
+		t.Fatalf("status = %s, want passed: %+v", res.Status, res.Scenarios)
+	}
+}

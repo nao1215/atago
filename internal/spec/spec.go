@@ -835,6 +835,13 @@ type Assert struct {
 	// actually sent to a declared mock server — request count, and header/body
 	// matchers applied to the last matching recorded request.
 	Mock *MockAssert `yaml:"mock,omitempty"`
+
+	// Screen is the rendered-terminal assertion target (#27), valid after a
+	// pty step: the transcript replayed through a vt10x emulator sized by the
+	// step's rows/cols, asserted as plain text with the stream matchers
+	// (line.n addresses screen rows 1-based). The raw transcript stays on
+	// stdout.
+	Screen *StreamAssert `yaml:"screen,omitempty"`
 }
 
 // PDFAssert checks a generated PDF file (#73). Like ImageAssert/DirAssert, every

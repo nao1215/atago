@@ -124,12 +124,18 @@ func Run(ctx context.Context, p *spec.PTY, workdir string, env []string) (*runne
 		}
 		_ = master.Close()
 		<-readDone
+		transcript := snapshot()
 		res := &runner.Result{
 			Command:  p.Command,
-			Stdout:   snapshot(),
+			Stdout:   transcript,
 			Duration: time.Since(start),
 			Workdir:  cmd.Dir,
 			TimedOut: timedOut,
+			IsPTY:    true,
+			// The rendered screen (#27) is derived from the same bytes, so
+			// screen asserts and transcript asserts never disagree about what
+			// happened.
+			Screen: []byte(RenderScreen(transcript, p)),
 		}
 		switch {
 		case timedOut:

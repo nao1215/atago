@@ -171,6 +171,8 @@ func checkTarget(a *spec.Assert, target spec.AssertTarget, res *runner.Result, e
 		return checkPDF(a.PDF, env)
 	case spec.AssertMock:
 		return checkMock(a.Mock, env)
+	case spec.AssertScreen:
+		return checkScreen(a.Screen, res, env)
 	default:
 		return &CheckResult{Desc: string(target), Hint: "assertion target not supported yet"}
 	}
