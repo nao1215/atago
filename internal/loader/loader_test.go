@@ -257,6 +257,18 @@ func TestLoadBytes_Errors(t *testing.T) {
 			wantMsg:  "is not a valid regexp",
 		},
 		{
+			name:     "pty timeout must be positive",
+			src:      "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - pty: {command: cat, timeout: \"0s\"}",
+			wantKind: KindValidation,
+			wantMsg:  "pty.timeout must be positive",
+		},
+		{
+			name:     "pty rows above the terminal limit are rejected",
+			src:      "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - pty: {command: cat, rows: 70000}",
+			wantKind: KindValidation,
+			wantMsg:  "rows/cols must be between 0 and 65535",
+		},
+		{
 			name:     "pty timeout must be a duration",
 			src:      "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - pty: {command: cat, timeout: \"soon\"}",
 			wantKind: KindValidation,

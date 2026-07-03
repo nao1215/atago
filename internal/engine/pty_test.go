@@ -119,6 +119,33 @@ scenarios:
 	}
 }
 
+// TestEngine_PTY_SeesSuiteEnv proves suite.env reaches pty commands like it
+// reaches run steps (CodeRabbit finding on #12: the pty step dropped it).
+func TestEngine_PTY_SeesSuiteEnv(t *testing.T) {
+	skipOnWindows(t)
+	t.Parallel()
+	res := runSpec(t, `
+version: "1"
+suite:
+  name: s
+  env:
+    PTY_SUITE_FLAG: from-suite-env
+scenarios:
+  - name: pty inherits the suite environment
+    steps:
+      - pty:
+          shell: true
+          command: echo flag=$PTY_SUITE_FLAG
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: flag=from-suite-env
+`)
+	if res.Status != StatusPassed {
+		t.Fatalf("status = %s, want passed: %+v", res.Status, res.Scenarios)
+	}
+}
+
 // TestEngine_PTY_StoreAndVariablesFlow proves ${name} expansion reaches send
 // payloads and the transcript feeds `store from.stdout` like any run step.
 func TestEngine_PTY_StoreAndVariablesFlow(t *testing.T) {

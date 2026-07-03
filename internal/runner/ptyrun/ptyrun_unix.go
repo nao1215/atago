@@ -142,6 +142,16 @@ func Run(ctx context.Context, p *spec.PTY, workdir string, env []string) (*runne
 		return finish(true, nil, ef)
 	}
 
+	// failHard cleans up (kill, reap, close, drain) before surfacing a hard
+	// error, so a failed terminal write never leaks the child or goroutines.
+	failHard := func(err error) (*runner.Result, *ExpectFailure, error) {
+		kill()
+		<-waitCh
+		_ = master.Close()
+		<-readDone
+		return nil, nil, err
+	}
+
 	// Drive the session in order. expect polls the transcript; send writes to
 	// the terminal; an empty send transmits EOF (^D).
 	for i, a := range p.Session {
@@ -168,12 +178,12 @@ func Run(ctx context.Context, p *spec.PTY, workdir string, env []string) (*runne
 			if *a.Send == "" {
 				// EOF: ^D. Terminals deliver it as VEOF on an empty input line.
 				if _, werr := master.Write([]byte{0x04}); werr != nil {
-					return nil, nil, fmt.Errorf("pty: send EOF: %w", werr)
+					return failHard(fmt.Errorf("pty: send EOF: %w", werr))
 				}
 				continue
 			}
 			if _, werr := master.Write([]byte(*a.Send)); werr != nil {
-				return nil, nil, fmt.Errorf("pty: send: %w", werr)
+				return failHard(fmt.Errorf("pty: send: %w", werr))
 			}
 		}
 	}

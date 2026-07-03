@@ -176,6 +176,9 @@ func buildStep(index int, step *spec.Step, vars map[string]bool) Step {
 		st.Shell = pt.Shell != nil && *pt.Shell
 		st.Action = "interactive (pty) " + pt.Command
 		collectVars(vars, pt.Command, pt.Cwd)
+		for _, v := range pt.Env {
+			collectVars(vars, v)
+		}
 		for _, a := range pt.Session {
 			if a.Send != nil {
 				collectVars(vars, *a.Send)

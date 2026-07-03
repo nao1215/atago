@@ -545,7 +545,7 @@ func (e *Engine) runScenario(ctx context.Context, scenarioIdx int, sc *spec.Scen
 			current = r
 			sr.Run = maskResult(masker, r)
 		case spec.StepPTY:
-			r, ef, err := e.runPTY(ctx, step.PTY, st, sc.Env, workdir)
+			r, ef, err := e.runPTY(ctx, step.PTY, st, scEnv, workdir)
 			if err != nil {
 				sr.ErrMsg = err.Error()
 				return sr, StatusError, false

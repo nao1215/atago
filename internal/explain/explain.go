@@ -128,7 +128,16 @@ func explainScenario(b *strings.Builder, sc *spec.Scenario) {
 		case spec.StepPTY:
 			if step.PTY != nil {
 				commands = append(commands, fmt.Sprintf("interactive (pty): %s  [%d session actions]", step.PTY.Command, len(step.PTY.Session)))
-				collectVars(vars, step.PTY.Command)
+				collectVars(vars, step.PTY.Command, step.PTY.Cwd)
+				for _, v := range step.PTY.Env {
+					collectVars(vars, v)
+				}
+				for _, a := range step.PTY.Session {
+					collectVars(vars, a.Expect)
+					if a.Send != nil {
+						collectVars(vars, *a.Send)
+					}
+				}
 			}
 		case spec.StepCDP:
 			if step.CDP != nil {

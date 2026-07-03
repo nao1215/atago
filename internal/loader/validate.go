@@ -429,12 +429,18 @@ func validatePTY(add func(string, ...any), where string, p *spec.PTY) {
 		add("%s.pty.command is required", where)
 	}
 	if p.Timeout != "" {
-		if _, err := time.ParseDuration(p.Timeout); err != nil {
+		d, err := time.ParseDuration(p.Timeout)
+		switch {
+		case err != nil:
 			add("%s.pty.timeout %q is not a valid duration (e.g. \"30s\")", where, p.Timeout)
+		case d <= 0:
+			add("%s.pty.timeout must be positive (got %q); omit it for the 30s default", where, p.Timeout)
 		}
 	}
-	if p.Rows < 0 || p.Cols < 0 {
-		add("%s.pty: rows/cols must be >= 0", where)
+	// A pty size is a uint16 on the wire; reject values the terminal cannot
+	// represent instead of silently truncating.
+	if p.Rows < 0 || p.Cols < 0 || p.Rows > 65535 || p.Cols > 65535 {
+		add("%s.pty: rows/cols must be between 0 and 65535", where)
 	}
 	for i, a := range p.Session {
 		aw := fmt.Sprintf("%s.pty.session[%d]", where, i)
