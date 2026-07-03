@@ -416,6 +416,40 @@ func validateStep(add func(string, ...any), where string, st *spec.Step, runners
 		validateStore(add, where, st.Store)
 	case spec.StepService:
 		add("%s: service steps are only allowed in suite.setup (scenario-scoped peers go under the scenario's services: list)", where)
+	case spec.StepPTY:
+		validatePTY(add, where, st.PTY)
+	}
+}
+
+// validatePTY checks a pty step (#8): a command, sane duration/size values,
+// and a session whose entries each set exactly one of expect/send with
+// compilable expect regexps.
+func validatePTY(add func(string, ...any), where string, p *spec.PTY) {
+	if p.Command == "" {
+		add("%s.pty.command is required", where)
+	}
+	if p.Timeout != "" {
+		if _, err := time.ParseDuration(p.Timeout); err != nil {
+			add("%s.pty.timeout %q is not a valid duration (e.g. \"30s\")", where, p.Timeout)
+		}
+	}
+	if p.Rows < 0 || p.Cols < 0 {
+		add("%s.pty: rows/cols must be >= 0", where)
+	}
+	for i, a := range p.Session {
+		aw := fmt.Sprintf("%s.pty.session[%d]", where, i)
+		hasExpect := a.Expect != ""
+		hasSend := a.Send != nil
+		switch {
+		case hasExpect && hasSend:
+			add("%s: set exactly one of expect/send (got both)", aw)
+		case !hasExpect && !hasSend:
+			add("%s: set exactly one of expect/send (an empty send: \"\" transmits EOF)", aw)
+		case hasExpect:
+			if _, err := regexp.Compile(a.Expect); err != nil {
+				add("%s.expect %q is not a valid regexp: %v", aw, a.Expect, err)
+			}
+		}
 	}
 }
 

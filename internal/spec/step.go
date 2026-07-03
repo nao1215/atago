@@ -14,6 +14,7 @@ const (
 	StepAssert  StepKind = "assert"
 	StepStore   StepKind = "store"
 	StepService StepKind = "service"
+	StepPTY     StepKind = "pty"
 )
 
 // SetKeys returns the action keys that are present on the step. A valid step has
@@ -46,6 +47,9 @@ func (s *Step) SetKeys() []StepKind {
 	}
 	if s.Service != nil {
 		keys = append(keys, StepService)
+	}
+	if s.PTY != nil {
+		keys = append(keys, StepPTY)
 	}
 	return keys
 }

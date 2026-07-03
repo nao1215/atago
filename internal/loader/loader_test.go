@@ -245,6 +245,24 @@ func TestLoadBytes_Errors(t *testing.T) {
 			wantMsg:  "run.command is required",
 		},
 		{
+			name:     "pty session entry needs exactly one of expect and send",
+			src:      "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - pty:\n          command: cat\n          session:\n            - expect: hi\n              send: \"yo\\n\"",
+			wantKind: KindValidation,
+			wantMsg:  "set exactly one of expect/send",
+		},
+		{
+			name:     "pty expect must be a valid regexp",
+			src:      "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - pty:\n          command: cat\n          session:\n            - expect: \"hi[\"",
+			wantKind: KindValidation,
+			wantMsg:  "is not a valid regexp",
+		},
+		{
+			name:     "pty timeout must be a duration",
+			src:      "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - pty: {command: cat, timeout: \"soon\"}",
+			wantKind: KindValidation,
+			wantMsg:  "pty.timeout \"soon\" is not a valid duration",
+		},
+		{
 			name:     "invalid fixture mtime fails at load",
 			src:      "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - fixture: {file: f.txt, content: x, mtime: \"yesterday\"}\n      - run: {command: echo}",
 			wantKind: KindValidation,

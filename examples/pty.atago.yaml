@@ -1,0 +1,49 @@
+version: "1"
+
+# A `pty` step runs one command inside a REAL pseudo-terminal and drives it
+# with a declarative expect/send session — for CLIs that branch on TTY-ness or
+# present an interactive prompt (REPLs, wizards). The captured transcript
+# (terminal echo included) becomes the step's stdout, so every stream matcher,
+# snapshot, and `store from.stdout` works unchanged. An `expect` waits until
+# the transcript matches the regexp; a `send` types into the terminal (include
+# "\n" to press enter; an empty send: "" transmits EOF, i.e. Ctrl-D). The
+# whole session is bounded by `timeout` (default 30s) — a prompt that never
+# appears fails loudly instead of hanging.
+# POSIX-only for now; on Windows the step reports a clear execution error.
+# Runs green as-is on Linux/macOS: atago run examples/pty.atago.yaml
+
+suite:
+  name: pty
+
+scenarios:
+  - name: the program sees a real terminal
+    skip:
+      os: windows
+    steps:
+      # `[ -t 0 ]` is the classic "am I connected to a TTY?" probe. Under a
+      # plain `run:` step stdin is a pipe and this prints is-a-pipe.
+      - pty:
+          shell: true
+          command: 'if [ -t 0 ]; then echo is-a-tty; else echo is-a-pipe; fi'
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: is-a-tty
+
+  - name: drive an interactive session with expect and send
+    skip:
+      os: windows
+    steps:
+      # cat in a terminal behaves like a tiny echo-REPL: each line you type is
+      # echoed back. expect gates each send; the final empty send is Ctrl-D.
+      - pty:
+          command: cat
+          timeout: 10s
+          session:
+            - send: "hello interactive world\n"
+            - expect: "hello interactive world"
+            - send: ""
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: hello interactive world

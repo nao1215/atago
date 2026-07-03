@@ -272,7 +272,8 @@
         { "required": ["cdp"] },
         { "required": ["assert"] },
         { "required": ["store"] },
-        { "required": ["service"] }
+        { "required": ["service"] },
+        { "required": ["pty"] }
       ],
       "properties": {
         "fixture": { "$ref": "#/$defs/fixture" },
@@ -285,6 +286,7 @@
           "$ref": "#/$defs/service",
           "description": "Starts a suite-wide background process at this point in the sequence. Valid only inside suite.setup; the loader rejects it anywhere else."
         },
+        "pty": { "$ref": "#/$defs/pty" },
         "assert": { "$ref": "#/$defs/assert" },
         "store": { "$ref": "#/$defs/store" }
       }
@@ -438,6 +440,34 @@
         "times": { "type": "integer", "minimum": 1 },
         "interval": { "type": "string" },
         "until": { "$ref": "#/$defs/assert" }
+      }
+    },
+    "pty": {
+      "type": "object",
+      "required": ["command"],
+      "additionalProperties": false,
+      "description": "Runs one command inside a real pseudo-terminal and drives it with a declarative expect/send session (#8) — for CLIs that branch on TTY-ness or present interactive prompts. POSIX-only at runtime; Windows reports a clear execution error.",
+      "properties": {
+        "command": { "type": "string", "minLength": 1 },
+        "shell": { "type": "boolean" },
+        "cwd": { "type": "string" },
+        "rows": { "type": "integer", "minimum": 0 },
+        "cols": { "type": "integer", "minimum": 0 },
+        "timeout": { "type": "string", "description": "Go duration bounding the WHOLE session (default 30s)." },
+        "env": { "type": "object", "additionalProperties": { "type": "string" } },
+        "session": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "description": "Exactly one of expect (wait until the transcript matches the regexp) or send (write to the terminal; \"\" sends EOF/^D).",
+            "properties": {
+              "expect": { "type": "string" },
+              "send": { "type": "string" }
+            }
+          }
+        }
       }
     },
     "http": {
