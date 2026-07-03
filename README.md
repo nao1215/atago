@@ -138,6 +138,7 @@ Every feature has a commented, runnable spec under [examples/](examples/). The e
 | [teardown](examples/teardown.atago.yaml) | cleanup steps that always run — pass or fail — sharing the scenario's variables |
 | [hermetic_env](examples/hermetic_env.atago.yaml) | `clear_env: true` starts commands from an empty environment, `pass_env` re-admits an allowlist of host variables |
 | [timeouts](examples/timeouts.atago.yaml) | the built-in 60s default step timeout, `suite.timeout`, per-step overrides, and the `timeout: "0"` escape hatch |
+| [stdin](examples/stdin.atago.yaml) | stdin sources: inline text, `stdin: {file: ...}` from a workdir file, and binary input via `stdin: {base64: ...}` |
 | [matrix](examples/matrix.atago.yaml) | one template scenario expanded per parameter row |
 | [pty](examples/pty.atago.yaml) | interactive testing in a real pseudo-terminal: expect/send sessions, TTY-detection (POSIX-only) |
 | [retry](examples/retry.atago.yaml) | polling a command until an assertion passes |

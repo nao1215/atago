@@ -4,9 +4,12 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -58,8 +61,12 @@ func (r *Runner) Run(ctx context.Context, run *spec.Run, workdir string) (*runne
 	// otherwise block until it exits on its own. WaitDelay is a portable backstop
 	// that force-closes the pipes if a stray child still lingers.
 	configureCancellation(cmd)
-	if run.Stdin != "" {
-		cmd.Stdin = strings.NewReader(run.Stdin)
+	stdin, err := stdinReader(run, workdir)
+	if err != nil {
+		return nil, err
+	}
+	if stdin != nil {
+		cmd.Stdin = stdin
 	}
 
 	var stdout, stderr strings.Builder
@@ -115,6 +122,38 @@ func (r *Runner) Run(ctx context.Context, run *spec.Run, workdir string) (*runne
 		return nil, fmt.Errorf("failed to execute %q: %w", run.Command, runErr)
 	}
 	return res, nil
+}
+
+// stdinReader builds the reader fed to the command's standard input (#18):
+// inline text verbatim, a workdir-confined file's bytes, or decoded base64
+// for binary input. It returns nil when no stdin was authored (the child
+// inherits no stdin, exec's default). The one-of shape and the base64 payload
+// are validated at load time; the file read stays a runtime concern because
+// the file typically comes from an earlier fixture or run step.
+func stdinReader(run *spec.Run, workdir string) (io.Reader, error) {
+	s := run.Stdin
+	switch {
+	case s.File != "":
+		abs, err := security.ResolveWorkdirPath("run.stdin.file", workdir, s.File)
+		if err != nil {
+			return nil, err
+		}
+		data, err := os.ReadFile(abs) //nolint:gosec // confined to the scenario workdir above
+		if err != nil {
+			return nil, fmt.Errorf("run.stdin.file: %w", err)
+		}
+		return bytes.NewReader(data), nil
+	case s.Base64 != "":
+		data, err := base64.StdEncoding.DecodeString(s.Base64)
+		if err != nil {
+			// Unreachable for loader-validated specs; kept for direct API users.
+			return nil, fmt.Errorf("run.stdin.base64: %w", err)
+		}
+		return bytes.NewReader(data), nil
+	case s.Inline != "":
+		return strings.NewReader(s.Inline), nil
+	}
+	return nil, nil
 }
 
 // writeRedirects writes the captured stdout/stderr to the workdir-relative files

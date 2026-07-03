@@ -29,10 +29,16 @@ jq -c .
 - stdout at `$.a` equals `1`
 - stderr is empty
 ### Scenario: sort-keys output is deterministic and exact
+#### Given
+- Fixture file `input.json` is created.
 #### Inputs
-_stdin for `jq`:_
+_Fixture `input.json`:_
 ```text
 {"b":2,"a":1}
+```
+_stdin for `jq`:_
+```text
+(read from file input.json)
 ```
 #### When
 ```shell

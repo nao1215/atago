@@ -25,9 +25,16 @@ scenarios:
 
   - name: sort-keys output is deterministic and exact
     steps:
+      # stdin can come from a workdir file (#18) instead of an inline string —
+      # the natural shape for large documents produced by fixtures or earlier
+      # steps.
+      - fixture:
+          file: input.json
+          content: '{"b":2,"a":1}'
       - run:
           command: jq -c --sort-keys .
-          stdin: '{"b":2,"a":1}'
+          stdin:
+            file: input.json
       - assert:
           exit_code: 0
           stdout:

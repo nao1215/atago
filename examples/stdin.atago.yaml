@@ -1,0 +1,69 @@
+version: "1"
+
+# Standard-input sources (#18). Filter-style CLIs (jq, sort, iconv, pandoc)
+# live on stdin, and `stdin:` accepts three shapes:
+#
+#   stdin: "inline text"        # the historical scalar form, fed verbatim
+#   stdin: {file: input.txt}    # a workdir-relative file's bytes (expanded,
+#                               # path-confined like assertion paths)
+#   stdin: {base64: AAEC/w==}   # binary bytes, decoded before the run
+#
+# The mapping form sets exactly one of file/base64 (the loader rejects both or
+# neither, exit 2), and an invalid base64 payload is a load-time error too.
+# base64 gets no ${name} expansion — binary payloads stay byte-exact.
+# The probes below are POSIX commands, so these scenarios skip on Windows.
+# Runs green as-is on Linux/macOS: atago run examples/stdin.atago.yaml
+
+suite:
+  name: stdin sources
+
+scenarios:
+  - name: inline text is fed to stdin verbatim
+    skip:
+      os: windows
+    steps:
+      - run:
+          command: cat
+          stdin: "hello from stdin"
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: hello from stdin
+
+  - name: stdin from a workdir file
+    skip:
+      os: windows
+    steps:
+      # Fixtures write the input; stdin: {file: ...} pipes it in. The path is
+      # ${name}-expanded and confined to the scenario workdir.
+      - fixture:
+          file: input.txt
+          content: |
+            beta
+            alpha
+      - run:
+          command: sort
+          stdin:
+            file: input.txt
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - alpha
+              - beta
+
+  - name: binary stdin via base64
+    skip:
+      os: windows
+    steps:
+      # AAEC/w== decodes to the four bytes 00 01 02 ff — content no inline
+      # YAML string could carry. `wc -c` proves all four arrived.
+      - run:
+          shell: true
+          command: wc -c
+          stdin:
+            base64: AAEC/w==
+      - assert:
+          exit_code: 0
+          stdout:
+            matches: "^\\s*4\\s*$"

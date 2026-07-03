@@ -1,6 +1,7 @@
 package loader
 
 import (
+	"encoding/base64"
 	"fmt"
 	"maps"
 	"regexp"
@@ -94,6 +95,9 @@ func validateDefaults(add func(string, ...any), d *spec.Defaults) {
 		if r.Retry != nil {
 			add("defaults.run.retry is not supported (retry is per-step)")
 		}
+		if !r.Stdin.IsZero() {
+			add("defaults.run.stdin is not supported (stdin is per-step input data, like command)")
+		}
 		if r.Timeout != "" {
 			if _, err := time.ParseDuration(r.Timeout); err != nil {
 				add("defaults.run.timeout %q is not a valid duration (e.g. \"30s\")", r.Timeout)
@@ -110,6 +114,29 @@ func validateDefaults(add func(string, ...any), d *spec.Defaults) {
 		}
 		validateHermeticEnv(add, "defaults.service", sv.ClearEnv, sv.PassEnv)
 		validateReady(add, "defaults.service", sv.Ready)
+	}
+}
+
+// validateStdin checks a run step's stdin source (#18): the mapping form must
+// set exactly one of file/base64, and a base64 payload must decode — at load
+// time, so a typo fails with a positioned message instead of mid-run.
+func validateStdin(add func(string, ...any), where string, s spec.Stdin) {
+	if s.IsMapping() {
+		set := 0
+		if s.File != "" {
+			set++
+		}
+		if s.Base64 != "" {
+			set++
+		}
+		if set != 1 {
+			add("%s.stdin must set exactly one of file/base64 (or be a plain string for inline text)", where)
+		}
+	}
+	if s.Base64 != "" {
+		if _, err := base64.StdEncoding.DecodeString(s.Base64); err != nil {
+			add("%s.stdin.base64 is not valid base64: %v", where, err)
+		}
 	}
 }
 
@@ -263,6 +290,7 @@ func validateSuiteBlock(add func(string, ...any), where string, steps []spec.Ste
 				add("%s.run.command is required", sw)
 			}
 			validateHermeticEnv(add, sw+".run", st.Run.ClearEnv, st.Run.PassEnv)
+			validateStdin(add, sw+".run", st.Run.Stdin)
 			validateRetry(add, sw+".run", st.Run.Retry)
 		case spec.StepStore:
 			validateStore(add, sw, st.Store)
@@ -404,6 +432,7 @@ func validateStep(add func(string, ...any), where string, st *spec.Step, runners
 			}
 		}
 		validateHermeticEnv(add, where+".run", st.Run.ClearEnv, st.Run.PassEnv)
+		validateStdin(add, where+".run", st.Run.Stdin)
 		validateRetry(add, where+".run", st.Run.Retry)
 	case spec.StepAssert:
 		validateAssert(add, where, st.Assert)

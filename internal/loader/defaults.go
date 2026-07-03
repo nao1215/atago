@@ -80,9 +80,8 @@ func mergeRunDefaults(def, r *spec.Run) {
 	// value — the timeout-kill hint names that level, and a runner-common
 	// timeout must beat defaults.run.timeout, which a string-fill here would
 	// invert.
-	if r.Stdin == "" {
-		r.Stdin = def.Stdin
-	}
+	// Stdin is deliberately NOT merged: like command it is per-step input
+	// data, and the validator rejects it on defaults.run (#18).
 	r.Env = mergeStringMap(def.Env, r.Env)
 	if r.ClearEnv == nil {
 		r.ClearEnv = def.ClearEnv

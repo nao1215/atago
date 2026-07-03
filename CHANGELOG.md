@@ -19,6 +19,12 @@ and this project follows [Semantic Versioning](https://semver.org/).
   (`SystemRoot`, `SystemDrive`, `TEMP`, `TMP`, `PATHEXT`) is always retained.
   `pass_env` without `clear_env: true` is a load-time error (exit 2).
   See `examples/hermetic_env.atago.yaml`.
+- stdin sources (#18): `run.stdin` now also accepts `{file: path}` (a
+  workdir-relative, `${name}`-expanded, path-confined file whose bytes are fed
+  to the child) and `{base64: data}` (binary stdin, validated at load time; no
+  `${name}` expansion, mirroring `fixture.base64`), alongside the historical
+  inline string. The mapping form sets exactly one of file/base64 (exit 2
+  otherwise). See `examples/stdin.atago.yaml`.
 - Suite-level default step timeout (#17): `suite.timeout: 2m` bounds every
   `run`/`http`/`query`/`grpc` step that has no more specific timeout.
   Precedence: step > runner `timeout` > `defaults.run.timeout` >
@@ -34,6 +40,8 @@ and this project follows [Semantic Versioning](https://semver.org/).
   "the command timed out ... and was killed" instead of hanging the run (or a
   CI job) forever. Specs relying on unbounded runs must either set a real
   bound (`suite.timeout: 10m`) or opt out explicitly with `timeout: "0"`.
+- `defaults.run.stdin` is no longer accepted (#18): stdin is per-step input
+  data, the same category as `command`. Declare it on each step.
 - `defaults.run.timeout` is no longer string-merged into steps at load time;
   the engine resolves the timeout precedence chain itself so a runner-common
   `timeout` now correctly outranks `defaults.run.timeout`, and the failure

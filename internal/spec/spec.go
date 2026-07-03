@@ -412,7 +412,10 @@ type Run struct {
 	// (#16). Only meaningful with ClearEnv (the loader rejects it otherwise);
 	// unset host variables are skipped, not an error.
 	PassEnv []string `yaml:"pass_env,omitempty"`
-	Stdin   string   `yaml:"stdin,omitempty"`
+	// Stdin feeds the command's standard input: a scalar string (inline
+	// text), {file: path} (workdir-relative, expanded and confined), or
+	// {base64: data} for binary bytes (#18).
+	Stdin Stdin `yaml:"stdin,omitempty"`
 	// StdoutTo / StderrTo redirect the command's captured stdout / stderr to a
 	// workdir-relative file (create/truncate), so a `shell: false` step can write
 	// output to a file without borrowing the shell's `>` operator. The streams are
@@ -669,6 +672,67 @@ type ImageAssert struct {
 	// for SimilarTo. It defaults to 0 (an exact pixel match); lossy formats need a
 	// small tolerance such as 0.02.
 	MaxDiff *float64 `yaml:"max_diff,omitempty"`
+}
+
+// Stdin is a run step's standard-input source (#18). It accepts either the
+// historical scalar string (inline text) or a mapping with exactly one of
+// `file` (a workdir-relative, ${name}-expanded, workdir-confined path whose
+// bytes are fed to the child) or `base64` (binary bytes, validated at load
+// time; no ${name} expansion, mirroring fixture.base64). The loader enforces
+// the one-of rule.
+type Stdin struct {
+	// Inline is the scalar form, fed to stdin verbatim.
+	Inline string
+	// File names a workdir-relative file whose bytes become stdin.
+	File string
+	// Base64 carries binary stdin as base64.
+	Base64 string
+
+	// mapped records that the author used the mapping form, so the validator
+	// can reject an empty mapping ({}), which is otherwise indistinguishable
+	// from "no stdin".
+	mapped bool
+}
+
+// IsZero reports whether no stdin was authored at all.
+func (s Stdin) IsZero() bool {
+	return s.Inline == "" && s.File == "" && s.Base64 == "" && !s.mapped
+}
+
+// IsMapping reports whether the author used the {file/base64} mapping form.
+func (s Stdin) IsMapping() bool { return s.mapped }
+
+// UnmarshalYAML decodes stdin as a scalar string or a {file}/{base64} mapping.
+// It uses the interface-based decoder so escapes like "\x1b" in the inline
+// form are resolved by goccy's parser, matching the historical behavior.
+// Unknown mapping keys are rejected here (a custom unmarshaler bypasses the
+// loader's strict-decode), with the accepted shapes spelled out.
+func (s *Stdin) UnmarshalYAML(unmarshal func(any) error) error {
+	var one string
+	if err := unmarshal(&one); err == nil {
+		s.Inline = one
+		return nil
+	}
+	var raw map[string]any
+	if err := unmarshal(&raw); err != nil {
+		return fmt.Errorf("stdin must be a string, {file: path}, or {base64: data}")
+	}
+	s.mapped = true
+	for k, v := range raw {
+		str, ok := v.(string)
+		if !ok {
+			return fmt.Errorf("stdin.%s must be a string", k)
+		}
+		switch k {
+		case "file":
+			s.File = str
+		case "base64":
+			s.Base64 = str
+		default:
+			return fmt.Errorf("stdin: unknown key %q (accepted: file, base64)", k)
+		}
+	}
+	return nil
 }
 
 // ExitCode accepts either a bare integer or {not: <int>}.

@@ -105,7 +105,7 @@ func explainScenario(b *strings.Builder, sc *spec.Scenario) {
 			collectVars(vars, step.Fixture.File, step.Fixture.Content)
 		case spec.StepRun:
 			commands = append(commands, describeRun(step.Run))
-			collectVars(vars, step.Run.Command, step.Run.Cwd, step.Run.Stdin)
+			collectVars(vars, step.Run.Command, step.Run.Cwd, step.Run.Stdin.Inline, step.Run.Stdin.File)
 		case spec.StepAssert:
 			expects = append(expects, describeAsserts(step.Assert)...)
 		case spec.StepStore:
@@ -183,7 +183,7 @@ func explainScenario(b *strings.Builder, sc *spec.Scenario) {
 		switch step.Kind() {
 		case spec.StepRun:
 			teardown = append(teardown, describeRun(step.Run))
-			collectVars(vars, step.Run.Command, step.Run.Cwd, step.Run.Stdin)
+			collectVars(vars, step.Run.Command, step.Run.Cwd, step.Run.Stdin.Inline, step.Run.Stdin.File)
 		case spec.StepHTTP:
 			teardown = append(teardown, fmt.Sprintf("HTTP %s %s", step.HTTP.Method, step.HTTP.Path))
 			collectVars(vars, step.HTTP.Path, step.HTTP.Body)
@@ -284,6 +284,12 @@ func describeRun(r *spec.Run) string {
 			note += " (passes: " + strings.Join(r.PassEnv, ", ") + ")"
 		}
 		notes = append(notes, note)
+	}
+	switch {
+	case r.Stdin.File != "":
+		notes = append(notes, "stdin from file "+r.Stdin.File)
+	case r.Stdin.Base64 != "":
+		notes = append(notes, "binary stdin (base64)")
 	}
 	if r.ShellEnabled() {
 		notes = append(notes, "shell")

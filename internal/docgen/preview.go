@@ -48,11 +48,24 @@ func inputPreviews(sc *spec.Scenario) []previewBlock {
 				})
 			}
 		case spec.StepRun:
-			if step.Run.Stdin != "" {
+			switch s := step.Run.Stdin; {
+			case s.Inline != "":
 				out = append(out, previewBlock{
 					label: fmt.Sprintf("stdin for `%s`", firstToken(step.Run.Command)),
 					lang:  "",
-					body:  truncatePreview(step.Run.Stdin),
+					body:  truncatePreview(s.Inline),
+				})
+			case s.File != "":
+				out = append(out, previewBlock{
+					label: fmt.Sprintf("stdin for `%s`", firstToken(step.Run.Command)),
+					lang:  "",
+					body:  "(read from file " + s.File + ")",
+				})
+			case s.Base64 != "":
+				out = append(out, previewBlock{
+					label: fmt.Sprintf("stdin for `%s`", firstToken(step.Run.Command)),
+					lang:  "",
+					body:  fmt.Sprintf("(binary, %d base64 chars)", len(s.Base64)),
 				})
 			}
 		}
