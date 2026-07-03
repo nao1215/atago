@@ -160,6 +160,7 @@ func (e *Engine) Run(ctx context.Context, s *spec.Spec, specPath string) *SuiteR
 		}
 		rc.suiteVars = suiteRT.vars
 		rc.suiteEnv = suiteRT.env
+		rc.suiteServices = suiteRT.services
 		defer func() {
 			// Deferred after suiteRT.stop ⇒ runs before it, so teardown can
 			// still reach the suite services.
@@ -333,6 +334,10 @@ type runConfig struct {
 	// and can name it in the timeout-kill hint.
 	suiteTimeout       string
 	defaultsRunTimeout string
+	// suiteServices are the suite-wide background processes started by
+	// suite.setup service steps (#7), threaded here so a scenario's `signal:`
+	// step (#23) can target them by name alongside its own services.
+	suiteServices []*servicerunner.Proc
 }
 
 func (e *Engine) runScenario(ctx context.Context, scenarioIdx int, sc *spec.Scenario, rc runConfig) ScenarioResult {
@@ -579,6 +584,15 @@ func (e *Engine) runScenario(ctx context.Context, scenarioIdx int, sc *spec.Scen
 			}
 			current = r
 			sr.Run = maskResult(masker, r)
+		case spec.StepSignal:
+			// Handle-based signaling (#23): the target is a service atago
+			// itself started (scenario services first, then suite services),
+			// so delivery is race-free under --parallel, unlike name-based
+			// kill/killall shell hacks.
+			if err := runSignal(step.Signal, st, services, rc.suiteServices); err != nil {
+				sr.ErrMsg = err.Error()
+				status = StatusError
+			}
 		default:
 			sr.ErrMsg = "step has no recognized action"
 			status = StatusError

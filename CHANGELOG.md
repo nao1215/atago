@@ -19,6 +19,14 @@ and this project follows [Semantic Versioning](https://semver.org/).
   (`SystemRoot`, `SystemDrive`, `TEMP`, `TMP`, `PATHEXT`) is always retained.
   `pass_env` without `clear_env: true` is a load-time error (exit 2).
   See `examples/hermetic_env.atago.yaml`.
+- `signal:` step (#23): send a named POSIX signal (TERM, INT, HUP, USR1,
+  USR2, KILL) to a managed service's whole process group — scenario services
+  and suite services both — for declarative graceful-shutdown and
+  SIGHUP-reload testing. Handle-based targeting makes it race-free under
+  `--parallel`, unlike `kill`/`killall` shell hacks. An optional
+  `wait: {timeout: 5s}` blocks until the process exits and fails the step
+  with a named message when it does not. POSIX-only (Windows reports a clear
+  execution error, like pty). See `examples/signal.atago.yaml`.
 - `exit_code: {in: [0, 2]}` (#19): assert the exit code against a set of
   accepted values — the contract shape of grep (0/1) or
   `terraform plan -detailed-exitcode` (0/2). Exactly one of the bare-int /

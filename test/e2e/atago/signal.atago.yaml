@@ -1,0 +1,109 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / signal step (graceful shutdown)
+
+# Exercises #23: `signal:` delivers a named POSIX signal to a service atago
+# itself started, so delivery is race-free under the default --parallel —
+# unlike name-based kill/killall shell hacks, it can never cross a scenario
+# boundary. POSIX-only, so every scenario skips on Windows.
+scenarios:
+  - name: SIGTERM reaches the trap handler and wait observes the exit
+    skip:
+      os: windows
+    services:
+      - name: server
+        shell: true
+        command: "trap 'echo graceful shutdown complete > server.log; exit 0' TERM; echo booted; while true; do sleep 0.1; done"
+        ready:
+          log: booted
+          timeout: 10s
+    steps:
+      - signal:
+          service: server
+          signal: TERM
+          wait:
+            timeout: 5s
+      - assert:
+          file:
+            path: server.log
+            contains: "graceful shutdown complete"
+
+  - name: SIGHUP triggers a reload without stopping the service
+    skip:
+      os: windows
+    services:
+      - name: reloader
+        shell: true
+        command: "trap 'echo reloaded >> reload.log' HUP; echo booted; while true; do sleep 0.1; done"
+        ready:
+          log: booted
+          timeout: 10s
+    steps:
+      # No wait: the service keeps running after handling the signal.
+      - signal:
+          service: reloader
+          signal: HUP
+      - run:
+          shell: true
+          command: "for i in 1 2 3 4 5 6 7 8 9 10; do [ -f reload.log ] && break; sleep 0.1; done; cat reload.log"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: reloaded
+
+  - name: a wait timeout on a TERM-ignoring service fails with the documented message
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: stubborn.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: stubborn
+            scenarios:
+              - name: never exits on TERM
+                services:
+                  - name: stubborn
+                    shell: true
+                    command: "trap '' TERM; echo booted; while true; do sleep 0.2; done"
+                    ready: {log: booted, timeout: 10s}
+                steps:
+                  - signal:
+                      service: stubborn
+                      signal: TERM
+                      wait:
+                        timeout: 300ms
+      - run:
+          command: ${atago} run stubborn.atago.yaml
+          timeout: 30s
+      - assert:
+          exit_code: { not: 0 }
+      - assert:
+          stdout:
+            contains: 'did not exit within 300ms after SIGTERM'
+
+  - name: an unknown target service is a load-time error listing declared names
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: bad
+            scenarios:
+              - name: wrong name
+                services:
+                  - name: web
+                    command: ./web
+                steps:
+                  - signal:
+                      service: cache
+                      signal: TERM
+      - run:
+          command: ${atago} run bad.atago.yaml
+      - assert:
+          exit_code: 2
+          stderr:
+            contains: 'not a declared service (declared: web)'

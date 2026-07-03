@@ -173,6 +173,11 @@ func explainScenario(b *strings.Builder, sc *spec.Scenario) {
 					}
 				}
 			}
+		case spec.StepSignal:
+			if step.Signal != nil {
+				commands = append(commands, describeSignal(step.Signal))
+				collectVars(vars, step.Signal.Service)
+			}
 		}
 	}
 
@@ -202,6 +207,9 @@ func explainScenario(b *strings.Builder, sc *spec.Scenario) {
 			teardown = append(teardown, describeAsserts(step.Assert)...)
 		case spec.StepStore:
 			teardown = append(teardown, "store "+step.Store.Name)
+		case spec.StepSignal:
+			teardown = append(teardown, describeSignal(step.Signal))
+			collectVars(vars, step.Signal.Service)
 		}
 	}
 
@@ -261,6 +269,19 @@ func describeCDP(c *spec.CDP) string {
 		acts = append(acts, spec.CDPActionLabel(a))
 	}
 	return fmt.Sprintf("CDP via %s: %s", c.Runner, strings.Join(acts, " → "))
+}
+
+// describeSignal renders a one-line summary of a signal step (#23).
+func describeSignal(sg *spec.Signal) string {
+	desc := "send SIG" + spec.NormalizeSignalName(sg.Signal) + " to service " + sg.Service
+	if sg.Wait != nil {
+		timeout := sg.Wait.Timeout
+		if timeout == "" {
+			timeout = "5s"
+		}
+		desc += "  [wait up to " + timeout + " for exit]"
+	}
+	return desc
 }
 
 func describeFixture(f *spec.Fixture) string {

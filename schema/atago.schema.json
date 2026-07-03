@@ -282,7 +282,8 @@
         { "required": ["assert"] },
         { "required": ["store"] },
         { "required": ["service"] },
-        { "required": ["pty"] }
+        { "required": ["pty"] },
+        { "required": ["signal"] }
       ],
       "properties": {
         "fixture": { "$ref": "#/$defs/fixture" },
@@ -295,6 +296,7 @@
           "$ref": "#/$defs/service",
           "description": "Starts a suite-wide background process at this point in the sequence. Valid only inside suite.setup; the loader rejects it anywhere else."
         },
+        "signal": { "$ref": "#/$defs/signal" },
         "pty": { "$ref": "#/$defs/pty" },
         "assert": { "$ref": "#/$defs/assert" },
         "store": { "$ref": "#/$defs/store" }
@@ -496,6 +498,24 @@
               "expect": { "type": "string" },
               "send": { "type": "string" }
             }
+          }
+        }
+      }
+    },
+    "signal": {
+      "type": "object",
+      "required": ["service", "signal"],
+      "additionalProperties": false,
+      "description": "Sends a named POSIX signal to a managed service's process group (#23) - the race-free alternative to kill/killall for graceful-shutdown tests. POSIX-only at runtime; Windows reports a clear execution error.",
+      "properties": {
+        "service": { "type": "string", "minLength": 1, "description": "A service declared in the scenario's services: list or started by a suite.setup service: step." },
+        "signal": { "type": "string", "minLength": 1, "description": "TERM, INT, HUP, USR1, USR2, or KILL (optional SIG prefix accepted)." },
+        "wait": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Block until the signaled process exits; a still-running process fails the step.",
+          "properties": {
+            "timeout": { "type": "string", "description": "Go duration bounding the wait (default 5s)." }
           }
         }
       }

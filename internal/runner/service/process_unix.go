@@ -4,6 +4,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"os/exec"
 	"syscall"
 	"time"
@@ -28,6 +29,28 @@ func newProcessCmd(ctx context.Context, name string, args []string) *processCmd 
 
 func (p *processCmd) terminate() { _ = signalGroup(p.cmd, syscall.SIGTERM) }
 func (p *processCmd) kill()      { _ = signalGroup(p.cmd, syscall.SIGKILL) }
+
+// namedSignals maps the signal names a `signal:` step accepts (#23) to their
+// POSIX numbers. The loader validates against the same set, so an unknown
+// name here means the spec bypassed validation.
+var namedSignals = map[string]syscall.Signal{
+	"TERM": syscall.SIGTERM,
+	"INT":  syscall.SIGINT,
+	"HUP":  syscall.SIGHUP,
+	"USR1": syscall.SIGUSR1,
+	"USR2": syscall.SIGUSR2,
+	"KILL": syscall.SIGKILL,
+}
+
+// signalByName delivers the named signal to the whole process group (#23),
+// consistent with terminate/kill.
+func (p *processCmd) signalByName(name string) error {
+	sig, ok := namedSignals[name]
+	if !ok {
+		return fmt.Errorf("unknown signal %q (accepted: TERM, INT, HUP, USR1, USR2, KILL)", name)
+	}
+	return signalGroup(p.cmd, sig)
+}
 
 // signalGroup sends sig to the command's process group, falling back to the
 // leader process if the group id cannot be resolved.

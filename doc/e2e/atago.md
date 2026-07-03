@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-46 suites · 157 scenarios
+47 suites · 161 scenarios
 ## Contents
 - [atago self-hosting / variable expansion in assertion matcher values](#atago-self-hosting--variable-expansion-in-assertion-matcher-values) — 3 scenarios
   - [stdout.equals expands ${workdir}](#scenario-stdoutequals-expands-workdir)
@@ -164,6 +164,11 @@
 - [atago self-hosting / harness shell is not shadowed by the program PATH](#atago-self-hosting--harness-shell-is-not-shadowed-by-the-program-path) — 2 scenarios
   - [a PATH-resident fake sh does not hijack shell:true](#scenario-a-path-resident-fake-sh-does-not-hijack-shelltrue)
   - [ATAGO_SHELL overrides the shell used for shell:true](#scenario-atago_shell-overrides-the-shell-used-for-shelltrue)
+- [atago self-hosting / signal step (graceful shutdown)](#atago-self-hosting--signal-step-graceful-shutdown) — 4 scenarios
+  - [SIGTERM reaches the trap handler and wait observes the exit](#scenario-sigterm-reaches-the-trap-handler-and-wait-observes-the-exit)
+  - [SIGHUP triggers a reload without stopping the service](#scenario-sighup-triggers-a-reload-without-stopping-the-service)
+  - [a wait timeout on a TERM-ignoring service fails with the documented message](#scenario-a-wait-timeout-on-a-term-ignoring-service-fails-with-the-documented-message)
+  - [an unknown target service is a load-time error listing declared names](#scenario-an-unknown-target-service-is-a-load-time-error-listing-declared-names)
 - [atago self-hosting / skip-only command predicate](#atago-self-hosting--skip-only-command-predicate) — 3 scenarios
   - [skip command that succeeds skips the scenario](#scenario-skip-command-that-succeeds-skips-the-scenario)
   - [only command that fails skips the scenario](#scenario-only-command-that-fails-skips-the-scenario)
@@ -2831,6 +2836,88 @@ printf '%s\n' ok
 ```
 #### Then
 - stdout equals an exact value
+## atago self-hosting / signal step (graceful shutdown)
+Source: `test/e2e/atago/signal.atago.yaml`
+### Scenario: SIGTERM reaches the trap handler and wait observes the exit
+_skipped on windows_
+#### Given
+- Background service `server` is started: `trap 'echo graceful shutdown complete > server.log; exit 0' TERM; echo booted; while true; do sleep 0.1; done`.
+#### When
+```shell
+# send SIGTERM to service server and wait up to 5s for exit
+```
+#### Then
+- file `server.log` contains `graceful shutdown complete`
+### Scenario: SIGHUP triggers a reload without stopping the service
+_skipped on windows_
+#### Given
+- Background service `reloader` is started: `trap 'echo reloaded >> reload.log' HUP; echo booted; while true; do sleep 0.1; done`.
+#### When
+```shell
+# send SIGHUP to service reloader
+for i in 1 2 3 4 5 6 7 8 9 10; do [ -f reload.log ] && break; sleep 0.1; done; cat reload.log
+```
+#### Then
+- after `for i in 1 2 3 4 5 6 7 8 9 10; do [ -f reload.log ] && break; sleep 0.1; done; cat reload.log`:
+  - exit code is `0`
+  - stdout contains `reloaded`
+### Scenario: a wait timeout on a TERM-ignoring service fails with the documented message
+_skipped on windows_
+#### Given
+- Fixture file `stubborn.atago.yaml` is created.
+#### Inputs
+_Fixture `stubborn.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: stubborn
+scenarios:
+  - name: never exits on TERM
+    services:
+      - name: stubborn
+        shell: true
+        command: "trap '' TERM; echo booted; while true; do sleep 0.2; done"
+        ready: {log: booted, timeout: 10s}
+    steps:
+      - signal:
+          service: stubborn
+          signal: TERM
+          wait:
+            timeout: 300ms
+```
+#### When
+```shell
+${atago} run stubborn.atago.yaml
+```
+#### Then
+- exit code is not `0`
+- stdout contains `did not exit within 300ms after SIGTERM`
+### Scenario: an unknown target service is a load-time error listing declared names
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: bad
+scenarios:
+  - name: wrong name
+    services:
+      - name: web
+        command: ./web
+    steps:
+      - signal:
+          service: cache
+          signal: TERM
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `not a declared service (declared: web)`
 ## atago self-hosting / skip-only command predicate
 Source: `test/e2e/atago/skip_command.atago.yaml`
 ### Scenario: skip command that succeeds skips the scenario

@@ -113,6 +113,38 @@ func (p *Proc) Stop() {
 	}
 }
 
+// Signal delivers the named POSIX signal (TERM, INT, HUP, USR1, USR2, KILL)
+// to the service's whole process group (#23), consistent with the teardown
+// kill semantics. Signaling a service that already exited is an error naming
+// the service — a graceful-shutdown spec that signals a dead process is
+// asserting against nothing.
+func (p *Proc) Signal(name string) error {
+	if p == nil || p.c == nil {
+		return fmt.Errorf("service is not running")
+	}
+	select {
+	case <-p.done:
+		return fmt.Errorf("service %q already exited", p.name)
+	default:
+	}
+	return p.c.signalByName(name)
+}
+
+// WaitExit blocks until the service's process exits or timeout elapses,
+// reporting whether it exited (#23). The exit is observed through the same
+// done channel Stop uses, so a later teardown Stop is a clean no-op.
+func (p *Proc) WaitExit(timeout time.Duration) bool {
+	if p == nil || p.c == nil {
+		return true
+	}
+	select {
+	case <-p.done:
+		return true
+	case <-time.After(timeout):
+		return false
+	}
+}
+
 // waitReady blocks until the readiness probe passes or its timeout elapses. A
 // nil probe means "ready as soon as it is spawned".
 func (p *Proc) waitReady(ctx context.Context, r *spec.Ready, workdir string) (string, error) {

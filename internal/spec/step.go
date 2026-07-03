@@ -15,6 +15,7 @@ const (
 	StepStore   StepKind = "store"
 	StepService StepKind = "service"
 	StepPTY     StepKind = "pty"
+	StepSignal  StepKind = "signal"
 )
 
 // SetKeys returns the action keys that are present on the step. A valid step has
@@ -50,6 +51,9 @@ func (s *Step) SetKeys() []StepKind {
 	}
 	if s.PTY != nil {
 		keys = append(keys, StepPTY)
+	}
+	if s.Signal != nil {
+		keys = append(keys, StepSignal)
 	}
 	return keys
 }

@@ -39,6 +39,14 @@ func validate(s *spec.Spec) []string {
 	validateSuiteBlock(add, "suite.setup", s.Suite.Setup, s.Runners, true)
 	validateSuiteBlock(add, "suite.teardown", s.Suite.Teardown, s.Runners, false)
 
+	// Suite services are legal signal targets from any scenario (#23).
+	suiteServiceNames := map[string]bool{}
+	for i := range s.Suite.Setup {
+		if svc := s.Suite.Setup[i].Service; svc != nil && svc.Name != "" {
+			suiteServiceNames[svc.Name] = true
+		}
+	}
+
 	seen := make(map[string]bool, len(s.Scenarios))
 	for i := range s.Scenarios {
 		sc := &s.Scenarios[i]
@@ -55,15 +63,21 @@ func validate(s *spec.Spec) []string {
 		validateCondition(add, where, "skip", sc.Skip)
 		validateCondition(add, where, "only", sc.Only)
 		validateServices(add, where, sc.Services)
+		serviceNames := maps.Clone(suiteServiceNames)
+		for j := range sc.Services {
+			if sc.Services[j].Name != "" {
+				serviceNames[sc.Services[j].Name] = true
+			}
+		}
 		if len(sc.Steps) == 0 {
 			add("%s: steps must contain at least one step", where)
 			continue
 		}
 		for j := range sc.Steps {
-			validateStep(add, fmt.Sprintf("%s.steps[%d]", where, j), &sc.Steps[j], s.Runners)
+			validateStep(add, fmt.Sprintf("%s.steps[%d]", where, j), &sc.Steps[j], s.Runners, serviceNames)
 		}
 		for j := range sc.Teardown {
-			validateStep(add, fmt.Sprintf("%s.teardown[%d]", where, j), &sc.Teardown[j], s.Runners)
+			validateStep(add, fmt.Sprintf("%s.teardown[%d]", where, j), &sc.Teardown[j], s.Runners, serviceNames)
 		}
 	}
 	return errs
@@ -432,11 +446,11 @@ func validateRunnerRef(add func(string, ...any), where, stepKind, name string, r
 	}
 }
 
-func validateStep(add func(string, ...any), where string, st *spec.Step, runners map[string]spec.Runner) {
+func validateStep(add func(string, ...any), where string, st *spec.Step, runners map[string]spec.Runner, serviceNames map[string]bool) {
 	keys := st.SetKeys()
 	switch len(keys) {
 	case 0:
-		add("%s: step must set exactly one of fixture/run/http/query/grpc/cdp/assert/store (got none)", where)
+		add("%s: step must set exactly one of fixture/run/http/query/grpc/cdp/assert/store/pty/signal (got none)", where)
 		return
 	case 1:
 	default:
@@ -518,6 +532,39 @@ func validateStep(add func(string, ...any), where string, st *spec.Step, runners
 		add("%s: service steps are only allowed in suite.setup (scenario-scoped peers go under the scenario's services: list)", where)
 	case spec.StepPTY:
 		validatePTY(add, where, st.PTY)
+	case spec.StepSignal:
+		validateSignal(add, where, st.Signal, serviceNames)
+	}
+}
+
+// validateSignal checks a signal step (#23): a declared target service, an
+// accepted signal name, and a parseable wait timeout. A ${name}-referencing
+// target is resolved at run time and skips the declared-name check.
+func validateSignal(add func(string, ...any), where string, sg *spec.Signal, serviceNames map[string]bool) {
+	switch {
+	case sg.Service == "":
+		add("%s.signal.service is required (the scenario or suite service to signal)", where)
+	case !strings.Contains(sg.Service, "${") && !serviceNames[sg.Service]:
+		declared := "none"
+		if len(serviceNames) > 0 {
+			declared = strings.Join(slices.Sorted(maps.Keys(serviceNames)), ", ")
+		}
+		add("%s.signal.service %q is not a declared service (declared: %s)", where, sg.Service, declared)
+	}
+	switch {
+	case sg.Signal == "":
+		add("%s.signal.signal is required (TERM, INT, HUP, USR1, USR2, or KILL)", where)
+	case !spec.ValidSignalName(sg.Signal):
+		add("%s.signal.signal %q is not an accepted signal (TERM, INT, HUP, USR1, USR2, or KILL, with an optional SIG prefix)", where, sg.Signal)
+	}
+	if sg.Wait != nil && sg.Wait.Timeout != "" {
+		d, err := time.ParseDuration(sg.Wait.Timeout)
+		switch {
+		case err != nil:
+			add("%s.signal.wait.timeout %q is not a valid duration (e.g. \"5s\")", where, sg.Wait.Timeout)
+		case d <= 0:
+			add("%s.signal.wait.timeout must be positive (got %q); omit it for the 5s default", where, sg.Wait.Timeout)
+		}
 	}
 }
 

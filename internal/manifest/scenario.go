@@ -174,6 +174,19 @@ func buildStep(index int, step *spec.Step, vars map[string]bool) Step {
 			}
 		}
 
+	case spec.StepSignal:
+		sg := step.Signal
+		st.Target = sg.Service
+		st.Action = "signal SIG" + spec.NormalizeSignalName(sg.Signal) + " to service " + sg.Service
+		if sg.Wait != nil {
+			timeout := sg.Wait.Timeout
+			if timeout == "" {
+				timeout = "5s"
+			}
+			st.Action += ", wait up to " + timeout + " for exit"
+		}
+		collectVars(vars, sg.Service)
+
 	case spec.StepPTY:
 		pt := step.PTY
 		st.Command = pt.Command
