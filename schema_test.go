@@ -188,6 +188,23 @@ scenarios:
 	}
 }
 
+// TestSchema_AcceptsSignalStep confirms the signal step (#23) is accepted.
+func TestSchema_AcceptsSignalStep(t *testing.T) {
+	s := loadSchema(t)
+	src := `version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    services:
+      - {name: srv, command: ./srv}
+    steps:
+      - signal: {service: srv, signal: TERM, wait: {timeout: 5s}}
+      - signal: {service: srv, signal: KILL}`
+	if err := s.Validate(yamlToAny(t, []byte(src))); err != nil {
+		t.Errorf("schema rejected valid signal steps:\n%v", err)
+	}
+}
+
 // TestSchema_RejectsInvalid confirms the schema actually catches bad specs.
 func TestSchema_RejectsInvalid(t *testing.T) {
 	s := loadSchema(t)

@@ -263,6 +263,18 @@ func commands(steps []spec.Step, expand func(string) string) []string {
 			if step.Store != nil {
 				out = append(out, fmt.Sprintf("# capture ${%s} from %s", step.Store.Name, storeSourceLabel(step.Store)))
 			}
+		case spec.StepSignal:
+			if step.Signal != nil {
+				line := fmt.Sprintf("# send SIG%s to service %s", spec.NormalizeSignalName(step.Signal.Signal), expand(step.Signal.Service))
+				if step.Signal.Wait != nil {
+					timeout := step.Signal.Wait.Timeout
+					if timeout == "" {
+						timeout = "5s"
+					}
+					line += fmt.Sprintf(" and wait up to %s for exit", timeout)
+				}
+				out = append(out, line)
+			}
 		}
 	}
 	return out
@@ -322,7 +334,7 @@ func thenGroups(sc *spec.Scenario, expand func(string) string) []thenGroup {
 	for i := range sc.Steps {
 		step := &sc.Steps[i]
 		switch step.Kind() {
-		case spec.StepRun, spec.StepHTTP, spec.StepQuery, spec.StepGRPC, spec.StepCDP:
+		case spec.StepRun, spec.StepHTTP, spec.StepQuery, spec.StepGRPC, spec.StepCDP, spec.StepSignal:
 			actionIdx, actionLbl = i, actionLabel(step, expand)
 		case spec.StepAssert:
 			if len(groups) == 0 || groups[len(groups)-1].actionIdx != actionIdx {
@@ -351,6 +363,8 @@ func actionLabel(step *spec.Step, expand func(string) string) string {
 		return "gRPC " + step.GRPC.Method
 	case spec.StepCDP:
 		return "the browser flow"
+	case spec.StepSignal:
+		return "SIG" + spec.NormalizeSignalName(step.Signal.Signal) + " to " + expand(step.Signal.Service)
 	default:
 		return ""
 	}

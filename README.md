@@ -144,6 +144,7 @@ Every feature has a commented, runnable spec under [examples/](examples/). The e
 | [retry](examples/retry.atago.yaml) | polling a command until an assertion passes |
 | [snapshot](examples/snapshot.atago.yaml) | golden-file testing with normalized output |
 | [services](examples/services.atago.yaml) | background servers: readiness probes, `ready.store`, teardown |
+| [signal](examples/signal.atago.yaml) | `signal:` steps deliver SIGTERM/SIGHUP/... to a managed service's process group for graceful-shutdown and reload testing (POSIX-only) |
 | [defaults](examples/defaults.atago.yaml) | sharing `shell`/`env`/`service` fragments across scenarios |
 | [suite_setup](examples/suite_setup.atago.yaml) | once-per-suite bootstrap: ordered setup steps, suite-wide `service:` steps, `${suitedir}`, suite env, always-run suite teardown |
 | [select_skip_only](examples/select_skip_only.atago.yaml) | tags, and gating scenarios by OS, env var, or a probe command |

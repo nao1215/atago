@@ -1,0 +1,60 @@
+version: "1"
+
+# Signal steps (#23). `signal:` sends a named POSIX signal (TERM, INT, HUP,
+# USR1, USR2, KILL — optional SIG prefix accepted) to a service atago itself
+# started, targeting its whole process group. Because the target is a handle,
+# not a process name, delivery is race-free under --parallel — the reason
+# this exists instead of `kill`/`killall` shell hacks.
+#
+# `wait:` optionally blocks until the process exits (default timeout 5s); a
+# still-running process fails the step with "service X did not exit within
+# ... after SIGTERM". Signals are POSIX-only, so these scenarios skip on
+# Windows. Runs green as-is on Linux/macOS: atago run examples/signal.atago.yaml
+
+suite:
+  name: signal steps
+
+scenarios:
+  - name: a server shuts down gracefully on SIGTERM
+    skip:
+      os: windows
+    services:
+      # The classic graceful-shutdown shape: a trap handler cleans up, writes
+      # evidence, and exits 0.
+      - name: server
+        shell: true
+        command: "trap 'echo graceful shutdown complete > server.log; exit 0' TERM; echo booted; while true; do sleep 0.1; done"
+        ready:
+          log: booted
+    steps:
+      - signal:
+          service: server        # must name a declared scenario/suite service
+          signal: TERM
+          wait:
+            timeout: 5s          # fail loudly if it never exits
+      - assert:
+          file:
+            path: server.log
+            contains: "graceful shutdown complete"
+
+  - name: SIGHUP reloads configuration without a restart
+    skip:
+      os: windows
+    services:
+      - name: daemon
+        shell: true
+        command: "trap 'echo config reloaded >> daemon.log' HUP; echo booted; while true; do sleep 0.1; done"
+        ready:
+          log: booted
+    steps:
+      # No wait: the daemon handles the signal and keeps serving.
+      - signal:
+          service: daemon
+          signal: HUP
+      - run:
+          shell: true
+          command: "for i in 1 2 3 4 5 6 7 8 9 10; do [ -f daemon.log ] && break; sleep 0.1; done; cat daemon.log"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: config reloaded

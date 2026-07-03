@@ -463,6 +463,114 @@ scenarios:
 	}
 }
 
+// TestValidate_SignalStep proves the signal-step rules (#23): the target must
+// be a declared service (with the declared names listed), the signal name
+// must be in the accepted set, and wait.timeout must parse.
+func TestValidate_SignalStep(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name, src, wantMsg string
+	}{
+		{
+			name: "unknown service lists declared names",
+			src: `
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: s
+    services:
+      - name: web
+        command: ./web
+      - name: db
+        command: ./db
+    steps:
+      - signal:
+          service: cache
+          signal: TERM
+`,
+			wantMsg: `signal.service "cache" is not a declared service (declared: db, web)`,
+		},
+		{
+			name: "invalid signal name",
+			src: `
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: s
+    services:
+      - name: web
+        command: ./web
+    steps:
+      - signal:
+          service: web
+          signal: STOP
+`,
+			wantMsg: "not an accepted signal",
+		},
+		{
+			name: "bad wait timeout",
+			src: `
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: s
+    services:
+      - name: web
+        command: ./web
+    steps:
+      - signal:
+          service: web
+          signal: TERM
+          wait:
+            timeout: soon
+`,
+			wantMsg: "signal.wait.timeout",
+		},
+		{
+			name: "suite service is a legal target",
+			src: `
+version: "1"
+suite:
+  name: sample
+  setup:
+    - service:
+        name: shared
+        command: ./shared
+scenarios:
+  - name: s
+    steps:
+      - signal:
+          service: shared
+          signal: SIGHUP
+      - run:
+          command: echo ok
+`,
+			wantMsg: "", // loads cleanly
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			_, err := LoadBytes("sample.atago.yaml", []byte(tc.src))
+			if tc.wantMsg == "" {
+				if err != nil {
+					t.Fatalf("LoadBytes() error = %v, want clean load", err)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatal("LoadBytes() = nil error, want a signal validation error")
+			}
+			if !strings.Contains(err.Error(), tc.wantMsg) {
+				t.Errorf("error = %q, want substring %q", err, tc.wantMsg)
+			}
+		})
+	}
+}
+
 // TestValidate_SuiteTimeoutInvalid proves an unparsable suite.timeout is a
 // load-time validation error (exit 2) naming the field (#17).
 func TestValidate_SuiteTimeoutInvalid(t *testing.T) {

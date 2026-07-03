@@ -34,6 +34,7 @@ var exampleSpecs = map[string]bool{ // path -> hermetic (run, not just validate)
 	"examples/select_skip_only.atago.yaml":    true,
 	"examples/services.atago.yaml":            true,
 	"examples/shell_and_redirect.atago.yaml":  true,
+	"examples/signal.atago.yaml":              true,
 	"examples/snapshot.atago.yaml":            true,
 	"examples/ssh.atago.yaml":                 false,
 	"examples/stdin.atago.yaml":               true,
