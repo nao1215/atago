@@ -19,6 +19,15 @@ and this project follows [Semantic Versioning](https://semver.org/).
   (`SystemRoot`, `SystemDrive`, `TEMP`, `TMP`, `PATHEXT`) is always retained.
   `pass_env` without `clear_env: true` is a load-time error (exit 2).
   See `examples/hermetic_env.atago.yaml`.
+- Colorized unified diff for equals/snapshot failures (#28): when both
+  sides of a failed `equals`/`snapshot` comparison are multi-line, the
+  console FAILED block renders a unified diff (3 context lines, removals
+  red / additions green, hunk headers dimmed; snapshot sides labeled
+  "snapshot (golden)" / "actual") instead of two raw Expected/Actual dumps.
+  Color respects `--ci`/`NO_COLOR`; the uncolored diff text also lands in
+  the JSON report's new additive `diff` field and the junit/tap/gha detail
+  bodies. Inputs and rendered hunks are capped with explicit truncation
+  notes; secrets are masked before diffing.
 - PTY screen assertions (#27): the new `screen:` assertion target replays a
   pty step's transcript through a vt100 terminal emulator (hinshun/vt10x)
   sized by the step's rows/cols and asserts on the final RENDERED screen —

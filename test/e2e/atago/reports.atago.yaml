@@ -126,3 +126,60 @@ scenarios:
           exit_code: 0
           stdout:
             contains: Bob
+
+  - name: a multi-line snapshot failure renders a unified diff with hunks
+    steps:
+      # Record a golden, mutate the output, and fail against it: the FAILED
+      # block shows -/+ hunk lines and the golden path (#28) instead of two
+      # raw dumps, and --report json carries the same diff additively.
+      - fixture:
+          file: diffspec.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: diffdemo
+            scenarios:
+              - name: multi-line output matches its golden
+                steps:
+                  - run:
+                      shell: true
+                      command: "printf 'alpha\\nbeta\\ngamma\\n'"
+                  - assert:
+                      stdout:
+                        snapshot: snaps/out.txt
+      - run:
+          command: ${atago} run --update-snapshots diffspec.atago.yaml
+      - assert:
+          exit_code: 0
+      - fixture:
+          file: diffspec.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: diffdemo
+            scenarios:
+              - name: multi-line output matches its golden
+                steps:
+                  - run:
+                      shell: true
+                      command: "printf 'alpha\\nBETA\\ngamma\\n'"
+                  - assert:
+                      stdout:
+                        snapshot: snaps/out.txt
+      - run:
+          command: ${atago} run diffspec.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - "Diff (-expected +actual):"
+              - "--- snapshot (golden)"
+              - "-beta"
+              - "+BETA"
+              - "snaps/out.txt"
+      - run:
+          shell: true
+          command: ${atago} run --report json diffspec.atago.yaml; true
+      - assert:
+          stdout:
+            contains: '"diff":'

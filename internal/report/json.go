@@ -56,11 +56,14 @@ type jsonServiceLog struct {
 }
 
 type jsonFailure struct {
-	Scenario  string         `json:"scenario"`
-	Step      string         `json:"step"`
-	Command   string         `json:"command,omitempty"`
-	Expected  string         `json:"expected,omitempty"`
-	Actual    string         `json:"actual,omitempty"`
+	Scenario string `json:"scenario"`
+	Step     string `json:"step"`
+	Command  string `json:"command,omitempty"`
+	Expected string `json:"expected,omitempty"`
+	Actual   string `json:"actual,omitempty"`
+	// Diff is the uncolored unified diff for multi-line equals/snapshot
+	// failures (#28) — additive, so schema_version stays "1".
+	Diff      string         `json:"diff,omitempty"`
 	Hint      string         `json:"hint,omitempty"`
 	Error     string         `json:"error,omitempty"`
 	Artifacts []jsonArtifact `json:"artifacts,omitempty"`
@@ -144,6 +147,7 @@ func suiteStepFailures(suite string, steps []engine.StepResult) []jsonFailure {
 				Step:     ck.Desc,
 				Expected: ck.Expected,
 				Actual:   ck.Actual,
+				Diff:     checkDiff(ck),
 				Hint:     ck.Hint,
 			})
 		}
@@ -173,6 +177,7 @@ func teardownFailuresOf(sc *engine.ScenarioResult) []jsonFailure {
 				Step:      ck.Desc,
 				Expected:  ck.Expected,
 				Actual:    ck.Actual,
+				Diff:      checkDiff(ck),
 				Hint:      ck.Hint,
 				Artifacts: artifactsOf(ck),
 			})
@@ -202,6 +207,7 @@ func failuresOf(sc *engine.ScenarioResult) []jsonFailure {
 				Command:   cmd,
 				Expected:  ck.Expected,
 				Actual:    ck.Actual,
+				Diff:      checkDiff(ck),
 				Hint:      ck.Hint,
 				Artifacts: artifactsOf(ck),
 			})

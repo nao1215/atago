@@ -40,11 +40,18 @@ func writeDetail(b *strings.Builder, color bool, suite string, sc *engine.Scenar
 				if cmd != "" {
 					fmt.Fprintf(b, "\nCommand:\n  %s\n", cmd)
 				}
-				if ck.Expected != "" {
-					fmt.Fprintf(b, "\nExpected:\n%s\n", indent(ck.Expected))
-				}
-				if ck.Actual != "" {
-					fmt.Fprintf(b, "\nActual:\n%s\n", indent(ck.Actual))
+				// Multi-line equals/snapshot failures render a unified diff
+				// (#28): the one-character difference the two raw blocks hide.
+				// Single-line failures keep the compact Expected/Actual form.
+				if diff := checkDiff(ck); diff != "" {
+					fmt.Fprintf(b, "\nDiff (-expected +actual):\n%s\n", indent(colorizeDiff(color, diff)))
+				} else {
+					if ck.Expected != "" {
+						fmt.Fprintf(b, "\nExpected:\n%s\n", indent(ck.Expected))
+					}
+					if ck.Actual != "" {
+						fmt.Fprintf(b, "\nActual:\n%s\n", indent(ck.Actual))
+					}
 				}
 				if ck.Hint != "" {
 					fmt.Fprintf(b, "\nHint:\n  %s\n", ck.Hint)
@@ -123,11 +130,15 @@ func writeSuiteSteps(b *strings.Builder, color bool, suite, label string, steps 
 			}
 			fmt.Fprintf(b, "\n%s %s\n", colorize(color, cRed+cBold, label), suite)
 			fmt.Fprintf(b, "\nStep:\n  %s\n", ck.Desc)
-			if ck.Expected != "" {
-				fmt.Fprintf(b, "\nExpected:\n%s\n", indent(ck.Expected))
-			}
-			if ck.Actual != "" {
-				fmt.Fprintf(b, "\nActual:\n%s\n", indent(ck.Actual))
+			if diff := checkDiff(ck); diff != "" {
+				fmt.Fprintf(b, "\nDiff (-expected +actual):\n%s\n", indent(colorizeDiff(color, diff)))
+			} else {
+				if ck.Expected != "" {
+					fmt.Fprintf(b, "\nExpected:\n%s\n", indent(ck.Expected))
+				}
+				if ck.Actual != "" {
+					fmt.Fprintf(b, "\nActual:\n%s\n", indent(ck.Actual))
+				}
 			}
 			if ck.Hint != "" {
 				fmt.Fprintf(b, "\nHint:\n  %s\n", ck.Hint)

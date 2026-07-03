@@ -90,6 +90,10 @@
         "command": {"type": "string"},
         "expected": {"type": "string"},
         "actual": {"type": "string"},
+        "diff": {
+          "description": "Uncolored unified diff for multi-line equals/snapshot failures (#28).",
+          "type": "string"
+        },
         "hint": {"type": "string"},
         "error": {"type": "string"},
         "artifacts": {

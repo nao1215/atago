@@ -121,11 +121,18 @@ func detailText(sc *engine.ScenarioResult) string {
 				continue
 			}
 			fmt.Fprintf(&b, "Step: %s\n", ck.Desc)
-			if ck.Expected != "" {
-				fmt.Fprintf(&b, "Expected: %s\n", ck.Expected)
-			}
-			if ck.Actual != "" {
-				fmt.Fprintf(&b, "Actual: %s\n", ck.Actual)
+			// Multi-line equals/snapshot failures embed the uncolored unified
+			// diff (#28); the compact form covers everything else. These
+			// bodies feed junit/tap/gha, which must stay ANSI-free.
+			if diff := checkDiff(ck); diff != "" {
+				fmt.Fprintf(&b, "Diff (-expected +actual):\n%s\n", diff)
+			} else {
+				if ck.Expected != "" {
+					fmt.Fprintf(&b, "Expected: %s\n", ck.Expected)
+				}
+				if ck.Actual != "" {
+					fmt.Fprintf(&b, "Actual: %s\n", ck.Actual)
+				}
 			}
 			if ck.Hint != "" {
 				fmt.Fprintf(&b, "Hint: %s\n", ck.Hint)
