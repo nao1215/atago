@@ -684,7 +684,10 @@
         "count": { "type": "integer", "minimum": 0 },
         "min_count": { "type": "integer", "minimum": 0 },
         "max_count": { "type": "integer", "minimum": 0 },
-        "glob": { "type": "string" }
+        "glob": { "type": "string" },
+        "recursive": { "type": "boolean", "description": "Apply contains/not_contains/count/glob to the whole tree (#25): counts see files only; glob matches relative paths, or basenames for patterns without /." },
+        "snapshot": { "type": "string", "description": "Golden tree manifest (#25): sorted relative paths, one line per entry (dir/file sha256/link). Composes only with ignore; refresh with --update-snapshots." },
+        "ignore": { "type": "array", "items": { "type": "string" }, "description": "Glob patterns excluded from the recursive walk and the snapshot manifest (*.log, .git/**)." }
       }
     },
     "exitCode": {

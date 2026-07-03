@@ -463,6 +463,52 @@ scenarios:
 	}
 }
 
+// TestValidate_DirTreeRules proves the #25 combination rules: snapshot is
+// exclusive with the matcher family, ignore needs recursive/snapshot, bad
+// ignore globs fail, and bare recursive needs a matcher.
+func TestValidate_DirTreeRules(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name, dir, wantMsg string
+	}{
+		{"snapshot with contains", "{path: out, snapshot: t.txt, contains: [a]}", "snapshot cannot be combined"},
+		{"snapshot with recursive", "{path: out, snapshot: t.txt, recursive: true}", "recursive is implied by snapshot"},
+		{"ignore without recursive", "{path: out, contains: [a], ignore: ['*.log']}", "ignore only applies to recursive or snapshot"},
+		{"bare recursive", "{path: out, recursive: true}", "recursive needs at least one of"},
+		{"invalid ignore glob", "{path: out, snapshot: t.txt, ignore: ['[']}", "not a valid glob"},
+		{"snapshot alone is valid", "{path: out, snapshot: t.txt, ignore: ['*.log']}", ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			src := `
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: s
+    steps:
+      - run: {command: echo hi}
+      - assert:
+          dir: ` + tc.dir + `
+`
+			_, err := LoadBytes("sample.atago.yaml", []byte(src))
+			if tc.wantMsg == "" {
+				if err != nil {
+					t.Fatalf("LoadBytes() error = %v, want clean load", err)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatal("LoadBytes() = nil error, want a dir validation error")
+			}
+			if !strings.Contains(err.Error(), tc.wantMsg) {
+				t.Errorf("error = %q, want substring %q", err, tc.wantMsg)
+			}
+		})
+	}
+}
+
 // TestValidate_MockServers proves the mock-server rules (#24): duplicate
 // names, route payload one-of, unknown mock names in asserts (listing the
 // declared ones), and count-0-with-matchers contradictions all fail at load.

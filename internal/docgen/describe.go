@@ -199,6 +199,12 @@ func dirConstraints(d *spec.DirAssert) []string {
 	if d.Glob != "" {
 		parts = append(parts, "matches glob "+markdown.Code(d.Glob))
 	}
+	if d.Snapshot != "" {
+		parts = append(parts, "tree matches snapshot "+markdown.Code(d.Snapshot))
+	}
+	if d.Recursive {
+		parts = append(parts, "(recursive)")
+	}
 	return parts
 }
 

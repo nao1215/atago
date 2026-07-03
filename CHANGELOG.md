@@ -19,6 +19,16 @@ and this project follows [Semantic Versioning](https://semver.org/).
   (`SystemRoot`, `SystemDrive`, `TEMP`, `TMP`, `PATHEXT`) is always retained.
   `pass_env` without `clear_env: true` is a load-time error (exit 2).
   See `examples/hermetic_env.atago.yaml`.
+- Recursive dir assertions and directory-tree snapshots (#25):
+  `dir.recursive: true` makes `contains`/`not_contains` accept nested
+  relative paths and `count`/`min_count`/`max_count` (files only) / `glob`
+  walk the whole tree; `dir.snapshot:` pins the tree against a golden
+  manifest (`dir <path>` / `file <path> sha256:<hash>` /
+  `link <path> -> <target>`, sorted, /-separated, byte-exact hashes — CRLF
+  differences ARE differences) refreshed with `--update-snapshots`, with a
+  failure diff naming exactly the added/removed/changed paths;
+  `dir.ignore:` glob patterns (`*.log`, `.git/**`) filter both. See
+  `examples/dir_tree.atago.yaml`.
 - Mock HTTP servers (#24): `mock_servers:` (scenario level) and
   suite.setup `mock_server:` steps start declarative stub HTTP servers on
   ephemeral loopback ports — canned routes matched on exact method+path

@@ -494,6 +494,15 @@ func describeDir(d *spec.DirAssert) string {
 	if d.Glob != "" {
 		parts = append(parts, "matches glob "+d.Glob)
 	}
+	if d.Snapshot != "" {
+		parts = append(parts, "tree matches snapshot "+d.Snapshot)
+	}
+	if d.Recursive {
+		parts = append(parts, "(recursive)")
+	}
+	if len(d.Ignore) > 0 {
+		parts = append(parts, "ignoring "+strings.Join(d.Ignore, ", "))
+	}
 	if len(parts) == 0 {
 		return fmt.Sprintf("%q is checked", d.Path)
 	}

@@ -756,6 +756,22 @@ type DirAssert struct {
 	// Glob asserts that at least one direct entry matches this shell glob pattern
 	// (filepath.Match semantics, e.g. "*.html").
 	Glob string `yaml:"glob,omitempty"`
+	// Recursive makes Contains/NotContains accept slash-separated relative
+	// paths anywhere in the tree, and Count/MinCount/MaxCount/Glob apply to
+	// the whole walk (counts see FILES only; Glob matches each entry's
+	// relative path, or its basename for patterns without "/") (#25).
+	Recursive bool `yaml:"recursive,omitempty"`
+	// Snapshot compares the whole tree against a golden manifest (#25):
+	// sorted /-separated relative paths, one line per entry — `dir <path>`,
+	// `file <path> sha256:<hash>` (hashed byte-exact: CRLF is NOT normalized
+	// inside file content), or `link <path> -> <target>` (not traversed).
+	// No mode/mtime (not portable). Refresh with --update-snapshots.
+	Snapshot string `yaml:"snapshot,omitempty"`
+	// Ignore lists glob patterns excluded from the recursive walk and the
+	// snapshot manifest ("*.log", ".git/**"). A pattern without "/" also
+	// matches basenames at any depth; a "<dir>/**" pattern prunes the whole
+	// subtree.
+	Ignore []string `yaml:"ignore,omitempty"`
 }
 
 // ImageAssert checks a generated image file (ADR-0030). Unlike the one-of

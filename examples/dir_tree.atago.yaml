@@ -1,0 +1,68 @@
+version: "1"
+
+# Recursive dir assertions and directory-tree snapshots (#25) — for CLIs whose
+# primary output IS a tree (project generators, scaffolders, archive
+# extractors, backup tools).
+#
+#   recursive: true   makes contains/not_contains take slash-separated
+#                     relative paths anywhere in the tree, count/min/max count
+#                     FILES across the whole walk, and glob match relative
+#                     paths (or basenames for patterns without "/").
+#   snapshot:         pins the WHOLE tree against a committed golden manifest:
+#                     one line per entry — `dir <path>`,
+#                     `file <path> sha256:<hash>`, `link <path> -> <target>`.
+#                     File content is hashed byte-exact (CRLF differences ARE
+#                     differences). Refresh with:
+#                       atago snapshot update examples/dir_tree.atago.yaml
+#   ignore:           glob patterns excluded from the walk and the manifest
+#                     ("*.log", ".git/**" prunes the subtree).
+#
+# Runs green as-is on every OS (pure Go): atago run examples/dir_tree.atago.yaml
+
+suite:
+  name: dir tree
+
+scenarios:
+  - name: a scaffolded tree is pinned by one snapshot line
+    steps:
+      - fixture:
+          file: site/hugo.toml
+          content: "baseURL = 'https://example.org/'\n"
+      - fixture:
+          file: site/content/posts/hello.md
+          content: "# hello\n"
+      - fixture:
+          file: site/debug.log
+          content: "noise that must not churn the golden\n"
+      # One line replaces a whole ladder of per-level dir asserts.
+      - assert:
+          dir:
+            path: site
+            snapshot: snapshots/site_tree.txt
+            ignore: ["*.log"]
+
+  - name: recursive matchers walk the whole tree
+    steps:
+      - fixture:
+          file: out/a/deep/nested.md
+          content: "nested\n"
+      - fixture:
+          file: out/top.txt
+          content: "top\n"
+      - assert:
+          dir:
+            path: out
+            recursive: true
+            contains: [a/deep/nested.md, top.txt]
+      # Counts see FILES only (directories are structure, not output).
+      - assert:
+          dir:
+            path: out
+            recursive: true
+            count: 2
+      # A "/"-less glob matches basenames at any depth.
+      - assert:
+          dir:
+            path: out
+            recursive: true
+            glob: "*.md"

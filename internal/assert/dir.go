@@ -43,6 +43,19 @@ func checkDir(d *spec.DirAssert, env Env) *CheckResult {
 		}
 	}
 
+	// Tree snapshot (#25): the golden manifest covers the whole walk; the
+	// loader guarantees it is not combined with the matcher family.
+	if d.Snapshot != "" {
+		return checkDirSnapshot(d, dirPath, env)
+	}
+	// Recursive mode (#25): the matcher family applies to the whole walk.
+	if d.Recursive {
+		if cr := checkDirRecursive(d, dirPath); cr != nil {
+			return cr
+		}
+		return pass(fmt.Sprintf("assert dir %q (recursive)", d.Path))
+	}
+
 	if cr := checkDirChildren(d, dirPath); cr != nil {
 		return cr
 	}

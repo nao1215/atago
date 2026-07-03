@@ -119,6 +119,7 @@ jobs:
           ./test/e2e/atago/db.atago.yaml
           ./test/e2e/atago/http.atago.yaml
           ./test/e2e/atago/mock_server.atago.yaml
+          ./test/e2e/atago/dir_tree.atago.yaml
           ./test/e2e/atago/grpc.atago.yaml
           ./test/e2e/atago/ssh.atago.yaml
           ./test/e2e/atago/cdp.atago.yaml

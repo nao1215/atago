@@ -1,0 +1,129 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / recursive dir asserts + tree snapshots
+
+# Exercises #25 end-to-end through an inner atago run: recording a tree
+# manifest with --update-snapshots, a green compare, a failing compare whose
+# FAILED block names exactly the added/removed/changed paths, and the
+# recursive matcher family. Pure Go and fixture-driven, so every scenario
+# runs on all three OSes.
+scenarios:
+  - name: record, compare green, then a mutation names the changed paths
+    steps:
+      - fixture:
+          file: inner.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: tree matches its golden
+                steps:
+                  - fixture:
+                      file: site/hugo.toml
+                      content: "baseURL = 'x'\n"
+                  - fixture:
+                      file: site/content/posts/hello.md
+                      content: "# hello\n"
+                  - assert:
+                      dir:
+                        path: site
+                        snapshot: snapshots/site_tree.txt
+      # 1. Record the golden.
+      - run:
+          command: ${atago} run --update-snapshots inner.atago.yaml
+      - assert:
+          exit_code: 0
+      - assert:
+          file:
+            path: snapshots/site_tree.txt
+            contains:
+              - "dir content"
+              - "file hugo.toml sha256:"
+      # 2. Compare green.
+      - run:
+          command: ${atago} run inner.atago.yaml
+      - assert:
+          exit_code: 0
+      # 3. Mutate the inner spec's tree (an extra fixture) and compare again:
+      #    the failure names the added path, not two full manifests.
+      - fixture:
+          file: inner_mutated.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: tree matches its golden
+                steps:
+                  - fixture:
+                      file: site/hugo.toml
+                      content: "baseURL = 'x'\n"
+                  - fixture:
+                      file: site/content/posts/hello.md
+                      content: "# CHANGED\n"
+                  - fixture:
+                      file: site/extra.txt
+                      content: "new\n"
+                  - assert:
+                      dir:
+                        path: site
+                        snapshot: snapshots/site_tree.txt
+      - run:
+          command: ${atago} run inner_mutated.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - "added:   file extra.txt"
+              - "changed: content/posts/hello.md"
+
+  - name: recursive matchers and ignore globs walk the tree
+    steps:
+      - fixture:
+          file: out/a/deep/nested.md
+          content: "nested\n"
+      - fixture:
+          file: out/top.txt
+          content: "top\n"
+      - fixture:
+          file: out/noise.log
+          content: "noise\n"
+      - assert:
+          dir:
+            path: out
+            recursive: true
+            ignore: ["*.log"]
+            contains: [a/deep/nested.md]
+            count: 2
+            glob: "*.md"
+      - assert:
+          dir:
+            path: out
+            recursive: true
+            not_contains: [a/deep/missing.md]
+
+  - name: combining snapshot with matchers is a load-time error
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: bad
+            scenarios:
+              - name: over-specified
+                steps:
+                  - run: {command: echo hi}
+                  - assert:
+                      dir:
+                        path: out
+                        snapshot: tree.txt
+                        contains: [a.txt]
+      - run:
+          command: ${atago} run bad.atago.yaml
+      - assert:
+          exit_code: 2
+          stderr:
+            contains: "snapshot cannot be combined"

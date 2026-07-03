@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-48 suites · 164 scenarios
+49 suites · 167 scenarios
 ## Contents
 - [atago self-hosting / variable expansion in assertion matcher values](#atago-self-hosting--variable-expansion-in-assertion-matcher-values) — 3 scenarios
   - [stdout.equals expands ${workdir}](#scenario-stdoutequals-expands-workdir)
@@ -31,6 +31,10 @@
 - [atago self-hosting / dir assertion](#atago-self-hosting--dir-assertion) — 2 scenarios
   - [directory/tree assertions cover a multi-file generator](#scenario-directorytree-assertions-cover-a-multi-file-generator)
   - [a missing directory can be asserted absent](#scenario-a-missing-directory-can-be-asserted-absent)
+- [atago self-hosting / recursive dir asserts + tree snapshots](#atago-self-hosting--recursive-dir-asserts--tree-snapshots) — 3 scenarios
+  - [record, compare green, then a mutation names the changed paths](#scenario-record-compare-green-then-a-mutation-names-the-changed-paths)
+  - [recursive matchers and ignore globs walk the tree](#scenario-recursive-matchers-and-ignore-globs-walk-the-tree)
+  - [combining snapshot with matchers is a load-time error](#scenario-combining-snapshot-with-matchers-is-a-load-time-error)
 - [atago self-hosting / doc](#atago-self-hosting--doc) — 5 scenarios
   - [doc generates Markdown to a file](#scenario-doc-generates-markdown-to-a-file)
   - [doc writes Markdown to stdout without --out](#scenario-doc-writes-markdown-to-stdout-without---out)
@@ -675,6 +679,116 @@ mkdir -p site/assets && printf '<html>' > site/index.html && printf '<html>' > s
 ### Scenario: a missing directory can be asserted absent
 #### Then
 - dir `never-created` does not exist
+## atago self-hosting / recursive dir asserts + tree snapshots
+Source: `test/e2e/atago/dir_tree.atago.yaml`
+### Scenario: record, compare green, then a mutation names the changed paths
+#### Given
+- Fixture file `inner.atago.yaml` is created.
+- Fixture file `inner_mutated.atago.yaml` is created.
+#### Inputs
+_Fixture `inner.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: tree matches its golden
+    steps:
+      - fixture:
+          file: site/hugo.toml
+          content: "baseURL = 'x'\n"
+      - fixture:
+          file: site/content/posts/hello.md
+          content: "# hello\n"
+      - assert:
+          dir:
+            path: site
+            snapshot: snapshots/site_tree.txt
+```
+_Fixture `inner_mutated.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: tree matches its golden
+    steps:
+      - fixture:
+          file: site/hugo.toml
+          content: "baseURL = 'x'\n"
+      - fixture:
+          file: site/content/posts/hello.md
+          content: "# CHANGED\n"
+      - fixture:
+          file: site/extra.txt
+          content: "new\n"
+      - assert:
+          dir:
+            path: site
+            snapshot: snapshots/site_tree.txt
+```
+#### When
+```shell
+${atago} run --update-snapshots inner.atago.yaml
+${atago} run inner.atago.yaml
+${atago} run inner_mutated.atago.yaml
+```
+#### Then
+- after `${atago} run --update-snapshots inner.atago.yaml`:
+  - exit code is `0`
+  - file `snapshots/site_tree.txt` contains `dir content`, `file hugo.toml sha256:`
+- after `${atago} run inner.atago.yaml`:
+  - exit code is `0`
+- after `${atago} run inner_mutated.atago.yaml`:
+  - exit code is `1`
+  - stdout contains `added:   file extra.txt`, `changed: content/posts/hello.md`
+### Scenario: recursive matchers and ignore globs walk the tree
+#### Given
+- Fixture file `out/a/deep/nested.md` is created.
+- Fixture file `out/top.txt` is created.
+- Fixture file `out/noise.log` is created.
+#### Inputs
+_Fixture `out/a/deep/nested.md`:_
+```text
+nested
+```
+_Fixture `out/top.txt`:_
+```text
+top
+```
+_Fixture `out/noise.log`:_
+```text
+noise
+```
+#### Then
+- dir `out` contains `a/deep/nested.md`, has 2 entries, matches glob `*.md`, (recursive)
+- dir `out` does not contain `a/deep/missing.md`, (recursive)
+### Scenario: combining snapshot with matchers is a load-time error
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: bad
+scenarios:
+  - name: over-specified
+    steps:
+      - run: {command: echo hi}
+      - assert:
+          dir:
+            path: out
+            snapshot: tree.txt
+            contains: [a.txt]
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `snapshot cannot be combined`
 ## atago self-hosting / doc
 Source: `test/e2e/atago/doc.atago.yaml`
 ### Scenario: doc generates Markdown to a file

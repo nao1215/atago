@@ -145,6 +145,7 @@ Every feature has a commented, runnable spec under [examples/](examples/). The e
 | [pty](examples/pty.atago.yaml) | interactive testing in a real pseudo-terminal: expect/send sessions, TTY-detection (POSIX-only) |
 | [retry](examples/retry.atago.yaml) | polling a command until an assertion passes |
 | [snapshot](examples/snapshot.atago.yaml) | golden-file testing with normalized output |
+| [dir_tree](examples/dir_tree.atago.yaml) | recursive dir assertions and directory-tree snapshots: pin a generator's whole output tree with one golden manifest |
 | [services](examples/services.atago.yaml) | background servers: readiness probes, `ready.store`, teardown |
 | [signal](examples/signal.atago.yaml) | `signal:` steps deliver SIGTERM/SIGHUP/... to a managed service's process group for graceful-shutdown and reload testing (POSIX-only) |
 | [defaults](examples/defaults.atago.yaml) | sharing `shell`/`env`/`service` fragments across scenarios |

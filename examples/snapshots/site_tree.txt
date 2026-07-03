@@ -1,0 +1,4 @@
+dir content
+dir content/posts
+file content/posts/hello.md sha256:9e8b62f81ea5c66fa06ee53da032751386b37702153070c0e14dd1d316282fa7
+file hugo.toml sha256:a3ee5004ca17c908e6b261b344cd061808b2a3df8b983189eb387046b02b3946

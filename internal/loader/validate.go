@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"maps"
+	"path"
 	"regexp"
 	"slices"
 	"strconv"
@@ -945,8 +946,32 @@ func validateDir(add func(string, ...any), where string, d *spec.DirAssert) {
 	if d.MinCount != nil && d.MaxCount != nil && *d.MinCount > *d.MaxCount {
 		add("%s: min_count %d exceeds max_count %d", where, *d.MinCount, *d.MaxCount)
 	}
-	if n == 0 {
-		add("%s: must set at least one of exists/contains/not_contains/count/min_count/max_count/glob", where)
+	// Tree snapshot rules (#25): the golden manifest IS the whole assertion,
+	// so it composes only with ignore; the matcher family needs recursive or
+	// the historical single-level semantics.
+	if d.Snapshot != "" {
+		if n > 0 || d.Exists != nil {
+			add("%s: snapshot cannot be combined with the matcher family (exists/contains/not_contains/count/glob) — the manifest already pins the whole tree", where)
+		}
+		if d.Recursive {
+			add("%s: recursive is implied by snapshot; drop it", where)
+		}
+	} else {
+		if d.Recursive && n == 0 {
+			add("%s: recursive needs at least one of contains/not_contains/count/min_count/max_count/glob", where)
+		}
+		if len(d.Ignore) > 0 && !d.Recursive {
+			add("%s: ignore only applies to recursive or snapshot assertions", where)
+		}
+	}
+	for _, pat := range d.Ignore {
+		trimmed := strings.TrimSuffix(pat, "/**")
+		if _, err := path.Match(trimmed, "probe"); err != nil {
+			add("%s.ignore %q is not a valid glob: %v", where, pat, err)
+		}
+	}
+	if n == 0 && d.Snapshot == "" {
+		add("%s: must set at least one of exists/contains/not_contains/count/min_count/max_count/glob/snapshot", where)
 	}
 }
 
