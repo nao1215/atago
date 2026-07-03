@@ -13,7 +13,11 @@ func expandRun(st *store.Store, r *spec.Run) *spec.Run {
 	c := *r
 	c.Command = st.Expand(r.Command)
 	c.Cwd = st.Expand(r.Cwd)
-	c.Stdin = st.Expand(r.Stdin)
+	// Stdin: inline text and the file path are ${name}-expanded; base64 is
+	// deliberately not (binary payloads must stay byte-exact, mirroring the
+	// fixture.base64 rule) (#18).
+	c.Stdin.Inline = st.Expand(r.Stdin.Inline)
+	c.Stdin.File = st.Expand(r.Stdin.File)
 	c.Env = st.ExpandMap(r.Env)
 	return &c
 }

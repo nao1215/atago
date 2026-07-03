@@ -89,8 +89,7 @@
             "timeout": { "type": "string" },
             "env": { "type": "object", "additionalProperties": { "type": "string" } },
             "clear_env": { "type": "boolean", "description": "Start the child from an empty environment instead of inheriting the host environment (#16). On Windows a small system-critical set (SystemRoot, SystemDrive, TEMP, TMP, PATHEXT) is always retained." },
-            "pass_env": { "type": "array", "items": { "type": "string", "minLength": 1 }, "description": "Host variables copied into the cleared environment (#16). Requires clear_env: true; unset host variables are skipped." },
-            "stdin": { "type": "string" }
+            "pass_env": { "type": "array", "items": { "type": "string", "minLength": 1 }, "description": "Host variables copied into the cleared environment (#16). Requires clear_env: true; unset host variables are skipped." }
           }
         },
         "scenario": {
@@ -438,7 +437,24 @@
         "env": { "type": "object", "additionalProperties": { "type": "string" } },
         "clear_env": { "type": "boolean", "description": "Start the child from an empty environment instead of inheriting the host environment (#16). On Windows a small system-critical set (SystemRoot, SystemDrive, TEMP, TMP, PATHEXT) is always retained." },
         "pass_env": { "type": "array", "items": { "type": "string", "minLength": 1 }, "description": "Host variables copied into the cleared environment (#16). Requires clear_env: true; unset host variables are skipped." },
-        "stdin": { "type": "string" },
+        "stdin": {
+          "description": "Standard input for the command (#18): a plain string (inline text), {file: path} (workdir-relative, path-confined), or {base64: data} for binary bytes.",
+          "oneOf": [
+            { "type": "string" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["file"],
+              "properties": { "file": { "type": "string", "minLength": 1 } }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["base64"],
+              "properties": { "base64": { "type": "string" } }
+            }
+          ]
+        },
         "stdout_to": { "type": "string", "minLength": 1, "description": "Write the command's captured stdout to this workdir-relative file (create/truncate), without needing shell redirection." },
         "stderr_to": { "type": "string", "minLength": 1, "description": "Write the command's captured stderr to this workdir-relative file (create/truncate), without needing shell redirection." },
         "retry": { "$ref": "#/$defs/retry" }

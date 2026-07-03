@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -233,13 +235,83 @@ func TestRun_ClearEnvEndToEnd(t *testing.T) {
 	}
 }
 
+// TestRun_StdinFromFile proves stdin: {file: ...} feeds a workdir file's bytes
+// to the child (#18).
+func TestRun_StdinFromFile(t *testing.T) {
+	t.Parallel()
+	wd := t.TempDir()
+	if err := os.WriteFile(filepath.Join(wd, "in.txt"), []byte("piped\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	r := New()
+	res, err := r.Run(context.Background(), &spec.Run{
+		Command: argvCommand("cat", "findstr piped"),
+		Stdin:   spec.Stdin{File: "in.txt"},
+	}, wd)
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if got := strings.TrimSpace(string(res.Stdout)); got != "piped" {
+		t.Errorf("stdout = %q, want piped", got)
+	}
+}
+
+// TestRun_StdinFileConfinedToWorkdir proves the stdin file path may not escape
+// the scenario workdir (#18).
+func TestRun_StdinFileConfinedToWorkdir(t *testing.T) {
+	t.Parallel()
+	r := New()
+	_, err := r.Run(context.Background(), &spec.Run{
+		Command: argvCommand("cat", "findstr x"),
+		Stdin:   spec.Stdin{File: "../escape.txt"},
+	}, t.TempDir())
+	if err == nil {
+		t.Fatal("expected a workdir-confinement error, got nil")
+	}
+}
+
+// TestRun_StdinFileMissing proves a missing stdin file is a named execution
+// error instead of a silent empty stdin (#18).
+func TestRun_StdinFileMissing(t *testing.T) {
+	t.Parallel()
+	r := New()
+	_, err := r.Run(context.Background(), &spec.Run{
+		Command: argvCommand("cat", "findstr x"),
+		Stdin:   spec.Stdin{File: "nope.txt"},
+	}, t.TempDir())
+	if err == nil || !strings.Contains(err.Error(), "run.stdin.file") {
+		t.Fatalf("error = %v, want it to name run.stdin.file", err)
+	}
+}
+
+// TestRun_StdinBase64Binary proves base64 stdin delivers the decoded bytes
+// exactly, including NUL and non-UTF8 bytes (#18).
+func TestRun_StdinBase64Binary(t *testing.T) {
+	t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skip("cat-based byte-exact check is POSIX-only; loader/schema cover Windows")
+	}
+	want := []byte{0x00, 0x01, 0x02, 0xff}
+	r := New()
+	res, err := r.Run(context.Background(), &spec.Run{
+		Command: "cat",
+		Stdin:   spec.Stdin{Base64: base64.StdEncoding.EncodeToString(want)},
+	}, t.TempDir())
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if !bytes.Equal(res.Stdout, want) {
+		t.Errorf("stdout = %x, want %x (byte-exact binary delivery)", res.Stdout, want)
+	}
+}
+
 func TestRun_Stdin(t *testing.T) {
 	t.Parallel()
 	r := New()
 	// cat / findstr both copy the matching stdin lines to stdout.
 	res, err := r.Run(context.Background(), &spec.Run{
 		Command: argvCommand("cat", "findstr piped"),
-		Stdin:   "piped\n",
+		Stdin:   spec.Stdin{Inline: "piped\n"},
 	}, t.TempDir())
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)

@@ -109,7 +109,7 @@ func SecurityNotes(sc *Scenario) []string {
 			if NetworkCommand.MatchString(step.Run.Command) {
 				add("network access: " + step.Run.Command)
 			}
-			addEnvRefs(step.Run.Command, step.Run.Stdin)
+			addEnvRefs(step.Run.Command, step.Run.Stdin.Inline, step.Run.Stdin.File)
 			addEnvRefs(envValues(step.Run.Env)...)
 		case StepHTTP:
 			add("network access: HTTP request")

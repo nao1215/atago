@@ -1,0 +1,113 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / stdin sources (file + base64)
+
+# Exercises #18: stdin: {file: ...} pipes a workdir file into the child,
+# stdin: {base64: ...} delivers binary bytes exactly, and the malformed
+# shapes fail at load time with positioned messages. The byte-count probes
+# are POSIX (`wc -c`), so those scenarios skip on Windows; the load-error
+# scenarios run everywhere.
+scenarios:
+  - name: base64 stdin delivers the exact byte count
+    skip:
+      os: windows
+    steps:
+      # AAEC/w== is the four bytes 00 01 02 ff; wc -c must see all four.
+      - run:
+          shell: true
+          command: wc -c
+          stdin:
+            base64: AAEC/w==
+      - assert:
+          exit_code: 0
+          stdout:
+            matches: "^\\s*4\\s*$"
+
+  - name: stdin file is expanded and read from the workdir
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: payload.txt
+          content: "from-a-file"
+      # ${workdir} proves the path is ${name}-expanded before the confinement
+      # check; an absolute path inside the workdir is allowed.
+      - run:
+          command: cat
+          stdin:
+            file: ${workdir}/payload.txt
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: from-a-file
+
+  - name: a stdin file outside the workdir is rejected at runtime
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: escape.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: escape
+            scenarios:
+              - name: tries to read outside the workdir
+                steps:
+                  - run:
+                      command: cat
+                      stdin:
+                        file: ../outside.txt
+      - run:
+          command: ${atago} run escape.atago.yaml
+      - assert:
+          exit_code: { not: 0 }
+      - assert:
+          stdout:
+            contains: "run.stdin.file"
+
+  - name: stdin with both file and base64 is a load-time error
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: bad
+            scenarios:
+              - name: both sources
+                steps:
+                  - run:
+                      command: cat
+                      stdin:
+                        file: in.txt
+                        base64: AAEC
+      - run:
+          command: ${atago} run bad.atago.yaml
+      - assert:
+          exit_code: 2
+          stderr:
+            contains: "exactly one of file/base64"
+
+  - name: invalid base64 stdin is a load-time error
+    steps:
+      - fixture:
+          file: badb64.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: badb64
+            scenarios:
+              - name: bad payload
+                steps:
+                  - run:
+                      command: cat
+                      stdin:
+                        base64: "not!!base64"
+      - run:
+          command: ${atago} run badb64.atago.yaml
+      - assert:
+          exit_code: 2
+          stderr:
+            contains: "not valid base64"

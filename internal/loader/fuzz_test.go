@@ -17,6 +17,10 @@ func FuzzLoadBytes(f *testing.F) {
 		"version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}",
 		"version: \"1\"\nsuite: {name: x}\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n        assert: {exit_code: 0}",
 		"version: \"1\"\nsuite: {name: x}\nrunners:\n  d: {type: db, dsn: \"sqlite::memory:\"}\nscenarios:\n  - name: a\n    steps: [{query: {runner: d, sql: SELECT 1}}, {assert: {rows: {empty: false}}}]",
+		// stdin sources (#18): inline scalar, file mapping, base64 mapping.
+		"version: \"1\"\nsuite: {name: x}\nscenarios:\n  - name: a\n    steps: [{run: {command: cat, stdin: \"inline\"}}]",
+		"version: \"1\"\nsuite: {name: x}\nscenarios:\n  - name: a\n    steps: [{run: {command: cat, stdin: {file: in.txt}}}]",
+		"version: \"1\"\nsuite: {name: x}\nscenarios:\n  - name: a\n    steps: [{run: {command: cat, stdin: {base64: AAEC/w==}}}]",
 	}
 	for _, s := range seeds {
 		f.Add([]byte(s))

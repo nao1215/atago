@@ -155,6 +155,23 @@ scenarios:
 	}
 }
 
+// TestSchema_AcceptsStdinSources confirms the three stdin shapes (#18) are
+// accepted.
+func TestSchema_AcceptsStdinSources(t *testing.T) {
+	s := loadSchema(t)
+	src := `version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    steps:
+      - run: {command: cat, stdin: "inline"}
+      - run: {command: cat, stdin: {file: in.txt}}
+      - run: {command: cat, stdin: {base64: AAEC/w==}}`
+	if err := s.Validate(yamlToAny(t, []byte(src))); err != nil {
+		t.Errorf("schema rejected valid stdin sources:\n%v", err)
+	}
+}
+
 // TestSchema_RejectsInvalid confirms the schema actually catches bad specs.
 func TestSchema_RejectsInvalid(t *testing.T) {
 	s := loadSchema(t)
@@ -244,6 +261,26 @@ suite: {name: x, timeout: 30}
 scenarios:
   - name: a
     steps: [{run: {command: echo}}]`,
+		// Issue #18: the stdin mapping form sets exactly one of file/base64.
+		"stdin with both file and base64": `version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    steps: [{run: {command: cat, stdin: {file: in.txt, base64: AAEC}}}]`,
+		// Issue #18: unknown stdin keys are rejected.
+		"stdin with unknown key": `version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    steps: [{run: {command: cat, stdin: {fil: in.txt}}}]`,
+		// Issue #18: defaults.run.stdin is per-step input data.
+		"defaults run stdin": `version: "1"
+suite: {name: x}
+defaults:
+  run: {stdin: shared}
+scenarios:
+  - name: a
+    steps: [{run: {command: cat}}]`,
 	}
 	for name, src := range bad {
 		t.Run(name, func(t *testing.T) {

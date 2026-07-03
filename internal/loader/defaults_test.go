@@ -277,6 +277,105 @@ scenarios:
 	}
 }
 
+// TestValidate_StdinShapes proves the stdin one-of rule and base64 validation
+// fire at load time with positioned messages (#18).
+func TestValidate_StdinShapes(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name, src, wantMsg string
+	}{
+		{
+			name: "empty mapping",
+			src: `
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: s
+    steps:
+      - run:
+          command: cat
+          stdin: {}
+`,
+			wantMsg: "exactly one of file/base64",
+		},
+		{
+			name: "both file and base64",
+			src: `
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: s
+    steps:
+      - run:
+          command: cat
+          stdin: {file: in.txt, base64: AAEC}
+`,
+			wantMsg: "exactly one of file/base64",
+		},
+		{
+			name: "invalid base64",
+			src: `
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: s
+    steps:
+      - run:
+          command: cat
+          stdin: {base64: "not!!base64"}
+`,
+			wantMsg: "not valid base64",
+		},
+		{
+			name: "unknown stdin key",
+			src: `
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: s
+    steps:
+      - run:
+          command: cat
+          stdin: {fil: in.txt}
+`,
+			wantMsg: "accepted: file, base64",
+		},
+		{
+			name: "defaults.run.stdin rejected",
+			src: `
+version: "1"
+suite:
+  name: sample
+defaults:
+  run:
+    stdin: "shared input"
+scenarios:
+  - name: s
+    steps:
+      - run:
+          command: cat
+`,
+			wantMsg: "defaults.run.stdin is not supported",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			_, err := LoadBytes("sample.atago.yaml", []byte(tc.src))
+			if err == nil {
+				t.Fatal("LoadBytes() = nil error, want a stdin validation error")
+			}
+			if !strings.Contains(err.Error(), tc.wantMsg) {
+				t.Errorf("error = %q, want substring %q", err, tc.wantMsg)
+			}
+		})
+	}
+}
+
 // TestValidate_SuiteTimeoutInvalid proves an unparsable suite.timeout is a
 // load-time validation error (exit 2) naming the field (#17).
 func TestValidate_SuiteTimeoutInvalid(t *testing.T) {

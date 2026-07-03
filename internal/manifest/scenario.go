@@ -107,7 +107,7 @@ func buildStep(index int, step *spec.Step, vars map[string]bool) Step {
 		if r.Retry != nil {
 			st.Retry = &Retry{Times: r.Retry.Times, Interval: r.Retry.Interval}
 		}
-		collectVars(vars, r.Command, r.Cwd, r.Stdin)
+		collectVars(vars, r.Command, r.Cwd, r.Stdin.Inline, r.Stdin.File)
 		for _, v := range r.Env {
 			collectVars(vars, v)
 		}

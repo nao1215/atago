@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-44 suites · 148 scenarios
+45 suites · 153 scenarios
 ## Contents
 - [atago self-hosting / variable expansion in assertion matcher values](#atago-self-hosting--variable-expansion-in-assertion-matcher-values) — 3 scenarios
   - [stdout.equals expands ${workdir}](#scenario-stdoutequals-expands-workdir)
@@ -170,6 +170,12 @@
 - [atago self-hosting / ssh runner](#atago-self-hosting--ssh-runner) — 2 scenarios
   - [an ssh runner without host/user fails validation (exit 2)](#scenario-an-ssh-runner-without-hostuser-fails-validation-exit-2)
   - [a run step naming an undeclared runner fails validation (exit 2)](#scenario-a-run-step-naming-an-undeclared-runner-fails-validation-exit-2)
+- [atago self-hosting / stdin sources (file + base64)](#atago-self-hosting--stdin-sources-file--base64) — 5 scenarios
+  - [base64 stdin delivers the exact byte count](#scenario-base64-stdin-delivers-the-exact-byte-count)
+  - [stdin file is expanded and read from the workdir](#scenario-stdin-file-is-expanded-and-read-from-the-workdir)
+  - [a stdin file outside the workdir is rejected at runtime](#scenario-a-stdin-file-outside-the-workdir-is-rejected-at-runtime)
+  - [stdin with both file and base64 is a load-time error](#scenario-stdin-with-both-file-and-base64-is-a-load-time-error)
+  - [invalid base64 stdin is a load-time error](#scenario-invalid-base64-stdin-is-a-load-time-error)
 - [atago self-hosting / store](#atago-self-hosting--store) — 2 scenarios
   - [a stored JSON value is reusable in later commands](#scenario-a-stored-json-value-is-reusable-in-later-commands)
   - [storing from a missing JSON path is an execution error](#scenario-storing-from-a-missing-json-path-is-an-execution-error)
@@ -2961,6 +2967,116 @@ ${atago} run norunner.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `is not declared`
+## atago self-hosting / stdin sources (file + base64)
+Source: `test/e2e/atago/stdin_sources.atago.yaml`
+### Scenario: base64 stdin delivers the exact byte count
+_skipped on windows_
+#### Inputs
+_stdin for `wc`:_
+```text
+(binary, 8 base64 chars)
+```
+#### When
+```shell
+wc -c
+```
+#### Then
+- exit code is `0`
+- stdout matches `/^\s*4\s*$/`
+### Scenario: stdin file is expanded and read from the workdir
+_skipped on windows_
+#### Given
+- Fixture file `payload.txt` is created.
+#### Inputs
+_Fixture `payload.txt`:_
+```text
+from-a-file
+```
+_stdin for `cat`:_
+```text
+(read from file ${workdir}/payload.txt)
+```
+#### When
+```shell
+cat
+```
+#### Then
+- exit code is `0`
+- stdout equals an exact value
+### Scenario: a stdin file outside the workdir is rejected at runtime
+_skipped on windows_
+#### Given
+- Fixture file `escape.atago.yaml` is created.
+#### Inputs
+_Fixture `escape.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: escape
+scenarios:
+  - name: tries to read outside the workdir
+    steps:
+      - run:
+          command: cat
+          stdin:
+            file: ../outside.txt
+```
+#### When
+```shell
+${atago} run escape.atago.yaml
+```
+#### Then
+- exit code is not `0`
+- stdout contains `run.stdin.file`
+### Scenario: stdin with both file and base64 is a load-time error
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: bad
+scenarios:
+  - name: both sources
+    steps:
+      - run:
+          command: cat
+          stdin:
+            file: in.txt
+            base64: AAEC
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `exactly one of file/base64`
+### Scenario: invalid base64 stdin is a load-time error
+#### Given
+- Fixture file `badb64.atago.yaml` is created.
+#### Inputs
+_Fixture `badb64.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: badb64
+scenarios:
+  - name: bad payload
+    steps:
+      - run:
+          command: cat
+          stdin:
+            base64: "not!!base64"
+```
+#### When
+```shell
+${atago} run badb64.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `not valid base64`
 ## atago self-hosting / store
 Source: `test/e2e/atago/store.atago.yaml`
 ### Scenario: a stored JSON value is reusable in later commands
