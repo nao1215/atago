@@ -1,0 +1,3 @@
+Main Menu
+> Settings
+  Quit

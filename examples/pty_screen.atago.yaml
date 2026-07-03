@@ -1,0 +1,57 @@
+version: "1"
+
+# Screen assertions (#27): TUI testing on what the user actually SEES. A pty
+# step's transcript is a raw byte stream — full-screen programs redraw with
+# cursor moves and erases, so "the current screen" is scattered across
+# overwrites. The `screen:` assertion target replays the transcript through a
+# vt100 terminal emulator sized by the step's rows/cols and asserts on the
+# final rendered screen as plain text (trailing whitespace stripped, colors
+# dropped). All stream matchers work; `line: N` addresses screen rows
+# (1-based); `snapshot:` pins the whole screen against a committed golden,
+# refreshed with:
+#   atago snapshot update examples/pty_screen.atago.yaml
+# The raw transcript stays on `stdout`, so both views are assertable.
+# POSIX-only like pty. Runs green as-is on Linux/macOS:
+#   atago run examples/pty_screen.atago.yaml
+
+suite:
+  name: pty screen
+
+scenarios:
+  - name: the screen shows the final overwrite, the transcript shows history
+    skip:
+      os: windows
+    steps:
+      # A classic progress line: drawn, then overwritten in place with \r.
+      - pty:
+          shell: true
+          command: "printf 'loading...\\r'; printf 'done.      \\r\\n'; printf 'bye\\r\\n'"
+          rows: 10
+          cols: 40
+      # The SCREEN holds only what survived the redraw...
+      - assert:
+          screen:
+            line: 1
+            equals: "done."
+      - assert:
+          screen:
+            not_contains: loading
+      # ...while the raw transcript keeps the full history.
+      - assert:
+          stdout:
+            contains: loading
+
+  - name: a cleared-and-redrawn menu snapshots as the final frame
+    skip:
+      os: windows
+    steps:
+      # Draw noise, clear the screen (ESC[2J), home the cursor (ESC[H), and
+      # draw the menu — the golden records only the final frame.
+      - pty:
+          shell: true
+          command: "printf 'noise\\r\\n'; printf '\\033[2J\\033[HMain Menu\\r\\n> Settings\\r\\n  Quit\\r\\n'"
+          rows: 10
+          cols: 40
+      - assert:
+          screen:
+            snapshot: snapshots/menu_screen.txt

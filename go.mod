@@ -9,6 +9,7 @@ require (
 	github.com/gliderlabs/ssh v0.3.8
 	github.com/go-sql-driver/mysql v1.10.0
 	github.com/goccy/go-yaml v1.19.2
+	github.com/hinshun/vt10x v0.0.0-20220301184237-5011da428d02
 	github.com/jhump/protoreflect/v2 v2.0.0-beta.2
 	github.com/k1LoW/grpcstub v0.26.4
 	github.com/lib/pq v1.12.3

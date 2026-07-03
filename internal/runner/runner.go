@@ -52,6 +52,12 @@ type Result struct {
 	GRPCStatus  int
 	MessageJSON []byte
 
+	// PTY fields, set only by the pty runner. Screen is the final rendered
+	// terminal screen (vt10x emulation, plain text) for the `screen`
+	// assertion target (#27); Stdout keeps the raw transcript.
+	IsPTY  bool
+	Screen []byte
+
 	// Browser fields, set only by the browser/CDP runner. CDPValue is the value
 	// captured by the last text/eval action (the document the `value` assertion
 	// target and `store from.value` read): a text capture is the raw string, an

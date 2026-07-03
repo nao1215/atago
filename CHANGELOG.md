@@ -19,6 +19,15 @@ and this project follows [Semantic Versioning](https://semver.org/).
   (`SystemRoot`, `SystemDrive`, `TEMP`, `TMP`, `PATHEXT`) is always retained.
   `pass_env` without `clear_env: true` is a load-time error (exit 2).
   See `examples/hermetic_env.atago.yaml`.
+- PTY screen assertions (#27): the new `screen:` assertion target replays a
+  pty step's transcript through a vt100 terminal emulator (hinshun/vt10x)
+  sized by the step's rows/cols and asserts on the final RENDERED screen —
+  what the user actually sees after every overwrite and erase — with the
+  full stream matcher family (`line: N` addresses screen rows) including
+  screen snapshots refreshed via `--update-snapshots`. Failures print the
+  screen in a bordered block and export it to `--artifacts-dir`. The raw
+  transcript stays on `stdout`. First declarative TUI E2E in the
+  runn/ShellSpec/expect ecosystem. See `examples/pty_screen.atago.yaml`.
 - PTY named keys (#26): `send: {key: enter}` presses a named key instead of
   embedding raw escape bytes — enter, tab, esc, space, backspace, delete,
   the arrows, home/end, pageup/pagedown, f1-f12, and ctrl-a..ctrl-z (mapped

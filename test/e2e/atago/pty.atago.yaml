@@ -110,3 +110,79 @@ scenarios:
           exit_code: 2
           stderr:
             contains: 'not a supported key (supported: enter, tab'
+
+  - name: screen asserts see the final frame where the transcript sees history
+    skip:
+      os: windows
+    steps:
+      # An overwritten progress line (#27): the rendered screen holds only
+      # the final text; the raw transcript still carries both versions.
+      - pty:
+          shell: true
+          command: "printf 'loading...\r'; printf 'done.      \r\n'"
+          rows: 10
+          cols: 40
+      - assert:
+          screen:
+            line: 1
+            equals: "done."
+      - assert:
+          screen:
+            not_contains: loading
+      - assert:
+          stdout:
+            contains: loading
+
+  - name: a screen snapshot round-trips through update and compare
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: inner.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: menu frame
+                steps:
+                  - pty:
+                      shell: true
+                      command: "printf '\\033[2J\\033[HMain Menu\\r\\n> Settings\\r\\n'"
+                      rows: 10
+                      cols: 40
+                  - assert:
+                      screen:
+                        snapshot: snapshots/menu.txt
+      - run:
+          command: ${atago} run --update-snapshots inner.atago.yaml
+      - assert:
+          exit_code: 0
+          file:
+            path: snapshots/menu.txt
+            contains: "> Settings"
+      - run:
+          command: ${atago} run inner.atago.yaml
+      - assert:
+          exit_code: 0
+
+  - name: a screen assert without a pty step is a load-time error
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: bad
+            scenarios:
+              - name: no pty
+                steps:
+                  - run: {command: echo hi}
+                  - assert:
+                      screen: {contains: hi}
+      - run:
+          command: ${atago} run bad.atago.yaml
+      - assert:
+          exit_code: 2
+          stderr:
+            contains: "requires a preceding pty step"
