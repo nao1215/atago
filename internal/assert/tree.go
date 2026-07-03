@@ -216,7 +216,10 @@ func checkDirSnapshot(d *spec.DirAssert, dirPath string, env Env) *CheckResult {
 		return cr
 	}
 	// Replace the two full-dump excerpts with a manifest diff: the names of
-	// the added/removed/changed paths are the review-relevant signal.
+	// the added/removed/changed paths are the review-relevant signal. The
+	// distinct "tree" kind keeps the report's generic unified diff (#28) from
+	// overriding this domain-specific summary.
+	cr.ArtifactKind = "tree"
 	cr.Expected = fmt.Sprintf("tree matches snapshot %q", d.Snapshot)
 	cr.Actual = manifestDiff(string(cr.ArtifactExpected), string(cr.ArtifactActual))
 	return cr

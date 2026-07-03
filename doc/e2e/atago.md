@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-49 suites · 172 scenarios
+49 suites · 173 scenarios
 ## Contents
 - [atago self-hosting / variable expansion in assertion matcher values](#atago-self-hosting--variable-expansion-in-assertion-matcher-values) — 3 scenarios
   - [stdout.equals expands ${workdir}](#scenario-stdoutequals-expands-workdir)
@@ -143,11 +143,12 @@
   - [screen asserts see the final frame where the transcript sees history](#scenario-screen-asserts-see-the-final-frame-where-the-transcript-sees-history)
   - [a screen snapshot round-trips through update and compare](#scenario-a-screen-snapshot-round-trips-through-update-and-compare)
   - [a screen assert without a pty step is a load-time error](#scenario-a-screen-assert-without-a-pty-step-is-a-load-time-error)
-- [atago self-hosting / reports](#atago-self-hosting--reports) — 4 scenarios
+- [atago self-hosting / reports](#atago-self-hosting--reports) — 5 scenarios
   - [JUnit report is XML with a testsuite and testcase](#scenario-junit-report-is-xml-with-a-testsuite-and-testcase)
   - [GitHub Actions annotations are emitted on failure](#scenario-github-actions-annotations-are-emitted-on-failure)
   - [TAP report is a numbered TAP 13 stream with ok / not ok points](#scenario-tap-report-is-a-numbered-tap-13-stream-with-ok--not-ok-points)
   - [failure artifacts are written and referenced in the JSON report](#scenario-failure-artifacts-are-written-and-referenced-in-the-json-report)
+  - [a multi-line snapshot failure renders a unified diff with hunks](#scenario-a-multi-line-snapshot-failure-renders-a-unified-diff-with-hunks)
 - [atago self-hosting / rerun-failed](#atago-self-hosting--rerun-failed) — 2 scenarios
   - [a failing run is recorded and rerun-failed selects only it](#scenario-a-failing-run-is-recorded-and-rerun-failed-selects-only-it)
   - [rerun-failed with nothing recorded is a no-op success](#scenario-rerun-failed-with-nothing-recorded-is-a-no-op-success)
@@ -2637,6 +2638,55 @@ cat arts/*/*/step-*-stdout.actual.txt
 - after `cat arts/*/*/step-*-stdout.actual.txt`:
   - exit code is `0`
   - stdout contains `Bob`
+### Scenario: a multi-line snapshot failure renders a unified diff with hunks
+#### Given
+- Fixture file `diffspec.atago.yaml` is created.
+- Fixture file `diffspec.atago.yaml` is created.
+#### Inputs
+_Fixture `diffspec.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: diffdemo
+scenarios:
+  - name: multi-line output matches its golden
+    steps:
+      - run:
+          shell: true
+          command: "printf 'alpha\\nbeta\\ngamma\\n'"
+      - assert:
+          stdout:
+            snapshot: snaps/out.txt
+```
+_Fixture `diffspec.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: diffdemo
+scenarios:
+  - name: multi-line output matches its golden
+    steps:
+      - run:
+          shell: true
+          command: "printf 'alpha\\nBETA\\ngamma\\n'"
+      - assert:
+          stdout:
+            snapshot: snaps/out.txt
+```
+#### When
+```shell
+${atago} run --update-snapshots diffspec.atago.yaml
+${atago} run diffspec.atago.yaml
+${atago} run --report json diffspec.atago.yaml; true
+```
+#### Then
+- after `${atago} run --update-snapshots diffspec.atago.yaml`:
+  - exit code is `0`
+- after `${atago} run diffspec.atago.yaml`:
+  - exit code is `1`
+  - stdout contains `Diff (-expected +actual):`, `--- snapshot (golden)`, `-beta`, `+BETA`, `snaps/out.txt`
+- after `${atago} run --report json diffspec.atago.yaml; true`:
+  - stdout contains `"diff":`
 ## atago self-hosting / rerun-failed
 Source: `test/e2e/atago/rerun.atago.yaml`
 ### Scenario: a failing run is recorded and rerun-failed selects only it

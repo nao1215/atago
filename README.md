@@ -90,7 +90,28 @@ $ atago run ./specs
 PASSED  47 scenarios: 47 passed, 0 failed, 0 errored, 0 skipped (1.2s)
 ```
 
-When a check fails, atago prints exactly what was expected and what happened:
+When a check fails, atago prints exactly what was expected and what happened — and multi-line `equals`/`snapshot` mismatches render a colorized unified diff (respecting `--ci`/`NO_COLOR`) instead of two raw dumps:
+
+```text
+FAILED: demo / greeting matches its golden
+
+Step:
+  assert stdout snapshot
+
+Diff (-expected +actual):
+  --- snapshot (golden)
+  +++ actual
+  @@ -1,3 +1,3 @@
+   hello
+  -WORLD
+  +world
+   bye
+
+Hint:
+  stdout did not match snapshot "snaps/greeting.txt" (update with --update-snapshots if intended)
+```
+
+Single-line failures keep the compact form:
 
 ```text
 FAILED: demo / expect Alice but the command prints Bob
