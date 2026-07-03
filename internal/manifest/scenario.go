@@ -207,8 +207,8 @@ func buildStep(index int, step *spec.Step, vars map[string]bool) Step {
 			collectVars(vars, v)
 		}
 		for _, a := range pt.Session {
-			if a.Send != nil {
-				collectVars(vars, *a.Send)
+			if a.Send != nil && a.Send.Text != nil {
+				collectVars(vars, *a.Send.Text)
 			}
 			collectVars(vars, a.Expect)
 		}

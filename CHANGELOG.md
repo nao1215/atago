@@ -19,6 +19,12 @@ and this project follows [Semantic Versioning](https://semver.org/).
   (`SystemRoot`, `SystemDrive`, `TEMP`, `TMP`, `PATHEXT`) is always retained.
   `pass_env` without `clear_env: true` is a load-time error (exit 2).
   See `examples/hermetic_env.atago.yaml`.
+- PTY named keys (#26): `send: {key: enter}` presses a named key instead of
+  embedding raw escape bytes — enter, tab, esc, space, backspace, delete,
+  the arrows, home/end, pageup/pagedown, f1-f12, and ctrl-a..ctrl-z (mapped
+  to standard xterm sequences; `{key: ctrl-d}` is the readable alias for the
+  empty-send EOF rule). Unknown names are load-time errors listing the
+  vocabulary; explain renders the keys symbolically.
 - Recursive dir assertions and directory-tree snapshots (#25):
   `dir.recursive: true` makes `contains`/`not_contains` accept nested
   relative paths and `count`/`min_count`/`max_count` (files only) / `glob`

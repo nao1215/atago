@@ -184,3 +184,43 @@ scenarios:
 		t.Fatalf("status = %s, want passed: %+v", res.Status, res.Scenarios)
 	}
 }
+
+// TestEngine_PTY_NamedKeys proves named keys transmit their documented xterm
+// bytes (#26): `cat -v` renders the down arrow it received as ^[[B, ctrl-d
+// ends the stream, and a trap-based shell observes ctrl-c as SIGINT.
+func TestEngine_PTY_NamedKeys(t *testing.T) {
+	skipOnWindows(t)
+	t.Parallel()
+	res := runSpec(t, `
+version: "1"
+suite:
+  name: s
+scenarios:
+  - name: cat -v shows the arrow bytes and ctrl-d ends input
+    steps:
+      - pty:
+          command: cat -v
+          session:
+            - send: { key: down }
+            - send: { key: enter }
+            - expect: '\^\[\[B'
+            - send: { key: ctrl-d }
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "^[[B"
+  - name: ctrl-c delivers SIGINT
+    steps:
+      - pty:
+          shell: true
+          command: "trap 'exit 130' INT; echo waiting; while true; do sleep 0.1; done"
+          session:
+            - expect: waiting
+            - send: { key: ctrl-c }
+      - assert:
+          exit_code: 130
+`)
+	if res.Status != StatusPassed {
+		t.Fatalf("status = %s, want passed: %+v", res.Status, res.Scenarios)
+	}
+}

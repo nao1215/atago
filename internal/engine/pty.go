@@ -32,8 +32,14 @@ func (e *Engine) runPTY(ctx context.Context, p *spec.PTY, st *store.Store, scena
 		for i, a := range p.Session {
 			na := spec.PTYAction{Expect: st.Expand(a.Expect)}
 			if a.Send != nil {
-				sent := st.Expand(*a.Send)
-				na.Send = &sent
+				cs := *a.Send
+				// Only verbatim text gets ${name} expansion; named keys are
+				// fixed byte sequences (#26).
+				if cs.Text != nil {
+					txt := st.Expand(*cs.Text)
+					cs.Text = &txt
+				}
+				na.Send = &cs
 			}
 			c.Session[i] = na
 		}
