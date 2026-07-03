@@ -55,6 +55,9 @@ jobs:
           - name: redis
             dir: ./test/e2e/thirdparty/redis
             install: command -v redis-server >/dev/null || (sudo apt-get update && sudo apt-get install -y redis-server redis-tools)
+          - name: hugo
+            dir: ./test/e2e/thirdparty/hugo
+            install: go install github.com/gohugoio/hugo@latest
           - name: restic
             dir: ./test/e2e/thirdparty/restic
             install: go install github.com/restic/restic/cmd/restic@latest

@@ -1,0 +1,107 @@
+version: "1"
+
+suite:
+  name: hugo (scaffold + build CLI, tree-snapshot testbed)
+
+# hugo is scaffolding + build + serve in one binary (#22). `hugo new site`
+# generates a directory tree — the exact workload that motivates recursive
+# dir assertions and directory-tree snapshots (#25) — and `hugo --minify`
+# builds files worth asserting on. The server half lives in
+# hugo_server.atago.yaml. Every scenario probes for hugo first so the suite
+# skips cleanly where it is absent.
+# Install with: go install github.com/gohugoio/hugo@latest / brew install hugo
+scenarios:
+  - name: new site scaffolds the documented directory tree
+    only:
+      command: hugo version
+    steps:
+      - run:
+          command: hugo new site mysite
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: Congratulations
+      # Friction inventory for #25: pinning the scaffold takes one dir assert
+      # per level plus a file assert for the config — a recursive `tree:`
+      # assertion (or a directory-tree snapshot) would collapse all of this
+      # into a single declarative block, and would also catch UNEXPECTED
+      # entries, which `contains` cannot.
+      - assert:
+          dir:
+            path: mysite
+            contains:
+              - archetypes
+              - content
+              - layouts
+              - static
+              - themes
+      - assert:
+          file:
+            path: mysite/hugo.toml
+            contains: baseURL
+
+  - name: new content plus a minimal layout builds the public tree
+    only:
+      command: hugo version
+    steps:
+      - run:
+          command: hugo new site mysite --quiet
+      # A theme-less site needs only these root templates (hugo >= 0.146
+      # template system): home for /, single for leaf pages, list for
+      # sections/taxonomies.
+      - fixture:
+          file: mysite/layouts/home.html
+          content: '<!DOCTYPE html><html><body><h1>HOME</h1>{{ range site.RegularPages }}<a href="{{ .RelPermalink }}">{{ .Title }}</a>{{ end }}</body></html>'
+      - fixture:
+          file: mysite/layouts/single.html
+          content: '<!DOCTYPE html><html><body><article><h1>{{ .Title }}</h1>{{ .Content }}</article></body></html>'
+      - fixture:
+          file: mysite/layouts/list.html
+          content: '<html><body>{{ range .Pages }}{{ .Title }}{{ end }}</body></html>'
+      - run:
+          command: hugo new content posts/hello.md
+          cwd: mysite
+      - assert:
+          exit_code: 0
+          file:
+            path: mysite/content/posts/hello.md
+            contains: draft
+      - run:
+          command: hugo --minify --buildDrafts
+          cwd: mysite
+      - assert:
+          exit_code: 0
+          file:
+            path: mysite/public/index.html
+            contains: HOME
+      - assert:
+          file:
+            path: mysite/public/index.html
+            contains: /posts/hello/
+      - assert:
+          file:
+            path: mysite/public/posts/hello/index.html
+            contains: "<h1>Hello</h1>"
+      # More #25 friction: "the build produced exactly these files and nothing
+      # else" is inexpressible today — count/glob check one directory level
+      # at a time.
+      - assert:
+          dir:
+            path: mysite/public
+            contains:
+              - index.html
+              - sitemap.xml
+              - posts/hello/index.html
+
+  - name: building outside a site directory fails with a config hint
+    only:
+      command: hugo version
+    steps:
+      # The scenario workdir is empty: no hugo.toml anywhere above it.
+      - run:
+          command: hugo
+      - assert:
+          exit_code: { not: 0 }
+      - assert:
+          stderr:
+            matches: "(?i)config"

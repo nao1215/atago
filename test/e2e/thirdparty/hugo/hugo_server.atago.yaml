@@ -1,0 +1,75 @@
+version: "1"
+
+suite:
+  name: hugo server (suite-wide service + http peer)
+  # The site must exist BEFORE the server starts, so the scaffold happens in
+  # suite.setup (ordered steps in ${suitedir}) and the `service:` step starts
+  # `hugo server` at that exact point in the sequence — the build-then-serve
+  # bootstrap pattern (#7). Like the caddy suite, this file assumes hugo is
+  # on PATH (make thirdparty documents the toolset; CI installs it).
+  setup:
+    - run:
+        command: hugo new site mysite --quiet
+    - fixture:
+        file: mysite/layouts/home.html
+        content: '<!DOCTYPE html><html><body><h1>HOME</h1>{{ range site.RegularPages }}<a href="{{ .RelPermalink }}">{{ .Title }}</a>{{ end }}</body></html>'
+    - fixture:
+        file: mysite/layouts/single.html
+        content: '<!DOCTYPE html><html><body><article><h1>{{ .Title }}</h1>{{ .Content }}</article></body></html>'
+    - fixture:
+        file: mysite/layouts/list.html
+        content: '<html><body>{{ range .Pages }}{{ .Title }}{{ end }}</body></html>'
+    - run:
+        command: hugo new content posts/hello.md
+        cwd: mysite
+    - service:
+        name: hugo
+        command: hugo server --source ${suitedir}/mysite --port 14140 --bind 127.0.0.1 --buildDrafts
+        ready:
+          log: "Web Server is available"
+          timeout: 30s
+
+permissions:
+  network:
+    allow: [127.0.0.1]
+
+runners:
+  site:
+    type: http
+    base_url: http://127.0.0.1:14140
+    timeout: 10s
+
+scenarios:
+  - name: the home page lists the post
+    steps:
+      - http:
+          runner: site
+          method: GET
+          path: /
+      - assert:
+          status: 200
+          body:
+            contains: HOME
+      - assert:
+          body:
+            contains: /posts/hello/
+
+  - name: the post page renders its title
+    steps:
+      - http:
+          runner: site
+          method: GET
+          path: /posts/hello/
+      - assert:
+          status: 200
+          body:
+            contains: "<h1>Hello</h1>"
+
+  - name: an unknown path is a 404
+    steps:
+      - http:
+          runner: site
+          method: GET
+          path: /no/such/page/
+      - assert:
+          status: 404

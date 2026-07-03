@@ -20,6 +20,7 @@ A browsable, repo-local index of atago's documentation, generated from repositor
 - [gotify.md](../doc/e2e/gotify.md)
 - [grafana.md](../doc/e2e/grafana.md)
 - [gup.md](../doc/e2e/gup.md)
+- [hugo.md](../doc/e2e/hugo.md)
 - [iso8583tool.md](../doc/e2e/iso8583tool.md)
 - [jose.md](../doc/e2e/jose.md)
 - [jq.md](../doc/e2e/jq.md)
