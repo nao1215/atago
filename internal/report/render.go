@@ -26,11 +26,14 @@ func Render(w io.Writer, f Format, results []*engine.SuiteResult) error {
 				writeDetail(&b, color, res.Suite, &res.Scenarios[i])
 			}
 			writeSuiteDetail(&b, color, res)
+			writeRepeatRates(&b, color, res)
+			writeFlaky(&b, color, res)
 			c := res.Counts()
 			agg.Passed += c.Passed
 			agg.Failed += c.Failed
 			agg.Errored += c.Errored
 			agg.Skipped += c.Skipped
+			agg.Flaky += c.Flaky
 			total += len(res.Scenarios)
 			dur += res.Duration
 		}

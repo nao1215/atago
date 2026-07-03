@@ -35,9 +35,11 @@ func runCmd(args []string, stdout, stderr io.Writer) int {
 	skipTag := fs.String("skip-tag", "", "skip scenarios with any of these comma-separated tags")
 	artifactsDir := fs.String("artifacts-dir", "", "write deterministic failure artifacts (actual/expected payloads) under DIR for review tooling")
 	rerunFailed := fs.Bool("rerun-failed", false, "run only the scenarios that failed on the previous run (recorded in .atago/last-failed.json)")
+	repeat := fs.Int("repeat", 0, "run each selected scenario N times to surface flakiness; any failing iteration fails the run")
+	retryFailed := fs.Int("retry-failed", 0, "retry failed scenarios up to N times; recovered scenarios are reported as flaky, never hidden")
 	verbose := fs.Bool("verbose", false, "trace every scenario as it finishes: commands, exit codes, captured output, and per-assertion verdicts — for passing scenarios too")
 	fs.Usage = func() {
-		fmt.Fprint(stderr, "Usage: atago run [--report console|json|junit|gha|tap] [--update-snapshots] [--parallel N] [--fail-fast] [--filter S] [--tag T] [--skip-tag T] [--rerun-failed] [--artifacts-dir DIR] [--verbose] [--ci] <path | dir>...\n  (directories are searched recursively)\n")
+		fmt.Fprint(stderr, "Usage: atago run [--report console|json|junit|gha|tap] [--update-snapshots] [--parallel N] [--fail-fast] [--filter S] [--tag T] [--skip-tag T] [--rerun-failed] [--repeat N] [--retry-failed N] [--artifacts-dir DIR] [--verbose] [--ci] <path | dir>...\n  (directories are searched recursively)\n")
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(args); err != nil {
@@ -72,10 +74,23 @@ func runCmd(args []string, stdout, stderr io.Writer) int {
 		return ExitConfig
 	}
 
+	// --repeat and --retry-failed answer opposite questions (does it flake? /
+	// keep CI green despite flakes) and would fight over the attempt loop.
+	if *repeat > 0 && *retryFailed > 0 {
+		fmt.Fprintln(stderr, "atago run: --repeat and --retry-failed are mutually exclusive (repeat detects flakiness, retry-failed tolerates it)")
+		return ExitConfig
+	}
+	if *repeat < 0 || *retryFailed < 0 {
+		fmt.Fprintln(stderr, "atago run: --repeat and --retry-failed must be >= 0")
+		return ExitConfig
+	}
+
 	eng := engine.New()
 	eng.UpdateSnapshots = *updateSnapshots
 	eng.Parallel = *parallel
 	eng.FailFast = *failFast
+	eng.Repeat = *repeat
+	eng.RetryFailed = *retryFailed
 	eng.FilterName = *filter
 	eng.Tags = splitCSV(*tag)
 	eng.SkipTags = splitCSV(*skipTag)
@@ -361,7 +376,7 @@ func exitForSuite(res *engine.SuiteResult) int {
 		return ExitSecurity
 	}
 	switch res.Status {
-	case engine.StatusPassed, engine.StatusSkipped:
+	case engine.StatusPassed, engine.StatusSkipped, engine.StatusFlaky:
 		return ExitOK
 	case engine.StatusFailed:
 		return ExitFailures

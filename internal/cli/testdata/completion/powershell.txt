@@ -3,7 +3,7 @@
 Register-ArgumentCompleter -Native -CommandName atago -ScriptBlock {
     param($wordToComplete, $commandAst, $cursorPosition)
     $commands = @('completion', 'doc', 'explain', 'help', 'init', 'list', 'manifest', 'run', 'snapshot', 'version')
-    $runFlags = @('--artifacts-dir', '--ci', '--fail-fast', '--filter', '--parallel', '--report', '--rerun-failed', '--skip-tag', '--tag', '--update-snapshots', '--verbose')
+    $runFlags = @('--artifacts-dir', '--ci', '--fail-fast', '--filter', '--parallel', '--repeat', '--report', '--rerun-failed', '--retry-failed', '--skip-tag', '--tag', '--update-snapshots', '--verbose')
     $tokens = $commandAst.CommandElements
     if ($tokens.Count -le 2) {
         $commands | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object {

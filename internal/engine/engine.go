@@ -53,8 +53,20 @@ type Engine struct {
 	Parallel int
 
 	// FailFast stops scheduling new scenarios once one fails or errors.
-	// In-flight scenarios are allowed to finish.
+	// In-flight scenarios are allowed to finish. With RetryFailed it triggers
+	// only on a FINAL failure (a recovered flaky scenario never trips it).
 	FailFast bool
+
+	// Repeat runs each selected scenario this many times (#29) to surface
+	// flakiness: any failing iteration fails the scenario, and the per-
+	// iteration statuses are recorded. Values < 2 disable it.
+	Repeat int
+
+	// RetryFailed re-runs a failed/errored scenario up to this many times in
+	// a fresh workdir (#29); a recovering re-run yields StatusFlaky — counted
+	// green for the exit code but reported loudly. Mutually exclusive with
+	// Repeat (the CLI enforces it).
+	RetryFailed int
 
 	// Sem, if set, is a shared concurrency limiter acquired around every
 	// scenario. It lets a caller run multiple suites concurrently while capping
@@ -225,7 +237,7 @@ func (e *Engine) Run(ctx context.Context, s *spec.Spec, specPath string) *SuiteR
 						continue
 					}
 				}
-				sc := e.runScenario(ctx, idx, &s.Scenarios[idx], rc)
+				sc := e.runScenarioWithPolicy(ctx, idx, &s.Scenarios[idx], rc)
 				sc.Suite = s.Suite.Name
 				if e.Sem != nil {
 					<-e.Sem
@@ -840,7 +852,7 @@ func (e *Engine) runStep(ctx context.Context, run *spec.Run, st *store.Store, wo
 // worseStatus returns the more severe of two statuses (error > failed > passed,
 // skipped is neutral at suite level).
 func worseStatus(a, b Status) Status {
-	rank := map[Status]int{StatusPassed: 0, StatusSkipped: 0, StatusFailed: 1, StatusError: 2}
+	rank := map[Status]int{StatusPassed: 0, StatusSkipped: 0, StatusFlaky: 0, StatusFailed: 1, StatusError: 2}
 	if rank[b] > rank[a] {
 		return b
 	}

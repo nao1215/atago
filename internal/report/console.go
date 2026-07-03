@@ -19,9 +19,15 @@ func writeSummary(b *strings.Builder, color bool, c engine.Counts, total int, d 
 	if total == 1 {
 		plural = "scenario"
 	}
-	fmt.Fprintf(b, "\n%s  %d %s: %d passed, %d failed, %d errored, %d skipped (%s)\n",
+	// Flaky scenarios (#29) are green for the verdict but never hidden: the
+	// count appears only when non-zero so steady-state output is unchanged.
+	flaky := ""
+	if c.Flaky > 0 {
+		flaky = fmt.Sprintf(", %d flaky", c.Flaky)
+	}
+	fmt.Fprintf(b, "\n%s  %d %s: %d passed, %d failed, %d errored, %d skipped%s (%s)\n",
 		colorize(color, code+cBold, status), total, plural,
-		c.Passed, c.Failed, c.Errored, c.Skipped, d.Round(time.Millisecond))
+		c.Passed, c.Failed, c.Errored, c.Skipped, flaky, d.Round(time.Millisecond))
 }
 
 // writeDetail prints the failure/error block for a scenario, or nothing if it
@@ -111,6 +117,42 @@ func writeDetail(b *strings.Builder, color bool, suite string, sc *engine.Scenar
 		for _, sl := range sc.ServiceLogs {
 			fmt.Fprintf(b, "  %s: %s\n", sl.Name, sl.Path)
 		}
+	}
+}
+
+// writeRepeatRates prints one per-scenario pass-rate line for --repeat runs
+// (#29): "race prone: 18/20 passed". Silent when repeat was off.
+func writeRepeatRates(b *strings.Builder, color bool, res *engine.SuiteResult) {
+	for i := range res.Scenarios {
+		sc := &res.Scenarios[i]
+		if len(sc.Iterations) == 0 {
+			continue
+		}
+		passed := 0
+		for _, st := range sc.Iterations {
+			if st == engine.StatusPassed {
+				passed++
+			}
+		}
+		code := cGreen
+		if passed < len(sc.Iterations) {
+			code = cRed
+		}
+		fmt.Fprintf(b, "\n%s %s: %d/%d passed\n",
+			colorize(color, code+cBold, "REPEAT:"), sc.Name, passed, len(sc.Iterations))
+	}
+}
+
+// writeFlaky prints one line per recovered scenario (#29): green for the
+// verdict, but never hidden.
+func writeFlaky(b *strings.Builder, color bool, res *engine.SuiteResult) {
+	for i := range res.Scenarios {
+		sc := &res.Scenarios[i]
+		if sc.Status != engine.StatusFlaky {
+			continue
+		}
+		fmt.Fprintf(b, "\n%s %s / %s: passed after %d attempts\n",
+			colorize(color, cYellow+cBold, "FLAKY:"), res.Suite, sc.Name, sc.Attempts)
 	}
 }
 

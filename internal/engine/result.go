@@ -20,6 +20,10 @@ const (
 	StatusSkipped Status = "skipped"
 	// StatusError means a step could not execute (e.g. command not found).
 	StatusError Status = "error"
+	// StatusFlaky means the scenario failed at least once and then passed on
+	// a --retry-failed re-run (#29): green for the exit code, but surfaced
+	// everywhere so instability is never silently hidden.
+	StatusFlaky Status = "flaky"
 )
 
 // StepResult records what happened for a single step.
@@ -64,6 +68,14 @@ type ScenarioResult struct {
 	// set and the scenario failed or a service never became ready (#51). Paths are
 	// relative to the artifacts dir root.
 	ServiceLogs []ServiceLog
+	// Attempts is how many executions this result folds under --retry-failed
+	// (#29): 1 for a normal run, >1 when re-runs happened (StatusFlaky when
+	// one of them recovered). Zero means the feature was off.
+	Attempts int
+	// Iterations records each execution's status under --repeat (#29); the
+	// visible Steps belong to the first failing iteration (or the last one
+	// when all passed).
+	Iterations []Status
 }
 
 // TeardownFailed reports whether any teardown step failed or errored. Reports
@@ -103,7 +115,7 @@ type SuiteResult struct {
 
 // Counts summarizes scenario outcomes.
 type Counts struct {
-	Passed, Failed, Skipped, Errored int
+	Passed, Failed, Skipped, Errored, Flaky int
 }
 
 // Counts tallies scenario statuses.
@@ -119,6 +131,8 @@ func (s *SuiteResult) Counts() Counts {
 			c.Skipped++
 		case StatusError:
 			c.Errored++
+		case StatusFlaky:
+			c.Flaky++
 		}
 	}
 	return c

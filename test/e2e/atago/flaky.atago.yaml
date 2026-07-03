@@ -1,0 +1,125 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / flaky tooling (--repeat, --retry-failed)
+
+# Exercises #29 through inner atago runs. The deterministic-flaky inner spec
+# fails while its marker file is absent, creates it, and passes on the next
+# attempt — each attempt gets a fresh workdir, so the marker lives in the
+# OUTER scenario's ${workdir}, shared across the inner attempts. POSIX shell
+# probes, so those scenarios skip on Windows; the flag-exclusivity check runs
+# everywhere.
+scenarios:
+  - name: retry-failed recovers a flaky scenario and reports it loudly
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: flaky.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: flaky once
+                steps:
+                  - run:
+                      shell: true
+                      command: "if [ -f '${workdir}/seen.txt' ]; then echo recovered; else touch '${workdir}/seen.txt'; exit 1; fi"
+                  - assert:
+                      exit_code: 0
+      # Without retries the first (failing) attempt decides: exit 1.
+      - run:
+          command: ${atago} run flaky.atago.yaml
+      - assert:
+          exit_code: 1
+      # Reset the marker so the retry run starts flaky again.
+      - run:
+          shell: true
+          command: rm -f seen.txt
+      # With --retry-failed the recovery is green BUT surfaced: exit 0, an
+      # 'f' progress dot, a FLAKY line, and ", 1 flaky" in the summary.
+      - run:
+          command: ${atago} run --retry-failed 1 flaky.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "FLAKY:"
+              - "passed after 2 attempts"
+              - "1 flaky"
+      # The JSON report carries status flaky + attempts.
+      - run:
+          shell: true
+          command: rm -f seen.txt
+      - run:
+          command: ${atago} run --retry-failed 1 --report json flaky.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - '"status": "flaky"'
+              - '"attempts": 2'
+
+  - name: repeat surfaces flakiness that a single run would miss
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: green.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: steady
+                steps:
+                  - run: {shell: true, command: echo ok}
+                  - assert:
+                      exit_code: 0
+      - run:
+          command: ${atago} run --repeat 3 green.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "steady: 3/3 passed"
+      - fixture:
+          file: flaky.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: flaky once
+                steps:
+                  - run:
+                      shell: true
+                      command: "if [ -f '${workdir}/seen.txt' ]; then echo recovered; else touch '${workdir}/seen.txt'; exit 1; fi"
+                  - assert:
+                      exit_code: 0
+      # Any failing iteration fails the run — repeat DETECTS, never tolerates.
+      - run:
+          command: ${atago} run --repeat 3 flaky.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: "flaky once: 2/3 passed"
+
+  - name: repeat and retry-failed are mutually exclusive
+    steps:
+      - fixture:
+          file: any.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: s
+                steps:
+                  - run: {command: echo hi}
+      - run:
+          command: ${atago} run --repeat 2 --retry-failed 1 any.atago.yaml
+      - assert:
+          exit_code: 3
+          stderr:
+            contains: "mutually exclusive"

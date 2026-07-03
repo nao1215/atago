@@ -19,6 +19,17 @@ and this project follows [Semantic Versioning](https://semver.org/).
   (`SystemRoot`, `SystemDrive`, `TEMP`, `TMP`, `PATHEXT`) is always retained.
   `pass_env` without `clear_env: true` is a load-time error (exit 2).
   See `examples/hermetic_env.atago.yaml`.
+- Flaky-test tooling (#29): `--repeat N` runs each selected scenario N times
+  (fresh workdir per iteration, sequential per scenario) to detect
+  flakiness — any failing iteration fails the run and the console reports
+  per-scenario pass rates; `--retry-failed N` re-runs failed/errored
+  scenarios and reports recovered ones as **flaky** — counted green for the
+  exit code but surfaced everywhere: `, N flaky` in the summary, `f`
+  progress dots, JSON `status: "flaky"` + `attempts`/`iterations`
+  (additive), JUnit `<flakyFailure>`, a TAP `# flaky` diagnostic, and a GHA
+  `::warning`. The two flags are mutually exclusive (exit 3); fail-fast
+  triggers only on a FINAL failure; flaky scenarios are not recorded by
+  `--rerun-failed`.
 - Colorized unified diff for equals/snapshot failures (#28): when both
   sides of a failed `equals`/`snapshot` comparison are multi-line, the
   console FAILED block renders a unified diff (3 context lines, removals
