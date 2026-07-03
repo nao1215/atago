@@ -29,6 +29,11 @@ type jsonReport struct {
 	DurationMS int64          `json:"duration_ms"`
 	Scenarios  []jsonScenario `json:"scenarios"`
 	Failures   []jsonFailure  `json:"failures"`
+	// SetupFailures / TeardownFailures list failed suite.setup / suite.teardown
+	// steps (#7). Setup failures also error every scenario; teardown failures
+	// never change the suite status but incomplete cleanup must stay visible.
+	SetupFailures    []jsonFailure `json:"setup_failures,omitempty"`
+	TeardownFailures []jsonFailure `json:"teardown_failures,omitempty"`
 }
 
 type jsonScenario struct {
@@ -81,6 +86,8 @@ func buildJSON(res *engine.SuiteResult) jsonReport {
 		Scenarios:  make([]jsonScenario, 0, len(res.Scenarios)),
 		Failures:   []jsonFailure{},
 	}
+	out.SetupFailures = suiteStepFailures(res.Suite, res.Setup)
+	out.TeardownFailures = suiteStepFailures(res.Suite, res.Teardown)
 	for i := range res.Scenarios {
 		sc := &res.Scenarios[i]
 		out.Scenarios = append(out.Scenarios, jsonScenario{
@@ -121,6 +128,34 @@ func serviceLogsOf(sc *engine.ScenarioResult) []jsonServiceLog {
 		out = append(out, jsonServiceLog{Name: sl.Name, Path: sl.Path})
 	}
 	return out
+}
+
+// suiteStepFailures maps failed/errored suite-level steps (#7) into the
+// jsonFailure shape, using the suite name as the scenario label.
+func suiteStepFailures(suite string, steps []engine.StepResult) []jsonFailure {
+	var fs []jsonFailure
+	for _, step := range steps {
+		for _, ck := range step.Checks {
+			if ck == nil || ck.OK {
+				continue
+			}
+			fs = append(fs, jsonFailure{
+				Scenario: suite,
+				Step:     ck.Desc,
+				Expected: ck.Expected,
+				Actual:   ck.Actual,
+				Hint:     ck.Hint,
+			})
+		}
+		if step.ErrMsg != "" {
+			fs = append(fs, jsonFailure{
+				Scenario: suite,
+				Step:     stepPhase(step),
+				Error:    step.ErrMsg,
+			})
+		}
+	}
+	return fs
 }
 
 // teardownFailuresOf maps failed/errored teardown steps into the jsonFailure

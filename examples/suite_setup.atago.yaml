@@ -1,0 +1,70 @@
+version: "1"
+
+# suite.setup runs ONCE before any scenario — in order, inside a suite-scoped
+# scratch dir (${suitedir}) — and exists so bootstrap shell scripts (build a
+# helper, start a shared peer, warm a cache) become spec YAML. A `service:`
+# step starts a suite-wide background process at that exact point in the
+# sequence; its ready.store value reaches every scenario. suite.env is exported
+# to every scenario (a scenario's own env wins per key), and suite.teardown
+# always runs after the last scenario — pass or fail — while suite services are
+# still up. A teardown failure never changes the verdict.
+# The setup/service commands here are POSIX-shell; on Windows validate it with
+# `atago explain`. Runs green as-is on Linux/macOS:
+#   atago run examples/suite_setup.atago.yaml
+
+suite:
+  name: suite setup
+  env:
+    GREETING: from-suite
+  setup:
+    # Ordinary run steps, executed once. ${suitedir} lives until the suite ends.
+    - run:
+        shell: true
+        command: "echo shared-token-123 > ${suitedir}/token.txt"
+    - run:
+        shell: true
+        command: "cat ${suitedir}/token.txt"
+    - store:
+        name: token
+        from:
+          stdout:
+            matches: "shared-token-[0-9]+"
+    # A suite-wide service: started here, stopped after suite.teardown (LIFO).
+    # Its ready file doubles as the readiness signal.
+    - service:
+        name: beacon
+        shell: true
+        command: "echo up > ${suitedir}/ready.txt && sleep 30"
+        ready:
+          file: "${suitedir}/ready.txt"
+          timeout: 5s
+  teardown:
+    - run:
+        shell: true
+        command: "echo cleaned up ${token}"
+    - assert:
+        stdout:
+          contains: cleaned up shared-token-123
+
+scenarios:
+  - name: scenarios share the setup store and suite env
+    steps:
+      - run:
+          shell: true
+          command: "echo got ${token} greeting=$GREETING"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - got shared-token-123
+              - greeting=from-suite
+
+  - name: the suite service outlives individual scenarios
+    steps:
+      - run:
+          shell: true
+          command: "cat ${suitedir}/ready.txt"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: up

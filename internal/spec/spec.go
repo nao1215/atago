@@ -56,6 +56,23 @@ type ScenarioDefaults struct {
 // Suite groups scenarios under a name.
 type Suite struct {
 	Name string `yaml:"name"`
+	// Env is exported to every scenario, setup, and teardown step in the
+	// suite (a scenario's own env wins per key). Values get ${name} expansion
+	// against the suite store (${suitedir}, ${env:NAME}, setup stores).
+	Env map[string]string `yaml:"env,omitempty"`
+	// Setup steps run ONCE before any scenario, in declaration order, inside a
+	// suite-scoped scratch directory exposed as ${suitedir} (#7). They exist
+	// so bootstrap shell scripts (build a helper binary, start a shared peer,
+	// warm a cache) become spec YAML. Allowed kinds: fixture, run, store,
+	// assert, and — unique to this block — `service:`, which starts a
+	// suite-wide background process at that exact point in the sequence.
+	// Values captured here (store, ready.store) seed every scenario's store.
+	// A failing setup step marks every scenario errored; no scenario runs.
+	Setup []Step `yaml:"setup,omitempty"`
+	// Teardown steps always run after the last scenario — pass, fail, error,
+	// or interrupt — while suite services are still up (services stop last,
+	// LIFO). Failures are reported but never change the suite verdict.
+	Teardown []Step `yaml:"teardown,omitempty"`
 }
 
 // Runner declares a named runner. cmd is the implicit default for run steps;
@@ -221,6 +238,11 @@ type Step struct {
 	CDP     *CDP     `yaml:"cdp,omitempty"`
 	Assert  *Assert  `yaml:"assert,omitempty"`
 	Store   *Store   `yaml:"store,omitempty"`
+	// Service starts a suite-wide background process (#7). It is valid only
+	// inside suite.setup — the loader rejects it anywhere else — so its
+	// position in the setup sequence controls ordering relative to the run
+	// steps around it (build the binary, then serve it, then warm a cache).
+	Service *Service `yaml:"service,omitempty"`
 }
 
 // Query runs a SQL statement through a named db runner (ADR-0026). The result

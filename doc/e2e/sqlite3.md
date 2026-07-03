@@ -78,7 +78,7 @@ sqlite3 copy.db "SELECT name FROM u WHERE id=1;"
 - Fixture file `people.csv` is created.
 #### Inputs
 _Fixture `people.csv`:_
-```
+```text
 id,name
 1,carol
 2,dave

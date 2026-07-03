@@ -1,0 +1,139 @@
+# suite.setup / suite.teardown (#7): once-per-suite bootstrap steps (including
+# suite-wide `service:` steps) with ${suitedir}, suite.env, and store sharing;
+# teardown always runs and never changes the verdict.
+version: "1"
+
+suite:
+  name: atago self-hosting / suite setup
+
+scenarios:
+  - name: setup runs once, shares stores and env, and teardown always runs
+    steps:
+      - fixture:
+          file: ok.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+              env:
+                FLAG: suite-env-flag
+              setup:
+                - run:
+                    shell: true
+                    command: "echo boot-42 > ${suitedir}/t.txt && cat ${suitedir}/t.txt"
+                - store:
+                    name: bootid
+                    from:
+                      stdout:
+                        matches: "boot-[0-9]+"
+              teardown:
+                - run:
+                    shell: true
+                    command: "echo swept ${bootid}"
+            scenarios:
+              - name: one
+                steps:
+                  - run: {shell: true, command: "echo one sees ${bootid} $FLAG"}
+                  - assert:
+                      stdout:
+                        contains:
+                          - one sees boot-42
+                          - suite-env-flag
+              - name: two
+                steps:
+                  - run: {shell: true, command: "echo two sees ${bootid}"}
+                  - assert:
+                      stdout: {contains: two sees boot-42}
+      - run:
+          command: ${atago} run --verbose ok.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "2 passed"
+
+  - name: a failing setup errors every scenario and none runs (exit 4)
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+              setup:
+                - run: {command: definitely-not-a-real-binary-xyz}
+            scenarios:
+              - name: never runs
+                steps:
+                  - run: {shell: true, command: echo unreached}
+              - name: never runs either
+                steps:
+                  - run: {shell: true, command: echo unreached}
+      - run:
+          command: ${atago} run bad.atago.yaml
+      - assert:
+          exit_code: 4
+          stdout:
+            contains:
+              - "suite setup"
+              - "0 passed"
+              - "2 errored"
+      - assert:
+          stdout:
+            not_contains: unreached
+
+  - name: a suite service starts once and its store reaches every scenario
+    steps:
+      - fixture:
+          file: svc.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+              setup:
+                - service:
+                    name: peer
+                    shell: true
+                    command: "echo addr-9999 > ${suitedir}/ready.txt && sleep 30"
+                    ready:
+                      file: "${suitedir}/ready.txt"
+                      store: addr
+                      timeout: 5s
+            scenarios:
+              - name: dials
+                steps:
+                  - run: {shell: true, command: "echo dial ${addr}"}
+                  - assert:
+                      stdout: {contains: dial addr-9999}
+      - run:
+          command: ${atago} run svc.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "1 passed"
+
+  - name: a failing suite teardown is loud but does not flip the verdict
+    steps:
+      - fixture:
+          file: td.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+              setup:
+                - run: {shell: true, command: echo fine}
+              teardown:
+                - run: {command: definitely-not-a-real-binary-xyz}
+            scenarios:
+              - name: passes
+                steps:
+                  - run: {shell: true, command: echo ok}
+                  - assert:
+                      stdout: {contains: ok}
+      - run:
+          command: ${atago} run td.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "1 passed"
+              - "SUITE TEARDOWN FAILED"

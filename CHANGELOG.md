@@ -9,6 +9,23 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Suite-level `setup:` / `teardown:` / `env:` (#7) — the bootstrap shell
+  scripts real ShellSpec migrations could not shed (build a helper binary,
+  start a shared peer, warm a cache) become spec YAML. `suite.setup` is an
+  ordered list of steps run ONCE before any scenario inside a suite-scoped
+  scratch dir (`${suitedir}`); a `service:` step — valid only there — starts a
+  suite-wide background process at that exact point in the sequence, so
+  build-then-serve-then-warm bootstraps keep their order. Setup stores and
+  `ready.store` captures seed every scenario's store; `suite.env` is layered
+  beneath each scenario's env. A failing setup step errors every scenario
+  (labeled `suite setup`; nothing runs); `suite.teardown` always runs after
+  the last scenario — pass, fail, error, or interrupt (bounded context) —
+  while suite services are still up (services stop last, LIFO), and its
+  failures are loud (console `SUITE TEARDOWN FAILED`, JSON
+  `setup_failures`/`teardown_failures`) but never change the verdict.
+  Surfaced in the JSON schema, `explain`, `manifest`
+  (`suite_env`/`suite_setup`/`suite_teardown`), and a runnable example.
+
 - `atago run --verbose` (#6): trace every scenario as it finishes — the
   expanded command, exit code / HTTP status, captured stdout/stderr (excerpted
   at the same limit as failure output), skip reasons, teardown steps, and each

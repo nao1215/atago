@@ -25,6 +25,7 @@ func Render(w io.Writer, f Format, results []*engine.SuiteResult) error {
 			for i := range res.Scenarios {
 				writeDetail(&b, color, res.Suite, &res.Scenarios[i])
 			}
+			writeSuiteDetail(&b, color, res)
 			c := res.Counts()
 			agg.Passed += c.Passed
 			agg.Failed += c.Failed

@@ -17,7 +17,7 @@ Source: `test/e2e/thirdparty/jq/jq.atago.yaml`
 ### Scenario: identity filter echoes the document from stdin
 #### Inputs
 _stdin for `jq`:_
-```
+```text
 {"b":2,"a":1}
 ```
 #### When
@@ -31,7 +31,7 @@ jq -c .
 ### Scenario: sort-keys output is deterministic and exact
 #### Inputs
 _stdin for `jq`:_
-```
+```text
 {"b":2,"a":1}
 ```
 #### When
@@ -46,7 +46,7 @@ jq -c --sort-keys .
 - Fixture file `user.json` is created.
 #### Inputs
 _Fixture `user.json`:_
-```
+```text
 {"name":"alice","admin":true}
 ```
 #### When
@@ -59,7 +59,7 @@ jq -r .name user.json
 ### Scenario: arguments flow in with --arg
 #### Inputs
 _stdin for `jq`:_
-```
+```text
 null
 ```
 #### When
@@ -74,7 +74,7 @@ jq -c --arg who atago '{greeting: ("hello " + $who)}'
 - Fixture file `nums.json` is created.
 #### Inputs
 _Fixture `nums.json`:_
-```
+```text
 [1,2,3,4,5]
 ```
 #### When
@@ -87,7 +87,7 @@ jq 'reduce .[] as $n (0; . + $n)' nums.json
 ### Scenario: -e exits 1 when the result is false
 #### Inputs
 _stdin for `jq`:_
-```
+```text
 {"present":1}
 ```
 #### When
@@ -99,7 +99,7 @@ jq -e '.missing'
 ### Scenario: a program that does not compile exits 3 with a diagnostic on stderr
 #### Inputs
 _stdin for `jq`:_
-```
+```text
 {}
 ```
 #### When
@@ -113,7 +113,7 @@ jq '.foo['
 ### Scenario: invalid JSON input fails loudly and keeps stdout clean
 #### Inputs
 _stdin for `jq`:_
-```
+```text
 not json at all
 ```
 #### When
@@ -126,7 +126,7 @@ jq .
 ### Scenario: streaming several documents produces one result per document
 #### Inputs
 _stdin for `jq`:_
-```
+```text
 {"n":1}
 {"n":2}
 ```

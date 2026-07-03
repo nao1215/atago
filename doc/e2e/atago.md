@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-40 suites · 133 scenarios
+41 suites · 137 scenarios
 ## Contents
 - [atago self-hosting / variable expansion in assertion matcher values](#atago-self-hosting--variable-expansion-in-assertion-matcher-values) — 3 scenarios
   - [stdout.equals expands ${workdir}](#scenario-stdoutequals-expands-workdir)
@@ -164,6 +164,11 @@
 - [atago self-hosting / store](#atago-self-hosting--store) — 2 scenarios
   - [a stored JSON value is reusable in later commands](#scenario-a-stored-json-value-is-reusable-in-later-commands)
   - [storing from a missing JSON path is an execution error](#scenario-storing-from-a-missing-json-path-is-an-execution-error)
+- [atago self-hosting / suite setup](#atago-self-hosting--suite-setup) — 4 scenarios
+  - [setup runs once, shares stores and env, and teardown always runs](#scenario-setup-runs-once-shares-stores-and-env-and-teardown-always-runs)
+  - [a failing setup errors every scenario and none runs (exit 4)](#scenario-a-failing-setup-errors-every-scenario-and-none-runs-exit-4)
+  - [a suite service starts once and its store reaches every scenario](#scenario-a-suite-service-starts-once-and-its-store-reaches-every-scenario)
+  - [a failing suite teardown is loud but does not flip the verdict](#scenario-a-failing-suite-teardown-is-loud-but-does-not-flip-the-verdict)
 - [atago self-hosting / verbose](#atago-self-hosting--verbose) — 4 scenarios
   - [verbose shows a passing scenario's command, output, and verdicts](#scenario-verbose-shows-a-passing-scenarios-command-output-and-verdicts)
   - [without --verbose the trace is absent](#scenario-without---verbose-the-trace-is-absent)
@@ -2876,6 +2881,129 @@ ${atago} run bad-store.atago.yaml
 #### Then
 - exit code is `4`
 - stdout contains `ERROR`
+## atago self-hosting / suite setup
+Source: `test/e2e/atago/suite_setup.atago.yaml`
+### Scenario: setup runs once, shares stores and env, and teardown always runs
+#### Given
+- Fixture file `ok.atago.yaml` is created.
+#### Inputs
+_Fixture `ok.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+  env:
+    FLAG: suite-env-flag
+  setup:
+    - run:
+        shell: true
+        command: "echo boot-42 > ${suitedir}/t.txt && cat ${suitedir}/t.txt"
+    - store:
+        name: bootid
+        from:
+          stdout:
+            matches: "boot-[0-9]+"
+  teardown:
+    - run:
+        shell: true
+        command: "echo swept ${bootid}"
+scenarios:
+  - name: one
+… (truncated, 12 more lines)
+```
+#### When
+```shell
+${atago} run --verbose ok.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout contains `2 passed`
+### Scenario: a failing setup errors every scenario and none runs (exit 4)
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+  setup:
+    - run: {command: definitely-not-a-real-binary-xyz}
+scenarios:
+  - name: never runs
+    steps:
+      - run: {shell: true, command: echo unreached}
+  - name: never runs either
+    steps:
+      - run: {shell: true, command: echo unreached}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `4`
+- stdout contains `suite setup`, `0 passed`, `2 errored`
+- stdout does not contain `unreached`
+### Scenario: a suite service starts once and its store reaches every scenario
+#### Given
+- Fixture file `svc.atago.yaml` is created.
+#### Inputs
+_Fixture `svc.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+  setup:
+    - service:
+        name: peer
+        shell: true
+        command: "echo addr-9999 > ${suitedir}/ready.txt && sleep 30"
+        ready:
+          file: "${suitedir}/ready.txt"
+          store: addr
+          timeout: 5s
+scenarios:
+  - name: dials
+    steps:
+      - run: {shell: true, command: "echo dial ${addr}"}
+      - assert:
+          stdout: {contains: dial addr-9999}
+```
+#### When
+```shell
+${atago} run svc.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout contains `1 passed`
+### Scenario: a failing suite teardown is loud but does not flip the verdict
+#### Given
+- Fixture file `td.atago.yaml` is created.
+#### Inputs
+_Fixture `td.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+  setup:
+    - run: {shell: true, command: echo fine}
+  teardown:
+    - run: {command: definitely-not-a-real-binary-xyz}
+scenarios:
+  - name: passes
+    steps:
+      - run: {shell: true, command: echo ok}
+      - assert:
+          stdout: {contains: ok}
+```
+#### When
+```shell
+${atago} run td.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout contains `1 passed`, `SUITE TEARDOWN FAILED`
 ## atago self-hosting / verbose
 Source: `test/e2e/atago/verbose.atago.yaml`
 ### Scenario: verbose shows a passing scenario's command, output, and verdicts

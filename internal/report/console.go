@@ -107,6 +107,39 @@ func writeDetail(b *strings.Builder, color bool, suite string, sc *engine.Scenar
 	}
 }
 
+// writeSuiteDetail prints suite-level setup/teardown failure blocks (#7).
+// A setup failure already errors every scenario; the block explains why. A
+// teardown failure never changes the verdict but must stay loud.
+func writeSuiteDetail(b *strings.Builder, color bool, res *engine.SuiteResult) {
+	writeSuiteSteps(b, color, res.Suite, "SUITE SETUP FAILED:", res.Setup)
+	writeSuiteSteps(b, color, res.Suite, "SUITE TEARDOWN FAILED:", res.Teardown)
+}
+
+func writeSuiteSteps(b *strings.Builder, color bool, suite, label string, steps []engine.StepResult) {
+	for _, step := range steps {
+		for _, ck := range step.Checks {
+			if ck == nil || ck.OK {
+				continue
+			}
+			fmt.Fprintf(b, "\n%s %s\n", colorize(color, cRed+cBold, label), suite)
+			fmt.Fprintf(b, "\nStep:\n  %s\n", ck.Desc)
+			if ck.Expected != "" {
+				fmt.Fprintf(b, "\nExpected:\n%s\n", indent(ck.Expected))
+			}
+			if ck.Actual != "" {
+				fmt.Fprintf(b, "\nActual:\n%s\n", indent(ck.Actual))
+			}
+			if ck.Hint != "" {
+				fmt.Fprintf(b, "\nHint:\n  %s\n", ck.Hint)
+			}
+		}
+		if step.ErrMsg != "" {
+			fmt.Fprintf(b, "\n%s %s\n  step %d (%s): %s\n",
+				colorize(color, cRed+cBold, label), suite, step.Index, step.Kind, step.ErrMsg)
+		}
+	}
+}
+
 // lastCommand returns the most recent run command in a scenario, for context.
 func lastCommand(sc *engine.ScenarioResult) string {
 	cmd := ""
