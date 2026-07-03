@@ -761,7 +761,7 @@ _Fixture `out/noise.log`:_
 noise
 ```
 #### Then
-- dir `out` contains `a/deep/nested.md`, has 2 entries, matches glob `*.md`, (recursive)
+- dir `out` contains `a/deep/nested.md`, has 2 entries, matches glob `*.md`, (recursive), ignoring *.log
 - dir `out` does not contain `a/deep/missing.md`, (recursive)
 ### Scenario: combining snapshot with matchers is a load-time error
 #### Given
