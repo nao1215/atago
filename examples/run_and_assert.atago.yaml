@@ -60,3 +60,15 @@ scenarios:
           stdout:
             line: 1
             equals: first
+
+  - name: exit code sets match a documented contract
+    steps:
+      # Real CLIs define exit-code SETS as their contract: grep exits 0 or 1
+      # without error, terraform plan -detailed-exitcode exits 0 (clean) or 2
+      # (changes). `in:` asserts membership in the accepted set (#19).
+      - run:
+          shell: true
+          command: exit 2
+      - assert:
+          exit_code:
+            in: [0, 2]

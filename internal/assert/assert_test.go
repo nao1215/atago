@@ -58,6 +58,44 @@ func TestCheck_ExitCode_TimedOut(t *testing.T) {
 	}
 }
 
+// TestCheck_ExitCode_In proves membership in the accepted set (#19): a listed
+// code passes, an unlisted one fails with the set spelled out.
+func TestCheck_ExitCode_In(t *testing.T) {
+	t.Parallel()
+	in := &spec.ExitCode{In: []int{0, 2}}
+	if got := Check(&spec.Assert{ExitCode: in}, &runner.Result{ExitCode: 2}, Env{}); !got.OK {
+		t.Errorf("exit code 2 against in [0, 2]: OK = false, want pass: %+v", got)
+	}
+	got := Check(&spec.Assert{ExitCode: in}, &runner.Result{ExitCode: 1}, Env{})
+	if got.OK {
+		t.Fatal("exit code 1 against in [0, 2]: OK = true, want failure")
+	}
+	if !strings.Contains(got.Expected, "exit code in [0, 2]") {
+		t.Errorf("Expected = %q, want it to list the accepted set", got.Expected)
+	}
+	if !strings.Contains(got.Hint, "[0, 2]") {
+		t.Errorf("Hint = %q, want it to list the accepted set", got.Hint)
+	}
+}
+
+// TestCheck_ExitCode_InTimedOut proves a timeout kill keeps the timeout hint
+// under the in matcher instead of presenting the synthetic -1 as a plain
+// mismatch (#19).
+func TestCheck_ExitCode_InTimedOut(t *testing.T) {
+	t.Parallel()
+	res := &runner.Result{ExitCode: -1, TimedOut: true, Duration: 200 * time.Millisecond}
+	got := Check(&spec.Assert{ExitCode: &spec.ExitCode{In: []int{0, 2}}}, res, Env{})
+	if got.OK {
+		t.Fatal("OK = true, want a failure for a timed-out command")
+	}
+	if !strings.Contains(got.Actual, "timed out after 200ms") {
+		t.Errorf("Actual = %q, want it to mention the timeout", got.Actual)
+	}
+	if !strings.Contains(got.Hint, "run.timeout") {
+		t.Errorf("Hint = %q, want the timeout hint, not a bare mismatch", got.Hint)
+	}
+}
+
 // TestCheck_ExitCode_TimedOutNamesSource proves the hint names the level that
 // supplied the timeout when the engine's resolver recorded one (#17).
 func TestCheck_ExitCode_TimedOutNamesSource(t *testing.T) {

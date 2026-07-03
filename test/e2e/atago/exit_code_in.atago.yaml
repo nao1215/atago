@@ -1,0 +1,91 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / exit_code in-set matcher
+
+# Exercises #19: `exit_code: {in: [...]}` passes when the exit code is any of
+# the listed values, fails with the set spelled out otherwise, and the
+# malformed shapes are load-time errors. `exit 2` under shell: true works in
+# both sh and cmd.exe, so these scenarios run on every OS.
+scenarios:
+  - name: a listed exit code passes
+    steps:
+      - run:
+          shell: true
+          command: exit 2
+      - assert:
+          exit_code:
+            in: [0, 2]
+
+  - name: an unlisted exit code fails and the output lists the set
+    steps:
+      - fixture:
+          file: inner.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: exit 2 is not in the accepted set
+                steps:
+                  - run:
+                      shell: true
+                      command: exit 2
+                  - assert:
+                      exit_code:
+                        in: [0, 1]
+      - run:
+          command: ${atago} run inner.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: "exit code in [0, 1]"
+
+  - name: mixing not and in is a load-time error
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: bad
+            scenarios:
+              - name: both forms
+                steps:
+                  - run:
+                      shell: true
+                      command: exit 0
+                  - assert:
+                      exit_code:
+                        not: 1
+                        in: [0, 2]
+      - run:
+          command: ${atago} run bad.atago.yaml
+      - assert:
+          exit_code: 2
+          stderr:
+            contains: "exactly one of"
+
+  - name: an empty in list is a load-time error
+    steps:
+      - fixture:
+          file: empty.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: empty
+            scenarios:
+              - name: empty set
+                steps:
+                  - run:
+                      shell: true
+                      command: exit 0
+                  - assert:
+                      exit_code:
+                        in: []
+      - run:
+          command: ${atago} run empty.atago.yaml
+      - assert:
+          exit_code: 2
+          stderr:
+            contains: "at least one accepted exit code"

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/nao1215/atago/internal/spec"
@@ -321,6 +322,9 @@ func describeTarget(a *spec.Assert, target spec.AssertTarget) string {
 		if a.ExitCode.Not != nil {
 			return fmt.Sprintf("exit code is not %d", *a.ExitCode.Not)
 		}
+		if len(a.ExitCode.In) > 0 {
+			return "exit code in " + intList(a.ExitCode.In)
+		}
 		if a.ExitCode.Equals != nil {
 			return fmt.Sprintf("exit code is %d", *a.ExitCode.Equals)
 		}
@@ -566,6 +570,15 @@ func writeList(b *strings.Builder, title string, items []string) {
 	for _, it := range items {
 		fmt.Fprintf(b, "    - %s\n", it)
 	}
+}
+
+// intList renders an accepted exit-code set as "[0, 2]" (#19).
+func intList(ns []int) string {
+	parts := make([]string, len(ns))
+	for i, n := range ns {
+		parts[i] = strconv.Itoa(n)
+	}
+	return "[" + strings.Join(parts, ", ") + "]"
 }
 
 func toSet(m map[string]string) map[string]bool {
