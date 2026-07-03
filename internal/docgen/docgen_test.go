@@ -203,6 +203,56 @@ scenarios:
 	}
 }
 
+// TestGenerate_SignalGroupsThenBullets proves a signal step is an action for
+// Then-grouping (#23): a run + signal scenario (each with asserts) renders two
+// "after ...:" groups instead of one flattened list — the writeThen counter
+// and thenGroups must agree on what counts as an action.
+func TestGenerate_SignalGroupsThenBullets(t *testing.T) {
+	t.Parallel()
+	src := `
+version: "1"
+suite:
+  name: sig
+scenarios:
+  - name: shutdown flow
+    services:
+      - name: server
+        command: ./server
+    steps:
+      - run:
+          command: ./client warmup
+      - assert:
+          exit_code: 0
+      - signal:
+          service: server
+          signal: TERM
+          wait:
+            timeout: 5s
+      - assert:
+          file:
+            path: server.log
+            contains: done
+`
+	s, err := loader.LoadBytes("sig.atago.yaml", []byte(src))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	var b bytes.Buffer
+	if err := Generate(&b, []Source{{Path: "sig.atago.yaml", Spec: s}}); err != nil {
+		t.Fatal(err)
+	}
+	out := b.String()
+	for _, w := range []string{
+		"# send SIGTERM to service server and wait up to 5s for exit",
+		"after `./client warmup`:",
+		"after `SIGTERM to server`:",
+	} {
+		if !strings.Contains(out, w) {
+			t.Errorf("doc output missing %q\n--- got ---\n%s", w, out)
+		}
+	}
+}
+
 // TestGenerate_MixedRunners verifies doc generation reaches parity with the
 // supported step kinds: background services, HTTP/query/gRPC/CDP steps all
 // appear in the narrative instead of only run steps (issue #41).

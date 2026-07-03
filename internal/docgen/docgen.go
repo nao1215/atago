@@ -379,10 +379,12 @@ func writeThen(md *markdown.Markdown, sc *spec.Scenario, expand func(string) str
 	if len(groups) == 0 {
 		return
 	}
+	// Keep this action set in sync with thenGroups: a drift flattens grouped
+	// bullets (or vice versa) for scenarios mixing the two step kinds.
 	actions := 0
 	for i := range sc.Steps {
 		switch sc.Steps[i].Kind() {
-		case spec.StepRun, spec.StepHTTP, spec.StepQuery, spec.StepGRPC, spec.StepCDP:
+		case spec.StepRun, spec.StepHTTP, spec.StepQuery, spec.StepGRPC, spec.StepCDP, spec.StepSignal:
 			actions++
 		}
 	}
