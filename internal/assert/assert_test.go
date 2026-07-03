@@ -58,6 +58,20 @@ func TestCheck_ExitCode_TimedOut(t *testing.T) {
 	}
 }
 
+// TestCheck_ExitCode_TimedOutNamesSource proves the hint names the level that
+// supplied the timeout when the engine's resolver recorded one (#17).
+func TestCheck_ExitCode_TimedOutNamesSource(t *testing.T) {
+	t.Parallel()
+	res := &runner.Result{ExitCode: -1, TimedOut: true, TimeoutSource: "suite.timeout", Duration: 200 * time.Millisecond}
+	got := Check(&spec.Assert{ExitCode: &spec.ExitCode{Equals: intp(0)}}, res, Env{})
+	if got.OK {
+		t.Fatal("OK = true, want a failure for a timed-out command")
+	}
+	if !strings.Contains(got.Hint, "suite.timeout") {
+		t.Errorf("Hint = %q, want it to name suite.timeout", got.Hint)
+	}
+}
+
 func TestCheck_Stream(t *testing.T) {
 	t.Parallel()
 	res := &runner.Result{Stdout: []byte("Alice and Bob\n"), Stderr: []byte("")}

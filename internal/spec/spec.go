@@ -56,6 +56,12 @@ type ScenarioDefaults struct {
 // Suite groups scenarios under a name.
 type Suite struct {
 	Name string `yaml:"name"`
+	// Timeout is the suite-level default step timeout (#17): every run, http,
+	// query, and grpc step without a more specific timeout (step > runner >
+	// defaults.run > suite) is bounded by this Go duration. "0"/"0s" disables
+	// the bound. When no level configures one, a built-in 60s default applies
+	// so a hanging command fails instead of stalling the run forever.
+	Timeout string `yaml:"timeout,omitempty"`
 	// Env is exported to every scenario, setup, and teardown step in the
 	// suite (a scenario's own env wins per key). Values get ${name} expansion
 	// against the suite store (${suitedir}, ${env:NAME}, setup stores).
@@ -386,10 +392,16 @@ type Run struct {
 	// Shell is a pointer so an authored `shell: false` is distinguishable from
 	// "unset" when `defaults.run.shell` is layered in (an authored value always
 	// wins over a default).
-	Shell   *bool             `yaml:"shell,omitempty"`
-	Cwd     string            `yaml:"cwd,omitempty"`
-	Timeout string            `yaml:"timeout,omitempty"`
-	Env     map[string]string `yaml:"env,omitempty"`
+	Shell   *bool  `yaml:"shell,omitempty"`
+	Cwd     string `yaml:"cwd,omitempty"`
+	Timeout string `yaml:"timeout,omitempty"`
+	// TimeoutSource names the level that supplied the effective Timeout
+	// (run.timeout / runner.timeout / defaults.run.timeout / suite.timeout /
+	// built-in default). It is set by the engine's precedence resolver (#17),
+	// never authored, and lets a timeout-kill failure hint say which level to
+	// adjust.
+	TimeoutSource string            `yaml:"-"`
+	Env           map[string]string `yaml:"env,omitempty"`
 	// ClearEnv starts the child from an empty environment instead of inheriting
 	// the host environment (#16), so host vars (LANG, GIT_*, proxies, ...) cannot
 	// silently change the behavior under test. A pointer so an authored

@@ -41,6 +41,10 @@
           "description": "Suite name declared by the spec.",
           "type": "string"
         },
+        "suite_timeout": {
+          "description": "Suite-level default step timeout (suite.timeout, #17); omitted when the built-in default applies.",
+          "type": "string"
+        },
         "secrets": {
           "description": "Declared secret names (omitted when none).",
           "type": "array",

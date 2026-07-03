@@ -16,11 +16,16 @@ import (
 //
 // stepVerb names the step kind for the unknown-runner error (e.g. "query step");
 // wantType is the required runner.Type; open builds and opens the typed
-// connection from the runner definition and its parsed timeout.
+// connection from the runner definition and its parsed timeout. defaultBounded
+// opts the runner family into the step-timeout precedence chain (#17): query
+// and grpc steps fall back to suite.timeout and the built-in 60s default when
+// the runner declares no timeout, while ssh and browser keep their historical
+// "empty means unbounded" behavior (their long-lived sessions are not steps).
 func resolveConn[T io.Closer](
 	name, stepVerb, wantType string,
 	rc runConfig,
 	conns map[string]T,
+	defaultBounded bool,
 	open func(rdef spec.Runner, timeout time.Duration) (T, error),
 ) (T, error) {
 	var zero T
@@ -34,11 +39,15 @@ func resolveConn[T io.Closer](
 	if rdef.Type != wantType {
 		return zero, fmt.Errorf("runner %q is not a %s runner (type %q)", name, wantType, rdef.Type)
 	}
+	timeoutStr := rdef.Timeout
+	if defaultBounded {
+		timeoutStr, _ = resolveTimeout("", rdef.Timeout, "", rc.suiteTimeout)
+	}
 	var timeout time.Duration
-	if rdef.Timeout != "" {
-		d, err := time.ParseDuration(rdef.Timeout)
+	if timeoutStr != "" {
+		d, err := time.ParseDuration(timeoutStr)
 		if err != nil {
-			return zero, fmt.Errorf("runner %q has invalid timeout %q: %w", name, rdef.Timeout, err)
+			return zero, fmt.Errorf("runner %q has invalid timeout %q: %w", name, timeoutStr, err)
 		}
 		timeout = d
 	}

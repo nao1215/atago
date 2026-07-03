@@ -14,7 +14,7 @@ import (
 // are ${name}-expanded so host/user/password/key can reference stored values or
 // built-ins (e.g. a key written under ${workdir}).
 func sshConn(name string, st *store.Store, rc runConfig, conns map[string]*sshrunner.Runner) (*sshrunner.Runner, error) {
-	return resolveConn(name, "run step", "ssh", rc, conns, func(rdef spec.Runner, timeout time.Duration) (*sshrunner.Runner, error) {
+	return resolveConn(name, "run step", "ssh", rc, conns, false, func(rdef spec.Runner, timeout time.Duration) (*sshrunner.Runner, error) {
 		cfg := sshrunner.Config{
 			Addr:            st.Expand(rdef.Host),
 			User:            st.Expand(rdef.User),

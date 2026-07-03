@@ -83,24 +83,26 @@ func (e *Engine) runHTTP(ctx context.Context, h *spec.HTTP, st *store.Store, rc 
 // so it can reference stored values or built-ins.
 func resolveHTTPConfig(h *spec.HTTP, st *store.Store, rc runConfig) (httprunner.Config, error) {
 	cfg := httprunner.Config{Allow: rc.allow}
-	if h.Runner == "" {
-		return cfg, nil
-	}
-	r, ok := rc.runners[h.Runner]
-	if !ok {
-		return cfg, fmt.Errorf("http step references unknown runner %q", h.Runner)
-	}
-	if r.Type != "http" {
-		return cfg, fmt.Errorf("runner %q is not an http runner (type %q)", h.Runner, r.Type)
-	}
-	cfg.BaseURL = st.Expand(r.BaseURL)
-	if r.Timeout != "" {
-		d, err := time.ParseDuration(r.Timeout)
-		if err != nil {
-			return cfg, fmt.Errorf("runner %q has invalid timeout %q: %w", h.Runner, r.Timeout, err)
+	var runnerTimeout string
+	if h.Runner != "" {
+		r, ok := rc.runners[h.Runner]
+		if !ok {
+			return cfg, fmt.Errorf("http step references unknown runner %q", h.Runner)
 		}
-		cfg.Timeout = d
+		if r.Type != "http" {
+			return cfg, fmt.Errorf("runner %q is not an http runner (type %q)", h.Runner, r.Type)
+		}
+		cfg.BaseURL = st.Expand(r.BaseURL)
+		runnerTimeout = r.Timeout
 	}
+	// http requests join the step-timeout precedence chain (#17): runner
+	// timeout > suite.timeout > built-in 60s ("0" disables).
+	timeoutStr, _ := resolveTimeout("", runnerTimeout, "", rc.suiteTimeout)
+	d, err := time.ParseDuration(timeoutStr)
+	if err != nil {
+		return cfg, fmt.Errorf("runner %q has invalid timeout %q: %w", h.Runner, timeoutStr, err)
+	}
+	cfg.Timeout = d
 	return cfg, nil
 }
 

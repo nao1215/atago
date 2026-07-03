@@ -74,9 +74,12 @@ func mergeRunDefaults(def, r *spec.Run) {
 	if r.Cwd == "" {
 		r.Cwd = def.Cwd
 	}
-	if r.Timeout == "" {
-		r.Timeout = def.Timeout
-	}
+	// Timeout is deliberately NOT merged here: the engine resolves the full
+	// precedence chain (step > runner > defaults.run > suite > built-in, #17)
+	// itself, and merging at load time would erase which level supplied the
+	// value — the timeout-kill hint names that level, and a runner-common
+	// timeout must beat defaults.run.timeout, which a string-fill here would
+	// invert.
 	if r.Stdin == "" {
 		r.Stdin = def.Stdin
 	}

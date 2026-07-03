@@ -7,6 +7,38 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Hermetic environment control (#16): `clear_env: true` on `run`, `service`,
+  and `pty` steps (and `defaults.run` / `defaults.service`) starts the child
+  from an EMPTY environment instead of inheriting the host's, so host vars
+  (`LANG`, `GIT_*`, proxies, ...) cannot silently change the behavior under
+  test. `pass_env: [PATH, HOME]` re-admits an explicit allowlist (unset host
+  vars are skipped); explicit `env:` overrides layer on top in the existing
+  suite → scenario → step order. On Windows a system-critical set
+  (`SystemRoot`, `SystemDrive`, `TEMP`, `TMP`, `PATHEXT`) is always retained.
+  `pass_env` without `clear_env: true` is a load-time error (exit 2).
+  See `examples/hermetic_env.atago.yaml`.
+- Suite-level default step timeout (#17): `suite.timeout: 2m` bounds every
+  `run`/`http`/`query`/`grpc` step that has no more specific timeout.
+  Precedence: step > runner `timeout` > `defaults.run.timeout` >
+  `suite.timeout` > built-in 60s. `timeout: "0"` (or `"0s"`) at any level
+  disables the bound. A timeout kill names the level that supplied the bound
+  in its failure hint. See `examples/timeouts.atago.yaml`.
+
+### Changed
+
+- **Steps are now bounded by a built-in 60s default timeout** (#17): a
+  `run`/`http`/`query`/`grpc` step with no timeout configured at any level
+  (step, runner, `defaults.run`, `suite.timeout`) now fails after 60s with
+  "the command timed out ... and was killed" instead of hanging the run (or a
+  CI job) forever. Specs relying on unbounded runs must either set a real
+  bound (`suite.timeout: 10m`) or opt out explicitly with `timeout: "0"`.
+- `defaults.run.timeout` is no longer string-merged into steps at load time;
+  the engine resolves the timeout precedence chain itself so a runner-common
+  `timeout` now correctly outranks `defaults.run.timeout`, and the failure
+  hint can name the level that supplied the bound (#17).
+
 ## [0.2.0] - 2026-07-03
 
 Suite-level bootstrap, interactive terminal testing, and verbose scenario

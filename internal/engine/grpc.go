@@ -34,7 +34,7 @@ func (e *Engine) runGRPC(ctx context.Context, g *spec.GRPC, st *store.Store, rc 
 // grpcConn returns the scenario's connection for a named grpc runner, opening it
 // on first use.
 func grpcConn(name string, st *store.Store, rc runConfig, conns map[string]*grpcrunner.Runner) (*grpcrunner.Runner, error) {
-	return resolveConn(name, "grpc step", "grpc", rc, conns, func(rdef spec.Runner, timeout time.Duration) (*grpcrunner.Runner, error) {
+	return resolveConn(name, "grpc step", "grpc", rc, conns, true, func(rdef spec.Runner, timeout time.Duration) (*grpcrunner.Runner, error) {
 		cfg := grpcrunner.Config{Target: st.Expand(rdef.Target), TLS: rdef.TLS, Timeout: timeout}
 		// Enforce the network allowlist before dialing (issue #17): grpc egress is
 		// confined to permissions.network.allow just like HTTP.

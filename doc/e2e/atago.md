@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-43 suites · 144 scenarios
+44 suites · 148 scenarios
 ## Contents
 - [atago self-hosting / variable expansion in assertion matcher values](#atago-self-hosting--variable-expansion-in-assertion-matcher-values) — 3 scenarios
   - [stdout.equals expands ${workdir}](#scenario-stdoutequals-expands-workdir)
@@ -178,6 +178,11 @@
   - [a failing setup errors every scenario and none runs (exit 4)](#scenario-a-failing-setup-errors-every-scenario-and-none-runs-exit-4)
   - [a suite service starts once and its store reaches every scenario](#scenario-a-suite-service-starts-once-and-its-store-reaches-every-scenario)
   - [a failing suite teardown is loud but does not flip the verdict](#scenario-a-failing-suite-teardown-is-loud-but-does-not-flip-the-verdict)
+- [atago self-hosting / step timeouts (suite default + escape hatch)](#atago-self-hosting--step-timeouts-suite-default--escape-hatch) — 4 scenarios
+  - [suite.timeout kills a hanging step and the hint names it](#scenario-suitetimeout-kills-a-hanging-step-and-the-hint-names-it)
+  - [a step timeout beats the suite timeout and the hint says run.timeout](#scenario-a-step-timeout-beats-the-suite-timeout-and-the-hint-says-runtimeout)
+  - [timeout zero disables a short suite bound](#scenario-timeout-zero-disables-a-short-suite-bound)
+  - [an invalid suite.timeout is a load-time error](#scenario-an-invalid-suitetimeout-is-a-load-time-error)
 - [atago self-hosting / verbose](#atago-self-hosting--verbose) — 4 scenarios
   - [verbose shows a passing scenario's command, output, and verdicts](#scenario-verbose-shows-a-passing-scenarios-command-output-and-verdicts)
   - [without --verbose the trace is absent](#scenario-without---verbose-the-trace-is-absent)
@@ -3147,6 +3152,113 @@ ${atago} run td.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `1 passed`, `SUITE TEARDOWN FAILED`
+## atago self-hosting / step timeouts (suite default + escape hatch)
+Source: `test/e2e/atago/timeouts.atago.yaml`
+### Scenario: suite.timeout kills a hanging step and the hint names it
+_skipped on windows_
+#### Given
+- Fixture file `hang.atago.yaml` is created.
+#### Inputs
+_Fixture `hang.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: hang
+  timeout: 1s
+scenarios:
+  - name: sleeps past the suite bound
+    steps:
+      - run:
+          shell: true
+          command: sleep 300
+      - assert:
+          exit_code: 0
+```
+#### When
+```shell
+${atago} run hang.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `timed out`, `suite.timeout`
+### Scenario: a step timeout beats the suite timeout and the hint says run.timeout
+_skipped on windows_
+#### Given
+- Fixture file `step_wins.atago.yaml` is created.
+#### Inputs
+_Fixture `step_wins.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: step-wins
+  timeout: 30s
+scenarios:
+  - name: the step's own 1s bound fires first
+    steps:
+      - run:
+          shell: true
+          command: sleep 300
+          timeout: 1s
+      - assert:
+          exit_code: 0
+```
+#### When
+```shell
+${atago} run step_wins.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `timed out`, `run.timeout`
+### Scenario: timeout zero disables a short suite bound
+_skipped on windows_
+#### Given
+- Fixture file `optout.atago.yaml` is created.
+#### Inputs
+_Fixture `optout.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: optout
+  timeout: 1s
+scenarios:
+  - name: the opted-out step outlives the suite bound
+    steps:
+      - run:
+          shell: true
+          command: sleep 2
+          timeout: "0"
+      - assert:
+          exit_code: 0
+```
+#### When
+```shell
+${atago} run optout.atago.yaml
+```
+#### Then
+- exit code is `0`
+### Scenario: an invalid suite.timeout is a load-time error
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: bad
+  timeout: fast
+scenarios:
+  - name: never runs
+    steps:
+      - run:
+          command: echo hi
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `suite.timeout`
 ## atago self-hosting / verbose
 Source: `test/e2e/atago/verbose.atago.yaml`
 ### Scenario: verbose shows a passing scenario's command, output, and verdicts

@@ -1,0 +1,117 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / step timeouts (suite default + escape hatch)
+
+# Exercises #17: suite.timeout bounds every step without a more specific
+# timeout, the failure hint names the level that supplied the bound, and
+# `timeout: "0"` opts a step back out. The probes use POSIX `sleep`, so these
+# scenarios skip on Windows; the precedence chain itself is covered by unit
+# tests on every OS.
+scenarios:
+  - name: suite.timeout kills a hanging step and the hint names it
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: hang.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: hang
+              timeout: 1s
+            scenarios:
+              - name: sleeps past the suite bound
+                steps:
+                  - run:
+                      shell: true
+                      command: sleep 300
+                  - assert:
+                      exit_code: 0
+      - run:
+          command: ${atago} run hang.atago.yaml
+          timeout: 30s
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - "timed out"
+              - "suite.timeout"
+
+  - name: a step timeout beats the suite timeout and the hint says run.timeout
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: step_wins.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: step-wins
+              timeout: 30s
+            scenarios:
+              - name: the step's own 1s bound fires first
+                steps:
+                  - run:
+                      shell: true
+                      command: sleep 300
+                      timeout: 1s
+                  - assert:
+                      exit_code: 0
+      - run:
+          command: ${atago} run step_wins.atago.yaml
+          timeout: 30s
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - "timed out"
+              - "run.timeout"
+
+  - name: timeout zero disables a short suite bound
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: optout.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: optout
+              timeout: 1s
+            scenarios:
+              - name: the opted-out step outlives the suite bound
+                steps:
+                  - run:
+                      shell: true
+                      command: sleep 2
+                      timeout: "0"
+                  - assert:
+                      exit_code: 0
+      - run:
+          command: ${atago} run optout.atago.yaml
+          timeout: 30s
+      - assert:
+          exit_code: 0
+
+  - name: an invalid suite.timeout is a load-time error
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: bad
+              timeout: fast
+            scenarios:
+              - name: never runs
+                steps:
+                  - run:
+                      command: echo hi
+      - run:
+          command: ${atago} run bad.atago.yaml
+      # A spec-content (validation) error exits 2.
+      - assert:
+          exit_code: 2
+          stderr:
+            contains: "suite.timeout"

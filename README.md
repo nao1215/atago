@@ -81,7 +81,7 @@ scenarios:
             empty: true
 ```
 
-`atago run` accepts spec files and directories (searched recursively for `*.atago.yaml`). Each scenario runs in its own temporary directory, and progress streams as a dot per scenario (`.` pass, `F` fail, `E` error, `s` skip). For full reproducibility a step can also opt out of the inherited host environment with `clear_env: true` (re-admitting an allowlist via `pass_env`), so host vars like `LANG` or `GIT_*` cannot make a spec pass on one machine and fail on another:
+`atago run` accepts spec files and directories (searched recursively for `*.atago.yaml`). Each scenario runs in its own temporary directory, and progress streams as a dot per scenario (`.` pass, `F` fail, `E` error, `s` skip). For full reproducibility a step can also opt out of the inherited host environment with `clear_env: true` (re-admitting an allowlist via `pass_env`), so host vars like `LANG` or `GIT_*` cannot make a spec pass on one machine and fail on another. Every run/http/query/grpc step is bounded by a built-in 60s default timeout, so a hanging command fails loudly instead of stalling CI — set `suite.timeout` (or a step/runner `timeout`) to change the budget, or `timeout: "0"` to opt a legitimately long step out:
 
 ```shell
 $ atago run ./specs
@@ -137,6 +137,7 @@ Every feature has a commented, runnable spec under [examples/](examples/). The e
 | [store_and_variables](examples/store_and_variables.atago.yaml) | capturing values into `${name}`, `${workdir}`, `${env:NAME}` host-environment reads, the `$${...}` literal escape |
 | [teardown](examples/teardown.atago.yaml) | cleanup steps that always run — pass or fail — sharing the scenario's variables |
 | [hermetic_env](examples/hermetic_env.atago.yaml) | `clear_env: true` starts commands from an empty environment, `pass_env` re-admits an allowlist of host variables |
+| [timeouts](examples/timeouts.atago.yaml) | the built-in 60s default step timeout, `suite.timeout`, per-step overrides, and the `timeout: "0"` escape hatch |
 | [matrix](examples/matrix.atago.yaml) | one template scenario expanded per parameter row |
 | [pty](examples/pty.atago.yaml) | interactive testing in a real pseudo-terminal: expect/send sessions, TTY-detection (POSIX-only) |
 | [retry](examples/retry.atago.yaml) | polling a command until an assertion passes |

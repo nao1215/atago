@@ -24,7 +24,7 @@ func (e *Engine) runCDP(ctx context.Context, c *spec.CDP, workdir string, st *st
 // browserConn returns the scenario's session for a named browser runner,
 // launching it on first use.
 func browserConn(name string, _ *store.Store, rc runConfig, conns map[string]*browserrunner.Runner) (*browserrunner.Runner, error) {
-	return resolveConn(name, "cdp step", "browser", rc, conns, func(rdef spec.Runner, timeout time.Duration) (*browserrunner.Runner, error) {
+	return resolveConn(name, "cdp step", "browser", rc, conns, false, func(rdef spec.Runner, timeout time.Duration) (*browserrunner.Runner, error) {
 		// Headless defaults to true; an explicit `headless: false` runs headed.
 		headless := rdef.Headless == nil || *rdef.Headless
 		return browserrunner.Open(browserrunner.Config{
