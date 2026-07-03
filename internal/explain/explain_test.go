@@ -370,6 +370,54 @@ scenarios:
 	}
 }
 
+// TestExplain_HermeticEnv proves explain surfaces clear_env/pass_env on run
+// steps and services (#16) so a reviewer sees the hermetic-environment intent.
+func TestExplain_HermeticEnv(t *testing.T) {
+	t.Parallel()
+	src := `
+version: "1"
+suite:
+  name: hermetic
+scenarios:
+  - name: cleared
+    services:
+      - name: srv
+        command: ./srv
+        clear_env: true
+        pass_env: [PATH]
+    steps:
+      - run:
+          command: env
+          clear_env: true
+          pass_env: [PATH, HOME]
+      - assert:
+          exit_code: 0
+      - run:
+          command: env
+          clear_env: true
+      - assert:
+          exit_code: 0
+`
+	s, err := loader.LoadBytes("t.atago.yaml", []byte(src))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	var b bytes.Buffer
+	if err := Explain(&b, s, "t.atago.yaml"); err != nil {
+		t.Fatal(err)
+	}
+	out := b.String()
+	for _, want := range []string{
+		"cleared environment (passes: PATH, HOME)",
+		"cleared environment)",
+		"[cleared environment, passes: PATH]",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("explain output missing %q\n--- got ---\n%s", want, out)
+		}
+	}
+}
+
 // TestExplain_AssertVariants exercises describeAssert/describeStream/
 // describeFile/describeImage/jsonMatcher across every matcher shape.
 func TestExplain_AssertVariants(t *testing.T) {

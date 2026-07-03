@@ -58,7 +58,7 @@ func buildScenario(sc *spec.Scenario, src SourceLocator) Scenario {
 }
 
 func buildService(svc *spec.Service) Service {
-	out := Service{Name: svc.Name, Command: svc.Command, Shell: svc.ShellEnabled()}
+	out := Service{Name: svc.Name, Command: svc.Command, Shell: svc.ShellEnabled(), ClearEnv: svc.ClearEnvEnabled(), PassEnv: svc.PassEnv}
 	if svc.Ready != nil {
 		switch {
 		case svc.Ready.File != "":
@@ -90,6 +90,8 @@ func buildStep(index int, step *spec.Step, vars map[string]bool) Step {
 		svc := step.Service
 		st.Command = svc.Command
 		st.Shell = svc.ShellEnabled()
+		st.ClearEnv = svc.ClearEnvEnabled()
+		st.PassEnv = svc.PassEnv
 		st.Target = svc.Name
 		st.Action = "start suite service " + svc.Name
 		collectVars(vars, svc.Command, svc.Cwd)
@@ -98,6 +100,8 @@ func buildStep(index int, step *spec.Step, vars map[string]bool) Step {
 		r := step.Run
 		st.Command = r.Command
 		st.Shell = r.ShellEnabled()
+		st.ClearEnv = r.ClearEnvEnabled()
+		st.PassEnv = r.PassEnv
 		st.Runner = r.Runner
 		st.Action = "run " + r.Command
 		if r.Retry != nil {
@@ -174,6 +178,8 @@ func buildStep(index int, step *spec.Step, vars map[string]bool) Step {
 		pt := step.PTY
 		st.Command = pt.Command
 		st.Shell = pt.Shell != nil && *pt.Shell
+		st.ClearEnv = pt.ClearEnvEnabled()
+		st.PassEnv = pt.PassEnv
 		st.Action = "interactive (pty) " + pt.Command
 		collectVars(vars, pt.Command, pt.Cwd)
 		for _, v := range pt.Env {

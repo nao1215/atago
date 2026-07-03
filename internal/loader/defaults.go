@@ -81,6 +81,14 @@ func mergeRunDefaults(def, r *spec.Run) {
 		r.Stdin = def.Stdin
 	}
 	r.Env = mergeStringMap(def.Env, r.Env)
+	if r.ClearEnv == nil {
+		r.ClearEnv = def.ClearEnv
+	}
+	// pass_env is meaningless without clear_env, so a step that authored
+	// `clear_env: false` does not inherit the default allowlist (#16).
+	if r.PassEnv == nil && r.ClearEnvEnabled() {
+		r.PassEnv = def.PassEnv
+	}
 }
 
 // mergeServiceDefaults layers def beneath an authored service. Name and Command
@@ -95,6 +103,13 @@ func mergeServiceDefaults(def, svc *spec.Service) {
 		svc.Cwd = def.Cwd
 	}
 	svc.Env = mergeStringMap(def.Env, svc.Env)
+	if svc.ClearEnv == nil {
+		svc.ClearEnv = def.ClearEnv
+	}
+	// Mirrors mergeRunDefaults: no allowlist inheritance without clear_env (#16).
+	if svc.PassEnv == nil && svc.ClearEnvEnabled() {
+		svc.PassEnv = def.PassEnv
+	}
 	if svc.Ready == nil && def.Ready != nil {
 		ready := *def.Ready
 		svc.Ready = &ready

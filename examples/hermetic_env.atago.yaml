@@ -1,0 +1,75 @@
+version: "1"
+
+# Hermetic environment control (#16): `clear_env: true` starts the child from
+# an EMPTY environment instead of inheriting the host's, so host vars (LANG,
+# GIT_*, NO_COLOR, proxy settings, ...) cannot silently change the behavior
+# under test — the spec passes on your machine and in CI for the same reason.
+# `pass_env` re-admits an explicit allowlist of host variables (unset ones are
+# skipped); explicit `env:` overrides are layered on top as always.
+#
+# Note the distinction from `${env:NAME}` interpolation: `${env:NAME}` is
+# resolved by atago itself (it reads the real host environment and substitutes
+# the value into the spec string), while clear_env/pass_env control what the
+# CHILD PROCESS sees in its own environment block. A value injected via
+# `${env:...}` into `env:` survives clear_env because it became an explicit
+# override.
+#
+# On Windows a small system-critical set (SystemRoot, SystemDrive, TEMP, TMP,
+# PATHEXT) is always retained so processes can start at all. The probe
+# commands below are POSIX, so these scenarios skip on Windows.
+# Runs green as-is on Linux/macOS: atago run examples/hermetic_env.atago.yaml
+
+suite:
+  name: hermetic environment
+
+scenarios:
+  - name: clear_env hides the host environment from the child
+    skip:
+      os: windows
+    steps:
+      # `env` prints the child's environment, one VAR=value per line. With
+      # clear_env and only an explicit env override, that is ALL the child sees.
+      - run:
+          command: env
+          clear_env: true
+          env:
+            ONLY_THIS: survives
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: ONLY_THIS=survives
+
+  - name: pass_env re-admits an allowlist of host variables
+    skip:
+      os: windows
+    steps:
+      # PATH is copied from the host; HOME is not listed, so it stays hidden.
+      - run:
+          command: env
+          clear_env: true
+          pass_env: [PATH]
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "PATH="
+      # A stream assert sets exactly one matcher, so the negative check is its
+      # own step: HOME was not in the allowlist and stays hidden.
+      - assert:
+          stdout:
+            not_contains: "HOME="
+
+  - name: explicit env still wins over a passed-through host variable
+    skip:
+      os: windows
+    steps:
+      - run:
+          shell: true
+          command: "printf '%s\\n' \"$HOME\""
+          clear_env: true
+          pass_env: [HOME]
+          env:
+            HOME: /hermetic/home
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: /hermetic/home

@@ -81,7 +81,7 @@ scenarios:
             empty: true
 ```
 
-`atago run` accepts spec files and directories (searched recursively for `*.atago.yaml`). Each scenario runs in its own temporary directory, and progress streams as a dot per scenario (`.` pass, `F` fail, `E` error, `s` skip):
+`atago run` accepts spec files and directories (searched recursively for `*.atago.yaml`). Each scenario runs in its own temporary directory, and progress streams as a dot per scenario (`.` pass, `F` fail, `E` error, `s` skip). For full reproducibility a step can also opt out of the inherited host environment with `clear_env: true` (re-admitting an allowlist via `pass_env`), so host vars like `LANG` or `GIT_*` cannot make a spec pass on one machine and fail on another:
 
 ```shell
 $ atago run ./specs
@@ -136,6 +136,7 @@ Every feature has a commented, runnable spec under [examples/](examples/). The e
 | [files_and_fixtures](examples/files_and_fixtures.atago.yaml) | input fixtures (text and base64), `file` and `dir` assertions |
 | [store_and_variables](examples/store_and_variables.atago.yaml) | capturing values into `${name}`, `${workdir}`, `${env:NAME}` host-environment reads, the `$${...}` literal escape |
 | [teardown](examples/teardown.atago.yaml) | cleanup steps that always run — pass or fail — sharing the scenario's variables |
+| [hermetic_env](examples/hermetic_env.atago.yaml) | `clear_env: true` starts commands from an empty environment, `pass_env` re-admits an allowlist of host variables |
 | [matrix](examples/matrix.atago.yaml) | one template scenario expanded per parameter row |
 | [pty](examples/pty.atago.yaml) | interactive testing in a real pseudo-terminal: expect/send sessions, TTY-detection (POSIX-only) |
 | [retry](examples/retry.atago.yaml) | polling a command until an assertion passes |

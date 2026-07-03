@@ -206,6 +206,13 @@ func givenBullets(sc *spec.Scenario, expand func(string) string) []string {
 			if len(step.Run.Env) > 0 {
 				out = append(out, "Environment variables are set: "+strings.Join(sortedEnvKeys(step.Run.Env), ", ")+".")
 			}
+			if step.Run.ClearEnvEnabled() {
+				bullet := "The command runs with a cleared environment"
+				if len(step.Run.PassEnv) > 0 {
+					bullet += " (passing through: " + strings.Join(step.Run.PassEnv, ", ") + ")"
+				}
+				out = append(out, bullet+".")
+			}
 		}
 	}
 	return out

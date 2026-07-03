@@ -248,6 +248,17 @@
         "shell": {
           "type": "boolean"
         },
+        "clear_env": {
+          "description": "The service starts from a cleared environment (#16).",
+          "type": "boolean"
+        },
+        "pass_env": {
+          "description": "Host variables passed through into the cleared environment (#16).",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "ready": {
           "description": "Readiness signal kind, or empty when steps start as soon as the process spawns.",
           "type": "string",
@@ -289,6 +300,17 @@
         },
         "shell": {
           "type": "boolean"
+        },
+        "clear_env": {
+          "description": "The command runs with a cleared environment (#16).",
+          "type": "boolean"
+        },
+        "pass_env": {
+          "description": "Host variables passed through into the cleared environment (#16).",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         },
         "runner": {
           "type": "string"

@@ -38,7 +38,7 @@ func (e *Engine) runPTY(ctx context.Context, p *spec.PTY, st *store.Store, scena
 			c.Session[i] = na
 		}
 	}
-	return ptyrun.Run(ctx, &c, workdir, runnercmd.BuildEnv(c.Env))
+	return ptyrun.Run(ctx, &c, workdir, runnercmd.BuildEnv(c.Env, c.ClearEnvEnabled(), c.PassEnv))
 }
 
 // ptyExpectCheck converts a never-matched session expect into the structured

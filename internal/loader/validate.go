@@ -88,6 +88,7 @@ func validateDefaults(add func(string, ...any), d *spec.Defaults) {
 				add("defaults.run.timeout %q is not a valid duration (e.g. \"30s\")", r.Timeout)
 			}
 		}
+		validateHermeticEnv(add, "defaults.run", r.ClearEnv, r.PassEnv)
 	}
 	if sv := d.Service; sv != nil {
 		if sv.Name != "" {
@@ -96,7 +97,26 @@ func validateDefaults(add func(string, ...any), d *spec.Defaults) {
 		if sv.Command != "" {
 			add("defaults.service.command is not supported (each service sets its own command)")
 		}
+		validateHermeticEnv(add, "defaults.service", sv.ClearEnv, sv.PassEnv)
 		validateReady(add, "defaults.service", sv.Ready)
+	}
+}
+
+// validateHermeticEnv checks the clear_env/pass_env pairing (#16): pass_env is
+// only meaningful when clear_env starts the environment empty, so an
+// allowlist without clear_env: true is authoring confusion and is rejected
+// instead of silently ignored. Empty variable names are rejected too.
+func validateHermeticEnv(add func(string, ...any), where string, clearEnv *bool, passEnv []string) {
+	if len(passEnv) == 0 {
+		return
+	}
+	if clearEnv == nil || !*clearEnv {
+		add("%s.pass_env requires clear_env: true (pass_env selects host vars for a cleared environment)", where)
+	}
+	for i, name := range passEnv {
+		if name == "" {
+			add("%s.pass_env[%d] must not be an empty variable name", where, i)
+		}
 	}
 }
 
@@ -198,6 +218,7 @@ func validateServices(add func(string, ...any), where string, services []spec.Se
 		if svc.Command == "" {
 			add("%s.command is required", sw)
 		}
+		validateHermeticEnv(add, sw, svc.ClearEnv, svc.PassEnv)
 		validateReady(add, sw, svc.Ready)
 	}
 }
@@ -230,6 +251,7 @@ func validateSuiteBlock(add func(string, ...any), where string, steps []spec.Ste
 			if st.Run.Command == "" {
 				add("%s.run.command is required", sw)
 			}
+			validateHermeticEnv(add, sw+".run", st.Run.ClearEnv, st.Run.PassEnv)
 			validateRetry(add, sw+".run", st.Run.Retry)
 		case spec.StepStore:
 			validateStore(add, sw, st.Store)
@@ -251,6 +273,7 @@ func validateSuiteBlock(add func(string, ...any), where string, steps []spec.Ste
 			if svc.Command == "" {
 				add("%s.service.command is required", sw)
 			}
+			validateHermeticEnv(add, sw+".service", svc.ClearEnv, svc.PassEnv)
 			validateReady(add, sw+".service", svc.Ready)
 		default:
 			add("%s: %s steps are per-scenario (they need a scenario workdir and runners); move it into a scenario", sw, st.Kind())
@@ -369,6 +392,7 @@ func validateStep(add func(string, ...any), where string, st *spec.Step, runners
 					"or use `stdout_to` / `stderr_to` for redirection", where, tok)
 			}
 		}
+		validateHermeticEnv(add, where+".run", st.Run.ClearEnv, st.Run.PassEnv)
 		validateRetry(add, where+".run", st.Run.Retry)
 	case spec.StepAssert:
 		validateAssert(add, where, st.Assert)
@@ -437,6 +461,7 @@ func validatePTY(add func(string, ...any), where string, p *spec.PTY) {
 			add("%s.pty.timeout must be positive (got %q); omit it for the 30s default", where, p.Timeout)
 		}
 	}
+	validateHermeticEnv(add, where+".pty", p.ClearEnv, p.PassEnv)
 	// A pty size is a uint16 on the wire; reject values the terminal cannot
 	// represent instead of silently truncating.
 	if p.Rows < 0 || p.Cols < 0 || p.Rows > 65535 || p.Cols > 65535 {

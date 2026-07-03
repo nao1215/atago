@@ -214,6 +214,13 @@ func explainScenario(b *strings.Builder, sc *spec.Scenario) {
 // readiness is decided (ADR-0031).
 func describeService(svc *spec.Service) string {
 	desc := svc.Name + ": " + svc.Command
+	if svc.ClearEnvEnabled() {
+		note := "  [cleared environment"
+		if len(svc.PassEnv) > 0 {
+			note += ", passes: " + strings.Join(svc.PassEnv, ", ")
+		}
+		desc += note + "]"
+	}
 	if svc.Ready == nil {
 		return desc
 	}
@@ -259,6 +266,13 @@ func describeRun(r *spec.Run) string {
 	}
 	if len(r.Env) > 0 {
 		notes = append(notes, "env: "+strings.Join(sortedKeys(toSet(r.Env)), ", "))
+	}
+	if r.ClearEnvEnabled() {
+		note := "cleared environment"
+		if len(r.PassEnv) > 0 {
+			note += " (passes: " + strings.Join(r.PassEnv, ", ") + ")"
+		}
+		notes = append(notes, note)
 	}
 	if r.ShellEnabled() {
 		notes = append(notes, "shell")

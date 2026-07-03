@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-42 suites · 139 scenarios
+43 suites · 144 scenarios
 ## Contents
 - [atago self-hosting / variable expansion in assertion matcher values](#atago-self-hosting--variable-expansion-in-assertion-matcher-values) — 3 scenarios
   - [stdout.equals expands ${workdir}](#scenario-stdoutequals-expands-workdir)
@@ -61,6 +61,12 @@
 - [atago self-hosting / grpc runner](#atago-self-hosting--grpc-runner) — 2 scenarios
   - [a grpc runner without a target fails validation (exit 2)](#scenario-a-grpc-runner-without-a-target-fails-validation-exit-2)
   - [a grpc step naming an undeclared runner fails validation (exit 2)](#scenario-a-grpc-step-naming-an-undeclared-runner-fails-validation-exit-2)
+- [atago self-hosting / hermetic environment (clear_env + pass_env)](#atago-self-hosting--hermetic-environment-clear_env--pass_env) — 5 scenarios
+  - [clear_env drops inherited host variables](#scenario-clear_env-drops-inherited-host-variables)
+  - [pass_env re-admits an allowlist of host variables](#scenario-pass_env-re-admits-an-allowlist-of-host-variables)
+  - [explicit env wins over a passed-through host variable](#scenario-explicit-env-wins-over-a-passed-through-host-variable)
+  - [pass_env without clear_env is a load-time error](#scenario-pass_env-without-clear_env-is-a-load-time-error)
+  - [unset host variables in pass_env are skipped, not an error](#scenario-unset-host-variables-in-pass_env-are-skipped-not-an-error)
 - [atago self-hosting / http runner](#atago-self-hosting--http-runner) — 2 scenarios
   - [a denied host is a security policy violation (exit 6)](#scenario-a-denied-host-is-a-security-policy-violation-exit-6)
   - [an http step with an undeclared runner fails validation (exit 2)](#scenario-an-http-step-with-an-undeclared-runner-fails-validation-exit-2)
@@ -1109,6 +1115,84 @@ ${atago} run norunner.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `is not declared`
+## atago self-hosting / hermetic environment (clear_env + pass_env)
+Source: `test/e2e/atago/hermetic_env.atago.yaml`
+### Scenario: clear_env drops inherited host variables
+_skipped on windows_
+#### Given
+- The command runs with a cleared environment.
+#### When
+```shell
+env
+env
+```
+#### Then
+- after `env`:
+  - exit code is `0`
+  - stdout contains `ATAGO_HERMETIC_CANARY`
+- after `env`:
+  - exit code is `0`
+  - stdout contains `ATAGO_HERMETIC_CANARY=leaked-from-scenario`
+  - stdout does not contain `PATH=/`
+### Scenario: pass_env re-admits an allowlist of host variables
+_skipped on windows_
+#### Given
+- The command runs with a cleared environment (passing through: PATH).
+#### When
+```shell
+env
+```
+#### Then
+- exit code is `0`
+- stdout contains `PATH=`
+- stdout does not contain `HOME=`
+### Scenario: explicit env wins over a passed-through host variable
+_skipped on windows_
+#### Given
+- Environment variables are set: HOME.
+- The command runs with a cleared environment (passing through: HOME).
+#### When
+```shell
+printf '%s\n' "$HOME"
+```
+#### Then
+- exit code is `0`
+- stdout equals an exact value
+### Scenario: pass_env without clear_env is a load-time error
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: bad
+scenarios:
+  - name: forgot clear_env
+    steps:
+      - run:
+          command: env
+          pass_env: [PATH]
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `pass_env requires clear_env: true`, `steps[0].run`
+### Scenario: unset host variables in pass_env are skipped, not an error
+_skipped on windows_
+#### Given
+- The command runs with a cleared environment (passing through: PATH, ATAGO_SURELY_UNSET_VAR_2026).
+#### When
+```shell
+env
+```
+#### Then
+- exit code is `0`
+- stdout contains `PATH=`
+- stdout does not contain `ATAGO_SURELY_UNSET_VAR_2026`
 ## atago self-hosting / http runner
 Source: `test/e2e/atago/http.atago.yaml`
 ### Scenario: a denied host is a security policy violation (exit 6)

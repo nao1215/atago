@@ -51,7 +51,7 @@ func (r *Runner) Run(ctx context.Context, run *spec.Run, workdir string) (*runne
 		ConfigureShell(cmd, run.Command)
 	}
 	cmd.Dir = resolveDir(workdir, run.Cwd)
-	cmd.Env = buildEnv(run.Env)
+	cmd.Env = buildEnv(run.Env, run.ClearEnvEnabled(), run.PassEnv)
 	// On cancellation (Ctrl-C / suite cancel / step timeout), kill the whole
 	// process group, not just the shell we spawned: `sh -c "sleep 30"` orphans its
 	// child, and that orphan keeps the stdout/stderr pipe open, so cmd.Wait would
@@ -249,9 +249,13 @@ func parseTimeout(s string) (time.Duration, error) {
 // interpreted relative to the scenario workdir (shared with the service runner).
 func ResolveDir(workdir, cwd string) string { return resolveDir(workdir, cwd) }
 
-// BuildEnv inherits the parent environment and applies per-command overrides
-// (shared with the service runner).
-func BuildEnv(overrides map[string]string) []string { return buildEnv(overrides) }
+// BuildEnv composes a child process environment: it inherits the parent
+// environment (or starts empty when clearEnv is set, re-admitting only the
+// passEnv allowlist) and applies per-command overrides on top (shared with the
+// service and pty runners) (#16).
+func BuildEnv(overrides map[string]string, clearEnv bool, passEnv []string) []string {
+	return buildEnv(overrides, clearEnv, passEnv)
+}
 
 // resolveDir returns the working directory for the command. cwd is interpreted
 // relative to the scenario workdir.
@@ -265,14 +269,60 @@ func resolveDir(workdir, cwd string) string {
 	return filepath.Join(workdir, cwd)
 }
 
-// buildEnv inherits the parent environment and applies per-step overrides.
-func buildEnv(overrides map[string]string) []string {
-	if len(overrides) == 0 {
-		return nil // nil → inherit os.Environ() (exec default)
+// windowsCriticalEnv is the documented set of system-critical variables always
+// retained under clear_env on Windows so processes can start at all (#16).
+var windowsCriticalEnv = []string{"SystemRoot", "SystemDrive", "TEMP", "TMP", "PATHEXT"}
+
+// buildEnv composes the child environment. Without clearEnv it inherits the
+// parent environment and appends per-step overrides (a nil return means
+// "inherit os.Environ()", exec's default). With clearEnv it starts empty:
+// only the passEnv allowlist (plus the Windows system-critical set) is copied
+// from the host, and overrides are layered on top so the existing
+// suite → scenario → step precedence is preserved (#16).
+func buildEnv(overrides map[string]string, clearEnv bool, passEnv []string) []string {
+	if !clearEnv {
+		if len(overrides) == 0 {
+			return nil // nil → inherit os.Environ() (exec default)
+		}
+		env := os.Environ()
+		for k, v := range overrides {
+			env = append(env, k+"="+v)
+		}
+		return env
 	}
-	env := os.Environ()
+	env := make([]string, 0, len(passEnv)+len(overrides)+len(windowsCriticalEnv))
+	if runtime.GOOS == "windows" {
+		for _, name := range windowsCriticalEnv {
+			if v, ok := lookupHostEnv(name); ok {
+				env = append(env, name+"="+v)
+			}
+		}
+	}
+	for _, name := range passEnv {
+		if v, ok := lookupHostEnv(name); ok {
+			env = append(env, name+"="+v)
+		}
+	}
 	for k, v := range overrides {
 		env = append(env, k+"="+v)
 	}
 	return env
+}
+
+// lookupHostEnv reads a host variable for pass_env. Windows environment names
+// are case-insensitive (PATH arrives as "Path"), so fall back to a
+// case-insensitive scan there; os.LookupEnv is case-sensitive everywhere.
+func lookupHostEnv(name string) (string, bool) {
+	if v, ok := os.LookupEnv(name); ok {
+		return v, true
+	}
+	if runtime.GOOS == "windows" {
+		for _, kv := range os.Environ() {
+			k, v, found := strings.Cut(kv, "=")
+			if found && strings.EqualFold(k, name) {
+				return v, true
+			}
+		}
+	}
+	return "", false
 }

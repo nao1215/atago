@@ -148,6 +148,8 @@ scenarios:
           content: "{}"
       - run:
           command: gup list --json
+          clear_env: true
+          pass_env: [PATH]
           env:
             GOBIN: ./tmp/bin
       - assert:
@@ -178,6 +180,7 @@ scenarios:
 		"#### Given",
 		"Fixture file `config.yaml` is created.",
 		"Environment variables are set: GOBIN.",
+		"The command runs with a cleared environment (passing through: PATH).",
 		"#### When",
 		"```shell",
 		"gup list --json",

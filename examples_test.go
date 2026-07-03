@@ -23,6 +23,7 @@ var exampleSpecs = map[string]bool{ // path -> hermetic (run, not just validate)
 	"examples/defaults.atago.yaml":            true,
 	"examples/files_and_fixtures.atago.yaml":  true,
 	"examples/grpc.atago.yaml":                false,
+	"examples/hermetic_env.atago.yaml":        true,
 	"examples/http.atago.yaml":                false,
 	"examples/image_and_pdf.atago.yaml":       true,
 	"examples/json_and_yaml.atago.yaml":       true,

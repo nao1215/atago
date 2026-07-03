@@ -189,6 +189,14 @@ type Service struct {
 	// Env sets process environment variables (layered over the scenario env and
 	// the inherited host environment), with ${name} expansion on the values.
 	Env map[string]string `yaml:"env,omitempty"`
+	// ClearEnv starts the service from an empty environment instead of
+	// inheriting the host environment (#16). A pointer so an authored
+	// `clear_env: false` is distinguishable from "unset" when
+	// `defaults.service.clear_env` is layered in.
+	ClearEnv *bool `yaml:"clear_env,omitempty"`
+	// PassEnv copies the listed host variables into the cleared environment
+	// (#16). Only meaningful with ClearEnv; unset host variables are skipped.
+	PassEnv []string `yaml:"pass_env,omitempty"`
 	// Ready declares how to wait until the service is accepting work before the
 	// steps run. When omitted, the steps start as soon as the process is spawned.
 	Ready *Ready `yaml:"ready,omitempty"`
@@ -382,7 +390,17 @@ type Run struct {
 	Cwd     string            `yaml:"cwd,omitempty"`
 	Timeout string            `yaml:"timeout,omitempty"`
 	Env     map[string]string `yaml:"env,omitempty"`
-	Stdin   string            `yaml:"stdin,omitempty"`
+	// ClearEnv starts the child from an empty environment instead of inheriting
+	// the host environment (#16), so host vars (LANG, GIT_*, proxies, ...) cannot
+	// silently change the behavior under test. A pointer so an authored
+	// `clear_env: false` is distinguishable from "unset" when
+	// `defaults.run.clear_env` is layered in.
+	ClearEnv *bool `yaml:"clear_env,omitempty"`
+	// PassEnv copies the listed host variables into the cleared environment
+	// (#16). Only meaningful with ClearEnv (the loader rejects it otherwise);
+	// unset host variables are skipped, not an error.
+	PassEnv []string `yaml:"pass_env,omitempty"`
+	Stdin   string   `yaml:"stdin,omitempty"`
 	// StdoutTo / StderrTo redirect the command's captured stdout / stderr to a
 	// workdir-relative file (create/truncate), so a `shell: false` step can write
 	// output to a file without borrowing the shell's `>` operator. The streams are
@@ -404,6 +422,15 @@ func (r *Run) ShellEnabled() bool { return r.Shell != nil && *r.Shell }
 
 // ShellEnabled reports whether the service opts into shell execution.
 func (s *Service) ShellEnabled() bool { return s.Shell != nil && *s.Shell }
+
+// ClearEnvEnabled reports whether the step opts into a cleared environment (#16).
+func (r *Run) ClearEnvEnabled() bool { return r.ClearEnv != nil && *r.ClearEnv }
+
+// ClearEnvEnabled reports whether the service opts into a cleared environment (#16).
+func (s *Service) ClearEnvEnabled() bool { return s.ClearEnv != nil && *s.ClearEnv }
+
+// ClearEnvEnabled reports whether the pty step opts into a cleared environment (#16).
+func (p *PTY) ClearEnvEnabled() bool { return p.ClearEnv != nil && *p.ClearEnv }
 
 // Retry re-runs a command until Until passes or the attempt budget is exhausted.
 // The last attempt's result is what subsequent steps observe.
@@ -435,6 +462,12 @@ type PTY struct {
 	// instead of hanging the run.
 	Timeout string            `yaml:"timeout,omitempty"`
 	Env     map[string]string `yaml:"env,omitempty"`
+	// ClearEnv starts the pty child from an empty environment instead of
+	// inheriting the host environment (#16), mirroring run.clear_env.
+	ClearEnv *bool `yaml:"clear_env,omitempty"`
+	// PassEnv copies the listed host variables into the cleared environment
+	// (#16). Only meaningful with ClearEnv; unset host variables are skipped.
+	PassEnv []string `yaml:"pass_env,omitempty"`
 	// Session is the ordered expect/send script. Each entry sets exactly one
 	// of Expect (wait until the accumulated transcript matches the regexp) or
 	// Send (write the string to the terminal; an empty send transmits EOF,
