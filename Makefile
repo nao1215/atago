@@ -83,7 +83,11 @@ dogfood-mimixbox: ## Full mimixbox applet e2e (builds + --full-installs applets;
 	# Builds the mimixbox multi-call binary, installs every applet into an
 	# isolated bin dir put FIRST on PATH, then runs the atago specs against the
 	# real applets (the atago replacement for mimixbox's ShellSpec suite).
-	bash ./test/e2e/tools/mimixbox/run.sh --parallel $(PARALLEL)
+	# --parallel 1 on purpose: the kill-family scenarios (killall/pkill/pgrep)
+	# signal processes BY NAME, so running them alongside other scenarios'
+	# `sleep` processes is a cross-scenario race (seen as a flaky
+	# "sleeps then returns" failure under --parallel 8).
+	bash ./test/e2e/tools/mimixbox/run.sh --parallel 1
 
 dogfood-mobilepkg: ## Full mobilepkg e2e (builds latest mobilepkg; set MOBILEPKG_REPO)
 	bash ./test/e2e/tools/mobilepkg/run.sh --parallel $(PARALLEL)
