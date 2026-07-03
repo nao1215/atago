@@ -1,0 +1,111 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / hermetic environment (clear_env + pass_env)
+
+# Exercises #16: `clear_env: true` starts the child from an empty environment
+# (so host vars cannot silently change the behavior under test) and `pass_env`
+# re-admits an explicit allowlist of host variables. Explicit `env:` overrides
+# are layered on top, preserving the suite → scenario → step order.
+# The probing commands (`env`, `sh`) are POSIX, so these scenarios skip on
+# Windows; the runner behavior itself is covered on Windows by unit tests.
+scenarios:
+  - name: clear_env drops inherited host variables
+    skip:
+      os: windows
+    env:
+      ATAGO_HERMETIC_CANARY: leaked-from-scenario
+    steps:
+      # Without clear_env the canary is visible: scenario env layers over the
+      # inherited host environment as always.
+      - run:
+          command: env
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: ATAGO_HERMETIC_CANARY
+      # With clear_env the child starts empty; only explicit env survives.
+      # The scenario env is an explicit override, so it is still layered in —
+      # clear_env drops the *inherited host* environment, not authored env.
+      - run:
+          command: env
+          clear_env: true
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: ATAGO_HERMETIC_CANARY=leaked-from-scenario
+      - assert:
+          stdout:
+            not_contains: "PATH=/"
+
+  - name: pass_env re-admits an allowlist of host variables
+    skip:
+      os: windows
+    steps:
+      - run:
+          command: env
+          clear_env: true
+          pass_env: [PATH]
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "PATH="
+      - assert:
+          stdout:
+            not_contains: "HOME="
+
+  - name: explicit env wins over a passed-through host variable
+    skip:
+      os: windows
+    steps:
+      - run:
+          shell: true
+          command: "printf '%s\\n' \"$HOME\""
+          clear_env: true
+          pass_env: [HOME]
+          env:
+            HOME: /hermetic/home
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: /hermetic/home
+
+  - name: pass_env without clear_env is a load-time error
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: bad
+            scenarios:
+              - name: forgot clear_env
+                steps:
+                  - run:
+                      command: env
+                      pass_env: [PATH]
+      - run:
+          command: ${atago} run bad.atago.yaml
+      # A spec-content (validation) error exits 2 with a positioned message.
+      - assert:
+          exit_code: 2
+          stderr:
+            contains:
+              - "pass_env requires clear_env: true"
+              - steps[0].run
+
+  - name: unset host variables in pass_env are skipped, not an error
+    skip:
+      os: windows
+    steps:
+      - run:
+          command: env
+          clear_env: true
+          pass_env: [PATH, ATAGO_SURELY_UNSET_VAR_2026]
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "PATH="
+      - assert:
+          stdout:
+            not_contains: ATAGO_SURELY_UNSET_VAR_2026

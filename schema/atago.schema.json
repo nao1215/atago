@@ -84,6 +84,8 @@
             "cwd": { "type": "string" },
             "timeout": { "type": "string" },
             "env": { "type": "object", "additionalProperties": { "type": "string" } },
+            "clear_env": { "type": "boolean", "description": "Start the child from an empty environment instead of inheriting the host environment (#16). On Windows a small system-critical set (SystemRoot, SystemDrive, TEMP, TMP, PATHEXT) is always retained." },
+            "pass_env": { "type": "array", "items": { "type": "string", "minLength": 1 }, "description": "Host variables copied into the cleared environment (#16). Requires clear_env: true; unset host variables are skipped." },
             "stdin": { "type": "string" }
           }
         },
@@ -103,6 +105,8 @@
             "shell": { "type": "boolean" },
             "cwd": { "type": "string" },
             "env": { "type": "object", "additionalProperties": { "type": "string" } },
+            "clear_env": { "type": "boolean", "description": "Start the child from an empty environment instead of inheriting the host environment (#16). On Windows a small system-critical set (SystemRoot, SystemDrive, TEMP, TMP, PATHEXT) is always retained." },
+            "pass_env": { "type": "array", "items": { "type": "string", "minLength": 1 }, "description": "Host variables copied into the cleared environment (#16). Requires clear_env: true; unset host variables are skipped." },
             "ready": {
               "type": "object",
               "additionalProperties": false,
@@ -246,6 +250,8 @@
         "shell": { "type": "boolean" },
         "cwd": { "type": "string" },
         "env": { "type": "object", "additionalProperties": { "type": "string" } },
+        "clear_env": { "type": "boolean", "description": "Start the child from an empty environment instead of inheriting the host environment (#16). On Windows a small system-critical set (SystemRoot, SystemDrive, TEMP, TMP, PATHEXT) is always retained." },
+        "pass_env": { "type": "array", "items": { "type": "string", "minLength": 1 }, "description": "Host variables copied into the cleared environment (#16). Requires clear_env: true; unset host variables are skipped." },
         "ready": {
           "type": "object",
           "additionalProperties": false,
@@ -426,6 +432,8 @@
         "cwd": { "type": "string" },
         "timeout": { "type": "string" },
         "env": { "type": "object", "additionalProperties": { "type": "string" } },
+        "clear_env": { "type": "boolean", "description": "Start the child from an empty environment instead of inheriting the host environment (#16). On Windows a small system-critical set (SystemRoot, SystemDrive, TEMP, TMP, PATHEXT) is always retained." },
+        "pass_env": { "type": "array", "items": { "type": "string", "minLength": 1 }, "description": "Host variables copied into the cleared environment (#16). Requires clear_env: true; unset host variables are skipped." },
         "stdin": { "type": "string" },
         "stdout_to": { "type": "string", "minLength": 1, "description": "Write the command's captured stdout to this workdir-relative file (create/truncate), without needing shell redirection." },
         "stderr_to": { "type": "string", "minLength": 1, "description": "Write the command's captured stderr to this workdir-relative file (create/truncate), without needing shell redirection." },
@@ -455,6 +463,8 @@
         "cols": { "type": "integer", "minimum": 0 },
         "timeout": { "type": "string", "description": "Go duration bounding the WHOLE session (default 30s)." },
         "env": { "type": "object", "additionalProperties": { "type": "string" } },
+        "clear_env": { "type": "boolean", "description": "Start the child from an empty environment instead of inheriting the host environment (#16). On Windows a small system-critical set (SystemRoot, SystemDrive, TEMP, TMP, PATHEXT) is always retained." },
+        "pass_env": { "type": "array", "items": { "type": "string", "minLength": 1 }, "description": "Host variables copied into the cleared environment (#16). Requires clear_env: true; unset host variables are skipped." },
         "session": {
           "type": "array",
           "minItems": 1,

@@ -127,7 +127,15 @@ func explainScenario(b *strings.Builder, sc *spec.Scenario) {
 			}
 		case spec.StepPTY:
 			if step.PTY != nil {
-				commands = append(commands, fmt.Sprintf("interactive (pty): %s  [%d session actions]", step.PTY.Command, len(step.PTY.Session)))
+				desc := fmt.Sprintf("interactive (pty): %s  [%d session actions]", step.PTY.Command, len(step.PTY.Session))
+				if step.PTY.ClearEnvEnabled() {
+					note := "  (cleared environment"
+					if len(step.PTY.PassEnv) > 0 {
+						note += ", passes: " + strings.Join(step.PTY.PassEnv, ", ")
+					}
+					desc += note + ")"
+				}
+				commands = append(commands, desc)
 				collectVars(vars, step.PTY.Command, step.PTY.Cwd)
 				for _, v := range step.PTY.Env {
 					collectVars(vars, v)
@@ -214,6 +222,13 @@ func explainScenario(b *strings.Builder, sc *spec.Scenario) {
 // readiness is decided (ADR-0031).
 func describeService(svc *spec.Service) string {
 	desc := svc.Name + ": " + svc.Command
+	if svc.ClearEnvEnabled() {
+		note := "  [cleared environment"
+		if len(svc.PassEnv) > 0 {
+			note += ", passes: " + strings.Join(svc.PassEnv, ", ")
+		}
+		desc += note + "]"
+	}
 	if svc.Ready == nil {
 		return desc
 	}
@@ -259,6 +274,13 @@ func describeRun(r *spec.Run) string {
 	}
 	if len(r.Env) > 0 {
 		notes = append(notes, "env: "+strings.Join(sortedKeys(toSet(r.Env)), ", "))
+	}
+	if r.ClearEnvEnabled() {
+		note := "cleared environment"
+		if len(r.PassEnv) > 0 {
+			note += " (passes: " + strings.Join(r.PassEnv, ", ") + ")"
+		}
+		notes = append(notes, note)
 	}
 	if r.ShellEnabled() {
 		notes = append(notes, "shell")

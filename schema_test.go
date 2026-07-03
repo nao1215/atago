@@ -118,6 +118,30 @@ scenarios:
 	}
 }
 
+// TestSchema_AcceptsHermeticEnv confirms clear_env/pass_env (#16) are accepted
+// on run, pty, service, and the defaults blocks.
+func TestSchema_AcceptsHermeticEnv(t *testing.T) {
+	s := loadSchema(t)
+	src := `version: "1"
+suite:
+  name: x
+  setup:
+    - service: {name: shared, command: ./srv, clear_env: true, pass_env: [PATH]}
+defaults:
+  run: {clear_env: true, pass_env: [PATH, HOME]}
+  service: {clear_env: true, pass_env: [PATH]}
+scenarios:
+  - name: a
+    services:
+      - {name: mock, command: ./mock, clear_env: true, pass_env: [PATH]}
+    steps:
+      - run: {command: env, clear_env: true, pass_env: [PATH, HOME], env: {A: b}}
+      - pty: {command: cat, clear_env: true, pass_env: [TERM], session: [{send: ""}]}`
+	if err := s.Validate(yamlToAny(t, []byte(src))); err != nil {
+		t.Errorf("schema rejected valid hermetic-env spec:\n%v", err)
+	}
+}
+
 // TestSchema_RejectsInvalid confirms the schema actually catches bad specs.
 func TestSchema_RejectsInvalid(t *testing.T) {
 	s := loadSchema(t)
@@ -189,6 +213,18 @@ runners:
 scenarios:
   - name: a
     steps: [{run: {command: echo}}]`,
+		// Issue #16: pass_env entries are variable names, not key=value pairs.
+		"pass_env with non-string entry": `version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    steps: [{run: {command: env, clear_env: true, pass_env: [{PATH: yes}]}}]`,
+		// Issue #16: clear_env is a boolean, not a string.
+		"clear_env with string value": `version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    steps: [{run: {command: env, clear_env: "yes"}}]`,
 	}
 	for name, src := range bad {
 		t.Run(name, func(t *testing.T) {

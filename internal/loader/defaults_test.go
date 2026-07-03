@@ -101,6 +101,182 @@ scenarios:
 	}
 }
 
+// TestApplyDefaults_ClearEnvPassEnv proves defaults.run.clear_env /
+// defaults.run.pass_env layer into steps under the authored-value-wins rule,
+// and the same for defaults.service (#16).
+func TestApplyDefaults_ClearEnvPassEnv(t *testing.T) {
+	t.Parallel()
+	src := `
+version: "1"
+suite:
+  name: sample
+defaults:
+  run:
+    clear_env: true
+    pass_env: [PATH, HOME]
+  service:
+    clear_env: true
+    pass_env: [PATH]
+scenarios:
+  - name: hermetic by default
+    services:
+      - name: mock
+        command: ./mock
+    steps:
+      - run:
+          command: echo hi
+      - run:
+          command: echo bye
+          clear_env: false
+      - run:
+          command: echo own
+          pass_env: [LANG]
+`
+	s, err := LoadBytes("sample.atago.yaml", []byte(src))
+	if err != nil {
+		t.Fatalf("LoadBytes() error = %v", err)
+	}
+	sc := s.Scenarios[0]
+	if !sc.Steps[0].Run.ClearEnvEnabled() {
+		t.Error("step 0: clear_env default not applied")
+	}
+	if got := sc.Steps[0].Run.PassEnv; len(got) != 2 || got[0] != "PATH" || got[1] != "HOME" {
+		t.Errorf("step 0: pass_env = %v, want default [PATH HOME]", got)
+	}
+	if sc.Steps[1].Run.ClearEnvEnabled() {
+		t.Error("step 1: authored clear_env: false must win over the default")
+	}
+	if got := sc.Steps[1].Run.PassEnv; len(got) != 0 {
+		t.Errorf("step 1: pass_env = %v, want none (pass_env is not inherited when clear_env is off)", got)
+	}
+	if got := sc.Steps[2].Run.PassEnv; len(got) != 1 || got[0] != "LANG" {
+		t.Errorf("step 2: pass_env = %v, want the authored [LANG] to win", got)
+	}
+	if !sc.Services[0].ClearEnvEnabled() {
+		t.Error("service: clear_env default not applied")
+	}
+	if got := sc.Services[0].PassEnv; len(got) != 1 || got[0] != "PATH" {
+		t.Errorf("service: pass_env = %v, want default [PATH]", got)
+	}
+}
+
+// TestValidate_PassEnvRequiresClearEnv proves pass_env without clear_env: true
+// is a load-time validation error with a positioned message (#16).
+func TestValidate_PassEnvRequiresClearEnv(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name, src, wantPos string
+	}{
+		{
+			name: "run step",
+			src: `
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: s
+    steps:
+      - run:
+          command: echo hi
+          pass_env: [PATH]
+`,
+			wantPos: `scenario "s".steps[0].run`,
+		},
+		{
+			name: "scenario service",
+			src: `
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: s
+    services:
+      - name: mock
+        command: ./mock
+        pass_env: [PATH]
+    steps:
+      - run:
+          command: echo hi
+`,
+			wantPos: `service "mock"`,
+		},
+		{
+			name: "pty step",
+			src: `
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: s
+    steps:
+      - pty:
+          command: cat
+          pass_env: [PATH]
+`,
+			wantPos: `scenario "s".steps[0].pty`,
+		},
+		{
+			name: "suite setup service",
+			src: `
+version: "1"
+suite:
+  name: sample
+  setup:
+    - service:
+        name: shared
+        command: ./mock
+        pass_env: [PATH]
+scenarios:
+  - name: s
+    steps:
+      - run:
+          command: echo hi
+`,
+			wantPos: "suite.setup[0].service",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			_, err := LoadBytes("sample.atago.yaml", []byte(tc.src))
+			if err == nil {
+				t.Fatal("LoadBytes() = nil error, want a pass_env-requires-clear_env validation error")
+			}
+			if !strings.Contains(err.Error(), "pass_env") || !strings.Contains(err.Error(), "clear_env") {
+				t.Errorf("error = %q, want it to mention pass_env requiring clear_env", err)
+			}
+			if !strings.Contains(err.Error(), tc.wantPos) {
+				t.Errorf("error = %q, want position %q", err, tc.wantPos)
+			}
+		})
+	}
+}
+
+// TestValidate_PassEnvEmptyEntryRejected proves an empty variable name inside
+// pass_env is rejected at load time (#16).
+func TestValidate_PassEnvEmptyEntryRejected(t *testing.T) {
+	t.Parallel()
+	src := `
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: s
+    steps:
+      - run:
+          command: echo hi
+          clear_env: true
+          pass_env: ["PATH", ""]
+`
+	_, err := LoadBytes("sample.atago.yaml", []byte(src))
+	if err == nil {
+		t.Fatal("LoadBytes() = nil error, want an empty-pass_env-entry validation error")
+	}
+	if !strings.Contains(err.Error(), "pass_env") {
+		t.Errorf("error = %q, want it to mention pass_env", err)
+	}
+}
+
 // TestApplyDefaults_Service proves defaults.service fills shell/env and copies a
 // whole ready probe into a service that declares none, while a service with its
 // own ready keeps it.

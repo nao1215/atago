@@ -143,6 +143,9 @@ type Service struct {
 	Name    string `json:"name"`
 	Command string `json:"command"`
 	Shell   bool   `json:"shell,omitempty"`
+	// ClearEnv / PassEnv mirror the hermetic-environment controls (#16).
+	ClearEnv bool     `json:"clear_env,omitempty"`
+	PassEnv  []string `json:"pass_env,omitempty"`
 	// Ready is the readiness signal kind ("file", "port", "log", "delay") or
 	// empty when the steps start as soon as the process spawns.
 	Ready string `json:"ready,omitempty"`
@@ -158,13 +161,17 @@ type Step struct {
 	// Kind-specific fields, all optional.
 	Command string `json:"command,omitempty"`
 	Shell   bool   `json:"shell,omitempty"`
-	Runner  string `json:"runner,omitempty"`
-	Method  string `json:"method,omitempty"`
-	Path    string `json:"path,omitempty"`
-	SQL     string `json:"sql,omitempty"`
-	File    string `json:"file,omitempty"`
-	Target  string `json:"target,omitempty"` // assert target / store name
-	Retry   *Retry `json:"retry,omitempty"`
+	// ClearEnv / PassEnv mirror the hermetic-environment controls on run, pty,
+	// and suite service steps (#16).
+	ClearEnv bool     `json:"clear_env,omitempty"`
+	PassEnv  []string `json:"pass_env,omitempty"`
+	Runner   string   `json:"runner,omitempty"`
+	Method   string   `json:"method,omitempty"`
+	Path     string   `json:"path,omitempty"`
+	SQL      string   `json:"sql,omitempty"`
+	File     string   `json:"file,omitempty"`
+	Target   string   `json:"target,omitempty"` // assert target / store name
+	Retry    *Retry   `json:"retry,omitempty"`
 	// Source is the authored location of this step (#80).
 	Source *Source `json:"source,omitempty"`
 }

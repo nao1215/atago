@@ -126,6 +126,113 @@ func TestRun_ShellAndEnvAndCwd(t *testing.T) {
 	}
 }
 
+// envMap converts an exec-style env slice into a map for assertions (last
+// entry wins, matching exec.Cmd's dedup semantics).
+func envMap(env []string) map[string]string {
+	m := make(map[string]string, len(env))
+	for _, kv := range env {
+		k, v, _ := strings.Cut(kv, "=")
+		m[k] = v
+	}
+	return m
+}
+
+// TestBuildEnv_ClearEnvDropsHostEnv proves clear_env: true starts from an
+// empty environment: a canary host var must not reach the child (#16).
+func TestBuildEnv_ClearEnvDropsHostEnv(t *testing.T) {
+	t.Setenv("ATAGO_TEST_CANARY", "leaked")
+	env := BuildEnv(nil, true, nil)
+	if env == nil {
+		t.Fatal("BuildEnv(clear) = nil, want a non-nil slice (nil inherits os.Environ)")
+	}
+	if _, ok := envMap(env)["ATAGO_TEST_CANARY"]; ok {
+		t.Errorf("canary host var leaked into cleared env: %v", env)
+	}
+}
+
+// TestBuildEnv_PassEnvCopiesListedVars proves pass_env copies exactly the
+// listed host vars and skips unset ones (#16).
+func TestBuildEnv_PassEnvCopiesListedVars(t *testing.T) {
+	t.Setenv("ATAGO_TEST_KEEP", "kept")
+	t.Setenv("ATAGO_TEST_DROP", "dropped")
+	env := envMap(BuildEnv(nil, true, []string{"ATAGO_TEST_KEEP", "ATAGO_TEST_UNSET"}))
+	if got := env["ATAGO_TEST_KEEP"]; got != "kept" {
+		t.Errorf("passed var = %q, want kept", got)
+	}
+	if _, ok := env["ATAGO_TEST_DROP"]; ok {
+		t.Error("unlisted host var leaked into cleared env")
+	}
+	if _, ok := env["ATAGO_TEST_UNSET"]; ok {
+		t.Error("unset host var should be skipped, not set")
+	}
+}
+
+// TestBuildEnv_OverridesLayerOnTop proves explicit env overrides win over
+// passed-through host vars, preserving the existing layering order (#16).
+func TestBuildEnv_OverridesLayerOnTop(t *testing.T) {
+	t.Setenv("ATAGO_TEST_LAYER", "host")
+	env := envMap(BuildEnv(map[string]string{"ATAGO_TEST_LAYER": "step"}, true, []string{"ATAGO_TEST_LAYER"}))
+	if got := env["ATAGO_TEST_LAYER"]; got != "step" {
+		t.Errorf("override = %q, want step (explicit env wins over pass_env)", got)
+	}
+}
+
+// TestBuildEnv_NoClearKeepsInheritance proves the pre-#16 behavior is
+// untouched when clear_env is off.
+func TestBuildEnv_NoClearKeepsInheritance(t *testing.T) {
+	if env := BuildEnv(nil, false, nil); env != nil {
+		t.Errorf("BuildEnv(no overrides) = %v, want nil (inherit os.Environ)", env)
+	}
+	t.Setenv("ATAGO_TEST_INHERIT", "here")
+	env := envMap(BuildEnv(map[string]string{"EXTRA": "1"}, false, nil))
+	if got := env["ATAGO_TEST_INHERIT"]; got != "here" {
+		t.Errorf("inherited var = %q, want here", got)
+	}
+	if got := env["EXTRA"]; got != "1" {
+		t.Errorf("override = %q, want 1", got)
+	}
+}
+
+// TestBuildEnv_WindowsKeepsSystemCriticalVars proves the documented
+// system-critical set survives clear_env on Windows so processes can start.
+func TestBuildEnv_WindowsKeepsSystemCriticalVars(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("windows-only behavior")
+	}
+	env := envMap(BuildEnv(nil, true, nil))
+	for _, name := range []string{"SystemRoot", "SystemDrive", "PATHEXT"} {
+		if _, ok := env[name]; !ok {
+			t.Errorf("system-critical var %s missing from cleared env", name)
+		}
+	}
+}
+
+// TestRun_ClearEnvEndToEnd proves a run step with clear_env does not see a
+// canary host var, and sees it again without clear_env (#16).
+func TestRun_ClearEnvEndToEnd(t *testing.T) {
+	t.Setenv("ATAGO_E2E_CANARY", "leaky")
+	r := New()
+	cmdLine := argvCommand("env", "cmd /c set")
+	hermetic, err := r.Run(context.Background(), &spec.Run{
+		Command:  cmdLine,
+		ClearEnv: spec.Bool(true),
+		PassEnv:  []string{"PATH"},
+	}, t.TempDir())
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if strings.Contains(string(hermetic.Stdout), "ATAGO_E2E_CANARY") {
+		t.Errorf("clear_env child saw the canary var:\n%s", hermetic.Stdout)
+	}
+	plain, err := r.Run(context.Background(), &spec.Run{Command: cmdLine}, t.TempDir())
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if !strings.Contains(string(plain.Stdout), "ATAGO_E2E_CANARY") {
+		t.Errorf("non-hermetic child should inherit the canary var:\n%s", plain.Stdout)
+	}
+}
+
 func TestRun_Stdin(t *testing.T) {
 	t.Parallel()
 	r := New()

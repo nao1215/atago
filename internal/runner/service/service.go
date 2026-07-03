@@ -61,7 +61,7 @@ func Start(ctx context.Context, svc *spec.Service, workdir string) (*Proc, strin
 		cmd.ConfigureShell(pc.cmd, svc.Command)
 	}
 	pc.cmd.Dir = cmd.ResolveDir(workdir, svc.Cwd)
-	pc.cmd.Env = cmd.BuildEnv(svc.Env)
+	pc.cmd.Env = cmd.BuildEnv(svc.Env, svc.ClearEnvEnabled(), svc.PassEnv)
 	pc.cmd.Stdout = out
 	pc.cmd.Stderr = out
 
