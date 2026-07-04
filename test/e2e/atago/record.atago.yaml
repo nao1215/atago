@@ -146,3 +146,35 @@ scenarios:
           exit_code: 0
           stdout:
             contains: "1 passed"
+
+  - name: record --pty records a live session and the generated spec replays green
+    skip:
+      os: windows
+    steps:
+      # The recorder recorded by atago (#69): an OUTER pty step drives
+      # `atago record --pty` by hand — typing "world" at the prompt — and the
+      # inner recorder reconstructs an expect/send spec from the transcript.
+      - pty:
+          shell: true
+          command: '${atago} record --pty --out generated.atago.yaml -- sh -c ''printf PROMPT; read n; echo hi-$n'''
+          timeout: 20s
+          session:
+            - expect: "PROMPT"
+            - send: "world\n"
+            - expect: "hi-world"
+      - assert:
+          exit_code: 0
+      # The generated spec exists and captured the session as a pty step.
+      - assert:
+          file:
+            path: generated.atago.yaml
+            contains:
+              - "- pty:"
+              - "- send:"
+      # The round-trip: replaying the generated spec passes.
+      - run:
+          command: ${atago} run generated.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "1 passed"

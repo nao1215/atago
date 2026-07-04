@@ -721,6 +721,35 @@ func ValidPTYKey(name string) bool {
 	return ok
 }
 
+// ptyKeyBySequence reverse-maps an xterm byte sequence to its friendly key name
+// (#69), preferring the readable name over a ctrl-* alias when a byte is shared
+// (e.g. \r is both enter and ctrl-m — enter wins). Built once at init: the
+// ctrl-* aliases go in first, then the friendly names overwrite any collision.
+var ptyKeyBySequence = func() map[string]string {
+	m := make(map[string]string, len(ptyKeySequences))
+	for c := byte('a'); c <= 'z'; c++ {
+		m[string([]byte{c - 'a' + 1})] = "ctrl-" + string(c)
+	}
+	for _, name := range []string{
+		"enter", "tab", "esc", "space", "backspace", "delete",
+		"up", "down", "right", "left", "home", "end",
+		"pageup", "pagedown",
+		"f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10", "f11", "f12",
+	} {
+		m[ptyKeySequences[name]] = name
+	}
+	return m
+}()
+
+// PTYKeyForSequence returns the friendly named key whose xterm sequence exactly
+// equals seq (#69), so `atago record --pty` can render a lone control key as
+// {key: <name>} instead of an opaque escape. It reports false when no named key
+// matches the bytes exactly.
+func PTYKeyForSequence(seq string) (string, bool) {
+	name, ok := ptyKeyBySequence[seq]
+	return name, ok
+}
+
 // PTYKeyNames lists the vocabulary for error messages, compactly.
 func PTYKeyNames() string {
 	return "enter, tab, esc, space, backspace, delete, up, down, left, right, home, end, pageup, pagedown, f1-f12, ctrl-a..ctrl-z"
