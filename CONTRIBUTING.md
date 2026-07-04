@@ -24,7 +24,14 @@ make e2e
 ```
 
 `make vet` runs `go vet` and `make fmt` formats the Go sources. `make test` also
-generates `cover.out` and `cover.html` locally.
+generates `cover.out` and `cover.html` locally (unit tests only).
+
+`make coverage` reports the fuller picture: it combines unit-test coverage with
+the self-hosted E2E coverage. The E2E half runs a `go build -cover` atago binary
+and collects its runtime coverage via `GOCOVERDIR`, then merges both into the
+same `cover.out` (`go tool cover -func` prints the total; `cover.html` is the
+HTML report). Scratch data lives under `.coverage/` (gitignored). This is the
+heavier target used by the Coverage CI job; `make test` / `make e2e` stay fast.
 
 `make e2e` builds the binary and runs atago against its own self-hosted specs in
 `test/e2e/atago/` plus the git suite in `test/e2e/thirdparty/git/`. atago is also

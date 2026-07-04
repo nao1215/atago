@@ -22,6 +22,10 @@ coverage.txt
 profile.cov
 cover.html
 
+# `make coverage` scratch: raw covdata (unit + e2e), the cover binary, and the
+# merged dir. The final cover.out / cover.html are the only kept artifacts.
+.coverage/
+
 # Dependency directories (remove the comment below to include it)
 # vendor/
 

@@ -1,4 +1,4 @@
-.PHONY: build test clean vet fmt lint tools release-smoke e2e thirdparty dogfood dogfood-iso8583tool dogfood-jose dogfood-career dogfood-gup dogfood-mimixbox dogfood-mobilepkg demo docs site help
+.PHONY: build test coverage clean vet fmt lint tools release-smoke e2e thirdparty dogfood dogfood-iso8583tool dogfood-jose dogfood-career dogfood-gup dogfood-mimixbox dogfood-mobilepkg demo docs site help
 
 APP         = atago
 VERSION     = $(shell git describe --tags --always --dirty 2>/dev/null)
@@ -25,11 +25,14 @@ build: ## Build binary
 	env GO111MODULE=on CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) $(GO_BUILD) $(GO_LDFLAGS) -o $(APP) .
 
 clean: ## Clean project artifacts
-	-rm -rf $(APP) cover.out cover.html dist
+	-rm -rf $(APP) cover.out cover.html dist .coverage
 
 test: ## Run tests with coverage output
 	env GOOS=$(GOOS) $(GO_TEST) -cover -coverpkg=./... -coverprofile=cover.out $(GO_PKGROOT)
 	$(GO_TOOL) cover -html=cover.out -o cover.html
+
+coverage: ## Combine unit + self-hosted E2E coverage into cover.out / cover.html (uses a `go build -cover` atago; scratch under .coverage/)
+	env PARALLEL=$(PARALLEL) bash ./scripts/coverage.sh
 
 vet: ## Run go vet
 	$(GO_VET) $(GO_PACKAGES)
