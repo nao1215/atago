@@ -140,6 +140,82 @@ scenarios:
 	}
 }
 
+// TestLoadBytes_Changes covers the load-time validation of the changes: assert
+// target (#70): it must follow a run/pty step, entries must be workdir-relative
+// and confined, and a valid placement loads.
+func TestLoadBytes_Changes(t *testing.T) {
+	t.Parallel()
+	valid := `
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: ok
+    steps:
+      - run:
+          command: echo hi
+      - assert:
+          changes:
+            created:
+              - out.txt
+              - "site/*.html"
+            modified: []
+            deleted: []
+`
+	s, err := LoadBytes("sample.atago.yaml", []byte(valid))
+	if err != nil {
+		t.Fatalf("valid changes spec should load: %v", err)
+	}
+	ch := s.Scenarios[0].Steps[1].Assert.Changes
+	if ch == nil || ch.Created == nil || len(*ch.Created) != 2 {
+		t.Fatalf("changes.created not decoded: %+v", ch)
+	}
+	if ch.Modified == nil || len(*ch.Modified) != 0 {
+		t.Errorf("modified: [] should decode to a non-nil empty list (assert nothing), got %+v", ch.Modified)
+	}
+
+	bad := []struct {
+		name    string
+		src     string
+		wantMsg string
+	}{
+		{
+			name:    "not preceded by run/pty",
+			src:     "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - assert:\n          changes:\n            created: [out.txt]",
+			wantMsg: "requires an immediately preceding run/pty step",
+		},
+		{
+			name:    "preceded by http, not run/pty",
+			src:     "version: \"1\"\nsuite:\n  name: x\nrunners:\n  api:\n    type: http\n    base_url: http://127.0.0.1:1\nscenarios:\n  - name: a\n    steps:\n      - http: {runner: api, method: GET, path: /}\n      - assert:\n          changes:\n            created: [out.txt]",
+			wantMsg: "requires an immediately preceding run/pty step",
+		},
+		{
+			name:    "absolute entry",
+			src:     "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n      - assert:\n          changes:\n            created: [/etc/passwd]",
+			wantMsg: "must be workdir-relative",
+		},
+		{
+			name:    "escaping entry",
+			src:     "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n      - assert:\n          changes:\n            created: [\"../escape.txt\"]",
+			wantMsg: "escapes the scenario workdir",
+		},
+		{
+			name:    "empty changes block",
+			src:     "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n      - assert:\n          changes: {}",
+			wantMsg: "set at least one of created/modified/deleted",
+		},
+	}
+	for _, tt := range bad {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			_, err := LoadBytes("sample.atago.yaml", []byte(tt.src))
+			if err == nil || !strings.Contains(err.Error(), tt.wantMsg) {
+				t.Errorf("error = %v, want containing %q", err, tt.wantMsg)
+			}
+		})
+	}
+}
+
 func TestLoadBytes_Errors(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/nao1215/atago/internal/fsdelta"
 	"github.com/nao1215/atago/internal/spec"
 )
 
@@ -64,6 +65,12 @@ type Result struct {
 	// eval capture is JSON.
 	IsCDP    bool
 	CDPValue []byte
+
+	// Changes is the workdir delta observed around a run/pty step (#70), set by
+	// the engine only when a `changes:` assert immediately follows the step. Nil
+	// means no delta was recorded (the assertion then reports that), so scenarios
+	// that never use `changes:` pay for no workdir scan.
+	Changes *fsdelta.Delta
 }
 
 // Runner executes a run step within a scenario workdir and returns the observed

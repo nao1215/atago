@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-53 suites · 189 scenarios
+53 suites · 190 scenarios
 ## Contents
 - [atago self-hosting / variable expansion in assertion matcher values](#atago-self-hosting--variable-expansion-in-assertion-matcher-values) — 3 scenarios
   - [stdout.equals expands ${workdir}](#scenario-stdoutequals-expands-workdir)
@@ -15,6 +15,10 @@
   - [manifest surfaces the browser-runner configuration](#scenario-manifest-surfaces-the-browser-runner-configuration)
   - [an upload action without a file fails validation (exit 2)](#scenario-an-upload-action-without-a-file-fails-validation-exit-2)
   - [a download action without a click selector fails validation (exit 2)](#scenario-a-download-action-without-a-click-selector-fails-validation-exit-2)
+- [atago self-hosting / changes (workdir delta assertions)](#atago-self-hosting--changes-workdir-delta-assertions) — 3 scenarios
+  - [a generator touches exactly the files it should (POSIX)](#scenario-a-generator-touches-exactly-the-files-it-should-posix)
+  - [an unexpected creation breaks the exact contract (POSIX)](#scenario-an-unexpected-creation-breaks-the-exact-contract-posix)
+  - [stdout_to counts as created, and modified nothing holds (portable)](#scenario-stdout_to-counts-as-created-and-modified-nothing-holds-portable)
 - [atago self-hosting / completion](#atago-self-hosting--completion) — 5 scenarios
   - [bash completion emits a recognizable script](#scenario-bash-completion-emits-a-recognizable-script)
   - [zsh completion emits a compdef script](#scenario-zsh-completion-emits-a-compdef-script)
@@ -177,9 +181,6 @@
   - [a failing assertion exits one and reports the failure](#scenario-a-failing-assertion-exits-one-and-reports-the-failure)
   - [a parse error exits with code two](#scenario-a-parse-error-exits-with-code-two)
   - [JSON report is valid JSON with a passed status](#scenario-json-report-is-valid-json-with-a-passed-status)
-- [atago self-hosting / sandbox_home (isolated per-OS home)](#atago-self-hosting--sandbox_home-isolated-per-os-home) — 2 scenarios
-  - [Unix XDG family — write config, read it back, inspect it under the workdir](#scenario-unix-xdg-family--write-config-read-it-back-inspect-it-under-the-workdir)
-  - [Windows APPDATA family — write config, read it back, inspect it under the workdir](#scenario-windows-appdata-family--write-config-read-it-back-inspect-it-under-the-workdir)
 - [atago self-hosting / security](#atago-self-hosting--security) — 3 scenarios
   - [declared secrets are masked in failure output](#scenario-declared-secrets-are-masked-in-failure-output)
   - [a file assertion path may not escape the scenario workdir](#scenario-a-file-assertion-path-may-not-escape-the-scenario-workdir)
@@ -498,6 +499,74 @@ ${atago} run baddownload.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `download requires a click selector`
+## atago self-hosting / changes (workdir delta assertions)
+Source: `test/e2e/atago/changes.atago.yaml`
+### Scenario: a generator touches exactly the files it should (POSIX)
+_skipped on windows_
+#### Given
+- Fixture file `config.yaml` is created.
+- Fixture file `stale.html` is created.
+#### Inputs
+_Fixture `config.yaml`:_
+```text
+theme: light
+```
+_Fixture `stale.html`:_
+```text
+old
+```
+#### When
+```shell
+printf 'theme: dark\n' > config.yaml && rm stale.html && mkdir -p site/assets && printf '<html></html>' > site/index.html && printf 'body{}' > site/assets/app.css
+```
+#### Then
+- exit code is `0`
+- the step changed exactly created `site/index.html`, `site/assets/*.css`, modified `config.yaml`, deleted `stale.html`
+### Scenario: an unexpected creation breaks the exact contract (POSIX)
+_skipped on windows_
+#### Given
+- Fixture file `check.atago.yaml` is created.
+#### Inputs
+_Fixture `check.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: unexpected
+scenarios:
+  - name: extra file
+    steps:
+      - run:
+          shell: true
+          command: 'echo a > a.txt && echo b > b.txt'
+      - assert:
+          changes:
+            created:
+              - a.txt
+```
+#### When
+```shell
+${atago} run check.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `unexpected created file`
+### Scenario: stdout_to counts as created, and modified nothing holds (portable)
+#### Given
+- Fixture file `input.txt` is created.
+#### Inputs
+_Fixture `input.txt`:_
+```text
+seed
+```
+#### When
+```shell
+echo produced
+```
+#### Then
+- exit code is `0`
+- the step changed exactly created `result.txt`, modified nothing, deleted nothing
+#### Generated artifacts
+- `result.txt`
 ## atago self-hosting / completion
 Source: `test/e2e/atago/completion.atago.yaml`
 ### Scenario: bash completion emits a recognizable script
@@ -3196,42 +3265,6 @@ ${atago} run --report json ok.atago.yaml
 - stdout at `$.schema_version` equals `1`
 - stdout at `$.suites[0].status` equals `passed`
 - stdout at `$.suites[0].scenarios` has length 1
-## atago self-hosting / sandbox_home (isolated per-OS home)
-Source: `test/e2e/atago/sandbox_home.atago.yaml`
-### Scenario: Unix XDG family — write config, read it back, inspect it under the workdir
-_skipped on windows_
-#### Given
-- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
-- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
-#### When
-```shell
-mkdir -p "$XDG_CONFIG_HOME/mytool" && printf editor=vim > "$XDG_CONFIG_HOME/mytool/config"
-cat "$XDG_CONFIG_HOME/mytool/config"
-```
-#### Then
-- after `mkdir -p "$XDG_CONFIG_HOME/mytool" && printf editor=vim > "$XDG_CONFIG_HOME/mytool/config"`:
-  - exit code is `0`
-- after `cat "$XDG_CONFIG_HOME/mytool/config"`:
-  - exit code is `0`
-  - stdout equals an exact value
-  - file `.atago-home/.config/mytool/config` contains `editor=vim`
-### Scenario: Windows APPDATA family — write config, read it back, inspect it under the workdir
-_only on windows_
-#### Given
-- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
-- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
-#### When
-```shell
-mkdir "%APPDATA%\mytool" & echo editor=vim>"%APPDATA%\mytool\config.txt"
-type "%APPDATA%\mytool\config.txt"
-```
-#### Then
-- after `mkdir "%APPDATA%\mytool" & echo editor=vim>"%APPDATA%\mytool\config.txt"`:
-  - exit code is `0`
-- after `type "%APPDATA%\mytool\config.txt"`:
-  - exit code is `0`
-  - stdout contains `editor=vim`
-  - file `.atago-home/AppData/Roaming/mytool/config.txt` contains `editor=vim`
 ## atago self-hosting / security
 Source: `test/e2e/atago/security.atago.yaml`
 ### Scenario: declared secrets are masked in failure output

@@ -653,7 +653,8 @@
         { "required": ["pdf"] },
         { "required": ["mock"] },
         { "required": ["screen"] },
-        { "required": ["duration"] }
+        { "required": ["duration"] },
+        { "required": ["changes"] }
       ],
       "properties": {
         "exit_code": { "$ref": "#/$defs/exitCode" },
@@ -675,8 +676,27 @@
           "$ref": "#/$defs/stream",
           "description": "The rendered terminal screen of the preceding pty step (#27): the transcript replayed through a vt10x emulator, asserted as plain text (line.n = screen row)."
         },
-        "duration": { "$ref": "#/$defs/durationAssert" }
+        "duration": { "$ref": "#/$defs/durationAssert" },
+        "changes": { "$ref": "#/$defs/changesAssert" }
       }
+    },
+    "changesAssert": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Pins the exact workdir delta of the immediately preceding run/pty step (#70): which files it created, modified, and deleted. Each set field is EXHAUSTIVE in both directions (every observed path must match an entry, every entry must match a path), so `modified: []` asserts \"modified nothing\". An omitted field is unconstrained. Entries are workdir-relative paths or /-globs.",
+      "minProperties": 1,
+      "properties": {
+        "created": { "$ref": "#/$defs/changesEntries" },
+        "modified": { "$ref": "#/$defs/changesEntries" },
+        "deleted": { "$ref": "#/$defs/changesEntries" }
+      }
+    },
+    "changesEntries": {
+      "description": "A single workdir-relative path/glob, or a list of them (the empty list [] asserts the category changed nothing).",
+      "oneOf": [
+        { "type": "string" },
+        { "type": "array", "items": { "type": "string" } }
+      ]
     },
     "durationAssert": {
       "type": "object",

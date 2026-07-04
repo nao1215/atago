@@ -70,6 +70,8 @@ func describeTarget(a *spec.Assert, target spec.AssertTarget) string {
 		return "rendered screen " + describeStream(a.Screen)
 	case spec.AssertDuration:
 		return "completes " + a.Duration.DescribeDuration()
+	case spec.AssertChanges:
+		return "the step changed exactly " + describeChanges(a.Changes)
 	case spec.AssertStdout:
 		return "stdout " + describeStream(a.Stdout)
 	case spec.AssertStderr:
@@ -108,6 +110,33 @@ func describeTarget(a *spec.Assert, target spec.AssertTarget) string {
 	default:
 		return string(target)
 	}
+}
+
+// describeChanges renders a workdir-delta assertion (#70) as a compact phrase
+// listing each set category. `modified: []` renders as "modified nothing".
+func describeChanges(c *spec.ChangesAssert) string {
+	var parts []string
+	for _, cat := range []struct {
+		name    string
+		entries *spec.StringList
+	}{
+		{"created", c.Created},
+		{"modified", c.Modified},
+		{"deleted", c.Deleted},
+	} {
+		if cat.entries == nil {
+			continue
+		}
+		if len(*cat.entries) == 0 {
+			parts = append(parts, cat.name+" nothing")
+			continue
+		}
+		parts = append(parts, cat.name+" "+codeList(*cat.entries))
+	}
+	if len(parts) == 0 {
+		return "nothing"
+	}
+	return strings.Join(parts, ", ")
 }
 
 func describeHeader(h *spec.HeaderMatch) string {

@@ -19,6 +19,7 @@ import (
 // implementation.
 var exampleSpecs = map[string]bool{ // path -> hermetic (run, not just validate)
 	"examples/browser.atago.yaml":             false,
+	"examples/changes.atago.yaml":             true,
 	"examples/db.atago.yaml":                  true,
 	"examples/defaults.atago.yaml":            true,
 	"examples/dir_tree.atago.yaml":            true,
