@@ -92,6 +92,10 @@ jobs:
           - name: ffmpeg
             dir: ./test/e2e/thirdparty/ffmpeg
             install: command -v ffmpeg >/dev/null || (sudo apt-get update && sudo apt-get install -y ffmpeg)
+          # pandoc converts documents (md/html/docx/json AST); apt on Linux.
+          - name: pandoc
+            dir: ./test/e2e/thirdparty/pandoc
+            install: command -v pandoc >/dev/null || (sudo apt-get update && sudo apt-get install -y pandoc)
           # The suite queries the DNS server with dig (bind9-dnsutils); most
           # runner images ship it, but install it if absent.
           - name: coredns

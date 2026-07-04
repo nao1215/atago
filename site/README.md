@@ -33,6 +33,7 @@ A browsable, repo-local index of atago's documentation, generated from repositor
 - [nats.md](../doc/e2e/nats.md)
 - [ntfy.md](../doc/e2e/ntfy.md)
 - [openssl.md](../doc/e2e/openssl.md)
+- [pandoc.md](../doc/e2e/pandoc.md)
 - [prometheus.md](../doc/e2e/prometheus.md)
 - [pushgateway.md](../doc/e2e/pushgateway.md)
 - [python.md](../doc/e2e/python.md)

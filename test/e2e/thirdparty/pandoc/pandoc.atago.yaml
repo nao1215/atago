@@ -1,0 +1,118 @@
+version: "1"
+
+suite:
+  name: pandoc (document conversion filter)
+
+# The classic document-conversion filter (#36): file-to-file and
+# stdin-to-stdout modes, structured JSON output (its AST), and multi-format
+# artifacts. It exercises the stdin story hard — a concrete consumer of the
+# stdin: {file:} feature (#18). PDF output is out of scope (needs LaTeX).
+# Gate: only where pandoc is installed.
+scenarios:
+  - name: markdown converts to HTML and a binary docx
+    only:
+      command: pandoc --version
+    steps:
+      - fixture:
+          file: doc.md
+          content: |
+            # Title
+
+            Some *emphasis* and a [link](https://example.org).
+
+            **bold text**
+      - run:
+          command: pandoc doc.md -o doc.html
+      - assert:
+          exit_code: 0
+          file:
+            path: doc.html
+            contains:
+              - "<h1"
+              - "<em>emphasis</em>"
+              - "<strong>bold text</strong>"
+      # docx is a binary (zip) artifact — assert it was produced.
+      - run:
+          command: pandoc doc.md -o doc.docx
+      - assert:
+          exit_code: 0
+          file:
+            path: doc.docx
+            exists: true
+
+  - name: pandoc is a stdin-to-stdout filter
+    only:
+      command: pandoc --version
+    steps:
+      - fixture:
+          file: snippet.md
+          content: "**strong** and _italic_\n"
+      # stdin: {file:} (#18) feeds the document without an inline duplicate —
+      # the natural shape for a conversion filter.
+      - run:
+          command: pandoc -f markdown -t html
+          stdin:
+            file: snippet.md
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "<strong>strong</strong>"
+              - "<em>italic</em>"
+
+  - name: the JSON AST is a queryable contract
+    only:
+      command: pandoc --version
+    steps:
+      - fixture:
+          file: doc.md
+          content: |
+            # Heading One
+
+            A paragraph.
+      - run:
+          command: pandoc -t json doc.md
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              path: "$.blocks[0].t"
+              equals: Header
+      - assert:
+          stdout:
+            json:
+              # pandoc-api-version is a [major, minor, patch] triple.
+              path: "$['pandoc-api-version']"
+              length: 3
+
+  - name: standalone HTML carries the metadata title
+    only:
+      command: pandoc --version
+    steps:
+      - fixture:
+          file: doc.md
+          content: "# Body\n"
+      - run:
+          command: pandoc --metadata title=Atago -s doc.md -o standalone.html
+      - assert:
+          exit_code: 0
+          file:
+            path: standalone.html
+            contains: "<title>Atago</title>"
+
+  - name: an unknown output format is rejected
+    only:
+      command: pandoc --version
+    steps:
+      - fixture:
+          file: doc.md
+          content: "# X\n"
+      - run:
+          command: pandoc -t nosuchformat doc.md
+      - assert:
+          # pandoc exits 22 for an unknown format; accept the 21-23 family so
+          # a version bump does not break the suite.
+          exit_code:
+            in: [21, 22, 23]
+          stderr:
+            contains: "Unknown output format"
