@@ -99,6 +99,12 @@ jobs:
           # terraform from the official HashiCorp apt repo (pinned key). Only
           # the builtin terraform_data resource is used, so `init` downloads no
           # providers and the suite stays fully offline.
+          # age (and age-keygen) — the Go-native encryption CLI, go-installed.
+          - name: age
+            dir: ./test/e2e/thirdparty/age
+            install: |
+              go install filippo.io/age/cmd/age@latest
+              go install filippo.io/age/cmd/age-keygen@latest
           - name: terraform
             dir: ./test/e2e/thirdparty/terraform
             install: |

@@ -113,6 +113,7 @@ docs: ## Regenerate the committed behavior docs under doc/e2e/ from the specs
 	./dist/$(APP) doc --out doc/e2e/ffmpeg.md      ./test/e2e/thirdparty/ffmpeg
 	./dist/$(APP) doc --out doc/e2e/pandoc.md      ./test/e2e/thirdparty/pandoc
 	./dist/$(APP) doc --out doc/e2e/terraform.md   ./test/e2e/thirdparty/terraform
+	./dist/$(APP) doc --out doc/e2e/age.md         ./test/e2e/thirdparty/age
 	./dist/$(APP) doc --out doc/e2e/prometheus.md  ./test/e2e/thirdparty/prometheus
 	./dist/$(APP) doc --out doc/e2e/rclone.md      ./test/e2e/thirdparty/rclone
 	./dist/$(APP) doc --out doc/e2e/restic.md      ./test/e2e/thirdparty/restic

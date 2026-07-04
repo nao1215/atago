@@ -1,0 +1,174 @@
+version: "1"
+
+suite:
+  name: age (modern file encryption)
+
+# age is a small, modern encryption CLI with an exemplary UX contract (#38):
+# binary-safe round-trips, armored output, interactive passphrase mode, and
+# clean failure semantics. It complements the openssl specs with a Go-native
+# tool many users ship alongside their own CLIs. Keys and passphrases here are
+# throwaways generated inside each scenario's isolated workdir. Gate: only
+# where age is installed; pty scenarios are POSIX-only.
+
+secrets:
+  - PASSPHRASE
+
+defaults:
+  scenario:
+    env:
+      # A throwaway passphrase, declared under secrets: so it is masked.
+      PASSPHRASE: atago-throwaway-passphrase
+
+scenarios:
+  - name: keygen writes a key and reports the public half
+    only:
+      command: age --version
+    steps:
+      - run:
+          command: age-keygen -o key.txt
+      - assert:
+          exit_code: 0
+          stderr:
+            contains: "Public key:"
+      - assert:
+          file:
+            path: key.txt
+            contains: "AGE-SECRET-KEY-1"
+      # age-keygen -y derives the public key from the private file to stdout.
+      - run:
+          command: age-keygen -y key.txt
+      - assert:
+          exit_code: 0
+          stdout:
+            matches: "(?m)^age1[a-z0-9]+$"
+
+  - name: encrypt then decrypt round-trips binary bytes exactly
+    only:
+      command: age --version
+    steps:
+      # Non-UTF8 bytes (00 01 02 ff ...) prove the round-trip is binary-safe.
+      - fixture:
+          file: data.bin
+          base64: AAEC/2JpbmFyeSBwYXlsb2Fk/wABAg==
+      - run:
+          command: age-keygen -o key.txt
+      - assert:
+          exit_code: 0
+      - run:
+          command: age-keygen -y key.txt
+      - store:
+          name: pubkey
+          from:
+            stdout:
+              matches: "age1[a-z0-9]+"
+      - run:
+          command: age -r ${pubkey} -o secret.age data.bin
+      - assert:
+          exit_code: 0
+      - run:
+          command: age -d -i key.txt -o out.bin secret.age
+      - assert:
+          exit_code: 0
+      # Byte-for-byte comparison via cmp (exit 0 = identical).
+      - run:
+          command: cmp data.bin out.bin
+      - assert:
+          exit_code: 0
+
+  - name: armored output is PEM-wrapped
+    only:
+      command: age --version
+    steps:
+      - fixture:
+          file: msg.txt
+          content: "armor me\n"
+      - run:
+          command: age-keygen -o key.txt
+      - assert:
+          exit_code: 0
+      - run:
+          command: age-keygen -y key.txt
+      - store:
+          name: pubkey
+          from:
+            stdout:
+              matches: "age1[a-z0-9]+"
+      - run:
+          command: age -a -r ${pubkey} -o armored.age msg.txt
+      - assert:
+          exit_code: 0
+          file:
+            path: armored.age
+            contains: "-----BEGIN AGE ENCRYPTED FILE-----"
+
+  - name: decrypting with the wrong identity fails
+    only:
+      command: age --version
+    steps:
+      - fixture:
+          file: msg.txt
+          content: "for the right key only\n"
+      - run:
+          command: age-keygen -o key.txt
+      - assert:
+          exit_code: 0
+      - run:
+          command: age-keygen -y key.txt
+      - store:
+          name: pubkey
+          from:
+            stdout:
+              matches: "age1[a-z0-9]+"
+      - run:
+          command: age -r ${pubkey} -o secret.age msg.txt
+      - assert:
+          exit_code: 0
+      # A freshly generated second key cannot decrypt.
+      - run:
+          command: age-keygen -o other.txt
+      - assert:
+          exit_code: 0
+      - run:
+          command: age -d -i other.txt secret.age
+      - assert:
+          exit_code: 1
+          stderr:
+            contains: "no identity matched"
+
+  - name: passphrase mode encrypts and decrypts interactively
+    only:
+      command: age --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: msg.txt
+          content: "passphrase protected\n"
+      # -p prompts for a passphrase and its confirmation on the tty.
+      - pty:
+          command: age -p -o secret.age msg.txt
+          timeout: 20s
+          session:
+            - expect: "Enter passphrase"
+            - send: "atago-throwaway-passphrase\n"
+            - expect: "Confirm passphrase"
+            - send: "atago-throwaway-passphrase\n"
+            - expect: "."
+      - assert:
+          exit_code: 0
+          file:
+            path: secret.age
+            exists: true
+      # Decryption prompts for the passphrase again.
+      - pty:
+          command: age -d -o out.txt secret.age
+          timeout: 20s
+          session:
+            - expect: "Enter passphrase"
+            - send: "atago-throwaway-passphrase\n"
+            - expect: "."
+      - assert:
+          exit_code: 0
+          file:
+            path: out.txt
+            contains: "passphrase protected"
