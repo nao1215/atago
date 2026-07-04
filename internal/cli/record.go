@@ -55,7 +55,15 @@ now — write those steps by hand.
 		return ExitConfig
 	}
 
-	command := strings.Join(cmdArgs, " ")
+	// Preserve argv boundaries: the runner (and later the generated spec)
+	// re-tokenizes the command string, so arguments containing spaces or
+	// quotes must be re-quoted or the recorded run diverges from what the
+	// user typed. In --shell mode the raw command line IS the input — the
+	// shell does its own tokenization — so it joins verbatim.
+	command := shellJoin(cmdArgs)
+	if *shell {
+		command = strings.Join(cmdArgs, " ")
+	}
 	workdir, err := os.MkdirTemp("", "atago-record-")
 	if err != nil {
 		fmt.Fprintf(stderr, "atago record: could not create scratch dir: %v\n", err)
@@ -154,6 +162,38 @@ func listFiles(root string) ([]string, error) {
 	}
 	sort.Strings(out)
 	return out, nil
+}
+
+// shellJoin renders argv as one command string whose tokenization yields the
+// same argv again: plain tokens pass through, anything else is single-quoted
+// (with embedded quotes escaped POSIX-style), which both go-shellwords and a
+// real shell understand.
+func shellJoin(args []string) string {
+	quoted := make([]string, len(args))
+	for i, a := range args {
+		if plainToken(a) {
+			quoted[i] = a
+			continue
+		}
+		quoted[i] = "'" + strings.ReplaceAll(a, "'", `'\''`) + "'"
+	}
+	return strings.Join(quoted, " ")
+}
+
+// plainToken reports whether the argument survives tokenization unquoted.
+func plainToken(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, r := range s {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
+		case strings.ContainsRune("_@%+=:,./-", r):
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 // suiteNameFor derives a suite name from the command's base name.

@@ -62,7 +62,9 @@ scenarios:
           exit_code: 0
           file:
             path: gen.atago.yaml
-            contains: "path: out.txt"
+            contains:
+              - "path: out.txt"
+              - "exists: true"
       - assert:
           file:
             path: gen.atago.yaml
@@ -102,3 +104,24 @@ scenarios:
           exit_code: 3
           stderr:
             contains: "no command given"
+
+  - name: argv boundaries survive spaced arguments
+    skip:
+      os: windows
+    steps:
+      # An argument containing spaces must reach the recorded command as ONE
+      # argv element, and the generated spec must reproduce it (quoted) so
+      # the round-trip run still passes.
+      - run:
+          command: ${atago} record --out spaced.atago.yaml -- printf %s 'hello world'
+      - assert:
+          exit_code: 0
+          file:
+            path: spaced.atago.yaml
+            contains: "contains: hello world"
+      - run:
+          command: ${atago} run spaced.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "1 passed"
