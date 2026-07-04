@@ -46,3 +46,59 @@ scenarios:
           file:
             path: note.txt
             contains: "${workdir}/marker"
+
+  # The newer target families must expand like the stream/file matchers above:
+  # dir.path, screen matchers, and changes entries all went through the same
+  # walker gap once, so each family gets its own regression pin.
+  - name: dir.path expands a stored variable
+    steps:
+      - run:
+          shell: true
+          command: 'mkdir -p site && touch site/a.html && echo site'
+      - store:
+          name: outdir
+          from:
+            stdout:
+              matches: "(site)"
+      - assert:
+          dir:
+            path: "${outdir}"
+            contains: [a.html]
+
+  - name: changes entries expand a stored variable
+    steps:
+      - run:
+          shell: true
+          command: 'echo out'
+      - store:
+          name: base
+          from:
+            stdout:
+              matches: "(out)"
+      - run:
+          shell: true
+          command: 'echo w > ${base}2.txt'
+      - assert:
+          changes:
+            created: ["${base}2.txt"]
+            modified: []
+            deleted: []
+
+  - name: screen matcher expands a stored variable
+    skip:
+      os: windows
+    steps:
+      - run:
+          shell: true
+          command: 'echo needle'
+      - store:
+          name: pat
+          from:
+            stdout:
+              matches: "(needle)"
+      - pty:
+          shell: true
+          command: 'echo needle'
+      - assert:
+          screen:
+            contains: ["${pat}"]

@@ -110,6 +110,51 @@ func TestGeneratePTY(t *testing.T) {
 	}
 }
 
+// TestGeneratePTY_EscapesVariableReferences proves the pty round-trip law for
+// text containing ${...}: the engine expands ${name} in the pty command and in
+// literal send text at replay, so both must carry the $${...} literal escape.
+// Expect anchors must NOT be $$-escaped: regexp.QuoteMeta already renders the
+// reference as \$\{...\} which the expander ignores, and double-escaping would
+// make the compiled pattern miss the transcript.
+func TestGeneratePTY_EscapesVariableReferences(t *testing.T) {
+	t.Parallel()
+	rec := PTYRecording{
+		Command:  "sh -c 'read x; echo got'",
+		ExitCode: 0,
+		Segments: []PTYSegment{
+			outSeg("enter ${VAR} value: "),
+			inSeg("literal ${HOME}\r"),
+			outSeg("got\r\n"),
+		},
+	}
+	got, err := GeneratePTY(rec, Options{SuiteName: "esc"})
+	if err != nil {
+		t.Fatalf("GeneratePTY: %v", err)
+	}
+	// Assert on the DECODED session (yamlScalar doubles backslashes on the
+	// wire, so string-matching the file text would test the quoting, not the
+	// semantics).
+	pty := loadGenerated(t, got)
+	var expect, send string
+	for _, a := range pty.Session {
+		if a.Expect != "" {
+			expect = a.Expect
+		}
+		if a.Send != nil && a.Send.Text != nil {
+			send = *a.Send.Text
+		}
+	}
+	if send != "literal $${HOME}\n" {
+		t.Errorf("literal send = %q, want the $${...} escape carried through", send)
+	}
+	// The expect stays QuoteMeta-only: \$\{VAR\} matches the literal prompt
+	// and is already inert to the expander; $$-escaping it too would make the
+	// compiled pattern miss the transcript.
+	if expect != `enter \$\{VAR\} value:` {
+		t.Errorf("expect = %q, want QuoteMeta-escaped exactly once", expect)
+	}
+}
+
 // TestGeneratePTY_EchoOffNeverLeaksSecret proves an echo-off (password) input
 // burst produces an ${env:...} placeholder and that the literal secret never
 // reaches the generated YAML (#69).

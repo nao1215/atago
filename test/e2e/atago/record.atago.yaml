@@ -269,3 +269,28 @@ scenarios:
           exit_code: 0
           stdout:
             contains: "1 passed"
+
+  - name: recorded text containing dollar-brace round-trips as literal text
+    skip:
+      os: windows
+    steps:
+      # The tool's argv and output contain a literal ${HOME}. The engine
+      # expands ${name} in command/assert values at replay, so record emits
+      # the $${...} escape — without it the generated no-shell command would
+      # error on the unresolved reference instead of replaying. This outer
+      # spec needs the same discipline: $${HOME} below reaches the recorder as
+      # the literal ${HOME}, and the contains value is $$$-escaped so it still
+      # reads $${HOME} after its own expansion.
+      - run:
+          command: ${atago} record --out dollar.atago.yaml -- printf %s 'literal $${HOME} here'
+      - assert:
+          exit_code: 0
+          file:
+            path: dollar.atago.yaml
+            contains: "$$${HOME}"
+      - run:
+          command: ${atago} run dollar.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "1 passed"

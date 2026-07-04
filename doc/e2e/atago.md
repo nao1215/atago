@@ -1,11 +1,14 @@
 # atago Behavior Specs
 ## Summary
-54 suites · 204 scenarios
+54 suites · 208 scenarios
 ## Contents
-- [atago self-hosting / variable expansion in assertion matcher values](#atago-self-hosting--variable-expansion-in-assertion-matcher-values) — 3 scenarios
+- [atago self-hosting / variable expansion in assertion matcher values](#atago-self-hosting--variable-expansion-in-assertion-matcher-values) — 6 scenarios
   - [stdout.equals expands ${workdir}](#scenario-stdoutequals-expands-workdir)
   - [stdout.contains and not_contains expand a stored variable](#scenario-stdoutcontains-and-not_contains-expand-a-stored-variable)
   - [file.contains expands ${workdir}](#scenario-filecontains-expands-workdir)
+  - [dir.path expands a stored variable](#scenario-dirpath-expands-a-stored-variable)
+  - [changes entries expand a stored variable](#scenario-changes-entries-expand-a-stored-variable)
+  - [screen matcher expands a stored variable](#scenario-screen-matcher-expands-a-stored-variable)
 - [atago self-hosting / browser (cdp) runner](#atago-self-hosting--browser-cdp-runner) — 8 scenarios
   - [a cdp step with no actions fails validation (exit 2)](#scenario-a-cdp-step-with-no-actions-fails-validation-exit-2)
   - [a cdp step naming an undeclared runner fails validation (exit 2)](#scenario-a-cdp-step-naming-an-undeclared-runner-fails-validation-exit-2)
@@ -161,7 +164,7 @@
   - [screen asserts see the final frame where the transcript sees history](#scenario-screen-asserts-see-the-final-frame-where-the-transcript-sees-history)
   - [a screen snapshot round-trips through update and compare](#scenario-a-screen-snapshot-round-trips-through-update-and-compare)
   - [a screen assert without a pty step is a load-time error](#scenario-a-screen-assert-without-a-pty-step-is-a-load-time-error)
-- [atago self-hosting / record (spec skeleton from an observed run)](#atago-self-hosting--record-spec-skeleton-from-an-observed-run) — 11 scenarios
+- [atago self-hosting / record (spec skeleton from an observed run)](#atago-self-hosting--record-spec-skeleton-from-an-observed-run) — 12 scenarios
   - [record then run round-trips green](#scenario-record-then-run-round-trips-green)
   - [refusing to overwrite without --force](#scenario-refusing-to-overwrite-without---force)
   - [record --pty refuses an existing --out before driving the session](#scenario-record---pty-refuses-an-existing---out-before-driving-the-session)
@@ -173,6 +176,7 @@
   - [record --pty records a live session and the generated spec replays green](#scenario-record---pty-records-a-live-session-and-the-generated-spec-replays-green)
   - [record --pty of a no-input command yields a session-less spec that replays green](#scenario-record---pty-of-a-no-input-command-yields-a-session-less-spec-that-replays-green)
   - [a prompt with regex metacharacters is escaped in the generated expect](#scenario-a-prompt-with-regex-metacharacters-is-escaped-in-the-generated-expect)
+  - [recorded text containing dollar-brace round-trips as literal text](#scenario-recorded-text-containing-dollar-brace-round-trips-as-literal-text)
 - [atago self-hosting / reports](#atago-self-hosting--reports) — 5 scenarios
   - [JUnit report is XML with a testsuite and testcase](#scenario-junit-report-is-xml-with-a-testsuite-and-testcase)
   - [GitHub Actions annotations are emitted on failure](#scenario-github-actions-annotations-are-emitted-on-failure)
@@ -287,6 +291,34 @@ printf "%s\n" "${workdir}/marker" > note.txt
 ```
 #### Then
 - file `note.txt` contains `${workdir}/marker`
+### Scenario: dir.path expands a stored variable
+#### When
+```shell
+mkdir -p site && touch site/a.html && echo site
+# capture ${outdir} from stdout
+```
+#### Then
+- dir `${outdir}` contains `a.html`
+### Scenario: changes entries expand a stored variable
+#### When
+```shell
+echo out
+# capture ${base} from stdout
+echo w > ${base}2.txt
+```
+#### Then
+- after `echo w > ${base}2.txt`:
+  - the step changed exactly created `${base}2.txt`, modified nothing, deleted nothing
+### Scenario: screen matcher expands a stored variable
+_skipped on windows_
+#### When
+```shell
+echo needle
+# capture ${pat} from stdout
+# interactive (pty): echo needle
+```
+#### Then
+- rendered screen contains `${pat}`
 ## atago self-hosting / browser (cdp) runner
 Source: `test/e2e/atago/cdp.atago.yaml`
 ### Scenario: a cdp step with no actions fails validation (exit 2)
@@ -3018,6 +3050,20 @@ ${atago} run meta.atago.yaml
 - file `meta.atago.yaml` contains `expect: "Continue\\? \\(y/n\\):"`, `- send:`
 - exit code is `0`
 - stdout contains `1 passed`
+### Scenario: recorded text containing dollar-brace round-trips as literal text
+_skipped on windows_
+#### When
+```shell
+${atago} record --out dollar.atago.yaml -- printf %s 'literal $${HOME} here'
+${atago} run dollar.atago.yaml
+```
+#### Then
+- after `${atago} record --out dollar.atago.yaml -- printf %s 'literal $${HOME} here'`:
+  - exit code is `0`
+  - file `dollar.atago.yaml` contains `$$${HOME}`
+- after `${atago} run dollar.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `1 passed`
 ## atago self-hosting / reports
 Source: `test/e2e/atago/reports.atago.yaml`
 ### Scenario: JUnit report is XML with a testsuite and testcase
