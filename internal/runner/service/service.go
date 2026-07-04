@@ -8,6 +8,7 @@ package service
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -20,6 +21,11 @@ import (
 	"github.com/nao1215/atago/internal/security"
 	"github.com/nao1215/atago/internal/spec"
 )
+
+// errExitedEarly is the readiness failure when the service process exits before
+// its probe (delay/file/port/log) succeeds. Shared so every wait path words it
+// identically.
+var errExitedEarly = errors.New("service exited before it became ready")
 
 // defaultReadyTimeout bounds a readiness probe when the spec omits one.
 const defaultReadyTimeout = 5 * time.Second
@@ -174,13 +180,13 @@ func (p *Proc) waitReady(ctx context.Context, r *spec.Ready, workdir string) (st
 			// how the file/port/log probes detect an early exit via p.done. Without
 			// this, a command that crashes (e.g. `exit 3`) during the delay was
 			// reported READY and the scenario ran against a dead peer.
-			return "", fmt.Errorf("service exited before it became ready")
+			return "", errExitedEarly
 		case <-time.After(d):
 			// Delay elapsed with the process still running — unless it exited in the
 			// same instant; check once more so a crash at the boundary is not missed.
 			select {
 			case <-p.done:
-				return "", fmt.Errorf("service exited before it became ready")
+				return "", errExitedEarly
 			default:
 				return "", nil
 			}
@@ -257,7 +263,7 @@ func (p *Proc) poll(ctx context.Context, timeout time.Duration, check func() boo
 			if check() {
 				return nil
 			}
-			return fmt.Errorf("service exited before it became ready")
+			return errExitedEarly
 		case <-deadline.C:
 			return fmt.Errorf("timed out after %s waiting for readiness", timeout)
 		case <-ctx.Done():

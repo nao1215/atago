@@ -178,8 +178,10 @@ func runCmd(args []string, stdout, stderr io.Writer) int {
 	// A --rerun-failed run that matched NOTHING verified nothing, yet the recorded
 	// failures are still real: greenlighting it and clearing the state would
 	// silently forget still-failing work. Warn loudly, keep the state, and do not
-	// exit green.
-	rerunMatchedNothing := *rerunFailed && ranScenarios == 0 && ctx.Err() == nil
+	// exit green. Require at least one suite to have LOADED, so this stays about a
+	// scenario-name mismatch — when every spec fails to parse, the load errors
+	// (already printed) are the real story, not a "renamed or removed" scenario.
+	rerunMatchedNothing := *rerunFailed && len(results) > 0 && ranScenarios == 0 && ctx.Err() == nil
 	if rerunMatchedNothing {
 		fmt.Fprintln(stderr, "atago run: warning: no recorded failing scenarios matched the current specs (renamed or removed?); the recorded failures were kept, not cleared")
 		exit = worseExit(exit, ExitConfig)
