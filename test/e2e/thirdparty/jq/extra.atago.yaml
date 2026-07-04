@@ -33,8 +33,11 @@ scenarios:
       - run:
           command: jq empty
           stdin: "not json"
+      # The parse-failure exit code changed across jq releases (1.6 exits 4,
+      # 1.7 exits 5), so pin the documented set rather than one version.
       - assert:
-          exit_code: 5
+          exit_code:
+            in: [4, 5]
           stdout:
             empty: true
           stderr:

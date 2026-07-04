@@ -269,6 +269,27 @@ func TestLoadBytes_SSHRunFields(t *testing.T) {
 			t.Errorf("minimal ssh run step should load: %v", err)
 		}
 	})
+
+	// shell is rejected with its own message: the remote login shell always
+	// interprets the command, so the knob has nothing to switch.
+	t.Run("ssh rejects shell", func(t *testing.T) {
+		t.Parallel()
+		_, err := LoadBytes("t.atago.yaml", []byte(sshSpec("command: uptime, shell: true")))
+		want := "run.shell has no effect on an ssh runner (the remote login shell always interprets the command)"
+		if err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("error = %v, want substring %q", err, want)
+		}
+	})
+
+	// A remote pipeline needs no shell: opt-in — the metacharacter hint (which
+	// would suggest the now-rejected shell: true) must not fire for ssh steps.
+	t.Run("ssh command with metacharacters loads without the shell hint", func(t *testing.T) {
+		t.Parallel()
+		src := sshSpec("command: \"ps aux | grep sshd > /tmp/out\"")
+		if _, err := LoadBytes("t.atago.yaml", []byte(src)); err != nil {
+			t.Errorf("ssh command with metacharacters should load (the remote shell interprets them): %v", err)
+		}
+	})
 }
 
 func TestLoadBytes_Errors(t *testing.T) {

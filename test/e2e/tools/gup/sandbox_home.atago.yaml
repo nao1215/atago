@@ -32,7 +32,7 @@ scenarios:
 
   - name: gup list is a pure read of GOBIN and writes nothing
     only:
-      command: gup version
+      command: gup list
     skip:
       os: windows
     steps:

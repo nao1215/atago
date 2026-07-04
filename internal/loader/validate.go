@@ -587,11 +587,13 @@ func validateStep(add func(string, ...any), where string, st *spec.Step, runners
 		}
 		if st.Run.Command == "" {
 			add("%s.run.command is required", where)
-		} else if !st.Run.ShellEnabled() {
+		} else if !st.Run.ShellEnabled() && !runnerIsSSH(st.Run.Runner, runners) {
 			// Without shell, the command is tokenized into argv, so shell operators
 			// (redirects, pipes, sequencing, substitution) are not honored. Rather
 			// than silently pass them as literal argv, flag them with a fix-forward
-			// hint (#: shell authoring UX).
+			// hint (#: shell authoring UX). An ssh command is exempt: it travels
+			// as one string and the REMOTE login shell always interprets it, so
+			// metacharacters are honored there without any shell: opt-in.
 			if tok := shellMetachar(st.Run.Command); tok != "" {
 				add("%s.run.command contains the shell metacharacter %q but shell is not enabled; "+
 					"set `shell: true` to run it through a shell, split it into multiple `run` steps, "+
@@ -661,13 +663,24 @@ func validateStep(add func(string, ...any), where string, st *spec.Step, runners
 // dropped by the engine's remote path (it forwards only the command). Rejecting
 // them at load time turns a silent no-op into a clear error. timeout and retry
 // are honored remotely and are intentionally absent here.
+// runnerIsSSH reports whether name references a declared ssh-type runner.
+func runnerIsSSH(name string, runners map[string]spec.Runner) bool {
+	if name == "" {
+		return false
+	}
+	rdef, ok := runners[name]
+	return ok && rdef.Type == "ssh"
+}
+
 func validateSSHRunFields(add func(string, ...any), where string, r *spec.Run, runners map[string]spec.Runner) {
-	if r.Runner == "" {
+	if !runnerIsSSH(r.Runner, runners) {
 		return
 	}
-	rdef, ok := runners[r.Runner]
-	if !ok || rdef.Type != "ssh" {
-		return
+	// shell gets its own message: it is not merely ignored — the remote login
+	// shell ALWAYS interprets the command string, so the knob has nothing to
+	// switch and an authored value only misleads.
+	if r.Shell != nil {
+		add("%s.run.shell has no effect on an ssh runner (the remote login shell always interprets the command)", where)
 	}
 	fields := []struct {
 		set   bool
