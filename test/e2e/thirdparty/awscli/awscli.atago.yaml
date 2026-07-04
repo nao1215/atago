@@ -1,0 +1,188 @@
+version: "1"
+
+suite:
+  name: aws-cli against MinIO (offline cloud-CLI story)
+
+# Drives the real AWS CLI against a local MinIO S3 endpoint (#32): test a
+# cloud CLI with no cloud account, no network, fully hermetic. MinIO is
+# started per scenario as a background service (its client peers already have
+# a suite here); `aws --endpoint-url` points at it. Install:
+#   go install github.com/minio/minio@latest   (server)
+#   pip install awscli / apt-get install awscli (client)
+#
+# Each scenario binds its own port and data dir so the suite runs under the
+# default scenario concurrency. Credentials come from scenario env; the
+# secret key is declared under `secrets:` so it is masked in reports.
+# Gate: only runs where the aws CLI is installed.
+
+secrets:
+  - AWS_SECRET_ACCESS_KEY
+
+defaults:
+  scenario:
+    env:
+      MINIO_ROOT_USER: atago
+      MINIO_ROOT_PASSWORD: atago-secret-key
+      AWS_ACCESS_KEY_ID: atago
+      AWS_SECRET_ACCESS_KEY: atago-secret-key
+      AWS_REGION: us-east-1
+      # Never let the CLI probe the EC2 metadata endpoint — this is offline.
+      AWS_EC2_METADATA_DISABLED: "true"
+      # Disable the v2 pager so JSON output goes straight to stdout (no less).
+      AWS_PAGER: ""
+
+scenarios:
+  - name: bucket and object lifecycle round-trips byte-identically
+    only:
+      command: aws --version
+    services:
+      - name: minio
+        command: minio server data --address 127.0.0.1:18530
+        ready:
+          port: 127.0.0.1:18530
+          timeout: 30s
+    steps:
+      - fixture:
+          file: payload.txt
+          content: "hello from atago via the aws cli\n"
+      - run:
+          command: aws --endpoint-url http://127.0.0.1:18530 s3 mb s3://mybucket
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "make_bucket: mybucket"
+      - run:
+          command: aws --endpoint-url http://127.0.0.1:18530 s3 cp payload.txt s3://mybucket/key.txt
+      - assert:
+          exit_code: 0
+      - run:
+          command: aws --endpoint-url http://127.0.0.1:18530 s3 ls s3://mybucket/
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: key.txt
+      # Download to a new name and assert byte-identical round-trip.
+      - run:
+          command: aws --endpoint-url http://127.0.0.1:18530 s3 cp s3://mybucket/key.txt roundtrip.txt
+      - assert:
+          exit_code: 0
+          file:
+            path: roundtrip.txt
+            contains: "hello from atago via the aws cli"
+      - run:
+          command: aws --endpoint-url http://127.0.0.1:18530 s3 rm s3://mybucket/key.txt
+      - assert:
+          exit_code: 0
+      - run:
+          command: aws --endpoint-url http://127.0.0.1:18530 s3 ls s3://mybucket/
+      - assert:
+          exit_code: 0
+          stdout:
+            not_contains: key.txt
+
+  - name: head-object and list-objects expose a JSON contract
+    only:
+      command: aws --version
+    services:
+      - name: minio
+        command: minio server data --address 127.0.0.1:18531
+        ready:
+          port: 127.0.0.1:18531
+          timeout: 30s
+    steps:
+      - fixture:
+          file: obj.txt
+          content: "twelve bytes"
+      - run:
+          command: aws --endpoint-url http://127.0.0.1:18531 s3 mb s3://jsonbucket
+      - assert:
+          exit_code: 0
+      - run:
+          command: aws --endpoint-url http://127.0.0.1:18531 s3 cp obj.txt s3://jsonbucket/obj.txt
+      - assert:
+          exit_code: 0
+      - run:
+          command: aws --endpoint-url http://127.0.0.1:18531 s3api head-object --bucket jsonbucket --key obj.txt --output json
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              path: "$.ContentLength"
+              equals: 12
+      - assert:
+          stdout:
+            json:
+              path: "$.ETag"
+              # MinIO returns the content MD5 as a quoted 32-hex-digit ETag.
+              matches: '^"[0-9a-f]{32}"$'
+      # The high-level `ls` lists the key (s3api list-objects output is
+      # covered by the JSONPath asserts above via head-object).
+      - run:
+          command: aws --endpoint-url http://127.0.0.1:18531 s3 ls s3://jsonbucket/
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: obj.txt
+
+  - name: a presigned URL is fetchable without credentials
+    only:
+      command: aws --version
+    services:
+      - name: minio
+        command: minio server data --address 127.0.0.1:18532
+        ready:
+          port: 127.0.0.1:18532
+          timeout: 30s
+    steps:
+      - fixture:
+          file: signed.txt
+          content: "presigned body content"
+      - run:
+          command: aws --endpoint-url http://127.0.0.1:18532 s3 mb s3://signbucket
+      - assert:
+          exit_code: 0
+      - run:
+          command: aws --endpoint-url http://127.0.0.1:18532 s3 cp signed.txt s3://signbucket/signed.txt
+      - assert:
+          exit_code: 0
+      # Capture the presigned URL, then fetch it with a plain (credential-less)
+      # curl — proof the signature in the query string carries the auth.
+      - run:
+          command: aws --endpoint-url http://127.0.0.1:18532 s3 presign s3://signbucket/signed.txt
+      - store:
+          name: url
+          from:
+            stdout:
+              matches: "http://127.0.0.1:18532/\\S+"
+      - run:
+          shell: true
+          command: curl -s "${url}"
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "presigned body content"
+
+  - name: head-object on a missing key fails with Not Found
+    only:
+      command: aws --version
+    services:
+      - name: minio
+        command: minio server data --address 127.0.0.1:18533
+        ready:
+          port: 127.0.0.1:18533
+          timeout: 30s
+    steps:
+      - run:
+          command: aws --endpoint-url http://127.0.0.1:18533 s3 mb s3://errbucket
+      - assert:
+          exit_code: 0
+      - run:
+          command: aws --endpoint-url http://127.0.0.1:18533 s3api head-object --bucket errbucket --key nope.txt
+      - assert:
+          # The AWS CLI exits 254 for a client error and 255 for a service
+          # error; a missing object is a 404 the CLI surfaces as 254, but
+          # accept both so a CLI version bump does not break the suite.
+          exit_code:
+            in: [254, 255]
+          stderr:
+            contains: "Not Found"

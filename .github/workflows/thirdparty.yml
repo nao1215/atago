@@ -69,6 +69,14 @@ jobs:
             install: |
               go install github.com/minio/minio@latest
               go install github.com/minio/mc@latest
+          # The AWS CLI is driven against a local MinIO S3 endpoint (#32): a
+          # cloud CLI tested with no cloud account, fully offline. minio is the
+          # server; the aws CLI ships on the runner image (installed if absent).
+          - name: awscli
+            dir: ./test/e2e/thirdparty/awscli
+            install: |
+              go install github.com/minio/minio@latest
+              command -v aws >/dev/null || (sudo apt-get update && sudo apt-get install -y awscli)
           # The suite queries the DNS server with dig (bind9-dnsutils); most
           # runner images ship it, but install it if absent.
           - name: coredns
