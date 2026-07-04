@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -219,6 +220,65 @@ func TestRunner_Do_NetworkPolicyAllowsListedHost(t *testing.T) {
 	}
 	if res.StatusCode != http.StatusOK {
 		t.Errorf("status = %d, want 200", res.StatusCode)
+	}
+}
+
+// TestRunner_Do_RedirectToDeniedHostBlocked is a security regression: an allowed
+// host must not be able to 3xx-redirect the client onto a denied host. The
+// network allowlist has to be re-enforced on every redirect hop, or the egress
+// restriction is silently bypassed.
+func TestRunner_Do_RedirectToDeniedHostBlocked(t *testing.T) {
+	t.Parallel()
+	reachedDenied := false
+	denied := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		reachedDenied = true
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("secret from denied host"))
+	}))
+	defer denied.Close()
+
+	allowed := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, denied.URL, http.StatusFound)
+	}))
+	defer allowed.Close()
+
+	// Allow only the allowed server's exact host:port; the denied server binds a
+	// different loopback port, so it is not on the list.
+	r := New(Config{BaseURL: allowed.URL, Allow: []string{strings.TrimPrefix(allowed.URL, "http://")}})
+	_, err := r.Do(context.Background(), &spec.HTTP{Method: "GET", Path: "/"})
+	if err == nil {
+		t.Fatal("Do() error = nil, want the redirect to a denied host to be blocked")
+	}
+	var pe *PolicyError
+	if !errors.As(err, &pe) {
+		t.Fatalf("error = %T (%v), want *PolicyError", err, err)
+	}
+	if reachedDenied {
+		t.Error("the denied host was reached: the network policy was bypassed via redirect")
+	}
+}
+
+// TestRunner_Do_RedirectToAllowedHostFollowed proves the hop check does not
+// break a legitimate redirect between two allowed endpoints.
+func TestRunner_Do_RedirectToAllowedHostFollowed(t *testing.T) {
+	t.Parallel()
+	final := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/from" {
+			http.Redirect(w, r, "/to", http.StatusFound)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("landed"))
+	}))
+	defer final.Close()
+
+	r := New(Config{BaseURL: final.URL, Allow: []string{strings.TrimPrefix(final.URL, "http://")}})
+	res, err := r.Do(context.Background(), &spec.HTTP{Method: "GET", Path: "/from"})
+	if err != nil {
+		t.Fatalf("Do() error = %v, want the same-host redirect to be followed", err)
+	}
+	if res.StatusCode != http.StatusOK || string(res.Body) != "landed" {
+		t.Errorf("status=%d body=%q, want 200/landed", res.StatusCode, string(res.Body))
 	}
 }
 

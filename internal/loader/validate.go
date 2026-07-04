@@ -841,9 +841,19 @@ func cdpActionCount(a *spec.CDPAction) int {
 	return n
 }
 
+// reservedVarNames are the built-in variables the engine seeds into every
+// scenario store (${atago} binary path, ${workdir}, ${suitedir}). A user store
+// or matrix variable that reuses one silently shadows it — pointing ${workdir}
+// outside the isolated temp dir while cleanup still targets the real one — so
+// the collision is rejected at load time.
+var reservedVarNames = map[string]bool{"atago": true, "workdir": true, "suitedir": true}
+
 func validateStore(add func(string, ...any), where string, s *spec.Store) {
 	if s.Name == "" {
 		add("%s.store.name is required", where)
+	}
+	if reservedVarNames[s.Name] {
+		add("%s.store.name %q shadows a built-in variable (atago/workdir/suitedir); choose another name", where, s.Name)
 	}
 	if s.From == nil {
 		add("%s.store.from is required", where)

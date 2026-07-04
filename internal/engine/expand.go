@@ -62,6 +62,11 @@ func expandService(st *store.Store, scenarioEnv map[string]string, svc *spec.Ser
 		rc := *svc.Ready
 		rc.File = st.Expand(svc.Ready.File)
 		rc.Port = st.Expand(svc.Ready.Port)
+		// The log-regexp readiness probe must be expanded too: a probe like
+		// `log: "listening on ${workdir}/sock"` is compiled verbatim by the
+		// service runner, so leaving ${workdir} unexpanded means it can never
+		// match and the service always hits its readiness timeout.
+		rc.Log = st.Expand(svc.Ready.Log)
 		c.Ready = &rc
 	}
 	return &c

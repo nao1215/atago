@@ -67,6 +67,11 @@ func TestLoadBytes_HTTPValidation(t *testing.T) {
 			src:     "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo hi}\n      - store:\n          name: v\n          from:\n            stdout: {contains: hi}",
 			wantMsg: "json path or a matches regexp",
 		},
+		{
+			name:    "store name shadowing a built-in is rejected",
+			src:     "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo hi}\n      - store:\n          name: workdir\n          from:\n            stdout: {matches: \"(.*)\"}",
+			wantMsg: "shadows a built-in variable",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

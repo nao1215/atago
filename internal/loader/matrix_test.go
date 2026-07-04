@@ -87,6 +87,11 @@ func TestLoadBytes_MatrixErrors(t *testing.T) {
 			src:     "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: \"fixed ${x}\"\n    matrix:\n      - { x: dup }\n      - { x: dup }\n    steps:\n      - run: {command: echo}",
 			wantMsg: "duplicate scenario name",
 		},
+		{
+			name:    "matrix key shadows a built-in",
+			src:     "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: \"m ${workdir}\"\n    matrix:\n      - { workdir: /tmp/x }\n    steps:\n      - run: {command: echo}",
+			wantMsg: "shadows a built-in variable",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

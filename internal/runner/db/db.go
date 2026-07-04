@@ -161,7 +161,34 @@ func isRowReturning(query string) bool {
 			return true
 		}
 	}
-	return strings.Contains(head, " RETURNING ")
+	return hasReturningKeyword(head)
+}
+
+// hasReturningKeyword reports whether head contains a RETURNING keyword OUTSIDE
+// any string literal or quoted identifier. A plain strings.Contains scan would
+// also match a data value like 'order RETURNING to sender', misrouting an
+// INSERT/UPDATE/DELETE to QueryContext and losing its affected-row count; this
+// scan skips quoted regions the way withIsRowReturning does.
+func hasReturningKeyword(head string) bool {
+	for i := 0; i < len(head); {
+		c := head[i]
+		switch {
+		case c == '\'' || c == '"' || c == '`':
+			i = skipQuoted(head, i)
+		case isWordChar(c):
+			j := i
+			for j < len(head) && isWordChar(head[j]) {
+				j++
+			}
+			if head[i:j] == "RETURNING" {
+				return true
+			}
+			i = j
+		default:
+			i++
+		}
+	}
+	return false
 }
 
 // withIsRowReturning classifies an upper-cased WITH statement by the first SQL
@@ -193,7 +220,7 @@ func withIsRowReturning(head string) bool {
 			case "SELECT", "VALUES":
 				return true
 			case "INSERT", "UPDATE", "DELETE", "MERGE":
-				return strings.Contains(head, " RETURNING ")
+				return hasReturningKeyword(head)
 			}
 			i = j
 		default:

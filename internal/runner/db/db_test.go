@@ -158,6 +158,11 @@ func TestIsRowReturning(t *testing.T) {
 		"WITH x AS (SELECT 1) INSERT INTO t SELECT * FROM x RETURNING id": true,
 		"WITH x AS (SELECT 1) DELETE FROM t RETURNING *":                  true,
 		"WITH RECURSIVE t(n) AS (SELECT 1) SELECT * FROM t":               true,
+		// A RETURNING token INSIDE a string literal must not route the statement
+		// as row-returning (it would lose the affected-row count).
+		"INSERT INTO logs (msg) VALUES ('order RETURNING to sender')":    false,
+		"UPDATE t SET note = 'see RETURNING policy' WHERE id = 1":        false,
+		"WITH x AS (SELECT 1) INSERT INTO logs VALUES ('a RETURNING b')": false,
 	}
 	for q, want := range cases {
 		if got := isRowReturning(q); got != want {

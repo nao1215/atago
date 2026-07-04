@@ -48,6 +48,14 @@ func Write(f *spec.Fixture, workdir, specDir string) error {
 	// existing file in place — e.g. chmod a file a previous step created — rather
 	// than truncating it. This lets a spec make a tool-created file read-only.
 	if f.Content == "" && f.Base64 == "" && f.From == "" && (f.Mode != "" || f.Mtime != "") {
+		// dest is lexically inside the workdir (safeJoin), but the untrusted
+		// program under test may have replaced it with a symlink pointing outside
+		// — and chmod/chtimes FOLLOW symlinks, so applying mode/mtime here would
+		// escape containment and re-permission a host file. Reject an existing
+		// symlink, mirroring writeNoFollow's guard on the content path (issue #16).
+		if fi, err := os.Lstat(dest); err == nil && fi.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("fixture %q: refusing to chmod/set-mtime through the existing symlink %q", f.File, dest)
+		}
 		if err := applyMode(f, dest); err != nil {
 			return err
 		}

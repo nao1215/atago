@@ -145,6 +145,33 @@ func TestWrite_RefusesToFollowPlantedSymlink(t *testing.T) {
 	}
 }
 
+// TestWrite_ModeMtimeRefusesPlantedSymlink is a security regression: a
+// mode/mtime-only fixture operates in place and chmod/chtimes FOLLOW symlinks,
+// so a link the program-under-test planted at the destination must be refused
+// rather than re-permissioning a host file outside the workdir (issue #16).
+func TestWrite_ModeMtimeRefusesPlantedSymlink(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	outside := filepath.Join(t.TempDir(), "secret.txt")
+	if err := os.WriteFile(outside, []byte("secret"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(dir, "planted")); err != nil {
+		t.Fatal(err)
+	}
+	err := Write(&spec.Fixture{File: "planted", Mode: "0777"}, dir, "")
+	if err == nil {
+		t.Error("chmod through a planted symlink should be refused")
+	}
+	fi, serr := os.Lstat(outside)
+	if serr != nil {
+		t.Fatal(serr)
+	}
+	if perm := fi.Mode().Perm(); perm != 0o600 {
+		t.Errorf("outside file perms changed through the symlink: %o, want 0600", perm)
+	}
+}
+
 func TestWrite_Mode(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()

@@ -152,6 +152,28 @@ func TestExpandStore_File(t *testing.T) {
 	}
 }
 
+// TestExpandService_ReadyLog is a regression: a service's log-regexp readiness
+// probe must be ${name}-expanded like its file/port probes, or a probe
+// referencing ${workdir} is compiled verbatim and never matches, so the service
+// always hits its readiness timeout and the scenario errors falsely.
+func TestExpandService_ReadyLog(t *testing.T) {
+	t.Parallel()
+	st := store.New()
+	st.Set("workdir", "/wd")
+	svc := &spec.Service{
+		Name:    "api",
+		Command: "./server",
+		Ready:   &spec.Ready{Log: "listening on ${workdir}/sock", File: "${workdir}/ready"},
+	}
+	out := expandService(st, nil, svc)
+	if got := out.Ready.Log; got != "listening on /wd/sock" {
+		t.Errorf("ready.log = %q, want it expanded to /wd/sock", got)
+	}
+	if got := out.Ready.File; got != "/wd/ready" {
+		t.Errorf("ready.file = %q, want /wd/ready", got)
+	}
+}
+
 func TestMergeScenarioEnv(t *testing.T) {
 	t.Parallel()
 	st := store.New()

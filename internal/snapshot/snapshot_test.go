@@ -17,9 +17,17 @@ func TestNormalize(t *testing.T) {
 		want string
 	}{
 		{"ansi stripped", "\x1b[32mok\x1b[0m", Options{}, "ok"},
+		// A spinner/TUI emits private-mode CSI (cursor hide/show, alt-screen) and
+		// colon-subparam SGR; none of it may reach the golden.
+		{"csi private-mode stripped", "loading\x1b[?25ldone\x1b[?25h", Options{}, "loadingdone"},
+		{"csi alt-screen stripped", "\x1b[?1049hui\x1b[?1049l", Options{}, "ui"},
+		{"csi colon sgr stripped", "\x1b[38:2:255:0:0mred\x1b[0m", Options{}, "red"},
+		{"osc title stripped", "\x1b]0;my title\x07text", Options{}, "text"},
 		{"uuid masked", "id=550e8400-e29b-41d4-a716-446655440000", Options{}, "id=<uuid>"},
 		{"timestamp masked", "at 2026-06-30T09:00:00Z done", Options{}, "at <timestamp> done"},
 		{"port masked", "listening on 127.0.0.1:54321", Options{}, "listening on 127.0.0.1:<port>"},
+		{"single-digit port masked", "127.0.0.1:0 bound", Options{}, "127.0.0.1:<port> bound"},
+		{"six-digit port fully masked", "127.0.0.1:123456", Options{}, "127.0.0.1:<port>"},
 		{"workdir masked", "wrote /tmp/atago-xyz/out.txt", Options{Workdir: "/tmp/atago-xyz"}, "wrote <workdir>/out.txt"},
 	}
 	for _, tt := range tests {
@@ -75,5 +83,24 @@ func TestNormalize_CRLF(t *testing.T) {
 	got := string(Normalize([]byte("hello\r\nworld\r\n"), Options{}))
 	if got != "hello\nworld\n" {
 		t.Errorf("Normalize CRLF = %q, want LF-only", got)
+	}
+}
+
+// TestCompare_CRLFGolden is a regression: a golden checked out with CRLF (git
+// autocrlf, a CRLF editor) must still match LF-folded actual output, since the
+// actual side is CRLF-folded during normalization.
+func TestCompare_CRLFGolden(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "golden.txt")
+	if err := os.WriteFile(path, []byte("hello\r\nworld\r\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	ok, _, _, err := Compare(path, []byte("hello\nworld\n"), Options{})
+	if err != nil {
+		t.Fatalf("Compare error = %v", err)
+	}
+	if !ok {
+		t.Error("a CRLF golden did not match LF-folded actual; CRLF must be folded on both sides")
 	}
 }
