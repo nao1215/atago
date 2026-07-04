@@ -192,7 +192,7 @@ func scenarioMeta(sc *spec.Scenario) string {
 func givenBullets(sc *spec.Scenario, expand func(string) string) []string {
 	var out []string
 	// Background services are part of the given world: they are started before
-	// the scenario's steps run (ADR-0031), so document them up front (#41).
+	// the scenario's steps run, so document them up front (#41).
 	for i := range sc.Services {
 		svc := &sc.Services[i]
 		out = append(out, fmt.Sprintf("Background service `%s` is started: `%s`.", svc.Name, expand(svc.Command)))

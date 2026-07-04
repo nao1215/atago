@@ -3,7 +3,7 @@ version: "1"
 suite:
   name: atago self-hosting / not_equals matcher
 
-# Exercises the negative exact-text matcher `not_equals` (ADR-0023), the
+# Exercises the negative exact-text matcher `not_equals`, the
 # symmetric counterpart of `equals`. Modeled on ShellSpec's `should not equal`,
 # which procps/util-linux ports had to work around with contains/matches.
 scenarios:

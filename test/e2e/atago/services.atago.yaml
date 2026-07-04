@@ -3,7 +3,7 @@ version: "1"
 suite:
   name: atago self-hosting / background services
 
-# Exercises scenario-level `services` (ADR-0031) through the real atago binary:
+# Exercises scenario-level `services` through the real atago binary:
 # a background process is started before the steps, its readiness is awaited via
 # file/log/delay probes, a dynamic value is captured from its ready file into a
 # ${var}, and the process group is torn down when the scenario ends. These

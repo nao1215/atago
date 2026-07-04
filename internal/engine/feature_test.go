@@ -7,7 +7,7 @@ import (
 )
 
 // TestEngine_MatrixRunsEachRow checks that a matrix scenario expands and each
-// instance resolves its own bound variables (ADR-0020).
+// instance resolves its own bound variables.
 func TestEngine_MatrixRunsEachRow(t *testing.T) {
 	t.Parallel()
 	res := runSpec(t, `
@@ -137,7 +137,7 @@ scenarios:
 	}
 }
 
-// TestEngine_SkipByCommand exercises the probe-command skip predicate (ADR-0021).
+// TestEngine_SkipByCommand exercises the probe-command skip predicate.
 func TestEngine_SkipByCommand(t *testing.T) {
 	t.Parallel()
 	res := runSpec(t, `

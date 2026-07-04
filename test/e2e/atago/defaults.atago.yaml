@@ -3,7 +3,7 @@ version: "1"
 suite:
   name: atago self-hosting / top-level defaults
 
-# Exercises the top-level `defaults:` block (ADR-0039): shared authoring sugar
+# Exercises the top-level `defaults:` block: shared authoring sugar
 # merged into the concrete scenario/step/service model at load time. These specs
 # run the built ${atago} against inner specs and assert the merged behavior, so
 # the feature is verified end-to-end (not just in loader unit tests). The scope

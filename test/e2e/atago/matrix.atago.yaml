@@ -3,7 +3,7 @@ version: "1"
 suite:
   name: atago self-hosting / matrix scenarios
 
-# Exercises declarative parameterized scenarios via `matrix:` (ADR-0020): one
+# Exercises declarative parameterized scenarios via `matrix:`: one
 # template scenario expands into a concrete scenario per row, with each row's
 # variables seeded for ${name} substitution. This is atago's answer to
 # ShellSpec `Parameters`, staying declarative with no expression language.

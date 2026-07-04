@@ -12,7 +12,7 @@ suite:
 
 # Every command here needs the shell (env vars like $ISO_EXAMPLES, pipes into
 # `cat -v`, redirects), so default shell:true once instead of on every run step
-# (ADR-0039). A step can still add its own runner/cwd/timeout/env/stdin.
+#. A step can still add its own runner/cwd/timeout/env/stdin.
 defaults:
   run:
     shell: true

@@ -15,7 +15,7 @@ import (
 )
 
 // runHTTPStep executes an http step, applying retry/until polling when
-// requested — the http counterpart of runStep (ADR-0022). The
+// requested — the http counterpart of runStep. The
 // request is re-issued until until passes or the attempt budget is spent; the
 // last response is what later steps observe. It returns the final response, the
 // until CheckResult (nil when no retry is configured), whether a failure was a

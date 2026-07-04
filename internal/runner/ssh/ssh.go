@@ -1,6 +1,6 @@
 // Package ssh implements the SSH runner: a `run` step naming an ssh runner
 // executes its command on a remote host over SSH, capturing stdout, stderr, and
-// the exit code as a runner.Result (ADR-0027). It is the atago
+// the exit code as a runner.Result. It is the atago
 // counterpart to runn's SSH runner and builds on golang.org/x/crypto/ssh — the
 // same transport runn uses — driven entirely by the runner's declared
 // connection fields (no ~/.ssh/config dependency, so runs stay reproducible).

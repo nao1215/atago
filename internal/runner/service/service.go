@@ -1,5 +1,5 @@
 // Package service runs the background processes a scenario declares under
-// `services` (ADR-0031): a long-lived peer (a TCP server, an API stub) started
+// `services`: a long-lived peer (a TCP server, an API stub) started
 // before the scenario's steps and torn down — with its whole process group —
 // when the scenario ends. It reuses the command runner's tokenization and
 // environment handling so a service spawns identically to a run step.

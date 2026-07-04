@@ -7,7 +7,7 @@ suite:
 # under test*, and a CLI may legitimately ship its own `sh` (e.g. mimixbox's sh
 # applet). If `shell: true` resolved its shell through that PATH, the program
 # under test would hijack atago's shell and change pipe/redirect/exit
-# semantics. The runner therefore invokes an absolute shell (ADR-0018), so a
+# semantics. The runner therefore invokes an absolute shell, so a
 # PATH-resident `sh` cannot take over.
 scenarios:
   - name: a PATH-resident fake sh does not hijack shell:true

@@ -3,7 +3,7 @@ version: "1"
 suite:
   name: atago self-hosting / image
 
-# Exercises the `image` assertion target (ADR-0030) end-to-end through the real
+# Exercises the `image` assertion target end-to-end through the real
 # binary: a generated image's format/dimensions/alpha are checked, and a pixel
 # comparison against a baseline image passes or fails as expected. Images are
 # materialized from base64 fixtures so the spec stays hermetic (no image tool on

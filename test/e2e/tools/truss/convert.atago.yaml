@@ -1,4 +1,4 @@
-# Dogfood spec: exercises atago's `image` assertion (ADR-0030) against the real
+# Dogfood spec: exercises atago's `image` assertion against the real
 # `truss` image-transform CLI (github.com/nao1215/truss). Requires `truss` on
 # PATH; run with: make dogfood. Each scenario is gated on truss being present so
 # the suite skips cleanly where it is not installed.

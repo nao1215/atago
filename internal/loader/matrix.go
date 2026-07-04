@@ -37,7 +37,7 @@ func validateMatrix(s *spec.Spec) []string {
 }
 
 // expandMatrix replaces every matrix scenario with one concrete scenario per row,
-// in definition order (ADR-0020). Each instance carries its row as
+// in definition order. Each instance carries its row as
 // Vars (seeded into the store before steps run) and a templated, unique Name.
 // Scenarios without a matrix are left untouched.
 func expandMatrix(s *spec.Spec) {

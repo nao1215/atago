@@ -171,7 +171,7 @@ func validateMockRoutes(add func(string, ...any), where string, routes []spec.Mo
 	}
 }
 
-// validateDefaults checks the top-level `defaults:` block (ADR-0039). The merge only
+// validateDefaults checks the top-level `defaults:` block. The merge only
 // covers non-identity, non-per-step fields, so a value the loader would silently
 // ignore is reported here instead. Fields the loader does merge are validated on
 // the concrete elements after applyDefaults (and, for a shared readiness probe,

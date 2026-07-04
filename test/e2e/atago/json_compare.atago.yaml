@@ -3,7 +3,7 @@ version: "1"
 suite:
   name: atago self-hosting / json numeric comparators
 
-# Exercises the numeric bound matchers gt/gte/lt/lte on a json target (ADR-0034).
+# Exercises the numeric bound matchers gt/gte/lt/lte on a json target.
 # They let a spec pin a non-deterministic-but-bounded metric — a processed-record
 # count, a coverage figure, a rate — where an exact `equals` is impossible but
 # "at least N" / "below N" is exactly the contract worth asserting. Surfaced

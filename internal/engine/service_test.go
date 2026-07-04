@@ -4,8 +4,8 @@ import (
 	"testing"
 )
 
-// TestEngine_ServiceReadyFileCapturedAndUsed covers ADR-0031 end to end through
-// the engine: a background service publishes a value to a ready file, the engine
+// TestEngine_ServiceReadyFileCapturedAndUsed covers the services feature end to
+// end through the engine: a background service publishes a value to a ready file, the engine
 // captures it into ${addr}, and a later step reads the value back.
 func TestEngine_ServiceReadyFileCapturedAndUsed(t *testing.T) {
 	t.Parallel()

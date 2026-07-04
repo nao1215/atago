@@ -457,7 +457,7 @@ func TestRun_CommandNotFound(t *testing.T) {
 }
 
 // TestRun_ShellNotShadowedByPath verifies that a `sh` placed first on PATH does
-// not hijack the harness shell (ADR-0018). A sabotaged `sh` that always prints
+// not hijack the harness shell. A sabotaged `sh` that always prints
 // HIJACKED and exits 0 sits in the workdir; with PATH pointing only at it, a
 // PATH-resolved shell would run it, but the absolute /bin/sh must be used.
 func TestRun_ShellNotShadowedByPath(t *testing.T) {

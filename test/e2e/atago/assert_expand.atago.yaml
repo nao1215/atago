@@ -6,7 +6,7 @@ suite:
 # Regression for the mimixbox migration: ShellSpec specs embed paths in expected
 # output, e.g. `The output should equal "${MIMIXBOX_IT_ROOT}/cat.txt"`. atago
 # now expands ${name}/${workdir} in stream and file matcher values too
-# (ADR-0019), not just in commands and file.path.
+#, not just in commands and file.path.
 scenarios:
   - name: stdout.equals expands ${workdir}
     steps:

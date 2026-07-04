@@ -22,14 +22,14 @@ type Spec struct {
 	Permissions *Permissions      `yaml:"permissions,omitempty"`
 	Secrets     []string          `yaml:"secrets,omitempty"`
 	// Defaults declares spec-wide default fragments merged into every matching
-	// element at load time (ADR-0039). It is authoring sugar only: the loader
+	// element at load time. It is authoring sugar only: the loader
 	// expands it into the concrete scenario/step/service model before validation,
 	// so nothing downstream (engine, manifest, explain) ever observes `defaults`.
 	Defaults  *Defaults  `yaml:"defaults,omitempty"`
 	Scenarios []Scenario `yaml:"scenarios"`
 }
 
-// Defaults holds the top-level `defaults:` block (ADR-0039). Each fragment is
+// Defaults holds the top-level `defaults:` block. Each fragment is
 // merged into the concrete model at load time to cut repetition without adding a
 // runtime model: `run` layers under every `run` step, `scenario.env` under every
 // scenario env, and `service` under every service.
@@ -90,13 +90,13 @@ type Runner struct {
 	BaseURL string `yaml:"base_url,omitempty"`
 	// DSN is the data source for a db runner, e.g. "sqlite:./app.db",
 	// "postgres://user:pass@host/db", or "mysql://user:pass@host:3306/db". The
-	// driver is inferred from the scheme unless Driver is set (ADR-0026).
+	// driver is inferred from the scheme unless Driver is set.
 	DSN string `yaml:"dsn,omitempty"`
 	// Driver, when set, names the database/sql driver explicitly (sqlite,
 	// postgres, or mysql), overriding scheme inference.
 	Driver string `yaml:"driver,omitempty"`
 
-	// SSH runner fields (ADR-0027). A `run` step naming an ssh runner executes its
+	// SSH runner fields. A `run` step naming an ssh runner executes its
 	// command on the remote host, capturing stdout/stderr/exit like a local run.
 	Host       string `yaml:"host,omitempty"`        // host or host:port (default port 22)
 	User       string `yaml:"user,omitempty"`        // login user
@@ -108,12 +108,12 @@ type Runner struct {
 	// configuration error rather than a silent MITM-able default (issue #17).
 	InsecureHostKey bool `yaml:"insecure_host_key,omitempty"`
 
-	// gRPC runner fields (ADR-0028). A `grpc` step calls a unary method on the
+	// gRPC runner fields. A `grpc` step calls a unary method on the
 	// target, resolving the schema via server reflection (no compiled stubs).
 	Target string `yaml:"target,omitempty"` // host:port of the gRPC server
 	TLS    bool   `yaml:"tls,omitempty"`    // use TLS (default plaintext)
 
-	// Browser runner fields (ADR-0038). A minimal, black-box configuration surface
+	// Browser runner fields. A minimal, black-box configuration surface
 	// for the CDP runner; all are optional and preserve the zero-config headless
 	// default when omitted.
 	//
@@ -147,7 +147,7 @@ type Scenario struct {
 	Only *Condition        `yaml:"only,omitempty"`
 	Env  map[string]string `yaml:"env,omitempty"`
 	// Matrix, when set, makes this scenario a template: the loader expands it into
-	// one concrete scenario per row before validation (ADR-0020).
+	// one concrete scenario per row before validation.
 	// Each row's key/value pairs are seeded as ${name} variables for that instance.
 	Matrix []map[string]string `yaml:"matrix,omitempty"`
 	// Vars holds the bound matrix row for an expanded scenario instance. It is
@@ -160,7 +160,7 @@ type Scenario struct {
 	// index — and therefore its source location (#80). Never decoded from YAML.
 	SourceIndex int `yaml:"-"`
 	// Services are background processes started before the scenario's steps run
-	// and terminated when the scenario ends (ADR-0031). They let a spec exercise a
+	// and terminated when the scenario ends. They let a spec exercise a
 	// CLI that talks to a peer (a TCP client, an API consumer) by standing up that
 	// peer for the duration of the scenario.
 	Services []Service `yaml:"services,omitempty"`
@@ -183,7 +183,7 @@ type Scenario struct {
 }
 
 // Service is a background process started before a scenario's steps run and
-// terminated (with its whole process group) when the scenario ends (ADR-0031).
+// terminated (with its whole process group) when the scenario ends.
 // It runs in the scenario workdir and gets the same ${name} expansion and
 // scenario-env layering as a run step.
 type Service struct {
@@ -272,7 +272,7 @@ type MockAssert struct {
 	Body *StreamAssert `yaml:"body,omitempty"`
 }
 
-// Ready is a service readiness probe (ADR-0031). Exactly one of File/Port/Log/
+// Ready is a service readiness probe. Exactly one of File/Port/Log/
 // Delay decides when the service is considered up; Timeout bounds the wait.
 type Ready struct {
 	// File waits until this workdir-relative file exists and is non-empty — the
@@ -299,7 +299,7 @@ type Ready struct {
 // `skip: { env: X }` skips when X is set; `only: { env: X }` runs only when X is
 // set. For Command, the condition is true when the probe command succeeds (exits
 // 0): `skip: { command: X }` skips when X succeeds; `only: { command: X }` runs
-// only when X succeeds (ADR-0021). The probe runs through the shell.
+// only when X succeeds. The probe runs through the shell.
 type Condition struct {
 	OS      string `yaml:"os,omitempty"`
 	Env     string `yaml:"env,omitempty"`
@@ -377,7 +377,7 @@ func NormalizeSignalName(name string) string {
 // ValidSignalName reports whether the (normalized) signal name is accepted.
 func ValidSignalName(name string) bool { return validSignalNames[NormalizeSignalName(name)] }
 
-// Query runs a SQL statement through a named db runner (ADR-0026). The result
+// Query runs a SQL statement through a named db runner. The result
 // rows (for a SELECT) are captured as JSON for the `rows` assertion target and
 // `store from.rows`; a non-row statement records its affected-row count.
 type Query struct {
@@ -385,7 +385,7 @@ type Query struct {
 	SQL    string `yaml:"sql"`
 }
 
-// GRPC calls a unary gRPC method through a named grpc runner (ADR-0028). The
+// GRPC calls a unary gRPC method through a named grpc runner. The
 // response message is captured as JSON for the `message` assertion target and
 // `store from.message`; the status code feeds the `grpc_status` target.
 type GRPC struct {
@@ -395,7 +395,7 @@ type GRPC struct {
 	JSON   any               `yaml:"json,omitempty"` // request message
 }
 
-// CDP drives a headless browser through a named browser runner (ADR-0029). The
+// CDP drives a headless browser through a named browser runner. The
 // action list runs in order against one browser session; the value captured by
 // the last `text`/`eval` action feeds the `value` assertion target and
 // `store from.value`.
@@ -537,7 +537,7 @@ type Run struct {
 	StdoutTo string `yaml:"stdout_to,omitempty"`
 	StderrTo string `yaml:"stderr_to,omitempty"`
 	// Retry, when set, re-runs the command until the Until assertion passes,
-	// polling declaratively for async behavior (ADR-0022).
+	// polling declaratively for async behavior.
 	Retry *Retry `yaml:"retry,omitempty"`
 }
 
@@ -775,7 +775,7 @@ type HTTP struct {
 	// Retry, when set, re-issues the request until the Until assertion passes,
 	// polling declaratively for eventually-consistent endpoints (a metric that
 	// appears after a scrape, an async job flipping to done) exactly like a run
-	// step's retry (ADR-0022).
+	// step's retry.
 	Retry *Retry `yaml:"retry,omitempty"`
 }
 
@@ -803,19 +803,19 @@ type Assert struct {
 	Body   *StreamAssert `yaml:"body,omitempty"`
 
 	// Rows is the db assertion target: the query result rows as a JSON array,
-	// matched with the stream matchers (json path/length, contains, …) (ADR-0026).
+	// matched with the stream matchers (json path/length, contains, …).
 	Rows *StreamAssert `yaml:"rows,omitempty"`
 
-	// gRPC assertion targets (ADR-0028): GRPCStatus checks the numeric status
+	// gRPC assertion targets: GRPCStatus checks the numeric status
 	// code; Message matches the response message (as JSON) with the stream matchers.
 	GRPCStatus *int          `yaml:"grpc_status,omitempty"`
 	Message    *StreamAssert `yaml:"message,omitempty"`
 
-	// Value is the browser assertion target (ADR-0029): the value captured by the
+	// Value is the browser assertion target: the value captured by the
 	// last text/eval action, matched with the stream matchers.
 	Value *StreamAssert `yaml:"value,omitempty"`
 
-	// Image is the image assertion target (ADR-0030): it inspects a generated
+	// Image is the image assertion target: it inspects a generated
 	// image file's decoded properties (format, dimensions, alpha) and can compare
 	// its pixels against a baseline image.
 	Image *ImageAssert `yaml:"image,omitempty"`
@@ -945,7 +945,7 @@ type DirAssert struct {
 	Ignore []string `yaml:"ignore,omitempty"`
 }
 
-// ImageAssert checks a generated image file (ADR-0030). Unlike the one-of
+// ImageAssert checks a generated image file. Unlike the one-of
 // stream/file targets, every field that is set is a separate constraint and all
 // of them must hold, because an image has several independent observable
 // attributes. At least one constraint must be set.

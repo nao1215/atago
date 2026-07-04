@@ -3,7 +3,7 @@ version: "1"
 suite:
   name: atago self-hosting / retry until
 
-# Exercises declarative retry/until polling on a run step (ADR-0022): the command
+# Exercises declarative retry/until polling on a run step: the command
 # is re-run until the `until` assertion passes or the attempt budget is spent.
 # This is atago's answer to runn's retry for async behavior, with no hand-rolled
 # shell `timeout` loops.

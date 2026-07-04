@@ -7,7 +7,7 @@ import (
 )
 
 // applyDefaults expands the top-level `defaults:` block into the concrete
-// scenario model (ADR-0039). It runs after matrix expansion and before
+// scenario model. It runs after matrix expansion and before
 // validation, so the merged result is validated and the engine only ever sees
 // fully-resolved scenarios — `defaults` is pure authoring sugar with no runtime
 // model of its own.

@@ -25,7 +25,7 @@ func readDoc(t *testing.T, path string) string {
 }
 
 // TestDocs_NoStaleLintReferences is the regression from #55: user-facing docs and
-// demo assets must not invoke the removed `atago lint` command (ADR-0035).
+// demo assets must not invoke the removed `atago lint` command.
 func TestDocs_NoStaleLintReferences(t *testing.T) {
 	for _, path := range []string{"README.md", "doc/vhs/review.tape"} {
 		if strings.Contains(readDoc(t, path), "atago lint") {

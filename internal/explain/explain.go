@@ -245,7 +245,7 @@ func explainScenario(b *strings.Builder, sc *spec.Scenario) {
 }
 
 // describeService renders a one-line summary of a background service and how its
-// readiness is decided (ADR-0031).
+// readiness is decided.
 func describeService(svc *spec.Service) string {
 	desc := svc.Name + ": " + svc.Command
 	if svc.ClearEnvEnabled() {
@@ -274,7 +274,7 @@ func describeService(svc *spec.Service) string {
 	return desc
 }
 
-// describeCDP renders a one-line summary of a cdp step's action list (ADR-0029),
+// describeCDP renders a one-line summary of a cdp step's action list,
 // reusing the shared per-action labels so explain stays aligned with doc and
 // manifest (#50).
 func describeCDP(c *spec.CDP) string {

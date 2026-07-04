@@ -3,7 +3,7 @@ version: "1"
 suite:
   name: atago self-hosting / db runner
 
-# Exercises the DB runner end-to-end through the real atago binary (ADR-0026),
+# Exercises the DB runner end-to-end through the real atago binary,
 # using an in-memory SQLite database (pure-Go modernc driver, no cgo, no external
 # server). Live multi-driver behavior is covered by Go tests
 # (internal/runner/db, internal/engine/db_test.go).

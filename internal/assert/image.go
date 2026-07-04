@@ -25,7 +25,7 @@ import (
 	"github.com/nao1215/atago/internal/spec"
 )
 
-// checkImage evaluates an image assertion (ADR-0030). Every constraint set on
+// checkImage evaluates an image assertion. Every constraint set on
 // the assertion must hold. Relative paths resolve against the scenario workdir;
 // a relative similar_to baseline resolves against the spec file's directory.
 func checkImage(im *spec.ImageAssert, env Env) *CheckResult {

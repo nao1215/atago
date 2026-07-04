@@ -69,7 +69,7 @@ func LoadBytes(path string, data []byte) (*spec.Spec, error) {
 	}
 	expandMatrix(&s)
 	// Expand the top-level defaults into the concrete scenario/step/service model
-	// so validation and the engine only ever see fully-resolved scenarios (ADR-0039).
+	// so validation and the engine only ever see fully-resolved scenarios.
 	applyDefaults(&s)
 	if errs := validate(&s); len(errs) > 0 {
 		return nil, &Error{Path: path, Kind: KindValidation, Msg: joinErrors(errs)}

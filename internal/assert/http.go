@@ -120,7 +120,7 @@ func cdpValue(res *runner.Result) []byte {
 }
 
 // checkGRPCStatus evaluates a `grpc_status` assertion against the numeric status
-// code captured by the grpc runner (ADR-0028).
+// code captured by the grpc runner.
 func checkGRPCStatus(want *int, res *runner.Result) *CheckResult {
 	if res == nil || !res.IsGRPC {
 		return &CheckResult{Desc: "assert grpc_status", Hint: "no gRPC call has run in this scenario yet"}

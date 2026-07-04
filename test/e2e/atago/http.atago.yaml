@@ -3,7 +3,7 @@ version: "1"
 suite:
   name: atago self-hosting / http runner
 
-# Exercises the HTTP runner end-to-end through the real atago binary (ADR-0025).
+# Exercises the HTTP runner end-to-end through the real atago binary.
 # Live request/response behavior is covered by Go httptest integration tests
 # (internal/runner/http, internal/engine/http_test.go); these self-host scenarios
 # pin the binary's wiring and exit codes for the paths that need no live server:

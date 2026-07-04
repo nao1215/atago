@@ -6,7 +6,7 @@
 # The fixture inlines a trimmed copy of sqly's testdata/user.csv (only the two
 # columns these queries touch) so the suite stays hermetic.
 #
-# This is the spec family the `line:` selector (ADR-0012) was added to migrate:
+# This is the spec family the `line:` selector was added to migrate:
 # ShellSpec's `The line N should equal '...'` becomes `line: N` + `equals:`.
 version: "1"
 

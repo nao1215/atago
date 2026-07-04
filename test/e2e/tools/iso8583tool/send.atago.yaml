@@ -2,7 +2,7 @@
 # send: drive the TCP client against a local, in-repo mock server. The mock
 # (spec/mock, built as `iso-mock` by run.sh) listens on 127.0.0.1 with an
 # ephemeral port, reads one framed request, and replies with a fixed 0810
-# response framed the same way. atago's `services` (ADR-0031) replace the
+# response framed the same way. atago's `services` replace the
 # ShellSpec build_mock/start_mock/stop_mock helpers: each scenario starts its
 # own single-shot mock, waits for it to publish its address into ready.txt, and
 # captures that address into ${addr}. No external network; deterministic reply.

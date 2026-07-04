@@ -12,7 +12,7 @@ import (
 
 func ptr(s string) *string { return &s }
 
-// TestExpandAssert_StreamAndFileMatchers covers ADR-0019: ${name}/${workdir}
+// TestExpandAssert_StreamAndFileMatchers covers that ${name}/${workdir}
 // substitution reaches stream and file matcher values, not just file.path.
 func TestExpandAssert_StreamAndFileMatchers(t *testing.T) {
 	t.Parallel()

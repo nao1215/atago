@@ -3,7 +3,7 @@ version: "1"
 suite:
   name: atago self-hosting / grpc runner
 
-# Exercises the gRPC runner's wiring through the real atago binary (ADR-0028).
+# Exercises the gRPC runner's wiring through the real atago binary.
 # Live unary calls (reflection-resolved, status/message asserts, value binding)
 # are covered hermetically by a Go test with an in-process grpcstub server
 # (internal/engine/grpc_test.go); these scenarios pin the binary's config

@@ -44,7 +44,7 @@ func mergeScenarioEnv(scenarioEnv map[string]string, r *spec.Run, st *store.Stor
 
 // expandService applies ${name} substitution to a background service's command,
 // cwd, env, and readiness file/port so a service can reference ${workdir} and
-// matrix-bound variables (ADR-0031). Scenario env is layered under the service's
+// matrix-bound variables. Scenario env is layered under the service's
 // own env, mirroring run steps.
 func expandService(st *store.Store, scenarioEnv map[string]string, svc *spec.Service) *spec.Service {
 	c := *svc
@@ -119,7 +119,7 @@ func expandHTTP(st *store.Store, h *spec.HTTP) *spec.HTTP {
 }
 
 // expandHTTP's gRPC counterpart: expand ${name} in the method, header values,
-// and JSON request body so a grpc call can reference stored values (ADR-0028).
+// and JSON request body so a grpc call can reference stored values.
 func expandGRPC(st *store.Store, g *spec.GRPC) *spec.GRPC {
 	c := *g
 	c.Method = st.Expand(g.Method)
@@ -129,7 +129,7 @@ func expandGRPC(st *store.Store, g *spec.GRPC) *spec.GRPC {
 }
 
 // expandCDP applies ${name} substitution to a cdp step's action arguments so a
-// browser flow can reference stored values (ADR-0029).
+// browser flow can reference stored values.
 func expandCDP(st *store.Store, c *spec.CDP) *spec.CDP {
 	out := *c
 	out.Actions = make([]spec.CDPAction, len(c.Actions))

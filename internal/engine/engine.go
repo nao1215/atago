@@ -459,7 +459,7 @@ func (e *Engine) runScenario(ctx context.Context, scenarioIdx int, sc *spec.Scen
 		leadingFixtures++
 	}
 
-	// Background services (ADR-0031) start after the store is seeded — so their
+	// Background services start after the store is seeded — so their
 	// commands can reference ${workdir} and matrix vars — and after the leading
 	// fixtures, but before any other step runs. They are stopped in LIFO order
 	// when the scenario ends, however it ends.
@@ -725,7 +725,7 @@ func (e *Engine) runScenario(ctx context.Context, scenarioIdx int, sc *spec.Scen
 
 // skipReason reports whether a scenario should be skipped given its skip/only
 // conditions: the host OS, an environment variable's presence, and — last,
-// because it spawns a process — a probe command's exit status (ADR-0021). The cheap, side-effect-free checks run first so a probe only runs
+// because it spawns a process — a probe command's exit status. The cheap, side-effect-free checks run first so a probe only runs
 // when nothing else already decided the outcome.
 func (e *Engine) skipReason(ctx context.Context, sc *spec.Scenario) (string, bool) {
 	if sc.Only != nil && sc.Only.OS != "" && !platform.Matches(sc.Only.OS) {
@@ -770,9 +770,9 @@ func (e *Engine) probeSucceeds(ctx context.Context, command string) bool {
 // returns the final observed result, the until CheckResult (nil when no retry is
 // configured), and an execution error. With retry, the command is re-run until
 // until passes or the attempt budget is spent; the last attempt's result is what
-// later steps observe (ADR-0022).
+// later steps observe.
 func (e *Engine) runStep(ctx context.Context, run *spec.Run, st *store.Store, workdir, specDir string, rc runConfig, sshConns map[string]*sshrunner.Runner) (*runner.Result, []*assert.CheckResult, error) {
-	// A run step naming an ssh runner executes remotely (ADR-0027); otherwise it
+	// A run step naming an ssh runner executes remotely; otherwise it
 	// runs locally via the cmd runner. The runner is resolved once (not per
 	// retry attempt) so the timeout precedence below sees the pristine authored
 	// step value.

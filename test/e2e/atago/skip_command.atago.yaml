@@ -3,7 +3,7 @@ version: "1"
 suite:
   name: atago self-hosting / skip-only command predicate
 
-# Exercises the runtime probe-command skip/only predicate (ADR-0021): a scenario
+# Exercises the runtime probe-command skip/only predicate: a scenario
 # is gated by whether a probe command succeeds (exits 0). This is atago's
 # declarative answer to ShellSpec's `Skip if <shell test>`.
 scenarios:

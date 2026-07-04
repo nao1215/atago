@@ -3,7 +3,7 @@ version: "1"
 suite:
   name: atago self-hosting / ssh runner
 
-# Exercises the SSH runner's wiring through the real atago binary (ADR-0027).
+# Exercises the SSH runner's wiring through the real atago binary.
 # Live remote execution is covered hermetically by a Go test with an in-process
 # SSH server (internal/engine/ssh_test.go); these scenarios pin the binary's
 # config validation and dispatch errors, which need no server.
