@@ -7,6 +7,19 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-07-05
+
+A bug-fix release — correctness and UX hardening across the assertion engine,
+the loader, and every runner (command, pty/TUI, HTTP, gRPC, database, SSH,
+background services), plus the record/snapshot/report tooling. No new features.
+
+Highlights: two security fixes (an HTTP redirect could follow an allowed host
+onto a denied one, bypassing `permissions.network.allow`; a `mode`/`mtime`-only
+fixture could follow a planted symlink and re-permission a file outside the
+workdir), and pty/TUI fixes that make real full-screen programs testable at last
+(a usable default `TERM`, and an `expect` that no longer matches a stale earlier
+prompt and races the session ahead).
+
 ### Fixed
 
 - A `pty` step now exports `TERM=xterm-256color` by default (overridable via
