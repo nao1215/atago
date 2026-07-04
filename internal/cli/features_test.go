@@ -344,6 +344,44 @@ func TestRerunFailed_RecordsAndReruns(t *testing.T) {
 	})
 }
 
+// TestRerunFailed_NoMatchKeepsStateAndWarns is a regression: when the recorded
+// failing scenario no longer exists in the spec (renamed/removed while still
+// broken), --rerun-failed must NOT report a false green and must NOT clear the
+// recorded failures — otherwise the still-failing work is silently forgotten.
+func TestRerunFailed_NoMatchKeepsStateAndWarns(t *testing.T) {
+	dir := t.TempDir()
+	writeSpec(t, dir, "s.atago.yaml", twoScenarioSpec)
+	withWorkdir(t, dir, func() {
+		// First run records the failing "fails" scenario.
+		var out, errb bytes.Buffer
+		if got := Main([]string{"run", "."}, &out, &errb); got != ExitFailures {
+			t.Fatalf("first run exit = %d, want %d (stderr=%s)", got, ExitFailures, errb.String())
+		}
+		// Rename the failing scenario so the recorded name no longer matches, but
+		// keep the spec path (and keep it broken).
+		renamed := strings.ReplaceAll(twoScenarioSpec, "name: fails", "name: fails-renamed")
+		writeSpec(t, dir, "s.atago.yaml", renamed)
+
+		out.Reset()
+		errb.Reset()
+		got := Main([]string{"run", "--rerun-failed", "."}, &out, &errb)
+		if got == ExitOK {
+			t.Errorf("exit = %d (ExitOK); a rerun that matched no recorded failure must not greenlight", got)
+		}
+		if !strings.Contains(errb.String(), "no recorded failing scenarios matched") {
+			t.Errorf("stderr = %q, want the no-match warning", errb.String())
+		}
+		// The recorded failures must survive so a later, correct rerun can find them.
+		st, err := loadRerunState()
+		if err != nil {
+			t.Fatalf("rerun state was removed or unreadable: %v", err)
+		}
+		if len(st.Failed) != 1 || st.Failed[0].Scenario != "fails" {
+			t.Errorf("recorded failures = %+v, want the original 'fails' preserved", st.Failed)
+		}
+	})
+}
+
 func TestRerunFailed_NothingRecorded(t *testing.T) {
 	dir := t.TempDir()
 	writeSpec(t, dir, "s.atago.yaml", passingSpec)

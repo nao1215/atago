@@ -9,6 +9,14 @@ func TestWithDefaultPort(t *testing.T) {
 		"example.com:2222": "example.com:2222",
 		"127.0.0.1":        "127.0.0.1:22",
 		"127.0.0.1:22":     "127.0.0.1:22",
+		// IPv6 literals must not be double-bracketed, and a bracketed literal
+		// without a port must gain one.
+		"::1":        "[::1]:22",
+		"[::1]":      "[::1]:22",
+		"[::1]:2222": "[::1]:2222",
+		"[fe80::1]":  "[fe80::1]:22",
+		// A trailing-colon host has an empty port that must still get the default.
+		"host:": "host:22",
 	}
 	for in, want := range cases {
 		if got := withDefaultPort(in); got != want {

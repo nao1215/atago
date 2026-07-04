@@ -115,6 +115,51 @@ func TestStart_ReadinessErrorOmitsEmptyOutput(t *testing.T) {
 	}
 }
 
+// TestStart_DelayReadyDetectsEarlyExit is a regression: a `ready.delay` service
+// whose command exits during the delay window must fail readiness, not be
+// reported ready — otherwise the scenario runs against a dead peer. The
+// file/port/log probes already detect early exit; the delay branch did not.
+func TestStart_DelayReadyDetectsEarlyExit(t *testing.T) {
+	wd := t.TempDir()
+	svc := &spec.Service{
+		Name:    "crasher",
+		Shell:   spec.Bool(true),
+		Command: "exit 3", // exits immediately, well within the delay
+		Ready:   &spec.Ready{Delay: "2s"},
+	}
+	_, _, err := Start(context.Background(), svc, wd)
+	if err == nil {
+		t.Fatal("Start() error = nil, want 'exited before it became ready'")
+	}
+	if !strings.Contains(err.Error(), "exited before it became ready") {
+		t.Errorf("error = %v, want it to report the early exit", err)
+	}
+}
+
+// TestStart_BarePortReadyRejected is a regression: a host-less ready.port must
+// fail fast with a clear message, not swallow "missing port in address" and run
+// to the full readiness timeout.
+func TestStart_BarePortReadyRejected(t *testing.T) {
+	wd := t.TempDir()
+	svc := &spec.Service{
+		Name:    "svc",
+		Shell:   spec.Bool(true),
+		Command: sleepCmd(5),
+		Ready:   &spec.Ready{Port: "9997", Timeout: "5s"}, // no host
+	}
+	start := time.Now()
+	_, _, err := Start(context.Background(), svc, wd)
+	if err == nil {
+		t.Fatal("Start() error = nil, want an invalid-port error")
+	}
+	if !strings.Contains(err.Error(), "invalid ready.port") {
+		t.Errorf("error = %v, want it to name the invalid ready.port", err)
+	}
+	if elapsed := time.Since(start); elapsed > 2*time.Second {
+		t.Errorf("took %s; a bare port must fail fast, not run to the readiness timeout", elapsed)
+	}
+}
+
 // On a readiness failure, Start returns the stopped Proc so the caller can still
 // read its captured output to preserve it as a log artifact (#51).
 func TestStart_ReadinessFailureReturnsProcForLogCapture(t *testing.T) {

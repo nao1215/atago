@@ -168,13 +168,32 @@ func runCmd(args []string, stdout, stderr io.Writer) int {
 		progress.Done()
 	}
 
+	// Scenarios that actually executed. A Select can exclude every scenario in a
+	// loaded suite — most importantly a --rerun-failed whose recorded scenario
+	// names no longer exist in the specs (renamed or removed while still broken).
+	ranScenarios := 0
+	for _, r := range results {
+		ranScenarios += len(r.Scenarios)
+	}
+	// A --rerun-failed run that matched NOTHING verified nothing, yet the recorded
+	// failures are still real: greenlighting it and clearing the state would
+	// silently forget still-failing work. Warn loudly, keep the state, and do not
+	// exit green.
+	rerunMatchedNothing := *rerunFailed && ranScenarios == 0 && ctx.Err() == nil
+	if rerunMatchedNothing {
+		fmt.Fprintln(stderr, "atago run: warning: no recorded failing scenarios matched the current specs (renamed or removed?); the recorded failures were kept, not cleared")
+		exit = worseExit(exit, ExitConfig)
+	}
+
 	// Record this run's failing scenarios for a later `--rerun-failed` (#64). The
 	// state reflects exactly the scenarios that ran: failures are recorded and a
 	// fully-green run clears the file. It is only rewritten when at least one suite
-	// loaded, so a run where every spec failed to parse leaves prior state intact.
-	// Writing is best-effort — a read-only checkout must not fail the run — so a
-	// write error is a warning, not a fatal exit.
-	if len(results) > 0 {
+	// loaded, so a run where every spec failed to parse leaves prior state intact;
+	// and a --rerun-failed that matched no scenario must NOT clear the file, or the
+	// still-failing work it could not map would be forgotten. Writing is
+	// best-effort — a read-only checkout must not fail the run — so a write error
+	// is a warning, not a fatal exit.
+	if len(results) > 0 && !rerunMatchedNothing {
 		if err := saveRerunState(collectFailures(results)); err != nil {
 			fmt.Fprintf(stderr, "atago run: could not update %s: %v\n", rerunStatePath(), err)
 		}

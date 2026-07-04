@@ -9,6 +9,46 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- A `pty` step now exports `TERM=xterm-256color` by default (overridable via
+  `env: {TERM: ...}`). Without a sane TERM, full-screen TUIs (less, vim, htop)
+  print "terminal is not fully functional" and refuse to draw, so a pty/screen
+  assertion never saw the real UI; the default matches the vt10x screen emulator
+  and is deterministic regardless of the host's own TERM.
+- A `pty` `expect` now scans only the transcript AFTER the previous match, so a
+  recurring pattern (any shell prompt) waits for its NEXT occurrence instead of
+  matching the stale earlier one. Previously every expect re-scanned the whole
+  transcript, so a second `expect "PROMPT> "` matched instantly and the session
+  raced ahead — a false pass for exactly the interactive flows the feature
+  exists for.
+- A `pty` step now surfaces a parent-context cancellation (Ctrl-C / suite
+  cancel) as an execution error instead of a spurious expect failure or a benign
+  timeout, so the scenario stops rather than asserting against a killed terminal
+  (matching the command runner, #30).
+- The gRPC runner treats a call that times out or drops (our per-call deadline
+  fired) as a transport error, not a passing result. `status.FromError` maps a
+  client-deadline `DeadlineExceeded`/`Unavailable` to `ok=true`, which was
+  recorded as a normal Result and passed against a hung or unreachable server
+  unless the spec happened to assert `grpc_status`.
+- `grpc` `method` accepts the fully-qualified `/pkg.Service/Method` form (a
+  single leading slash) and rejects a method with more than one internal slash,
+  instead of silently mis-parsing `/pkg.Service/Method` as service
+  `/pkg.Service` and failing later with a confusing reflection error.
+- A `service` `ready.delay` probe now fails if the process exits during the
+  delay window, instead of reporting the (dead) service ready and running the
+  scenario against a dead peer — matching the file/port/log probes.
+- A host-less `service` `ready.port` (e.g. `9997` instead of `:9997` /
+  `127.0.0.1:9997`) now fails fast with a clear message instead of swallowing
+  "missing port in address" and running to the full readiness timeout.
+- The SSH runner no longer mangles a bracketed IPv6 host: `[::1]` resolves to
+  `[::1]:22` rather than the malformed `[[::1]]:22`, and a trailing-colon host
+  (`host:`) gains the default port instead of dialing an empty one.
+- `atago run --rerun-failed` no longer reports a false green — and no longer
+  deletes the recorded failures — when the recorded scenario names no longer
+  match the specs (renamed or removed while still broken). It warns, keeps the
+  state, and exits non-zero so the still-failing work is not silently forgotten.
+- `atago doc` rejects `--out` combined with `--split-by-spec` instead of
+  silently ignoring `--out` (the split branch only writes into `--out-dir`).
+
 - The HTTP runner now re-enforces the network allowlist on every redirect hop.
   An allowed host could 3xx-redirect the client onto a denied host and the
   default client would follow it, silently defeating

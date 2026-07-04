@@ -1,0 +1,95 @@
+version: "1"
+
+# pty/TUI behavior against the real terminal (#8, #27): a pty step must export a
+# usable TERM so full-screen programs draw, and each expect must consume its
+# match so a recurring prompt is not matched from stale history. POSIX-only.
+
+suite:
+  name: atago self-hosting / tui
+
+scenarios:
+  # A pty child gets TERM=xterm-256color by default — without it, ncurses/termios
+  # programs refuse full-screen mode ("terminal is not fully functional").
+  - name: a pty step exports a usable TERM by default
+    skip:
+      os: windows
+    steps:
+      - pty:
+          shell: true
+          command: 'echo "TERM=[$TERM]"'
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "TERM=[xterm-256color]"
+
+  # An author-set TERM wins over the default.
+  - name: an explicit TERM overrides the default
+    skip:
+      os: windows
+    steps:
+      - pty:
+          shell: true
+          command: 'echo "TERM=[$TERM]"'
+          env:
+            TERM: vt100
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "TERM=[vt100]"
+
+  # Each expect scans only the transcript after the previous match: "AAA" is
+  # printed once, so a second expect for it must NOT match the stale one and the
+  # session must time out (proving it cannot race ahead on a recurring prompt).
+  - name: an expect does not re-match a consumed pattern
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: inner.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: stale expect must not re-match
+                steps:
+                  - pty:
+                      shell: true
+                      command: 'printf "AAA\n"'
+                      timeout: 1s
+                      session:
+                        - expect: "AAA"
+                        - expect: "AAA"
+      - run:
+          command: ${atago} run inner.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: "1 failed"
+
+  # A REAL third-party TUI pager: less -X keeps its output on the primary screen,
+  # so after quitting the rendered screen still shows the file. (less using the
+  # alternate screen would restore a blank primary screen on exit — documented in
+  # examples/pty.atago.yaml.) Gated on less being installed.
+  - name: less -X renders a real pager onto the screen
+    skip:
+      os: windows
+    only:
+      command: command -v less
+    steps:
+      - fixture:
+          file: page.txt
+          content: "Alpha line\nBeta line\nGamma line\n"
+      - pty:
+          command: less -X page.txt
+          rows: 10
+          cols: 40
+          session:
+            - expect: "Alpha line"
+            - send: "q"
+      - assert:
+          screen:
+            contains: "Alpha line"
+      - assert:
+          screen:
+            contains: "Gamma line"

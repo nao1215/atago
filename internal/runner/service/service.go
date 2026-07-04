@@ -167,10 +167,23 @@ func (p *Proc) waitReady(ctx context.Context, r *spec.Ready, workdir string) (st
 			return "", fmt.Errorf("invalid ready.delay %q: %w", r.Delay, err)
 		}
 		select {
-		case <-time.After(d):
-			return "", nil
 		case <-ctx.Done():
 			return "", ctx.Err()
+		case <-p.done:
+			// The process exited during the delay window: it is not ready, matching
+			// how the file/port/log probes detect an early exit via p.done. Without
+			// this, a command that crashes (e.g. `exit 3`) during the delay was
+			// reported READY and the scenario ran against a dead peer.
+			return "", fmt.Errorf("service exited before it became ready")
+		case <-time.After(d):
+			// Delay elapsed with the process still running — unless it exited in the
+			// same instant; check once more so a crash at the boundary is not missed.
+			select {
+			case <-p.done:
+				return "", fmt.Errorf("service exited before it became ready")
+			default:
+				return "", nil
+			}
 		}
 	case r.File != "":
 		path, err := security.ResolveWorkdirPath("service.ready.file", workdir, r.File)
@@ -179,6 +192,13 @@ func (p *Proc) waitReady(ctx context.Context, r *spec.Ready, workdir string) (st
 		}
 		return p.waitFile(ctx, path, r.Store, timeout)
 	case r.Port != "":
+		// A bare port ("9997") makes every dial fail with "missing port in
+		// address", which the probe swallows and then runs to the full timeout —
+		// a slow, misleading failure. Reject a host-less value up front with a
+		// clear message (":9997" for any host, "127.0.0.1:9997" for loopback).
+		if _, _, err := net.SplitHostPort(r.Port); err != nil {
+			return "", fmt.Errorf("invalid ready.port %q (use host:port, e.g. 127.0.0.1:8080 or :8080): %w", r.Port, err)
+		}
 		dialer := net.Dialer{Timeout: pollInterval}
 		return "", p.poll(ctx, timeout, func() bool {
 			conn, err := dialer.DialContext(ctx, "tcp", r.Port)

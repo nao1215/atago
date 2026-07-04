@@ -8,7 +8,18 @@ version: "1"
 # the transcript matches the regexp; a `send` types into the terminal (include
 # "\n" to press enter; an empty send: "" transmits EOF, i.e. Ctrl-D). The
 # whole session is bounded by `timeout` (default 30s) — a prompt that never
-# appears fails loudly instead of hanging.
+# appears fails loudly instead of hanging. Each `expect` scans only the
+# transcript AFTER the previous match, so a recurring prompt (`$ `) waits for
+# its NEXT occurrence rather than matching a stale earlier one.
+#
+# The child runs with TERM=xterm-256color by default (matching the vt10x screen
+# emulator, #27), so full-screen TUIs (less, vim, htop) actually draw — override
+# with `env: {TERM: ...}` if a program needs a specific terminal type. Note: a
+# TUI that uses the alternate screen buffer (most of them) RESTORES the primary
+# screen when it exits cleanly, so a `screen:` assertion after a clean quit sees
+# a blank screen. To assert a live TUI, capture it while it is still displayed
+# (e.g. keep output on the primary screen, or let a short `timeout` end the step
+# while the UI is up).
 # POSIX-only for now; on Windows the step reports a clear execution error.
 # Runs green as-is on Linux/macOS: atago run examples/pty.atago.yaml
 

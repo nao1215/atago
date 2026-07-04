@@ -39,6 +39,13 @@ func docCmd(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "atago doc: --out-dir requires --split-by-spec")
 		return ExitConfig
 	}
+	if *split && *out != "" {
+		// The split branch writes into --out-dir and never honors --out; rejecting
+		// the combination stops a silently-ignored --out (the file is never
+		// written and no docs land where the user asked).
+		fmt.Fprintln(stderr, "atago doc: --out and --split-by-spec are mutually exclusive (--split-by-spec writes one file per spec into --out-dir)")
+		return ExitConfig
+	}
 
 	targets := fs.Args()
 	if len(targets) == 0 {

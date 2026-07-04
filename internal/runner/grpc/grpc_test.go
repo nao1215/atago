@@ -18,9 +18,14 @@ func TestSplitMethod(t *testing.T) {
 	}{
 		{in: "pkg.Service/Method", svc: "pkg.Service", method: "Method"},
 		{in: "a.b.c.Svc/Do", svc: "a.b.c.Svc", method: "Do"},
+		// A single leading slash (the fully-qualified gRPC form) is tolerated.
+		{in: "/pkg.Service/Method", svc: "pkg.Service", method: "Method"},
 		{in: "NoSlash", wantErr: true},
 		{in: "/Method", wantErr: true},
 		{in: "Svc/", wantErr: true},
+		// More than one internal slash is a malformed method, not a nested service.
+		{in: "a/b/c", wantErr: true},
+		{in: "/pkg.Service/Method/extra", wantErr: true},
 		{in: "", wantErr: true},
 	}
 	for _, tt := range tests {
@@ -38,6 +43,32 @@ func TestSplitMethod(t *testing.T) {
 		if svc != tt.svc || method != tt.method {
 			t.Errorf("splitMethod(%q) = %q, %q; want %q, %q", tt.in, svc, method, tt.svc, tt.method)
 		}
+	}
+}
+
+// TestInvoke_CallTimeoutIsError is a regression: a unary call that hangs past
+// the per-call timeout must be a hard error, not a passing Result. status.From
+// Error maps a client-deadline DeadlineExceeded to ok=true, which would
+// otherwise be recorded as a normal Result{GRPCStatus:4} and pass against a hung
+// server unless the spec happened to assert grpc_status.
+func TestInvoke_CallTimeoutIsError(t *testing.T) {
+	t.Parallel()
+	ts := grpcstub.NewServer(t, "testdata/greeter.proto")
+	t.Cleanup(func() { ts.Close() })
+	ts.Method("SayHello").Handler(func(_ *grpcstub.Request) *grpcstub.Response {
+		time.Sleep(2 * time.Second) // longer than the client's per-call timeout
+		return grpcstub.NewResponse()
+	})
+
+	r, err := Open(Config{Target: ts.Addr(), Timeout: 300 * time.Millisecond})
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	t.Cleanup(func() { _ = r.Close() })
+
+	out, err := r.Invoke(context.Background(), "atago.test.Greeter/SayHello", nil, []byte(`{"name":"x"}`))
+	if err == nil {
+		t.Fatalf("Invoke against a hung handler returned no error; got Result %+v (a timed-out call must be an error, not a passing status)", out)
 	}
 }
 
