@@ -164,36 +164,39 @@ func listFiles(root string) ([]string, error) {
 	return out, nil
 }
 
-// shellJoin renders argv as one command string whose tokenization yields the
-// same argv again: plain tokens pass through, anything else is single-quoted
-// (with embedded quotes escaped POSIX-style), which both go-shellwords and a
-// real shell understand.
+// shellJoin renders argv as one command string that re-tokenizes to the same
+// argv through the cmd runner (go-shellwords on POSIX, native argv splitting
+// on Windows). Only whitespace splits a token, so a token is left verbatim
+// unless it carries whitespace, a quote, or is empty; those are wrapped in
+// DOUBLE quotes — the one quoting both tokenizers accept — with embedded
+// backslashes and double-quotes escaped. A Windows path like C:\tool.exe has
+// no whitespace, so it passes through unquoted (single-quoting it would leave
+// Windows treating the quotes as part of the filename).
 func shellJoin(args []string) string {
 	quoted := make([]string, len(args))
 	for i, a := range args {
-		if plainToken(a) {
+		if !needsQuoting(a) {
 			quoted[i] = a
 			continue
 		}
-		quoted[i] = "'" + strings.ReplaceAll(a, "'", `'\''`) + "'"
+		// Escape only embedded double-quotes: a backslash inside double
+		// quotes is a POSIX escape but a literal on Windows, so escaping it
+		// would round-trip on one platform and double up on the other.
+		// Leaving it literal keeps a spaced Windows path (C:\Program
+		// Files\tool.exe) intact on both.
+		quoted[i] = `"` + strings.ReplaceAll(a, `"`, `\"`) + `"`
 	}
 	return strings.Join(quoted, " ")
 }
 
-// plainToken reports whether the argument survives tokenization unquoted.
-func plainToken(s string) bool {
+// needsQuoting reports whether a token would lose its argv boundary when
+// re-tokenized unquoted: the empty string (would vanish) or anything with
+// whitespace or a quote character.
+func needsQuoting(s string) bool {
 	if s == "" {
-		return false
+		return true
 	}
-	for _, r := range s {
-		switch {
-		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
-		case strings.ContainsRune("_@%+=:,./-", r):
-		default:
-			return false
-		}
-	}
-	return true
+	return strings.ContainsAny(s, " \t\n'\"")
 }
 
 // suiteNameFor derives a suite name from the command's base name.
