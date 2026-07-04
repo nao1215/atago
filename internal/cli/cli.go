@@ -33,6 +33,8 @@ func Main(args []string, stdout, stderr io.Writer) int {
 		return runCmd(rest, stdout, stderr)
 	case "init":
 		return initCmd(rest, stdout, stderr)
+	case "record":
+		return recordCmd(rest, stdout, stderr)
 	case "explain":
 		return explainCmd(rest, stdout, stderr)
 	case "doc":
@@ -70,7 +72,8 @@ Usage:
 
 Commands:
   run         Run spec files and assert behavior
-  init        Scaffold a starter spec file (--template browser|cli|db|grpc|http|services|ssh)
+  init        Scaffold a starter spec file (--template browser|cli|db|grpc|http|mock|services|ssh)
+  record      Generate a spec skeleton from one observed command run (record -- <cmd>)
   list        List suites, scenarios, tags, and generated artifacts (--json)
   explain     Describe what a spec does without running it
   doc         Generate Markdown documentation from specs

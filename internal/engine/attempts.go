@@ -35,7 +35,7 @@ func (e *Engine) runRepeated(ctx context.Context, idx int, sc *spec.Scenario, rc
 
 	for i := 0; i < e.Repeat; i++ {
 		if ctx.Err() != nil && i > 0 {
-			break // cancelled mid-repeat: report what actually ran
+			break // canceled mid-repeat: report what actually ran
 		}
 		run := e.runScenario(ctx, idx, sc, rc)
 		iterations = append(iterations, run.Status)

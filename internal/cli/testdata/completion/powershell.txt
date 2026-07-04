@@ -2,7 +2,7 @@
 # Install: atago completion powershell | Out-String | Invoke-Expression
 Register-ArgumentCompleter -Native -CommandName atago -ScriptBlock {
     param($wordToComplete, $commandAst, $cursorPosition)
-    $commands = @('completion', 'doc', 'explain', 'help', 'init', 'list', 'manifest', 'run', 'snapshot', 'version')
+    $commands = @('completion', 'doc', 'explain', 'help', 'init', 'list', 'manifest', 'record', 'run', 'snapshot', 'version')
     $runFlags = @('--artifacts-dir', '--ci', '--fail-fast', '--filter', '--parallel', '--repeat', '--report', '--rerun-failed', '--retry-failed', '--skip-tag', '--tag', '--update-snapshots', '--verbose')
     $tokens = $commandAst.CommandElements
     if ($tokens.Count -le 2) {

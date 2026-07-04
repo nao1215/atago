@@ -8,6 +8,7 @@ complete -c atago -n '__fish_use_subcommand' -a help
 complete -c atago -n '__fish_use_subcommand' -a init
 complete -c atago -n '__fish_use_subcommand' -a list
 complete -c atago -n '__fish_use_subcommand' -a manifest
+complete -c atago -n '__fish_use_subcommand' -a record
 complete -c atago -n '__fish_use_subcommand' -a run
 complete -c atago -n '__fish_use_subcommand' -a snapshot
 complete -c atago -n '__fish_use_subcommand' -a version

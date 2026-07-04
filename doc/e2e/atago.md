@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-50 suites · 176 scenarios
+51 suites · 181 scenarios
 ## Contents
 - [atago self-hosting / variable expansion in assertion matcher values](#atago-self-hosting--variable-expansion-in-assertion-matcher-values) — 3 scenarios
   - [stdout.equals expands ${workdir}](#scenario-stdoutequals-expands-workdir)
@@ -147,6 +147,12 @@
   - [screen asserts see the final frame where the transcript sees history](#scenario-screen-asserts-see-the-final-frame-where-the-transcript-sees-history)
   - [a screen snapshot round-trips through update and compare](#scenario-a-screen-snapshot-round-trips-through-update-and-compare)
   - [a screen assert without a pty step is a load-time error](#scenario-a-screen-assert-without-a-pty-step-is-a-load-time-error)
+- [atago self-hosting / record (spec skeleton from an observed run)](#atago-self-hosting--record-spec-skeleton-from-an-observed-run) — 5 scenarios
+  - [record then run round-trips green](#scenario-record-then-run-round-trips-green)
+  - [refusing to overwrite without --force](#scenario-refusing-to-overwrite-without---force)
+  - [created files become exists asserts (shell mode)](#scenario-created-files-become-exists-asserts-shell-mode)
+  - [snapshot mode writes a golden the run then matches](#scenario-snapshot-mode-writes-a-golden-the-run-then-matches)
+  - [no command is a usage error](#scenario-no-command-is-a-usage-error)
 - [atago self-hosting / reports](#atago-self-hosting--reports) — 5 scenarios
   - [JUnit report is XML with a testsuite and testcase](#scenario-junit-report-is-xml-with-a-testsuite-and-testcase)
   - [GitHub Actions annotations are emitted on failure](#scenario-github-actions-annotations-are-emitted-on-failure)
@@ -2629,6 +2635,80 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `requires a preceding pty step`
+## atago self-hosting / record (spec skeleton from an observed run)
+Source: `test/e2e/atago/record.atago.yaml`
+### Scenario: record then run round-trips green
+#### When
+```shell
+${atago} record --out recorded.atago.yaml -- ${atago} version
+${atago} run recorded.atago.yaml
+```
+#### Then
+- after `${atago} record --out recorded.atago.yaml -- ${atago} version`:
+  - exit code is `0`
+  - stderr contains `wrote recorded.atago.yaml`
+  - file `recorded.atago.yaml` contains `contains: atago`
+- after `${atago} run recorded.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `1 passed`
+### Scenario: refusing to overwrite without --force
+#### Given
+- Fixture file `existing.atago.yaml` is created.
+#### Inputs
+_Fixture `existing.atago.yaml`:_
+```text
+precious
+```
+#### When
+```shell
+${atago} record --out existing.atago.yaml -- ${atago} version
+${atago} record --force --out existing.atago.yaml -- ${atago} version
+```
+#### Then
+- after `${atago} record --out existing.atago.yaml -- ${atago} version`:
+  - exit code is `3`
+  - stderr contains `use --force to overwrite`
+  - file `existing.atago.yaml` contains `precious`
+- after `${atago} record --force --out existing.atago.yaml -- ${atago} version`:
+  - exit code is `0`
+  - file `existing.atago.yaml` contains `exit_code: 0`
+### Scenario: created files become exists asserts (shell mode)
+_skipped on windows_
+#### When
+```shell
+${atago} record --shell --out gen.atago.yaml -- 'echo made > out.txt; echo done'
+${atago} run gen.atago.yaml
+```
+#### Then
+- after `${atago} record --shell --out gen.atago.yaml -- 'echo made > out.txt; echo done'`:
+  - exit code is `0`
+  - file `gen.atago.yaml` contains `path: out.txt`
+  - file `gen.atago.yaml` contains `shell: true`
+- after `${atago} run gen.atago.yaml`:
+  - exit code is `0`
+### Scenario: snapshot mode writes a golden the run then matches
+_skipped on windows_
+#### When
+```shell
+${atago} record --snapshot --out snapdemo.atago.yaml -- echo stable output
+${atago} run snapdemo.atago.yaml
+```
+#### Then
+- after `${atago} record --snapshot --out snapdemo.atago.yaml -- echo stable output`:
+  - exit code is `0`
+  - file `snapdemo.atago.yaml` contains `snapshot: snapshots/snapdemo.stdout.txt`
+  - file `snapshots/snapdemo.stdout.txt` contains `stable output`
+- after `${atago} run snapdemo.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `1 passed`
+### Scenario: no command is a usage error
+#### When
+```shell
+${atago} record
+```
+#### Then
+- exit code is `3`
+- stderr contains `no command given`
 ## atago self-hosting / reports
 Source: `test/e2e/atago/reports.atago.yaml`
 ### Scenario: JUnit report is XML with a testsuite and testcase

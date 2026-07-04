@@ -1,0 +1,104 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / record (spec skeleton from an observed run)
+
+# Exercises #30: the record → run round-trip is the core acceptance test —
+# a spec generated from an observed command must pass when run. The echo
+# scenarios run on every OS (this spec is in the Windows E2E allowlist);
+# the shell-redirect scenario is POSIX.
+scenarios:
+  - name: record then run round-trips green
+    steps:
+      # `${atago} version` is the one command guaranteed present on every OS.
+      - run:
+          command: ${atago} record --out recorded.atago.yaml -- ${atago} version
+      - assert:
+          exit_code: 0
+          stderr:
+            contains: "wrote recorded.atago.yaml"
+      - assert:
+          file:
+            path: recorded.atago.yaml
+            contains: "contains: atago"
+      - run:
+          command: ${atago} run recorded.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "1 passed"
+
+  - name: refusing to overwrite without --force
+    steps:
+      - fixture:
+          file: existing.atago.yaml
+          content: "precious"
+      - run:
+          command: ${atago} record --out existing.atago.yaml -- ${atago} version
+      - assert:
+          exit_code: 3
+          stderr:
+            contains: "use --force to overwrite"
+      - assert:
+          file:
+            path: existing.atago.yaml
+            contains: precious
+      - run:
+          command: ${atago} record --force --out existing.atago.yaml -- ${atago} version
+      - assert:
+          exit_code: 0
+          file:
+            path: existing.atago.yaml
+            contains: "exit_code: 0"
+
+  - name: created files become exists asserts (shell mode)
+    skip:
+      os: windows
+    steps:
+      - run:
+          shell: true
+          command: "${atago} record --shell --out gen.atago.yaml -- 'echo made > out.txt; echo done'"
+      - assert:
+          exit_code: 0
+          file:
+            path: gen.atago.yaml
+            contains: "path: out.txt"
+      - assert:
+          file:
+            path: gen.atago.yaml
+            contains: "shell: true"
+      - run:
+          command: ${atago} run gen.atago.yaml
+      - assert:
+          exit_code: 0
+
+  - name: snapshot mode writes a golden the run then matches
+    skip:
+      os: windows
+    steps:
+      - run:
+          command: ${atago} record --snapshot --out snapdemo.atago.yaml -- echo stable output
+      - assert:
+          exit_code: 0
+          file:
+            path: snapdemo.atago.yaml
+            contains: "snapshot: snapshots/snapdemo.stdout.txt"
+      - assert:
+          file:
+            path: snapshots/snapdemo.stdout.txt
+            contains: stable output
+      - run:
+          command: ${atago} run snapdemo.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "1 passed"
+
+  - name: no command is a usage error
+    steps:
+      - run:
+          command: ${atago} record
+      - assert:
+          exit_code: 3
+          stderr:
+            contains: "no command given"

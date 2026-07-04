@@ -132,6 +132,20 @@ Hint:
   the substring "Alice" was not present in stdout
 ```
 
+Already have a working command? `atago record -- <command>` runs it once in a scratch directory and generates a spec from what it observed — exit code, first output line, created files — so you start from *your* tool's behavior instead of a blank file:
+
+```shell
+$ atago record --out mytool.atago.yaml -- mytool convert input.txt
+recorded: exit 0, 2 stdout line(s), 1 file(s) created
+wrote mytool.atago.yaml
+$ atago run mytool.atago.yaml
+.
+
+PASSED  1 scenario: 1 passed, 0 failed, 0 errored, 0 skipped (12ms)
+```
+
+The generated matchers are deliberately conservative (a skeleton to tighten, not a brittle golden); `--snapshot` records a stdout golden instead, and `--shell` records shell-style command lines.
+
 `atago init --template <name>` scaffolds a starter for the other runner families; `atago init --list-templates` describes each one and says whether it runs as-is or what to edit first:
 
 ```shell

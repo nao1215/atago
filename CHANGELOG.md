@@ -19,6 +19,15 @@ and this project follows [Semantic Versioning](https://semver.org/).
   (`SystemRoot`, `SystemDrive`, `TEMP`, `TMP`, `PATHEXT`) is always retained.
   `pass_env` without `clear_env: true` is a load-time error (exit 2).
   See `examples/hermetic_env.atago.yaml`.
+- `atago record -- <command>` (#30): run a command once in a scratch
+  directory and generate a ready-to-edit spec skeleton from what it observed
+  — exact exit code, the first non-empty stdout line as a `contains`
+  matcher, `stderr: {empty: true}` when stderr was silent, and created
+  files as `exists` asserts (capped at 10 with a note). `--out`/`--force`
+  mirror `init`; `--shell` records shell command lines; `--snapshot` writes
+  a stdout golden instead. The generated spec is validated in-process
+  before it is written. Interactive (pty) and HTTP recording are explicit
+  non-goals for now.
 - Flaky-test tooling (#29): `--repeat N` runs each selected scenario N times
   (fresh workdir per iteration, sequential per scenario) to detect
   flakiness — any failing iteration fails the run and the console reports

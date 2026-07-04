@@ -19,6 +19,7 @@ var subcommandNames = []string{
 	"init",
 	"list",
 	"manifest",
+	"record",
 	"run",
 	"snapshot",
 	"version",
