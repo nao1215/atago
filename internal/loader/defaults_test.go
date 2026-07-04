@@ -160,6 +160,85 @@ scenarios:
 	}
 }
 
+// TestApplyDefaults_PTYEnvFamily proves defaults.run's environment-shaping
+// subset (env, clear_env, pass_env, sandbox_home) layers onto pty steps the
+// same way it does onto run steps (#77): the environment surface of a pty step
+// is identical to a run step's, so a shared defaults.run.sandbox_home must not
+// leave pty children on the host home. Run-only fields (shell, cwd, runner) do
+// NOT leak — pty owns its shell/cwd semantics — and authored pointer values win.
+func TestApplyDefaults_PTYEnvFamily(t *testing.T) {
+	t.Parallel()
+	src := `
+version: "1"
+suite:
+  name: sample
+defaults:
+  run:
+    shell: true
+    cwd: /run-only
+    clear_env: true
+    pass_env: [PATH, HOME]
+    sandbox_home: true
+    env:
+      SHARED: from-default
+      OVERRIDE: default
+scenarios:
+  - name: pty inherits the env family
+    steps:
+      - pty:
+          command: wizard
+          env:
+            OVERRIDE: own
+      - pty:
+          command: wizard
+          sandbox_home: false
+          clear_env: false
+`
+	s, err := LoadBytes("sample.atago.yaml", []byte(src))
+	if err != nil {
+		t.Fatalf("LoadBytes() error = %v", err)
+	}
+	p0 := s.Scenarios[0].Steps[0].PTY
+	if p0 == nil {
+		t.Fatal("step 0 is not a pty step")
+	}
+	if !p0.ClearEnvEnabled() {
+		t.Error("step 0: defaults.run.clear_env did not reach the pty step")
+	}
+	if !p0.SandboxHomeEnabled() {
+		t.Error("step 0: defaults.run.sandbox_home did not reach the pty step")
+	}
+	if got := p0.PassEnv; len(got) != 2 || got[0] != "PATH" || got[1] != "HOME" {
+		t.Errorf("step 0: pass_env = %v, want default [PATH HOME]", got)
+	}
+	if got := p0.Env["SHARED"]; got != "from-default" {
+		t.Errorf("step 0: env[SHARED] = %q, want the default to fill", got)
+	}
+	if got := p0.Env["OVERRIDE"]; got != "own" {
+		t.Errorf("step 0: env[OVERRIDE] = %q, want the authored value to win", got)
+	}
+	// Run-only fields must not leak onto a pty step: pty owns shell/cwd.
+	if p0.Shell != nil {
+		t.Errorf("step 0: defaults.run.shell leaked onto the pty step (shell=%v)", *p0.Shell)
+	}
+	if p0.Cwd != "" {
+		t.Errorf("step 0: defaults.run.cwd leaked onto the pty step (cwd=%q)", p0.Cwd)
+	}
+
+	// Authored pointer values win over the default.
+	p1 := s.Scenarios[0].Steps[1].PTY
+	if p1.SandboxHomeEnabled() {
+		t.Error("step 1: authored sandbox_home: false must beat the default")
+	}
+	if p1.ClearEnvEnabled() {
+		t.Error("step 1: authored clear_env: false must beat the default")
+	}
+	// pass_env is not inherited without an effective clear_env (mirrors run).
+	if got := p1.PassEnv; len(got) != 0 {
+		t.Errorf("step 1: pass_env = %v, want none (clear_env is off)", got)
+	}
+}
+
 // TestValidate_PassEnvRequiresClearEnv proves pass_env without clear_env: true
 // is a load-time validation error with a positioned message (#16).
 func TestValidate_PassEnvRequiresClearEnv(t *testing.T) {

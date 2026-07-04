@@ -80,7 +80,7 @@
       "properties": {
         "run": {
           "type": "object",
-          "description": "Layered beneath every `run` step. `command` and `retry` are per-step and rejected here.",
+          "description": "Layered beneath every `run` step. `command` and `retry` are per-step and rejected here. The environment-shaping subset (`env`, `clear_env`, `pass_env`, `sandbox_home`) also layers onto `pty` steps, which share the same environment surface (#77); the run-only fields (`runner`, `shell`, `cwd`, `timeout`, `stdin`, redirects) stay per-step and never reach pty steps.",
           "additionalProperties": false,
           "properties": {
             "runner": { "type": "string" },

@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-54 suites · 212 scenarios
+54 suites · 213 scenarios
 ## Contents
 - [atago self-hosting / variable expansion in assertion matcher values](#atago-self-hosting--variable-expansion-in-assertion-matcher-values) — 6 scenarios
   - [stdout.equals expands ${workdir}](#scenario-stdoutequals-expands-workdir)
@@ -38,9 +38,10 @@
 - [atago self-hosting / db runner](#atago-self-hosting--db-runner) — 2 scenarios
   - [query workflow (create, insert, select, row assert, value binding) passes](#scenario-query-workflow-create-insert-select-row-assert-value-binding-passes)
   - [a query against an undeclared runner fails validation (exit 2)](#scenario-a-query-against-an-undeclared-runner-fails-validation-exit-2)
-- [atago self-hosting / top-level defaults](#atago-self-hosting--top-level-defaults) — 3 scenarios
+- [atago self-hosting / top-level defaults](#atago-self-hosting--top-level-defaults) — 4 scenarios
   - [defaults.run.shell applies to every run step without repeating it](#scenario-defaultsrunshell-applies-to-every-run-step-without-repeating-it)
   - [defaults.scenario.env is merged and an explicit scenario env wins](#scenario-defaultsscenarioenv-is-merged-and-an-explicit-scenario-env-wins)
+  - [defaults.run.sandbox_home governs a run step and a pty step alike (POSIX)](#scenario-defaultsrunsandbox_home-governs-a-run-step-and-a-pty-step-alike-posix)
   - [an unsupported defaults field is a load-time error (exit 2)](#scenario-an-unsupported-defaults-field-is-a-load-time-error-exit-2)
 - [atago self-hosting / dir assertion](#atago-self-hosting--dir-assertion) — 2 scenarios
   - [directory/tree assertions cover a multi-file generator](#scenario-directorytree-assertions-cover-a-multi-file-generator)
@@ -887,6 +888,42 @@ scenarios:
 #### When
 ```shell
 ${atago} run env.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout contains `1 passed`
+### Scenario: defaults.run.sandbox_home governs a run step and a pty step alike (POSIX)
+_skipped on windows_
+#### Given
+- Fixture file `sandbox.atago.yaml` is created.
+#### Inputs
+_Fixture `sandbox.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: shared-sandbox
+defaults:
+  run:
+    shell: true
+    sandbox_home: true
+scenarios:
+  - name: a run step writes and a pty step reads under one sandbox home
+    steps:
+      - run:
+          command: 'mkdir -p "$XDG_CONFIG_HOME/mytool" && printf editor=vim > "$XDG_CONFIG_HOME/mytool/config"'
+      - assert:
+          exit_code: 0
+      - pty:
+          shell: true
+          command: 'cat "$XDG_CONFIG_HOME/mytool/config"'
+          session:
+            - expect: 'editor=vim'
+      - assert:
+… (truncated, 6 more lines)
+```
+#### When
+```shell
+${atago} run sandbox.atago.yaml
 ```
 #### Then
 - exit code is `0`
