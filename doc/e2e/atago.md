@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-54 suites · 213 scenarios
+55 suites · 217 scenarios
 ## Contents
 - [atago self-hosting / variable expansion in assertion matcher values](#atago-self-hosting--variable-expansion-in-assertion-matcher-values) — 6 scenarios
   - [stdout.equals expands ${workdir}](#scenario-stdoutequals-expands-workdir)
@@ -258,6 +258,11 @@
   - [a step timeout beats the suite timeout and the hint says run.timeout](#scenario-a-step-timeout-beats-the-suite-timeout-and-the-hint-says-runtimeout)
   - [timeout zero disables a short suite bound](#scenario-timeout-zero-disables-a-short-suite-bound)
   - [an invalid suite.timeout is a load-time error](#scenario-an-invalid-suitetimeout-is-a-load-time-error)
+- [atago self-hosting / tui](#atago-self-hosting--tui) — 4 scenarios
+  - [a pty step exports a usable TERM by default](#scenario-a-pty-step-exports-a-usable-term-by-default)
+  - [an explicit TERM overrides the default](#scenario-an-explicit-term-overrides-the-default)
+  - [an expect does not re-match a consumed pattern](#scenario-an-expect-does-not-re-match-a-consumed-pattern)
+  - [less -X renders a real pager onto the screen](#scenario-less--x-renders-a-real-pager-onto-the-screen)
 - [atago self-hosting / verbose](#atago-self-hosting--verbose) — 4 scenarios
   - [verbose shows a passing scenario's command, output, and verdicts](#scenario-verbose-shows-a-passing-scenarios-command-output-and-verdicts)
   - [without --verbose the trace is absent](#scenario-without---verbose-the-trace-is-absent)
@@ -4699,6 +4704,72 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `suite.timeout`
+## atago self-hosting / tui
+Source: `test/e2e/atago/tui.atago.yaml`
+### Scenario: a pty step exports a usable TERM by default
+_skipped on windows_
+#### When
+```shell
+# interactive (pty): echo "TERM=[$TERM]"
+```
+#### Then
+- exit code is `0`
+- stdout contains `TERM=[xterm-256color]`
+### Scenario: an explicit TERM overrides the default
+_skipped on windows_
+#### When
+```shell
+# interactive (pty): echo "TERM=[$TERM]"
+```
+#### Then
+- exit code is `0`
+- stdout contains `TERM=[vt100]`
+### Scenario: an expect does not re-match a consumed pattern
+_skipped on windows_
+#### Given
+- Fixture file `inner.atago.yaml` is created.
+#### Inputs
+_Fixture `inner.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: stale expect must not re-match
+    steps:
+      - pty:
+          shell: true
+          command: 'printf "AAA\n"'
+          timeout: 1s
+          session:
+            - expect: "AAA"
+            - expect: "AAA"
+```
+#### When
+```shell
+${atago} run inner.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `1 failed`
+### Scenario: less -X renders a real pager onto the screen
+_skipped on windows_
+#### Given
+- Fixture file `page.txt` is created.
+#### Inputs
+_Fixture `page.txt`:_
+```text
+Alpha line
+Beta line
+Gamma line
+```
+#### When
+```shell
+# interactive (pty): less -X page.txt
+```
+#### Then
+- rendered screen contains `Alpha line`
+- rendered screen contains `Gamma line`
 ## atago self-hosting / verbose
 Source: `test/e2e/atago/verbose.atago.yaml`
 ### Scenario: verbose shows a passing scenario's command, output, and verdicts

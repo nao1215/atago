@@ -58,6 +58,25 @@ func TestDocCmd_NoFiles(t *testing.T) {
 	}
 }
 
+// TestDocCmd_OutWithSplitRejected is a regression: --out and --split-by-spec are
+// contradictory (split writes into --out-dir), so passing both must fail loudly
+// instead of silently ignoring --out.
+func TestDocCmd_OutWithSplitRejected(t *testing.T) {
+	dir := t.TempDir()
+	p := writeSpec(t, dir, "ok.atago.yaml", passingSpec)
+	var out, errb bytes.Buffer
+	got := Main([]string{"doc", "--out", filepath.Join(dir, "ignored.md"), "--split-by-spec", "--out-dir", filepath.Join(dir, "d"), p}, &out, &errb)
+	if got != ExitConfig {
+		t.Fatalf("exit = %d, want %d (mutually-exclusive flags)", got, ExitConfig)
+	}
+	if !strings.Contains(errb.String(), "mutually exclusive") {
+		t.Errorf("stderr = %q, want a mutually-exclusive message", errb.String())
+	}
+	if _, err := os.Stat(filepath.Join(dir, "ignored.md")); !os.IsNotExist(err) {
+		t.Errorf("the ignored --out file was written despite the rejected combination")
+	}
+}
+
 func TestManifestCmd_Stdout(t *testing.T) {
 	dir := t.TempDir()
 	p := writeSpec(t, dir, "ok.atago.yaml", passingSpec)

@@ -119,6 +119,64 @@ scenarios:
 	}
 }
 
+// TestEngine_PTY_ExpectDoesNotRematchStale is a regression: each expect scans
+// only the transcript AFTER the previous match, so a pattern that appeared once
+// is not matched again from the stale buffer. "AAA" is printed exactly once, so
+// the second expect for it must NOT match and the step times out. With the
+// pre-fix whole-transcript match, the second expect matched the stale "AAA"
+// instantly and the step passed falsely. (printf, not cat+send, so terminal echo
+// does not duplicate the pattern.)
+func TestEngine_PTY_ExpectDoesNotRematchStale(t *testing.T) {
+	skipOnWindows(t)
+	t.Parallel()
+	res := runSpec(t, `
+version: "1"
+suite:
+  name: s
+scenarios:
+  - name: a once-only pattern is not re-matched
+    steps:
+      - pty:
+          shell: true
+          command: 'printf "AAA\n"'
+          timeout: 1s
+          session:
+            - expect: "AAA"
+            - expect: "AAA"
+`)
+	if res.Status != StatusFailed {
+		t.Fatalf("status = %s, want failed (the second AAA expect must not match the stale one): %+v", res.Status, res.Scenarios)
+	}
+}
+
+// TestEngine_PTY_ExpectMatchesEachRecurringOccurrence proves the offset does not
+// over-consume: when a pattern genuinely recurs, consecutive expects match the
+// successive occurrences in order, so a normal prompt/response loop still passes.
+func TestEngine_PTY_ExpectMatchesEachRecurringOccurrence(t *testing.T) {
+	skipOnWindows(t)
+	t.Parallel()
+	res := runSpec(t, `
+version: "1"
+suite:
+  name: s
+scenarios:
+  - name: two occurrences match two expects
+    steps:
+      - pty:
+          shell: true
+          command: 'printf "TICK\nTICK\n"'
+          timeout: 5s
+          session:
+            - expect: "TICK"
+            - expect: "TICK"
+      - assert:
+          exit_code: 0
+`)
+	if res.Status != StatusPassed {
+		t.Fatalf("status = %s, want passed: %+v", res.Status, res.Scenarios)
+	}
+}
+
 // TestEngine_PTY_SeesSuiteEnv proves suite.env reaches pty commands like it
 // reaches run steps (CodeRabbit finding on #12: the pty step dropped it).
 func TestEngine_PTY_SeesSuiteEnv(t *testing.T) {
@@ -140,6 +198,63 @@ scenarios:
           exit_code: 0
           stdout:
             contains: flag=from-suite-env
+`)
+	if res.Status != StatusPassed {
+		t.Fatalf("status = %s, want passed: %+v", res.Status, res.Scenarios)
+	}
+}
+
+// TestEngine_PTY_SetsDefaultTERM proves a pty step exports TERM=xterm-256color
+// by default. Without a sane TERM, full-screen TUIs (less, vim, htop) refuse to
+// draw ("terminal is not fully functional"), so a pty/screen assertion can never
+// see the real UI. atago renders through an xterm-compatible vt10x emulator, so
+// the default TERM matches the emulator and is deterministic regardless of the
+// host's own TERM (unset in CI, tmux/screen locally).
+func TestEngine_PTY_SetsDefaultTERM(t *testing.T) {
+	skipOnWindows(t)
+	t.Parallel()
+	res := runSpec(t, `
+version: "1"
+suite:
+  name: s
+scenarios:
+  - name: pty exports a usable TERM
+    steps:
+      - pty:
+          shell: true
+          command: echo "TERM=[$TERM]"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "TERM=[xterm-256color]"
+`)
+	if res.Status != StatusPassed {
+		t.Fatalf("status = %s, want passed: %+v", res.Status, res.Scenarios)
+	}
+}
+
+// TestEngine_PTY_RespectsExplicitTERM proves an author-set TERM wins over the
+// default, so a spec can pin a specific terminal type when a program's behavior
+// depends on it.
+func TestEngine_PTY_RespectsExplicitTERM(t *testing.T) {
+	skipOnWindows(t)
+	t.Parallel()
+	res := runSpec(t, `
+version: "1"
+suite:
+  name: s
+scenarios:
+  - name: explicit TERM wins
+    steps:
+      - pty:
+          shell: true
+          command: echo "TERM=[$TERM]"
+          env:
+            TERM: dumb
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "TERM=[dumb]"
 `)
 	if res.Status != StatusPassed {
 		t.Fatalf("status = %s, want passed: %+v", res.Status, res.Scenarios)

@@ -105,6 +105,15 @@ func (r *Runner) Invoke(ctx context.Context, method string, header map[string]st
 	if !ok {
 		return nil, fmt.Errorf("grpc invoke %s: %w", method, invErr)
 	}
+	// A non-nil ctx error means OUR per-call deadline (run.timeout) or a cancel
+	// fired: the call never completed, so it is a transport failure, not a
+	// captured status. status.FromError otherwise maps a timed-out/dropped call
+	// to codes.DeadlineExceeded(4)/Unavailable(14) with ok=true, which would be
+	// recorded as a passing Result — a false pass against a hung or unreachable
+	// server unless the spec happens to assert grpc_status.
+	if invErr != nil && ctx.Err() != nil {
+		return nil, fmt.Errorf("grpc invoke %s: %w", method, ctx.Err())
+	}
 
 	out := &runner.Result{Command: method, IsGRPC: true, GRPCStatus: int(stat.Code())}
 	if stat.Code() == codes.OK {
@@ -149,11 +158,17 @@ func (r *Runner) resolveMethod(ctx context.Context, service, method string) (pro
 	return nil, fmt.Errorf("grpc service %q not found in the reflected schema", service)
 }
 
-// splitMethod parses "pkg.Service/Method" into its service and method parts.
+// splitMethod parses "pkg.Service/Method" into its service and method parts. A
+// single leading slash is tolerated (the fully-qualified "/pkg.Service/Method"
+// form gRPC itself uses), but there must be exactly one internal slash — using
+// strings.LastIndex would silently accept "/pkg.Service/Method" as service
+// "/pkg.Service" and "a/b/c" as service "a/b", then fail later with a confusing
+// reflection error instead of a clear format message.
 func splitMethod(method string) (string, string, error) {
-	i := strings.LastIndex(method, "/")
-	if i <= 0 || i == len(method)-1 {
+	m := strings.TrimPrefix(method, "/")
+	i := strings.IndexByte(m, '/')
+	if i <= 0 || i == len(m)-1 || strings.Contains(m[i+1:], "/") {
 		return "", "", fmt.Errorf("grpc method %q must be in the form pkg.Service/Method", method)
 	}
-	return method[:i], method[i+1:], nil
+	return m[:i], m[i+1:], nil
 }

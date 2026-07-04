@@ -171,24 +171,53 @@ func Run(ctx context.Context, p *spec.PTY, workdir string, env []string) (*runne
 		return nil, nil, err
 	}
 
+	// canceledResult surfaces a parent-context cancellation (Ctrl-C / suite
+	// cancel) as a hard execution error, so the engine stops the scenario instead
+	// of asserting against a killed terminal — mirroring the cmd runner's
+	// cancel/timeout split (#30). Shared by both ctx.Done() sites below.
+	canceledResult := func() (*runner.Result, *ExpectFailure, error) {
+		return failHard(fmt.Errorf("pty %q canceled: %w", p.Command, ctx.Err()))
+	}
+
 	// Drive the session in order. expect polls the transcript; send writes to
 	// the terminal; an empty send transmits EOF (^D).
+	//
+	// matchOffset is the byte index just past the previously matched expect: each
+	// expect scans only transcript[matchOffset:], so a pattern that recurs (any
+	// shell prompt) waits for its NEXT occurrence instead of matching the stale
+	// earlier one. Without it, a second `expect "PROMPT> "` matches the first
+	// prompt already in the buffer and the session races ahead — a false pass for
+	// exactly the interactive flows this feature exists for.
+	matchOffset := 0
 	for i, a := range p.Session {
 		if expects[i] != nil {
 			matched := false
-			for !matched {
-				if expects[i].Match(snapshot()) {
+			for {
+				if loc := expects[i].FindIndex(snapshot()[matchOffset:]); loc != nil {
+					matchOffset += loc[1]
 					matched = true
 					break
 				}
 				select {
 				case <-ctx.Done():
+					// One last check: bytes may have landed in the final poll
+					// window before the deadline fired.
+					if loc := expects[i].FindIndex(snapshot()[matchOffset:]); loc != nil {
+						matchOffset += loc[1]
+						matched = true
+					}
 				case <-time.After(pollInterval):
 					continue
 				}
 				break
 			}
 			if !matched {
+				// A parent-context cancellation is an execution error that must stop
+				// the scenario; only a genuine session-budget timeout
+				// (DeadlineExceeded) becomes an ExpectFailure.
+				if errors.Is(ctx.Err(), context.Canceled) {
+					return canceledResult()
+				}
 				return abort(&ExpectFailure{Pattern: a.Expect, Transcript: string(snapshot())})
 			}
 			continue
@@ -208,6 +237,11 @@ func Run(ctx context.Context, p *spec.PTY, workdir string, env []string) (*runne
 	case waitErr := <-waitCh:
 		return finish(false, waitErr, nil)
 	case <-ctx.Done():
+		// A parent cancellation is a hard error; a session-budget timeout is a
+		// normal timed-out result (#30).
+		if errors.Is(ctx.Err(), context.Canceled) {
+			return canceledResult()
+		}
 		return abort(nil)
 	}
 }

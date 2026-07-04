@@ -37,6 +37,17 @@ func (e *Engine) runPTY(ctx context.Context, p *spec.PTY, st *store.Store, scena
 	for k, v := range st.ExpandMap(p.Env) { // step env overrides scenario env
 		merged[k] = v
 	}
+	// A pty step drives a REAL terminal, and full-screen TUIs (less, vim, htop —
+	// anything ncurses/termios) consult $TERM to decide whether to draw at all:
+	// an unset or "dumb" TERM makes them refuse full-screen mode ("terminal is
+	// not fully functional") or fall back to line mode, so a pty/screen assertion
+	// can never see the real UI. atago renders the transcript through an
+	// xterm-compatible vt10x emulator, so default TERM to xterm-256color unless
+	// the spec set it — giving deterministic behavior regardless of the host's
+	// own TERM (unset in CI, tmux/screen locally).
+	if _, ok := merged["TERM"]; !ok {
+		merged["TERM"] = "xterm-256color"
+	}
 	c.Env = merged
 	if len(p.Session) > 0 {
 		c.Session = make([]spec.PTYAction, len(p.Session))

@@ -170,9 +170,23 @@ func hostKeyCallback(knownHosts string, insecure bool) (ssh.HostKeyCallback, err
 	return cb, nil
 }
 
+// withDefaultPort appends the default SSH port 22 when addr carries none. It
+// must handle a bare IPv6 literal without mangling it: net.JoinHostPort on an
+// already-bracketed "[::1]" would double-bracket it ("[[::1]]:22"), and a
+// trailing-colon "host:" parses as a present-but-empty port that must still get
+// the default.
 func withDefaultPort(addr string) string {
-	if _, _, err := net.SplitHostPort(addr); err == nil {
-		return addr
+	if host, port, err := net.SplitHostPort(addr); err == nil {
+		if port != "" {
+			return addr
+		}
+		return net.JoinHostPort(host, "22") // "host:" → "host:22"
 	}
-	return net.JoinHostPort(addr, "22")
+	// No port present. Strip surrounding brackets from a bracketed IPv6 literal
+	// so JoinHostPort re-wraps it exactly once.
+	host := addr
+	if strings.HasPrefix(host, "[") && strings.HasSuffix(host, "]") {
+		host = host[1 : len(host)-1]
+	}
+	return net.JoinHostPort(host, "22")
 }
