@@ -1,0 +1,140 @@
+version: "1"
+
+suite:
+  name: ffmpeg / ffprobe (media pipeline)
+
+# A media pipeline in one package (#35): ffmpeg synthesizes video, ffprobe
+# reports a JSON contract, and extracted frames are verified with atago's
+# image assertions (format/dimensions/pixel similarity) — assertion types no
+# other third-party spec exercises together. Encodes are kept tiny (1s,
+# 320x240) so the job stays fast. Gate: only where ffmpeg is installed.
+scenarios:
+  - name: lavfi synthesizes a video file
+    only:
+      command: ffmpeg -version
+    steps:
+      # testsrc is ffmpeg's built-in test pattern — no input assets needed.
+      - run:
+          command: ffmpeg -v error -f lavfi -i testsrc=duration=1:size=320x240:rate=10 out.mp4
+      - assert:
+          exit_code: 0
+          file:
+            path: out.mp4
+            exists: true
+
+  - name: ffprobe exposes the stream JSON contract
+    only:
+      command: ffmpeg -version
+    steps:
+      - run:
+          command: ffmpeg -v error -f lavfi -i testsrc=duration=1:size=320x240:rate=10 out.mp4
+      - assert:
+          exit_code: 0
+      - run:
+          command: ffprobe -v error -print_format json -show_streams out.mp4
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              path: "$.streams[0].width"
+              equals: 320
+      - assert:
+          stdout:
+            json:
+              path: "$.streams[0].height"
+              equals: 240
+      - assert:
+          stdout:
+            json:
+              path: "$.streams[0].codec_type"
+              equals: video
+      - assert:
+          stdout:
+            json:
+              path: "$.streams"
+              length: 1
+
+  - name: extracted frames are the right image and deterministic
+    only:
+      command: ffmpeg -version
+    steps:
+      - run:
+          command: ffmpeg -v error -f lavfi -i testsrc=duration=1:size=320x240:rate=10 out.mp4
+      - assert:
+          exit_code: 0
+      - run:
+          command: ffmpeg -v error -i out.mp4 -frames:v 1 frame.png
+      - assert:
+          exit_code: 0
+          image:
+            path: frame.png
+            format: png
+            width: 320
+      - assert:
+          image:
+            path: frame.png
+            height: 240
+      # Extract the same frame again: identical input + deterministic codec
+      # ⇒ pixel-identical output (max_diff 0), proving the image comparison.
+      - run:
+          command: ffmpeg -v error -i out.mp4 -frames:v 1 frame2.png
+      - assert:
+          exit_code: 0
+          image:
+            path: frame2.png
+            similar_to: ${workdir}/frame.png
+            max_diff: 0
+
+  - name: transcode to webm and re-probe the codec
+    only:
+      command: ffmpeg -version
+    steps:
+      - run:
+          command: ffmpeg -v error -f lavfi -i testsrc=duration=1:size=320x240:rate=10 out.mp4
+      - assert:
+          exit_code: 0
+      - run:
+          command: ffmpeg -v error -i out.mp4 -c:v libvpx-vp9 -b:v 100k out.webm
+      - assert:
+          exit_code: 0
+          file:
+            path: out.webm
+            exists: true
+      - run:
+          command: ffprobe -v error -print_format json -show_streams out.webm
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              path: "$.streams[0].codec_name"
+              equals: vp9
+
+  - name: a missing input file fails with a not-found error
+    only:
+      command: ffmpeg -version
+    steps:
+      - run:
+          command: ffmpeg -v error -i no_such_input.mp4 out.mp4
+      - assert:
+          # ffmpeg exits 1 on some builds and 254 on others for a missing
+          # input; accept both so a version bump does not break the suite.
+          exit_code:
+            in: [1, 254]
+          stderr:
+            contains: "No such file or directory"
+
+  - name: ffprobe on non-media data reports invalid input
+    only:
+      command: ffmpeg -version
+    steps:
+      # A binary fixture standing in for a truncated/corrupt media file.
+      - fixture:
+          file: corrupt.mp4
+          base64: AAECAwQFBgcICQoLDA0ODw==
+      - run:
+          command: ffprobe -v error corrupt.mp4
+      - assert:
+          exit_code:
+            in: [1, 254]
+          stderr:
+            contains: "Invalid data"

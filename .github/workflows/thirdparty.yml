@@ -87,6 +87,11 @@ jobs:
           - name: ssh-keygen
             dir: ./test/e2e/thirdparty/ssh-keygen
             install: command -v ssh-keygen >/dev/null || (sudo apt-get update && sudo apt-get install -y openssh-client)
+          # ffmpeg (with ffprobe) synthesizes tiny test video and extracts
+          # frames; installed from apt where the runner image lacks it.
+          - name: ffmpeg
+            dir: ./test/e2e/thirdparty/ffmpeg
+            install: command -v ffmpeg >/dev/null || (sudo apt-get update && sudo apt-get install -y ffmpeg)
           # The suite queries the DNS server with dig (bind9-dnsutils); most
           # runner images ship it, but install it if absent.
           - name: coredns
