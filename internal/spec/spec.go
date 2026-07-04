@@ -842,6 +842,43 @@ type Assert struct {
 	// (line.n addresses screen rows 1-based). The raw transcript stays on
 	// stdout.
 	Screen *StreamAssert `yaml:"screen,omitempty"`
+
+	// Duration is the wall-clock assertion target (#31), valid after a
+	// measurable step (run/http/query/grpc/pty): it bounds how long that step
+	// took with lt/lte/gt/gte Go-duration bounds.
+	Duration *DurationAssert `yaml:"duration,omitempty"`
+}
+
+// DurationAssert bounds a step's measured wall-clock time (#31). At least one
+// bound must be set; lt/lte are mutually exclusive, as are gt/gte, and any
+// pair must form a non-empty interval (validated at load time). Values are Go
+// duration strings ("2s", "100ms").
+type DurationAssert struct {
+	// LT / LTE are the upper bound (exclusive / inclusive).
+	LT  string `yaml:"lt,omitempty"`
+	LTE string `yaml:"lte,omitempty"`
+	// GT / GTE are the lower bound (exclusive / inclusive).
+	GT  string `yaml:"gt,omitempty"`
+	GTE string `yaml:"gte,omitempty"`
+}
+
+// DescribeDuration renders a duration assert's bounds as a human phrase (#31),
+// shared by explain and doc so the two never drift.
+func (d *DurationAssert) DescribeDuration() string {
+	var parts []string
+	if d.LT != "" {
+		parts = append(parts, "in under "+d.LT)
+	}
+	if d.LTE != "" {
+		parts = append(parts, "in at most "+d.LTE)
+	}
+	if d.GT != "" {
+		parts = append(parts, "in over "+d.GT)
+	}
+	if d.GTE != "" {
+		parts = append(parts, "in at least "+d.GTE)
+	}
+	return strings.Join(parts, " and ")
 }
 
 // PDFAssert checks a generated PDF file (#73). Like ImageAssert/DirAssert, every

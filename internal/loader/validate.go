@@ -81,9 +81,11 @@ func validate(s *spec.Spec) []string {
 			add("%s: steps must contain at least one step", where)
 			continue
 		}
-		// A screen assert renders a pty step's terminal (#27): reject one
-		// that no pty step in this scenario could ever feed.
+		// A screen assert renders a pty step's terminal (#27) and a duration
+		// assert bounds the immediately preceding measurable step (#31):
+		// reject placements no step could feed.
 		ptySeen := false
+		prevMeasurable := false
 		for j := range sc.Steps {
 			sw := fmt.Sprintf("%s.steps[%d]", where, j)
 			st := &sc.Steps[j]
@@ -93,7 +95,11 @@ func validate(s *spec.Spec) []string {
 			if st.Assert != nil && st.Assert.Screen != nil && !ptySeen {
 				add("%s.assert.screen requires a preceding pty step (the screen is the pty step's rendered terminal)", sw)
 			}
+			if st.Assert != nil && st.Assert.Duration != nil && !prevMeasurable {
+				add("%s.assert.duration requires an immediately preceding run/http/query/grpc/pty step (the step whose wall-clock time it bounds)", sw)
+			}
 			validateStep(add, sw, st, s.Runners, serviceNames, mockNames)
+			prevMeasurable = measurableStep(st.Kind())
 		}
 		for j := range sc.Teardown {
 			tw := fmt.Sprintf("%s.teardown[%d]", where, j)
@@ -891,10 +897,76 @@ func validateAssertTarget(add func(string, ...any), where string, a *spec.Assert
 		validateMockAssert(add, where+".assert.mock", a.Mock, mockNames)
 	case spec.AssertScreen:
 		validateStream(add, where+".assert.screen", a.Screen)
+	case spec.AssertDuration:
+		validateDuration(add, where+".assert.duration", a.Duration)
 	case spec.AssertPDF:
 		validatePDF(add, where+".assert.pdf", a.PDF)
 	case spec.AssertGRPCStatus:
 		// grpc_status is a bare int; no further shape to validate.
+	}
+}
+
+// measurableStep reports whether a step kind records a wall-clock duration a
+// following duration assert can bound (#31).
+func measurableStep(k spec.StepKind) bool {
+	switch k {
+	case spec.StepRun, spec.StepHTTP, spec.StepQuery, spec.StepGRPC, spec.StepPTY:
+		return true
+	default:
+		return false
+	}
+}
+
+// validateDuration checks a duration assert (#31): at least one bound, lt/lte
+// and gt/gte mutually exclusive, every bound a valid Go duration, and any
+// interval non-empty (lower < upper).
+func validateDuration(add func(string, ...any), where string, d *spec.DurationAssert) {
+	parse := func(field, val string) (time.Duration, bool) {
+		if val == "" {
+			return 0, false
+		}
+		dur, err := time.ParseDuration(val)
+		if err != nil {
+			add("%s.%s %q is not a valid duration (e.g. \"2s\", \"100ms\")", where, field, val)
+			return 0, false
+		}
+		return dur, true
+	}
+	lt, ltOK := parse("lt", d.LT)
+	lte, lteOK := parse("lte", d.LTE)
+	gt, gtOK := parse("gt", d.GT)
+	gte, gteOK := parse("gte", d.GTE)
+
+	if d.LT == "" && d.LTE == "" && d.GT == "" && d.GTE == "" {
+		add("%s: set at least one bound (lt/lte/gt/gte)", where)
+		return
+	}
+	if d.LT != "" && d.LTE != "" {
+		add("%s: set only one upper bound (lt or lte, not both)", where)
+	}
+	if d.GT != "" && d.GTE != "" {
+		add("%s: set only one lower bound (gt or gte, not both)", where)
+	}
+
+	// The interval, when both ends are present, must be non-empty. lte/gte
+	// endpoints may touch (lte == gte is the single-point interval); strict
+	// bounds must leave room.
+	upper, upOK := lt, ltOK
+	upStrict := true
+	if lteOK {
+		upper, upOK, upStrict = lte, true, false
+	}
+	lower, lowOK := gt, gtOK
+	lowStrict := true
+	if gteOK {
+		lower, lowOK, lowStrict = gte, true, false
+	}
+	if upOK && lowOK {
+		if (upStrict || lowStrict) && lower >= upper {
+			add("%s: the bounds form an empty interval (lower %s is not below upper %s)", where, lower, upper)
+		} else if !upStrict && !lowStrict && lower > upper {
+			add("%s: the bounds form an empty interval (lower %s exceeds upper %s)", where, lower, upper)
+		}
 	}
 }
 

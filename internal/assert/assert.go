@@ -173,6 +173,8 @@ func checkTarget(a *spec.Assert, target spec.AssertTarget, res *runner.Result, e
 		return checkMock(a.Mock, env)
 	case spec.AssertScreen:
 		return checkScreen(a.Screen, res, env)
+	case spec.AssertDuration:
+		return checkDuration(a.Duration, res)
 	default:
 		return &CheckResult{Desc: string(target), Hint: "assertion target not supported yet"}
 	}

@@ -463,6 +463,83 @@ scenarios:
 	}
 }
 
+// TestValidate_DurationAssert proves the #31 rules: at least one bound,
+// mutually-exclusive lt/lte and gt/gte, non-empty interval, valid duration
+// strings, and a preceding measurable step.
+func TestValidate_DurationAssert(t *testing.T) {
+	t.Parallel()
+	step := func(assert string) string {
+		return `
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: s
+    steps:
+      - run: {command: echo hi}
+      - assert:
+          duration: ` + assert + `
+`
+	}
+	cases := []struct{ name, src, wantMsg string }{
+		{"no bounds", step("{}"), "set at least one bound"},
+		{"lt and lte", step("{lt: 2s, lte: 3s}"), "only one upper bound"},
+		{"gt and gte", step("{gt: 1s, gte: 2s}"), "only one lower bound"},
+		{"empty interval", step("{gt: 2s, lt: 1s}"), "empty interval"},
+		{"touching strict", step("{gt: 1s, lt: 1s}"), "empty interval"},
+		{"bad duration", step("{lt: soon}"), "not a valid duration"},
+		{"valid interval loads", step("{gte: 100ms, lt: 60s}"), ""},
+		{"inclusive point loads", step("{gte: 1s, lte: 1s}"), ""},
+		{
+			name: "misplaced after fixture",
+			src: `
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: s
+    steps:
+      - fixture: {file: a.txt, content: x}
+      - assert:
+          duration: {lt: 2s}
+`,
+			wantMsg: "requires an immediately preceding",
+		},
+		{
+			name: "first in scenario",
+			src: `
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: s
+    steps:
+      - assert:
+          duration: {lt: 2s}
+`,
+			wantMsg: "requires an immediately preceding",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			_, err := LoadBytes("sample.atago.yaml", []byte(tc.src))
+			if tc.wantMsg == "" {
+				if err != nil {
+					t.Fatalf("LoadBytes() error = %v, want clean load", err)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatal("LoadBytes() = nil error, want a duration validation error")
+			}
+			if !strings.Contains(err.Error(), tc.wantMsg) {
+				t.Errorf("error = %q, want substring %q", err, tc.wantMsg)
+			}
+		})
+	}
+}
+
 // TestValidate_ScreenNeedsPTY proves a screen assert without a pty step in
 // the scenario is a load-time error (#27), and one after a pty loads.
 func TestValidate_ScreenNeedsPTY(t *testing.T) {

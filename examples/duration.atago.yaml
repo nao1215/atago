@@ -1,0 +1,41 @@
+version: "1"
+
+# Duration assertions (#31) bound the wall-clock time of the immediately
+# preceding measurable step (run/http/query/grpc/pty) with lt/lte/gt/gte Go
+# duration strings. "The command finishes within X" and "the backoff actually
+# waited" become declarative instead of shelling out to `time`.
+#
+# IMPORTANT: CI runners are shared and slow. Assert ORDERS OF MAGNITUDE, not
+# milliseconds — a bound tight enough to be interesting on your laptop will
+# flake on a loaded runner. The bounds below are deliberately generous.
+# Runs green as-is: atago run examples/duration.atago.yaml
+
+suite:
+  name: duration
+
+scenarios:
+  - name: a fast command completes well under a generous ceiling
+    steps:
+      - run:
+          command: echo quick
+      # duration bounds the immediately preceding step, so it shares the assert
+      # block with the other checks on that same run.
+      - assert:
+          exit_code: 0
+          # Even a cold, loaded runner starts echo in far under a minute.
+          duration:
+            lt: 60s
+
+  - name: a deliberate wait proves it actually waited
+    skip:
+      os: windows
+    steps:
+      - run:
+          shell: true
+          command: sleep 0.2
+      - assert:
+          # gte pins the lower bound (the sleep happened); lt keeps a sane
+          # ceiling. The interval is wide so runner jitter never flakes it.
+          duration:
+            gte: 100ms
+            lt: 60s
