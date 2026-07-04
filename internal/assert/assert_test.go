@@ -310,6 +310,10 @@ func TestCheck_Line(t *testing.T) {
 		// single phantom final newline is dropped, not every trailing newline.
 		{"trailing blank line addressable", "hello\n\n", &spec.StreamAssert{Line: intp(2), Empty: boolp(true)}, true},
 		{"content after blank preserved", "a\n\nb\n", &spec.StreamAssert{Line: intp(3), Equals: strp("b")}, true},
+		// A bare newline is one blank line, not zero (emptiness is judged before
+		// the single-newline trim).
+		{"bare newline is one blank line", "\n", &spec.StreamAssert{Line: intp(1), Empty: boolp(true)}, true},
+		{"bare newline has no line 2", "\n", &spec.StreamAssert{Line: intp(2), Empty: boolp(true)}, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -419,6 +423,34 @@ func TestCheck_JSON_NumericStringStrict(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			got := Check(&spec.Assert{Stdout: &spec.StreamAssert{JSON: tt.j}}, res, Env{})
+			if got.OK != tt.wantOK {
+				t.Errorf("OK = %v, want %v (%s)", got.OK, tt.wantOK, got.Hint)
+			}
+		})
+	}
+}
+
+// TestCheck_YAML_UnsignedInteger is a regression (CodeRabbit): goccy/go-yaml
+// decodes an integer that overflows int64 as uint64, so the numeric matchers
+// must recognize unsigned kinds — otherwise a large value falls back to string
+// comparison and fails gt/gte/lt/lte and equals.
+func TestCheck_YAML_UnsignedInteger(t *testing.T) {
+	t.Parallel()
+	res := &runner.Result{Stdout: []byte("big: 18446744073709551615\n")} // math.MaxUint64
+	tests := []struct {
+		name   string
+		j      *spec.JSONAssert
+		wantOK bool
+	}{
+		{"gt below", &spec.JSONAssert{Path: "$.big", Gt: f64p(1e19)}, true},
+		{"lt above", &spec.JSONAssert{Path: "$.big", Lt: f64p(2e19)}, true},
+		{"gte equal-ish", &spec.JSONAssert{Path: "$.big", Gte: f64p(1e19)}, true},
+		{"not gt above", &spec.JSONAssert{Path: "$.big", Gt: f64p(2e19)}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := Check(&spec.Assert{Stdout: &spec.StreamAssert{YAML: tt.j}}, res, Env{})
 			if got.OK != tt.wantOK {
 				t.Errorf("OK = %v, want %v (%s)", got.OK, tt.wantOK, got.Hint)
 			}

@@ -304,10 +304,13 @@ func valuesEqual(node, want any) bool {
 
 // isNumericKind reports whether v is a genuine numeric type (not a numeric
 // string). It gates valuesEqual's numeric coercion so string-vs-string equality
-// stays byte-exact.
+// stays byte-exact. Unsigned kinds are included because goccy/go-yaml decodes a
+// large integer that overflows int64 as uint64.
 func isNumericKind(v any) bool {
 	switch v.(type) {
-	case int, int64, float64, float32:
+	case int, int8, int16, int32, int64,
+		uint, uint8, uint16, uint32, uint64,
+		float32, float64:
 		return true
 	default:
 		return false
@@ -318,12 +321,28 @@ func toFloat(v any) (float64, bool) {
 	switch t := v.(type) {
 	case int:
 		return float64(t), true
+	case int8:
+		return float64(t), true
+	case int16:
+		return float64(t), true
+	case int32:
+		return float64(t), true
 	case int64:
+		return float64(t), true
+	case uint:
+		return float64(t), true
+	case uint8:
+		return float64(t), true
+	case uint16:
+		return float64(t), true
+	case uint32:
+		return float64(t), true
+	case uint64:
+		return float64(t), true
+	case float32:
 		return float64(t), true
 	case float64:
 		return t, true
-	case float32:
-		return float64(t), true
 	case string:
 		// strconv.ParseFloat requires the WHOLE (trimmed) string to be a valid
 		// float. fmt.Sscanf("%g") used to be used here, but it stops at the first

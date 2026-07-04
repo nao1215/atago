@@ -217,14 +217,17 @@ func countLines(s string) int {
 }
 
 func splitLines(s string) []string {
+	// Truly empty output (no command wrote anything) has zero lines; check that
+	// on the ORIGINAL string, before trimming, so a bare "\n" — one deliberate
+	// blank line — is not collapsed to zero.
+	if s == "" {
+		return nil
+	}
 	// Strip exactly ONE trailing newline (the phantom final "\n" a normal command
 	// emits), not every trailing newline: output that deliberately ends in a blank
 	// line must keep that line addressable, or `line: N` / countLines silently
 	// under-count and a spec pinning a trailing blank line can never pass.
 	s = strings.TrimSuffix(s, "\n")
-	if s == "" {
-		return nil
-	}
 	lines := strings.Split(s, "\n")
 	for i, ln := range lines {
 		lines[i] = strings.TrimRight(ln, "\r")
