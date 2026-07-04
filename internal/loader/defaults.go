@@ -34,7 +34,7 @@ func applyDefaults(s *spec.Spec) {
 		if d.Run != nil {
 			for j := range sc.Steps {
 				if sc.Steps[j].Run != nil {
-					mergeRunDefaults(d.Run, sc.Steps[j].Run)
+					mergeRunDefaults(d.Run, sc.Steps[j].Run, s.Runners)
 				}
 				// A pty step carries the same environment surface as a run step
 				// (env/clear_env/pass_env/sandbox_home), so defaults.run layers
@@ -48,7 +48,7 @@ func applyDefaults(s *spec.Spec) {
 			// apply so cleanup does not need to re-declare them.
 			for j := range sc.Teardown {
 				if sc.Teardown[j].Run != nil {
-					mergeRunDefaults(d.Run, sc.Teardown[j].Run)
+					mergeRunDefaults(d.Run, sc.Teardown[j].Run, s.Runners)
 				}
 				if sc.Teardown[j].PTY != nil {
 					mergePTYDefaults(d.Run, sc.Teardown[j].PTY)
@@ -74,9 +74,18 @@ func mergeStringMap(def, own map[string]string) map[string]string {
 // mergeRunDefaults layers def beneath an authored run step. Command and Retry are
 // intentionally not merged (they are per-step; the validator rejects them on
 // defaults.run so a stray value is never silently ignored).
-func mergeRunDefaults(def, r *spec.Run) {
+func mergeRunDefaults(def, r *spec.Run, runners map[string]spec.Runner) {
 	if r.Runner == "" {
 		r.Runner = def.Runner
+	}
+	// An ssh step runs its command on a remote host, where none of the
+	// environment-shaping or shell/cwd defaults have any effect —
+	// validateSSHRunFields rejects them. Layering defaults.run onto such a step
+	// would turn a shared `defaults.run.env` (or shell/cwd/…) into a load error
+	// for an ssh step the author left bare, so only the runner default (resolved
+	// above) crosses over to ssh steps.
+	if runnerIsSSH(r.Runner, runners) {
+		return
 	}
 	if r.Shell == nil {
 		r.Shell = def.Shell

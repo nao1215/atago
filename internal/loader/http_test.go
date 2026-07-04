@@ -52,6 +52,26 @@ func TestLoadBytes_HTTPValidation(t *testing.T) {
 			src:     "version: \"1\"\nsuite:\n  name: x\nrunners:\n  api:\n    type: http\n    base_url: http://localhost:8080\nscenarios:\n  - name: a\n    steps:\n      - http:\n          runner: api\n          method: GET\n          path: /x\n      - assert:\n          status: 200",
 			wantMsg: "",
 		},
+		{
+			name:    "store stdout matches invalid regexp is rejected at load",
+			src:     "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo hi}\n      - store:\n          name: v\n          from:\n            stdout: {matches: \"[unterminated\"}",
+			wantMsg: "not a valid regexp",
+		},
+		{
+			name:    "store stdout json valid path loads",
+			src:     "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo hi}\n      - store:\n          name: v\n          from:\n            stdout: {json: {path: \"$.token\"}}",
+			wantMsg: "",
+		},
+		{
+			name:    "store stdout without json or matches is rejected",
+			src:     "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo hi}\n      - store:\n          name: v\n          from:\n            stdout: {contains: hi}",
+			wantMsg: "json path or a matches regexp",
+		},
+		{
+			name:    "store name shadowing a built-in is rejected",
+			src:     "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo hi}\n      - store:\n          name: workdir\n          from:\n            stdout: {matches: \"(.*)\"}",
+			wantMsg: "shadows a built-in variable",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

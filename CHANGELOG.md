@@ -7,6 +7,95 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- The HTTP runner now re-enforces the network allowlist on every redirect hop.
+  An allowed host could 3xx-redirect the client onto a denied host and the
+  default client would follow it, silently defeating
+  `permissions.network.allow` — the redirect target is now policy-checked and a
+  denied hop fails with the same violation as a direct request.
+- The db runner no longer misroutes a statement whose string literal contains the
+  word `RETURNING` (e.g. `INSERT INTO logs (msg) VALUES ('order RETURNING to
+  sender')`). The RETURNING check now skips quoted regions, so such an
+  INSERT/UPDATE/DELETE runs through Exec and its affected-row count is captured
+  instead of being lost.
+- `atago record` no longer corrupts a spec when recorded output/command/path
+  carries a control byte. A raw tab was spliced into a plain YAML scalar and
+  silently stripped on reparse (so a recorded tab-separated line could never
+  match), and a newline produced a block scalar that aborted `record` with an
+  "atago bug" error; such values are now emitted as escaped double-quoted
+  scalars that round-trip exactly.
+- A `fixture` that sets only `mode`/`mtime` no longer follows a symlink the
+  program under test may have planted at the destination: `chmod`/`chtimes`
+  follow symlinks, so this could re-permission a file outside the workdir. An
+  existing symlink at the target is now refused, matching the content path.
+- Snapshot normalization strips private-mode and colon-subparameter CSI escapes
+  (`\x1b[?25l` cursor hide/show, `\x1b[?1049h` alt-screen, `\x1b[38:2:…m`) and
+  OSC sequences, which every spinner/TUI emits — they previously leaked raw
+  escape bytes into golden files.
+- A snapshot golden checked out with CRLF line endings (git `autocrlf`, a CRLF
+  editor) now matches LF-folded actual output; CRLF is folded on both sides, not
+  only the actual.
+- Snapshot port masking consumes the whole port number, so a single-digit
+  ephemeral port is masked and a >5-digit value no longer leaves an orphan
+  trailing digit.
+- A background service's `ready.log` regexp probe is now `${name}`-expanded like
+  its `ready.file`/`ready.port` siblings; a probe referencing `${workdir}` was
+  compiled verbatim and could never match, so the service always hit its
+  readiness timeout and the scenario errored falsely.
+- A `store.name` or `matrix` key that reuses a built-in variable name
+  (`atago`/`workdir`/`suitedir`) is rejected at load time instead of silently
+  shadowing the built-in and breaking scenario isolation.
+
+- `json`/`yaml` `equals` no longer treats textually-different numeric strings as
+  equal. A numeric-string coercion used `fmt.Sscanf("%g")`, which accepts a
+  numeric PREFIX and ignores trailing bytes, so `"1.2.3"` parsed as `1.2` and
+  `"3abc"` as `3` — making two different version strings compare equal and
+  letting a string field silently satisfy a numeric matcher. Coercion now
+  requires the whole string to be a valid number (`strconv.ParseFloat`) and only
+  applies when at least one side is a genuine number, so `equals` on two strings
+  is byte-exact (`"2"` ≠ `"2.0"`) while number/numeric-string equality is kept.
+- Secret masking now masks the longest secret first. Sequential replacement let
+  a short secret that is a substring of a longer one mask only its prefix and
+  leak the remainder into reports and snapshots (masking `abcd` before
+  `abcdefgh` left `efgh` visible).
+- `atago manifest` and `atago explain` no longer drop dotted variable references:
+  `spec.VarRefs` used a regexp that excluded the dotted names of namespaced
+  built-ins (`${<mock>.url}`, `${<mock>.port}`, #24), so those references were
+  silently omitted from the manifest's variable list and the explain output. Its
+  pattern is now in lockstep with the expander again.
+- `atago explain` now renders the `json`/`yaml` numeric comparison matchers
+  (`gt`/`gte`/`lt`/`lte`); they previously showed as an empty matcher.
+- A `line: N` selector (and `line`-scoped matchers) can now address a deliberate
+  trailing blank line. Line splitting stripped EVERY trailing newline instead of
+  the single phantom final one, so output ending in a blank line under-counted
+  its lines and a spec pinning that blank line could never pass.
+- `json`/`yaml` `length` on a string now counts characters, not bytes, so a
+  multi-byte value like `"café"` has length 4 rather than 5.
+- A spec that combines a shared `defaults.run` (env/shell/cwd/…) with an `ssh`
+  step now loads: those defaults were layered onto the ssh step and then rejected
+  by the ssh-runner validator, so any such spec failed to load even though the
+  ssh step was authored bare. `defaults.run` no longer layers ssh-incompatible
+  fields onto ssh steps.
+- `contains: ""` / `not_contains: ""` (an empty-string element) is now rejected
+  at load time: it is an always-true no-op (`contains`) or can never pass
+  (`not_contains`), so it is caught like the empty-list case.
+- A `store.from` stdout/body/rows/message/value/file selector is now shape- and
+  syntax-checked at load time: it must set a `json` path or a `matches` regexp,
+  and a malformed regexp or JSON path fails at load with a positioned message
+  instead of aborting mid-run.
+- `exit_code` accepts a YAML-quoted integer (`exit_code: "0"`) instead of
+  rejecting it with a misleading "must be an integer" message.
+
+### Docs
+
+- Regenerated the snapshot-workflow README GIF (`doc/img/snapshot.gif`), which
+  still showed the pre-rename `b3spec` command and `.b3spec.yaml` files instead
+  of `atago` / `.atago.yaml`.
+- Added `not_equals` to `examples/run_and_assert.atago.yaml` and `min_count` /
+  `max_count` to `examples/dir_tree.atago.yaml`, filling the last matcher gaps in
+  the runnable example suite.
+
 ## [0.3.0] - 2026-07-04
 
 Exact workdir-delta assertions, hermetic per-OS home isolation, and interactive

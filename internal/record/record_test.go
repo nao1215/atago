@@ -141,6 +141,49 @@ func TestGenerate_EdgeShapes(t *testing.T) {
 	}
 }
 
+// TestGenerate_ControlBytesRoundTrip is a regression: a recorded value carrying
+// a tab or newline must survive a generate → reload round-trip exactly. A raw
+// tab spliced into a plain YAML scalar is silently stripped on reparse (so the
+// generated assertion could never match the real output), and a newline made
+// yaml.Marshal emit a block scalar that broke the document and aborted record.
+func TestGenerate_ControlBytesRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	// Tab-separated first line (very common CLI output): must round-trip.
+	out, err := Generate(Observation{
+		Command:  "mytool list",
+		ExitCode: 0,
+		Stdout:   []byte("col1\tcol2\tcol3\n"),
+	}, Options{SuiteName: "demo"})
+	if err != nil {
+		t.Fatalf("Generate(tab): %v", err)
+	}
+	s, err := loader.LoadBytes("g.atago.yaml", out)
+	if err != nil {
+		t.Fatalf("reload(tab): %v\n%s", err, out)
+	}
+	var contains []string
+	for _, st := range s.Scenarios[0].Steps {
+		if st.Assert != nil && st.Assert.Stdout != nil && st.Assert.Stdout.Contains != nil {
+			contains = st.Assert.Stdout.Contains
+		}
+	}
+	if len(contains) != 1 || contains[0] != "col1\tcol2\tcol3" {
+		t.Errorf("tab-separated contains round-trip = %q, want [\"col1\\tcol2\\tcol3\"]", contains)
+	}
+
+	// A multi-line command must produce a valid spec, not abort with an
+	// "atago bug" internal error.
+	if _, err := Generate(Observation{
+		Command:  "sh -c 'printf a\nprintf b'",
+		Shell:    true,
+		ExitCode: 0,
+		Stdout:   []byte("ab\n"),
+	}, Options{SuiteName: "demo"}); err != nil {
+		t.Errorf("Generate(multi-line command) failed: %v", err)
+	}
+}
+
 // TestGenerate_Snapshot proves --snapshot switches stdout to the snapshot
 // matcher referencing the given golden path.
 func TestGenerate_Snapshot(t *testing.T) {

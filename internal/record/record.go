@@ -127,10 +127,35 @@ func firstLine(stream []byte) string {
 // yamlScalar renders an arbitrary string as one safe inline YAML scalar,
 // delegating quoting decisions to the YAML library so recorded commands and
 // output can never break the document structure.
+//
+// yaml.Marshal is trusted for punctuation-heavy scalars (`#`, `:`, `*`, a
+// leading space, …), but NOT for control bytes: it leaves a raw tab in a plain
+// scalar — which YAML re-parsing then silently strips, so a recorded
+// tab-separated line would no longer match the real output — and it renders any
+// multi-line string as a block scalar that cannot be spliced inline after
+// `contains: ` / `command: ` (producing an invalid document that aborts
+// `atago record`). For a value carrying any control byte, emit an explicit
+// single-line double-quoted scalar that escapes it, so the value round-trips
+// exactly.
 func yamlScalar(s string) string {
+	if hasControlByte(s) {
+		return yamlDoubleQuoted(s)
+	}
 	out, err := yaml.Marshal(s)
 	if err != nil {
 		return fmt.Sprintf("%q", s)
 	}
 	return strings.TrimRight(string(out), "\n")
+}
+
+// hasControlByte reports whether s contains a C0 control character (tab,
+// newline, CR, …) — the bytes yaml.Marshal cannot safely inline and that
+// yamlDoubleQuoted escapes.
+func hasControlByte(s string) bool {
+	for _, r := range s {
+		if r < 0x20 {
+			return true
+		}
+	}
+	return false
 }

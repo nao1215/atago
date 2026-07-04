@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/nao1215/atago/internal/spec"
@@ -62,6 +63,10 @@ func NewMasker(values []string) *Masker {
 			v = append(v, x)
 		}
 	}
+	// Mask longest-first: sequential ReplaceAll would otherwise let a short
+	// secret that is a substring of a longer one mask only its prefix and leak
+	// the rest (e.g. masking "abcd" before "abcdefgh" leaves "efgh" visible).
+	sort.SliceStable(v, func(i, j int) bool { return len(v[i]) > len(v[j]) })
 	return &Masker{values: v}
 }
 

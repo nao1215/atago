@@ -105,10 +105,29 @@ func (r *Runner) Do(ctx context.Context, h *spec.HTTP) (*runner.Result, error) {
 	// follow_redirects defaults to true, matching every HTTP client a user
 	// knows. `follow_redirects: false` surfaces the 3xx itself so a spec can
 	// assert the redirect status and Location header (e.g. "/" -> "/login").
+	//
+	// When a network allowlist is configured, the policy must be re-checked on
+	// every redirect hop: otherwise an allowed host could 3xx-redirect the client
+	// to a denied host and the default client would follow it, silently defeating
+	// the egress restriction. The returned *PolicyError propagates out of
+	// client.Do (wrapped in a *url.Error) and is still recognized by the engine's
+	// errors.As mapping to exit code 6.
+	stopRedirects := h.FollowRedirects != nil && !*h.FollowRedirects
 	client := r.client
-	if h.FollowRedirects != nil && !*h.FollowRedirects {
+	if stopRedirects || len(r.allow) > 0 {
 		c := *r.client
-		c.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+		c.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+			if stopRedirects {
+				return http.ErrUseLastResponse
+			}
+			if err := r.checkPolicy(req.URL); err != nil {
+				return err
+			}
+			if len(via) >= 10 { // preserve net/http's default hop limit
+				return fmt.Errorf("stopped after 10 redirects")
+			}
+			return nil
+		}
 		client = &c
 	}
 

@@ -3,6 +3,7 @@ package fixture
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/nao1215/atago/internal/spec"
@@ -142,6 +143,39 @@ func TestWrite_RefusesToFollowPlantedSymlink(t *testing.T) {
 	}
 	if string(got) != "original" {
 		t.Errorf("outside file was modified through the symlink: %q", got)
+	}
+}
+
+// TestWrite_ModeMtimeRefusesPlantedSymlink is a security regression: a
+// mode/mtime-only fixture operates in place and chmod/chtimes FOLLOW symlinks,
+// so a link the program-under-test planted at the destination must be refused
+// rather than re-permissioning a host file outside the workdir (issue #16).
+func TestWrite_ModeMtimeRefusesPlantedSymlink(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	outside := filepath.Join(t.TempDir(), "secret.txt")
+	if err := os.WriteFile(outside, []byte("secret"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(dir, "planted")); err != nil {
+		t.Skipf("symlink creation unavailable: %v", err) // Windows without privilege
+	}
+	// The portable guarantee is that Write REFUSES to touch the planted symlink.
+	err := Write(&spec.Fixture{File: "planted", Mode: "0777"}, dir, "")
+	if err == nil {
+		t.Fatal("chmod through a planted symlink should be refused")
+	}
+	// Confirm the outside file's perms were not changed. Windows does not honor
+	// POSIX mode bits (both 0600 and 0777 report as 0666), so the refusal above
+	// is the portable check and the perm value is only meaningful on POSIX.
+	if runtime.GOOS != "windows" {
+		fi, serr := os.Lstat(outside)
+		if serr != nil {
+			t.Fatal(serr)
+		}
+		if perm := fi.Mode().Perm(); perm != 0o600 {
+			t.Errorf("outside file perms changed through the symlink: %o, want 0600", perm)
+		}
 	}
 }
 

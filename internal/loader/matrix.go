@@ -31,6 +31,11 @@ func validateMatrix(s *spec.Spec) []string {
 			if len(row) == 0 {
 				errs = append(errs, fmt.Sprintf("%s.matrix[%d] must contain at least one variable", where, r))
 			}
+			for k := range row {
+				if reservedVarNames[k] {
+					errs = append(errs, fmt.Sprintf("%s.matrix[%d] key %q shadows a built-in variable (atago/workdir/suitedir); choose another name", where, r, k))
+				}
+			}
 		}
 	}
 	return errs

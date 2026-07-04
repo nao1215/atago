@@ -472,6 +472,11 @@ scenarios:
               matches: "[0-9]+"
       - assert:
           stdout:
+            json:
+              path: $.count
+              gt: 5
+      - assert:
+          stdout:
             snapshot: out.snap
       - assert:
           file:
@@ -526,6 +531,7 @@ scenarios:
 		"JSON $.name",
 		"length 3",
 		"matches /[0-9]+/",
+		"$.count > 5",
 		"matches snapshot out.snap",
 		`"gone.txt" does not exist`,
 		`"data.json" JSON $.ok`,

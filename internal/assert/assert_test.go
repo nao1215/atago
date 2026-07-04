@@ -306,6 +306,14 @@ func TestCheck_Line(t *testing.T) {
 		{"csv data line", csvOut, &spec.StreamAssert{Line: intp(2), Equals: strp("booker12,1")}, true},
 		{"out of range fails", csvOut, &spec.StreamAssert{Line: intp(3), Equals: strp("x")}, false},
 		{"trailing newline ignored", "only\n", &spec.StreamAssert{Line: intp(2), Equals: strp("")}, false},
+		// Regression: a deliberate trailing blank line stays addressable — only the
+		// single phantom final newline is dropped, not every trailing newline.
+		{"trailing blank line addressable", "hello\n\n", &spec.StreamAssert{Line: intp(2), Empty: boolp(true)}, true},
+		{"content after blank preserved", "a\n\nb\n", &spec.StreamAssert{Line: intp(3), Equals: strp("b")}, true},
+		// A bare newline is one blank line, not zero (emptiness is judged before
+		// the single-newline trim).
+		{"bare newline is one blank line", "\n", &spec.StreamAssert{Line: intp(1), Empty: boolp(true)}, true},
+		{"bare newline has no line 2", "\n", &spec.StreamAssert{Line: intp(2), Empty: boolp(true)}, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -380,6 +388,76 @@ func TestCheck_JSON_Compare(t *testing.T) {
 	}
 }
 
+// TestCheck_JSON_NumericStringStrict is a regression for the toFloat bug where
+// fmt.Sscanf("%g") accepted a numeric PREFIX and ignored trailing bytes, so
+// "1.2.3" parsed as 1.2 and "3abc" as 3. That made two different version strings
+// compare equal and let a non-numeric field silently satisfy a numeric matcher.
+// A numeric-string coercion must require the WHOLE string to be a valid number.
+func TestCheck_JSON_NumericStringStrict(t *testing.T) {
+	t.Parallel()
+	res := &runner.Result{Stdout: []byte(`{"ver":"1.2.3","other":"1.2.9","mixed":"3abc","spaced":"3 4","clean":"7"}`)}
+	tests := []struct {
+		name   string
+		j      *spec.JSONAssert
+		wantOK bool
+	}{
+		// Two distinct version strings must NOT be equal (both used to coerce to 1.2).
+		{"distinct versions not equal", &spec.JSONAssert{Path: "$.ver", Equals: "1.2.9"}, false},
+		// Same version string still equals itself via string fallback.
+		{"same version equals", &spec.JSONAssert{Path: "$.ver", Equals: "1.2.3"}, true},
+		// A version string is not a number, so a numeric compare must fail, not coerce to 1.2.
+		{"version not numeric for gt", &spec.JSONAssert{Path: "$.ver", Gt: f64p(1)}, false},
+		// "3abc" is not numeric.
+		{"mixed not numeric", &spec.JSONAssert{Path: "$.mixed", Gte: f64p(3)}, false},
+		{"mixed not equal to 3", &spec.JSONAssert{Path: "$.mixed", Equals: 3}, false},
+		// "3 4" is not a single number.
+		{"spaced not numeric", &spec.JSONAssert{Path: "$.spaced", Lt: f64p(4)}, false},
+		// A genuinely clean numeric string still coerces.
+		{"clean numeric string compares", &spec.JSONAssert{Path: "$.clean", Gte: f64p(7)}, true},
+		{"clean numeric string equals number", &spec.JSONAssert{Path: "$.clean", Equals: 7}, true},
+		// Two distinct strings that merely parse to the same float must NOT be
+		// equal under exact `equals` (string-vs-string is byte-exact).
+		{"7 not equal to string 7.0", &spec.JSONAssert{Path: "$.clean", Equals: "7.0"}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := Check(&spec.Assert{Stdout: &spec.StreamAssert{JSON: tt.j}}, res, Env{})
+			if got.OK != tt.wantOK {
+				t.Errorf("OK = %v, want %v (%s)", got.OK, tt.wantOK, got.Hint)
+			}
+		})
+	}
+}
+
+// TestCheck_YAML_UnsignedInteger is a regression (CodeRabbit): goccy/go-yaml
+// decodes an integer that overflows int64 as uint64, so the numeric matchers
+// must recognize unsigned kinds — otherwise a large value falls back to string
+// comparison and fails gt/gte/lt/lte and equals.
+func TestCheck_YAML_UnsignedInteger(t *testing.T) {
+	t.Parallel()
+	res := &runner.Result{Stdout: []byte("big: 18446744073709551615\n")} // math.MaxUint64
+	tests := []struct {
+		name   string
+		j      *spec.JSONAssert
+		wantOK bool
+	}{
+		{"gt below", &spec.JSONAssert{Path: "$.big", Gt: f64p(1e19)}, true},
+		{"lt above", &spec.JSONAssert{Path: "$.big", Lt: f64p(2e19)}, true},
+		{"gte equal-ish", &spec.JSONAssert{Path: "$.big", Gte: f64p(1e19)}, true},
+		{"not gt above", &spec.JSONAssert{Path: "$.big", Gt: f64p(2e19)}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := Check(&spec.Assert{Stdout: &spec.StreamAssert{YAML: tt.j}}, res, Env{})
+			if got.OK != tt.wantOK {
+				t.Errorf("OK = %v, want %v (%s)", got.OK, tt.wantOK, got.Hint)
+			}
+		})
+	}
+}
+
 // TestCheck_JSON_EqualsStructural verifies json.equals compares nested
 // objects/arrays structurally and is insensitive to map key ordering (#40),
 // rather than relying on fmt.Sprintf("%v") of the decoded Go values.
@@ -446,6 +524,23 @@ func TestCheck_JSON_Length(t *testing.T) {
 		{"object length match", &spec.JSONAssert{Path: "$.obj", Length: intp(2)}, true, ""},
 		{"object length mismatch", &spec.JSONAssert{Path: "$.obj", Length: intp(1)}, false, "length at"},
 		{"number has no length", &spec.JSONAssert{Path: "$.num", Length: intp(2)}, false, "no length"},
+	}
+	// A multi-byte string's length is its character count, not its byte count:
+	// "café" is 4 (not 5). Verified separately so the shared table stays ASCII.
+	unicodeRes := &runner.Result{Stdout: []byte(`{"name":"café","emoji":"a→b"}`)}
+	for _, tc := range []struct {
+		path string
+		n    int
+		ok   bool
+	}{
+		{"$.name", 4, true},
+		{"$.name", 5, false}, // byte count would wrongly pass here
+		{"$.emoji", 3, true}, // a, →, b
+	} {
+		got := Check(&spec.Assert{Stdout: &spec.StreamAssert{JSON: &spec.JSONAssert{Path: tc.path, Length: intp(tc.n)}}}, unicodeRes, Env{})
+		if got.OK != tc.ok {
+			t.Errorf("unicode length %s == %d: OK = %v, want %v (%s)", tc.path, tc.n, got.OK, tc.ok, got.Hint)
+		}
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

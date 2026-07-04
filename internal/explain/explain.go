@@ -653,6 +653,14 @@ func jsonMatcher(j *spec.JSONAssert) string {
 		return fmt.Sprintf("matches /%s/", *j.Matches)
 	case j.Length != nil:
 		return fmt.Sprintf("length %d", *j.Length)
+	case j.Gt != nil:
+		return fmt.Sprintf("> %v", *j.Gt)
+	case j.Gte != nil:
+		return fmt.Sprintf(">= %v", *j.Gte)
+	case j.Lt != nil:
+		return fmt.Sprintf("< %v", *j.Lt)
+	case j.Lte != nil:
+		return fmt.Sprintf("<= %v", *j.Lte)
 	default:
 		return ""
 	}

@@ -116,6 +116,32 @@ scenarios:
 	}
 }
 
+// TestLoadBytes_EmptyStringElementRejected proves an empty-string element in a
+// contains/not_contains matcher is a validation error: `contains ""` is an
+// always-true no-op and `not_contains ""` can never pass, so both are authoring
+// mistakes worth catching at load time rather than at run time.
+func TestLoadBytes_EmptyStringElementRejected(t *testing.T) {
+	t.Parallel()
+	for _, key := range []string{"contains", "not_contains"} {
+		src := `
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: ok
+    steps:
+      - run: {command: echo hi}
+      - assert:
+          stdout:
+            ` + key + `: ""
+`
+		_, err := LoadBytes("sample.atago.yaml", []byte(src))
+		if err == nil || !strings.Contains(err.Error(), "empty string") {
+			t.Fatalf("%s: LoadBytes() error = %v, want an 'empty string' validation error", key, err)
+		}
+	}
+}
+
 // TestLoadBytes_ShellMetacharWithoutShell proves a command carrying shell syntax
 // is rejected when shell is not enabled, with a fix-forward hint. Each metachar
 // in the guarded set is exercised.
