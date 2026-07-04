@@ -10,7 +10,9 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/nao1215/atago)](https://goreportcard.com/report/github.com/nao1215/atago)
 ![GitHub](https://img.shields.io/github/license/nao1215/atago)
 
-<img src="./doc/img/atago-logo.jpg" alt="atago logo" width="400" />
+<p align="center">
+  <img src="./doc/img/atago-logo.jpg" alt="atago logo" width="400" />
+</p>
 
 atago tests real CLI behavior from plain YAML: commands, files, snapshots, services, and interactive terminals. It runs your actual binary — in any language — and asserts what a user observes. No test code, no shell DSL.
 
