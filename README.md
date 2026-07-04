@@ -17,9 +17,9 @@ atago tests real CLI behavior from plain YAML: commands, files, snapshots, servi
 ![demo](./doc/img/demo.gif)
 
 ```shell
-atago record -- mytool convert input.txt  # turn a real run into mytool.atago.yaml
-atago run mytool.atago.yaml               # replay it as a test
-atago run --report junit specs/           # or run a whole suite in CI
+atago record --out mytool.atago.yaml -- mytool convert input.txt  # turn a real run into a spec
+atago run mytool.atago.yaml                                       # replay it as a test
+atago run --report junit specs/                                   # or run a whole suite in CI
 ```
 
 ## Why atago?
