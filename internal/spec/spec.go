@@ -1131,6 +1131,17 @@ func (e *ExitCode) UnmarshalYAML(b []byte) error {
 		e.Equals = &n
 		return nil
 	}
+	// A YAML-quoted integer (exit_code: "0" / '2') is still an integer to the
+	// author, but the raw-bytes Atoi above sees the surrounding quotes and fails.
+	// A plain int decode unquotes it, so a quoted scalar is accepted instead of
+	// falling through to the misleading "must be an integer … got \"0\"" error.
+	// Mapping/sequence forms ({not:…}, {in:[…]}) fail this decode and fall
+	// through to the shape-specific handling below.
+	var n int
+	if err := yaml.Unmarshal(b, &n); err == nil {
+		e.Equals = &n
+		return nil
+	}
 	var m struct {
 		Not *int  `yaml:"not"`
 		In  []int `yaml:"in"`

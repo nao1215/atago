@@ -14,6 +14,7 @@ import (
 	"github.com/bmatcuk/doublestar/v4"
 	"github.com/nao1215/atago/internal/runner/db"
 	"github.com/nao1215/atago/internal/spec"
+	"github.com/ohler55/ojg/jp"
 )
 
 var validOS = map[string]bool{"linux": true, "darwin": true, "windows": true}
@@ -877,6 +878,55 @@ func validateStore(add func(string, ...any), where string, s *spec.Store) {
 	default:
 		add("%s.store.from must set exactly one source", where)
 	}
+
+	// A store selector extracts a value via a json path or a matches regexp
+	// (unlike a full assert). Validate the regexp/path at load time so a typo
+	// fails with a positioned message instead of aborting mid-run, matching how
+	// assert streams validate their regexp/path.
+	for _, sel := range []struct {
+		name string
+		s    *spec.StreamAssert
+	}{
+		{"stdout", s.From.Stdout},
+		{"body", s.From.Body},
+		{"rows", s.From.Rows},
+		{"message", s.From.Message},
+		{"value", s.From.Value},
+	} {
+		if sel.s != nil {
+			validateStoreSelector(add, where+".store.from."+sel.name, sel.s)
+		}
+	}
+	if s.From.File != nil && s.From.File.JSON != nil {
+		validateStoreJSONPath(add, where+".store.from.file.json", s.From.File.JSON.Path)
+	}
+}
+
+// validateStoreSelector checks a store.from stream selector: it must carry a
+// json path or a matches regexp (the only two the extractor understands), and
+// whichever is present must be well-formed.
+func validateStoreSelector(add func(string, ...any), where string, s *spec.StreamAssert) {
+	switch {
+	case s.JSON != nil:
+		validateStoreJSONPath(add, where+".json", s.JSON.Path)
+	case s.Matches != nil:
+		if _, err := regexp.Compile(*s.Matches); err != nil {
+			add("%s.matches %q is not a valid regexp: %v", where, *s.Matches, err)
+		}
+	default:
+		add("%s must set a json path or a matches regexp to extract a value", where)
+	}
+}
+
+// validateStoreJSONPath compile-checks a store selector's JSON path.
+func validateStoreJSONPath(add func(string, ...any), where, path string) {
+	if path == "" {
+		add("%s.path is required", where)
+		return
+	}
+	if _, err := jp.ParseString(path); err != nil {
+		add("%s.path %q is not a valid JSON path: %v", where, path, err)
+	}
 }
 
 func validateFixture(add func(string, ...any), where string, f *spec.Fixture) {
@@ -1185,10 +1235,18 @@ func validateDir(add func(string, ...any), where string, d *spec.DirAssert) {
 
 // validateStringList rejects an explicitly-empty contains/not_contains list
 // (`contains: []`), which would otherwise decode to a present-but-empty matcher
-// that trivially passes. A scalar or non-empty list is accepted.
+// that trivially passes, and rejects any empty-string element: `contains: ""`
+// is an always-true no-op and `not_contains: ""` can never pass (every string
+// contains the empty substring), so either is an authoring mistake — caught at
+// load time like the empty-list case and like validateChanges' empty entries.
 func validateStringList(add func(string, ...any), where, key string, l spec.StringList) {
 	if l != nil && len(l) == 0 {
 		add("%s.%s must not be empty", where, key)
+	}
+	for i, s := range l {
+		if s == "" {
+			add("%s.%s[%d] is an empty string, which matches everything (contains) or nothing (not_contains); remove it or give a real substring", where, key, i)
+		}
 	}
 }
 

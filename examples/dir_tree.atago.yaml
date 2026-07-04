@@ -66,3 +66,12 @@ scenarios:
             path: out
             recursive: true
             glob: "*.md"
+      # min_count/max_count bound the file total without pinning it exactly —
+      # right when a generator emits "a few" files and the precise number is an
+      # implementation detail you do not want the test to churn on.
+      - assert:
+          dir:
+            path: out
+            recursive: true
+            min_count: 1
+            max_count: 5

@@ -63,6 +63,57 @@ scenarios:
 	}
 }
 
+// TestApplyDefaults_SSHStepNotRejected is a regression: defaults.run env/shell/
+// cwd/… must NOT be layered onto a step targeting an ssh runner, because the
+// SSH validator rejects those fields. Before the fix, any spec that combined a
+// shared defaults.run with even one bare ssh step failed to load.
+func TestApplyDefaults_SSHStepNotRejected(t *testing.T) {
+	t.Parallel()
+	src := `
+version: "1"
+suite:
+  name: sample
+runners:
+  remote:
+    type: ssh
+    host: h
+    user: u
+defaults:
+  run:
+    env:
+      FOO: bar
+    shell: true
+    cwd: /somewhere
+scenarios:
+  - name: bare ssh step
+    steps:
+      - run:
+          runner: remote
+          command: echo hi
+      - assert:
+          exit_code: 0
+`
+	s, err := LoadBytes("sample.atago.yaml", []byte(src))
+	if err != nil {
+		t.Fatalf("LoadBytes() error = %v (defaults.run must not leak onto ssh steps)", err)
+	}
+	run := s.Scenarios[0].Steps[0].Run
+	// The ssh step stays bare: none of the ssh-incompatible defaults were merged.
+	if len(run.Env) != 0 {
+		t.Errorf("ssh step env = %v, want empty (defaults.run.env must not leak)", run.Env)
+	}
+	if run.Shell != nil {
+		t.Errorf("ssh step shell = %v, want nil (defaults.run.shell must not leak)", *run.Shell)
+	}
+	if run.Cwd != "" {
+		t.Errorf("ssh step cwd = %q, want empty (defaults.run.cwd must not leak)", run.Cwd)
+	}
+	// The runner default still resolves (only compatible defaults cross over).
+	if run.Runner != "remote" {
+		t.Errorf("ssh step runner = %q, want remote", run.Runner)
+	}
+}
+
 // TestApplyDefaults_ExplicitShellFalseWins proves an authored `shell: false`
 // beats a defaulted `shell: true` — the documented "an explicitly authored
 // value always wins" rule holds for booleans too (Shell is a *bool so unset

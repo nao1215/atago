@@ -3,7 +3,9 @@ package assert
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/goccy/go-yaml"
 	"github.com/nao1215/atago/internal/spec"
@@ -245,7 +247,10 @@ func lengthOf(v any) (int, bool) {
 	case map[string]any:
 		return len(t), true
 	case string:
-		return len(t), true
+		// Count characters, not bytes: a spec author asking for the length of a
+		// string means "how many characters", so a multi-byte value like "café"
+		// is length 4, not 5. Array/object length is element count either way.
+		return utf8.RuneCountInString(t), true
 	default:
 		return 0, false
 	}
@@ -256,9 +261,17 @@ func lengthOf(v any) (int, bool) {
 // objects and arrays, recurses so nested structures compare by value rather
 // than by fmt.Sprintf output. Map comparison is key-order independent (#40).
 func valuesEqual(node, want any) bool {
-	if nf, ok := toFloat(node); ok {
-		if wf, ok := toFloat(want); ok {
-			return nf == wf
+	// Numeric normalization (int 2 == 2.0, and a numeric string vs a number) is
+	// intended, but only when at least ONE side is a genuine number: two DIFFERENT
+	// strings that merely parse to the same float ("2" vs "2.0", "1e3" vs "1000")
+	// must not be reported equal by an exact `equals`. Gating on a real numeric
+	// operand keeps number/numeric-string equality while making string-vs-string
+	// byte-exact.
+	if isNumericKind(node) || isNumericKind(want) {
+		if nf, ok := toFloat(node); ok {
+			if wf, ok := toFloat(want); ok {
+				return nf == wf
+			}
 		}
 	}
 	switch n := node.(type) {
@@ -289,6 +302,18 @@ func valuesEqual(node, want any) bool {
 	return fmt.Sprintf("%v", node) == fmt.Sprintf("%v", want)
 }
 
+// isNumericKind reports whether v is a genuine numeric type (not a numeric
+// string). It gates valuesEqual's numeric coercion so string-vs-string equality
+// stays byte-exact.
+func isNumericKind(v any) bool {
+	switch v.(type) {
+	case int, int64, float64, float32:
+		return true
+	default:
+		return false
+	}
+}
+
 func toFloat(v any) (float64, bool) {
 	switch t := v.(type) {
 	case int:
@@ -300,8 +325,13 @@ func toFloat(v any) (float64, bool) {
 	case float32:
 		return float64(t), true
 	case string:
-		var f float64
-		if _, err := fmt.Sscanf(strings.TrimSpace(t), "%g", &f); err == nil {
+		// strconv.ParseFloat requires the WHOLE (trimmed) string to be a valid
+		// float. fmt.Sscanf("%g") used to be used here, but it stops at the first
+		// non-numeric byte and reports success on the prefix, so "1.2.3" parsed as
+		// 1.2 and "3abc" as 3 — making version strings compare equal and string
+		// fields silently pass numeric matchers. Requiring full consumption fixes
+		// both.
+		if f, err := strconv.ParseFloat(strings.TrimSpace(t), 64); err == nil {
 			return f, true
 		}
 	}

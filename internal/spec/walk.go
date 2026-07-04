@@ -7,8 +7,12 @@ import "regexp"
 // `env:` prefix). It is the single source of truth for what a variable
 // reference looks like, shared by the engine's expansion and explain
 // (issue #23). It must stay in lockstep with
-// store.varRef, including the `$${name}` literal-escape handling (issue #37).
-var varRef = regexp.MustCompile(`(\$?)\$\{((?:env:)?[a-zA-Z_][a-zA-Z0-9_]*)\}`)
+// store.varRef, including the `$${name}` literal-escape handling (issue #37)
+// and the dotted segments of namespaced built-ins like a mock server's
+// `${<name>.url}`/`${<name>.port}` (issue #24) — without the `\.`-segment
+// branch, VarRefs silently dropped every dotted reference, so `atago manifest`
+// and explain under-reported which variables a scenario actually uses.
+var varRef = regexp.MustCompile(`(\$?)\$\{((?:env:)?[a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z0-9_]+)*)\}`)
 
 // VarRefs returns the variable names referenced by live ${name} occurrences in
 // s. Escaped `$${name}` references are literal text, not live references, and

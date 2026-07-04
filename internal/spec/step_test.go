@@ -130,6 +130,20 @@ func TestExitCode_UnmarshalYAML(t *testing.T) {
 			t.Errorf("scalar decode = %+v, want Equals=0", e)
 		}
 	})
+	t.Run("quoted int scalar", func(t *testing.T) {
+		t.Parallel()
+		// Regression: a YAML-quoted integer (exit_code: "0") must decode as the
+		// integer 0, not fail with the "must be an integer, got \"0\"" message.
+		for _, in := range []string{`"0"`, `'2'`} {
+			var e ExitCode
+			if err := yaml.Unmarshal([]byte(in), &e); err != nil {
+				t.Fatalf("quoted %s: %v", in, err)
+			}
+			if e.Equals == nil || e.Not != nil || e.In != nil {
+				t.Errorf("quoted %s decode = %+v, want Equals set", in, e)
+			}
+		}
+	})
 	t.Run("not map", func(t *testing.T) {
 		t.Parallel()
 		var e ExitCode

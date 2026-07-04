@@ -23,6 +23,23 @@ func TestMasker_Mask(t *testing.T) {
 	}
 }
 
+// TestMasker_OverlappingSecretsNoLeak is a regression: masking must apply the
+// LONGEST secret first, or a short secret that is a substring of a longer one
+// (e.g. a token and that same token with a suffix) masks only the prefix and
+// leaks the remainder into reports and snapshots.
+func TestMasker_OverlappingSecretsNoLeak(t *testing.T) {
+	t.Parallel()
+	// Deliberately supply the short value first, the order a naive masker leaks on.
+	m := NewMasker([]string{"abcd", "abcdefgh"})
+	got := m.Mask("token is abcdefgh here")
+	if strings.Contains(got, "efgh") {
+		t.Errorf("longer secret partially leaked: %q", got)
+	}
+	if strings.Contains(got, "abcd") {
+		t.Errorf("secret leaked: %q", got)
+	}
+}
+
 func TestMasker_MaskBytes(t *testing.T) {
 	t.Parallel()
 	m := NewMasker([]string{"supersecret"})

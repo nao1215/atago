@@ -28,6 +28,11 @@ scenarios:
       - assert:
           stdout:
             equals: alpha beta
+      # not_equals is the exact-text negation: assert the output is anything
+      # BUT the given text — a trailing-newline-insensitive inequality.
+      - assert:
+          stdout:
+            not_equals: gamma delta
       - assert:
           stdout:
             matches: "a.+a"

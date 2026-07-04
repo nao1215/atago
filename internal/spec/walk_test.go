@@ -25,6 +25,15 @@ func TestVarRefs(t *testing.T) {
 	if got := VarRefs("$${skip} but ${real}"); !reflect.DeepEqual(got, []string{"real"}) {
 		t.Errorf("VarRefs mixed escape = %v, want [real]", got)
 	}
+	// Issue #24: namespaced built-ins use dotted names (${<mock>.url},
+	// ${<mock>.port}). VarRefs must stay in lockstep with store.varRef and
+	// collect them, or manifest/explain silently drop every dotted reference.
+	if got := VarRefs("base_url: ${api.url} port ${api.port}"); !reflect.DeepEqual(got, []string{"api.url", "api.port"}) {
+		t.Errorf("VarRefs dotted = %v, want [api.url api.port]", got)
+	}
+	if got := VarRefs("${env:HOME}"); !reflect.DeepEqual(got, []string{"env:HOME"}) {
+		t.Errorf("VarRefs env = %v, want [env:HOME]", got)
+	}
 }
 
 func sp(s string) *string { return &s }
