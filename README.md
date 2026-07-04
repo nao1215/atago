@@ -88,6 +88,12 @@ $ atago run mytool.atago.yaml
 PASSED  1 scenario: 1 passed, 0 failed, 0 errored, 0 skipped (12ms)
 ```
 
+Interactive tools record too: `atago record --pty -- <command>` runs it in a real terminal, lets you drive one session by hand, and writes a `pty:` step that replays your keystrokes as expect/send pairs (POSIX-only; password prompts become `${env:...}` placeholders, never literals):
+
+```shell
+$ atago record --pty --out wizard.atago.yaml -- mytool init
+```
+
 Prefer a blank template? `atago init` scaffolds one. Either way, the shape is always the same: declare a command, run it, assert on what it produced.
 
 ### 1. Check exit code, stdout, and stderr

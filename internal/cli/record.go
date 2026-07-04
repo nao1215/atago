@@ -30,13 +30,19 @@ func recordCmd(args []string, stdout, stderr io.Writer) int {
 	force := fs.Bool("force", false, "overwrite --out if it already exists")
 	shell := fs.Bool("shell", false, "record the command line verbatim with shell: true")
 	snap := fs.Bool("snapshot", false, "assert stdout against a snapshot golden (requires --out; the golden is written next to it)")
+	ptyMode := fs.Bool("pty", false, "record an interactive pty session and generate an expect/send spec (POSIX-only)")
 	fs.Usage = func() {
 		fmt.Fprint(stderr, `Usage: atago record [--out FILE] [--force] [--shell] [--snapshot] -- <command> [args...]
+       atago record --pty [--out FILE] [--force] [--shell] -- <command> [args...]
 
 Runs the command once in a scratch directory and prints a spec skeleton
 derived from what it observed: exit code, first stdout line, empty stderr,
-and created files. Interactive (pty) and HTTP recording are non-goals for
-now — write those steps by hand.
+and created files.
+
+With --pty, runs the command in a real pseudo-terminal wired to your
+terminal, lets you drive one interactive session by hand, and generates a
+spec whose pty: step replays it as expect/send pairs (POSIX-only). HTTP
+recording is a non-goal for now — write those steps by hand.
 `)
 		fs.PrintDefaults()
 	}
@@ -54,6 +60,14 @@ now — write those steps by hand.
 	if *snap && *out == "" {
 		fmt.Fprintln(stderr, "atago record: --snapshot needs --out (the golden is written next to the spec)")
 		return ExitConfig
+	}
+	if *ptyMode && *snap {
+		// A hand-driven screen golden is too brittle to auto-record in v1.
+		fmt.Fprintln(stderr, "atago record: --snapshot cannot be combined with --pty")
+		return ExitConfig
+	}
+	if *ptyMode {
+		return recordPTY(cmdArgs, *shell, *out, *force, stdout, stderr)
 	}
 
 	// Preserve argv boundaries: the runner (and later the generated spec)
@@ -137,6 +151,60 @@ now — write those steps by hand.
 		return ExitExec
 	}
 	fmt.Fprintf(stderr, "wrote %s\n", *out)
+	return ExitOK
+}
+
+// recordPTY implements `atago record --pty` (#69): run the command in a real
+// pseudo-terminal wired to the developer's own terminal, let them drive one
+// interactive session by hand, and generate a spec whose pty: step replays it
+// as expect/send pairs. POSIX-only; Windows returns a clear error.
+func recordPTY(cmdArgs []string, shell bool, out string, force bool, stdout, stderr io.Writer) int {
+	command := shellJoin(cmdArgs)
+	if shell {
+		command = strings.Join(cmdArgs, " ")
+	}
+
+	fmt.Fprintln(stderr, "recording pty session — drive it by hand; it ends when the program exits")
+	rec, err := record.CapturePTY(command, shell, os.Stdin, os.Stdout)
+	if err != nil {
+		fmt.Fprintf(stderr, "atago record: %v\n", err)
+		return ExitExec
+	}
+
+	opts := record.Options{SuiteName: suiteNameFor(cmdArgs[0])}
+	generated, err := record.GeneratePTY(rec, opts)
+	if err != nil {
+		fmt.Fprintf(stderr, "atago record: %v\n", err)
+		return ExitInternal
+	}
+
+	sends := 0
+	for _, seg := range rec.Segments {
+		if seg.Input != nil {
+			sends++
+		}
+	}
+	fmt.Fprintf(stderr, "recorded: pty session, exit %d, %d send(s)\n", rec.ExitCode, sends)
+
+	if out == "" {
+		fmt.Fprint(stdout, string(generated))
+		return ExitOK
+	}
+	if _, err := os.Stat(out); err == nil && !force {
+		fmt.Fprintf(stderr, "atago record: %q already exists (use --force to overwrite)\n", out)
+		return ExitConfig
+	}
+	if dir := filepath.Dir(out); dir != "." {
+		if err := os.MkdirAll(dir, 0o750); err != nil {
+			fmt.Fprintf(stderr, "atago record: %v\n", err)
+			return ExitExec
+		}
+	}
+	if err := os.WriteFile(out, generated, 0o644); err != nil { //nolint:gosec // a spec file the user asked for
+		fmt.Fprintf(stderr, "atago record: %v\n", err)
+		return ExitExec
+	}
+	fmt.Fprintf(stderr, "wrote %s\n", out)
 	return ExitOK
 }
 

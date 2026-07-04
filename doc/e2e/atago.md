@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-54 suites · 192 scenarios
+54 suites · 193 scenarios
 ## Contents
 - [atago self-hosting / variable expansion in assertion matcher values](#atago-self-hosting--variable-expansion-in-assertion-matcher-values) — 3 scenarios
   - [stdout.equals expands ${workdir}](#scenario-stdoutequals-expands-workdir)
@@ -156,7 +156,7 @@
   - [screen asserts see the final frame where the transcript sees history](#scenario-screen-asserts-see-the-final-frame-where-the-transcript-sees-history)
   - [a screen snapshot round-trips through update and compare](#scenario-a-screen-snapshot-round-trips-through-update-and-compare)
   - [a screen assert without a pty step is a load-time error](#scenario-a-screen-assert-without-a-pty-step-is-a-load-time-error)
-- [atago self-hosting / record (spec skeleton from an observed run)](#atago-self-hosting--record-spec-skeleton-from-an-observed-run) — 7 scenarios
+- [atago self-hosting / record (spec skeleton from an observed run)](#atago-self-hosting--record-spec-skeleton-from-an-observed-run) — 8 scenarios
   - [record then run round-trips green](#scenario-record-then-run-round-trips-green)
   - [refusing to overwrite without --force](#scenario-refusing-to-overwrite-without---force)
   - [created files become exists asserts (shell mode)](#scenario-created-files-become-exists-asserts-shell-mode)
@@ -164,6 +164,7 @@
   - [no command is a usage error](#scenario-no-command-is-a-usage-error)
   - [argv boundaries survive spaced arguments](#scenario-argv-boundaries-survive-spaced-arguments)
   - [a shell metacharacter argument stays one token](#scenario-a-shell-metacharacter-argument-stays-one-token)
+  - [record --pty records a live session and the generated spec replays green](#scenario-record---pty-records-a-live-session-and-the-generated-spec-replays-green)
 - [atago self-hosting / reports](#atago-self-hosting--reports) — 5 scenarios
   - [JUnit report is XML with a testsuite and testcase](#scenario-junit-report-is-xml-with-a-testsuite-and-testcase)
   - [GitHub Actions annotations are emitted on failure](#scenario-github-actions-annotations-are-emitted-on-failure)
@@ -2885,6 +2886,18 @@ ${atago} run meta.atago.yaml
 - after `${atago} run meta.atago.yaml`:
   - exit code is `0`
   - stdout contains `1 passed`
+### Scenario: record --pty records a live session and the generated spec replays green
+_skipped on windows_
+#### When
+```shell
+# interactive (pty): ${atago} record --pty --out generated.atago.yaml -- sh -c 'printf PROMPT; read n; echo hi-$n'
+${atago} run generated.atago.yaml
+```
+#### Then
+- exit code is `0`
+- file `generated.atago.yaml` contains `- pty:`, `- send:`
+- exit code is `0`
+- stdout contains `1 passed`
 ## atago self-hosting / reports
 Source: `test/e2e/atago/reports.atago.yaml`
 ### Scenario: JUnit report is XML with a testsuite and testcase
