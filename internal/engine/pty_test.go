@@ -185,6 +185,122 @@ scenarios:
 	}
 }
 
+// TestEngine_PTY_UnresolvedSendVarErrors: a send referencing a ${name} nothing
+// defines is an explained step error before any I/O, not the literal reference
+// typed into the program (#78) — mirroring the run.command guard so a typo'd
+// store name fails at the mistake, not garbled downstream.
+func TestEngine_PTY_UnresolvedSendVarErrors(t *testing.T) {
+	skipOnWindows(t)
+	t.Parallel()
+	res := runSpec(t, `
+version: "1"
+suite:
+  name: v
+scenarios:
+  - name: typo in a send variable
+    steps:
+      - pty:
+          command: cat
+          timeout: 10s
+          session:
+            - send: "${no_such_var}\n"
+`)
+	if res.Status != StatusError {
+		t.Fatalf("status = %s, want error: %+v", res.Status, res.Scenarios)
+	}
+	msg := res.Scenarios[0].Steps[0].ErrMsg
+	if !strings.Contains(msg, "${no_such_var}") || !strings.Contains(msg, "$${no_such_var}") {
+		t.Errorf("error should name the reference and the $${...} literal escape, got %q", msg)
+	}
+}
+
+// TestEngine_PTY_UnresolvedEnvVarErrors: an unset ${env:NAME} in a send fails
+// the same way — a forgotten `env:` wiring must not feed a placeholder to a
+// password prompt (#78).
+func TestEngine_PTY_UnresolvedEnvVarErrors(t *testing.T) {
+	skipOnWindows(t)
+	t.Parallel()
+	res := runSpec(t, `
+version: "1"
+suite:
+  name: v
+scenarios:
+  - name: unset env in a send
+    steps:
+      - pty:
+          command: cat
+          timeout: 10s
+          session:
+            - send: "${env:ATAGO_SURELY_UNSET_78}\n"
+`)
+	if res.Status != StatusError {
+		t.Fatalf("status = %s, want error: %+v", res.Status, res.Scenarios)
+	}
+	msg := res.Scenarios[0].Steps[0].ErrMsg
+	if !strings.Contains(msg, "ATAGO_SURELY_UNSET_78") {
+		t.Errorf("error should name the env variable, got %q", msg)
+	}
+}
+
+// TestEngine_PTY_UnresolvedExpectVarErrors: the guard covers expect patterns
+// too — an unresolved reference in an expect would silently match the literal
+// text and pass, so it must fail identically (#78).
+func TestEngine_PTY_UnresolvedExpectVarErrors(t *testing.T) {
+	skipOnWindows(t)
+	t.Parallel()
+	res := runSpec(t, `
+version: "1"
+suite:
+  name: v
+scenarios:
+  - name: typo in an expect variable
+    steps:
+      - pty:
+          command: cat
+          timeout: 10s
+          session:
+            - send: "hi\n"
+            - expect: "${no_such_var}"
+`)
+	if res.Status != StatusError {
+		t.Fatalf("status = %s, want error: %+v", res.Status, res.Scenarios)
+	}
+	msg := res.Scenarios[0].Steps[0].ErrMsg
+	if !strings.Contains(msg, "${no_such_var}") {
+		t.Errorf("error should name the reference, got %q", msg)
+	}
+}
+
+// TestEngine_PTY_EscapedLiteralSendTypesLiteral: a $${...} escaped reference in
+// a send still types the literal ${...} into the program (this is how recorded
+// sessions carry literal `${`), so the guard must not touch it (#78).
+func TestEngine_PTY_EscapedLiteralSendTypesLiteral(t *testing.T) {
+	skipOnWindows(t)
+	t.Parallel()
+	res := runSpec(t, `
+version: "1"
+suite:
+  name: v
+scenarios:
+  - name: escaped literal is typed verbatim
+    steps:
+      - pty:
+          command: cat
+          timeout: 10s
+          session:
+            - send: "$${literal}\n"
+            - expect: '\$\{literal\}'
+            - send: ""
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "${literal}"
+`)
+	if res.Status != StatusPassed {
+		t.Fatalf("status = %s, want passed: %+v", res.Status, res.Scenarios[0].Steps)
+	}
+}
+
 // TestEngine_PTY_NamedKeys proves named keys transmit their documented xterm
 // bytes (#26): `cat -v` renders the down arrow it received as ^[[B, ctrl-d
 // ends the stream, and a trap-based shell observes ctrl-c as SIGINT.
