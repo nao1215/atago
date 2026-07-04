@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-52 suites · 187 scenarios
+53 suites · 189 scenarios
 ## Contents
 - [atago self-hosting / variable expansion in assertion matcher values](#atago-self-hosting--variable-expansion-in-assertion-matcher-values) — 3 scenarios
   - [stdout.equals expands ${workdir}](#scenario-stdoutequals-expands-workdir)
@@ -177,6 +177,9 @@
   - [a failing assertion exits one and reports the failure](#scenario-a-failing-assertion-exits-one-and-reports-the-failure)
   - [a parse error exits with code two](#scenario-a-parse-error-exits-with-code-two)
   - [JSON report is valid JSON with a passed status](#scenario-json-report-is-valid-json-with-a-passed-status)
+- [atago self-hosting / sandbox_home (isolated per-OS home)](#atago-self-hosting--sandbox_home-isolated-per-os-home) — 2 scenarios
+  - [Unix XDG family — write config, read it back, inspect it under the workdir](#scenario-unix-xdg-family--write-config-read-it-back-inspect-it-under-the-workdir)
+  - [Windows APPDATA family — write config, read it back, inspect it under the workdir](#scenario-windows-appdata-family--write-config-read-it-back-inspect-it-under-the-workdir)
 - [atago self-hosting / security](#atago-self-hosting--security) — 3 scenarios
   - [declared secrets are masked in failure output](#scenario-declared-secrets-are-masked-in-failure-output)
   - [a file assertion path may not escape the scenario workdir](#scenario-a-file-assertion-path-may-not-escape-the-scenario-workdir)
@@ -3193,6 +3196,42 @@ ${atago} run --report json ok.atago.yaml
 - stdout at `$.schema_version` equals `1`
 - stdout at `$.suites[0].status` equals `passed`
 - stdout at `$.suites[0].scenarios` has length 1
+## atago self-hosting / sandbox_home (isolated per-OS home)
+Source: `test/e2e/atago/sandbox_home.atago.yaml`
+### Scenario: Unix XDG family — write config, read it back, inspect it under the workdir
+_skipped on windows_
+#### Given
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### When
+```shell
+mkdir -p "$XDG_CONFIG_HOME/mytool" && printf editor=vim > "$XDG_CONFIG_HOME/mytool/config"
+cat "$XDG_CONFIG_HOME/mytool/config"
+```
+#### Then
+- after `mkdir -p "$XDG_CONFIG_HOME/mytool" && printf editor=vim > "$XDG_CONFIG_HOME/mytool/config"`:
+  - exit code is `0`
+- after `cat "$XDG_CONFIG_HOME/mytool/config"`:
+  - exit code is `0`
+  - stdout equals an exact value
+  - file `.atago-home/.config/mytool/config` contains `editor=vim`
+### Scenario: Windows APPDATA family — write config, read it back, inspect it under the workdir
+_only on windows_
+#### Given
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### When
+```shell
+mkdir "%APPDATA%\mytool" & echo editor=vim>"%APPDATA%\mytool\config.txt"
+type "%APPDATA%\mytool\config.txt"
+```
+#### Then
+- after `mkdir "%APPDATA%\mytool" & echo editor=vim>"%APPDATA%\mytool\config.txt"`:
+  - exit code is `0`
+- after `type "%APPDATA%\mytool\config.txt"`:
+  - exit code is `0`
+  - stdout contains `editor=vim`
+  - file `.atago-home/AppData/Roaming/mytool/config.txt` contains `editor=vim`
 ## atago self-hosting / security
 Source: `test/e2e/atago/security.atago.yaml`
 ### Scenario: declared secrets are masked in failure output

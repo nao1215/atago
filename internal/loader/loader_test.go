@@ -88,6 +88,58 @@ scenarios:
 	}
 }
 
+// TestLoadBytes_SandboxHome proves sandbox_home is accepted on run, pty, and
+// defaults.run, decodes to the pointer, and is strict-rejected on a service (#71).
+func TestLoadBytes_SandboxHome(t *testing.T) {
+	t.Parallel()
+	src := `
+version: "1"
+suite:
+  name: sample
+defaults:
+  run:
+    sandbox_home: true
+scenarios:
+  - name: ok
+    steps:
+      - run:
+          command: echo hi
+      - pty:
+          command: echo hi
+          sandbox_home: true
+`
+	s, err := LoadBytes("sample.atago.yaml", []byte(src))
+	if err != nil {
+		t.Fatalf("LoadBytes() error = %v", err)
+	}
+	run := s.Scenarios[0].Steps[0].Run
+	if !run.SandboxHomeEnabled() {
+		t.Errorf("defaults.run.sandbox_home did not layer onto the run step: %+v", run.SandboxHome)
+	}
+	pty := s.Scenarios[0].Steps[1].PTY
+	if !pty.SandboxHomeEnabled() {
+		t.Errorf("pty.sandbox_home not decoded: %+v", pty.SandboxHome)
+	}
+
+	// A service has no sandbox_home key: strict decode must reject it.
+	bad := `
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: ok
+    services:
+      - name: peer
+        command: sleep 1
+        sandbox_home: true
+    steps:
+      - run: {command: echo hi}
+`
+	if _, err := LoadBytes("sample.atago.yaml", []byte(bad)); err == nil {
+		t.Error("sandbox_home on a service should be strict-rejected, got nil error")
+	}
+}
+
 func TestLoadBytes_Errors(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

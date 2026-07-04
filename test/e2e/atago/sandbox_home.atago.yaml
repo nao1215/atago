@@ -1,0 +1,64 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / sandbox_home (isolated per-OS home)
+
+# Exercises #71: `sandbox_home: true` points the child's home and per-OS
+# config/cache/data/state locations at a fresh ${workdir}/.atago-home, so a CLI
+# that reads or writes ~/.config (or %APPDATA% on Windows) runs hermetically
+# with one key. The isolated home is created once and reused across steps, and
+# its path is deterministic — so an ordinary file: assert can inspect what the
+# CLI wrote there without any new builtin variable.
+#
+# The variable families differ per OS, so the write/read commands are OS-gated:
+# the Unix scenario drives $XDG_CONFIG_HOME, the Windows scenario drives
+# %APPDATA%. Both prove the same contract.
+scenarios:
+  - name: Unix XDG family — write config, read it back, inspect it under the workdir
+    skip:
+      os: windows
+    steps:
+      # Step 1 writes a config file under the sandboxed XDG config home.
+      - run:
+          shell: true
+          sandbox_home: true
+          command: 'mkdir -p "$XDG_CONFIG_HOME/mytool" && printf editor=vim > "$XDG_CONFIG_HOME/mytool/config"'
+      - assert:
+          exit_code: 0
+      # Step 2 reads it back — the isolated home is reused across steps.
+      - run:
+          shell: true
+          sandbox_home: true
+          command: 'cat "$XDG_CONFIG_HOME/mytool/config"'
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: editor=vim
+      # The file lives at the deterministic path under ${workdir}.
+      - assert:
+          file:
+            path: .atago-home/.config/mytool/config
+            contains: editor=vim
+
+  - name: Windows APPDATA family — write config, read it back, inspect it under the workdir
+    only:
+      os: windows
+    steps:
+      - run:
+          shell: true
+          sandbox_home: true
+          command: 'mkdir "%APPDATA%\mytool" & echo editor=vim>"%APPDATA%\mytool\config.txt"'
+      - assert:
+          exit_code: 0
+      - run:
+          shell: true
+          sandbox_home: true
+          command: 'type "%APPDATA%\mytool\config.txt"'
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: editor=vim
+      - assert:
+          file:
+            path: .atago-home/AppData/Roaming/mytool/config.txt
+            contains: editor=vim

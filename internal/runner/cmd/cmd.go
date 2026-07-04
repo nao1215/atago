@@ -54,7 +54,17 @@ func (r *Runner) Run(ctx context.Context, run *spec.Run, workdir string) (*runne
 		ConfigureShell(cmd, run.Command)
 	}
 	cmd.Dir = resolveDir(workdir, run.Cwd)
-	cmd.Env = buildEnv(run.Env, run.ClearEnvEnabled(), run.PassEnv)
+	// sandbox_home (#71) redirects the child's home and per-OS config/cache dirs
+	// at ${workdir}/.atago-home. The overlay sits between pass_env and the step's
+	// own env in precedence and composes with clear_env.
+	var sandbox map[string]string
+	if run.SandboxHomeEnabled() {
+		sandbox, err = EnsureSandboxHome(workdir)
+		if err != nil {
+			return nil, err
+		}
+	}
+	cmd.Env = buildEnv(run.Env, run.ClearEnvEnabled(), run.PassEnv, sandbox)
 	// On cancellation (Ctrl-C / suite cancel / step timeout), kill the whole
 	// process group, not just the shell we spawned: `sh -c "sleep 30"` orphans its
 	// child, and that orphan keeps the stdout/stderr pipe open, so cmd.Wait would
@@ -294,9 +304,11 @@ func ResolveDir(workdir, cwd string) string { return resolveDir(workdir, cwd) }
 // BuildEnv composes a child process environment: it inherits the parent
 // environment (or starts empty when clearEnv is set, re-admitting only the
 // passEnv allowlist) and applies per-command overrides on top (shared with the
-// service and pty runners) (#16).
-func BuildEnv(overrides map[string]string, clearEnv bool, passEnv []string) []string {
-	return buildEnv(overrides, clearEnv, passEnv)
+// service and pty runners) (#16). sandbox is the optional sandbox_home overlay
+// (#71), layered above pass_env/host but below the step's own overrides; pass
+// nil when no isolated home is requested.
+func BuildEnv(overrides map[string]string, clearEnv bool, passEnv []string, sandbox map[string]string) []string {
+	return buildEnv(overrides, clearEnv, passEnv, sandbox)
 }
 
 // resolveDir returns the working directory for the command. cwd is interpreted
@@ -316,23 +328,27 @@ func resolveDir(workdir, cwd string) string {
 var windowsCriticalEnv = []string{"SystemRoot", "SystemDrive", "TEMP", "TMP", "PATHEXT"}
 
 // buildEnv composes the child environment. Without clearEnv it inherits the
-// parent environment and appends per-step overrides (a nil return means
-// "inherit os.Environ()", exec's default). With clearEnv it starts empty:
-// only the passEnv allowlist (plus the Windows system-critical set) is copied
-// from the host, and overrides are layered on top so the existing
-// suite → scenario → step precedence is preserved (#16).
-func buildEnv(overrides map[string]string, clearEnv bool, passEnv []string) []string {
+// parent environment and appends the sandbox_home overlay and per-step
+// overrides (a nil return means "inherit os.Environ()", exec's default). With
+// clearEnv it starts empty: only the passEnv allowlist (plus the Windows
+// system-critical set) is copied from the host, then the sandbox overlay, then
+// overrides — so the precedence step env > sandbox > pass_env > host holds
+// (os/exec keeps the last value for a duplicated key) (#16, #71).
+func buildEnv(overrides map[string]string, clearEnv bool, passEnv []string, sandbox map[string]string) []string {
 	if !clearEnv {
-		if len(overrides) == 0 {
+		if len(overrides) == 0 && len(sandbox) == 0 {
 			return nil // nil → inherit os.Environ() (exec default)
 		}
 		env := os.Environ()
+		for k, v := range sandbox {
+			env = append(env, k+"="+v)
+		}
 		for k, v := range overrides {
 			env = append(env, k+"="+v)
 		}
 		return env
 	}
-	env := make([]string, 0, len(passEnv)+len(overrides)+len(windowsCriticalEnv))
+	env := make([]string, 0, len(passEnv)+len(sandbox)+len(overrides)+len(windowsCriticalEnv))
 	if runtime.GOOS == "windows" {
 		for _, name := range windowsCriticalEnv {
 			if v, ok := lookupHostEnv(name); ok {
@@ -344,6 +360,12 @@ func buildEnv(overrides map[string]string, clearEnv bool, passEnv []string) []st
 		if v, ok := lookupHostEnv(name); ok {
 			env = append(env, name+"="+v)
 		}
+	}
+	// The sandbox overlay is injected after the environment is cleared and after
+	// pass_env, so `pass_env: [HOME]` cannot leak the host home past an enabled
+	// sandbox (#71).
+	for k, v := range sandbox {
+		env = append(env, k+"="+v)
 	}
 	for k, v := range overrides {
 		env = append(env, k+"="+v)

@@ -143,7 +143,7 @@ func envMap(env []string) map[string]string {
 // empty environment: a canary host var must not reach the child (#16).
 func TestBuildEnv_ClearEnvDropsHostEnv(t *testing.T) {
 	t.Setenv("ATAGO_TEST_CANARY", "leaked")
-	env := BuildEnv(nil, true, nil)
+	env := BuildEnv(nil, true, nil, nil)
 	if env == nil {
 		t.Fatal("BuildEnv(clear) = nil, want a non-nil slice (nil inherits os.Environ)")
 	}
@@ -157,7 +157,7 @@ func TestBuildEnv_ClearEnvDropsHostEnv(t *testing.T) {
 func TestBuildEnv_PassEnvCopiesListedVars(t *testing.T) {
 	t.Setenv("ATAGO_TEST_KEEP", "kept")
 	t.Setenv("ATAGO_TEST_DROP", "dropped")
-	env := envMap(BuildEnv(nil, true, []string{"ATAGO_TEST_KEEP", "ATAGO_TEST_UNSET"}))
+	env := envMap(BuildEnv(nil, true, []string{"ATAGO_TEST_KEEP", "ATAGO_TEST_UNSET"}, nil))
 	if got := env["ATAGO_TEST_KEEP"]; got != "kept" {
 		t.Errorf("passed var = %q, want kept", got)
 	}
@@ -173,7 +173,7 @@ func TestBuildEnv_PassEnvCopiesListedVars(t *testing.T) {
 // passed-through host vars, preserving the existing layering order (#16).
 func TestBuildEnv_OverridesLayerOnTop(t *testing.T) {
 	t.Setenv("ATAGO_TEST_LAYER", "host")
-	env := envMap(BuildEnv(map[string]string{"ATAGO_TEST_LAYER": "step"}, true, []string{"ATAGO_TEST_LAYER"}))
+	env := envMap(BuildEnv(map[string]string{"ATAGO_TEST_LAYER": "step"}, true, []string{"ATAGO_TEST_LAYER"}, nil))
 	if got := env["ATAGO_TEST_LAYER"]; got != "step" {
 		t.Errorf("override = %q, want step (explicit env wins over pass_env)", got)
 	}
@@ -182,11 +182,11 @@ func TestBuildEnv_OverridesLayerOnTop(t *testing.T) {
 // TestBuildEnv_NoClearKeepsInheritance proves the pre-#16 behavior is
 // untouched when clear_env is off.
 func TestBuildEnv_NoClearKeepsInheritance(t *testing.T) {
-	if env := BuildEnv(nil, false, nil); env != nil {
+	if env := BuildEnv(nil, false, nil, nil); env != nil {
 		t.Errorf("BuildEnv(no overrides) = %v, want nil (inherit os.Environ)", env)
 	}
 	t.Setenv("ATAGO_TEST_INHERIT", "here")
-	env := envMap(BuildEnv(map[string]string{"EXTRA": "1"}, false, nil))
+	env := envMap(BuildEnv(map[string]string{"EXTRA": "1"}, false, nil, nil))
 	if got := env["ATAGO_TEST_INHERIT"]; got != "here" {
 		t.Errorf("inherited var = %q, want here", got)
 	}
@@ -201,7 +201,7 @@ func TestBuildEnv_WindowsKeepsSystemCriticalVars(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		t.Skip("windows-only behavior")
 	}
-	env := envMap(BuildEnv(nil, true, nil))
+	env := envMap(BuildEnv(nil, true, nil, nil))
 	for _, name := range []string{"SystemRoot", "SystemDrive", "PATHEXT"} {
 		if _, ok := env[name]; !ok {
 			t.Errorf("system-critical var %s missing from cleared env", name)

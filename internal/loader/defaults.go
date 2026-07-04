@@ -86,6 +86,9 @@ func mergeRunDefaults(def, r *spec.Run) {
 	if r.ClearEnv == nil {
 		r.ClearEnv = def.ClearEnv
 	}
+	if r.SandboxHome == nil {
+		r.SandboxHome = def.SandboxHome
+	}
 	// pass_env is meaningless without clear_env, so a step that authored
 	// `clear_env: false` does not inherit the default allowlist (#16).
 	if r.PassEnv == nil && r.ClearEnvEnabled() {

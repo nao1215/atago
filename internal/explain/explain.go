@@ -144,6 +144,9 @@ func explainScenario(b *strings.Builder, sc *spec.Scenario) {
 					}
 					desc += note + ")"
 				}
+				if step.PTY.SandboxHomeEnabled() {
+					desc += "  (isolated home)"
+				}
 				commands = append(commands, desc)
 				collectVars(vars, step.PTY.Command, step.PTY.Cwd)
 				for _, v := range step.PTY.Env {
@@ -339,6 +342,9 @@ func describeRun(r *spec.Run) string {
 			note += " (passes: " + strings.Join(r.PassEnv, ", ") + ")"
 		}
 		notes = append(notes, note)
+	}
+	if r.SandboxHomeEnabled() {
+		notes = append(notes, "isolated home")
 	}
 	switch {
 	case r.Stdin.File != "":

@@ -213,14 +213,24 @@ func givenBullets(sc *spec.Scenario, expand func(string) string) []string {
 			if step.Run.ClearEnvEnabled() {
 				out = append(out, clearedEnvBullet(step.Run.PassEnv))
 			}
+			if step.Run.SandboxHomeEnabled() {
+				out = append(out, sandboxHomeBullet)
+			}
 		case spec.StepPTY:
 			if step.PTY.ClearEnvEnabled() {
 				out = append(out, clearedEnvBullet(step.PTY.PassEnv))
+			}
+			if step.PTY.SandboxHomeEnabled() {
+				out = append(out, sandboxHomeBullet)
 			}
 		}
 	}
 	return out
 }
+
+// sandboxHomeBullet is the Given bullet for a step that runs with an isolated
+// home (sandbox_home, #71).
+const sandboxHomeBullet = "The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected)."
 
 // clearedEnvBullet renders the hermetic-environment Given bullet shared by run
 // and pty steps (#16).
