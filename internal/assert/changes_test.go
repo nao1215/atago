@@ -79,6 +79,58 @@ func TestCheckChanges(t *testing.T) {
 			delta:  fsdelta.Delta{Deleted: []string{"tmp/a", "tmp/b"}},
 			wantOK: true,
 		},
+		{
+			name:   "doublestar matches at any depth",
+			assert: &spec.ChangesAssert{Created: list("site/**")},
+			delta:  fsdelta.Delta{Created: []string{"site/index.html", "site/a/b/c.txt"}},
+			wantOK: true,
+		},
+		{
+			name:   "doublestar matches at depth 1",
+			assert: &spec.ChangesAssert{Created: list("site/**")},
+			delta:  fsdelta.Delta{Created: []string{"site/index.html"}},
+			wantOK: true,
+		},
+		{
+			name:   "doublestar composes with a suffix pattern",
+			assert: &spec.ChangesAssert{Created: list("dist/**/*.css")},
+			delta:  fsdelta.Delta{Created: []string{"dist/app.css", "dist/a/b/theme.css"}},
+			wantOK: true,
+		},
+		{
+			name:   "doublestar composition rejects the wrong suffix",
+			assert: &spec.ChangesAssert{Created: list("dist/**/*.css")},
+			delta:  fsdelta.Delta{Created: []string{"dist/app.js"}},
+			wantOK: false, // .js is not covered, and the entry itself matches nothing
+		},
+		{
+			name:   "doublestar does not spill onto a sibling prefix",
+			assert: &spec.ChangesAssert{Created: list("site/**")},
+			delta:  fsdelta.Delta{Created: []string{"sitex/y.txt"}},
+			wantOK: false, // site/** must not match sitex/...
+		},
+		{
+			// Pinned semantics: `site/**` matches the bare `site` path itself
+			// (doublestar's native behavior), not only paths strictly under it.
+			name:   "doublestar matches the bare prefix path itself",
+			assert: &spec.ChangesAssert{Created: list("site/**")},
+			delta:  fsdelta.Delta{Created: []string{"site"}},
+			wantOK: true,
+		},
+		{
+			name:   "backslash escapes a literal metacharacter",
+			assert: &spec.ChangesAssert{Created: list(`a\[1\].txt`)},
+			delta:  fsdelta.Delta{Created: []string{"a[1].txt"}},
+			wantOK: true,
+		},
+		{
+			// Documented: an UNescaped `[` is still a character class, so
+			// `a[1].txt` matches `a1.txt` (and not the literal `a[1].txt`).
+			name:   "unescaped bracket stays a character class",
+			assert: &spec.ChangesAssert{Created: list("a[1].txt")},
+			delta:  fsdelta.Delta{Created: []string{"a1.txt"}},
+			wantOK: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

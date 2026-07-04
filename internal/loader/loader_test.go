@@ -159,6 +159,8 @@ scenarios:
             created:
               - out.txt
               - "site/*.html"
+              - "dist/**"
+              - "assets/**/*.css"
             modified: []
             deleted: []
 `
@@ -167,7 +169,7 @@ scenarios:
 		t.Fatalf("valid changes spec should load: %v", err)
 	}
 	ch := s.Scenarios[0].Steps[1].Assert.Changes
-	if ch == nil || ch.Created == nil || len(*ch.Created) != 2 {
+	if ch == nil || ch.Created == nil || len(*ch.Created) != 4 {
 		t.Fatalf("changes.created not decoded: %+v", ch)
 	}
 	if ch.Modified == nil || len(*ch.Modified) != 0 {
@@ -203,6 +205,11 @@ scenarios:
 			name:    "empty changes block",
 			src:     "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n      - assert:\n          changes: {}",
 			wantMsg: "set at least one of created/modified/deleted",
+		},
+		{
+			name:    "malformed glob entry",
+			src:     "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n      - assert:\n          changes:\n            created: [\"site/[unclosed\"]",
+			wantMsg: "is not a valid glob",
 		},
 	}
 	for _, tt := range bad {

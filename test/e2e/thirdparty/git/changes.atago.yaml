@@ -41,3 +41,24 @@ scenarios:
               - repo/.git/objects/*/*
             modified: []
             deleted: []
+
+  - name: git init's whole .git tree is pinned by one recursive glob (POSIX)
+    skip:
+      os: windows
+    steps:
+      # The real-world case that motivated #76: `git init` lays down a .git tree
+      # of arbitrary, git-version-dependent depth (hooks/, refs/heads/, info/,
+      # ...). A single `repo/.git/**` doublestar covers the whole subtree at any
+      # depth — the v1 vocabulary needed one glob per directory level and still
+      # could not say "and nothing deeper". modified/deleted stay empty, so the
+      # exhaustive-both-ways contract still proves init touched only the .git
+      # tree and created nothing outside it.
+      - run:
+          command: git init -q repo
+      - assert:
+          exit_code: 0
+          changes:
+            created:
+              - "repo/.git/**"
+            modified: []
+            deleted: []
