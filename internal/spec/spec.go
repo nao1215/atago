@@ -525,6 +525,13 @@ type Run struct {
 	// (#16). Only meaningful with ClearEnv (the loader rejects it otherwise);
 	// unset host variables are skipped, not an error.
 	PassEnv []string `yaml:"pass_env,omitempty"`
+	// SandboxHome points the child's home directory and per-OS config/cache/
+	// data/state locations at a fresh `${workdir}/.atago-home` so a CLI that
+	// reads or writes ~/.config, ~/.cache, or %APPDATA% runs hermetically. The
+	// sandbox variables sit between pass_env and the step's own env in
+	// precedence, and compose with clear_env (injected after the clear). A
+	// pointer so an authored `sandbox_home: false` beats a defaulted true.
+	SandboxHome *bool `yaml:"sandbox_home,omitempty"`
 	// Stdin feeds the command's standard input: a scalar string (inline
 	// text), {file: path} (workdir-relative, expanded and confined), or
 	// {base64: data} for binary bytes (#18).
@@ -559,6 +566,12 @@ func (s *Service) ClearEnvEnabled() bool { return s.ClearEnv != nil && *s.ClearE
 
 // ClearEnvEnabled reports whether the pty step opts into a cleared environment (#16).
 func (p *PTY) ClearEnvEnabled() bool { return p.ClearEnv != nil && *p.ClearEnv }
+
+// SandboxHomeEnabled reports whether the run step opts into an isolated home (#71).
+func (r *Run) SandboxHomeEnabled() bool { return r.SandboxHome != nil && *r.SandboxHome }
+
+// SandboxHomeEnabled reports whether the pty step opts into an isolated home (#71).
+func (p *PTY) SandboxHomeEnabled() bool { return p.SandboxHome != nil && *p.SandboxHome }
 
 // Retry re-runs a command until Until passes or the attempt budget is exhausted.
 // The last attempt's result is what subsequent steps observe.
@@ -596,6 +609,9 @@ type PTY struct {
 	// PassEnv copies the listed host variables into the cleared environment
 	// (#16). Only meaningful with ClearEnv; unset host variables are skipped.
 	PassEnv []string `yaml:"pass_env,omitempty"`
+	// SandboxHome isolates the pty child's home and per-OS config/cache/data/
+	// state directories under `${workdir}/.atago-home`, mirroring run.sandbox_home.
+	SandboxHome *bool `yaml:"sandbox_home,omitempty"`
 	// Session is the ordered expect/send script. Each entry sets exactly one
 	// of Expect (wait until the accumulated transcript matches the regexp) or
 	// Send (write the string to the terminal; an empty send transmits EOF,

@@ -122,6 +122,7 @@ jobs:
           ./test/e2e/atago/dir_tree.atago.yaml
           ./test/e2e/atago/record.atago.yaml
           ./test/e2e/atago/duration.atago.yaml
+          ./test/e2e/atago/sandbox_home.atago.yaml
           ./test/e2e/atago/grpc.atago.yaml
           ./test/e2e/atago/ssh.atago.yaml
           ./test/e2e/atago/cdp.atago.yaml

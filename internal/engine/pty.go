@@ -44,7 +44,16 @@ func (e *Engine) runPTY(ctx context.Context, p *spec.PTY, st *store.Store, scena
 			c.Session[i] = na
 		}
 	}
-	return ptyrun.Run(ctx, &c, workdir, runnercmd.BuildEnv(c.Env, c.ClearEnvEnabled(), c.PassEnv))
+	// sandbox_home (#71) redirects the pty child's home under ${workdir}/.atago-home.
+	var sandbox map[string]string
+	if c.SandboxHomeEnabled() {
+		s, err := runnercmd.EnsureSandboxHome(workdir)
+		if err != nil {
+			return nil, nil, err
+		}
+		sandbox = s
+	}
+	return ptyrun.Run(ctx, &c, workdir, runnercmd.BuildEnv(c.Env, c.ClearEnvEnabled(), c.PassEnv, sandbox))
 }
 
 // ptyExpectCheck converts a never-matched session expect into the structured

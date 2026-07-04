@@ -73,3 +73,33 @@ scenarios:
           exit_code: 0
           stdout:
             equals: /hermetic/home
+
+  # sandbox_home (#71) does the OS-specific work clear_env leaves to you: it
+  # points HOME and the XDG config/cache/data/state dirs (USERPROFILE/APPDATA on
+  # Windows) at a fresh ${workdir}/.atago-home, so a CLI that reads or writes
+  # ~/.config runs hermetically with one key. The path is deterministic, so an
+  # ordinary file: assert can inspect what the CLI wrote there.
+  - name: sandbox_home isolates the home directory
+    skip:
+      os: windows
+    steps:
+      # Write a config file under the sandboxed home, then read it back in a
+      # second step — the isolated home is created once and reused.
+      - run:
+          shell: true
+          sandbox_home: true
+          command: 'mkdir -p "$XDG_CONFIG_HOME/mytool" && echo dark > "$XDG_CONFIG_HOME/mytool/theme"'
+      - run:
+          shell: true
+          sandbox_home: true
+          command: 'cat "$XDG_CONFIG_HOME/mytool/theme"'
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "dark\n"
+      # The file lives at the deterministic path under ${workdir}, so no new
+      # builtin variable is needed to inspect it.
+      - assert:
+          file:
+            path: .atago-home/.config/mytool/theme
+            contains: dark

@@ -210,7 +210,7 @@ Every feature has a commented, runnable spec under [examples/](examples/). The e
 | [files_and_fixtures](examples/files_and_fixtures.atago.yaml) | input fixtures (text and base64), `file` and `dir` assertions |
 | [store_and_variables](examples/store_and_variables.atago.yaml) | capturing values into `${name}`, `${workdir}`, `${env:NAME}` host-environment reads, the `$${...}` literal escape |
 | [teardown](examples/teardown.atago.yaml) | cleanup steps that always run — pass or fail — sharing the scenario's variables |
-| [hermetic_env](examples/hermetic_env.atago.yaml) | `clear_env: true` starts commands from an empty environment, `pass_env` re-admits an allowlist of host variables |
+| [hermetic_env](examples/hermetic_env.atago.yaml) | `clear_env: true` starts commands from an empty environment, `pass_env` re-admits an allowlist of host variables, `sandbox_home: true` isolates HOME and per-OS config/cache dirs |
 | [timeouts](examples/timeouts.atago.yaml) | the built-in 60s default step timeout, `suite.timeout`, per-step overrides, and the `timeout: "0"` escape hatch |
 | [stdin](examples/stdin.atago.yaml) | stdin sources: inline text, `stdin: {file: ...}` from a workdir file, and binary input via `stdin: {base64: ...}` |
 | [matrix](examples/matrix.atago.yaml) | one template scenario expanded per parameter row |
