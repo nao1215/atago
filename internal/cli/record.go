@@ -55,7 +55,15 @@ now — write those steps by hand.
 		return ExitConfig
 	}
 
-	command := strings.Join(cmdArgs, " ")
+	// Preserve argv boundaries: the runner (and later the generated spec)
+	// re-tokenizes the command string, so arguments containing spaces or
+	// quotes must be re-quoted or the recorded run diverges from what the
+	// user typed. In --shell mode the raw command line IS the input — the
+	// shell does its own tokenization — so it joins verbatim.
+	command := shellJoin(cmdArgs)
+	if *shell {
+		command = strings.Join(cmdArgs, " ")
+	}
 	workdir, err := os.MkdirTemp("", "atago-record-")
 	if err != nil {
 		fmt.Fprintf(stderr, "atago record: could not create scratch dir: %v\n", err)
@@ -154,6 +162,41 @@ func listFiles(root string) ([]string, error) {
 	}
 	sort.Strings(out)
 	return out, nil
+}
+
+// shellJoin renders argv as one command string that re-tokenizes to the same
+// argv through the cmd runner (go-shellwords on POSIX, native argv splitting
+// on Windows). Only whitespace splits a token, so a token is left verbatim
+// unless it carries whitespace, a quote, or is empty; those are wrapped in
+// DOUBLE quotes — the one quoting both tokenizers accept — with embedded
+// backslashes and double-quotes escaped. A Windows path like C:\tool.exe has
+// no whitespace, so it passes through unquoted (single-quoting it would leave
+// Windows treating the quotes as part of the filename).
+func shellJoin(args []string) string {
+	quoted := make([]string, len(args))
+	for i, a := range args {
+		if !needsQuoting(a) {
+			quoted[i] = a
+			continue
+		}
+		// Escape only embedded double-quotes: a backslash inside double
+		// quotes is a POSIX escape but a literal on Windows, so escaping it
+		// would round-trip on one platform and double up on the other.
+		// Leaving it literal keeps a spaced Windows path (C:\Program
+		// Files\tool.exe) intact on both.
+		quoted[i] = `"` + strings.ReplaceAll(a, `"`, `\"`) + `"`
+	}
+	return strings.Join(quoted, " ")
+}
+
+// needsQuoting reports whether a token would lose its argv boundary when
+// re-tokenized unquoted: the empty string (would vanish) or anything with
+// whitespace or a quote character.
+func needsQuoting(s string) bool {
+	if s == "" {
+		return true
+	}
+	return strings.ContainsAny(s, " \t\n'\"")
 }
 
 // suiteNameFor derives a suite name from the command's base name.

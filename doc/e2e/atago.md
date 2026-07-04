@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-51 suites · 181 scenarios
+51 suites · 182 scenarios
 ## Contents
 - [atago self-hosting / variable expansion in assertion matcher values](#atago-self-hosting--variable-expansion-in-assertion-matcher-values) — 3 scenarios
   - [stdout.equals expands ${workdir}](#scenario-stdoutequals-expands-workdir)
@@ -147,12 +147,13 @@
   - [screen asserts see the final frame where the transcript sees history](#scenario-screen-asserts-see-the-final-frame-where-the-transcript-sees-history)
   - [a screen snapshot round-trips through update and compare](#scenario-a-screen-snapshot-round-trips-through-update-and-compare)
   - [a screen assert without a pty step is a load-time error](#scenario-a-screen-assert-without-a-pty-step-is-a-load-time-error)
-- [atago self-hosting / record (spec skeleton from an observed run)](#atago-self-hosting--record-spec-skeleton-from-an-observed-run) — 5 scenarios
+- [atago self-hosting / record (spec skeleton from an observed run)](#atago-self-hosting--record-spec-skeleton-from-an-observed-run) — 6 scenarios
   - [record then run round-trips green](#scenario-record-then-run-round-trips-green)
   - [refusing to overwrite without --force](#scenario-refusing-to-overwrite-without---force)
   - [created files become exists asserts (shell mode)](#scenario-created-files-become-exists-asserts-shell-mode)
   - [snapshot mode writes a golden the run then matches](#scenario-snapshot-mode-writes-a-golden-the-run-then-matches)
   - [no command is a usage error](#scenario-no-command-is-a-usage-error)
+  - [argv boundaries survive spaced arguments](#scenario-argv-boundaries-survive-spaced-arguments)
 - [atago self-hosting / reports](#atago-self-hosting--reports) — 5 scenarios
   - [JUnit report is XML with a testsuite and testcase](#scenario-junit-report-is-xml-with-a-testsuite-and-testcase)
   - [GitHub Actions annotations are emitted on failure](#scenario-github-actions-annotations-are-emitted-on-failure)
@@ -2682,7 +2683,7 @@ ${atago} run gen.atago.yaml
 #### Then
 - after `${atago} record --shell --out gen.atago.yaml -- 'echo made > out.txt; echo done'`:
   - exit code is `0`
-  - file `gen.atago.yaml` contains `path: out.txt`
+  - file `gen.atago.yaml` contains `path: out.txt`, `exists: true`
   - file `gen.atago.yaml` contains `shell: true`
 - after `${atago} run gen.atago.yaml`:
   - exit code is `0`
@@ -2709,6 +2710,20 @@ ${atago} record
 #### Then
 - exit code is `3`
 - stderr contains `no command given`
+### Scenario: argv boundaries survive spaced arguments
+_skipped on windows_
+#### When
+```shell
+${atago} record --out spaced.atago.yaml -- printf %s 'hello world'
+${atago} run spaced.atago.yaml
+```
+#### Then
+- after `${atago} record --out spaced.atago.yaml -- printf %s 'hello world'`:
+  - exit code is `0`
+  - file `spaced.atago.yaml` contains `contains: hello world`
+- after `${atago} run spaced.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `1 passed`
 ## atago self-hosting / reports
 Source: `test/e2e/atago/reports.atago.yaml`
 ### Scenario: JUnit report is XML with a testsuite and testcase
