@@ -125,3 +125,24 @@ scenarios:
           exit_code: 0
           stdout:
             contains: "1 passed"
+
+  - name: a shell metacharacter argument stays one token
+    skip:
+      os: windows
+    steps:
+      # `foo|bar` is one argv element to the tool, but go-shellwords would
+      # split it on the pipe if it were re-emitted unquoted — record must
+      # quote it so the round-trip run reproduces the same single argument.
+      - run:
+          command: ${atago} record --out meta.atago.yaml -- printf %s "foo|bar"
+      - assert:
+          exit_code: 0
+          file:
+            path: meta.atago.yaml
+            contains: "contains: foo|bar"
+      - run:
+          command: ${atago} run meta.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "1 passed"
