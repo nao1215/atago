@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-1 suite · 5 scenarios
+2 suites · 6 scenarios
 ## Contents
 - [age (modern file encryption)](#age-modern-file-encryption) — 5 scenarios
   - [keygen writes a key and reports the public half](#scenario-keygen-writes-a-key-and-reports-the-public-half)
@@ -8,6 +8,8 @@
   - [armored output is PEM-wrapped](#scenario-armored-output-is-pem-wrapped)
   - [decrypting with the wrong identity fails](#scenario-decrypting-with-the-wrong-identity-fails)
   - [passphrase mode encrypts and decrypts interactively](#scenario-passphrase-mode-encrypts-and-decrypts-interactively)
+- [age + changes (single-artifact generator)](#age--changes-single-artifact-generator) — 1 scenario
+  - [age-keygen writes exactly the key file (HOME untouched)](#scenario-age-keygen-writes-exactly-the-key-file-home-untouched)
 ## age (modern file encryption)
 Source: `test/e2e/thirdparty/age/age.atago.yaml`
 ### Scenario: keygen writes a key and reports the public half
@@ -114,3 +116,14 @@ passphrase protected
 - file `out.txt` contains `passphrase protected`
 #### Generated artifacts
 - `secret.age`
+## age + changes (single-artifact generator)
+Source: `test/e2e/thirdparty/age/changes.atago.yaml`
+### Scenario: age-keygen writes exactly the key file (HOME untouched)
+#### When
+```shell
+age-keygen -o key.txt
+```
+#### Then
+- exit code is `0`
+- the step changed exactly created `key.txt`, modified nothing, deleted nothing
+- file `key.txt` contains `AGE-SECRET-KEY-1`

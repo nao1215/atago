@@ -1,13 +1,35 @@
 # atago Behavior Specs
 ## Summary
-1 suite · 5 scenarios
+2 suites · 6 scenarios
 ## Contents
+- [pandoc + changes (a conversion writes exactly its output)](#pandoc--changes-a-conversion-writes-exactly-its-output) — 1 scenario
+  - [markdown-to-html creates exactly the output file](#scenario-markdown-to-html-creates-exactly-the-output-file)
 - [pandoc (document conversion filter)](#pandoc-document-conversion-filter) — 5 scenarios
   - [markdown converts to HTML and a binary docx](#scenario-markdown-converts-to-html-and-a-binary-docx)
   - [pandoc is a stdin-to-stdout filter](#scenario-pandoc-is-a-stdin-to-stdout-filter)
   - [the JSON AST is a queryable contract](#scenario-the-json-ast-is-a-queryable-contract)
   - [standalone HTML carries the metadata title](#scenario-standalone-html-carries-the-metadata-title)
   - [an unknown output format is rejected](#scenario-an-unknown-output-format-is-rejected)
+## pandoc + changes (a conversion writes exactly its output)
+Source: `test/e2e/thirdparty/pandoc/changes.atago.yaml`
+### Scenario: markdown-to-html creates exactly the output file
+#### Given
+- Fixture file `in.md` is created.
+#### Inputs
+_Fixture `in.md`:_
+```text
+# Title
+
+Some text with *emphasis*.
+```
+#### When
+```shell
+pandoc in.md -o out.html
+```
+#### Then
+- exit code is `0`
+- the step changed exactly created `out.html`, modified nothing, deleted nothing
+- file `out.html` contains `<em>emphasis</em>`
 ## pandoc (document conversion filter)
 Source: `test/e2e/thirdparty/pandoc/pandoc.atago.yaml`
 ### Scenario: markdown converts to HTML and a binary docx

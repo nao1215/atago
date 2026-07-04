@@ -1,0 +1,49 @@
+version: "1"
+
+suite:
+  name: openssl + changes (key and cert generation footprints)
+
+# Companion to openssl.atago.yaml: key/cert generation should write exactly the
+# file named by -out and nothing else. Each `changes:` assert pins one created
+# artifact; the second scenario's baseline includes key.pem (created by the
+# prior step, whose delta is not asserted there). Gate: only where openssl is
+# installed.
+scenarios:
+  - name: genrsa writes exactly the key file
+    only:
+      command: openssl version
+    steps:
+      - run:
+          command: openssl genrsa -out key.pem 2048
+      - assert:
+          exit_code: 0
+          changes:
+            created:
+              - key.pem
+            modified: []
+            deleted: []
+
+  - name: a self-signed cert is the only new file the req step creates
+    only:
+      command: openssl version
+    steps:
+      # key.pem is created by this step; its delta is not asserted.
+      - run:
+          command: openssl genrsa -out key.pem 2048
+      - assert:
+          exit_code: 0
+      # The req step's baseline already contains key.pem, so its only creation
+      # is cert.pem.
+      - run:
+          command: openssl req -new -x509 -key key.pem -out cert.pem -subj /CN=atago-test -days 1
+      - assert:
+          exit_code: 0
+          changes:
+            created:
+              - cert.pem
+            modified: []
+            deleted: []
+      - assert:
+          file:
+            path: cert.pem
+            contains: "BEGIN CERTIFICATE"

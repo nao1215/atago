@@ -62,3 +62,32 @@ scenarios:
           file:
             path: .atago-home/AppData/Roaming/mytool/config.txt
             contains: editor=vim
+
+  - name: cwd anchors the run, but sandbox_home stays at the workdir ROOT (Unix)
+    skip:
+      os: windows
+    steps:
+      # A step can run in a sub-directory via cwd:, but sandbox_home is anchored
+      # to the workdir ROOT, not the step's cwd — so .atago-home is created at
+      # ${workdir}/.atago-home even when the command runs from sub/. This keeps
+      # the isolated home shared and its path deterministic regardless of cwd.
+      - run:
+          shell: true
+          command: mkdir -p sub
+      - run:
+          shell: true
+          cwd: sub
+          sandbox_home: true
+          command: 'mkdir -p "$XDG_CONFIG_HOME/mytool" && printf editor=vim > "$XDG_CONFIG_HOME/mytool/config"'
+      - assert:
+          exit_code: 0
+      # The config lands under the ROOT .atago-home...
+      - assert:
+          file:
+            path: .atago-home/.config/mytool/config
+            contains: editor=vim
+      # ...and NOT under a sub/.atago-home that the cwd might have suggested.
+      - assert:
+          file:
+            path: sub/.atago-home/.config/mytool/config
+            exists: false

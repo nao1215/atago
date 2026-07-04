@@ -1,7 +1,11 @@
 package cli
 
 import (
+	"bytes"
+	"os"
+	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	shellwords "github.com/mattn/go-shellwords"
@@ -35,6 +39,30 @@ func TestPOSIXJoin_RoundTrip(t *testing.T) {
 		if !reflect.DeepEqual(got, argv) {
 			t.Errorf("round-trip changed argv: %v -> %q -> %v", argv, joined, got)
 		}
+	}
+}
+
+// TestRecordPTY_ExistingOutExitsEarly proves `record --pty --out FILE` refuses
+// an existing --out BEFORE driving any session (#69 follow-up): the check now
+// fires first, so it returns ExitConfig without opening a pty (which would hang
+// waiting on stdin here) and leaves the existing file untouched.
+func TestRecordPTY_ExistingOutExitsEarly(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	out := filepath.Join(dir, "generated.atago.yaml")
+	if err := os.WriteFile(out, []byte("precious"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	code := recordCmd([]string{"--pty", "--out", out, "--", "echo", "hi"}, &stdout, &stderr)
+	if code != ExitConfig {
+		t.Fatalf("exit = %d, want %d", code, ExitConfig)
+	}
+	if !strings.Contains(stderr.String(), "use --force") {
+		t.Errorf("stderr = %q, want mention of --force", stderr.String())
+	}
+	if b, _ := os.ReadFile(out); string(b) != "precious" {
+		t.Errorf("existing file was modified: %q", b)
 	}
 }
 

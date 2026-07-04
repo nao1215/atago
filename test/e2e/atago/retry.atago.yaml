@@ -61,3 +61,33 @@ scenarios:
           command: ${atago} run never.atago.yaml
       - assert:
           exit_code: 1
+
+  - name: until with a changes target is a load-time error
+    steps:
+      # A retry polls the raw exec result of each attempt, where the workdir
+      # delta is never computed — so `until: {changes: ...}` could never pass.
+      # The loader rejects it up front (exit 2) instead of exhausting the budget.
+      - fixture:
+          file: badchanges.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: bad
+            scenarios:
+              - name: unsatisfiable until
+                steps:
+                  - run:
+                      command: echo hi
+                      retry:
+                        times: 3
+                        until:
+                          changes:
+                            created: [out.txt]
+      - run:
+          command: ${atago} run badchanges.atago.yaml
+      - assert:
+          exit_code: 2
+          stderr:
+            contains:
+              - "retry.until.changes cannot be satisfied"
+              - steps[0].run

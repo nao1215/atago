@@ -1,0 +1,33 @@
+version: "1"
+
+suite:
+  name: pandoc + changes (a conversion writes exactly its output)
+
+# Companion to pandoc.atago.yaml: a file-to-file conversion should touch
+# nothing but its named output. The `changes:` assert states that as an exact
+# contract — the input is a fixture (baseline), and the single created file is
+# out.html. Gate: only where pandoc is installed.
+scenarios:
+  - name: markdown-to-html creates exactly the output file
+    only:
+      command: pandoc --version
+    steps:
+      - fixture:
+          file: in.md
+          content: |
+            # Title
+
+            Some text with *emphasis*.
+      - run:
+          command: pandoc in.md -o out.html
+      - assert:
+          exit_code: 0
+          changes:
+            created:
+              - out.html
+            modified: []
+            deleted: []
+      - assert:
+          file:
+            path: out.html
+            contains: "<em>emphasis</em>"

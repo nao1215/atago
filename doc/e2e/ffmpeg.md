@@ -1,7 +1,9 @@
 # atago Behavior Specs
 ## Summary
-1 suite · 6 scenarios
+2 suites · 7 scenarios
 ## Contents
+- [ffmpeg + changes (single-artifact encode)](#ffmpeg--changes-single-artifact-encode) — 1 scenario
+  - [lavfi source encodes exactly one output file](#scenario-lavfi-source-encodes-exactly-one-output-file)
 - [ffmpeg / ffprobe (media pipeline)](#ffmpeg--ffprobe-media-pipeline) — 6 scenarios
   - [lavfi synthesizes a video file](#scenario-lavfi-synthesizes-a-video-file)
   - [ffprobe exposes the stream JSON contract](#scenario-ffprobe-exposes-the-stream-json-contract)
@@ -9,6 +11,16 @@
   - [transcode to webm and re-probe the codec](#scenario-transcode-to-webm-and-re-probe-the-codec)
   - [a missing input file fails with a not-found error](#scenario-a-missing-input-file-fails-with-a-not-found-error)
   - [ffprobe on non-media data reports invalid input](#scenario-ffprobe-on-non-media-data-reports-invalid-input)
+## ffmpeg + changes (single-artifact encode)
+Source: `test/e2e/thirdparty/ffmpeg/changes.atago.yaml`
+### Scenario: lavfi source encodes exactly one output file
+#### When
+```shell
+ffmpeg -v error -f lavfi -i testsrc=duration=0.1:size=64x64 -y out.mp4
+```
+#### Then
+- exit code is `0`
+- the step changed exactly created `out.mp4`, modified nothing, deleted nothing
 ## ffmpeg / ffprobe (media pipeline)
 Source: `test/e2e/thirdparty/ffmpeg/ffmpeg.atago.yaml`
 ### Scenario: lavfi synthesizes a video file

@@ -1,13 +1,39 @@
 # atago Behavior Specs
 ## Summary
-1 suite · 5 scenarios
+3 suites · 7 scenarios
 ## Contents
+- [git + changes (a staged blob touches exactly index + one object)](#git--changes-a-staged-blob-touches-exactly-index--one-object) — 1 scenario
+  - [staging one file creates the index and a single loose object (POSIX)](#scenario-staging-one-file-creates-the-index-and-a-single-loose-object-posix)
 - [git (third-party CLI, no build required)](#git-third-party-cli-no-build-required) — 5 scenarios
   - [init creates an empty repository](#scenario-init-creates-an-empty-repository)
   - [add and commit make the working tree clean](#scenario-add-and-commit-make-the-working-tree-clean)
   - [a captured commit hash flows into a later command](#scenario-a-captured-commit-hash-flows-into-a-later-command)
   - [checking out a missing ref fails with an explanation (no-such-branch)](#scenario-checking-out-a-missing-ref-fails-with-an-explanation-no-such-branch)
   - [checking out a missing ref fails with an explanation (v9.9.9)](#scenario-checking-out-a-missing-ref-fails-with-an-explanation-v999)
+- [git + sandbox_home (global config in an isolated HOME)](#git--sandbox_home-global-config-in-an-isolated-home) — 1 scenario
+  - [global user.name is written under the sandbox home and read back (POSIX)](#scenario-global-username-is-written-under-the-sandbox-home-and-read-back-posix)
+## git + changes (a staged blob touches exactly index + one object)
+Source: `test/e2e/thirdparty/git/changes.atago.yaml`
+### Scenario: staging one file creates the index and a single loose object (POSIX)
+_skipped on windows_
+#### Given
+- Fixture file `repo/f.txt` is created.
+#### Inputs
+_Fixture `repo/f.txt`:_
+```text
+hello from atago
+```
+#### When
+```shell
+git init -q repo
+git -C repo add f.txt
+```
+#### Then
+- after `git init -q repo`:
+  - exit code is `0`
+- after `git -C repo add f.txt`:
+  - exit code is `0`
+  - the step changed exactly created `repo/.git/index`, `repo/.git/objects/*/*`, modified nothing, deleted nothing
 ## git (third-party CLI, no build required)
 Source: `test/e2e/thirdparty/git/git.atago.yaml`
 ### Scenario: init creates an empty repository
@@ -87,3 +113,22 @@ git -C repo checkout v9.9.9
 - after `git -C repo checkout v9.9.9`:
   - exit code is not `0`
   - stderr contains `v9.9.9`
+## git + sandbox_home (global config in an isolated HOME)
+Source: `test/e2e/thirdparty/git/sandbox_home.atago.yaml`
+### Scenario: global user.name is written under the sandbox home and read back (POSIX)
+_skipped on windows_
+#### Given
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### When
+```shell
+git config --global user.name atago-sandbox-user
+git config --global user.name
+```
+#### Then
+- after `git config --global user.name atago-sandbox-user`:
+  - exit code is `0`
+  - file `.atago-home/.gitconfig` contains `atago-sandbox-user`
+- after `git config --global user.name`:
+  - exit code is `0`
+  - stdout equals an exact value

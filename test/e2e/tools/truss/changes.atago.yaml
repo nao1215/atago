@@ -1,0 +1,59 @@
+# Dogfood spec: exercises atago's `changes` delta against the real `truss`
+# image-transform CLI (github.com/nao1215/truss). Requires `truss` on PATH; run
+# with: make dogfood. Complements the image:-assert coverage in convert.atago.yaml
+# with the filesystem-footprint angle: truss convert reads the input and writes
+# exactly one output — no temp/backup files, and nothing in HOME.
+#
+# The input PNG is generated deterministically in-workdir from base64 (a 2x2 red
+# PNG), so the spec is hermetic and needs no committed testdata.
+version: "1"
+
+suite:
+  name: truss convert (filesystem footprint)
+
+scenarios:
+  - name: convert PNG->JPEG creates only the output file
+    only:
+      command: truss --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: in.png
+          base64: iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEElEQVR4nGP4z8AARAwQCgAf7gP9i18U1AAAAABJRU5ErkJggg==
+      - run:
+          command: truss convert in.png -o out.jpg
+      - assert:
+          exit_code: 0
+          changes:
+            created:
+              - out.jpg
+            modified: []
+            deleted: []
+      # And the created file really is a JPEG of the right size.
+      - assert:
+          image:
+            path: out.jpg
+            format: jpeg
+            width: 2
+            height: 2
+
+  - name: convert to a glob-matched output honors path.Match
+    only:
+      command: truss --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: in.png
+          base64: iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEElEQVR4nGP4z8AARAwQCgAf7gP9i18U1AAAAABJRU5ErkJggg==
+      - run:
+          command: truss convert in.png -o thumb.webp --format webp
+      - assert:
+          exit_code: 0
+          # *.webp must match the single output; * does not cross '/'.
+          changes:
+            created:
+              - "*.webp"
+            modified: []
+            deleted: []

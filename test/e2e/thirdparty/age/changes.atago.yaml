@@ -1,0 +1,29 @@
+version: "1"
+
+suite:
+  name: age + changes (single-artifact generator)
+
+# Companion to age.atago.yaml: age-keygen writes exactly one file and touches
+# nothing else — not even HOME (it self-contains its output). A minimal proof
+# that the delta engine reports a clean single creation. Gate: only where age
+# is installed.
+scenarios:
+  - name: age-keygen writes exactly the key file (HOME untouched)
+    only:
+      command: age --version
+    steps:
+      # sandbox_home would create .atago-home; here we prove age-keygen touches
+      # nothing outside the named output, so no sandbox is needed.
+      - run:
+          command: age-keygen -o key.txt
+      - assert:
+          exit_code: 0
+          changes:
+            created:
+              - key.txt
+            modified: []
+            deleted: []
+      - assert:
+          file:
+            path: key.txt
+            contains: "AGE-SECRET-KEY-1"

@@ -1,7 +1,10 @@
 # atago Behavior Specs
 ## Summary
-1 suite · 7 scenarios
+2 suites · 9 scenarios
 ## Contents
+- [truss convert (filesystem footprint)](#truss-convert-filesystem-footprint) — 2 scenarios
+  - [convert PNG->JPEG creates only the output file](#scenario-convert-png-jpeg-creates-only-the-output-file)
+  - [convert to a glob-matched output honors path.Match](#scenario-convert-to-a-glob-matched-output-honors-pathmatch)
 - [truss image conversion](#truss-image-conversion) — 7 scenarios
   - [inspect reports PNG format and dimensions as JSON](#scenario-inspect-reports-png-format-and-dimensions-as-json)
   - [convert PNG to JPEG yields a same-size opaque JPEG](#scenario-convert-png-to-jpeg-yields-a-same-size-opaque-jpeg)
@@ -10,6 +13,33 @@
   - [a high-quality JPEG stays visually close to the source](#scenario-a-high-quality-jpeg-stays-visually-close-to-the-source)
   - [a lossless PNG re-encode is pixel-identical to the source](#scenario-a-lossless-png-re-encode-is-pixel-identical-to-the-source)
   - [a missing input file exits with the I/O error code](#scenario-a-missing-input-file-exits-with-the-io-error-code)
+## truss convert (filesystem footprint)
+Source: `test/e2e/tools/truss/changes.atago.yaml`
+### Scenario: convert PNG->JPEG creates only the output file
+_skipped on windows_
+#### Given
+- Fixture file `in.png` is created.
+#### When
+```shell
+truss convert in.png -o out.jpg
+```
+#### Then
+- exit code is `0`
+- the step changed exactly created `out.jpg`, modified nothing, deleted nothing
+- image `out.jpg` is `jpeg`, width 2, height 2
+#### Generated artifacts
+- `out.jpg`
+### Scenario: convert to a glob-matched output honors path.Match
+_skipped on windows_
+#### Given
+- Fixture file `in.png` is created.
+#### When
+```shell
+truss convert in.png -o thumb.webp --format webp
+```
+#### Then
+- exit code is `0`
+- the step changed exactly created `*.webp`, modified nothing, deleted nothing
 ## truss image conversion
 Source: `test/e2e/tools/truss/convert.atago.yaml`
 ### Scenario: inspect reports PNG format and dimensions as JSON

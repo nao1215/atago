@@ -88,3 +88,111 @@ scenarios:
               - result.txt
             modified: []
             deleted: []
+
+  - name: the delta over a retried step is cumulative across all attempts (POSIX)
+    skip:
+      os: windows
+    steps:
+      # Pinned semantic: with retry, atago pre-scans ONCE before attempt 1 and
+      # post-scans ONCE after the LAST attempt — so the changes delta is the
+      # cumulative footprint of every attempt, not just the winning one. This
+      # command fails on attempt 1 (c does not exist yet) and passes on attempt
+      # 2, and a, b, c are all created along the way.
+      - run:
+          shell: true
+          command: 'touch a; [ -f b ] && touch c; touch b; [ -f c ]'
+          retry:
+            times: 3
+            interval: 10ms
+            until:
+              exit_code: 0
+      - assert:
+          exit_code: 0
+          changes:
+            created:
+              - a
+              - b
+              - c
+            modified: []
+            deleted: []
+
+  - name: deleting and recreating a byte-identical file appears in no list (POSIX)
+    skip:
+      os: windows
+    steps:
+      # The delta is content-hash based, not event based: a file that is
+      # removed and rewritten with its ORIGINAL bytes is indistinguishable from
+      # untouched, so it appears in none of created/modified/deleted.
+      - fixture:
+          file: f.txt
+          content: "hello"
+      - run:
+          shell: true
+          command: 'rm f.txt && printf hello > f.txt'
+      - assert:
+          exit_code: 0
+          changes:
+            created: []
+            modified: []
+            deleted: []
+
+  - name: deleting and recreating with different content is modified only (POSIX)
+    skip:
+      os: windows
+    steps:
+      # Same delete+recreate, but the new bytes differ — so the content hash
+      # changes and the file reports as modified (not deleted+created).
+      - fixture:
+          file: f.txt
+          content: "hello"
+      - run:
+          shell: true
+          command: 'rm f.txt && printf world > f.txt'
+      - assert:
+          exit_code: 0
+          changes:
+            created: []
+            modified:
+              - f.txt
+            deleted: []
+
+  - name: stdout_to overwrites a fixture (modified) while stderr_to creates an empty file (POSIX)
+    skip:
+      os: windows
+    steps:
+      # stdout_to onto a pre-existing fixture rewrites it with new bytes, so it
+      # is modified; stderr_to captures an empty stderr, which still creates a
+      # brand-new 0-byte file that the delta counts as created.
+      - fixture:
+          file: existing.txt
+          content: "old"
+      - run:
+          shell: true
+          command: printf newcontent
+          stdout_to: existing.txt
+          stderr_to: err.txt
+      - assert:
+          exit_code: 0
+          changes:
+            created:
+              - err.txt
+            modified:
+              - existing.txt
+            deleted: []
+
+  - name: a pty step feeds the delta scan just like a run step (POSIX)
+    skip:
+      os: windows
+    steps:
+      # The pre/post workdir scan wraps a pty step too: the file the
+      # interactive command touched shows up in the very next changes assert.
+      - pty:
+          shell: true
+          command: 'sh -c "touch from-pty; echo done"'
+          timeout: 10s
+          session:
+            - expect: done
+      - assert:
+          changes:
+            created:
+              - from-pty

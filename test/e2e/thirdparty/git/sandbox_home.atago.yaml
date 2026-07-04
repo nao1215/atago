@@ -1,0 +1,37 @@
+version: "1"
+
+suite:
+  name: git + sandbox_home (global config in an isolated HOME)
+
+# git --global writes to $HOME/.gitconfig. With sandbox_home the child's HOME
+# is redirected to ${workdir}/.atago-home, so the write is hermetic and the
+# result is inspectable at a deterministic path. A second sandbox_home step
+# reads the same value back — the isolated home is reused across steps.
+#
+# POSIX-only: this pins the HOME-based path .atago-home/.gitconfig. On Windows
+# git resolves config through USERPROFILE (which sandbox_home also sets), but
+# the exact on-disk path was not verified here, so the scenario is gated.
+scenarios:
+  - name: global user.name is written under the sandbox home and read back (POSIX)
+    skip:
+      os: windows
+    steps:
+      - run:
+          command: git config --global user.name atago-sandbox-user
+          sandbox_home: true
+      - assert:
+          exit_code: 0
+      # git wrote to $HOME/.gitconfig, which sandbox_home pinned under the
+      # workdir — an ordinary file: assert can inspect it.
+      - assert:
+          file:
+            path: .atago-home/.gitconfig
+            contains: atago-sandbox-user
+      # A second sandbox_home step reads the same value: the home is reused.
+      - run:
+          command: git config --global user.name
+          sandbox_home: true
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: atago-sandbox-user

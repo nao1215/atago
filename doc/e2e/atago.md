@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-54 suites · 193 scenarios
+54 suites · 204 scenarios
 ## Contents
 - [atago self-hosting / variable expansion in assertion matcher values](#atago-self-hosting--variable-expansion-in-assertion-matcher-values) — 3 scenarios
   - [stdout.equals expands ${workdir}](#scenario-stdoutequals-expands-workdir)
@@ -15,10 +15,15 @@
   - [manifest surfaces the browser-runner configuration](#scenario-manifest-surfaces-the-browser-runner-configuration)
   - [an upload action without a file fails validation (exit 2)](#scenario-an-upload-action-without-a-file-fails-validation-exit-2)
   - [a download action without a click selector fails validation (exit 2)](#scenario-a-download-action-without-a-click-selector-fails-validation-exit-2)
-- [atago self-hosting / changes (workdir delta assertions)](#atago-self-hosting--changes-workdir-delta-assertions) — 3 scenarios
+- [atago self-hosting / changes (workdir delta assertions)](#atago-self-hosting--changes-workdir-delta-assertions) — 8 scenarios
   - [a generator touches exactly the files it should (POSIX)](#scenario-a-generator-touches-exactly-the-files-it-should-posix)
   - [an unexpected creation breaks the exact contract (POSIX)](#scenario-an-unexpected-creation-breaks-the-exact-contract-posix)
   - [stdout_to counts as created, and modified nothing holds (portable)](#scenario-stdout_to-counts-as-created-and-modified-nothing-holds-portable)
+  - [the delta over a retried step is cumulative across all attempts (POSIX)](#scenario-the-delta-over-a-retried-step-is-cumulative-across-all-attempts-posix)
+  - [deleting and recreating a byte-identical file appears in no list (POSIX)](#scenario-deleting-and-recreating-a-byte-identical-file-appears-in-no-list-posix)
+  - [deleting and recreating with different content is modified only (POSIX)](#scenario-deleting-and-recreating-with-different-content-is-modified-only-posix)
+  - [stdout_to overwrites a fixture (modified) while stderr_to creates an empty file (POSIX)](#scenario-stdout_to-overwrites-a-fixture-modified-while-stderr_to-creates-an-empty-file-posix)
+  - [a pty step feeds the delta scan just like a run step (POSIX)](#scenario-a-pty-step-feeds-the-delta-scan-just-like-a-run-step-posix)
 - [atago self-hosting / completion](#atago-self-hosting--completion) — 5 scenarios
   - [bash completion emits a recognizable script](#scenario-bash-completion-emits-a-recognizable-script)
   - [zsh completion emits a compdef script](#scenario-zsh-completion-emits-a-compdef-script)
@@ -156,15 +161,18 @@
   - [screen asserts see the final frame where the transcript sees history](#scenario-screen-asserts-see-the-final-frame-where-the-transcript-sees-history)
   - [a screen snapshot round-trips through update and compare](#scenario-a-screen-snapshot-round-trips-through-update-and-compare)
   - [a screen assert without a pty step is a load-time error](#scenario-a-screen-assert-without-a-pty-step-is-a-load-time-error)
-- [atago self-hosting / record (spec skeleton from an observed run)](#atago-self-hosting--record-spec-skeleton-from-an-observed-run) — 8 scenarios
+- [atago self-hosting / record (spec skeleton from an observed run)](#atago-self-hosting--record-spec-skeleton-from-an-observed-run) — 11 scenarios
   - [record then run round-trips green](#scenario-record-then-run-round-trips-green)
   - [refusing to overwrite without --force](#scenario-refusing-to-overwrite-without---force)
+  - [record --pty refuses an existing --out before driving the session](#scenario-record---pty-refuses-an-existing---out-before-driving-the-session)
   - [created files become exists asserts (shell mode)](#scenario-created-files-become-exists-asserts-shell-mode)
   - [snapshot mode writes a golden the run then matches](#scenario-snapshot-mode-writes-a-golden-the-run-then-matches)
   - [no command is a usage error](#scenario-no-command-is-a-usage-error)
   - [argv boundaries survive spaced arguments](#scenario-argv-boundaries-survive-spaced-arguments)
   - [a shell metacharacter argument stays one token](#scenario-a-shell-metacharacter-argument-stays-one-token)
   - [record --pty records a live session and the generated spec replays green](#scenario-record---pty-records-a-live-session-and-the-generated-spec-replays-green)
+  - [record --pty of a no-input command yields a session-less spec that replays green](#scenario-record---pty-of-a-no-input-command-yields-a-session-less-spec-that-replays-green)
+  - [a prompt with regex metacharacters is escaped in the generated expect](#scenario-a-prompt-with-regex-metacharacters-is-escaped-in-the-generated-expect)
 - [atago self-hosting / reports](#atago-self-hosting--reports) — 5 scenarios
   - [JUnit report is XML with a testsuite and testcase](#scenario-junit-report-is-xml-with-a-testsuite-and-testcase)
   - [GitHub Actions annotations are emitted on failure](#scenario-github-actions-annotations-are-emitted-on-failure)
@@ -174,17 +182,19 @@
 - [atago self-hosting / rerun-failed](#atago-self-hosting--rerun-failed) — 2 scenarios
   - [a failing run is recorded and rerun-failed selects only it](#scenario-a-failing-run-is-recorded-and-rerun-failed-selects-only-it)
   - [rerun-failed with nothing recorded is a no-op success](#scenario-rerun-failed-with-nothing-recorded-is-a-no-op-success)
-- [atago self-hosting / retry until](#atago-self-hosting--retry-until) — 2 scenarios
+- [atago self-hosting / retry until](#atago-self-hosting--retry-until) — 3 scenarios
   - [retry polls until the condition becomes true](#scenario-retry-polls-until-the-condition-becomes-true)
   - [retry fails the inner spec when until never holds](#scenario-retry-fails-the-inner-spec-when-until-never-holds)
+  - [until with a changes target is a load-time error](#scenario-until-with-a-changes-target-is-a-load-time-error)
 - [atago self-hosting / run](#atago-self-hosting--run) — 4 scenarios
   - [a passing spec exits zero and reports PASS](#scenario-a-passing-spec-exits-zero-and-reports-pass)
   - [a failing assertion exits one and reports the failure](#scenario-a-failing-assertion-exits-one-and-reports-the-failure)
   - [a parse error exits with code two](#scenario-a-parse-error-exits-with-code-two)
   - [JSON report is valid JSON with a passed status](#scenario-json-report-is-valid-json-with-a-passed-status)
-- [atago self-hosting / sandbox_home (isolated per-OS home)](#atago-self-hosting--sandbox_home-isolated-per-os-home) — 2 scenarios
+- [atago self-hosting / sandbox_home (isolated per-OS home)](#atago-self-hosting--sandbox_home-isolated-per-os-home) — 3 scenarios
   - [Unix XDG family — write config, read it back, inspect it under the workdir](#scenario-unix-xdg-family--write-config-read-it-back-inspect-it-under-the-workdir)
   - [Windows APPDATA family — write config, read it back, inspect it under the workdir](#scenario-windows-appdata-family--write-config-read-it-back-inspect-it-under-the-workdir)
+  - [cwd anchors the run, but sandbox_home stays at the workdir ROOT (Unix)](#scenario-cwd-anchors-the-run-but-sandbox_home-stays-at-the-workdir-root-unix)
 - [atago self-hosting / security](#atago-self-hosting--security) — 3 scenarios
   - [declared secrets are masked in failure output](#scenario-declared-secrets-are-masked-in-failure-output)
   - [a file assertion path may not escape the scenario workdir](#scenario-a-file-assertion-path-may-not-escape-the-scenario-workdir)
@@ -216,9 +226,10 @@
   - [a snapshot assertion passes against a committed snapshot](#scenario-a-snapshot-assertion-passes-against-a-committed-snapshot)
   - [snapshot update creates the snapshot file](#scenario-snapshot-update-creates-the-snapshot-file)
   - [a snapshot mismatch writes the normalized actual as an artifact](#scenario-a-snapshot-mismatch-writes-the-normalized-actual-as-an-artifact)
-- [atago self-hosting / ssh runner](#atago-self-hosting--ssh-runner) — 2 scenarios
+- [atago self-hosting / ssh runner](#atago-self-hosting--ssh-runner) — 3 scenarios
   - [an ssh runner without host/user fails validation (exit 2)](#scenario-an-ssh-runner-without-hostuser-fails-validation-exit-2)
   - [a run step naming an undeclared runner fails validation (exit 2)](#scenario-a-run-step-naming-an-undeclared-runner-fails-validation-exit-2)
+  - [a local-only run field on an ssh runner fails validation (exit 2)](#scenario-a-local-only-run-field-on-an-ssh-runner-fails-validation-exit-2)
 - [atago self-hosting / stdin sources (file + base64)](#atago-self-hosting--stdin-sources-file--base64) — 5 scenarios
   - [base64 stdin delivers the exact byte count](#scenario-base64-stdin-delivers-the-exact-byte-count)
   - [stdin file is expanded and read from the workdir](#scenario-stdin-file-is-expanded-and-read-from-the-workdir)
@@ -571,6 +582,74 @@ echo produced
 - the step changed exactly created `result.txt`, modified nothing, deleted nothing
 #### Generated artifacts
 - `result.txt`
+### Scenario: the delta over a retried step is cumulative across all attempts (POSIX)
+_skipped on windows_
+#### When
+```shell
+touch a; [ -f b ] && touch c; touch b; [ -f c ]
+```
+#### Then
+- exit code is `0`
+- the step changed exactly created `a`, `b`, `c`, modified nothing, deleted nothing
+### Scenario: deleting and recreating a byte-identical file appears in no list (POSIX)
+_skipped on windows_
+#### Given
+- Fixture file `f.txt` is created.
+#### Inputs
+_Fixture `f.txt`:_
+```text
+hello
+```
+#### When
+```shell
+rm f.txt && printf hello > f.txt
+```
+#### Then
+- exit code is `0`
+- the step changed exactly created nothing, modified nothing, deleted nothing
+### Scenario: deleting and recreating with different content is modified only (POSIX)
+_skipped on windows_
+#### Given
+- Fixture file `f.txt` is created.
+#### Inputs
+_Fixture `f.txt`:_
+```text
+hello
+```
+#### When
+```shell
+rm f.txt && printf world > f.txt
+```
+#### Then
+- exit code is `0`
+- the step changed exactly created nothing, modified `f.txt`, deleted nothing
+### Scenario: stdout_to overwrites a fixture (modified) while stderr_to creates an empty file (POSIX)
+_skipped on windows_
+#### Given
+- Fixture file `existing.txt` is created.
+#### Inputs
+_Fixture `existing.txt`:_
+```text
+old
+```
+#### When
+```shell
+printf newcontent
+```
+#### Then
+- exit code is `0`
+- the step changed exactly created `err.txt`, modified `existing.txt`, deleted nothing
+#### Generated artifacts
+- `existing.txt`
+- `err.txt`
+### Scenario: a pty step feeds the delta scan just like a run step (POSIX)
+_skipped on windows_
+#### When
+```shell
+# interactive (pty): sh -c "touch from-pty; echo done"
+```
+#### Then
+- the step changed exactly created `from-pty`
 ## atago self-hosting / completion
 Source: `test/e2e/atago/completion.atago.yaml`
 ### Scenario: bash completion emits a recognizable script
@@ -2821,6 +2900,22 @@ ${atago} record --force --out existing.atago.yaml -- ${atago} version
 - after `${atago} record --force --out existing.atago.yaml -- ${atago} version`:
   - exit code is `0`
   - file `existing.atago.yaml` contains `exit_code: 0`
+### Scenario: record --pty refuses an existing --out before driving the session
+#### Given
+- Fixture file `taken.atago.yaml` is created.
+#### Inputs
+_Fixture `taken.atago.yaml`:_
+```text
+precious
+```
+#### When
+```shell
+${atago} record --pty --out taken.atago.yaml -- echo hi
+```
+#### Then
+- exit code is `3`
+- stderr contains `use --force to overwrite`
+- file `taken.atago.yaml` contains `precious`
 ### Scenario: created files become exists asserts (shell mode)
 _skipped on windows_
 #### When
@@ -2896,6 +2991,31 @@ ${atago} run generated.atago.yaml
 #### Then
 - exit code is `0`
 - file `generated.atago.yaml` contains `- pty:`, `- send:`
+- exit code is `0`
+- stdout contains `1 passed`
+### Scenario: record --pty of a no-input command yields a session-less spec that replays green
+_skipped on windows_
+#### When
+```shell
+# interactive (pty): ${atago} record --pty --out echo.atago.yaml -- echo done
+${atago} run echo.atago.yaml
+```
+#### Then
+- exit code is `0`
+- file `echo.atago.yaml` contains `- pty:`, `command: echo done`
+- file `echo.atago.yaml` is checked
+- exit code is `0`
+- stdout contains `1 passed`
+### Scenario: a prompt with regex metacharacters is escaped in the generated expect
+_skipped on windows_
+#### When
+```shell
+# interactive (pty): ${atago} record --pty --out meta.atago.yaml -- sh -c 'printf "Continue? (y/n): "; read a; echo got-$a'
+${atago} run meta.atago.yaml
+```
+#### Then
+- exit code is `0`
+- file `meta.atago.yaml` contains `expect: "Continue\\? \\(y/n\\):"`, `- send:`
 - exit code is `0`
 - stdout contains `1 passed`
 ## atago self-hosting / reports
@@ -3182,6 +3302,33 @@ ${atago} run never.atago.yaml
 ```
 #### Then
 - exit code is `1`
+### Scenario: until with a changes target is a load-time error
+#### Given
+- Fixture file `badchanges.atago.yaml` is created.
+#### Inputs
+_Fixture `badchanges.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: bad
+scenarios:
+  - name: unsatisfiable until
+    steps:
+      - run:
+          command: echo hi
+          retry:
+            times: 3
+            until:
+              changes:
+                created: [out.txt]
+```
+#### When
+```shell
+${atago} run badchanges.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `retry.until.changes cannot be satisfied`, `steps[0].run`
 ## atago self-hosting / run
 Source: `test/e2e/atago/run.atago.yaml`
 ### Scenario: a passing spec exits zero and reports PASS
@@ -3317,6 +3464,20 @@ type "%APPDATA%\mytool\config.txt"
   - exit code is `0`
   - stdout contains `editor=vim`
   - file `.atago-home/AppData/Roaming/mytool/config.txt` contains `editor=vim`
+### Scenario: cwd anchors the run, but sandbox_home stays at the workdir ROOT (Unix)
+_skipped on windows_
+#### Given
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### When
+```shell
+mkdir -p sub
+mkdir -p "$XDG_CONFIG_HOME/mytool" && printf editor=vim > "$XDG_CONFIG_HOME/mytool/config"
+```
+#### Then
+- after `mkdir -p "$XDG_CONFIG_HOME/mytool" && printf editor=vim > "$XDG_CONFIG_HOME/mytool/config"`:
+  - exit code is `0`
+  - file `.atago-home/.config/mytool/config` contains `editor=vim`
+  - file `sub/.atago-home/.config/mytool/config` does not exist
 ## atago self-hosting / security
 Source: `test/e2e/atago/security.atago.yaml`
 ### Scenario: declared secrets are masked in failure output
@@ -3931,6 +4092,35 @@ ${atago} run norunner.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `is not declared`
+### Scenario: a local-only run field on an ssh runner fails validation (exit 2)
+#### Given
+- Fixture file `sshfield.atago.yaml` is created.
+#### Inputs
+_Fixture `sshfield.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: ssh
+runners:
+  box:
+    type: ssh
+    host: deploy.example.com
+    user: deploy
+scenarios:
+  - name: remote run
+    steps:
+      - run:
+          runner: box
+          command: uptime
+          cwd: /var/tmp
+```
+#### When
+```shell
+${atago} run sshfield.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `run.cwd has no effect on an ssh runner`, `steps[0].run`
 ## atago self-hosting / stdin sources (file + base64)
 Source: `test/e2e/atago/stdin_sources.atago.yaml`
 ### Scenario: base64 stdin delivers the exact byte count

@@ -1,0 +1,79 @@
+# Dogfood spec: cross-checks atago's `changes` delta against the real `sqly`
+# CLI (github.com/nao1215/sqly). Requires `sqly` on PATH. Run with: make dogfood
+#
+# Does atago's changes delta report nested sandbox-home paths with forward
+# slashes (Windows-portable) and account for EVERY file a real tool writes?
+# These scenarios deliberately over/under-specify to confirm the exhaustive-set
+# semantics fail loudly and correctly, using a nested ${atago} run to observe
+# the inner failure.
+version: "1"
+
+suite:
+  name: sqly changes delta cross-checks (exhaustive-set semantics)
+
+scenarios:
+  # NEGATIVE: an exhaustive created list that OMITS the sqly history DB must
+  # FAIL with "unexpected created file". We assert on the failing inner run via
+  # a nested atago invocation, so a PASS here means atago correctly rejected the
+  # incomplete list. This guards against a phantom/omission bug in the delta.
+  - name: omitting sqly's history DB from an exhaustive list is rejected
+    only:
+      command: sqly --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: inner.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: under-specified created list
+                steps:
+                  - fixture:
+                      file: user.csv
+                      content: |
+                        n,v
+                        a,1
+                  - run:
+                      sandbox_home: true
+                      command: sqly --sql "SELECT 1" user.csv
+                  - assert:
+                      changes:
+                        created: []
+      - run:
+          command: ${atago} run inner.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: "unexpected created file"
+      # The reported phantom path must be forward-slashed and nested — the
+      # Windows-portability contract the changes assert promises.
+      - assert:
+          stdout:
+            contains: ".atago-home/.config/sqly/history.db"
+
+  # POSITIVE control: the same run WITH the history DB listed must PASS, proving
+  # the rejection above was about the omission, not a spurious engine error.
+  - name: the exhaustive list including the history DB passes
+    only:
+      command: sqly --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: user.csv
+          content: |
+            n,v
+            a,1
+      - run:
+          sandbox_home: true
+          command: sqly --sql "SELECT 1" user.csv
+      - assert:
+          exit_code: 0
+          changes:
+            created:
+              - .atago-home/.config/sqly/history.db
+            modified: []
+            deleted: []

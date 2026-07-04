@@ -1,0 +1,41 @@
+version: "1"
+
+suite:
+  name: jq (uncovered contracts — unicode passthrough + empty validation)
+
+# Two contracts the main jq suite does not pin: multibyte unicode survives a
+# round-trip byte-exact, and `jq empty` is the canonical "validate only" idiom
+# — it consumes the document, prints nothing, and exits 0 on valid JSON but 5
+# on malformed input (the same not-JSON code the suite already relies on
+# elsewhere, here proven for the validation use-case with clean stdout).
+scenarios:
+  - name: multibyte unicode passes through unchanged
+    steps:
+      - run:
+          command: jq -c .
+          stdin: '{"s":"café 😀 日本語"}'
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: '{"s":"café 😀 日本語"}'
+
+  - name: jq empty validates JSON — silent success, loud failure
+    steps:
+      - run:
+          command: jq empty
+          stdin: '{"a":1,"b":[2,3]}'
+      - assert:
+          exit_code: 0
+          stdout:
+            empty: true
+          stderr:
+            empty: true
+      - run:
+          command: jq empty
+          stdin: "not json"
+      - assert:
+          exit_code: 5
+          stdout:
+            empty: true
+          stderr:
+            contains: "parse error"

@@ -1,7 +1,10 @@
 # atago Behavior Specs
 ## Summary
-1 suite · 7 scenarios
+2 suites · 9 scenarios
 ## Contents
+- [openssl + changes (key and cert generation footprints)](#openssl--changes-key-and-cert-generation-footprints) — 2 scenarios
+  - [genrsa writes exactly the key file](#scenario-genrsa-writes-exactly-the-key-file)
+  - [a self-signed cert is the only new file the req step creates](#scenario-a-self-signed-cert-is-the-only-new-file-the-req-step-creates)
 - [openssl (third-party CLI, no build required)](#openssl-third-party-cli-no-build-required) — 7 scenarios
   - [sha256 digest of a fixed input is exact and stable](#scenario-sha256-digest-of-a-fixed-input-is-exact-and-stable)
   - [base64 encode and decode round-trip via stdin](#scenario-base64-encode-and-decode-round-trip-via-stdin)
@@ -10,6 +13,29 @@
   - [symmetric encryption round-trips and a wrong password fails loudly](#scenario-symmetric-encryption-round-trips-and-a-wrong-password-fails-loudly)
   - [a self-signed certificate carries the requested subject](#scenario-a-self-signed-certificate-carries-the-requested-subject)
   - [signing with the private key verifies with the public key](#scenario-signing-with-the-private-key-verifies-with-the-public-key)
+## openssl + changes (key and cert generation footprints)
+Source: `test/e2e/thirdparty/openssl/changes.atago.yaml`
+### Scenario: genrsa writes exactly the key file
+#### When
+```shell
+openssl genrsa -out key.pem 2048
+```
+#### Then
+- exit code is `0`
+- the step changed exactly created `key.pem`, modified nothing, deleted nothing
+### Scenario: a self-signed cert is the only new file the req step creates
+#### When
+```shell
+openssl genrsa -out key.pem 2048
+openssl req -new -x509 -key key.pem -out cert.pem -subj /CN=atago-test -days 1
+```
+#### Then
+- after `openssl genrsa -out key.pem 2048`:
+  - exit code is `0`
+- after `openssl req -new -x509 -key key.pem -out cert.pem -subj /CN=atago-test -days 1`:
+  - exit code is `0`
+  - the step changed exactly created `cert.pem`, modified nothing, deleted nothing
+  - file `cert.pem` contains `BEGIN CERTIFICATE`
 ## openssl (third-party CLI, no build required)
 Source: `test/e2e/thirdparty/openssl/openssl.atago.yaml`
 ### Scenario: sha256 digest of a fixed input is exact and stable
