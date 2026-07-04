@@ -159,6 +159,14 @@ recording is a non-goal for now — write those steps by hand.
 // interactive session by hand, and generate a spec whose pty: step replays it
 // as expect/send pairs. POSIX-only; Windows returns a clear error.
 func recordPTY(cmdArgs []string, shell bool, out string, force bool, stdout, stderr io.Writer) int {
+	// Refuse an existing --out up front, before driving the session: otherwise
+	// a user hand-drives the whole interactive session only to be told the file
+	// already exists once it is too late to save the transcript.
+	if _, err := os.Stat(out); err == nil && !force {
+		fmt.Fprintf(stderr, "atago record: %q already exists (use --force to overwrite)\n", out)
+		return ExitConfig
+	}
+
 	command := shellJoin(cmdArgs)
 	if shell {
 		command = strings.Join(cmdArgs, " ")
@@ -189,10 +197,6 @@ func recordPTY(cmdArgs []string, shell bool, out string, force bool, stdout, std
 	if out == "" {
 		fmt.Fprint(stdout, string(generated))
 		return ExitOK
-	}
-	if _, err := os.Stat(out); err == nil && !force {
-		fmt.Fprintf(stderr, "atago record: %q already exists (use --force to overwrite)\n", out)
-		return ExitConfig
 	}
 	if dir := filepath.Dir(out); dir != "." {
 		if err := os.MkdirAll(dir, 0o750); err != nil {

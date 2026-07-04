@@ -51,6 +51,26 @@ scenarios:
             path: existing.atago.yaml
             contains: "exit_code: 0"
 
+  - name: record --pty refuses an existing --out before driving the session
+    steps:
+      # The --out existence check fires BEFORE any pty work, so this exits
+      # immediately with exit 3 — no interactive session is driven (and no tty
+      # is needed), proving a user is never made to hand-drive a whole session
+      # only to be told the file already exists afterwards.
+      - fixture:
+          file: taken.atago.yaml
+          content: "precious"
+      - run:
+          command: ${atago} record --pty --out taken.atago.yaml -- echo hi
+      - assert:
+          exit_code: 3
+          stderr:
+            contains: "use --force to overwrite"
+      - assert:
+          file:
+            path: taken.atago.yaml
+            contains: precious
+
   - name: created files become exists asserts (shell mode)
     skip:
       os: windows
@@ -174,6 +194,102 @@ scenarios:
       # The round-trip: replaying the generated spec passes.
       - run:
           command: ${atago} run generated.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "1 passed"
+
+  - name: record --pty of a no-input command yields a session-less spec that replays green
+    skip:
+      os: windows
+    steps:
+      # `echo` reads nothing, so the recorder captures output only and the
+      # generated spec's pty step has NO interactive session (no expect/send).
+      # An OUTER pty step still hand-drives the recorder because record --pty
+      # needs a real tty.
+      - pty:
+          command: '${atago} record --pty --out echo.atago.yaml -- echo done'
+          timeout: 20s
+          session:
+            # The recorder's closing summary reports the send count; anchoring
+            # on it proves the session ended with zero sends.
+            - expect: "0 send"
+      - assert:
+          exit_code: 0
+      - assert:
+          file:
+            path: echo.atago.yaml
+            contains:
+              - "- pty:"
+              - "command: echo done"
+      # No session was recorded — the pty step carries no send/session key.
+      - assert:
+          file:
+            path: echo.atago.yaml
+            not_contains:
+              - "- send:"
+              - "session:"
+      # The round-trip: replaying the generated spec passes.
+      - run:
+          command: ${atago} run echo.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "1 passed"
+
+  - name: a prompt with regex metacharacters is escaped in the generated expect
+    skip:
+      os: windows
+    steps:
+      # The prompt "Continue? (y/n): " contains regex metacharacters (? and
+      # parens). The recorder must emit a LITERAL matcher, so the generated
+      # expect escapes them (\? \( \)); an unescaped expect would treat them as
+      # regex operators and could match the wrong output.
+      - pty:
+          command: '${atago} record --pty --out meta.atago.yaml -- sh -c ''printf "Continue? (y/n): "; read a; echo got-$a'''
+          timeout: 20s
+          session:
+            - expect: "Continue\\? \\(y/n\\):"
+            - send: "y\n"
+            - expect: "got-y"
+      - assert:
+          exit_code: 0
+      # The generated expect is regex-escaped (single-quoted here so the
+      # backslashes are the literal bytes the recorder wrote).
+      - assert:
+          file:
+            path: meta.atago.yaml
+            contains:
+              - 'expect: "Continue\\? \\(y/n\\):"'
+              - "- send:"
+      # The round-trip: replaying the escaped matcher passes.
+      - run:
+          command: ${atago} run meta.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "1 passed"
+
+  - name: recorded text containing dollar-brace round-trips as literal text
+    skip:
+      os: windows
+    steps:
+      # The tool's argv and output contain a literal ${HOME}. The engine
+      # expands ${name} in command/assert values at replay, so record emits
+      # the $${...} escape — without it the generated no-shell command would
+      # error on the unresolved reference instead of replaying. This outer
+      # spec needs the same discipline: $${HOME} below reaches the recorder as
+      # the literal ${HOME}, and the contains value is $$$-escaped so it still
+      # reads $${HOME} after its own expansion.
+      - run:
+          command: ${atago} record --out dollar.atago.yaml -- printf %s 'literal $${HOME} here'
+      - assert:
+          exit_code: 0
+          file:
+            path: dollar.atago.yaml
+            contains: "$$${HOME}"
+      - run:
+          command: ${atago} run dollar.atago.yaml
       - assert:
           exit_code: 0
           stdout:

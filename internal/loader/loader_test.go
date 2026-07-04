@@ -216,6 +216,82 @@ scenarios:
 	}
 }
 
+// TestLoadBytes_SSHRunFields covers the rejection of run-step fields that only
+// shape local execution when the step names an ssh runner: the command runs
+// remotely, so env/clear_env/pass_env/sandbox_home/stdin/stdout_to/stderr_to/cwd
+// are silently dropped and must fail at load time. The same fields load fine on
+// a cmd runner, and an ssh step limited to command/runner/timeout/retry loads.
+func TestLoadBytes_SSHRunFields(t *testing.T) {
+	t.Parallel()
+	// sshSpec wraps a run: mapping naming ssh runner "box" (host+user set).
+	sshSpec := func(run string) string {
+		return "version: \"1\"\nsuite:\n  name: x\nrunners:\n  box: {type: ssh, host: h, user: u}\nscenarios:\n  - name: a\n    steps:\n      - run: {runner: box, " + run + "}"
+	}
+	cmdSpec := func(run string) string {
+		return "version: \"1\"\nsuite:\n  name: x\nrunners:\n  local: {type: cmd}\nscenarios:\n  - name: a\n    steps:\n      - run: {runner: local, " + run + "}"
+	}
+
+	rejected := []struct {
+		name  string
+		run   string
+		field string
+	}{
+		{"sandbox_home", "command: uptime, sandbox_home: true", "sandbox_home"},
+		{"clear_env", "command: uptime, clear_env: true", "clear_env"},
+		{"pass_env", "command: uptime, clear_env: true, pass_env: [PATH]", "pass_env"},
+		{"env", "command: uptime, env: {A: b}", "env"},
+		{"stdin", "command: cat, stdin: hello", "stdin"},
+		{"stdout_to", "command: uptime, stdout_to: out.txt", "stdout_to"},
+		{"stderr_to", "command: uptime, stderr_to: err.txt", "stderr_to"},
+		{"cwd", "command: uptime, cwd: sub", "cwd"},
+	}
+	for _, tt := range rejected {
+		t.Run("ssh rejects "+tt.name, func(t *testing.T) {
+			t.Parallel()
+			_, err := LoadBytes("t.atago.yaml", []byte(sshSpec(tt.run)))
+			want := "run." + tt.field + " has no effect on an ssh runner"
+			if err == nil || !strings.Contains(err.Error(), want) {
+				t.Errorf("error = %v, want substring %q", err, want)
+			}
+		})
+		t.Run("cmd accepts "+tt.name, func(t *testing.T) {
+			t.Parallel()
+			if _, err := LoadBytes("t.atago.yaml", []byte(cmdSpec(tt.run))); err != nil {
+				t.Errorf("cmd runner should load %s: %v", tt.name, err)
+			}
+		})
+	}
+
+	t.Run("ssh with only command/runner/timeout/retry loads", func(t *testing.T) {
+		t.Parallel()
+		src := sshSpec("command: uptime, timeout: 30s, retry: {times: 3, until: {exit_code: 0}}")
+		if _, err := LoadBytes("t.atago.yaml", []byte(src)); err != nil {
+			t.Errorf("minimal ssh run step should load: %v", err)
+		}
+	})
+
+	// shell is rejected with its own message: the remote login shell always
+	// interprets the command, so the knob has nothing to switch.
+	t.Run("ssh rejects shell", func(t *testing.T) {
+		t.Parallel()
+		_, err := LoadBytes("t.atago.yaml", []byte(sshSpec("command: uptime, shell: true")))
+		want := "run.shell has no effect on an ssh runner (the remote login shell always interprets the command)"
+		if err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("error = %v, want substring %q", err, want)
+		}
+	})
+
+	// A remote pipeline needs no shell: opt-in — the metacharacter hint (which
+	// would suggest the now-rejected shell: true) must not fire for ssh steps.
+	t.Run("ssh command with metacharacters loads without the shell hint", func(t *testing.T) {
+		t.Parallel()
+		src := sshSpec("command: \"ps aux | grep sshd > /tmp/out\"")
+		if _, err := LoadBytes("t.atago.yaml", []byte(src)); err != nil {
+			t.Errorf("ssh command with metacharacters should load (the remote shell interprets them): %v", err)
+		}
+	})
+}
+
 func TestLoadBytes_Errors(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

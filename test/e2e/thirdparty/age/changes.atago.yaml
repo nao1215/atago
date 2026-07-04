@@ -1,0 +1,32 @@
+version: "1"
+
+suite:
+  name: age + changes (single-artifact generator)
+
+# Companion to age.atago.yaml: age-keygen writes exactly one file and touches
+# nothing else — not even HOME. sandbox_home points HOME (and the per-OS
+# config/cache dirs) INSIDE the workdir, so a home write would surface in the
+# delta and break the exhaustive created list below — the "HOME untouched"
+# claim is enforced by the assert, not just stated in prose. Gate: only where
+# age is installed.
+scenarios:
+  - name: age-keygen writes exactly the key file (HOME untouched)
+    only:
+      command: age --version
+    steps:
+      # sandbox_home creates only directories under .atago-home (the delta
+      # tracks files), so a clean run still yields the single-file delta.
+      - run:
+          sandbox_home: true
+          command: age-keygen -o key.txt
+      - assert:
+          exit_code: 0
+          changes:
+            created:
+              - key.txt
+            modified: []
+            deleted: []
+      - assert:
+          file:
+            path: key.txt
+            contains: "AGE-SECRET-KEY-1"

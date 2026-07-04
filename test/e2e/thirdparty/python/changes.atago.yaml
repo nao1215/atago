@@ -1,0 +1,67 @@
+version: "1"
+
+suite:
+  name: python3 + changes (bytecode cache footprint)
+
+# Companion to python.atago.yaml, pinning the filesystem side effect of an
+# import with the `changes:` assert. Importing a local module writes a compiled
+# __pycache__/*.pyc; the entry script itself is never cached. A paired scenario
+# proves PYTHONDONTWRITEBYTECODE=1 suppresses the cache entirely (created: [] —
+# the run touches nothing). Gate: only where python3 is installed.
+scenarios:
+  - name: importing a local module writes exactly one .pyc
+    only:
+      command: python3 --version
+    steps:
+      - fixture:
+          file: mymod.py
+          content: |
+            def val():
+                return 42
+      - fixture:
+          file: main.py
+          content: |
+            import mymod
+            print(mymod.val())
+      - run:
+          command: python3 main.py
+      # main.py is the entry point (never cached); only the imported module
+      # produces a .pyc. The interpreter-tagged name (mymod.cpython-3XX.pyc) is
+      # covered by a single-level glob.
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "42"
+          changes:
+            created:
+              - __pycache__/*.pyc
+            modified: []
+            deleted: []
+
+  - name: PYTHONDONTWRITEBYTECODE suppresses the cache entirely
+    only:
+      command: python3 --version
+    steps:
+      - fixture:
+          file: mymod.py
+          content: |
+            def val():
+                return 42
+      - fixture:
+          file: main.py
+          content: |
+            import mymod
+            print(mymod.val())
+      - run:
+          command: python3 main.py
+          env:
+            PYTHONDONTWRITEBYTECODE: "1"
+      # No bytecode is written: the run creates nothing at all.
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "42"
+          changes:
+            created: []
+            modified: []
+            deleted: []

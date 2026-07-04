@@ -1,0 +1,48 @@
+# Dogfood spec: exercises atago's sandbox_home + changes against the real `gup`
+# CLI (github.com/nao1215/gup). Requires `gup` on PATH. Run with: make dogfood
+#
+# gup's network-free subcommands (version/list) are pure reads — they write
+# NOTHING, not even to HOME. The changes assert with all three lists empty is
+# the strongest possible "touches nothing" statement, and sandbox_home
+# guarantees any stray dotfile write would land inside .atago-home where changes
+# would catch it.
+version: "1"
+
+suite:
+  name: gup read-only subcommands (no HOME writes)
+
+scenarios:
+  - name: gup version writes nothing to the workdir or its sandbox home
+    only:
+      command: gup version
+    skip:
+      os: windows
+    steps:
+      - run:
+          sandbox_home: true
+          command: gup version
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: gup version
+          changes:
+            created: []
+            modified: []
+            deleted: []
+
+  - name: gup list is a pure read of GOBIN and writes nothing
+    only:
+      command: gup list
+    skip:
+      os: windows
+    steps:
+      - run:
+          sandbox_home: true
+          command: gup list
+      # Even under an isolated home, list produces no side effects.
+      - assert:
+          exit_code: 0
+          changes:
+            created: []
+            modified: []
+            deleted: []

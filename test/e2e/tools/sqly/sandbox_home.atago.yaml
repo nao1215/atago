@@ -1,0 +1,78 @@
+# Dogfood spec: exercises atago's sandbox_home + changes against the real
+# `sqly` CLI (github.com/nao1215/sqly). Requires `sqly` on PATH. Run with:
+# make dogfood
+#
+# sqly writes a shell-history DB under $XDG_CONFIG_HOME even in non-interactive
+# --sql mode. sandbox_home redirects that under ${workdir}/.atago-home; the
+# changes assert then pins the EXACT set of files sqly touched — the "this
+# command writes only these files, and only to its sandbox home" contract.
+version: "1"
+
+suite:
+  name: sqly sandbox_home + changes (history DB isolation)
+
+scenarios:
+  - name: sqly --sql writes exactly its history DB, only inside the sandbox home
+    only:
+      command: sqly --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: user.csv
+          content: |
+            user_name,identifier
+            booker12,1
+      - run:
+          sandbox_home: true
+          command: sqly --sql "SELECT identifier FROM user WHERE user_name = 'booker12'" user.csv
+      # changes must live in the SAME assert block as its run (an intervening
+      # assert step severs the "immediately preceding run/pty" link the loader
+      # enforces), so exit_code + stdout + changes are pinned together here.
+      # The ONLY filesystem change is the history DB under the isolated home;
+      # user.csv is a baseline input (untouched); nothing else appears.
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "1"
+          changes:
+            created:
+              - .atago-home/.config/sqly/history.db
+            modified: []
+            deleted: []
+      # The DB really landed at the deterministic sandbox path (not real $HOME).
+      - assert:
+          file:
+            path: .atago-home/.config/sqly/history.db
+            exists: true
+
+  - name: a second sqly batch run leaves its sandbox home byte-identical
+    only:
+      command: sqly --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: user.csv
+          content: |
+            user_name,identifier
+            booker12,1
+      # Prime the sandbox home so history.db already exists as a baseline.
+      - run:
+          sandbox_home: true
+          command: sqly --sql "SELECT 1" user.csv
+      - assert:
+          exit_code: 0
+      # Second batch run: sqly's --sql mode creates history.db once and does NOT
+      # persist executed queries into it, so a different query leaves the DB
+      # byte-identical. The delta is therefore EMPTY in all three categories —
+      # the strongest "re-running touches nothing" contract.
+      - run:
+          sandbox_home: true
+          command: sqly --sql "SELECT 2" user.csv
+      - assert:
+          exit_code: 0
+          changes:
+            created: []
+            modified: []
+            deleted: []

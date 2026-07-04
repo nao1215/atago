@@ -102,7 +102,7 @@ func validate(s *spec.Spec) []string {
 			// changes bounds the workdir delta of the immediately preceding
 			// run/pty step (#70): reject a placement no such step feeds.
 			if st.Assert != nil && st.Assert.Changes != nil && !prevRunOrPTY {
-				add("%s.assert.changes requires an immediately preceding run/pty step (the step whose workdir delta it pins)", sw)
+				add("%s.assert.changes requires an immediately preceding run/pty step (the step whose workdir delta it pins); combine it with the assert block directly after the step (one assert may set exit_code, stdout, and changes together)", sw)
 			}
 			validateStep(add, sw, st, s.Runners, serviceNames, mockNames)
 			prevMeasurable = measurableStep(st.Kind())
@@ -587,11 +587,13 @@ func validateStep(add func(string, ...any), where string, st *spec.Step, runners
 		}
 		if st.Run.Command == "" {
 			add("%s.run.command is required", where)
-		} else if !st.Run.ShellEnabled() {
+		} else if !st.Run.ShellEnabled() && !runnerIsSSH(st.Run.Runner, runners) {
 			// Without shell, the command is tokenized into argv, so shell operators
 			// (redirects, pipes, sequencing, substitution) are not honored. Rather
 			// than silently pass them as literal argv, flag them with a fix-forward
-			// hint (#: shell authoring UX).
+			// hint (#: shell authoring UX). An ssh command is exempt: it travels
+			// as one string and the REMOTE login shell always interprets it, so
+			// metacharacters are honored there without any shell: opt-in.
 			if tok := shellMetachar(st.Run.Command); tok != "" {
 				add("%s.run.command contains the shell metacharacter %q but shell is not enabled; "+
 					"set `shell: true` to run it through a shell, split it into multiple `run` steps, "+
@@ -601,6 +603,7 @@ func validateStep(add func(string, ...any), where string, st *spec.Step, runners
 		validateHermeticEnv(add, where+".run", st.Run.ClearEnv, st.Run.PassEnv)
 		validateStdin(add, where+".run", st.Run.Stdin)
 		validateRetry(add, where+".run", st.Run.Retry)
+		validateSSHRunFields(add, where, st.Run, runners)
 	case spec.StepAssert:
 		validateAssert(add, where, st.Assert, mockNames)
 	case spec.StepHTTP:
@@ -651,6 +654,51 @@ func validateStep(add func(string, ...any), where string, st *spec.Step, runners
 		validatePTY(add, where, st.PTY)
 	case spec.StepSignal:
 		validateSignal(add, where, st.Signal, serviceNames)
+	}
+}
+
+// validateSSHRunFields rejects run-step fields that only shape LOCAL execution
+// when the step names an ssh runner: the command runs on the remote host, so
+// env/clear_env/pass_env/sandbox_home/stdin/stdout_to/stderr_to/cwd are silently
+// dropped by the engine's remote path (it forwards only the command). Rejecting
+// them at load time turns a silent no-op into a clear error. timeout and retry
+// are honored remotely and are intentionally absent here.
+// runnerIsSSH reports whether name references a declared ssh-type runner.
+func runnerIsSSH(name string, runners map[string]spec.Runner) bool {
+	if name == "" {
+		return false
+	}
+	rdef, ok := runners[name]
+	return ok && rdef.Type == "ssh"
+}
+
+func validateSSHRunFields(add func(string, ...any), where string, r *spec.Run, runners map[string]spec.Runner) {
+	if !runnerIsSSH(r.Runner, runners) {
+		return
+	}
+	// shell gets its own message: it is not merely ignored — the remote login
+	// shell ALWAYS interprets the command string, so the knob has nothing to
+	// switch and an authored value only misleads.
+	if r.Shell != nil {
+		add("%s.run.shell has no effect on an ssh runner (the remote login shell always interprets the command)", where)
+	}
+	fields := []struct {
+		set   bool
+		field string
+	}{
+		{r.SandboxHome != nil, "sandbox_home"},
+		{r.ClearEnv != nil, "clear_env"},
+		{len(r.PassEnv) > 0, "pass_env"},
+		{len(r.Env) > 0, "env"},
+		{!r.Stdin.IsZero(), "stdin"},
+		{r.StdoutTo != "", "stdout_to"},
+		{r.StderrTo != "", "stderr_to"},
+		{r.Cwd != "", "cwd"},
+	}
+	for _, f := range fields {
+		if f.set {
+			add("%s.run.%s has no effect on an ssh runner (the command runs remotely; only command/runner/timeout apply)", where, f.field)
+		}
 	}
 }
 
@@ -1422,6 +1470,17 @@ func validateRetry(add func(string, ...any), where string, r *spec.Retry) {
 		return
 	}
 	validateAssert(add, where+".retry.until", r.Until, nil)
+	// A retry's until is evaluated against the raw exec result of each attempt.
+	// changes (the workdir delta) is computed only for a top-level assert
+	// directly after the step, and screen renders a pty step's terminal — a
+	// run/http result is never a pty. Neither can ever hold here, so the step
+	// would only ever exhaust its budget: reject them at load time instead.
+	if r.Until.Changes != nil {
+		add("%s.retry.until.changes cannot be satisfied in a retry condition (the workdir delta is computed only for a top-level assert directly after the step, never for the exec result a retry polls); move it to an assert after the step", where)
+	}
+	if r.Until.Screen != nil {
+		add("%s.retry.until.screen cannot be satisfied in a retry condition (screen renders a pty step's terminal, and a run/http result is never a pty); move it to an assert after a pty step", where)
+	}
 }
 
 func validateJSON(add func(string, ...any), where string, j *spec.JSONAssert) {

@@ -130,6 +130,26 @@ func TestLoadBytes_RetryValidation(t *testing.T) {
 			wantMsg: "",
 		},
 		{
+			name:    "until changes cannot be satisfied",
+			src:     "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run:\n          command: echo\n          retry:\n            times: 3\n            until: {changes: {created: [out.txt]}}",
+			wantMsg: "retry.until.changes cannot be satisfied",
+		},
+		{
+			name:    "until screen cannot be satisfied",
+			src:     "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run:\n          command: echo\n          retry:\n            times: 3\n            until: {screen: {contains: hi}}",
+			wantMsg: "retry.until.screen cannot be satisfied",
+		},
+		{
+			name:    "until duration is accepted",
+			src:     "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run:\n          command: echo\n          retry:\n            times: 3\n            until: {duration: {lt: 2s}}",
+			wantMsg: "",
+		},
+		{
+			name:    "until exit_code is accepted",
+			src:     "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run:\n          command: echo\n          retry:\n            times: 3\n            until: {exit_code: 0}",
+			wantMsg: "",
+		},
+		{
 			name:    "http retry times below 1",
 			src:     "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - http:\n          method: GET\n          path: /job\n          retry:\n            times: 0\n            until: {status: 200}",
 			wantMsg: "http.retry.times must be >= 1",

@@ -1,0 +1,23 @@
+version: "1"
+
+suite:
+  name: ffmpeg + changes (single-artifact encode)
+
+# Companion to ffmpeg.atago.yaml: a lavfi-sourced encode writes exactly one
+# output file and touches nothing else. A minimal proof that the delta engine
+# reports a clean single creation for a media tool. Encodes are kept tiny so
+# the job stays fast. Gate: only where ffmpeg is installed.
+scenarios:
+  - name: lavfi source encodes exactly one output file
+    only:
+      command: ffmpeg -version
+    steps:
+      - run:
+          command: ffmpeg -v error -f lavfi -i testsrc=duration=0.1:size=64x64 -y out.mp4
+      - assert:
+          exit_code: 0
+          changes:
+            created:
+              - out.mp4
+            modified: []
+            deleted: []

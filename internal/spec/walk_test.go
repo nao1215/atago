@@ -34,14 +34,20 @@ func sp(s string) *string { return &s }
 // interpolatable field, and that it returns a copy without mutating the input.
 func TestWalkAssertStrings_CollectAndExpand(t *testing.T) {
 	t.Parallel()
+	emptyList := StringList{}
 	a := &Assert{
 		Stdout:  &StreamAssert{Contains: StringList{"${a}"}},
 		Rows:    &StreamAssert{JSON: &JSONAssert{Path: "$.${b}", Equals: "${c}"}},
 		Message: &StreamAssert{Equals: sp("${d}")},
 		Value:   &StreamAssert{YAML: &JSONAssert{Path: "$.x", Matches: sp("${e}")}},
 		File:    &FileAssert{Path: "${f}", Contains: StringList{"${g}"}},
-		Header:  &HeaderMatch{Name: "X", Equals: sp("${h}")},
+		Header:  &HeaderMatch{Name: "X", Equals: sp("${h}"), Matches: sp("${r}")},
 		Image:   &ImageAssert{Path: "${i}", SimilarTo: "${j}"},
+		Screen:  &StreamAssert{Contains: StringList{"${k}"}},
+		Dir:     &DirAssert{Path: "${l}", Contains: []string{"${m}"}, NotContains: []string{"${n}"}, Glob: "${o}", Ignore: []string{"${p}"}},
+		PDF:     &PDFAssert{Path: "${q}", Metadata: map[string]string{"title": "${s}"}, Text: &StreamAssert{Contains: StringList{"${t}"}}},
+		Mock:    &MockAssert{Name: "api", Path: "${u}", Header: &HeaderMatch{Name: "Y", Contains: sp("${v}")}, Body: &StreamAssert{Contains: StringList{"${w}"}}},
+		Changes: &ChangesAssert{Created: &StringList{"${x}"}, Modified: &emptyList},
 	}
 
 	// Collect: identity visit records every reference.
@@ -52,7 +58,7 @@ func TestWalkAssertStrings_CollectAndExpand(t *testing.T) {
 		}
 		return s
 	})
-	for _, want := range []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j"} {
+	for _, want := range []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x"} {
 		if !seen[want] {
 			t.Errorf("collect missed ${%s}; got %v", want, seen)
 		}
@@ -65,6 +71,16 @@ func TestWalkAssertStrings_CollectAndExpand(t *testing.T) {
 	}
 	if a.Stdout.Contains[0] != "${a}" {
 		t.Error("WalkAssertStrings mutated its input")
+	}
+
+	// The changes lists keep the nil-vs-empty distinction the exhaustive-set
+	// semantics depend on: a visited empty list stays non-nil-and-empty, and an
+	// omitted (nil) list stays nil.
+	if out.Changes.Modified == nil || len(*out.Changes.Modified) != 0 {
+		t.Errorf("changes.modified = %v, want a non-nil empty list", out.Changes.Modified)
+	}
+	if out.Changes.Deleted != nil {
+		t.Errorf("changes.deleted = %v, want nil (omitted stays unconstrained)", out.Changes.Deleted)
 	}
 }
 

@@ -1,0 +1,43 @@
+version: "1"
+
+suite:
+  name: git + changes (a staged blob touches exactly index + one object)
+
+# A practical workdir-delta over git internals, companion to git.atago.yaml.
+# `git init` (a prior step) lays down the whole .git tree as the delta
+# baseline; the immediately-following `git add` then touches exactly two new
+# files: the staging index and one loose object. Object files are hash-named at
+# EXACTLY two levels (objects/<2-hex>/<38-hex>), so the v1 glob
+# `repo/.git/objects/*/*` covers them precisely — path.Match '*' never crosses
+# '/', so it cannot match a deeper path by accident.
+#
+# Unlike the rest of the git suite (which runs unchanged on every OS), this
+# scenario is POSIX-only: git-for-windows applies core.autocrlf/filemode
+# defaults whose exact effect on the loose-object footprint could not be
+# verified here, so the delta contract is gated to platforms it was proven on.
+scenarios:
+  - name: staging one file creates the index and a single loose object (POSIX)
+    skip:
+      os: windows
+    steps:
+      # f.txt is a fixture, so it lands before the pre-scan (baseline), not in
+      # the delta.
+      - fixture:
+          file: repo/f.txt
+          content: "hello from atago\n"
+      # git init's own tree is created here; this step's delta is not asserted.
+      - run:
+          command: git init -q repo
+      - assert:
+          exit_code: 0
+      # The add is the step under test: index + exactly one loose object.
+      - run:
+          command: git -C repo add f.txt
+      - assert:
+          exit_code: 0
+          changes:
+            created:
+              - repo/.git/index
+              - repo/.git/objects/*/*
+            modified: []
+            deleted: []

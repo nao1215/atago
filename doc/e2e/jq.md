@@ -1,7 +1,10 @@
 # atago Behavior Specs
 ## Summary
-1 suite · 9 scenarios
+2 suites · 11 scenarios
 ## Contents
+- [jq (uncovered contracts — unicode passthrough + empty validation)](#jq-uncovered-contracts--unicode-passthrough--empty-validation) — 2 scenarios
+  - [multibyte unicode passes through unchanged](#scenario-multibyte-unicode-passes-through-unchanged)
+  - [jq empty validates JSON — silent success, loud failure](#scenario-jq-empty-validates-json--silent-success-loud-failure)
 - [jq (third-party CLI, no build required)](#jq-third-party-cli-no-build-required) — 9 scenarios
   - [identity filter echoes the document from stdin](#scenario-identity-filter-echoes-the-document-from-stdin)
   - [sort-keys output is deterministic and exact](#scenario-sort-keys-output-is-deterministic-and-exact)
@@ -12,6 +15,45 @@
   - [a program that does not compile exits 3 with a diagnostic on stderr](#scenario-a-program-that-does-not-compile-exits-3-with-a-diagnostic-on-stderr)
   - [invalid JSON input fails loudly and keeps stdout clean](#scenario-invalid-json-input-fails-loudly-and-keeps-stdout-clean)
   - [streaming several documents produces one result per document](#scenario-streaming-several-documents-produces-one-result-per-document)
+## jq (uncovered contracts — unicode passthrough + empty validation)
+Source: `test/e2e/thirdparty/jq/extra.atago.yaml`
+### Scenario: multibyte unicode passes through unchanged
+#### Inputs
+_stdin for `jq`:_
+```text
+{"s":"café 😀 日本語"}
+```
+#### When
+```shell
+jq -c .
+```
+#### Then
+- exit code is `0`
+- stdout equals an exact value
+### Scenario: jq empty validates JSON — silent success, loud failure
+#### Inputs
+_stdin for `jq`:_
+```text
+{"a":1,"b":[2,3]}
+```
+_stdin for `jq`:_
+```text
+not json
+```
+#### When
+```shell
+jq empty
+jq empty
+```
+#### Then
+- after `jq empty`:
+  - exit code is `0`
+  - stdout is empty
+  - stderr is empty
+- after `jq empty`:
+  - exit code is `5`
+  - stdout is empty
+  - stderr contains `parse error`
 ## jq (third-party CLI, no build required)
 Source: `test/e2e/thirdparty/jq/jq.atago.yaml`
 ### Scenario: identity filter echoes the document from stdin

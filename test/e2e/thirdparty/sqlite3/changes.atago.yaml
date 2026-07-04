@@ -1,0 +1,39 @@
+version: "1"
+
+suite:
+  name: sqlite3 + changes (workdir-delta of a database write)
+
+# The companion to sqlite3.atago.yaml, pinning the exact filesystem footprint
+# of a one-shot write with the `changes:` assert. Counterintuitively, the
+# rollback-journal (default) and WAL modes both create side files
+# (t.db-journal / t.db-wal / t.db-shm) DURING the invocation, but a clean
+# sqlite3 process close deletes or checkpoints them before it exits — so the
+# pre/post workdir delta ever only sees the database file itself.
+scenarios:
+  - name: default rollback-journal mode creates exactly the db file
+    steps:
+      - run:
+          shell: true
+          command: sqlite3 t.db "create table x(a); insert into x values(1)"
+      - assert:
+          exit_code: 0
+          changes:
+            created:
+              - t.db
+            modified: []
+            deleted: []
+
+  - name: WAL mode leaves no -wal/-shm behind after a clean close
+    steps:
+      - run:
+          shell: true
+          command: sqlite3 t.db "PRAGMA journal_mode=WAL; create table x(a); insert into x values(1)"
+      # Only t.db survives: the -wal and -shm files are created and removed
+      # within the single invocation, so the delta never sees them.
+      - assert:
+          exit_code: 0
+          changes:
+            created:
+              - t.db
+            modified: []
+            deleted: []

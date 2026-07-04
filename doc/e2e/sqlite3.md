@@ -1,7 +1,10 @@
 # atago Behavior Specs
 ## Summary
-1 suite · 8 scenarios
+2 suites · 10 scenarios
 ## Contents
+- [sqlite3 + changes (workdir-delta of a database write)](#sqlite3--changes-workdir-delta-of-a-database-write) — 2 scenarios
+  - [default rollback-journal mode creates exactly the db file](#scenario-default-rollback-journal-mode-creates-exactly-the-db-file)
+  - [WAL mode leaves no -wal/-shm behind after a clean close](#scenario-wal-mode-leaves-no--wal-shm-behind-after-a-clean-close)
 - [sqlite3 (third-party CLI, no build required)](#sqlite3-third-party-cli-no-build-required) — 8 scenarios
   - [one-shot SQL creates, inserts, and counts in a single invocation](#scenario-one-shot-sql-creates-inserts-and-counts-in-a-single-invocation)
   - [the database file is durable across invocations](#scenario-the-database-file-is-durable-across-invocations)
@@ -11,6 +14,24 @@
   - [.import loads a CSV fixture into a table](#scenario-import-loads-a-csv-fixture-into-a-table)
   - [bad SQL exits 1 with the error position on stderr](#scenario-bad-sql-exits-1-with-the-error-position-on-stderr)
   - [querying a missing table names it in the diagnostics](#scenario-querying-a-missing-table-names-it-in-the-diagnostics)
+## sqlite3 + changes (workdir-delta of a database write)
+Source: `test/e2e/thirdparty/sqlite3/changes.atago.yaml`
+### Scenario: default rollback-journal mode creates exactly the db file
+#### When
+```shell
+sqlite3 t.db "create table x(a); insert into x values(1)"
+```
+#### Then
+- exit code is `0`
+- the step changed exactly created `t.db`, modified nothing, deleted nothing
+### Scenario: WAL mode leaves no -wal/-shm behind after a clean close
+#### When
+```shell
+sqlite3 t.db "PRAGMA journal_mode=WAL; create table x(a); insert into x values(1)"
+```
+#### Then
+- exit code is `0`
+- the step changed exactly created `t.db`, modified nothing, deleted nothing
 ## sqlite3 (third-party CLI, no build required)
 Source: `test/e2e/thirdparty/sqlite3/sqlite3.atago.yaml`
 ### Scenario: one-shot SQL creates, inserts, and counts in a single invocation

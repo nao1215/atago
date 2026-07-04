@@ -59,7 +59,7 @@ func Generate(obs Observation, opts Options) ([]byte, error) {
 	if obs.Shell {
 		b.WriteString("          shell: true\n")
 	}
-	fmt.Fprintf(&b, "          command: %s\n", yamlScalar(obs.Command))
+	fmt.Fprintf(&b, "          command: %s\n", yamlScalar(escapeVarRefs(obs.Command)))
 	b.WriteString("      - assert:\n")
 	fmt.Fprintf(&b, "          exit_code: %d\n", obs.ExitCode)
 
@@ -71,7 +71,7 @@ func Generate(obs Observation, opts Options) ([]byte, error) {
 	case firstLine(obs.Stdout) != "":
 		b.WriteString("      - assert:\n")
 		b.WriteString("          stdout:\n")
-		fmt.Fprintf(&b, "            contains: %s # first non-empty line, trimmed\n", yamlScalar(firstLine(obs.Stdout)))
+		fmt.Fprintf(&b, "            contains: %s # first non-empty line, trimmed\n", yamlScalar(escapeVarRefs(firstLine(obs.Stdout))))
 	}
 	if len(obs.Stderr) == 0 {
 		b.WriteString("      - assert:\n")
@@ -88,7 +88,7 @@ func Generate(obs Observation, opts Options) ([]byte, error) {
 	for _, f := range files {
 		b.WriteString("      - assert:\n")
 		b.WriteString("          file:\n")
-		fmt.Fprintf(&b, "            path: %s\n", yamlScalar(f))
+		fmt.Fprintf(&b, "            path: %s\n", yamlScalar(escapeVarRefs(f)))
 		b.WriteString("            exists: true\n")
 	}
 	if capped {
@@ -100,6 +100,18 @@ func Generate(obs Observation, opts Options) ([]byte, error) {
 		return nil, fmt.Errorf("generated spec does not validate (this is an atago bug, please report it): %w", err)
 	}
 	return out, nil
+}
+
+// escapeVarRefs rewrites every "${" in observed text as the documented "$${"
+// literal escape. Recorded commands, output anchors, file paths, and typed
+// pty input are RAW text — any ${...} in them is literal — but the engine
+// expands ${name} in run.command, assert values, and pty sends at replay (and
+// rejects an unresolved reference in a no-shell command), so an unescaped
+// reference would make the generated spec diverge from, or fail to replay,
+// the recorded run. The uniform rewrite round-trips: the expander turns
+// "$${" back into the literal "${" the tool actually saw.
+func escapeVarRefs(s string) string {
+	return strings.ReplaceAll(s, "${", "$${")
 }
 
 // firstLine returns the first non-empty line, trimmed.

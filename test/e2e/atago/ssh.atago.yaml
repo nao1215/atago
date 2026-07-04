@@ -52,3 +52,35 @@ scenarios:
           exit_code: 2
           stderr:
             contains: is not declared
+
+  - name: a local-only run field on an ssh runner fails validation (exit 2)
+    steps:
+      # env/clear_env/pass_env/sandbox_home/stdin/stdout_to/stderr_to/cwd shape
+      # LOCAL execution only; the ssh runner forwards just the command, so the
+      # loader rejects them instead of silently dropping them.
+      - fixture:
+          file: sshfield.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: ssh
+            runners:
+              box:
+                type: ssh
+                host: deploy.example.com
+                user: deploy
+            scenarios:
+              - name: remote run
+                steps:
+                  - run:
+                      runner: box
+                      command: uptime
+                      cwd: /var/tmp
+      - run:
+          command: ${atago} run sshfield.atago.yaml
+      - assert:
+          exit_code: 2
+          stderr:
+            contains:
+              - "run.cwd has no effect on an ssh runner"
+              - steps[0].run

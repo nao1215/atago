@@ -74,7 +74,7 @@ func GeneratePTY(rec PTYRecording, opts Options) ([]byte, error) {
 	if rec.Shell {
 		b.WriteString("          shell: true\n")
 	}
-	fmt.Fprintf(&b, "          command: %s\n", yamlScalar(rec.Command))
+	fmt.Fprintf(&b, "          command: %s\n", yamlScalar(escapeVarRefs(rec.Command)))
 	if rec.Rows > 0 {
 		fmt.Fprintf(&b, "          rows: %d\n", rec.Rows)
 	}
@@ -95,7 +95,7 @@ func GeneratePTY(rec PTYRecording, opts Options) ([]byte, error) {
 	if anchor := stableLine(lastOutput); anchor != "" {
 		b.WriteString("      - assert:\n")
 		b.WriteString("          stdout:\n")
-		fmt.Fprintf(&b, "            contains: %s # last stable line of the transcript\n", yamlScalar(anchor))
+		fmt.Fprintf(&b, "            contains: %s # last stable line of the transcript\n", yamlScalar(escapeVarRefs(anchor)))
 	}
 
 	out := []byte(b.String())
@@ -146,7 +146,10 @@ func renderSend(seg PTYSegment, secretN *int) []string {
 	if key, ok := spec.PTYKeyForSequence(string(seg.Input)); ok {
 		return []string{fmt.Sprintf("            - send: {key: %s}\n", key)}
 	}
-	return []string{fmt.Sprintf("            - send: %s\n", yamlDoubleQuoted(literalSend(seg.Input)))}
+	// Typed text is raw: escape ${...} so the replay engine types the literal
+	// bytes the user typed instead of expanding them (the secret placeholder
+	// above is the one send that MUST stay a live reference).
+	return []string{fmt.Sprintf("            - send: %s\n", yamlDoubleQuoted(escapeVarRefs(literalSend(seg.Input))))}
 }
 
 // yamlDoubleQuoted renders s as a YAML double-quoted flow scalar, escaping

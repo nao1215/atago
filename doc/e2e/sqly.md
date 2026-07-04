@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-44 suites · 389 scenarios
+46 suites · 393 scenarios
 ## Contents
 - [sqly ACH/Fedwire native write-back](#sqly-achfedwire-native-write-back) — 4 scenarios
   - [round-trips an ACH file through --save --force after an UPDATE](#scenario-round-trips-an-ach-file-through---save---force-after-an-update)
@@ -38,6 +38,9 @@
   - [reuses the cache that lives inside the imported directory and ignores its manifest](#scenario-reuses-the-cache-that-lives-inside-the-imported-directory-and-ignores-its-manifest)
   - [keeps the cache warm when only an unsupported sibling file changes](#scenario-keeps-the-cache-warm-when-only-an-unsupported-sibling-file-changes)
   - [still invalidates the cache when the supported file changes](#scenario-still-invalidates-the-cache-when-the-supported-file-changes)
+- [sqly changes delta cross-checks (exhaustive-set semantics)](#sqly-changes-delta-cross-checks-exhaustive-set-semantics) — 2 scenarios
+  - [omitting sqly's history DB from an exhaustive list is rejected](#scenario-omitting-sqlys-history-db-from-an-exhaustive-list-is-rejected)
+  - [the exhaustive list including the history DB passes](#scenario-the-exhaustive-list-including-the-history-db-passes)
 - [sqly CLI surface](#sqly-cli-surface) — 10 scenarios
   - [prints the version](#scenario-prints-the-version)
   - [prints usage with --help](#scenario-prints-usage-with---help)
@@ -223,6 +226,9 @@
   - [loads ACH records into multiple tables](#scenario-loads-ach-records-into-multiple-tables)
   - [queries the ACH entries table](#scenario-queries-the-ach-entries-table)
   - [loads a Fedwire file into a single message table](#scenario-loads-a-fedwire-file-into-a-single-message-table)
+- [sqly sandbox_home + changes (history DB isolation)](#sqly-sandbox_home--changes-history-db-isolation) — 2 scenarios
+  - [sqly --sql writes exactly its history DB, only inside the sandbox home](#scenario-sqly---sql-writes-exactly-its-history-db-only-inside-the-sandbox-home)
+  - [a second sqly batch run leaves its sandbox home byte-identical](#scenario-a-second-sqly-batch-run-leaves-its-sandbox-home-byte-identical)
 - [sqly write-back](#sqly-write-back) — 8 scenarios
   - [writes to --save-dir without modifying the source](#scenario-writes-to---save-dir-without-modifying-the-source)
   - [refuses --save without --force](#scenario-refuses---save-without---force)
@@ -1168,6 +1174,59 @@ sqly --cache snap.cache --sql "SELECT COUNT(*) AS n FROM data" indir
   - exit code is `0`
   - stdout contains `2`
   - stderr does not contain `cache: reused`
+## sqly changes delta cross-checks (exhaustive-set semantics)
+Source: `test/e2e/tools/sqly/changes_crosscheck.atago.yaml`
+### Scenario: omitting sqly's history DB from an exhaustive list is rejected
+_skipped on windows_
+#### Given
+- Fixture file `inner.atago.yaml` is created.
+#### Inputs
+_Fixture `inner.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: under-specified created list
+    steps:
+      - fixture:
+          file: user.csv
+          content: |
+            n,v
+            a,1
+      - run:
+          sandbox_home: true
+          command: sqly --sql "SELECT 1" user.csv
+      - assert:
+          changes:
+            created: []
+```
+#### When
+```shell
+${atago} run inner.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `unexpected created file`
+- stdout contains `.atago-home/.config/sqly/history.db`
+### Scenario: the exhaustive list including the history DB passes
+_skipped on windows_
+#### Given
+- Fixture file `user.csv` is created.
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `user.csv`:_
+```text
+n,v
+a,1
+```
+#### When
+```shell
+sqly --sql "SELECT 1" user.csv
+```
+#### Then
+- exit code is `0`
+- the step changed exactly created `.atago-home/.config/sqly/history.db`, modified nothing, deleted nothing
 ## sqly CLI surface
 Source: `test/e2e/tools/sqly/cli.atago.yaml`
 ### Scenario: prints the version
@@ -4186,6 +4245,53 @@ sqly customer-transfer.fed
 #### Then
 - exit code is `0`
 - stdout contains `customer_transfer_message`
+## sqly sandbox_home + changes (history DB isolation)
+Source: `test/e2e/tools/sqly/sandbox_home.atago.yaml`
+### Scenario: sqly --sql writes exactly its history DB, only inside the sandbox home
+_skipped on windows_
+#### Given
+- Fixture file `user.csv` is created.
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `user.csv`:_
+```text
+user_name,identifier
+booker12,1
+```
+#### When
+```shell
+sqly --sql "SELECT identifier FROM user WHERE user_name = 'booker12'" user.csv
+```
+#### Then
+- exit code is `0`
+- stdout contains `1`
+- the step changed exactly created `.atago-home/.config/sqly/history.db`, modified nothing, deleted nothing
+- file `.atago-home/.config/sqly/history.db` exists
+#### Generated artifacts
+- `.atago-home/.config/sqly/history.db`
+### Scenario: a second sqly batch run leaves its sandbox home byte-identical
+_skipped on windows_
+#### Given
+- Fixture file `user.csv` is created.
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `user.csv`:_
+```text
+user_name,identifier
+booker12,1
+```
+#### When
+```shell
+sqly --sql "SELECT 1" user.csv
+sqly --sql "SELECT 2" user.csv
+```
+#### Then
+- after `sqly --sql "SELECT 1" user.csv`:
+  - exit code is `0`
+- after `sqly --sql "SELECT 2" user.csv`:
+  - exit code is `0`
+  - the step changed exactly created nothing, modified nothing, deleted nothing
 ## sqly write-back
 Source: `test/e2e/tools/sqly/save.atago.yaml`
 ### Scenario: writes to --save-dir without modifying the source
