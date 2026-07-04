@@ -7,8 +7,45 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-04
+
+Exact workdir-delta assertions, hermetic per-OS home isolation, and interactive
+terminal recording — closing the gap between "the command exited 0" and "the
+command touched exactly these files, and nothing on the host."
+
 ### Added
 
+- `changes` workdir-delta assertion (#70): `changes: {created, modified,
+  deleted}` pins the EXACT set of files the immediately preceding run/pty step
+  touched in the scenario workdir — the "this command writes only these files"
+  contract no per-path `file:` assert can state. Each set field is exhaustive
+  in both directions (every observed path must match an entry, every entry must
+  match a path), so `modified: []` asserts "modified nothing"; an omitted field
+  is unconstrained. The delta is content-hash based (a delete+rewrite of
+  identical bytes shows in no list). Entries are doublestar globs, always
+  `/`-separated: a single `*` stays within one path segment while `**` crosses
+  `/` at any depth (`site/**`, `dist/**/*.css`), and a backslash escapes a
+  literal metacharacter (#76). See `examples/changes.atago.yaml`.
+- `sandbox_home` hermetic home isolation (#71): `sandbox_home: true` on `run`
+  and `pty` steps points the child's home and per-OS config/cache/data/state
+  directories (`$HOME`/`$XDG_*` on POSIX, `%APPDATA%` and friends on Windows)
+  at a fresh `${workdir}/.atago-home`, so a CLI that reads or writes `~/.config`
+  runs hermetically with one key. The isolated home is created once and reused
+  across a scenario's steps, and its path is deterministic — an ordinary
+  `file:` assert can inspect what the CLI wrote there. It composes with
+  `clear_env`/`pass_env` (the sandbox home wins over a `pass_env: [HOME]` leak).
+  It layers onto pty steps from `defaults.run` alongside the rest of the
+  environment family (#77), so one `defaults.run.sandbox_home: true` governs
+  run and pty steps alike.
+- `atago record --pty -- <command>` (#69): records an INTERACTIVE session as a
+  ready-to-replay `pty:` step. It runs the command in a real terminal, lets you
+  drive one session by hand, and reconstructs an expect/send spec from the
+  transcript — named keys where a lone control key was pressed, literal text
+  otherwise (`${...}` escaped to `$${...}` so replay types it verbatim).
+  Echo-off (password) input is NEVER recorded as its literal value: it becomes
+  a live `${env:ATAGO_SECRET_n}` placeholder with a comment to set the variable
+  and add it to `secrets:`. POSIX-only. The `--out`/`--force` existence check
+  fires before any tty work, so a taken `--out` fails immediately.
 - Hermetic environment control (#16): `clear_env: true` on `run`, `service`,
   and `pty` steps (and `defaults.run` / `defaults.service`) starts the child
   from an EMPTY environment instead of inheriting the host's, so host vars
@@ -135,6 +172,24 @@ and this project follows [Semantic Versioning](https://semver.org/).
   the engine resolves the timeout precedence chain itself so a runner-common
   `timeout` now correctly outranks `defaults.run.timeout`, and the failure
   hint can name the level that supplied the bound (#17).
+
+### Fixed
+
+- Unresolved-variable guard for pty sessions (#78): a `send`/`expect` entry
+  referencing a `${name}` nothing defines (or an unset `${env:NAME}`) now fails
+  the step with the same fix-forward error `run.command` produces — naming the
+  entry, the reference, and the `$${...}` literal escape — BEFORE any terminal
+  I/O, instead of silently typing (or matching) the literal reference text. A
+  typo'd store name or a forgotten `env:` wiring, including a `record --pty`
+  secret placeholder whose variable was never set, now fails loudly at the
+  mistake. Escaped `$${...}` literals, named-key sends, and the empty-string
+  EOF send are unaffected.
+- E2E hardening (#75): every assert target's strings are expanded (not just a
+  subset); `${` in recorded literal text is escaped so a generated spec never
+  re-expands it; `shell: true` is rejected on ssh-runner steps (the command
+  runs remotely, so a local shell flag is silently dropped) and the shell
+  metacharacter hint is muted there; unsatisfiable spec shapes are rejected at
+  load time; and `record --pty --out` is existence-checked up front.
 
 ## [0.2.0] - 2026-07-03
 
