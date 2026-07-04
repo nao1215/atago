@@ -196,3 +196,55 @@ scenarios:
           changes:
             created:
               - from-pty
+
+  - name: a doublestar glob pins an arbitrary-depth generated tree exactly (POSIX)
+    skip:
+      os: windows
+    steps:
+      # A generator that writes a 3-level tree of unknown depth: a single
+      # `out/**` entry (#76) pins the whole subtree at once — impossible with
+      # single-level `*`, which never crosses `/` — while modified/deleted stay
+      # empty to keep the exhaustive-both-ways contract intact.
+      - run:
+          shell: true
+          command: >-
+            mkdir -p out/a/b &&
+            printf '1' > out/top.txt &&
+            printf '2' > out/a/mid.txt &&
+            printf '3' > out/a/b/leaf.txt
+      - assert:
+          exit_code: 0
+          changes:
+            created:
+              - "out/**"
+            modified: []
+            deleted: []
+
+  - name: a stray file outside the doublestar prefix breaks the exact contract (POSIX)
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: check.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: stray-outside-doublestar
+            scenarios:
+              - name: extra file beside the tree
+                steps:
+                  - run:
+                      shell: true
+                      command: 'mkdir -p out/a && printf x > out/a/leaf.txt && printf y > stray.txt'
+                  - assert:
+                      changes:
+                        created:
+                          - "out/**"
+      - run:
+          command: ${atago} run check.atago.yaml
+      # stray.txt is created outside out/, so `out/**` cannot cover it and the
+      # exhaustive contract fails (exit 1).
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: "unexpected created file"

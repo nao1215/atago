@@ -905,6 +905,13 @@ type Assert struct {
 // must be matched by an entry (an exact workdir-relative path or a /-glob) and
 // every entry must match at least one observed path — so `modified: []` asserts
 // "modified nothing". An omitted (nil) field is unconstrained.
+//
+// Entries are doublestar globs, always /-separated (#76): a single `*` matches
+// within one path segment, while `**` matches across `/` at any depth
+// (`site/**` covers the whole tree under site/, `dist/**/*.css` composes with a
+// suffix). A backslash escapes a literal metacharacter — `a\[1\].txt` matches
+// the file `a[1].txt`; because entries are always /-separated the escape is
+// portable across operating systems.
 type ChangesAssert struct {
 	Created  *StringList `yaml:"created,omitempty"`
 	Modified *StringList `yaml:"modified,omitempty"`
