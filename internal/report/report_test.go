@@ -184,6 +184,98 @@ func TestRender_TAP(t *testing.T) {
 	}
 }
 
+// flakyResults builds a suite whose single scenario failed once and then passed
+// on retry (#29). atago treats a recovered scenario as green: the process exits 0
+// (exitForSuite), the console verdict stays PASSED, gha warns instead of erroring,
+// and junit records it as a passed testcase. Every report format must agree on
+// that verdict, so a flaky scenario is a pass and never a failure.
+func flakyResults() []*engine.SuiteResult {
+	return []*engine.SuiteResult{{
+		Suite:    "s1",
+		Status:   engine.StatusPassed,
+		Duration: 3 * time.Millisecond,
+		Scenarios: []engine.ScenarioResult{
+			{Name: "flake", Status: engine.StatusFlaky, Attempts: 2, Duration: time.Millisecond, Steps: []engine.StepResult{
+				{Kind: "assert", Checks: []*assert.CheckResult{{OK: true}}},
+			}},
+		},
+	}}
+}
+
+// TestRender_FlakyIsGreenAcrossFormats is a metamorphic parity check: a scenario
+// that recovered on retry (StatusFlaky) reads as a pass in every report format,
+// matching the exit code and the console verdict. TAP fell through to a `not ok`
+// point, contradicting the green verdict the same run reported everywhere else.
+func TestRender_FlakyIsGreenAcrossFormats(t *testing.T) {
+	t.Parallel()
+
+	t.Run("tap marks a flaky scenario ok, not failed", func(t *testing.T) {
+		t.Parallel()
+		var b bytes.Buffer
+		if err := Render(&b, FormatTAP, flakyResults()); err != nil {
+			t.Fatal(err)
+		}
+		out := b.String()
+		if strings.Contains(out, "not ok") {
+			t.Errorf("TAP reported a flaky scenario as failed; a recovered scenario is green:\n%s", out)
+		}
+		if !strings.Contains(out, "ok 1 - s1 / flake") {
+			t.Errorf("TAP should mark the flaky scenario as an ok point:\n%s", out)
+		}
+		// Green for the verdict, but the recovery stays visible, matching gha's
+		// warning and junit's flakyFailure element.
+		if !strings.Contains(out, "flaky: passed after 2 attempts") {
+			t.Errorf("TAP should keep the flaky recovery visible in a diagnostic:\n%s", out)
+		}
+	})
+
+	t.Run("junit counts a flaky scenario as passed", func(t *testing.T) {
+		t.Parallel()
+		var b bytes.Buffer
+		if err := Render(&b, FormatJUnit, flakyResults()); err != nil {
+			t.Fatal(err)
+		}
+		var root junitTestsuites
+		if err := xml.Unmarshal(b.Bytes(), &root); err != nil {
+			t.Fatalf("JUnit output is not valid XML: %v\n%s", err, b.String())
+		}
+		if root.Tests != 1 || root.Failures != 0 || root.Errors != 0 || root.Skipped != 0 {
+			t.Errorf("counts = tests %d failures %d errors %d skipped %d, want 1/0/0/0",
+				root.Tests, root.Failures, root.Errors, root.Skipped)
+		}
+	})
+
+	t.Run("gha warns instead of erroring on a flaky scenario", func(t *testing.T) {
+		t.Parallel()
+		var b bytes.Buffer
+		if err := Render(&b, FormatGHA, flakyResults()); err != nil {
+			t.Fatal(err)
+		}
+		out := b.String()
+		if strings.Contains(out, "::error") {
+			t.Errorf("gha emitted an error annotation for a flaky (green) scenario:\n%s", out)
+		}
+		if !strings.Contains(out, "::warning title=s1 / flake::") {
+			t.Errorf("gha should warn on a flaky scenario:\n%s", out)
+		}
+	})
+
+	t.Run("console verdict stays PASSED with a flaky scenario", func(t *testing.T) {
+		t.Parallel()
+		var b bytes.Buffer
+		if err := Render(&b, FormatConsole, flakyResults()); err != nil {
+			t.Fatal(err)
+		}
+		out := b.String()
+		if strings.Contains(out, "FAILED") {
+			t.Errorf("console verdict flipped to FAILED for a flaky (green) scenario:\n%s", out)
+		}
+		if !strings.Contains(out, "1 flaky") {
+			t.Errorf("console should surface the flaky count:\n%s", out)
+		}
+	})
+}
+
 func TestProgress_Markers(t *testing.T) {
 	t.Parallel()
 	var b bytes.Buffer

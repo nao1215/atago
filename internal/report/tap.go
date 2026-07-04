@@ -33,6 +33,13 @@ func writeTAP(w io.Writer, results []*engine.SuiteResult) error {
 				fmt.Fprintf(&b, "ok %d - %s\n", n, name)
 			case engine.StatusSkipped:
 				fmt.Fprintf(&b, "ok %d - %s # SKIP %s\n", n, name, tapInline(sc.SkipReason))
+			case engine.StatusFlaky:
+				// A scenario that failed and then passed on retry (#29) is green
+				// for the verdict, matching the exit code, console, gha, and
+				// junit. Emit a passing point so a TAP consumer agrees, and keep
+				// the recovery visible in the diagnostic rather than hiding it.
+				fmt.Fprintf(&b, "ok %d - %s\n", n, name)
+				writeTAPDiagnostic(&b, fmt.Sprintf("flaky: passed after %d attempts", sc.Attempts), detailText(sc))
 			case engine.StatusFailed:
 				fmt.Fprintf(&b, "not ok %d - %s\n", n, name)
 				writeTAPDiagnostic(&b, firstFailureMessage(sc), detailText(sc))
