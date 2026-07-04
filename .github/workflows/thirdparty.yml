@@ -77,6 +77,11 @@ jobs:
             install: |
               go install github.com/minio/minio@latest
               command -v aws >/dev/null || (sudo apt-get update && sudo apt-get install -y awscli)
+          # python3 ships on every runner image; the guard installs it only if
+          # a future image drops it. The pty scenarios exercise the REPL.
+          - name: python
+            dir: ./test/e2e/thirdparty/python
+            install: command -v python3 >/dev/null || (sudo apt-get update && sudo apt-get install -y python3)
           # The suite queries the DNS server with dig (bind9-dnsutils); most
           # runner images ship it, but install it if absent.
           - name: coredns

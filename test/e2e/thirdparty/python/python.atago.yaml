@@ -1,0 +1,139 @@
+version: "1"
+
+suite:
+  name: python3 REPL (interactive pty testbed)
+
+# The python3 REPL is the canonical long-lived interactive session (#33):
+# prompt detection (>>>), multi-exchange expect/send, tracebacks, TTY
+# branching, and clean EOF exit. python3 ships on every CI image, so this is
+# the cheapest always-available pty workout and a copy-paste template for
+# testing your own REPL. Non-interactive `-c` contracts run everywhere; the
+# pty scenarios are POSIX-only. Gate: only where python3 is installed.
+scenarios:
+  - name: version and -c contracts (non-interactive)
+    only:
+      command: python3 --version
+    steps:
+      - run:
+          command: python3 --version
+      - assert:
+          exit_code: 0
+          stdout:
+            matches: "^Python 3\\."
+      - run:
+          command: python3 -c "print('hello from python')"
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: hello from python
+
+  - name: a missing script exits 2 with a can't-open-file error
+    only:
+      command: python3 --version
+    steps:
+      - run:
+          command: python3 no_such_script.py
+      - assert:
+          exit_code: 2
+          stderr:
+            contains: "can't open file"
+
+  - name: stdout is a pipe under run but a tty under pty
+    only:
+      command: python3 --version
+    skip:
+      os: windows
+    steps:
+      # The clearest minimal demonstration of why pty exists: the exact same
+      # program reports False piped, True in a terminal.
+      - run:
+          command: python3 -c "import sys; print(sys.stdout.isatty())"
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "False"
+      - pty:
+          command: python3 -c "import sys; print(sys.stdout.isatty())"
+          timeout: 15s
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "True"
+
+  - name: an interactive session drives the REPL across exchanges
+    only:
+      command: python3 --version
+    skip:
+      os: windows
+    steps:
+      # -q suppresses the version banner; PYTHON_BASIC_REPL avoids the 3.13+
+      # pyrepl needing terminal capabilities the pty does not advertise. Each
+      # send is gated by the >>> prompt reappearing, and the results are
+      # asserted on the final transcript.
+      - pty:
+          command: python3 -q
+          timeout: 20s
+          env:
+            PYTHON_BASIC_REPL: "1"
+          session:
+            - expect: ">>> "
+            - send: "1 + 1\n"
+            - expect: ">>> "
+            - send: "import math\n"
+            - expect: ">>> "
+            - send: "math.factorial(5)\n"
+            - expect: ">>> "
+            - send: "exit()\n"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "2"
+              - "120"
+
+  - name: EOF (ctrl-d) ends the session cleanly
+    only:
+      command: python3 --version
+    skip:
+      os: windows
+    steps:
+      # The empty send / {key: ctrl-d} transmits EOF; the REPL exits 0.
+      - pty:
+          command: python3 -q
+          timeout: 15s
+          env:
+            PYTHON_BASIC_REPL: "1"
+          session:
+            - expect: ">>> "
+            - send: "x = 41\n"
+            - expect: ">>> "
+            - send: { key: ctrl-d }
+      - assert:
+          exit_code: 0
+
+  - name: a traceback is reported and the REPL recovers
+    only:
+      command: python3 --version
+    skip:
+      os: windows
+    steps:
+      - pty:
+          command: python3 -q
+          timeout: 20s
+          env:
+            PYTHON_BASIC_REPL: "1"
+          session:
+            - expect: ">>> "
+            - send: "1/0\n"
+            - expect: "ZeroDivisionError"
+            # The session continues: the REPL is still alive after the error.
+            - expect: ">>> "
+            - send: "'recovered'\n"
+            - expect: "recovered"
+            - send: { key: ctrl-d }
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "ZeroDivisionError"
+              - "recovered"

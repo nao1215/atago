@@ -34,6 +34,7 @@ A browsable, repo-local index of atago's documentation, generated from repositor
 - [openssl.md](../doc/e2e/openssl.md)
 - [prometheus.md](../doc/e2e/prometheus.md)
 - [pushgateway.md](../doc/e2e/pushgateway.md)
+- [python.md](../doc/e2e/python.md)
 - [rclone.md](../doc/e2e/rclone.md)
 - [redis.md](../doc/e2e/redis.md)
 - [restic.md](../doc/e2e/restic.md)

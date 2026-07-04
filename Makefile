@@ -108,6 +108,7 @@ docs: ## Regenerate the committed behavior docs under doc/e2e/ from the specs
 	./dist/$(APP) doc --out doc/e2e/sqlite3.md     ./test/e2e/thirdparty/sqlite3
 	./dist/$(APP) doc --out doc/e2e/minio.md       ./test/e2e/thirdparty/minio
 	./dist/$(APP) doc --out doc/e2e/awscli.md      ./test/e2e/thirdparty/awscli
+	./dist/$(APP) doc --out doc/e2e/python.md      ./test/e2e/thirdparty/python
 	./dist/$(APP) doc --out doc/e2e/prometheus.md  ./test/e2e/thirdparty/prometheus
 	./dist/$(APP) doc --out doc/e2e/rclone.md      ./test/e2e/thirdparty/rclone
 	./dist/$(APP) doc --out doc/e2e/restic.md      ./test/e2e/thirdparty/restic
