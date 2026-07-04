@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 
@@ -165,38 +166,67 @@ func listFiles(root string) ([]string, error) {
 }
 
 // shellJoin renders argv as one command string that re-tokenizes to the same
-// argv through the cmd runner (go-shellwords on POSIX, native argv splitting
-// on Windows). Only whitespace splits a token, so a token is left verbatim
-// unless it carries whitespace, a quote, or is empty; those are wrapped in
-// DOUBLE quotes — the one quoting both tokenizers accept — with embedded
-// backslashes and double-quotes escaped. A Windows path like C:\tool.exe has
-// no whitespace, so it passes through unquoted (single-quoting it would leave
-// Windows treating the quotes as part of the filename).
+// argv through the cmd runner, which uses go-shellwords on POSIX and native
+// argv splitting on Windows. The two tokenizers reinterpret different
+// characters, so quoting is platform-specific: it runs on the machine that
+// records, which is the machine that replays.
 func shellJoin(args []string) string {
-	quoted := make([]string, len(args))
-	for i, a := range args {
-		if !needsQuoting(a) {
-			quoted[i] = a
-			continue
-		}
-		// Escape only embedded double-quotes: a backslash inside double
-		// quotes is a POSIX escape but a literal on Windows, so escaping it
-		// would round-trip on one platform and double up on the other.
-		// Leaving it literal keeps a spaced Windows path (C:\Program
-		// Files\tool.exe) intact on both.
-		quoted[i] = `"` + strings.ReplaceAll(a, `"`, `\"`) + `"`
+	if runtime.GOOS == "windows" {
+		return windowsJoin(args)
 	}
-	return strings.Join(quoted, " ")
+	return posixJoin(args)
 }
 
-// needsQuoting reports whether a token would lose its argv boundary when
-// re-tokenized unquoted: the empty string (would vanish) or anything with
-// whitespace or a quote character.
-func needsQuoting(s string) bool {
-	if s == "" {
-		return true
+// posixJoin single-quotes every token that is not a plain word. Single quotes
+// disable ALL go-shellwords interpretation — whitespace, the metacharacters
+// it treats as boundaries (; & | < > ( )), globs, $-expansion, and
+// backslashes — so `foo|bar`, `a>b`, and `C:\tmp\file` all round-trip. An
+// embedded single quote is closed, escaped, and reopened ('\”).
+func posixJoin(args []string) string {
+	out := make([]string, len(args))
+	for i, a := range args {
+		if plainPOSIXWord(a) {
+			out[i] = a
+			continue
+		}
+		out[i] = "'" + strings.ReplaceAll(a, "'", `'\''`) + "'"
 	}
-	return strings.ContainsAny(s, " \t\n'\"")
+	return strings.Join(out, " ")
+}
+
+// windowsJoin double-quotes tokens the native tokenizer would split or
+// mis-read. Windows argv splitting breaks only on whitespace (the shell
+// metacharacters go-shellwords honors are not argv boundaries there), and
+// backslashes are literal, so a path like C:\tool.exe passes through and only
+// whitespace/quote-bearing tokens need wrapping.
+func windowsJoin(args []string) string {
+	out := make([]string, len(args))
+	for i, a := range args {
+		if a != "" && !strings.ContainsAny(a, " \t\n\"") {
+			out[i] = a
+			continue
+		}
+		out[i] = `"` + strings.ReplaceAll(a, `"`, `\"`) + `"`
+	}
+	return strings.Join(out, " ")
+}
+
+// plainPOSIXWord reports whether a token survives go-shellwords tokenization
+// unquoted: only alphanumerics and a small set of punctuation that carries no
+// shell meaning.
+func plainPOSIXWord(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, r := range s {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
+		case strings.ContainsRune("_@%+=:,./-", r):
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 // suiteNameFor derives a suite name from the command's base name.
