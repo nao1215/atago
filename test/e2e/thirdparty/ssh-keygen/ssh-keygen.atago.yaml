@@ -1,0 +1,162 @@
+version: "1"
+
+suite:
+  name: ssh-keygen (OpenSSH key generation)
+
+# ssh-keygen ships with OpenSSH on every CI image and mixes three atago
+# strengths in one small tool (#34): interactive passphrase prompts (pty),
+# generated-file assertions (the key pair on disk), and a crisp
+# stdout/exit-code contract (fingerprints, verification failures). Every key
+# here is a throwaway generated inside the scenario's isolated workdir — no
+# real credentials, and the workdir is discarded when the scenario ends.
+# Gate: only where ssh-keygen is installed. pty scenarios are POSIX-only.
+
+secrets:
+  - PASSPHRASE
+
+defaults:
+  scenario:
+    env:
+      # A throwaway passphrase, declared under secrets: so it is masked in
+      # reports even when ssh-keygen echoes prompts.
+      PASSPHRASE: atago-test-passphrase
+
+scenarios:
+  - name: non-interactive generation writes the key pair
+    only:
+      command: command -v ssh-keygen
+    steps:
+      - run:
+          command: ssh-keygen -t ed25519 -N '' -f key -C test@atago
+      - assert:
+          exit_code: 0
+      - assert:
+          file:
+            path: key
+            exists: true
+      - assert:
+          file:
+            path: key.pub
+            exists: true
+      - assert:
+          file:
+            path: key.pub
+            contains: ssh-ed25519
+      # The public key is not executable — a black-box permission contract.
+      - assert:
+          file:
+            path: key.pub
+            executable: false
+
+  - name: the fingerprint contract is exact
+    only:
+      command: command -v ssh-keygen
+    steps:
+      - run:
+          command: ssh-keygen -t ed25519 -N '' -f key -C test@atago
+      - assert:
+          exit_code: 0
+      - run:
+          command: ssh-keygen -lf key.pub
+      - assert:
+          exit_code: 0
+          stdout:
+            matches: '(?m)^256 SHA256:[A-Za-z0-9+/]+ test@atago \(ED25519\)$'
+
+  - name: -y regenerates the public key from the private key
+    only:
+      command: command -v ssh-keygen
+    steps:
+      - run:
+          command: ssh-keygen -t ed25519 -N '' -f key -C test@atago
+      - assert:
+          exit_code: 0
+      # -y prints the public half; it must match the committed key.pub line
+      # (both carry the same base64 body).
+      - run:
+          command: ssh-keygen -y -f key
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: ssh-ed25519
+
+  - name: -y on a corrupted key file fails
+    only:
+      command: command -v ssh-keygen
+    steps:
+      - fixture:
+          file: corrupt
+          content: "this is not a private key\n"
+      - run:
+          shell: true
+          command: chmod 600 corrupt && ssh-keygen -y -f corrupt
+      - assert:
+          exit_code:
+            in: [255, 1]
+          stderr:
+            contains: "error in libcrypto"
+
+  - name: interactive passphrase generation prompts twice
+    only:
+      command: command -v ssh-keygen
+    skip:
+      os: windows
+    steps:
+      # ssh-keygen prompts for a passphrase and its confirmation on the tty;
+      # the pty session answers both, then the key pair lands on disk.
+      - pty:
+          command: ssh-keygen -t ed25519 -f protected -C test@atago
+          timeout: 20s
+          session:
+            - expect: "Enter passphrase"
+            - send: "atago-test-passphrase\n"
+            - expect: "Enter same passphrase again"
+            - send: "atago-test-passphrase\n"
+            - expect: "randomart"
+      - assert:
+          exit_code: 0
+          file:
+            path: protected
+            exists: true
+      - assert:
+          file:
+            path: protected.pub
+            exists: true
+      - assert:
+          file:
+            path: protected.pub
+            contains: ssh-ed25519
+      # The passphrase-protected key round-trips: -y -P prints its public half.
+      - run:
+          shell: true
+          command: ssh-keygen -y -P "$PASSPHRASE" -f protected
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: ssh-ed25519
+
+  - name: the wrong passphrase is rejected
+    only:
+      command: command -v ssh-keygen
+    skip:
+      os: windows
+    steps:
+      - pty:
+          command: ssh-keygen -t ed25519 -f protected -C test@atago
+          timeout: 20s
+          session:
+            - expect: "Enter passphrase"
+            - send: "atago-test-passphrase\n"
+            - expect: "Enter same passphrase again"
+            - send: "atago-test-passphrase\n"
+            - expect: "randomart"
+      - assert:
+          exit_code: 0
+      # -y with the wrong passphrase cannot decrypt the key.
+      - run:
+          command: ssh-keygen -y -P definitely-not-the-passphrase -f protected
+      - assert:
+          exit_code:
+            in: [255, 1]
+          stderr:
+            contains: "incorrect passphrase"
