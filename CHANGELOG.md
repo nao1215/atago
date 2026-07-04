@@ -7,6 +7,15 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- The TAP report now emits a passing `ok` point for a flaky scenario (one that
+  failed and then passed under `--retry-failed`), matching the exit code and the
+  console, gha, and junit reports, which all treat a recovered scenario as green.
+  TAP previously fell through to `not ok`, so a CI step consuming the TAP stream
+  read the run as failed even though atago exited 0; the recovery now stays
+  visible in the point's diagnostic instead of flipping the verdict.
+
 ## [0.3.1] - 2026-07-05
 
 A bug-fix release — correctness and UX hardening across the assertion engine,
