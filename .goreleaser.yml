@@ -39,7 +39,7 @@ homebrew_casks:
       token: "{{ .Env.TAP_GITHUB_TOKEN }}"
     directory: Casks
     homepage: "https://github.com/nao1215/atago"
-    description: "End-to-end test runner for CLI tools driven by plain-YAML specs"
+    description: "Tests real CLI behavior from plain YAML: commands, files, snapshots, and interactive terminals"
     # The binary is not signed/notarized, so strip the quarantine attribute on
     # install — otherwise Gatekeeper blocks the cask-installed binary with
     # "cannot verify the developer" (the pattern GoReleaser documents for
@@ -57,7 +57,8 @@ release:
   header: |
     ## atago {{ .Tag }}
 
-    atago release.
+    atago tests real CLI behavior from plain YAML: commands, files, snapshots,
+    and interactive terminals.
 
     Every artifact is signed and ships with an SBOM and build provenance — see
     [Verifying release integrity](https://github.com/nao1215/atago#verifying-release-integrity).

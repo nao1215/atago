@@ -12,15 +12,28 @@
 
 # atago
 
-atago is an end-to-end test runner for command-line tools. It runs a real command, in any language, and checks what a user observes: the exit code, stdout, stderr, generated files, JSON output, and snapshots. Specs are plain YAML — no test code, no shell DSL, no embedded scripting. It also drives HTTP, database, SSH, gRPC, and headless-browser peers, and generates Markdown docs from specs.
+atago tests real CLI behavior from plain YAML: commands, files, snapshots, services, and interactive terminals. It runs your actual binary — in any language — and asserts what a user observes. No test code, no shell DSL.
 
 ![demo](./doc/img/demo.gif)
 
 ```shell
-atago init                       # write a starter example.atago.yaml
-atago run example.atago.yaml     # run the spec you just created
-atago run --report junit specs/  # emit a JUnit report for CI
+atago record -- mytool convert input.txt  # turn a real run into mytool.atago.yaml
+atago run mytool.atago.yaml               # replay it as a test
+atago run --report junit specs/           # or run a whole suite in CI
 ```
+
+## Why atago?
+
+Pick the tool that owns your layer:
+
+| You are testing | Use |
+|-----------------|-----|
+| An HTTP/gRPC API server — scenario-based API testing | [runn](https://github.com/k1LoW/runn) |
+| Shell functions and scripts — BDD-style unit tests | [ShellSpec](https://shellspec.info/) |
+| Bash scripts — TAP-style tests | [Bats](https://github.com/bats-core/bats-core) |
+| A CLI product — exit codes, output, generated files, snapshots, interactive prompts and TUIs | **atago** |
+
+If the server is the system under test, use runn. atago points the other way: the CLI is the product, and HTTP, database, SSH, gRPC, browser, and mock servers appear only as peers your CLI talks to.
 
 ## Install
 
@@ -36,7 +49,7 @@ brew install --cask nao1215/tap/atago
 
 The [release page](https://github.com/nao1215/atago/releases) contains prebuilt binary archives for Linux, macOS, and Windows (amd64/arm64; `.tar.gz`, or `.zip` on Windows). Requires Go 1.26 or later when building from source.
 
-Runs on Linux, macOS, and Windows. CI runs the unit tests on all three, the full E2E suite on Linux and macOS, and a portable E2E subset on Windows; specs that lean on POSIX-only shell tools are the remaining gap on Windows.
+Runs on Linux, macOS, and Windows (CI tests all three).
 
 ## Verifying release integrity
 
@@ -61,7 +74,23 @@ gh attestation verify atago_<version>_<os>_<arch>.tar.gz --repo nao1215/atago  #
 
 ## Getting started
 
-`atago init` scaffolds a runnable spec. The shape is always the same: declare a command, run it, assert on what it produced.
+### Start from a real run
+
+You don't write the first spec — your tool does. `atago record -- <command>` runs it once and generates a spec from what it observed (exit code, output, created files):
+
+```shell
+$ atago record --out mytool.atago.yaml -- mytool convert input.txt
+recorded: exit 0, 2 stdout line(s), 1 file(s) created
+wrote mytool.atago.yaml
+$ atago run mytool.atago.yaml
+.
+
+PASSED  1 scenario: 1 passed, 0 failed, 0 errored, 0 skipped (12ms)
+```
+
+Prefer a blank template? `atago init` scaffolds one. Either way, the shape is always the same: declare a command, run it, assert on what it produced.
+
+### 1. Check exit code, stdout, and stderr
 
 ```yaml
 version: "1"
@@ -81,7 +110,7 @@ scenarios:
             empty: true
 ```
 
-`atago run` accepts spec files and directories (searched recursively for `*.atago.yaml`). Each scenario runs in its own temporary directory, and progress streams as a dot per scenario (`.` pass, `F` fail, `E` error, `s` skip). For full reproducibility a step can also opt out of the inherited host environment with `clear_env: true` (re-admitting an allowlist via `pass_env`), so host vars like `LANG` or `GIT_*` cannot make a spec pass on one machine and fail on another. Every run/http/query/grpc step is bounded by a built-in 60s default timeout, so a hanging command fails loudly instead of stalling CI — set `suite.timeout` (or a step/runner `timeout`) to change the budget, or `timeout: "0"` to opt a legitimately long step out:
+`atago run` accepts spec files and directories (searched recursively for `*.atago.yaml`). Each scenario runs in its own temporary directory, and progress streams as a dot per scenario (`.` pass, `F` fail, `E` error, `s` skip):
 
 ```shell
 $ atago run ./specs
@@ -90,7 +119,7 @@ $ atago run ./specs
 PASSED  47 scenarios: 47 passed, 0 failed, 0 errored, 0 skipped (1.2s)
 ```
 
-When a check fails, atago prints exactly what was expected and what happened — and multi-line `equals`/`snapshot` mismatches render a colorized unified diff (respecting `--ci`/`NO_COLOR`) instead of two raw dumps:
+When a check fails, atago prints exactly what was expected and what happened; multi-line mismatches render a colorized unified diff:
 
 ```text
 FAILED: demo / greeting matches its golden
@@ -111,42 +140,51 @@ Hint:
   stdout did not match snapshot "snaps/greeting.txt" (update with --update-snapshots if intended)
 ```
 
-Single-line failures keep the compact form:
+### 2. Check generated files and snapshots
 
-```text
-FAILED: demo / expect Alice but the command prints Bob
+`fixture:` writes input files into the isolated workdir; `file:`/`dir:` assertions check what the command produced, and `snapshot:` pins output to a committed golden file (volatile details like temp paths, UUIDs, and timestamps are normalized):
 
-Step:
-  assert stdout contains "Alice"
-
-Command:
-  echo Bob
-
-Expected:
-  stdout contains "Alice"
-
-Actual:
-  Bob
-
-Hint:
-  the substring "Alice" was not present in stdout
+```yaml
+scenarios:
+  - name: the generator writes the expected files
+    steps:
+      - run:
+          command: mytool generate --out site
+      - assert:
+          file:
+            path: site/index.html
+            contains:
+              - "<html"
+      - assert:
+          stdout:
+            snapshot: snapshots/generate.txt   # record/refresh with `atago snapshot update`
 ```
 
-Already have a working command? `atago record -- <command>` runs it once in a scratch directory and generates a spec from what it observed — exit code, first output line, created files — so you start from *your* tool's behavior instead of a blank file:
+See [files_and_fixtures](examples/files_and_fixtures.atago.yaml), [snapshot](examples/snapshot.atago.yaml), and [dir_tree](examples/dir_tree.atago.yaml) for whole-tree golden manifests.
 
-```shell
-$ atago record --out mytool.atago.yaml -- mytool convert input.txt
-recorded: exit 0, 2 stdout line(s), 1 file(s) created
-wrote mytool.atago.yaml
-$ atago run mytool.atago.yaml
-.
+### 3. Drive interactive prompts and TUIs
 
-PASSED  1 scenario: 1 passed, 0 failed, 0 errored, 0 skipped (12ms)
+A `pty` step runs the command in a real pseudo-terminal and drives it with a declarative expect/send session — wizards, REPLs, and TTY-detection branches, no `expect(1)` scripting:
+
+```yaml
+scenarios:
+  - name: the init wizard completes
+    steps:
+      - pty:
+          command: mytool init
+          session:
+            - expect: "Project name:"
+            - send: "demo\n"
+            - expect: "created demo/"
+      - assert:
+          exit_code: 0
 ```
 
-The generated matchers are deliberately conservative (a skeleton to tighten, not a brittle golden); `--snapshot` records a stdout golden instead, and `--shell` records shell-style command lines.
+Named keys (`send: {key: enter}`) and asserts on the RENDERED terminal screen cover full TUIs — see [pty](examples/pty.atago.yaml) and [pty_screen](examples/pty_screen.atago.yaml) (POSIX-only).
 
-`atago init --template <name>` scaffolds a starter for the other runner families; `atago init --list-templates` describes each one and says whether it runs as-is or what to edit first:
+### When your CLI talks to a server
+
+The same YAML also drives HTTP, database, SSH, gRPC, headless-browser, and offline mock-server peers — as dependencies of the CLI under test. `atago init --template <name>` scaffolds each:
 
 ```shell
 $ atago init --list-templates
@@ -195,15 +233,11 @@ Every feature has a commented, runnable spec under [examples/](examples/). The e
 | [grpc](examples/grpc.atago.yaml) | unary gRPC calls via server reflection |
 | [browser](examples/browser.atago.yaml) | headless-Chrome flows and screenshots |
 
-Selection flags compose with any spec: `--filter NAME`, `--tag T`, `--skip-tag T`, `--parallel N` (default: the number of CPUs — scenarios are isolated, so runs are concurrent out of the box), `--fail-fast`, and `--rerun-failed` (rerun only what failed last time). While authoring a spec, `--verbose` traces every scenario — the expanded command, exit code, captured stdout/stderr, and each assertion's verdict — for passing scenarios too, so you never have to break an assertion just to see what a command printed.
-
-## Test API-client CLIs offline
-
-Tools that talk to an API — gh-style CLIs, cloud CLIs, webhook senders, anything with an `--endpoint` flag — are testable without the real service: `mock_servers:` starts a stub HTTP server on an ephemeral loopback port, serves canned routes, and records every request, and the `mock:` assertion target then checks what your CLI actually sent (request count, auth header, JSON body). `${<name>.url}` carries the address into your command; unmatched requests answer 404 and stay visible in failures. See [examples/mock_server.atago.yaml](examples/mock_server.atago.yaml) or scaffold one with `atago init --template mock`.
+Selection flags compose with any spec: `--filter NAME`, `--tag T`, `--skip-tag T`, `--parallel N`, `--fail-fast`, and `--rerun-failed`. While authoring, `--verbose` traces every command, capture, and assertion verdict — for passing scenarios too.
 
 ## Use it in CI
 
-Real E2E suites flake (timing, ports, external tools). atago handles that in the runner, honestly: `--retry-failed N` re-runs failed scenarios in a fresh workdir and reports recovered ones as **flaky** — green for the exit code, but surfaced in the summary (`, 2 flaky`), the progress dots (`f`), the JSON report (`"status": "flaky"` + `attempts`), JUnit (`<flakyFailure>`), TAP, and GitHub annotations. Silent retries are explicitly a non-goal. `--repeat N` does the opposite job: run each scenario N times to detect flakiness before it reaches CI (`race prone: 18/20 passed`; any failing iteration fails the run).
+Real E2E suites flake (timing, ports, external tools). `--retry-failed N` re-runs failed scenarios in a fresh workdir and reports recovered ones as **flaky** — green for the exit code, but loud in every report format; silent retries are explicitly a non-goal. `--repeat N` does the opposite job: run each scenario N times to detect flakiness before it reaches CI.
 
 ```shell
 atago run --ci --retry-failed 2 ./specs          # keep CI green, report instability loudly
