@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-54 suites · 211 scenarios
+54 suites · 213 scenarios
 ## Contents
 - [atago self-hosting / variable expansion in assertion matcher values](#atago-self-hosting--variable-expansion-in-assertion-matcher-values) — 6 scenarios
   - [stdout.equals expands ${workdir}](#scenario-stdoutequals-expands-workdir)
@@ -159,7 +159,7 @@
 - [atago self-hosting / pdf assertion](#atago-self-hosting--pdf-assertion) — 2 scenarios
   - [pdf assertions cover page count, metadata, and text](#scenario-pdf-assertions-cover-page-count-metadata-and-text)
   - [a non-pdf file fails the pdf target](#scenario-a-non-pdf-file-fails-the-pdf-target)
-- [atago self-hosting / pty](#atago-self-hosting--pty) — 7 scenarios
+- [atago self-hosting / pty](#atago-self-hosting--pty) — 8 scenarios
   - [a pty step sees a terminal where a run step sees a pipe](#scenario-a-pty-step-sees-a-terminal-where-a-run-step-sees-a-pipe)
   - [a never-matching expect fails with the pattern in the block](#scenario-a-never-matching-expect-fails-with-the-pattern-in-the-block)
   - [named keys transmit their documented bytes and ctrl-c aborts](#scenario-named-keys-transmit-their-documented-bytes-and-ctrl-c-aborts)
@@ -167,7 +167,8 @@
   - [screen asserts see the final frame where the transcript sees history](#scenario-screen-asserts-see-the-final-frame-where-the-transcript-sees-history)
   - [a screen snapshot round-trips through update and compare](#scenario-a-screen-snapshot-round-trips-through-update-and-compare)
   - [a screen assert without a pty step is a load-time error](#scenario-a-screen-assert-without-a-pty-step-is-a-load-time-error)
-- [atago self-hosting / record (spec skeleton from an observed run)](#atago-self-hosting--record-spec-skeleton-from-an-observed-run) — 12 scenarios
+  - [a send referencing an undefined variable is an execution error, not typed literally](#scenario-a-send-referencing-an-undefined-variable-is-an-execution-error-not-typed-literally)
+- [atago self-hosting / record (spec skeleton from an observed run)](#atago-self-hosting--record-spec-skeleton-from-an-observed-run) — 13 scenarios
   - [record then run round-trips green](#scenario-record-then-run-round-trips-green)
   - [refusing to overwrite without --force](#scenario-refusing-to-overwrite-without---force)
   - [record --pty refuses an existing --out before driving the session](#scenario-record---pty-refuses-an-existing---out-before-driving-the-session)
@@ -180,6 +181,7 @@
   - [record --pty of a no-input command yields a session-less spec that replays green](#scenario-record---pty-of-a-no-input-command-yields-a-session-less-spec-that-replays-green)
   - [a prompt with regex metacharacters is escaped in the generated expect](#scenario-a-prompt-with-regex-metacharacters-is-escaped-in-the-generated-expect)
   - [recorded text containing dollar-brace round-trips as literal text](#scenario-recorded-text-containing-dollar-brace-round-trips-as-literal-text)
+  - [a recorded secret placeholder replays green with the env set and is guarded when unset](#scenario-a-recorded-secret-placeholder-replays-green-with-the-env-set-and-is-guarded-when-unset)
 - [atago self-hosting / reports](#atago-self-hosting--reports) — 5 scenarios
   - [JUnit report is XML with a testsuite and testcase](#scenario-junit-report-is-xml-with-a-testsuite-and-testcase)
   - [GitHub Actions annotations are emitted on failure](#scenario-github-actions-annotations-are-emitted-on-failure)
@@ -2971,6 +2973,32 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `requires a preceding pty step`
+### Scenario: a send referencing an undefined variable is an execution error, not typed literally
+_skipped on windows_
+#### Given
+- Fixture file `typo.atago.yaml` is created.
+#### Inputs
+_Fixture `typo.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: typo
+scenarios:
+  - name: typo in a send variable
+    steps:
+      - pty:
+          command: cat
+          timeout: 5s
+          session:
+            - send: "${no_such_var}\n"
+```
+#### When
+```shell
+${atago} run typo.atago.yaml
+```
+#### Then
+- exit code is `4`
+- stdout contains `no variable with that name is defined`, `$${no_such_var}`
 ## atago self-hosting / record (spec skeleton from an observed run)
 Source: `test/e2e/atago/record.atago.yaml`
 ### Scenario: record then run round-trips green
@@ -3140,6 +3168,26 @@ ${atago} run dollar.atago.yaml
 - after `${atago} run dollar.atago.yaml`:
   - exit code is `0`
   - stdout contains `1 passed`
+### Scenario: a recorded secret placeholder replays green with the env set and is guarded when unset
+_skipped on windows_
+#### Given
+- Environment variables are set: ATAGO_SECRET_1.
+#### When
+```shell
+# interactive (pty): ${atago} record --pty --out sec.atago.yaml -- sh -c 'stty -echo; printf "Password: "; read pw; stty echo; printf "\naccepted\n"'
+${atago} run sec.atago.yaml
+${atago} run sec.atago.yaml
+```
+#### Then
+- exit code is `0`
+- file `sec.atago.yaml` contains `${env:ATAGO_SECRET_1}`
+- file `sec.atago.yaml` is checked
+- after `${atago} run sec.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `1 passed`
+- after `${atago} run sec.atago.yaml`:
+  - exit code is `4`
+  - stdout contains `ATAGO_SECRET_1 is not set`
 ## atago self-hosting / reports
 Source: `test/e2e/atago/reports.atago.yaml`
 ### Scenario: JUnit report is XML with a testsuite and testcase

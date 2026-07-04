@@ -506,7 +506,7 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "description": "Exactly one of expect (wait until the transcript matches the regexp) or send (write to the terminal; \"\" sends EOF/^D; {key: enter} presses a named key, #26).",
+            "description": "Exactly one of expect (wait until the transcript matches the regexp) or send (write to the terminal; \"\" sends EOF/^D; {key: enter} presses a named key, #26). ${name}/${env:NAME} references in a send or expect are expanded against the store; a reference nothing resolves fails the step before any terminal I/O (#78) — write $${name} for literal text.",
             "properties": {
               "expect": { "type": "string" },
               "send": {

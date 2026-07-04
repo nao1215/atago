@@ -294,3 +294,55 @@ scenarios:
           exit_code: 0
           stdout:
             contains: "1 passed"
+
+  - name: a recorded secret placeholder replays green with the env set and is guarded when unset
+    skip:
+      os: windows
+    steps:
+      # #69 records echo-off (secret) input as a live ${env:ATAGO_SECRET_n}
+      # placeholder — the one send that MUST stay a live reference. #78 adds the
+      # unresolved-variable guard for pty sessions, so this placeholder path has
+      # two contracts: with the variable SET it replays green, and with it UNSET
+      # the run fails loudly instead of typing the literal placeholder into the
+      # password prompt. An OUTER pty step hand-drives the recorder against a
+      # prompt that turns terminal echo off; the read value is never echoed, so
+      # the secret never lands in the generated spec.
+      - pty:
+          shell: true
+          command: '${atago} record --pty --out sec.atago.yaml -- sh -c ''stty -echo; printf "Password: "; read pw; stty echo; printf "\naccepted\n"'''
+          timeout: 20s
+          session:
+            - expect: "Password:"
+            - send: "hunter2\n"
+            - expect: "accepted"
+      - assert:
+          exit_code: 0
+      # The generated send is a live env placeholder, and the typed secret is not
+      # recorded anywhere in the spec.
+      - assert:
+          file:
+            path: sec.atago.yaml
+            contains: "${env:ATAGO_SECRET_1}"
+      - assert:
+          file:
+            path: sec.atago.yaml
+            not_contains: "hunter2"
+      # With the secret variable set, the placeholder expands and the spec
+      # replays green.
+      - run:
+          shell: true
+          env:
+            ATAGO_SECRET_1: hunter2
+          command: ${atago} run sec.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "1 passed"
+      # With it unset, the #78 guard fires (exit 4) instead of typing the literal
+      # ${env:ATAGO_SECRET_1} into the prompt.
+      - run:
+          command: ${atago} run sec.atago.yaml
+      - assert:
+          exit_code: 4
+          stdout:
+            contains: "ATAGO_SECRET_1 is not set"

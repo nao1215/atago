@@ -186,3 +186,36 @@ scenarios:
           exit_code: 2
           stderr:
             contains: "requires a preceding pty step"
+
+  - name: a send referencing an undefined variable is an execution error, not typed literally
+    skip:
+      os: windows
+    steps:
+      # #78: a pty session entry that references a ${name} nothing defines must
+      # fail the run with the same fix-forward guard a no-shell run.command
+      # produces — otherwise st.Expand leaves the reference verbatim and the
+      # literal `${no_such_var}` is TYPED into the program, so a typo'd store
+      # name feeds garbage instead of failing at the mistake. The run errors
+      # (exit 4) and the message names the reference and the $${...} escape.
+      - fixture:
+          file: typo.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: typo
+            scenarios:
+              - name: typo in a send variable
+                steps:
+                  - pty:
+                      command: cat
+                      timeout: 5s
+                      session:
+                        - send: "${no_such_var}\n"
+      - run:
+          command: ${atago} run typo.atago.yaml
+      - assert:
+          exit_code: 4
+          stdout:
+            contains:
+              - "no variable with that name is defined"
+              - "$${no_such_var}"
