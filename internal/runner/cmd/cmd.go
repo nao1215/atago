@@ -118,7 +118,7 @@ func (r *Runner) Run(ctx context.Context, run *spec.Run, workdir string) (*runne
 	// instead of asserting against the killed result (issue #30).
 	if err := ctx.Err(); err != nil {
 		res.ExitCode = -1
-		return res, fmt.Errorf("run %q cancelled: %w", run.Command, err)
+		return res, fmt.Errorf("run %q canceled: %w", run.Command, err)
 	}
 
 	var exitErr *exec.ExitError

@@ -210,7 +210,7 @@ func Run(ctx context.Context, p *spec.PTY, workdir string, env []string) (*runne
 				// cancel/timeout split (#30). Only a genuine session-budget timeout
 				// (DeadlineExceeded) becomes an ExpectFailure.
 				if errors.Is(ctx.Err(), context.Canceled) {
-					return failHard(fmt.Errorf("pty %q cancelled: %w", p.Command, ctx.Err()))
+					return failHard(fmt.Errorf("pty %q canceled: %w", p.Command, ctx.Err()))
 				}
 				return abort(&ExpectFailure{Pattern: a.Expect, Transcript: string(snapshot())})
 			}
@@ -234,7 +234,7 @@ func Run(ctx context.Context, p *spec.PTY, workdir string, env []string) (*runne
 		// A parent cancellation is a hard error; a session-budget timeout is a
 		// normal timed-out result (#30).
 		if errors.Is(ctx.Err(), context.Canceled) {
-			return failHard(fmt.Errorf("pty %q cancelled: %w", p.Command, ctx.Err()))
+			return failHard(fmt.Errorf("pty %q canceled: %w", p.Command, ctx.Err()))
 		}
 		return abort(nil)
 	}

@@ -52,7 +52,11 @@ func TestSplitMethod(t *testing.T) {
 // otherwise be recorded as a normal Result{GRPCStatus:4} and pass against a hung
 // server unless the spec happened to assert grpc_status.
 func TestInvoke_CallTimeoutIsError(t *testing.T) {
-	t.Parallel()
+	// NOT parallel: grpcstub.NewServer registers the proto into the global
+	// protoregistry with a check-then-register that races another grpcstub server
+	// spun up in parallel (TestInvoke_RepeatedReflectionCallsSucceed), panicking
+	// with "file already registered". Running sequentially, the first registration
+	// wins and the second is skipped.
 	ts := grpcstub.NewServer(t, "testdata/greeter.proto")
 	t.Cleanup(func() { ts.Close() })
 	ts.Method("SayHello").Handler(func(_ *grpcstub.Request) *grpcstub.Response {
