@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-54 suites · 210 scenarios
+54 suites · 212 scenarios
 ## Contents
 - [atago self-hosting / variable expansion in assertion matcher values](#atago-self-hosting--variable-expansion-in-assertion-matcher-values) — 6 scenarios
   - [stdout.equals expands ${workdir}](#scenario-stdoutequals-expands-workdir)
