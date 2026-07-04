@@ -387,6 +387,8 @@ func describeTarget(a *spec.Assert, target spec.AssertTarget) string {
 		return describeMockAssert(a.Mock)
 	case spec.AssertScreen:
 		return "screen " + describeStream(a.Screen)
+	case spec.AssertDuration:
+		return "completes " + a.Duration.DescribeDuration()
 	case spec.AssertStdout:
 		return "stdout " + describeStream(a.Stdout)
 	case spec.AssertStderr:

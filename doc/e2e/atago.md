@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-51 suites · 183 scenarios
+52 suites · 187 scenarios
 ## Contents
 - [atago self-hosting / variable expansion in assertion matcher values](#atago-self-hosting--variable-expansion-in-assertion-matcher-values) — 3 scenarios
   - [stdout.equals expands ${workdir}](#scenario-stdoutequals-expands-workdir)
@@ -41,6 +41,11 @@
   - [doc emits a summary, table of contents, and input previews](#scenario-doc-emits-a-summary-table-of-contents-and-input-previews)
   - [doc --split-by-spec writes one file per spec and an index](#scenario-doc---split-by-spec-writes-one-file-per-spec-and-an-index)
   - [doc --split-by-spec requires --out-dir](#scenario-doc---split-by-spec-requires---out-dir)
+- [atago self-hosting / duration assertion](#atago-self-hosting--duration-assertion) — 4 scenarios
+  - [a fast step passes a generous upper bound](#scenario-a-fast-step-passes-a-generous-upper-bound)
+  - [an impossible bound fails and shows the measured duration](#scenario-an-impossible-bound-fails-and-shows-the-measured-duration)
+  - [a deliberate wait satisfies a lower bound](#scenario-a-deliberate-wait-satisfies-a-lower-bound)
+  - [a duration assert with no preceding step is a load-time error](#scenario-a-duration-assert-with-no-preceding-step-is-a-load-time-error)
 - [atago self-hosting / edge cases](#atago-self-hosting--edge-cases) — 2 scenarios
   - [JSON assertion on empty stdout reports an empty stream](#scenario-json-assertion-on-empty-stdout-reports-an-empty-stream)
   - [an unsupported matcher is a parse error](#scenario-an-unsupported-matcher-is-a-parse-error)
@@ -949,6 +954,72 @@ ${atago} doc --split-by-spec solo.atago.yaml
 #### Then
 - exit code is `3`
 - stderr contains `requires --out-dir`
+## atago self-hosting / duration assertion
+Source: `test/e2e/atago/duration.atago.yaml`
+### Scenario: a fast step passes a generous upper bound
+#### When
+```shell
+${atago} version
+```
+#### Then
+- exit code is `0`
+- completes in under 60s
+### Scenario: an impossible bound fails and shows the measured duration
+#### Given
+- Fixture file `slow.atago.yaml` is created.
+#### Inputs
+_Fixture `slow.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: slow
+scenarios:
+  - name: cannot beat 1ns
+    steps:
+      - run:
+          command: ${atago} version
+      - assert:
+          duration:
+            lt: 1ns
+```
+#### When
+```shell
+${atago} run slow.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `assert duration < 1ns`, `orders of magnitude`
+### Scenario: a deliberate wait satisfies a lower bound
+_skipped on windows_
+#### When
+```shell
+sleep 0.2
+```
+#### Then
+- exit code is `0`
+- completes in under 60s and in at least 100ms
+### Scenario: a duration assert with no preceding step is a load-time error
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: bad
+scenarios:
+  - name: no step to measure
+    steps:
+      - assert:
+          duration: {lt: 2s}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `requires an immediately preceding`
 ## atago self-hosting / edge cases
 Source: `test/e2e/atago/edge.atago.yaml`
 ### Scenario: JSON assertion on empty stdout reports an empty stream

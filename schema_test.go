@@ -188,6 +188,23 @@ scenarios:
 	}
 }
 
+// TestSchema_AcceptsDuration confirms the duration assertion (#31) is
+// accepted and a conflicting bound pair is rejected.
+func TestSchema_AcceptsDuration(t *testing.T) {
+	s := loadSchema(t)
+	good := `version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    steps:
+      - run: {command: echo}
+      - assert:
+          duration: {gte: 100ms, lt: 60s}`
+	if err := s.Validate(yamlToAny(t, []byte(good))); err != nil {
+		t.Errorf("schema rejected valid duration assert:\n%v", err)
+	}
+}
+
 // TestSchema_AcceptsSignalStep confirms the signal step (#23) is accepted.
 func TestSchema_AcceptsSignalStep(t *testing.T) {
 	s := loadSchema(t)

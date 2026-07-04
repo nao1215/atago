@@ -1,0 +1,77 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / duration assertion
+
+# Exercises #31: bound a step's wall-clock time. The passing bounds are
+# deliberately generous (lt: 60s) so a slow CI runner never flakes them; the
+# failing case uses an impossible lt to prove the FAILED block shows the
+# measured duration. The always-green scenario runs on every OS (this spec is
+# in the Windows E2E allowlist); the sleep-based lower-bound scenario is POSIX.
+scenarios:
+  - name: a fast step passes a generous upper bound
+    steps:
+      - run:
+          command: ${atago} version
+      - assert:
+          exit_code: 0
+          duration:
+            lt: 60s
+
+  - name: an impossible bound fails and shows the measured duration
+    steps:
+      - fixture:
+          file: slow.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: slow
+            scenarios:
+              - name: cannot beat 1ns
+                steps:
+                  - run:
+                      command: ${atago} version
+                  - assert:
+                      duration:
+                        lt: 1ns
+      - run:
+          command: ${atago} run slow.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - "assert duration < 1ns"
+              - "orders of magnitude"
+
+  - name: a deliberate wait satisfies a lower bound
+    skip:
+      os: windows
+    steps:
+      - run:
+          shell: true
+          command: sleep 0.2
+      - assert:
+          exit_code: 0
+          duration:
+            gte: 100ms
+            lt: 60s
+
+  - name: a duration assert with no preceding step is a load-time error
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: bad
+            scenarios:
+              - name: no step to measure
+                steps:
+                  - assert:
+                      duration: {lt: 2s}
+      - run:
+          command: ${atago} run bad.atago.yaml
+      - assert:
+          exit_code: 2
+          stderr:
+            contains: "requires an immediately preceding"

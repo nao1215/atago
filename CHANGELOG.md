@@ -19,6 +19,15 @@ and this project follows [Semantic Versioning](https://semver.org/).
   (`SystemRoot`, `SystemDrive`, `TEMP`, `TMP`, `PATHEXT`) is always retained.
   `pass_env` without `clear_env: true` is a load-time error (exit 2).
   See `examples/hermetic_env.atago.yaml`.
+- `duration` assertion target (#31): `duration: {lt: 2s}` bounds the
+  wall-clock time of the immediately preceding measurable step
+  (run/http/query/grpc/pty) with lt/lte/gt/gte Go-duration bounds — "the
+  command finishes within X", "the backoff actually waited" become
+  declarative. At least one bound; lt/lte and gt/gte are mutually exclusive
+  and any interval must be non-empty (validated at load, exit 2); a
+  misplaced target (first in a scenario, or after fixture/store/assert) is a
+  positioned load error. Failures show the measured duration with a
+  CI-variance hint. See `examples/duration.atago.yaml`.
 - `atago record -- <command>` (#30): run a command once in a scratch
   directory and generate a ready-to-edit spec skeleton from what it observed
   — exact exit code, the first non-empty stdout line as a `contains`
