@@ -1,9 +1,10 @@
 # atago Behavior Specs
 ## Summary
-3 suites · 7 scenarios
+3 suites · 8 scenarios
 ## Contents
-- [git + changes (a staged blob touches exactly index + one object)](#git--changes-a-staged-blob-touches-exactly-index--one-object) — 1 scenario
+- [git + changes (a staged blob touches exactly index + one object)](#git--changes-a-staged-blob-touches-exactly-index--one-object) — 2 scenarios
   - [staging one file creates the index and a single loose object (POSIX)](#scenario-staging-one-file-creates-the-index-and-a-single-loose-object-posix)
+  - [git init's whole .git tree is pinned by one recursive glob (POSIX)](#scenario-git-inits-whole-git-tree-is-pinned-by-one-recursive-glob-posix)
 - [git (third-party CLI, no build required)](#git-third-party-cli-no-build-required) — 5 scenarios
   - [init creates an empty repository](#scenario-init-creates-an-empty-repository)
   - [add and commit make the working tree clean](#scenario-add-and-commit-make-the-working-tree-clean)
@@ -34,6 +35,15 @@ git -C repo add f.txt
 - after `git -C repo add f.txt`:
   - exit code is `0`
   - the step changed exactly created `repo/.git/index`, `repo/.git/objects/*/*`, modified nothing, deleted nothing
+### Scenario: git init's whole .git tree is pinned by one recursive glob (POSIX)
+_skipped on windows_
+#### When
+```shell
+git init -q repo
+```
+#### Then
+- exit code is `0`
+- the step changed exactly created `repo/.git/**`, modified nothing, deleted nothing
 ## git (third-party CLI, no build required)
 Source: `test/e2e/thirdparty/git/git.atago.yaml`
 ### Scenario: init creates an empty repository

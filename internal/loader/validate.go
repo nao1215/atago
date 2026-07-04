@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bmatcuk/doublestar/v4"
 	"github.com/nao1215/atago/internal/runner/db"
 	"github.com/nao1215/atago/internal/spec"
 )
@@ -1062,10 +1063,11 @@ func validateChanges(add func(string, ...any), where string, c *spec.ChangesAsse
 			case pathEscapesWorkdir(entry):
 				add("%s escapes the scenario workdir (no ../ traversal)", field)
 			default:
-				// The entry doubles as a path.Match glob at check time; reject a
-				// malformed pattern here rather than silently matching nothing.
-				if _, err := path.Match(entry, "probe"); err != nil {
-					add("%s is not a valid glob: %v", field, err)
+				// The entry doubles as a doublestar glob at check time (single
+				// `*` stays single-level; `**` crosses `/`); reject a malformed
+				// pattern here rather than silently matching nothing.
+				if !doublestar.ValidatePattern(entry) {
+					add("%s is not a valid glob: bad pattern syntax", field)
 				}
 			}
 		}

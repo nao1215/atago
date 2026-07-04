@@ -18,7 +18,7 @@
   - [manifest surfaces the browser-runner configuration](#scenario-manifest-surfaces-the-browser-runner-configuration)
   - [an upload action without a file fails validation (exit 2)](#scenario-an-upload-action-without-a-file-fails-validation-exit-2)
   - [a download action without a click selector fails validation (exit 2)](#scenario-a-download-action-without-a-click-selector-fails-validation-exit-2)
-- [atago self-hosting / changes (workdir delta assertions)](#atago-self-hosting--changes-workdir-delta-assertions) — 8 scenarios
+- [atago self-hosting / changes (workdir delta assertions)](#atago-self-hosting--changes-workdir-delta-assertions) — 10 scenarios
   - [a generator touches exactly the files it should (POSIX)](#scenario-a-generator-touches-exactly-the-files-it-should-posix)
   - [an unexpected creation breaks the exact contract (POSIX)](#scenario-an-unexpected-creation-breaks-the-exact-contract-posix)
   - [stdout_to counts as created, and modified nothing holds (portable)](#scenario-stdout_to-counts-as-created-and-modified-nothing-holds-portable)
@@ -27,6 +27,8 @@
   - [deleting and recreating with different content is modified only (POSIX)](#scenario-deleting-and-recreating-with-different-content-is-modified-only-posix)
   - [stdout_to overwrites a fixture (modified) while stderr_to creates an empty file (POSIX)](#scenario-stdout_to-overwrites-a-fixture-modified-while-stderr_to-creates-an-empty-file-posix)
   - [a pty step feeds the delta scan just like a run step (POSIX)](#scenario-a-pty-step-feeds-the-delta-scan-just-like-a-run-step-posix)
+  - [a doublestar glob pins an arbitrary-depth generated tree exactly (POSIX)](#scenario-a-doublestar-glob-pins-an-arbitrary-depth-generated-tree-exactly-posix)
+  - [a stray file outside the doublestar prefix breaks the exact contract (POSIX)](#scenario-a-stray-file-outside-the-doublestar-prefix-breaks-the-exact-contract-posix)
 - [atago self-hosting / completion](#atago-self-hosting--completion) — 5 scenarios
   - [bash completion emits a recognizable script](#scenario-bash-completion-emits-a-recognizable-script)
   - [zsh completion emits a compdef script](#scenario-zsh-completion-emits-a-compdef-script)
@@ -684,6 +686,43 @@ _skipped on windows_
 ```
 #### Then
 - the step changed exactly created `from-pty`
+### Scenario: a doublestar glob pins an arbitrary-depth generated tree exactly (POSIX)
+_skipped on windows_
+#### When
+```shell
+mkdir -p out/a/b && printf '1' > out/top.txt && printf '2' > out/a/mid.txt && printf '3' > out/a/b/leaf.txt
+```
+#### Then
+- exit code is `0`
+- the step changed exactly created `out/**`, modified nothing, deleted nothing
+### Scenario: a stray file outside the doublestar prefix breaks the exact contract (POSIX)
+_skipped on windows_
+#### Given
+- Fixture file `check.atago.yaml` is created.
+#### Inputs
+_Fixture `check.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: stray-outside-doublestar
+scenarios:
+  - name: extra file beside the tree
+    steps:
+      - run:
+          shell: true
+          command: 'mkdir -p out/a && printf x > out/a/leaf.txt && printf y > stray.txt'
+      - assert:
+          changes:
+            created:
+              - "out/**"
+```
+#### When
+```shell
+${atago} run check.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `unexpected created file`
 ## atago self-hosting / completion
 Source: `test/e2e/atago/completion.atago.yaml`
 ### Scenario: bash completion emits a recognizable script
