@@ -93,6 +93,7 @@ const (
 	AssertMock       AssertTarget = "mock"
 	AssertScreen     AssertTarget = "screen"
 	AssertDuration   AssertTarget = "duration"
+	AssertChanges    AssertTarget = "changes"
 )
 
 // SetTargets returns the assertion target families present. A valid assert has
@@ -149,6 +150,9 @@ func (a *Assert) SetTargets() []AssertTarget {
 	}
 	if a.Duration != nil {
 		t = append(t, AssertDuration)
+	}
+	if a.Changes != nil {
+		t = append(t, AssertChanges)
 	}
 	return t
 }

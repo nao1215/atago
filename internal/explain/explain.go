@@ -306,6 +306,33 @@ func describeSignal(sg *spec.Signal) string {
 	return desc
 }
 
+// describeChangesExplain renders a workdir-delta assertion (#70) as a compact
+// phrase for `atago explain`. `modified: []` renders as "modified nothing".
+func describeChangesExplain(c *spec.ChangesAssert) string {
+	var parts []string
+	for _, cat := range []struct {
+		name    string
+		entries *spec.StringList
+	}{
+		{"created", c.Created},
+		{"modified", c.Modified},
+		{"deleted", c.Deleted},
+	} {
+		if cat.entries == nil {
+			continue
+		}
+		if len(*cat.entries) == 0 {
+			parts = append(parts, cat.name+" nothing")
+			continue
+		}
+		parts = append(parts, cat.name+" "+strings.Join([]string(*cat.entries), ", "))
+	}
+	if len(parts) == 0 {
+		return "nothing"
+	}
+	return strings.Join(parts, "; ")
+}
+
 // describeMockAssert renders a one-line summary of a mock assertion (#24).
 func describeMockAssert(m *spec.MockAssert) string {
 	desc := "mock " + m.Name
@@ -395,6 +422,8 @@ func describeTarget(a *spec.Assert, target spec.AssertTarget) string {
 		return "screen " + describeStream(a.Screen)
 	case spec.AssertDuration:
 		return "completes " + a.Duration.DescribeDuration()
+	case spec.AssertChanges:
+		return "changed exactly " + describeChangesExplain(a.Changes)
 	case spec.AssertStdout:
 		return "stdout " + describeStream(a.Stdout)
 	case spec.AssertStderr:

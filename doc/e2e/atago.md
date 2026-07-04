@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-53 suites · 189 scenarios
+54 suites · 192 scenarios
 ## Contents
 - [atago self-hosting / variable expansion in assertion matcher values](#atago-self-hosting--variable-expansion-in-assertion-matcher-values) — 3 scenarios
   - [stdout.equals expands ${workdir}](#scenario-stdoutequals-expands-workdir)
@@ -15,6 +15,10 @@
   - [manifest surfaces the browser-runner configuration](#scenario-manifest-surfaces-the-browser-runner-configuration)
   - [an upload action without a file fails validation (exit 2)](#scenario-an-upload-action-without-a-file-fails-validation-exit-2)
   - [a download action without a click selector fails validation (exit 2)](#scenario-a-download-action-without-a-click-selector-fails-validation-exit-2)
+- [atago self-hosting / changes (workdir delta assertions)](#atago-self-hosting--changes-workdir-delta-assertions) — 3 scenarios
+  - [a generator touches exactly the files it should (POSIX)](#scenario-a-generator-touches-exactly-the-files-it-should-posix)
+  - [an unexpected creation breaks the exact contract (POSIX)](#scenario-an-unexpected-creation-breaks-the-exact-contract-posix)
+  - [stdout_to counts as created, and modified nothing holds (portable)](#scenario-stdout_to-counts-as-created-and-modified-nothing-holds-portable)
 - [atago self-hosting / completion](#atago-self-hosting--completion) — 5 scenarios
   - [bash completion emits a recognizable script](#scenario-bash-completion-emits-a-recognizable-script)
   - [zsh completion emits a compdef script](#scenario-zsh-completion-emits-a-compdef-script)
@@ -498,6 +502,74 @@ ${atago} run baddownload.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `download requires a click selector`
+## atago self-hosting / changes (workdir delta assertions)
+Source: `test/e2e/atago/changes.atago.yaml`
+### Scenario: a generator touches exactly the files it should (POSIX)
+_skipped on windows_
+#### Given
+- Fixture file `config.yaml` is created.
+- Fixture file `stale.html` is created.
+#### Inputs
+_Fixture `config.yaml`:_
+```text
+theme: light
+```
+_Fixture `stale.html`:_
+```text
+old
+```
+#### When
+```shell
+printf 'theme: dark\n' > config.yaml && rm stale.html && mkdir -p site/assets && printf '<html></html>' > site/index.html && printf 'body{}' > site/assets/app.css
+```
+#### Then
+- exit code is `0`
+- the step changed exactly created `site/index.html`, `site/assets/*.css`, modified `config.yaml`, deleted `stale.html`
+### Scenario: an unexpected creation breaks the exact contract (POSIX)
+_skipped on windows_
+#### Given
+- Fixture file `check.atago.yaml` is created.
+#### Inputs
+_Fixture `check.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: unexpected
+scenarios:
+  - name: extra file
+    steps:
+      - run:
+          shell: true
+          command: 'echo a > a.txt && echo b > b.txt'
+      - assert:
+          changes:
+            created:
+              - a.txt
+```
+#### When
+```shell
+${atago} run check.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `unexpected created file`
+### Scenario: stdout_to counts as created, and modified nothing holds (portable)
+#### Given
+- Fixture file `input.txt` is created.
+#### Inputs
+_Fixture `input.txt`:_
+```text
+seed
+```
+#### When
+```shell
+echo produced
+```
+#### Then
+- exit code is `0`
+- the step changed exactly created `result.txt`, modified nothing, deleted nothing
+#### Generated artifacts
+- `result.txt`
 ## atago self-hosting / completion
 Source: `test/e2e/atago/completion.atago.yaml`
 ### Scenario: bash completion emits a recognizable script

@@ -1,0 +1,57 @@
+version: "1"
+
+# Workdir delta assertions (#70): `changes:` pins the EXACT set of files the
+# immediately preceding run/pty step created, modified, and deleted in the
+# scenario workdir. It states the contract a CLI product actually has —
+# "this command touches only these files" — which per-path `file:` asserts
+# cannot ("...and nothing else") and a `dir:` snapshot proves only by pinning a
+# whole tree.
+#
+# Each listed field is EXHAUSTIVE in both directions: every observed path must
+# match an entry (an exact workdir-relative path or a /-glob), and every entry
+# must match at least one observed path. So `modified: []` asserts "modified
+# nothing", and an omitted field is unconstrained. Fixture writes happen before
+# the step's pre-scan, so they are inputs, not changes.
+#
+# The multi-file setup uses a POSIX shell, so this scenario skips on Windows;
+# the delta computation itself is covered on every OS by unit tests.
+# Runs green as-is on Linux/macOS: atago run examples/changes.atago.yaml
+
+suite:
+  name: workdir delta assertions
+
+scenarios:
+  - name: a generator touches exactly the files it should
+    skip:
+      os: windows
+    steps:
+      # Seed inputs. These land before the measured step's pre-scan, so they are
+      # the baseline — not counted as "created".
+      - fixture:
+          file: config.yaml
+          content: "theme: light\n"
+      - fixture:
+          file: stale.html
+          content: "<!-- old -->\n"
+      # The generator rewrites config.yaml, deletes the stale page, and emits a
+      # fresh site/ tree.
+      - run:
+          shell: true
+          command: >-
+            printf 'theme: dark\n' > config.yaml &&
+            rm stale.html &&
+            mkdir -p site/assets &&
+            printf '<html></html>' > site/index.html &&
+            printf 'body{}' > site/assets/app.css
+      - assert:
+          exit_code: 0
+          # The exact delta: two files created (index.html plus any CSS under
+          # assets/), config.yaml modified, stale.html deleted — and nothing else.
+          changes:
+            created:
+              - site/index.html
+              - site/assets/*.css
+            modified:
+              - config.yaml
+            deleted:
+              - stale.html

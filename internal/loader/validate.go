@@ -86,6 +86,7 @@ func validate(s *spec.Spec) []string {
 		// reject placements no step could feed.
 		ptySeen := false
 		prevMeasurable := false
+		prevRunOrPTY := false
 		for j := range sc.Steps {
 			sw := fmt.Sprintf("%s.steps[%d]", where, j)
 			st := &sc.Steps[j]
@@ -98,14 +99,25 @@ func validate(s *spec.Spec) []string {
 			if st.Assert != nil && st.Assert.Duration != nil && !prevMeasurable {
 				add("%s.assert.duration requires an immediately preceding run/http/query/grpc/pty step (the step whose wall-clock time it bounds)", sw)
 			}
+			// changes bounds the workdir delta of the immediately preceding
+			// run/pty step (#70): reject a placement no such step feeds.
+			if st.Assert != nil && st.Assert.Changes != nil && !prevRunOrPTY {
+				add("%s.assert.changes requires an immediately preceding run/pty step (the step whose workdir delta it pins)", sw)
+			}
 			validateStep(add, sw, st, s.Runners, serviceNames, mockNames)
 			prevMeasurable = measurableStep(st.Kind())
+			prevRunOrPTY = st.Kind() == spec.StepRun || st.Kind() == spec.StepPTY
 		}
 		for j := range sc.Teardown {
 			tw := fmt.Sprintf("%s.teardown[%d]", where, j)
 			st := &sc.Teardown[j]
 			if st.Assert != nil && st.Assert.Screen != nil && !ptySeen {
 				add("%s.assert.screen requires a pty step in the scenario", tw)
+			}
+			// The workdir delta is only tracked around Steps, so a changes assert
+			// in teardown could never be fed (#70).
+			if st.Assert != nil && st.Assert.Changes != nil {
+				add("%s.assert.changes is not supported in teardown (the workdir delta is tracked only around the scenario's steps)", tw)
 			}
 			validateStep(add, tw, st, s.Runners, serviceNames, mockNames)
 		}
@@ -899,6 +911,8 @@ func validateAssertTarget(add func(string, ...any), where string, a *spec.Assert
 		validateStream(add, where+".assert.screen", a.Screen)
 	case spec.AssertDuration:
 		validateDuration(add, where+".assert.duration", a.Duration)
+	case spec.AssertChanges:
+		validateChanges(add, where+".assert.changes", a.Changes)
 	case spec.AssertPDF:
 		validatePDF(add, where+".assert.pdf", a.PDF)
 	case spec.AssertGRPCStatus:
@@ -968,6 +982,54 @@ func validateDuration(add func(string, ...any), where string, d *spec.DurationAs
 			add("%s: the bounds form an empty interval (lower %s exceeds upper %s)", where, lower, upper)
 		}
 	}
+}
+
+// validateChanges checks a workdir-delta assertion (#70): at least one of
+// created/modified/deleted set, and every entry a workdir-relative, confined
+// path or a valid /-glob. Entries are compared with forward slashes at check
+// time, so confinement is validated in the same /-separated space.
+func validateChanges(add func(string, ...any), where string, c *spec.ChangesAssert) {
+	if c.Created == nil && c.Modified == nil && c.Deleted == nil {
+		add("%s: set at least one of created/modified/deleted (use [] to assert a category changed nothing)", where)
+		return
+	}
+	for _, cat := range []struct {
+		name    string
+		entries *spec.StringList
+	}{
+		{"created", c.Created},
+		{"modified", c.Modified},
+		{"deleted", c.Deleted},
+	} {
+		if cat.entries == nil {
+			continue
+		}
+		for _, entry := range []string(*cat.entries) {
+			field := fmt.Sprintf("%s.%s %q", where, cat.name, entry)
+			switch {
+			case entry == "":
+				add("%s must be a non-empty workdir-relative path or glob", field)
+			case strings.HasPrefix(entry, "/"):
+				add("%s must be workdir-relative, not absolute", field)
+			case pathEscapesWorkdir(entry):
+				add("%s escapes the scenario workdir (no ../ traversal)", field)
+			default:
+				// The entry doubles as a path.Match glob at check time; reject a
+				// malformed pattern here rather than silently matching nothing.
+				if _, err := path.Match(entry, "probe"); err != nil {
+					add("%s is not a valid glob: %v", field, err)
+				}
+			}
+		}
+	}
+}
+
+// pathEscapesWorkdir reports whether a /-separated relative entry would escape
+// the workdir root via ../ traversal, using the same containment rule as
+// security.ResolveWorkdirPath but in the loader's forward-slash space (#70).
+func pathEscapesWorkdir(entry string) bool {
+	cleaned := path.Clean(entry)
+	return cleaned == ".." || strings.HasPrefix(cleaned, "../")
 }
 
 // validatePDF checks a PDF assertion (#73): a path plus at least one constraint,

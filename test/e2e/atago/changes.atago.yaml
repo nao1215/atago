@@ -1,0 +1,90 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / changes (workdir delta assertions)
+
+# Exercises #70: the `changes:` assert pins the EXACT set of files the
+# immediately preceding run/pty step created, modified, and deleted in the
+# scenario workdir — the "this command touches only these files" contract that
+# per-path file: asserts cannot state. Each set field is exhaustive in both
+# directions, so `modified: []` asserts "modified nothing" and an omitted field
+# is unconstrained. Fixture writes are inputs (they land before the pre-scan),
+# not changes.
+#
+# The multi-file setup uses a POSIX shell, so the first scenario skips on
+# Windows; a portable stdout_to-only scenario runs everywhere to prove the
+# created-counting rule on Windows too.
+scenarios:
+  - name: a generator touches exactly the files it should (POSIX)
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: config.yaml
+          content: "theme: light\n"
+      - fixture:
+          file: stale.html
+          content: "old\n"
+      - run:
+          shell: true
+          command: >-
+            printf 'theme: dark\n' > config.yaml &&
+            rm stale.html &&
+            mkdir -p site/assets &&
+            printf '<html></html>' > site/index.html &&
+            printf 'body{}' > site/assets/app.css
+      - assert:
+          exit_code: 0
+          changes:
+            created:
+              - site/index.html
+              - site/assets/*.css
+            modified:
+              - config.yaml
+            deleted:
+              - stale.html
+
+  - name: an unexpected creation breaks the exact contract (POSIX)
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: check.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: unexpected
+            scenarios:
+              - name: extra file
+                steps:
+                  - run:
+                      shell: true
+                      command: 'echo a > a.txt && echo b > b.txt'
+                  - assert:
+                      changes:
+                        created:
+                          - a.txt
+      - run:
+          command: ${atago} run check.atago.yaml
+      # b.txt is an unexpected creation, so the inner run fails (exit 1).
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: "unexpected created file"
+
+  - name: stdout_to counts as created, and modified nothing holds (portable)
+    steps:
+      - fixture:
+          file: input.txt
+          content: seed
+      - run:
+          shell: true
+          command: echo produced
+          stdout_to: result.txt
+      - assert:
+          exit_code: 0
+          changes:
+            created:
+              - result.txt
+            modified: []
+            deleted: []

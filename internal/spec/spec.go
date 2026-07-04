@@ -863,6 +863,23 @@ type Assert struct {
 	// measurable step (run/http/query/grpc/pty): it bounds how long that step
 	// took with lt/lte/gt/gte Go-duration bounds.
 	Duration *DurationAssert `yaml:"duration,omitempty"`
+
+	// Changes is the workdir-delta assertion target (#70), valid after an
+	// immediately preceding run/pty step: it pins exactly which files that step
+	// created, modified, and deleted in the scenario workdir.
+	Changes *ChangesAssert `yaml:"changes,omitempty"`
+}
+
+// ChangesAssert pins the exact delta the immediately preceding run/pty step
+// made to the scenario workdir (#70). The delta is content-based (hash, not
+// mtime). Each set field is EXHAUSTIVE in both directions: every observed path
+// must be matched by an entry (an exact workdir-relative path or a /-glob) and
+// every entry must match at least one observed path — so `modified: []` asserts
+// "modified nothing". An omitted (nil) field is unconstrained.
+type ChangesAssert struct {
+	Created  *StringList `yaml:"created,omitempty"`
+	Modified *StringList `yaml:"modified,omitempty"`
+	Deleted  *StringList `yaml:"deleted,omitempty"`
 }
 
 // DurationAssert bounds a step's measured wall-clock time (#31). At least one

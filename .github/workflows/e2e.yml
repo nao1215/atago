@@ -120,6 +120,7 @@ jobs:
           ./test/e2e/atago/http.atago.yaml
           ./test/e2e/atago/mock_server.atago.yaml
           ./test/e2e/atago/dir_tree.atago.yaml
+          ./test/e2e/atago/changes.atago.yaml
           ./test/e2e/atago/record.atago.yaml
           ./test/e2e/atago/duration.atago.yaml
           ./test/e2e/atago/sandbox_home.atago.yaml

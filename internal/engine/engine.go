@@ -15,6 +15,7 @@ import (
 	"github.com/nao1215/atago/internal/artifact"
 	"github.com/nao1215/atago/internal/assert"
 	"github.com/nao1215/atago/internal/fixture"
+	"github.com/nao1215/atago/internal/fsdelta"
 	"github.com/nao1215/atago/internal/platform"
 	"github.com/nao1215/atago/internal/runner"
 	browserrunner "github.com/nao1215/atago/internal/runner/browser"
@@ -670,7 +671,24 @@ func (e *Engine) runScenario(ctx context.Context, scenarioIdx int, sc *spec.Scen
 			break
 		}
 
+		// The `changes:` assert (#70) pins the workdir delta of the immediately
+		// preceding run/pty step. Scan the workdir just before that step runs —
+		// and only then, so scenarios that never use it pay nothing — capturing a
+		// baseline in which prior fixture writes already exist (they are inputs,
+		// not changes). Fixtures written by THIS run/pty step's redirects
+		// (stdout_to/stderr_to) land after the baseline and count as created.
+		var preScan fsdelta.Snapshot
+		scanChanges := measurableForChanges(step.Kind()) && changesFollows(sc.Steps, i)
+		if scanChanges {
+			preScan, _ = fsdelta.Scan(workdir)
+		}
+
 		sr, status, secViolation := execStep(ctx, i, step)
+		if scanChanges && current != nil {
+			post, _ := fsdelta.Scan(workdir)
+			delta := fsdelta.Diff(preScan, post)
+			current.Changes = &delta
+		}
 		if secViolation {
 			out.SecurityViolation = true
 		}
@@ -847,6 +865,23 @@ func (e *Engine) runStep(ctx context.Context, run *spec.Run, st *store.Store, wo
 		}
 	}
 	return last, checks, nil
+}
+
+// measurableForChanges reports whether a step kind produces a workdir delta a
+// following `changes:` assert can pin (#70): only run and pty steps touch the
+// scenario workdir as their observable effect.
+func measurableForChanges(k spec.StepKind) bool {
+	return k == spec.StepRun || k == spec.StepPTY
+}
+
+// changesFollows reports whether the step at index i+1 is an assert carrying a
+// `changes:` target — the trigger for scanning the workdir around step i (#70).
+func changesFollows(steps []spec.Step, i int) bool {
+	if i+1 >= len(steps) {
+		return false
+	}
+	a := steps[i+1].Assert
+	return a != nil && a.Changes != nil
 }
 
 // worseStatus returns the more severe of two statuses (error > failed > passed,

@@ -221,6 +221,7 @@ Every feature has a commented, runnable spec under [examples/](examples/). The e
 | [snapshot](examples/snapshot.atago.yaml) | golden-file testing with normalized output |
 | [duration](examples/duration.atago.yaml) | bound a step's wall-clock time with `duration: {lt: 2s, gte: 100ms}` (use generous bounds — CI runners are slow) |
 | [dir_tree](examples/dir_tree.atago.yaml) | recursive dir assertions and directory-tree snapshots: pin a generator's whole output tree with one golden manifest |
+| [changes](examples/changes.atago.yaml) | `changes:` pins the exact workdir delta of a step — which files it created, modified, and deleted, and nothing else |
 | [services](examples/services.atago.yaml) | background servers: readiness probes, `ready.store`, teardown |
 | [signal](examples/signal.atago.yaml) | `signal:` steps deliver SIGTERM/SIGHUP/... to a managed service's process group for graceful-shutdown and reload testing (POSIX-only) |
 | [defaults](examples/defaults.atago.yaml) | sharing `shell`/`env`/`service` fragments across scenarios |
