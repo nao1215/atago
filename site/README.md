@@ -43,6 +43,7 @@ A browsable, repo-local index of atago's documentation, generated from repositor
 - [sqlite3.md](../doc/e2e/sqlite3.md)
 - [sqly.md](../doc/e2e/sqly.md)
 - [ssh-keygen.md](../doc/e2e/ssh-keygen.md)
+- [terraform.md](../doc/e2e/terraform.md)
 - [transfersh.md](../doc/e2e/transfersh.md)
 - [truss.md](../doc/e2e/truss.md)
 - [webhook.md](../doc/e2e/webhook.md)

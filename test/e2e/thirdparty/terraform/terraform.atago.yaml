@@ -1,0 +1,192 @@
+version: "1"
+
+suite:
+  name: terraform (offline via the builtin terraform_data resource)
+  # Deterministic, offline output: no CLI update checks, no telemetry, no
+  # interactive prompts. Only the builtin terraform_data resource is used, so
+  # `init` downloads nothing and the network allowlist stays untouched.
+  env:
+    TF_IN_AUTOMATION: "1"
+    CHECKPOINT_DISABLE: "1"
+    TF_CLI_ARGS: "-no-color"
+
+# terraform is a textbook multi-exit-code CLI (#37): `plan -detailed-exitcode`
+# returns 0 (no changes) / 1 (error) / 2 (changes) — the flagship consumer of
+# the exit_code: {in: [...]} matcher (#19). Kept fully offline via the builtin
+# terraform.io/builtin/terraform provider (terraform_data). Gate: only where
+# terraform is installed.
+scenarios:
+  - name: init downloads nothing and validate reports valid
+    only:
+      command: terraform version
+    steps:
+      - fixture:
+          file: main.tf
+          content: |
+            resource "terraform_data" "greeting" {
+              input = "hello from atago"
+            }
+            output "message" {
+              value = terraform_data.greeting.output
+            }
+      - run:
+          command: terraform init
+      - assert:
+          exit_code: 0
+          # The builtin provider needs no registry download.
+          stdout:
+            not_contains: Downloading
+      - run:
+          command: terraform validate -json
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              path: "$.valid"
+              equals: true
+
+  - name: plan -detailed-exitcode reports the change contract
+    only:
+      command: terraform version
+    steps:
+      - fixture:
+          file: main.tf
+          content: |
+            resource "terraform_data" "greeting" {
+              input = "hello from atago"
+            }
+            output "message" {
+              value = terraform_data.greeting.output
+            }
+      - run:
+          command: terraform init
+      - assert:
+          exit_code: 0
+      # A fresh workspace has changes pending: exit 2.
+      - run:
+          command: terraform plan -detailed-exitcode
+      - assert:
+          exit_code:
+            in: [2]
+      - run:
+          command: terraform apply -auto-approve
+      - assert:
+          exit_code: 0
+      # After apply nothing is pending: exit 0.
+      - run:
+          command: terraform plan -detailed-exitcode
+      - assert:
+          exit_code: 0
+
+  - name: apply exposes state JSON and a captured output
+    only:
+      command: terraform version
+    steps:
+      - fixture:
+          file: main.tf
+          content: |
+            resource "terraform_data" "greeting" {
+              input = "hello from atago"
+            }
+            output "message" {
+              value = terraform_data.greeting.output
+            }
+      - run:
+          command: terraform init
+      - assert:
+          exit_code: 0
+      - run:
+          command: terraform apply -auto-approve
+      - assert:
+          exit_code: 0
+      - run:
+          command: terraform show -json
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              path: "$.values.root_module.resources[0].address"
+              equals: terraform_data.greeting
+      # Capture the raw output and reuse it in a later assertion.
+      - run:
+          command: terraform output -raw message
+      - store:
+          name: message
+          from:
+            stdout:
+              matches: "hello from atago"
+      - run:
+          shell: true
+          command: "echo captured: ${message}"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "captured: hello from atago"
+
+  - name: destroy empties the state
+    only:
+      command: terraform version
+    steps:
+      - fixture:
+          file: main.tf
+          content: |
+            resource "terraform_data" "greeting" {
+              input = "hello from atago"
+            }
+      - run:
+          command: terraform init
+      - assert:
+          exit_code: 0
+      - run:
+          command: terraform apply -auto-approve
+      - assert:
+          exit_code: 0
+      - run:
+          command: terraform destroy -auto-approve
+      - assert:
+          exit_code: 0
+      - run:
+          command: terraform show -json
+      - assert:
+          exit_code: 0
+          # After destroy the state is empty: the resource address is gone
+          # (terraform show -json collapses to just the format_version).
+          stdout:
+            not_contains: terraform_data.greeting
+
+  - name: fmt -check exits 3 on a misformatted file
+    only:
+      command: terraform version
+    steps:
+      - fixture:
+          file: messy.tf
+          content: |
+            output   "x" {
+            value="terraform_data"
+            }
+      - run:
+          command: terraform fmt -check messy.tf
+      - assert:
+          # terraform fmt -check exits 3 when a file would be reformatted.
+          exit_code:
+            in: [3]
+
+  - name: a broken configuration is rejected
+    only:
+      command: terraform version
+    steps:
+      - fixture:
+          file: main.tf
+          content: |
+            resource "terraform_data" "broken" {
+              input =
+            }
+      # An invalid expression fails at parse time — before init can run — so
+      # plan surfaces the error directly with exit 1.
+      - run:
+          command: terraform plan
+      - assert:
+          exit_code:
+            in: [1]
+          stderr:
+            contains: "Error:"
