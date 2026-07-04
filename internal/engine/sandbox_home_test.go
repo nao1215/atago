@@ -75,6 +75,46 @@ scenarios:
 	}
 }
 
+// TestEngine_SandboxHome_DefaultsRunGovernsPTY proves defaults.run's sandbox
+// family (clear_env + sandbox_home) layers onto a pty step, so a shared
+// hermetic default governs interactive steps too (#77): the pty child sees the
+// sandbox HOME under ${workdir}/.atago-home, never the host home, even though
+// only defaults.run — not the pty step — declares the family. Mirrors
+// TestEngine_SandboxHome_ClearEnvComposition for the pty path.
+func TestEngine_SandboxHome_DefaultsRunGovernsPTY(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("HOME/XDG family and pty steps are POSIX-only")
+	}
+	t.Setenv("HOME", "/definitely/not/the/sandbox")
+	res := runSpec(t, `
+version: "1"
+suite:
+  name: sandbox
+defaults:
+  run:
+    clear_env: true
+    pass_env: [PATH, HOME]
+    sandbox_home: true
+scenarios:
+  - name: a shared default sandboxes a pty child's home
+    steps:
+      - pty:
+          shell: true
+          command: 'printf "HOME=[%s]\n" "$HOME"'
+          session:
+            - expect: 'HOME='
+      - assert:
+          stdout:
+            contains: /.atago-home]
+      - assert:
+          stdout:
+            not_contains: /definitely/not/the/sandbox
+`)
+	if res.Status != StatusPassed {
+		t.Fatalf("status = %s, want passed: %+v", res.Status, res.Scenarios[0].Steps)
+	}
+}
+
 // TestEngine_SandboxHome_IsolatedBetweenScenarios proves each scenario gets its
 // own workdir and therefore its own isolated home: a file written in one
 // scenario is not visible in the next (#71).

@@ -36,12 +36,22 @@ func applyDefaults(s *spec.Spec) {
 				if sc.Steps[j].Run != nil {
 					mergeRunDefaults(d.Run, sc.Steps[j].Run)
 				}
+				// A pty step carries the same environment surface as a run step
+				// (env/clear_env/pass_env/sandbox_home), so defaults.run layers
+				// that shared subset onto it too (#77) — without it, a shared
+				// sandbox_home would leave pty children on the host home.
+				if sc.Steps[j].PTY != nil {
+					mergePTYDefaults(d.Run, sc.Steps[j].PTY)
+				}
 			}
 			// Teardown steps are steps too: shared run defaults (shell, env, ...)
 			// apply so cleanup does not need to re-declare them.
 			for j := range sc.Teardown {
 				if sc.Teardown[j].Run != nil {
 					mergeRunDefaults(d.Run, sc.Teardown[j].Run)
+				}
+				if sc.Teardown[j].PTY != nil {
+					mergePTYDefaults(d.Run, sc.Teardown[j].PTY)
 				}
 			}
 		}
@@ -93,6 +103,27 @@ func mergeRunDefaults(def, r *spec.Run) {
 	// `clear_env: false` does not inherit the default allowlist (#16).
 	if r.PassEnv == nil && r.ClearEnvEnabled() {
 		r.PassEnv = def.PassEnv
+	}
+}
+
+// mergePTYDefaults layers defaults.run's environment-shaping subset beneath an
+// authored pty step (#77). Only env/clear_env/pass_env/sandbox_home cross over —
+// a pty step shares exactly that environment surface with a run step. Run-only
+// fields (runner, shell, cwd, timeout, stdin, redirects, retry) do NOT leak:
+// shell/cwd exist on pty with their own semantics and stay per-step until a
+// future defaults.pty. The merge rules mirror mergeRunDefaults exactly.
+func mergePTYDefaults(def *spec.Run, p *spec.PTY) {
+	p.Env = mergeStringMap(def.Env, p.Env)
+	if p.ClearEnv == nil {
+		p.ClearEnv = def.ClearEnv
+	}
+	if p.SandboxHome == nil {
+		p.SandboxHome = def.SandboxHome
+	}
+	// pass_env is meaningless without clear_env, so a pty step that authored
+	// `clear_env: false` does not inherit the default allowlist (#16).
+	if p.PassEnv == nil && p.ClearEnvEnabled() {
+		p.PassEnv = def.PassEnv
 	}
 }
 

@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-54 suites · 208 scenarios
+54 suites · 211 scenarios
 ## Contents
 - [atago self-hosting / variable expansion in assertion matcher values](#atago-self-hosting--variable-expansion-in-assertion-matcher-values) — 6 scenarios
   - [stdout.equals expands ${workdir}](#scenario-stdoutequals-expands-workdir)
@@ -18,7 +18,7 @@
   - [manifest surfaces the browser-runner configuration](#scenario-manifest-surfaces-the-browser-runner-configuration)
   - [an upload action without a file fails validation (exit 2)](#scenario-an-upload-action-without-a-file-fails-validation-exit-2)
   - [a download action without a click selector fails validation (exit 2)](#scenario-a-download-action-without-a-click-selector-fails-validation-exit-2)
-- [atago self-hosting / changes (workdir delta assertions)](#atago-self-hosting--changes-workdir-delta-assertions) — 8 scenarios
+- [atago self-hosting / changes (workdir delta assertions)](#atago-self-hosting--changes-workdir-delta-assertions) — 10 scenarios
   - [a generator touches exactly the files it should (POSIX)](#scenario-a-generator-touches-exactly-the-files-it-should-posix)
   - [an unexpected creation breaks the exact contract (POSIX)](#scenario-an-unexpected-creation-breaks-the-exact-contract-posix)
   - [stdout_to counts as created, and modified nothing holds (portable)](#scenario-stdout_to-counts-as-created-and-modified-nothing-holds-portable)
@@ -27,6 +27,8 @@
   - [deleting and recreating with different content is modified only (POSIX)](#scenario-deleting-and-recreating-with-different-content-is-modified-only-posix)
   - [stdout_to overwrites a fixture (modified) while stderr_to creates an empty file (POSIX)](#scenario-stdout_to-overwrites-a-fixture-modified-while-stderr_to-creates-an-empty-file-posix)
   - [a pty step feeds the delta scan just like a run step (POSIX)](#scenario-a-pty-step-feeds-the-delta-scan-just-like-a-run-step-posix)
+  - [a doublestar glob pins an arbitrary-depth generated tree exactly (POSIX)](#scenario-a-doublestar-glob-pins-an-arbitrary-depth-generated-tree-exactly-posix)
+  - [a stray file outside the doublestar prefix breaks the exact contract (POSIX)](#scenario-a-stray-file-outside-the-doublestar-prefix-breaks-the-exact-contract-posix)
 - [atago self-hosting / completion](#atago-self-hosting--completion) — 5 scenarios
   - [bash completion emits a recognizable script](#scenario-bash-completion-emits-a-recognizable-script)
   - [zsh completion emits a compdef script](#scenario-zsh-completion-emits-a-compdef-script)
@@ -36,9 +38,10 @@
 - [atago self-hosting / db runner](#atago-self-hosting--db-runner) — 2 scenarios
   - [query workflow (create, insert, select, row assert, value binding) passes](#scenario-query-workflow-create-insert-select-row-assert-value-binding-passes)
   - [a query against an undeclared runner fails validation (exit 2)](#scenario-a-query-against-an-undeclared-runner-fails-validation-exit-2)
-- [atago self-hosting / top-level defaults](#atago-self-hosting--top-level-defaults) — 3 scenarios
+- [atago self-hosting / top-level defaults](#atago-self-hosting--top-level-defaults) — 4 scenarios
   - [defaults.run.shell applies to every run step without repeating it](#scenario-defaultsrunshell-applies-to-every-run-step-without-repeating-it)
   - [defaults.scenario.env is merged and an explicit scenario env wins](#scenario-defaultsscenarioenv-is-merged-and-an-explicit-scenario-env-wins)
+  - [defaults.run.sandbox_home governs a run step and a pty step alike (POSIX)](#scenario-defaultsrunsandbox_home-governs-a-run-step-and-a-pty-step-alike-posix)
   - [an unsupported defaults field is a load-time error (exit 2)](#scenario-an-unsupported-defaults-field-is-a-load-time-error-exit-2)
 - [atago self-hosting / dir assertion](#atago-self-hosting--dir-assertion) — 2 scenarios
   - [directory/tree assertions cover a multi-file generator](#scenario-directorytree-assertions-cover-a-multi-file-generator)
@@ -682,6 +685,43 @@ _skipped on windows_
 ```
 #### Then
 - the step changed exactly created `from-pty`
+### Scenario: a doublestar glob pins an arbitrary-depth generated tree exactly (POSIX)
+_skipped on windows_
+#### When
+```shell
+mkdir -p out/a/b && printf '1' > out/top.txt && printf '2' > out/a/mid.txt && printf '3' > out/a/b/leaf.txt
+```
+#### Then
+- exit code is `0`
+- the step changed exactly created `out/**`, modified nothing, deleted nothing
+### Scenario: a stray file outside the doublestar prefix breaks the exact contract (POSIX)
+_skipped on windows_
+#### Given
+- Fixture file `check.atago.yaml` is created.
+#### Inputs
+_Fixture `check.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: stray-outside-doublestar
+scenarios:
+  - name: extra file beside the tree
+    steps:
+      - run:
+          shell: true
+          command: 'mkdir -p out/a && printf x > out/a/leaf.txt && printf y > stray.txt'
+      - assert:
+          changes:
+            created:
+              - "out/**"
+```
+#### When
+```shell
+${atago} run check.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `unexpected created file`
 ## atago self-hosting / completion
 Source: `test/e2e/atago/completion.atago.yaml`
 ### Scenario: bash completion emits a recognizable script
@@ -846,6 +886,42 @@ scenarios:
 #### When
 ```shell
 ${atago} run env.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout contains `1 passed`
+### Scenario: defaults.run.sandbox_home governs a run step and a pty step alike (POSIX)
+_skipped on windows_
+#### Given
+- Fixture file `sandbox.atago.yaml` is created.
+#### Inputs
+_Fixture `sandbox.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: shared-sandbox
+defaults:
+  run:
+    shell: true
+    sandbox_home: true
+scenarios:
+  - name: a run step writes and a pty step reads under one sandbox home
+    steps:
+      - run:
+          command: 'mkdir -p "$XDG_CONFIG_HOME/mytool" && printf editor=vim > "$XDG_CONFIG_HOME/mytool/config"'
+      - assert:
+          exit_code: 0
+      - pty:
+          shell: true
+          command: 'cat "$XDG_CONFIG_HOME/mytool/config"'
+          session:
+            - expect: 'editor=vim'
+      - assert:
+… (truncated, 6 more lines)
+```
+#### When
+```shell
+${atago} run sandbox.atago.yaml
 ```
 #### Then
 - exit code is `0`

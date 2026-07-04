@@ -80,7 +80,7 @@
       "properties": {
         "run": {
           "type": "object",
-          "description": "Layered beneath every `run` step. `command` and `retry` are per-step and rejected here.",
+          "description": "Layered beneath every `run` step. `command` and `retry` are per-step and rejected here. The environment-shaping subset (`env`, `clear_env`, `pass_env`, `sandbox_home`) also layers onto `pty` steps, which share the same environment surface (#77); the run-only fields (`runner`, `shell`, `cwd`, `timeout`, `stdin`, redirects) stay per-step and never reach pty steps.",
           "additionalProperties": false,
           "properties": {
             "runner": { "type": "string" },
@@ -683,7 +683,7 @@
     "changesAssert": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Pins the exact workdir delta of the immediately preceding run/pty step (#70): which files it created, modified, and deleted. Each set field is EXHAUSTIVE in both directions (every observed path must match an entry, every entry must match a path), so `modified: []` asserts \"modified nothing\". An omitted field is unconstrained. Entries are workdir-relative paths or /-globs.",
+      "description": "Pins the exact workdir delta of the immediately preceding run/pty step (#70): which files it created, modified, and deleted. Each set field is EXHAUSTIVE in both directions (every observed path must match an entry, every entry must match a path), so `modified: []` asserts \"modified nothing\". An omitted field is unconstrained. Entries are workdir-relative doublestar globs, always /-separated: a single `*` stays within one path segment while `**` crosses `/` at any depth (`site/**` covers the whole tree, `dist/**/*.css` composes with a suffix). A backslash escapes a literal metacharacter (`\\[`, `\\?`, `\\*`) — `a\\[1\\].txt` matches the file `a[1].txt`; the escape is portable because entries are always /-separated.",
       "minProperties": 1,
       "properties": {
         "created": { "$ref": "#/$defs/changesEntries" },
@@ -692,7 +692,7 @@
       }
     },
     "changesEntries": {
-      "description": "A single workdir-relative path/glob, or a list of them (the empty list [] asserts the category changed nothing).",
+      "description": "A single workdir-relative path/glob, or a list of them (the empty list [] asserts the category changed nothing). Globs are doublestar and /-separated: `*` within a segment, `**` across `/`; a backslash escapes a literal metacharacter.",
       "oneOf": [
         { "type": "string" },
         { "type": "array", "items": { "type": "string" } }

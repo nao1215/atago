@@ -2,10 +2,10 @@ package assert
 
 import (
 	"fmt"
-	"path"
 	"sort"
 	"strings"
 
+	"github.com/bmatcuk/doublestar/v4"
 	"github.com/nao1215/atago/internal/fsdelta"
 	"github.com/nao1215/atago/internal/runner"
 	"github.com/nao1215/atago/internal/spec"
@@ -65,11 +65,12 @@ func checkCategory(name string, entries *spec.StringList, observed []string, pro
 	}
 }
 
-// matchesAny reports whether p matches at least one pattern (exact path or
-// path.Match glob, always /-separated).
+// matchesAny reports whether p matches at least one pattern (exact path, a
+// single-level `*` glob, or a `**` doublestar that crosses `/`), always
+// /-separated. A backslash escapes a literal metacharacter (`\[`, `\?`, `\*`).
 func matchesAny(pats []string, p string) bool {
 	for _, pat := range pats {
-		if ok, _ := path.Match(pat, p); ok {
+		if ok, _ := doublestar.Match(pat, p); ok {
 			return true
 		}
 	}
@@ -79,7 +80,7 @@ func matchesAny(pats []string, p string) bool {
 // patternMatchesAny reports whether pat matches at least one observed path.
 func patternMatchesAny(pat string, paths []string) bool {
 	for _, p := range paths {
-		if ok, _ := path.Match(pat, p); ok {
+		if ok, _ := doublestar.Match(pat, p); ok {
 			return true
 		}
 	}

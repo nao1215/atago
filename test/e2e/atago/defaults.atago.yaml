@@ -70,6 +70,52 @@ scenarios:
           stdout:
             contains: "1 passed"
 
+  - name: defaults.run.sandbox_home governs a run step and a pty step alike (POSIX)
+    skip:
+      os: windows
+    steps:
+      # #77: the environment-shaping subset of defaults.run (here sandbox_home)
+      # must layer onto pty steps too — they share a run step's environment
+      # surface. A single defaults.run.sandbox_home: true isolates the home for
+      # BOTH steps: the run step writes config under the sandboxed XDG home and
+      # the pty step reads it back from the SAME .atago-home, proving the default
+      # reached the interactive step instead of leaving it on the host home.
+      - fixture:
+          file: sandbox.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: shared-sandbox
+            defaults:
+              run:
+                shell: true
+                sandbox_home: true
+            scenarios:
+              - name: a run step writes and a pty step reads under one sandbox home
+                steps:
+                  - run:
+                      command: 'mkdir -p "$XDG_CONFIG_HOME/mytool" && printf editor=vim > "$XDG_CONFIG_HOME/mytool/config"'
+                  - assert:
+                      exit_code: 0
+                  - pty:
+                      shell: true
+                      command: 'cat "$XDG_CONFIG_HOME/mytool/config"'
+                      session:
+                        - expect: 'editor=vim'
+                  - assert:
+                      exit_code: 0
+                  # Both steps shared the one deterministic isolated home.
+                  - assert:
+                      file:
+                        path: .atago-home/.config/mytool/config
+                        contains: editor=vim
+      - run:
+          command: ${atago} run sandbox.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "1 passed"
+
   - name: an unsupported defaults field is a load-time error (exit 2)
     steps:
       - fixture:

@@ -32,7 +32,10 @@ type Spec struct {
 // Defaults holds the top-level `defaults:` block. Each fragment is
 // merged into the concrete model at load time to cut repetition without adding a
 // runtime model: `run` layers under every `run` step, `scenario.env` under every
-// scenario env, and `service` under every service.
+// scenario env, and `service` under every service. The environment-shaping
+// subset of `run` (env, clear_env, pass_env, sandbox_home) also layers onto
+// `pty` steps — a pty step shares that surface — while run-only fields (runner,
+// shell, cwd, timeout, stdin, redirects, retry) never reach pty steps (#77).
 //
 // Merge rules (applied by the loader): an explicitly-authored value always wins;
 // maps shallow-merge (the authored key wins per key); a nil pointer / empty
@@ -905,6 +908,13 @@ type Assert struct {
 // must be matched by an entry (an exact workdir-relative path or a /-glob) and
 // every entry must match at least one observed path — so `modified: []` asserts
 // "modified nothing". An omitted (nil) field is unconstrained.
+//
+// Entries are doublestar globs, always /-separated (#76): a single `*` matches
+// within one path segment, while `**` matches across `/` at any depth
+// (`site/**` covers the whole tree under site/, `dist/**/*.css` composes with a
+// suffix). A backslash escapes a literal metacharacter — `a\[1\].txt` matches
+// the file `a[1].txt`; because entries are always /-separated the escape is
+// portable across operating systems.
 type ChangesAssert struct {
 	Created  *StringList `yaml:"created,omitempty"`
 	Modified *StringList `yaml:"modified,omitempty"`
