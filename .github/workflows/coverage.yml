@@ -17,15 +17,15 @@ permissions:
   pull-requests: write
 
 jobs:
-  unit_test:
-    name: Unit test (linux)
+  coverage:
+    name: Coverage (unit + e2e)
 
     strategy:
       matrix:
         platform: [ubuntu-latest]
 
     runs-on: ${{ matrix.platform }}
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -34,11 +34,15 @@ jobs:
 
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
-          go-version: "1"
+          go-version-file: "go.mod"
           check-latest: true
 
-      - name: Run tests with coverage report output
-        run: go test -cover -coverpkg=./... -coverprofile=cover.out ./...
+      # Combines unit-test coverage with self-hosted E2E coverage (E2E runs a
+      # `go build -cover` atago and collects covdata via GOCOVERDIR), then
+      # merges both into cover.out. git is preinstalled on the runner, which is
+      # all the atago + git E2E suites need.
+      - name: Run combined unit + E2E coverage
+        run: make coverage
 
       - uses: k1LoW/octocov-action@b3b6ee60482a667950f87553abf1df63217235d9 # v1.5.1
         with:
