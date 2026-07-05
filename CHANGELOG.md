@@ -7,6 +7,19 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-07-05
+
+A correctness pass over five independent surfaces — record, the equals matcher,
+the rerun ledger, tree snapshots, and the loader — each surfaced by a systematic
+bug hunt and fixed with a reproduction test first. No new features.
+
+Highlights: `atago record -- pwd` (and any command printing a path under its
+workdir) round-trips green again; `stdout equals` no longer ignores trailing
+blank lines; a narrowed `--rerun-failed` no longer forgets still-failing specs
+it did not run; a `dir:` tree snapshot can no longer be fooled by a newline in a
+filename; and a spec saved with a UTF-8 BOM loads instead of failing with a
+misleading unknown-field error.
+
 ### Fixed
 
 - A spec file saved with a leading UTF-8 byte-order mark now loads. Windows and
