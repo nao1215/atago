@@ -7,6 +7,17 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.4] - 2026-07-05
+
+A bug-fix release that bounds and guards the run engine. No new features.
+
+Highlights: `defaults.run.timeout` now bounds `http`, `query`, and `grpc` steps,
+not just `run` steps; a `skip.command` / `only.command` probe and a service
+`ready.delay` are both time-bounded so a hanging probe or an over-long delay
+fails fast instead of stalling the whole run; and the unresolved-variable guard
+now fires for a named `cmd` runner, so a typo cannot leak `${...}` into argv and
+run a garbled command.
+
 ### Fixed
 
 - The unresolved-variable guard now fires for a named `cmd` runner, not only the
