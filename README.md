@@ -298,10 +298,10 @@ atago snapshot update spec.atago.yaml
 
 ## Editor support (JSON Schema)
 
-A JSON Schema lives at [schema/atago.schema.json](schema/atago.schema.json). With the YAML language server you get completion and validation as you type:
+A JSON Schema lives at [schema/atago.schema.json](schema/atago.schema.json). With the YAML language server you get completion and validation as you type — step types, every matcher, and the `${workdir}` / `${env:NAME}` / `${name}` / `$${...}` expansion rules. `atago init` and `atago record` already emit this header as the first line of every generated spec, so scaffolded specs get completion out of the box. To add it to an existing spec, use the absolute URL (it resolves in any project, unlike a repo-relative path):
 
 ```yaml
-# yaml-language-server: $schema=./schema/atago.schema.json
+# yaml-language-server: $schema=https://raw.githubusercontent.com/nao1215/atago/main/schema/atago.schema.json
 version: "1"
 ```
 

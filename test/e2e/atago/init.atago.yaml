@@ -21,6 +21,25 @@ scenarios:
           stdout:
             contains: PASSED
 
+  - name: init emits a resolvable schema header for editor completion
+    steps:
+      - run:
+          command: ${atago} init headed.atago.yaml
+      - assert:
+          exit_code: 0
+      # The first line must be an absolute yaml-language-server schema URL, so
+      # completion works in any project (not the repo-relative ./schema path).
+      - run:
+          shell: true
+          command: head -1 headed.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "# yaml-language-server: $schema=https://"
+      - assert:
+          stdout:
+            not_contains: "./schema/"
+
   - name: init refuses to overwrite without --force
     steps:
       - fixture:

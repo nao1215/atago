@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/nao1215/atago/internal/buildinfo"
 	"github.com/nao1215/atago/internal/loader"
 	"github.com/nao1215/atago/internal/spec"
 )
@@ -61,6 +62,7 @@ var ansiPattern = regexp.MustCompile(`\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07\x1b
 // returning it (the same round-trip guarantee plain record gives) (#69).
 func GeneratePTY(rec PTYRecording, opts Options) ([]byte, error) {
 	var b strings.Builder
+	b.WriteString(buildinfo.SchemaHeader())
 	b.WriteString("version: \"1\"\n\n")
 	b.WriteString("# Recorded by `atago record --pty` — a starting point, not a verdict:\n")
 	b.WriteString("# each send replays a burst you typed, and each expect anchors on the\n")

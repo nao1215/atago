@@ -230,6 +230,38 @@ func TestInit_EveryTemplateIsSchemaValid(t *testing.T) {
 	}
 }
 
+// TestInit_EmitsResolvableSchemaHeader proves that init writes a resolvable
+// `# yaml-language-server: $schema=<url>` header as the first line of the
+// generated spec, so a scaffolded spec gets editor completion for the DSL out
+// of the box, and that the URL is absolute (not the old repo-relative
+// `./schema/...` path that only resolves inside the atago repo) (#121).
+func TestInit_EmitsResolvableSchemaHeader(t *testing.T) {
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "out.atago.yaml")
+	var out, errb bytes.Buffer
+	if got := Main([]string{"init", "--template", "cli", outPath}, &out, &errb); got != ExitOK {
+		t.Fatalf("init exit = %d (stderr=%s)", got, errb.String())
+	}
+	data, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	firstLine, _, _ := strings.Cut(string(data), "\n")
+	if !strings.HasPrefix(firstLine, "# yaml-language-server: $schema=") {
+		t.Errorf("first line = %q, want a yaml-language-server schema header", firstLine)
+	}
+	if !strings.Contains(firstLine, "https://") {
+		t.Errorf("schema URL must be absolute, got %q", firstLine)
+	}
+	if strings.Contains(firstLine, "./schema/") {
+		t.Errorf("schema URL must not be the repo-relative ./schema path: %q", firstLine)
+	}
+	// The header is an ignored YAML comment, so the spec still loads and runs.
+	if _, err := loader.Load(outPath); err != nil {
+		t.Fatalf("header-carrying spec does not load: %v", err)
+	}
+}
+
 func TestInit_UnknownTemplate(t *testing.T) {
 	dir := t.TempDir()
 	var out, errb bytes.Buffer

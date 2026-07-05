@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-55 suites · 219 scenarios
+55 suites · 220 scenarios
 ## Contents
 - [atago self-hosting / variable expansion in assertion matcher values](#atago-self-hosting--variable-expansion-in-assertion-matcher-values) — 6 scenarios
   - [stdout.equals expands ${workdir}](#scenario-stdoutequals-expands-workdir)
@@ -109,8 +109,9 @@
   - [a pixel comparison against an identical baseline passes](#scenario-a-pixel-comparison-against-an-identical-baseline-passes)
   - [a wrong dimension assertion fails with a clear diff](#scenario-a-wrong-dimension-assertion-fails-with-a-clear-diff)
   - [a failing similar_to writes visual diff artifacts](#scenario-a-failing-similar_to-writes-visual-diff-artifacts)
-- [atago self-hosting / init](#atago-self-hosting--init) — 2 scenarios
+- [atago self-hosting / init](#atago-self-hosting--init) — 3 scenarios
   - [init scaffolds a runnable spec](#scenario-init-scaffolds-a-runnable-spec)
+  - [init emits a resolvable schema header for editor completion](#scenario-init-emits-a-resolvable-schema-header-for-editor-completion)
   - [init refuses to overwrite without --force](#scenario-init-refuses-to-overwrite-without---force)
 - [atago self-hosting / init templates](#atago-self-hosting--init-templates) — 12 scenarios
   - [every template scaffolds a schema-valid spec \[template=cli\]](#scenario-every-template-scaffolds-a-schema-valid-spec-templatecli)
@@ -2124,6 +2125,19 @@ ${atago} run starter.atago.yaml
   - stdout contains `PASSED`
 #### Generated artifacts
 - `starter.atago.yaml`
+### Scenario: init emits a resolvable schema header for editor completion
+#### When
+```shell
+${atago} init headed.atago.yaml
+head -1 headed.atago.yaml
+```
+#### Then
+- after `${atago} init headed.atago.yaml`:
+  - exit code is `0`
+- after `head -1 headed.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `# yaml-language-server: $schema=https://`
+  - stdout does not contain `./schema/`
 ### Scenario: init refuses to overwrite without --force
 #### Given
 - Fixture file `taken.atago.yaml` is created.

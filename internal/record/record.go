@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/goccy/go-yaml"
+	"github.com/nao1215/atago/internal/buildinfo"
 	"github.com/nao1215/atago/internal/loader"
 	"github.com/nao1215/atago/internal/store"
 )
@@ -49,6 +50,7 @@ type Options struct {
 // problem.
 func Generate(obs Observation, opts Options) ([]byte, error) {
 	var b strings.Builder
+	b.WriteString(buildinfo.SchemaHeader())
 	b.WriteString("version: \"1\"\n\n")
 	b.WriteString("# Recorded by `atago record` — a starting point, not a verdict:\n")
 	b.WriteString("# tighten the matchers to pin the behavior you actually care about.\n")
