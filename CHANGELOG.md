@@ -9,6 +9,12 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- A service `ready.delay` is now bounded by `ready.timeout`, as the docs promise
+  ("Timeout bounds the readiness wait"). The delay branch waited the full
+  duration regardless of the timeout, so `delay: 30s` with `timeout: 500ms`
+  stalled for 30 seconds instead of failing fast — a CI-hang hazard. A delay
+  longer than the timeout now fails at the timeout with a message naming the
+  misconfiguration; a delay within the timeout is unchanged.
 - `defaults.run.timeout` now bounds `http`, `query`, and `grpc` steps, not just
   `run` steps. The precedence chain (step > runner > defaults.run > suite >
   built-in 60s) documents these steps as members, but the http and connection
