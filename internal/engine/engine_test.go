@@ -398,6 +398,38 @@ func TestProbeSucceeds_BoundedByTimeout(t *testing.T) {
 	}
 }
 
+// TestEngine_UnresolvedVarErrorsForNamedCmdRunner is a regression: the
+// unresolved-${name} guard fires for any local (non-ssh) run, not just an
+// unnamed one. A named cmd runner executes the command as argv the same as the
+// default runner, so a typo'd ${name} would otherwise leak into argv and run a
+// garbled command instead of erroring with the reference named. Only an ssh
+// runner (remote, where a remote shell may expand it) is exempt.
+func TestEngine_UnresolvedVarErrorsForNamedCmdRunner(t *testing.T) {
+	t.Parallel()
+	res := runSpec(t, `
+version: "1"
+suite:
+  name: s
+runners:
+  local:
+    type: cmd
+scenarios:
+  - name: a typo in a named cmd runner errors instead of running literally
+    steps:
+      - run:
+          runner: local
+          command: "echo ${typo}"
+`)
+	if res.Status != StatusError {
+		t.Fatalf("status = %s, want error (unresolved ${typo} must not run literally through a named cmd runner): %+v",
+			res.Status, res.Scenarios)
+	}
+	msg := res.Scenarios[0].Steps[0].ErrMsg
+	if !strings.Contains(msg, "typo") || !strings.Contains(msg, "no variable with that name") {
+		t.Errorf("error = %q, want it to name the unresolved ${typo}", msg)
+	}
+}
+
 // parityScenarios builds a spec with n scenarios cycling passed/failed/skipped so
 // the parallel scheduler has real mixed outcomes to interleave.
 func parityScenarios(n int) string {

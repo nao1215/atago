@@ -541,8 +541,11 @@ func (e *Engine) runScenario(ctx context.Context, scenarioIdx int, sc *spec.Scen
 			// still expand it — but a local run without `shell: true`
 			// has no shell, so nothing could ever expand it and the literal text
 			// would leak into argv. That is almost always a typo; error with the
-			// reference named instead of running a garbled command (#UX).
-			if !step.Run.ShellEnabled() && step.Run.Runner == "" {
+			// reference named instead of running a garbled command (#UX). A named
+			// cmd runner runs the command as local argv too, so it is guarded like
+			// the default runner; only an ssh runner (remote, where a remote shell
+			// may expand it) is exempt.
+			if !step.Run.ShellEnabled() && !isSSHRunner(step.Run.Runner, rc.runners) {
 				if names := st.Unresolved(step.Run.Command); len(names) > 0 {
 					if envName, isEnv := strings.CutPrefix(names[0], "env:"); isEnv {
 						sr.ErrMsg = fmt.Sprintf(
@@ -798,6 +801,14 @@ func (e *Engine) probeSucceeds(ctx context.Context, command string) bool {
 		return false
 	}
 	return res.ExitCode == 0
+}
+
+// isSSHRunner reports whether a run step's named runner is an ssh runner, which
+// executes remotely where a remote shell may still expand a ${name}. An empty
+// name is the default local cmd runner, and an unknown name is not ssh; both run
+// the command as local argv, so the unresolved-variable guard applies to them.
+func isSSHRunner(name string, runners map[string]spec.Runner) bool {
+	return name != "" && runners[name].Type == "ssh"
 }
 
 // runStep executes a run step, applying retry/until polling when requested. It
