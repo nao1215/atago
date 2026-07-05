@@ -82,6 +82,20 @@ func (s *Store) Expand(in string) string {
 	})
 }
 
+// Escape rewrites text so that Expand returns it verbatim: it prefixes an extra
+// `$` onto exactly the references Expand acts on — a live `${name}` becomes the
+// literal `$${name}`, and an already-escaped `$${name}` becomes `$$${name}` —
+// while a `${` that Expand ignores (one not followed by a valid name, e.g.
+// `${1}` or `${}`) is left untouched, because Expand would already pass it
+// through. It is the exact inverse Expand relies on, so raw observed text (a
+// recorded command, output anchor, or typed pty input) can be embedded in a spec
+// without being re-expanded at replay. A blind `${`→`$${` rewrite is wrong: the
+// expander only unescapes `$${<valid-name>}`, so `$${1}` would never round-trip
+// back to the observed `${1}`.
+func Escape(s string) string {
+	return varRef.ReplaceAllStringFunc(s, func(m string) string { return "$" + m })
+}
+
 // Unresolved returns the names of ${name} references in in that no stored
 // variable resolves, and of ${env:NAME} references whose environment variable
 // is not set. Escaped $${name} literals are not reported — the author
