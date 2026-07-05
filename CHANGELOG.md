@@ -7,8 +7,42 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-05
+
+Runner-selection and reporting polish surfaced while migrating real E2E suites
+(gup) to atago, plus editor-completion discoverability for the spec DSL.
+
+Highlights: `--filter` now selects multiple scenarios with OR semantics (comma
+list or repeated flag) instead of silently honoring only the last; a run that
+drops a spec to a load error now reads `FAILED` and counts the drop instead of a
+misleading `PASSED ... 0 errored`; and `atago init`/`atago record` emit a
+resolvable `# yaml-language-server: $schema=...` header so scaffolded specs get
+editor completion out of the box.
+
+### Added
+
+- `atago run --filter` accepts multiple name substrings with OR semantics,
+  mirroring `--tag`: a comma list (`--filter a,b`) or a repeated flag
+  (`--filter a --filter b`) runs every scenario whose name contains any term. A
+  single substring is unchanged, and the "no scenarios matched" warning still
+  fires when none match. Previously a comma list was one literal substring and
+  repeated flags silently kept only the last — a green run could hide that half
+  the selection never ran (#119).
+- `atago init` and `atago record` emit a resolvable
+  `# yaml-language-server: $schema=<url>` header as the first line of every
+  generated spec, so a freshly scaffolded spec gets editor completion for step
+  types, matchers, and `${...}` expansion forms out of the box. The URL pins to
+  a tagged binary's own release tag and otherwise resolves against `main`; the
+  README editor-support snippet now uses the same absolute URL instead of a
+  repo-relative path that only resolved inside the atago repo (#121).
+
 ### Fixed
 
+- `atago run` over a directory that mixes loadable specs with a spec that fails
+  to load now prints a summary that reads `FAILED` (matching the non-zero exit
+  code) and counts the dropped file (`N spec(s) failed to load`), instead of a
+  misleading `PASSED ... 0 errored` that silently omitted it. A fully-valid run
+  is unchanged (#120).
 - PDF text extraction now decodes octal `\ddd`, `\b`, `\f`, and backslash-newline
   line-continuation escapes in literal strings (ISO 32000), so a `pdf: {text:
   {...}}` assertion matches non-ASCII text as written by pandoc/LaTeX/wkhtmltopdf
