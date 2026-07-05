@@ -648,6 +648,37 @@ func TestLoadBytes_Errors(t *testing.T) {
 			wantKind: KindValidation,
 			wantMsg:  "set exactly one",
 		},
+		// PDF assertion validation (#73): every branch of validatePDF.
+		{
+			name:     "pdf assert without a path",
+			src:      "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n      - assert:\n          pdf: {pages: 1}",
+			wantKind: KindValidation,
+			wantMsg:  "pdf.path is required",
+		},
+		{
+			name:     "pdf assert with a negative page count",
+			src:      "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n      - assert:\n          pdf: {path: r.pdf, pages: -1}",
+			wantKind: KindValidation,
+			wantMsg:  "page counts must be >= 0",
+		},
+		{
+			name:     "pdf assert with min_pages above max_pages",
+			src:      "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n      - assert:\n          pdf: {path: r.pdf, min_pages: 5, max_pages: 2}",
+			wantKind: KindValidation,
+			wantMsg:  "min_pages 5 exceeds max_pages 2",
+		},
+		{
+			name:     "pdf assert with an unknown metadata field",
+			src:      "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n      - assert:\n          pdf:\n            path: r.pdf\n            metadata: {bogus: v}",
+			wantKind: KindValidation,
+			wantMsg:  "unknown field \"bogus\"",
+		},
+		{
+			name:     "pdf assert with no constraint",
+			src:      "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n      - assert:\n          pdf: {path: r.pdf}",
+			wantKind: KindValidation,
+			wantMsg:  "must set at least one of pages/min_pages/max_pages/metadata/text",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
