@@ -377,6 +377,27 @@ scenarios:
 	}
 }
 
+// TestProbeSucceeds_BoundedByTimeout is a regression: a skip/only probe command
+// must be time-bounded so a hanging probe (e.g. `sleep 9999`) cannot stall the
+// sequential selection phase and, with it, the whole run.
+func TestProbeSucceeds_BoundedByTimeout(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("uses a POSIX sleep as the hanging probe")
+	}
+	t.Parallel()
+	e := New()
+	e.probeTimeout = 100 * time.Millisecond
+	start := time.Now()
+	ok := e.probeSucceeds(context.Background(), "sleep 30")
+	elapsed := time.Since(start)
+	if ok {
+		t.Error("a hanging probe timed out and must not count as succeeded")
+	}
+	if elapsed > 2*time.Second {
+		t.Errorf("probeSucceeds ran %s; a probe must be bounded by the probe timeout", elapsed)
+	}
+}
+
 // parityScenarios builds a spec with n scenarios cycling passed/failed/skipped so
 // the parallel scheduler has real mixed outcomes to interleave.
 func parityScenarios(n int) string {

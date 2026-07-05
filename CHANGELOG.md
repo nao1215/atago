@@ -15,6 +15,10 @@ and this project follows [Semantic Versioning](https://semver.org/).
   stalled for 30 seconds instead of failing fast — a CI-hang hazard. A delay
   longer than the timeout now fails at the timeout with a message naming the
   misconfiguration; a delay within the timeout is unchanged.
+- A `skip.command` / `only.command` probe is now time-bounded (30s). The probe
+  ran unbounded, so a hanging probe (`sleep 9999`, an unreachable health check)
+  stalled the sequential selection phase and with it the whole run. A probe that
+  exceeds the bound is treated as "did not succeed".
 - `defaults.run.timeout` now bounds `http`, `query`, and `grpc` steps, not just
   `run` steps. The precedence chain (step > runner > defaults.run > suite >
   built-in 60s) documents these steps as members, but the http and connection
