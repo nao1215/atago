@@ -97,7 +97,7 @@ scenarios:
           stderr:
             contains: boom
 `, addr)
-	res := runHTTPSpec(t, src)
+	res := runSpec(t, src)
 	if res.Status != StatusPassed {
 		t.Fatalf("status = %s, want passed: %+v", res.Status, res.Scenarios[0].Steps)
 	}
@@ -135,7 +135,7 @@ scenarios:
           stdout:
             contains: got-token42
 `, addr)
-	res := runHTTPSpec(t, src)
+	res := runSpec(t, src)
 	if res.Status != StatusPassed {
 		t.Fatalf("status = %s, want passed: %+v", res.Status, res.Scenarios[0].Steps)
 	}

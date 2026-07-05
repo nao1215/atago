@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/nao1215/atago/internal/loader"
+	"github.com/nao1215/atago/internal/spec"
 )
 
 // TestGenerate_SnapshotGoldenInlined verifies a committed snapshot golden's
@@ -31,10 +32,7 @@ scenarios:
           stdout:
             snapshot: greeting.snap
 `
-	s, err := loader.LoadBytes("s.atago.yaml", []byte(src))
-	if err != nil {
-		t.Fatalf("load: %v", err)
-	}
+	s := mustLoadSpec(t, "s.atago.yaml", src)
 	var b bytes.Buffer
 	if err := Generate(&b, []Source{{Path: filepath.Join(dir, "s.atago.yaml"), Spec: s}}); err != nil {
 		t.Fatal(err)
@@ -77,10 +75,7 @@ scenarios:
             path: out.png
             similar_to: testdata/base.png
 `
-	s, err := loader.LoadBytes("s.atago.yaml", []byte(src))
-	if err != nil {
-		t.Fatalf("load: %v", err)
-	}
+	s := mustLoadSpec(t, "s.atago.yaml", src)
 	var b bytes.Buffer
 	if err := GenerateTo(&b, []Source{{Path: filepath.Join(specDir, "s.atago.yaml"), Spec: s}}, outDir); err != nil {
 		t.Fatal(err)
@@ -121,10 +116,7 @@ scenarios:
           stdout:
             snapshot: nonexistent.snap
 `
-	s, err := loader.LoadBytes("s.atago.yaml", []byte(src))
-	if err != nil {
-		t.Fatalf("load: %v", err)
-	}
+	s := mustLoadSpec(t, "s.atago.yaml", src)
 	var b bytes.Buffer
 	if err := Generate(&b, []Source{{Path: "s.atago.yaml", Spec: s}}); err != nil {
 		t.Fatal(err)
@@ -170,10 +162,7 @@ scenarios:
             path: out.json
             exists: true
 `
-	s, err := loader.LoadBytes("gup.atago.yaml", []byte(src))
-	if err != nil {
-		t.Fatalf("load: %v", err)
-	}
+	s := mustLoadSpec(t, "gup.atago.yaml", src)
 	var b bytes.Buffer
 	if err := Generate(&b, []Source{{Path: "gup.atago.yaml", Spec: s}}); err != nil {
 		t.Fatal(err)
@@ -233,10 +222,7 @@ scenarios:
             path: server.log
             contains: done
 `
-	s, err := loader.LoadBytes("sig.atago.yaml", []byte(src))
-	if err != nil {
-		t.Fatalf("load: %v", err)
-	}
+	s := mustLoadSpec(t, "sig.atago.yaml", src)
 	var b bytes.Buffer
 	if err := Generate(&b, []Source{{Path: "sig.atago.yaml", Spec: s}}); err != nil {
 		t.Fatal(err)
@@ -317,10 +303,7 @@ scenarios:
           value:
             contains: Hello
 `
-	s, err := loader.LoadBytes("mixed.atago.yaml", []byte(src))
-	if err != nil {
-		t.Fatalf("load: %v", err)
-	}
+	s := mustLoadSpec(t, "mixed.atago.yaml", src)
 	var b bytes.Buffer
 	if err := Generate(&b, []Source{{Path: "mixed.atago.yaml", Spec: s}}); err != nil {
 		t.Fatal(err)
@@ -381,10 +364,7 @@ scenarios:
           value:
             contains: ok
 `
-	s, err := loader.LoadBytes("t.atago.yaml", []byte(src))
-	if err != nil {
-		t.Fatalf("load: %v", err)
-	}
+	s := mustLoadSpec(t, "t.atago.yaml", src)
 	var b bytes.Buffer
 	if err := Generate(&b, []Source{{Path: "t.atago.yaml", Spec: s}}); err != nil {
 		t.Fatal(err)
@@ -476,10 +456,7 @@ scenarios:
             path: flat.jpg
             alpha: false
 `
-	s, err := loader.LoadBytes("v.atago.yaml", []byte(src))
-	if err != nil {
-		t.Fatalf("load: %v", err)
-	}
+	s := mustLoadSpec(t, "v.atago.yaml", src)
 	var b bytes.Buffer
 	if err := Generate(&b, []Source{{Path: "v.atago.yaml", Spec: s}}); err != nil {
 		t.Fatal(err)
@@ -506,4 +483,16 @@ scenarios:
 			t.Errorf("doc output missing %q\n--- got ---\n%s", w, out)
 		}
 	}
+}
+
+// mustLoadSpec loads src under the given spec path, failing the test on a load
+// error. It collapses the load boilerplate shared by the docgen tests, leaving
+// each test to invoke Generate/GenerateTo with its own Source wiring.
+func mustLoadSpec(t *testing.T, path, src string) *spec.Spec {
+	t.Helper()
+	s, err := loader.LoadBytes(path, []byte(src))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	return s
 }

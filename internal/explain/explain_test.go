@@ -40,15 +40,7 @@ scenarios:
             path: out.txt
             exists: true
 `
-	s, err := loader.LoadBytes("t.atago.yaml", []byte(src))
-	if err != nil {
-		t.Fatalf("load: %v", err)
-	}
-	var b bytes.Buffer
-	if err := Explain(&b, s, "t.atago.yaml"); err != nil {
-		t.Fatal(err)
-	}
-	out := b.String()
+	out := mustExplain(t, src)
 	wants := []string{
 		"Suite: demo",
 		"Secrets declared: API_TOKEN",
@@ -89,15 +81,7 @@ scenarios:
       - assert:
           exit_code: 0
 `
-	s, err := loader.LoadBytes("t.atago.yaml", []byte(src))
-	if err != nil {
-		t.Fatalf("load: %v", err)
-	}
-	var b bytes.Buffer
-	if err := Explain(&b, s, "t.atago.yaml"); err != nil {
-		t.Fatal(err)
-	}
-	out := b.String()
+	out := mustExplain(t, src)
 	if strings.Contains(out, "restricted") && !strings.Contains(out, "unrestricted") {
 		t.Errorf("no-allowlist network should not be described as restricted:\n%s", out)
 	}
@@ -147,15 +131,7 @@ scenarios:
           value:
             contains: Hello
 `
-	s, err := loader.LoadBytes("t.atago.yaml", []byte(src))
-	if err != nil {
-		t.Fatalf("load: %v", err)
-	}
-	var b bytes.Buffer
-	if err := Explain(&b, s, "t.atago.yaml"); err != nil {
-		t.Fatal(err)
-	}
-	out := b.String()
+	out := mustExplain(t, src)
 	wants := []string{
 		"SQL query via d: SELECT name FROM users",
 		"gRPC pkg.Svc/Get via g",
@@ -208,15 +184,7 @@ scenarios:
           value:
             contains: ok
 `
-	s, err := loader.LoadBytes("t.atago.yaml", []byte(src))
-	if err != nil {
-		t.Fatalf("load: %v", err)
-	}
-	var b bytes.Buffer
-	if err := Explain(&b, s, "t.atago.yaml"); err != nil {
-		t.Fatal(err)
-	}
-	out := b.String()
+	out := mustExplain(t, src)
 	for _, w := range []string{"Generates", "thumb.png", "out.txt", "home.png"} {
 		if !strings.Contains(out, w) {
 			t.Errorf("explain output missing generated artifact %q\n--- got ---\n%s", w, out)
@@ -254,15 +222,7 @@ scenarios:
           value:
             contains: ok
 `
-	s, err := loader.LoadBytes("t.atago.yaml", []byte(src))
-	if err != nil {
-		t.Fatalf("load: %v", err)
-	}
-	var b bytes.Buffer
-	if err := Explain(&b, s, "t.atago.yaml"); err != nil {
-		t.Fatal(err)
-	}
-	out := b.String()
+	out := mustExplain(t, src)
 	for _, w := range []string{
 		"wait_hidden #spinner",
 		"press Enter on #in",
@@ -344,15 +304,7 @@ scenarios:
       - run: {command: echo ok}
       - assert: {exit_code: 0}
 `
-	s, err := loader.LoadBytes("t.atago.yaml", []byte(src))
-	if err != nil {
-		t.Fatalf("load: %v", err)
-	}
-	var b bytes.Buffer
-	if err := Explain(&b, s, "t.atago.yaml"); err != nil {
-		t.Fatal(err)
-	}
-	out := b.String()
+	out := mustExplain(t, src)
 	for _, want := range []string{
 		"Services:",
 		"peer: ./serve",
@@ -406,15 +358,7 @@ scenarios:
       - assert:
           exit_code: 0
 `
-	s, err := loader.LoadBytes("t.atago.yaml", []byte(src))
-	if err != nil {
-		t.Fatalf("load: %v", err)
-	}
-	var b bytes.Buffer
-	if err := Explain(&b, s, "t.atago.yaml"); err != nil {
-		t.Fatal(err)
-	}
-	out := b.String()
+	out := mustExplain(t, src)
 	for _, want := range []string{
 		"cleared environment (passes: PATH, HOME)",
 		"cleared environment)",
@@ -513,15 +457,7 @@ scenarios:
             path: flat.jpg
             alpha: false
 `
-	s, err := loader.LoadBytes("t.atago.yaml", []byte(src))
-	if err != nil {
-		t.Fatalf("load: %v", err)
-	}
-	var b bytes.Buffer
-	if err := Explain(&b, s, "t.atago.yaml"); err != nil {
-		t.Fatal(err)
-	}
-	out := b.String()
+	out := mustExplain(t, src)
 	wants := []string{
 		"exit code is not 1",
 		"stdout matches /h.+/",
@@ -546,6 +482,86 @@ scenarios:
 	for _, w := range wants {
 		if !strings.Contains(out, w) {
 			t.Errorf("explain output missing %q\n--- got ---\n%s", w, out)
+		}
+	}
+}
+
+// mustExplain loads src and returns the rendered explain text, failing the test
+// on any load or render error. It collapses the load+Explain boilerplate shared
+// by the explain tests.
+func mustExplain(t *testing.T, src string) string {
+	t.Helper()
+	s, err := loader.LoadBytes("t.atago.yaml", []byte(src))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	var b bytes.Buffer
+	if err := Explain(&b, s, "t.atago.yaml"); err != nil {
+		t.Fatal(err)
+	}
+	return b.String()
+}
+
+// TestExplain_CollectsAllVariableBearingFields is a regression test for a bug
+// where the explain "Variables used" summary under-reported ${name} references:
+// it scanned only http path/body and part of the cdp action set, missing run
+// env, http body_file/body_to/form/files, and cdp upload/download (the manifest
+// already scanned them). explain and manifest now share spec.CollectStepVars,
+// so every variable-bearing field is counted. Each variable below is referenced
+// only from a field the old code skipped, so a miss regresses the fix.
+func TestExplain_CollectsAllVariableBearingFields(t *testing.T) {
+	t.Parallel()
+	src := `
+version: "1"
+suite:
+  name: vars
+runners:
+  api:
+    type: http
+    base_url: http://localhost:9999
+  web:
+    type: browser
+scenarios:
+  - name: exercises previously-unscanned variable-bearing fields
+    steps:
+      - run:
+          shell: true
+          command: echo hi
+          env:
+            TOKEN: "${runenv_ref}"
+      - http:
+          runner: api
+          method: PUT
+          path: /put
+          body_file: "${bodyfile_ref}"
+          body_to: "${bodyto_ref}"
+      - http:
+          runner: api
+          method: POST
+          path: /form
+          form:
+            field1: "${form_ref}"
+          files:
+            - field: upload
+              path: "${files_ref}"
+      - cdp:
+          runner: web
+          actions:
+            - navigate: http://localhost
+            - upload:
+                selector: "#file"
+                file: "${upload_ref}"
+            - download:
+                click: "#dl"
+                dir: "${download_ref}"
+`
+	out := mustExplain(t, src)
+	for _, v := range []string{
+		"runenv_ref", "bodyfile_ref", "bodyto_ref",
+		"form_ref", "files_ref", "upload_ref", "download_ref",
+	} {
+		if !strings.Contains(out, v) {
+			t.Errorf("explain output missing variable %q from a previously-unscanned field\n--- got ---\n%s", v, out)
 		}
 	}
 }

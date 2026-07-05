@@ -2,7 +2,6 @@ package manifest
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 
 	"github.com/nao1215/atago/internal/spec"
@@ -28,10 +27,7 @@ func buildScenario(sc *spec.Scenario, src SourceLocator) Scenario {
 	for i := range sc.Services {
 		svc := &sc.Services[i]
 		out.Services = append(out.Services, buildService(svc))
-		collectVars(vars, svc.Command, svc.Cwd)
-		for _, v := range svc.Env {
-			collectVars(vars, v)
-		}
+		spec.CollectServiceVars(vars, svc)
 	}
 	for i := range sc.MockServers {
 		out.MockServers = append(out.MockServers, MockServer{Name: sc.MockServers[i].Name, Routes: len(sc.MockServers[i].Routes)})
@@ -52,7 +48,7 @@ func buildScenario(sc *spec.Scenario, src SourceLocator) Scenario {
 		out.Teardown = append(out.Teardown, buildStep(i, &sc.Teardown[i], vars))
 	}
 
-	out.Variables = sortedKeys(vars)
+	out.Variables = spec.SortedKeys(vars)
 	// Generated artifacts and security notes come from the shared spec model, so
 	// the manifest and the human-facing explain/doc summaries never drift (#56).
 	out.Generates = spec.GeneratedArtifacts(sc)
@@ -83,11 +79,11 @@ func buildService(svc *spec.Service) Service {
 // notes are derived separately from the shared spec model (#56).
 func buildStep(index int, step *spec.Step, vars map[string]bool) Step {
 	st := Step{Index: index, Kind: string(step.Kind())}
+	spec.CollectStepVars(vars, step)
 	switch step.Kind() {
 	case spec.StepFixture:
 		st.File = step.Fixture.File
 		st.Action = "write fixture " + step.Fixture.File
-		collectVars(vars, step.Fixture.File, step.Fixture.Content, step.Fixture.Symlink)
 
 	case spec.StepService:
 		svc := step.Service
@@ -97,7 +93,6 @@ func buildStep(index int, step *spec.Step, vars map[string]bool) Step {
 		st.PassEnv = svc.PassEnv
 		st.Target = svc.Name
 		st.Action = "start suite service " + svc.Name
-		collectVars(vars, svc.Command, svc.Cwd)
 
 	case spec.StepRun:
 		r := step.Run
@@ -110,10 +105,6 @@ func buildStep(index int, step *spec.Step, vars map[string]bool) Step {
 		if r.Retry != nil {
 			st.Retry = &Retry{Times: r.Retry.Times, Interval: r.Retry.Interval}
 		}
-		collectVars(vars, r.Command, r.Cwd, r.Stdin.Inline, r.Stdin.File)
-		for _, v := range r.Env {
-			collectVars(vars, v)
-		}
 
 	case spec.StepHTTP:
 		h := step.HTTP
@@ -124,58 +115,23 @@ func buildStep(index int, step *spec.Step, vars map[string]bool) Step {
 		if h.Retry != nil {
 			st.Retry = &Retry{Times: h.Retry.Times, Interval: h.Retry.Interval}
 		}
-		collectVars(vars, h.Path)
-		collectVars(vars, h.Body)
-		collectVars(vars, h.BodyFile, h.BodyTo)
-		for _, v := range h.Form {
-			collectVars(vars, v)
-		}
-		for _, f := range h.Files {
-			collectVars(vars, f.Path)
-		}
 
 	case spec.StepQuery:
 		q := step.Query
 		st.SQL = q.SQL
 		st.Runner = q.Runner
 		st.Action = "SQL query via " + q.Runner
-		collectVars(vars, q.SQL)
 
 	case spec.StepGRPC:
 		g := step.GRPC
 		st.Method = g.Method
 		st.Runner = g.Runner
 		st.Action = "gRPC " + g.Method + " via " + g.Runner
-		collectVars(vars, g.Method)
 
 	case spec.StepCDP:
 		c := step.CDP
 		st.Runner = c.Runner
-		st.Action = describeCDPActions(c)
-		for _, a := range c.Actions {
-			collectVars(vars, a.Navigate, a.WaitVisible, a.WaitHidden, a.Click, a.Check, a.Uncheck, a.Text, a.Eval)
-			if a.SendKeys != nil {
-				collectVars(vars, a.SendKeys.Selector, a.SendKeys.Value)
-			}
-			if a.Press != nil {
-				collectVars(vars, a.Press.Selector, a.Press.Key)
-			}
-			if a.Select != nil {
-				collectVars(vars, a.Select.Selector, a.Select.Value)
-			}
-			if a.Screenshot != nil {
-				collectVars(vars, a.Screenshot.Path, a.Screenshot.Selector)
-			}
-			if a.Attribute != nil {
-				collectVars(vars, a.Attribute.Selector, a.Attribute.Name)
-			}
-			if a.Upload != nil {
-				collectVars(vars, a.Upload.Selector, a.Upload.File)
-			}
-			if a.Download != nil {
-				collectVars(vars, a.Download.Click, a.Download.Dir)
-			}
-		}
+		st.Action = spec.CDPActionSummary(c)
 
 	case spec.StepMockServer:
 		ms := step.MockServer
@@ -193,7 +149,6 @@ func buildStep(index int, step *spec.Step, vars map[string]bool) Step {
 			}
 			st.Action += ", wait up to " + timeout + " for exit"
 		}
-		collectVars(vars, sg.Service)
 
 	case spec.StepPTY:
 		pt := step.PTY
@@ -202,16 +157,6 @@ func buildStep(index int, step *spec.Step, vars map[string]bool) Step {
 		st.ClearEnv = pt.ClearEnvEnabled()
 		st.PassEnv = pt.PassEnv
 		st.Action = "interactive (pty) " + pt.Command
-		collectVars(vars, pt.Command, pt.Cwd)
-		for _, v := range pt.Env {
-			collectVars(vars, v)
-		}
-		for _, a := range pt.Session {
-			if a.Send != nil && a.Send.Text != nil {
-				collectVars(vars, *a.Send.Text)
-			}
-			collectVars(vars, a.Expect)
-		}
 
 	case spec.StepAssert:
 		st.Target = assertTarget(step.Assert)
@@ -241,27 +186,11 @@ func assertTarget(a *spec.Assert) string {
 	return strings.Join(names, "+")
 }
 
-func describeCDPActions(c *spec.CDP) string {
-	acts := make([]string, 0, len(c.Actions))
-	for _, a := range c.Actions {
-		acts = append(acts, spec.CDPActionLabel(a))
-	}
-	return "CDP via " + c.Runner + ": " + strings.Join(acts, " → ")
-}
-
 func condition(c *spec.Condition) *Condition {
 	if c == nil || (c.OS == "" && c.Env == "" && c.Command == "") {
 		return nil
 	}
 	return &Condition{OS: c.OS, Env: c.Env, Command: c.Command}
-}
-
-func collectVars(set map[string]bool, fields ...string) {
-	for _, f := range fields {
-		for _, name := range spec.VarRefs(f) {
-			set[name] = true
-		}
-	}
 }
 
 func copyMap(m map[string]string) map[string]string {
@@ -273,13 +202,4 @@ func copyMap(m map[string]string) map[string]string {
 		out[k] = v
 	}
 	return out
-}
-
-func sortedKeys(m map[string]bool) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	return keys
 }

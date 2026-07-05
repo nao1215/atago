@@ -94,7 +94,7 @@ func explainScenario(b *strings.Builder, sc *spec.Scenario) {
 	for i := range sc.Services {
 		svc := &sc.Services[i]
 		services = append(services, describeService(svc))
-		collectVars(vars, svc.Command, svc.Cwd)
+		spec.CollectServiceVars(vars, svc)
 		if svc.Ready != nil && svc.Ready.Store != "" {
 			stores = append(stores, svc.Ready.Store)
 		}
@@ -105,13 +105,15 @@ func explainScenario(b *strings.Builder, sc *spec.Scenario) {
 
 	for i := range sc.Steps {
 		step := &sc.Steps[i]
+		// Variable references are collected by the shared spec walk so explain and
+		// manifest never disagree about which ${name}s a step uses; the switch
+		// below only formats the human-facing summary lines.
+		spec.CollectStepVars(vars, step)
 		switch step.Kind() {
 		case spec.StepFixture:
 			fixtures = append(fixtures, describeFixture(step.Fixture))
-			collectVars(vars, step.Fixture.File, step.Fixture.Content)
 		case spec.StepRun:
 			commands = append(commands, describeRun(step.Run))
-			collectVars(vars, step.Run.Command, step.Run.Cwd, step.Run.Stdin.Inline, step.Run.Stdin.File)
 		case spec.StepAssert:
 			expects = append(expects, describeAsserts(step.Assert)...)
 		case spec.StepStore:
@@ -121,18 +123,14 @@ func explainScenario(b *strings.Builder, sc *spec.Scenario) {
 		case spec.StepHTTP:
 			if step.HTTP != nil {
 				commands = append(commands, fmt.Sprintf("HTTP %s %s", step.HTTP.Method, step.HTTP.Path))
-				collectVars(vars, step.HTTP.Path)
-				collectVars(vars, step.HTTP.Body)
 			}
 		case spec.StepQuery:
 			if step.Query != nil {
 				commands = append(commands, fmt.Sprintf("SQL query via %s: %s", step.Query.Runner, step.Query.SQL))
-				collectVars(vars, step.Query.SQL)
 			}
 		case spec.StepGRPC:
 			if step.GRPC != nil {
 				commands = append(commands, fmt.Sprintf("gRPC %s via %s", step.GRPC.Method, step.GRPC.Runner))
-				collectVars(vars, step.GRPC.Method)
 			}
 		case spec.StepPTY:
 			if step.PTY != nil {
@@ -148,20 +146,10 @@ func explainScenario(b *strings.Builder, sc *spec.Scenario) {
 					desc += "  (isolated home)"
 				}
 				commands = append(commands, desc)
-				collectVars(vars, step.PTY.Command, step.PTY.Cwd)
-				for _, v := range step.PTY.Env {
-					collectVars(vars, v)
-				}
 				var keys []string
 				for _, a := range step.PTY.Session {
-					collectVars(vars, a.Expect)
-					if a.Send != nil {
-						if a.Send.Text != nil {
-							collectVars(vars, *a.Send.Text)
-						}
-						if a.Send.Key != "" {
-							keys = append(keys, a.Send.Key)
-						}
+					if a.Send != nil && a.Send.Key != "" {
+						keys = append(keys, a.Send.Key)
 					}
 				}
 				if len(keys) > 0 {
@@ -170,30 +158,11 @@ func explainScenario(b *strings.Builder, sc *spec.Scenario) {
 			}
 		case spec.StepCDP:
 			if step.CDP != nil {
-				commands = append(commands, describeCDP(step.CDP))
-				for _, a := range step.CDP.Actions {
-					collectVars(vars, a.Navigate, a.WaitVisible, a.WaitHidden, a.Click, a.Check, a.Uncheck, a.Text, a.Eval)
-					if a.SendKeys != nil {
-						collectVars(vars, a.SendKeys.Selector, a.SendKeys.Value)
-					}
-					if a.Press != nil {
-						collectVars(vars, a.Press.Selector, a.Press.Key)
-					}
-					if a.Select != nil {
-						collectVars(vars, a.Select.Selector, a.Select.Value)
-					}
-					if a.Screenshot != nil {
-						collectVars(vars, a.Screenshot.Path, a.Screenshot.Selector)
-					}
-					if a.Attribute != nil {
-						collectVars(vars, a.Attribute.Selector, a.Attribute.Name)
-					}
-				}
+				commands = append(commands, spec.CDPActionSummary(step.CDP))
 			}
 		case spec.StepSignal:
 			if step.Signal != nil {
 				commands = append(commands, describeSignal(step.Signal))
-				collectVars(vars, step.Signal.Service)
 			}
 		}
 	}
@@ -203,21 +172,18 @@ func explainScenario(b *strings.Builder, sc *spec.Scenario) {
 	var teardown []string
 	for i := range sc.Teardown {
 		step := &sc.Teardown[i]
+		spec.CollectStepVars(vars, step)
 		switch step.Kind() {
 		case spec.StepRun:
 			teardown = append(teardown, describeRun(step.Run))
-			collectVars(vars, step.Run.Command, step.Run.Cwd, step.Run.Stdin.Inline, step.Run.Stdin.File)
 		case spec.StepHTTP:
 			teardown = append(teardown, fmt.Sprintf("HTTP %s %s", step.HTTP.Method, step.HTTP.Path))
-			collectVars(vars, step.HTTP.Path, step.HTTP.Body)
 		case spec.StepQuery:
 			teardown = append(teardown, fmt.Sprintf("SQL query via %s: %s", step.Query.Runner, step.Query.SQL))
-			collectVars(vars, step.Query.SQL)
 		case spec.StepGRPC:
 			teardown = append(teardown, fmt.Sprintf("gRPC %s via %s", step.GRPC.Method, step.GRPC.Runner))
-			collectVars(vars, step.GRPC.Method)
 		case spec.StepCDP:
-			teardown = append(teardown, describeCDP(step.CDP))
+			teardown = append(teardown, spec.CDPActionSummary(step.CDP))
 		case spec.StepFixture:
 			teardown = append(teardown, describeFixture(step.Fixture))
 		case spec.StepAssert:
@@ -226,7 +192,6 @@ func explainScenario(b *strings.Builder, sc *spec.Scenario) {
 			teardown = append(teardown, "store "+step.Store.Name)
 		case spec.StepSignal:
 			teardown = append(teardown, describeSignal(step.Signal))
-			collectVars(vars, step.Signal.Service)
 		}
 	}
 
@@ -239,7 +204,7 @@ func explainScenario(b *strings.Builder, sc *spec.Scenario) {
 	writeList(b, "Teardown (always runs)", teardown)
 	writeList(b, "Generates", spec.GeneratedArtifacts(sc))
 	writeList(b, "Stores", stores)
-	if used := sortedKeys(vars); len(used) > 0 {
+	if used := spec.SortedKeys(vars); len(used) > 0 {
 		fmt.Fprintf(b, "  Variables used: %s\n", strings.Join(used, ", "))
 	}
 	if security := spec.SecurityNotes(sc); len(security) > 0 {
@@ -275,17 +240,6 @@ func describeService(svc *spec.Service) string {
 		desc += "  [ready after " + svc.Ready.Delay + "]"
 	}
 	return desc
-}
-
-// describeCDP renders a one-line summary of a cdp step's action list,
-// reusing the shared per-action labels so explain stays aligned with doc and
-// manifest (#50).
-func describeCDP(c *spec.CDP) string {
-	acts := make([]string, 0, len(c.Actions))
-	for _, a := range c.Actions {
-		acts = append(acts, spec.CDPActionLabel(a))
-	}
-	return fmt.Sprintf("CDP via %s: %s", c.Runner, strings.Join(acts, " → "))
 }
 
 // describeMockServer renders a one-line summary of a stub HTTP server (#24).
@@ -361,7 +315,7 @@ func describeRun(r *spec.Run) string {
 		notes = append(notes, "timeout "+r.Timeout)
 	}
 	if len(r.Env) > 0 {
-		notes = append(notes, "env: "+strings.Join(sortedKeys(toSet(r.Env)), ", "))
+		notes = append(notes, "env: "+strings.Join(spec.SortedKeys(toSet(r.Env)), ", "))
 	}
 	if r.ClearEnvEnabled() {
 		note := "cleared environment"
@@ -666,14 +620,6 @@ func jsonMatcher(j *spec.JSONAssert) string {
 	}
 }
 
-func collectVars(set map[string]bool, fields ...string) {
-	for _, f := range fields {
-		for _, name := range spec.VarRefs(f) {
-			set[name] = true
-		}
-	}
-}
-
 func writeList(b *strings.Builder, title string, items []string) {
 	if len(items) == 0 {
 		return
@@ -699,13 +645,4 @@ func toSet(m map[string]string) map[string]bool {
 		out[k] = true
 	}
 	return out
-}
-
-func sortedKeys(m map[string]bool) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	return keys
 }

@@ -60,7 +60,7 @@ scenarios:
               path: "$[0].role"
               equals: admin
 `
-	res := runHTTPSpec(t, src) // shared loader+run helper
+	res := runSpec(t, src)
 	if res.Status != StatusPassed {
 		t.Fatalf("status = %s, want passed: %+v", res.Status, res.Scenarios[0].Steps)
 	}
@@ -83,7 +83,7 @@ scenarios:
           runner: store
           sql: "SELECT * FROM does_not_exist"
 `
-	res := runHTTPSpec(t, src)
+	res := runSpec(t, src)
 	if res.Status != StatusError {
 		t.Fatalf("status = %s, want error", res.Status)
 	}
@@ -141,7 +141,7 @@ scenarios:
           runner: store
           sql: "SELECT * FROM t"
 `
-	res := runHTTPSpec(t, src)
+	res := runSpec(t, src)
 	if res.Scenarios[0].Status != StatusPassed {
 		t.Errorf("scenario[0] = %s, want passed", res.Scenarios[0].Status)
 	}

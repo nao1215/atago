@@ -37,10 +37,7 @@ scenarios:
           env:
             B: own
 `
-	s, err := LoadBytes("sample.atago.yaml", []byte(src))
-	if err != nil {
-		t.Fatalf("LoadBytes() error = %v", err)
-	}
+	s := mustLoadSpec(t, "sample.atago.yaml", src)
 	sc := s.Scenarios[0]
 	if sc.Env["HOME"] != "${workdir}/home" {
 		t.Errorf("scenario env HOME = %q, want default applied", sc.Env["HOME"])
@@ -140,10 +137,7 @@ scenarios:
           shell: false
           command: echo hi
 `
-	s, err := LoadBytes("sample.atago.yaml", []byte(src))
-	if err != nil {
-		t.Fatalf("LoadBytes() error = %v", err)
-	}
+	s := mustLoadSpec(t, "sample.atago.yaml", src)
 	if s.Scenarios[0].Steps[0].Run.ShellEnabled() {
 		t.Errorf("run.shell = true, want the authored false to win over the default")
 	}
@@ -183,10 +177,7 @@ scenarios:
           command: echo own
           pass_env: [LANG]
 `
-	s, err := LoadBytes("sample.atago.yaml", []byte(src))
-	if err != nil {
-		t.Fatalf("LoadBytes() error = %v", err)
-	}
+	s := mustLoadSpec(t, "sample.atago.yaml", src)
 	sc := s.Scenarios[0]
 	if !sc.Steps[0].Run.ClearEnvEnabled() {
 		t.Error("step 0: clear_env default not applied")
@@ -245,10 +236,7 @@ scenarios:
           sandbox_home: false
           clear_env: false
 `
-	s, err := LoadBytes("sample.atago.yaml", []byte(src))
-	if err != nil {
-		t.Fatalf("LoadBytes() error = %v", err)
-	}
+	s := mustLoadSpec(t, "sample.atago.yaml", src)
 	p0 := s.Scenarios[0].Steps[0].PTY
 	if p0 == nil {
 		t.Fatal("step 0 is not a pty step")
@@ -1088,10 +1076,7 @@ scenarios:
       - run:
           command: echo hi
 `
-	s, err := LoadBytes("sample.atago.yaml", []byte(src))
-	if err != nil {
-		t.Fatalf("LoadBytes() error = %v", err)
-	}
+	s := mustLoadSpec(t, "sample.atago.yaml", src)
 	if got := s.Scenarios[0].Steps[0].Run.Timeout; got != "" {
 		t.Errorf("run.timeout = %q, want empty (the engine resolves defaults.run.timeout itself)", got)
 	}
@@ -1131,10 +1116,7 @@ scenarios:
       - run:
           command: echo hi
 `
-	s, err := LoadBytes("sample.atago.yaml", []byte(src))
-	if err != nil {
-		t.Fatalf("LoadBytes() error = %v", err)
-	}
+	s := mustLoadSpec(t, "sample.atago.yaml", src)
 	svc := s.Scenarios[0].Services[0]
 	if !svc.ShellEnabled() {
 		t.Errorf("service.shell = false, want default applied")
@@ -1169,10 +1151,7 @@ scenarios:
       - run:
           command: echo ${who}
 `
-	s, err := LoadBytes("sample.atago.yaml", []byte(src))
-	if err != nil {
-		t.Fatalf("LoadBytes() error = %v", err)
-	}
+	s := mustLoadSpec(t, "sample.atago.yaml", src)
 	if len(s.Scenarios) != 2 {
 		t.Fatalf("got %d scenarios, want 2 matrix instances", len(s.Scenarios))
 	}
@@ -1242,10 +1221,7 @@ scenarios:
       - run:
           command: echo hi
 `
-	s, err := LoadBytes("sample.atago.yaml", []byte(src))
-	if err != nil {
-		t.Fatalf("LoadBytes() error = %v", err)
-	}
+	s := mustLoadSpec(t, "sample.atago.yaml", src)
 	if s.Defaults != nil {
 		t.Errorf("Defaults = %+v, want nil", s.Defaults)
 	}
