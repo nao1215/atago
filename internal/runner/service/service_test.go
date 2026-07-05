@@ -136,6 +136,30 @@ func TestStart_DelayReadyDetectsEarlyExit(t *testing.T) {
 	}
 }
 
+// TestStart_DelayBoundedByTimeout is a regression: ready.timeout must bound the
+// ready.delay wait, as the docs promise ("Timeout bounds the readiness wait").
+// A delay longer than the timeout was waited out in full — a spec with
+// delay: 5s, timeout: 100ms stalled for 5 seconds, a CI-hang hazard.
+func TestStart_DelayBoundedByTimeout(t *testing.T) {
+	skipWindows(t)
+	wd := t.TempDir()
+	svc := &spec.Service{
+		Name:    "slow",
+		Shell:   spec.Bool(true),
+		Command: sleepCmd(5), // stays alive well past both the delay and the timeout
+		Ready:   &spec.Ready{Delay: "5s", Timeout: "100ms"},
+	}
+	start := time.Now()
+	_, _, err := Start(context.Background(), svc, wd)
+	elapsed := time.Since(start)
+	if err == nil {
+		t.Fatal("Start() error = nil, want a readiness timeout (delay exceeds timeout)")
+	}
+	if elapsed > 2*time.Second {
+		t.Errorf("Start waited %s; ready.timeout 100ms must bound the 5s ready.delay", elapsed)
+	}
+}
+
 // TestStart_BarePortReadyRejected is a regression: a host-less ready.port must
 // fail fast with a clear message, not swallow "missing port in address" and run
 // to the full readiness timeout.

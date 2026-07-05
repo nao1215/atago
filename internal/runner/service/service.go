@@ -172,6 +172,14 @@ func (p *Proc) waitReady(ctx context.Context, r *spec.Ready, workdir string) (st
 		if err != nil {
 			return "", fmt.Errorf("invalid ready.delay %q: %w", r.Delay, err)
 		}
+		// Timeout is the ceiling on any readiness wait (documented on ready), so a
+		// delay longer than the timeout can never be reached — wait only up to the
+		// timeout and report the misconfiguration instead of stalling for the full
+		// delay (a CI-hang hazard). A non-positive timeout means "unbounded".
+		wait, cappedByTimeout := d, false
+		if timeout > 0 && timeout < d {
+			wait, cappedByTimeout = timeout, true
+		}
 		select {
 		case <-ctx.Done():
 			return "", ctx.Err()
@@ -181,7 +189,10 @@ func (p *Proc) waitReady(ctx context.Context, r *spec.Ready, workdir string) (st
 			// this, a command that crashes (e.g. `exit 3`) during the delay was
 			// reported READY and the scenario ran against a dead peer.
 			return "", errExitedEarly
-		case <-time.After(d):
+		case <-time.After(wait):
+			if cappedByTimeout {
+				return "", fmt.Errorf("timed out after %s waiting for readiness (ready.delay %s exceeds ready.timeout)", timeout, r.Delay)
+			}
 			// Delay elapsed with the process still running — unless it exited in the
 			// same instant; check once more so a crash at the boundary is not missed.
 			select {
