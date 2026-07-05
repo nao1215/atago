@@ -10,12 +10,15 @@ import (
 
 // writeSummary prints the final tally line. The uppercase status word
 // (PASSED/FAILED) anchors the line and is part of the stable output contract.
-func writeSummary(b *strings.Builder, color bool, c engine.Counts, total int, d time.Duration, hardFail bool) {
+func writeSummary(b *strings.Builder, color bool, c engine.Counts, total int, d time.Duration, hardFail bool, loadFailures int) {
 	status, code := "PASSED", cGreen
 	// hardFail covers a suite that errored before producing any scenario row (#7):
 	// the counts are all zero, but the verdict must still read FAILED to match the
 	// non-zero exit code and the SUITE SETUP FAILED block printed above.
-	if c.Failed > 0 || c.Errored > 0 || hardFail {
+	// loadFailures covers spec files that could not be parsed/validated (#120):
+	// they run no scenario, so without this the headline would read PASSED while
+	// the process exits non-zero and the dropped file is silently uncounted.
+	if c.Failed > 0 || c.Errored > 0 || hardFail || loadFailures > 0 {
 		status, code = "FAILED", cRed
 	}
 	plural := "scenarios"
@@ -28,9 +31,19 @@ func writeSummary(b *strings.Builder, color bool, c engine.Counts, total int, d 
 	if c.Flaky > 0 {
 		flaky = fmt.Sprintf(", %d flaky", c.Flaky)
 	}
-	fmt.Fprintf(b, "\n%s  %d %s: %d passed, %d failed, %d errored, %d skipped%s (%s)\n",
+	// Spec-load failures are not scenarios, so they get their own count in the
+	// tally line — otherwise the totals silently omit the dropped files (#120).
+	loadFail := ""
+	if loadFailures > 0 {
+		specPlural := "specs"
+		if loadFailures == 1 {
+			specPlural = "spec"
+		}
+		loadFail = fmt.Sprintf(", %d %s failed to load", loadFailures, specPlural)
+	}
+	fmt.Fprintf(b, "\n%s  %d %s: %d passed, %d failed, %d errored, %d skipped%s%s (%s)\n",
 		colorize(color, code+cBold, status), total, plural,
-		c.Passed, c.Failed, c.Errored, c.Skipped, flaky, d.Round(time.Millisecond))
+		c.Passed, c.Failed, c.Errored, c.Skipped, flaky, loadFail, d.Round(time.Millisecond))
 }
 
 // writeDetail prints the failure/error block for a scenario, or nothing if it

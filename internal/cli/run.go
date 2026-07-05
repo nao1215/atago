@@ -156,10 +156,12 @@ func runCmd(args []string, stdout, stderr io.Writer) int {
 
 	results := make([]*engine.SuiteResult, 0, len(paths))
 	exit := ExitOK
+	loadFailures := 0
 	for i := range paths {
 		if loadErrs[i] != nil {
 			fmt.Fprintf(stderr, "%v\n", loadErrs[i])
 			exit = worseExit(exit, exitForLoadError(loadErrs[i]))
+			loadFailures++
 			continue
 		}
 		results = append(results, suiteResults[i])
@@ -231,7 +233,7 @@ func runCmd(args []string, stdout, stderr io.Writer) int {
 		}
 	}
 
-	if err := report.Render(stdout, format, results); err != nil {
+	if err := report.Render(stdout, format, results, report.WithLoadFailures(loadFailures)); err != nil {
 		fmt.Fprintf(stderr, "atago run: failed to write report: %v\n", err)
 		return worseExit(exit, ExitInternal)
 	}

@@ -56,3 +56,38 @@ scenarios:
           command: ${atago} run bad.atago.yaml
       - assert:
           exit_code: 2
+
+  - name: a mixed valid+invalid run reads FAILED and counts the dropped spec
+    steps:
+      - fixture:
+          file: good.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: good
+            scenarios:
+              - name: echo works
+                steps:
+                  - run: {shell: true, command: echo hi}
+                  - assert: {exit_code: 0}
+      - fixture:
+          file: broken.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: broken
+            scenarios:
+              - name: uses an unknown field
+                steps:
+                  - nonsense_field: {command: echo nope}
+      # The valid spec runs, the invalid one is dropped: the headline must read
+      # FAILED (not a misleading PASSED), surface the dropped spec, and exit 2.
+      - run:
+          command: ${atago} run good.atago.yaml broken.atago.yaml
+      - assert:
+          exit_code: 2
+          stdout:
+            contains: "1 spec failed to load"
+      - assert:
+          stdout:
+            not_contains: "PASSED"

@@ -47,6 +47,73 @@ func TestRender_Console(t *testing.T) {
 	}
 }
 
+// allPassingResults is a single all-green suite, used to prove the load-failure
+// path (#120) flips an otherwise-PASSED summary to FAILED.
+func allPassingResults() []*engine.SuiteResult {
+	return []*engine.SuiteResult{{
+		Suite:    "good",
+		Status:   engine.StatusPassed,
+		Duration: time.Millisecond,
+		Scenarios: []engine.ScenarioResult{
+			{Name: "ok", Status: engine.StatusPassed, Duration: time.Millisecond,
+				Steps: []engine.StepResult{{Kind: "assert", Checks: []*assert.CheckResult{{OK: true}}}}},
+		},
+	}}
+}
+
+// TestRender_Console_LoadFailures proves that when spec files failed to load
+// (#120) the console summary reads FAILED — not a misleading PASSED that
+// contradicts the non-zero exit code — and surfaces the dropped-file count so
+// the totals are not silently short. With zero load failures a green run is
+// unchanged.
+func TestRender_Console_LoadFailures(t *testing.T) {
+	t.Parallel()
+
+	t.Run("mixed valid+invalid reads FAILED and counts the drop", func(t *testing.T) {
+		t.Parallel()
+		var b bytes.Buffer
+		if err := Render(&b, FormatConsole, allPassingResults(), WithLoadFailures(1)); err != nil {
+			t.Fatal(err)
+		}
+		out := b.String()
+		if !strings.Contains(out, "FAILED") {
+			t.Errorf("summary should read FAILED when a spec failed to load:\n%s", out)
+		}
+		if strings.Contains(out, "PASSED") {
+			t.Errorf("summary must not read PASSED when a spec failed to load:\n%s", out)
+		}
+		if !strings.Contains(out, "1 spec failed to load") {
+			t.Errorf("summary should report the load failure count:\n%s", out)
+		}
+	})
+
+	t.Run("plural spec count", func(t *testing.T) {
+		t.Parallel()
+		var b bytes.Buffer
+		if err := Render(&b, FormatConsole, allPassingResults(), WithLoadFailures(3)); err != nil {
+			t.Fatal(err)
+		}
+		if out := b.String(); !strings.Contains(out, "3 specs failed to load") {
+			t.Errorf("summary should pluralize the load failure count:\n%s", out)
+		}
+	})
+
+	t.Run("no load failures is unchanged (green stays PASSED)", func(t *testing.T) {
+		t.Parallel()
+		var b bytes.Buffer
+		if err := Render(&b, FormatConsole, allPassingResults()); err != nil {
+			t.Fatal(err)
+		}
+		out := b.String()
+		if !strings.Contains(out, "PASSED") {
+			t.Errorf("all-green run should read PASSED:\n%s", out)
+		}
+		if strings.Contains(out, "failed to load") {
+			t.Errorf("clean run must not mention load failures:\n%s", out)
+		}
+	})
+}
+
 // Regression for issue #19: a service/setup-phase error (StepResult with an
 // empty Kind) must render as "service setup", not the misleading "step 0 ()".
 func TestRender_Console_ServiceSetupError(t *testing.T) {
