@@ -35,6 +35,17 @@ func VarRefs(s string) []string {
 	return names
 }
 
+// CollectVars adds the variable names referenced by ${name} interpolation in
+// each field to set. It is the shared accumulator behind the variable-usage
+// summaries that explain and manifest each build over a scenario's fields.
+func CollectVars(set map[string]bool, fields ...string) {
+	for _, f := range fields {
+		for _, name := range VarRefs(f) {
+			set[name] = true
+		}
+	}
+}
+
 // WalkAssertStrings returns a deep copy of a in which visit has been applied to
 // every interpolatable (${name}) string field — the single field list the
 // engine's expansion needs (issue #23). Pass a substituting visit (e.g.

@@ -7,6 +7,23 @@ import (
 	"strings"
 )
 
+// CDPActionSummary renders a cdp step's action list as a single line —
+// "CDP via <runner>: <label → label → …>" — shared by explain and manifest so
+// the two never disagree about how a browser step reads (#56).
+func CDPActionSummary(c *CDP) string {
+	acts := make([]string, 0, len(c.Actions))
+	for _, a := range c.Actions {
+		acts = append(acts, CDPActionLabel(a))
+	}
+	return "CDP via " + c.Runner + ": " + strings.Join(acts, " → ")
+}
+
+// SortedKeys returns the keys of a set in lexicographic order — the shared
+// helper behind the sorted variable/label lists in explain and manifest.
+func SortedKeys(m map[string]bool) []string {
+	return slices.Sorted(maps.Keys(m))
+}
+
 // NetworkCommand matches shell commands that reach the network. explain, doc, and
 // manifest share this single heuristic so their security notes never disagree
 // about whether a command touches the network (#56).
