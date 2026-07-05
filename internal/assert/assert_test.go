@@ -523,6 +523,10 @@ func TestCheck_JSON_LargeInteger(t *testing.T) {
 		// Distinct integers beyond uint64, one apart: equals stays exact.
 		{"distinct huge not equal", `{"n":100000000000000000001}`, &spec.JSONAssert{Path: "$.n", Equals: "100000000000000000000"}, false},
 		{"same huge equal", `{"n":100000000000000000000}`, &spec.JSONAssert{Path: "$.n", Equals: "100000000000000000000"}, true},
+		// A json.Number is a real number, so equals against a numeric spec value
+		// compares numerically, not lexically: whitespace around the expected
+		// digits does not defeat the match.
+		{"huge equals ignores surrounding space", `{"n":100000000000000000000}`, &spec.JSONAssert{Path: "$.n", Equals: " 100000000000000000000 "}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

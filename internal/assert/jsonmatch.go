@@ -331,15 +331,18 @@ func valuesEqual(node, want any) bool {
 	return fmt.Sprintf("%v", node) == fmt.Sprintf("%v", want)
 }
 
-// isNumericKind reports whether v is a genuine numeric type (not a numeric
+// isNumericKind reports whether v is a genuine number (not an arbitrary numeric
 // string). It gates valuesEqual's numeric coercion so string-vs-string equality
 // stays byte-exact. Unsigned kinds are included because goccy/go-yaml decodes a
-// large integer that overflows int64 as uint64.
+// large integer that overflows int64 as uint64, and json.Number because oj
+// decodes an integer beyond int64/uint64 as one — both are real numbers from a
+// parsed document, so an `equals` against a numeric spec value must compare them
+// numerically (via toBigInt/toFloat), not lexically.
 func isNumericKind(v any) bool {
 	switch v.(type) {
 	case int, int8, int16, int32, int64,
 		uint, uint8, uint16, uint32, uint64,
-		float32, float64:
+		float32, float64, json.Number:
 		return true
 	default:
 		return false
