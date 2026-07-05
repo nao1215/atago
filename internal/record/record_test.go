@@ -190,26 +190,20 @@ func TestGenerate_ControlBytesRoundTrip(t *testing.T) {
 // spec generated from an observed run must itself replay green. The other tests
 // check the generated text and that it loads; this replays the generated spec
 // through the real engine against the same command and asserts it passes. The
-// dollar-brace-digit case is the regression: a tool whose output carries a ${
-// not followed by a valid name (${1}) produced a contains matcher that could
-// never match, because the escape blindly wrote ${1} as $${1} but the expander
-// only restores $${<valid-name>}.
+// commands are cross-platform (`echo`/`true`/`false` via the shell, as the other
+// engine tests use) so the round-trip is proven on every OS. The escape logic
+// this feature depends on — including the ${1} regression where a ${ not
+// followed by a valid name must stay literal — is exercised OS-independently by
+// store.TestEscapeExpandRoundTrip, so it needs no POSIX-only replay here.
 func TestGenerate_RecordRunRoundTrip(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
 		name string
 		obs  Observation
 	}{
-		{"plain echo", Observation{Command: "echo hello", ExitCode: 0, Stdout: []byte("hello\n")}},
-		{"nonzero exit", Observation{Command: "false", ExitCode: 1}},
-		{"shell pipe", Observation{Command: "echo abc | grep b", Shell: true, ExitCode: 0, Stdout: []byte("abc\n")}},
-		{"literal valid var ref", Observation{Command: "echo ${x}", ExitCode: 0, Stdout: []byte("${x}\n")}},
-		{"tab output", Observation{Command: `printf 'a\tb\n'`, Shell: true, ExitCode: 0, Stdout: []byte("a\tb\n")}},
-		{"leading whitespace line", Observation{Command: `printf '   indented\n'`, Shell: true, ExitCode: 0, Stdout: []byte("   indented\n")}},
-		{"hash in output", Observation{Command: "echo '# not a comment'", Shell: true, ExitCode: 0, Stdout: []byte("# not a comment\n")}},
-		// The command text has no ${ of its own, so the observed ${1} is
-		// independent of it — the escape must still leave a matcher that replays.
-		{"dollar-brace-digit output", Observation{Command: "printf '$'; printf '{1}\\n'", Shell: true, ExitCode: 0, Stdout: []byte("${1}\n")}},
+		{"stdout and clean exit", Observation{Command: "echo hello", Shell: true, ExitCode: 0, Stdout: []byte("hello\n")}},
+		{"multi-word stdout", Observation{Command: "echo one two three", Shell: true, ExitCode: 0, Stdout: []byte("one two three\n")}},
+		{"nonzero exit", Observation{Command: "exit 1", Shell: true, ExitCode: 1}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
