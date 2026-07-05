@@ -183,6 +183,41 @@ func TestCheck_Stream_CRLF(t *testing.T) {
 	}
 }
 
+// TestCheck_Stream_EqualsTrailingNewline is a regression: `equals`/`not_equals`
+// tolerate a single phantom trailing newline (the one most commands emit, which
+// a YAML block scalar also carries), not an arbitrary run of trailing blank
+// lines. Trimming every trailing newline made `equals "hello"` pass against
+// output with extra blank lines, and `not_equals` report a false "equal", and
+// it disagreed with the line: matcher, which drops exactly one trailing newline
+// so a deliberate trailing blank line stays addressable (see splitLines).
+func TestCheck_Stream_EqualsTrailingNewline(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name   string
+		stdout string
+		a      *spec.Assert
+		wantOK bool
+	}{
+		{"single trailing newline tolerated", "hello\n", &spec.Assert{Stdout: &spec.StreamAssert{Equals: strp("hello")}}, true},
+		{"no newline either side", "hello", &spec.Assert{Stdout: &spec.StreamAssert{Equals: strp("hello")}}, true},
+		{"want carries the newline", "hello", &spec.Assert{Stdout: &spec.StreamAssert{Equals: strp("hello\n")}}, true},
+		{"extra trailing blank lines are not equal", "hello\n\n\n", &spec.Assert{Stdout: &spec.StreamAssert{Equals: strp("hello")}}, false},
+		{"a deliberate trailing blank line is distinguishable", "hello\n\n", &spec.Assert{Stdout: &spec.StreamAssert{Equals: strp("hello\n")}}, false},
+		{"empty output is not equal to blank lines", "\n\n", &spec.Assert{Stdout: &spec.StreamAssert{Equals: strp("")}}, false},
+		{"not_equals sees the extra blank lines", "hello\n\n\n", &spec.Assert{Stdout: &spec.StreamAssert{NotEquals: strp("hello")}}, true},
+		{"not_equals stays tolerant of one newline", "hello\n", &spec.Assert{Stdout: &spec.StreamAssert{NotEquals: strp("hello")}}, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			res := &runner.Result{Stdout: []byte(tc.stdout)}
+			if got := Check(tc.a, res, Env{}); got.OK != tc.wantOK {
+				t.Errorf("OK = %v, want %v (%s)", got.OK, tc.wantOK, got.Hint)
+			}
+		})
+	}
+}
+
 // TestCheck_ContainsList_FailureNamesElement verifies an array contains /
 // not_contains failure identifies which element failed, and that a single-element
 // list keeps the original (no "element N of M") failure phrasing.
