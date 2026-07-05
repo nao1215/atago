@@ -52,6 +52,12 @@ func Load(path string) (*spec.Spec, error) {
 
 // LoadBytes parses and validates spec bytes, labeling errors with path.
 func LoadBytes(path string, data []byte) (*spec.Spec, error) {
+	// Strip a leading UTF-8 byte-order mark. Windows/Notepad-family editors emit
+	// one routinely, and goccy/go-yaml does not skip it: it glues the BOM onto the
+	// first key, so a correctly-authored spec failed with a confusing "unknown
+	// field" error naming a field the author wrote right. Most YAML tooling strips
+	// a single leading BOM transparently.
+	data = bytes.TrimPrefix(data, []byte("\ufeff"))
 	var s spec.Spec
 	dec := yaml.NewDecoder(bytes.NewReader(data), yaml.Strict())
 	if err := dec.Decode(&s); err != nil {

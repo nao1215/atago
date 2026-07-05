@@ -57,6 +57,37 @@ scenarios:
 	}
 }
 
+// TestLoadBytes_StripsLeadingBOM is a regression: a spec saved with a leading
+// UTF-8 byte-order mark (routinely emitted by Windows/Notepad-family editors)
+// must load. The raw bytes went straight to the YAML decoder, which glued the
+// BOM onto the first key and failed with a confusing `unknown field "version"`
+// that blamed a field the author wrote correctly. A single leading BOM is now
+// stripped transparently, as most YAML tooling does.
+func TestLoadBytes_StripsLeadingBOM(t *testing.T) {
+	t.Parallel()
+	src := "\ufeff" + `version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: ok
+    steps:
+      - run:
+          command: echo hi
+      - assert:
+          exit_code: 0
+`
+	s, err := LoadBytes("bom.atago.yaml", []byte(src))
+	if err != nil {
+		t.Fatalf("LoadBytes() with a leading BOM error = %v", err)
+	}
+	if s.Suite.Name != "sample" {
+		t.Errorf("suite name = %q, want sample", s.Suite.Name)
+	}
+	if len(s.Scenarios) != 1 || s.Scenarios[0].Name != "ok" {
+		t.Errorf("scenario not decoded through the BOM: %+v", s.Scenarios)
+	}
+}
+
 // TestLoadBytes_BrowserRunnerConfig proves the minimal browser-runner
 // configuration surface loads and round-trips: headless, exec_path, browser_args.
 func TestLoadBytes_BrowserRunnerConfig(t *testing.T) {

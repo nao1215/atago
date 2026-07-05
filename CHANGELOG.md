@@ -9,6 +9,11 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- A spec file saved with a leading UTF-8 byte-order mark now loads. Windows and
+  Notepad-family editors emit a BOM routinely, and the YAML decoder glued it onto
+  the first key, so a correctly-authored spec failed with a confusing
+  `unknown field "version"` that blamed a field the author wrote right. A single
+  leading BOM is now stripped before parsing, as most YAML tooling does.
 - A `dir:` tree `snapshot:` manifest now escapes control bytes in entry paths and
   link targets, so a filesystem name embedding a newline (legal on POSIX) can no
   longer masquerade as several manifest lines. Before, a single entry named
