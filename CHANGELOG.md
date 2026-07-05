@@ -7,6 +7,20 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-07-05
+
+A correctness pass over three surfaces — the JSON/YAML numeric matchers, the
+loader's assertion validation, and the machine-readable report formats — each
+defect surfaced by an edge-case bug hunt and fixed with a reproduction test
+first. No new features.
+
+Highlights: `json` `equals` no longer collapses two distinct 64-bit integers,
+and `gt`/`lt` compare integers beyond int64; a whole-number float like
+`1000000.0` now matches `^1000000$`; the loader rejects an empty
+`matches`/`not_matches` regexp and negative `length`/`duration` bounds at load
+time instead of at run time; and a captured ANSI escape can no longer break a
+`--report tap` diagnostic or a `--report gha` annotation.
+
 ### Fixed
 
 - `json:`/`yaml:` `equals` no longer reports two distinct large integers as
