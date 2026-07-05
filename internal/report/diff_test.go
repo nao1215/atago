@@ -1,11 +1,52 @@
 package report
 
 import (
+	"math/rand"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/nao1215/atago/internal/assert"
 )
+
+// TestDiffOps_Reconstruct is the fundamental diff invariant: the edit script
+// diffOps(a, b) must, in order, reconstruct a from its keep+remove ops and b
+// from its keep+add ops. A script that violates this renders a misleading
+// failure diff to the user. The inputs draw from a tiny alphabet with repeats so
+// the LCS has real common subsequences to find, not just wholesale replacement.
+func TestDiffOps_Reconstruct(t *testing.T) {
+	t.Parallel()
+	rng := rand.New(rand.NewSource(1))
+	alphabet := []string{"", "a", "b", "c", "d", "a", "b"}
+	gen := func() []string {
+		out := make([]string, rng.Intn(9))
+		for i := range out {
+			out[i] = alphabet[rng.Intn(len(alphabet))]
+		}
+		return out
+	}
+	for iter := range 5000 {
+		a, b := gen(), gen()
+		var gotA, gotB []string
+		for _, op := range diffOps(a, b) {
+			switch op.kind {
+			case ' ':
+				gotA = append(gotA, a[op.aIdx])
+				gotB = append(gotB, b[op.bIdx])
+			case '-':
+				gotA = append(gotA, a[op.aIdx])
+			case '+':
+				gotB = append(gotB, b[op.bIdx])
+			}
+		}
+		if !slices.Equal(gotA, a) {
+			t.Fatalf("iter %d: keep+remove ops do not reconstruct a\n a=%q got=%q b=%q", iter, a, gotA, b)
+		}
+		if !slices.Equal(gotB, b) {
+			t.Fatalf("iter %d: keep+add ops do not reconstruct b\n a=%q b=%q got=%q", iter, a, b, gotB)
+		}
+	}
+}
 
 // TestUnifiedDiff_HunkPlacement pins hunk generation for a change at the
 // start, middle, and end of a document (#28).
