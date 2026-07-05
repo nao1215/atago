@@ -94,11 +94,20 @@ type Engine struct {
 	// assertions write durable sidecar files for review tooling (#48, the
 	// --artifacts-dir flag). Nil disables artifact export.
 	Artifacts *artifact.Dir
+
+	// probeTimeout bounds a skip/only probe command so a hanging probe cannot
+	// stall the (sequential) selection phase. Zero means unbounded.
+	probeTimeout time.Duration
 }
+
+// defaultProbeTimeout bounds a skip/only probe command: quick checks like
+// `command -v tool` need far less, but a generous ceiling still stops a
+// pathological probe (`sleep 9999`) from hanging the selection phase.
+const defaultProbeTimeout = 30 * time.Second
 
 // New returns an Engine with the default command runner.
 func New() *Engine {
-	return &Engine{cmd: runnercmd.New(), builtins: builtinVars()}
+	return &Engine{cmd: runnercmd.New(), builtins: builtinVars(), probeTimeout: defaultProbeTimeout}
 }
 
 // builtinVars are variables seeded into every scenario's store. ${atago} is the
@@ -773,6 +782,13 @@ func (e *Engine) skipReason(ctx context.Context, sc *spec.Scenario) (string, boo
 // tool. The probe runs in a throwaway temp dir so it cannot touch the cwd; if
 // that dir cannot be created it falls back to the process cwd.
 func (e *Engine) probeSucceeds(ctx context.Context, command string) bool {
+	// A probe is a quick selection check, not a step, so bound it: a hanging
+	// probe would otherwise stall the sequential selection phase indefinitely.
+	if e.probeTimeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, e.probeTimeout)
+		defer cancel()
+	}
 	dir, err := os.MkdirTemp("", "atago-probe-")
 	if err == nil {
 		defer os.RemoveAll(dir)
