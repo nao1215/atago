@@ -313,6 +313,26 @@ func TestLoadBytes_Errors(t *testing.T) {
 			wantKind: KindParse,
 		},
 		{
+			// An empty file previously surfaced the raw decoder "EOF", which tells
+			// the user nothing. It now names the problem and what a spec needs.
+			name:     "empty file",
+			src:      "",
+			wantKind: KindParse,
+			wantMsg:  "spec is empty",
+		},
+		{
+			name:     "whitespace-only file",
+			src:      "   \n\t\n  ",
+			wantKind: KindParse,
+			wantMsg:  "spec is empty",
+		},
+		{
+			name:     "comments-only file",
+			src:      "# just a comment\n# nothing else\n",
+			wantKind: KindParse,
+			wantMsg:  "spec is empty",
+		},
+		{
 			name:     "unknown field is strict-rejected",
 			src:      "version: \"1\"\nsuite:\n  name: x\nbogus: true\nscenarios:\n  - name: a\n    steps:\n      - run:\n          command: echo",
 			wantKind: KindParse,

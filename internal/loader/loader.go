@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -54,6 +55,12 @@ func LoadBytes(path string, data []byte) (*spec.Spec, error) {
 	var s spec.Spec
 	dec := yaml.NewDecoder(bytes.NewReader(data), yaml.Strict())
 	if err := dec.Decode(&s); err != nil {
+		// An empty document (empty file, whitespace, or comments only) decodes to
+		// io.EOF, whose bare "EOF" tells the user nothing. Name the problem and
+		// what a spec needs instead.
+		if errors.Is(err, io.EOF) {
+			return nil, &Error{Path: path, Kind: KindParse, Msg: "spec is empty: expected a YAML document with version, suite, and scenarios"}
+		}
 		return nil, &Error{Path: path, Kind: KindParse, Msg: formatYAMLError(err)}
 	}
 	// Record each scenario's authored index before matrix expansion, so every
