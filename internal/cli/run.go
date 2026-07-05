@@ -104,6 +104,13 @@ func runCmd(args []string, stdout, stderr io.Writer) int {
 	// collected targets so the usual path semantics still apply, and installs an
 	// identity selector so only the recorded scenarios execute. With nothing
 	// recorded there is nothing to rerun, which is reported and treated as success.
+	//
+	// rerunPreserved holds recorded failures in specs OUTSIDE this run's target
+	// (a narrowed `--rerun-failed a.atago.yaml` when b.atago.yaml also had
+	// recorded failures). Those scenarios were not re-verified, so they must be
+	// carried back into the saved ledger below; overwriting it with only what ran
+	// would forget still-failing work and could greenlight the loop.
+	var rerunPreserved []failedEntry
 	if *rerunFailed {
 		state, lerr := loadRerunState()
 		if lerr != nil {
@@ -119,6 +126,15 @@ func runCmd(args []string, stdout, stderr io.Writer) int {
 		if len(paths) == 0 {
 			fmt.Fprintln(stderr, "atago run: no previously failed scenarios under the given targets")
 			return ExitOK
+		}
+		inScope := make(map[string]bool, len(paths))
+		for _, p := range paths {
+			inScope[p] = true
+		}
+		for _, e := range state.Failed {
+			if !inScope[e.SpecPath] {
+				rerunPreserved = append(rerunPreserved, e)
+			}
 		}
 		eng.Select = sel
 	}
@@ -195,11 +211,14 @@ func runCmd(args []string, stdout, stderr io.Writer) int {
 	// fully-green run clears the file. It is only rewritten when at least one suite
 	// loaded, so a run where every spec failed to parse leaves prior state intact;
 	// and a --rerun-failed that matched no scenario must NOT clear the file, or the
-	// still-failing work it could not map would be forgotten. Writing is
+	// still-failing work it could not map would be forgotten. A narrowed
+	// --rerun-failed carries back the recorded failures for specs outside its
+	// target (rerunPreserved), which it did not re-verify, so a partial rerun
+	// cannot silently drop still-failing work elsewhere in the ledger. Writing is
 	// best-effort — a read-only checkout must not fail the run — so a write error
 	// is a warning, not a fatal exit.
 	if len(results) > 0 && !rerunMatchedNothing {
-		if err := saveRerunState(collectFailures(results)); err != nil {
+		if err := saveRerunState(append(collectFailures(results), rerunPreserved...)); err != nil {
 			fmt.Fprintf(stderr, "atago run: could not update %s: %v\n", rerunStatePath(), err)
 		}
 	}

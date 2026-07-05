@@ -9,6 +9,14 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- `atago run --rerun-failed` narrowed to a subset of the recorded specs no longer
+  drops the recorded failures in the specs it did not run. It rewrote the whole
+  `.atago/last-failed.json` ledger from only the scenarios that ran, so
+  `--rerun-failed a.atago.yaml` forgot a still-broken `b.atago.yaml` — and if the
+  narrowed target now passed, the ledger was wiped and the run exited green while
+  other work stayed broken. Recorded failures for specs outside the run's target
+  are now carried back into the saved ledger, since they were never re-verified;
+  a full-scope rerun and a normal run are unchanged (#64).
 - `stdout`/`stderr` `equals` and `not_equals` now tolerate only a single
   trailing newline, not an arbitrary run of trailing blank lines. The matcher
   trimmed every trailing newline, so `equals: "hello"` passed against output
