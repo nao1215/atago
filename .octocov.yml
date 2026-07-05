@@ -1,11 +1,10 @@
 coverage:
   paths:
     - cover.out
-  acceptable: 80%
-  exclude:
-    # The process entrypoint just wires os.Args into cli.Main; it has no logic
-    # worth a test and is exercised end-to-end by the binary itself.
-    - "github.com/nao1215/atago/main.go"
+  # cover.out is the merged unit + self-hosted E2E profile (make coverage), so
+  # main.go is exercised by the real binary and needs no exclude; every package
+  # is measured against one honest number.
+  acceptable: 90%
   badge:
     path: doc/coverage.svg
 diff:

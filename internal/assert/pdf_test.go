@@ -145,3 +145,38 @@ func indexOf(s, sub string) int {
 	}
 	return -1
 }
+
+// TestDecodePDFString_Escapes pins PDF literal-string decoding (ISO 32000
+// §7.3.4.2) as used by the `pdf: {text: {...}}` assertion. Beyond the \n \r \t
+// already handled, PDFs written by common generators (pandoc, LaTeX, wkhtmltopdf)
+// escape non-ASCII bytes as octal \ddd and use \b \f and backslash-newline line
+// continuations. Decoding those wrong makes a valid pdf text assertion silently
+// fail to match, so each case here is a correctness guard, not cosmetics.
+func TestDecodePDFString_Escapes(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name string
+		lit  string
+		want string
+	}{
+		{"plain", "(hello)", "hello"},
+		{"newline-tab", "(a\\nb\\tc)", "a\nb\tc"},
+		// \351 is octal for 0xE9 — 'é' in Latin-1/PDFDocEncoding. It must decode to
+		// that single byte, not the literal text "351".
+		{"octal-latin1", "(caf\\351)", "caf\xe9"},
+		{"octal-short", "(\\7a)", "\x07a"},
+		{"octal-three", "(\\101\\102\\103)", "ABC"},
+		// \b and \f are defined escapes.
+		{"backspace-formfeed", "(x\\by\\fz)", "x\by\fz"},
+		// Escaped parentheses and backslash pass through literally.
+		{"escaped-parens", "(a\\(b\\)c\\\\d)", "a(b)c\\d"},
+		// A backslash immediately before a newline is a line continuation: it and
+		// the newline vanish, joining the two source lines.
+		{"line-continuation", "(line1\\\nline2)", "line1line2"},
+	}
+	for _, c := range cases {
+		if got := decodePDFString([]byte(c.lit)); got != c.want {
+			t.Errorf("%s: decodePDFString(%q) = %q, want %q", c.name, c.lit, got, c.want)
+		}
+	}
+}

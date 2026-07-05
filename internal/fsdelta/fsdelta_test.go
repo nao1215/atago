@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
+	"sort"
 	"testing"
 )
 
@@ -98,4 +100,91 @@ func keys(m Snapshot) []string {
 		out = append(out, k)
 	}
 	return out
+}
+
+// TestScan_MissingRootReturnsEmpty covers the os.IsNotExist branch: scanning a
+// root that does not exist yields an empty snapshot and no error, so a step that
+// never created its workdir does not turn a `changes:` assertion into an engine
+// error.
+func TestScan_MissingRootReturnsEmpty(t *testing.T) {
+	t.Parallel()
+	snap, err := Scan(filepath.Join(t.TempDir(), "does-not-exist"))
+	if err != nil {
+		t.Fatalf("Scan(missing) error = %v, want nil", err)
+	}
+	if len(snap) != 0 {
+		t.Errorf("Scan(missing) = %v, want empty snapshot", snap)
+	}
+}
+
+// TestScan_SkipsSymlinks proves symlinks are not tracked (only regular files
+// are), so a symlink cannot be mistaken for a created/modified content file.
+func TestScan_SkipsSymlinks(t *testing.T) {
+	t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink creation is restricted on Windows")
+	}
+	root := t.TempDir()
+	target := filepath.Join(root, "real.txt")
+	if err := os.WriteFile(target, []byte("data"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, filepath.Join(root, "link.txt")); err != nil {
+		t.Fatal(err)
+	}
+	snap, err := Scan(root)
+	if err != nil {
+		t.Fatalf("Scan: %v", err)
+	}
+	if _, ok := snap["link.txt"]; ok {
+		t.Errorf("symlink should not be tracked, snapshot = %v", snap)
+	}
+	if _, ok := snap["real.txt"]; !ok {
+		t.Errorf("regular file should be tracked, snapshot = %v", snap)
+	}
+}
+
+// TestDiff_Antisymmetry is a metamorphic law: swapping the two snapshots turns
+// every Created into a Deleted and vice versa, while the Modified set is
+// unchanged (only its membership flips direction, not the paths). A break here
+// would mean the delta reports the wrong verb for a change.
+func TestDiff_Antisymmetry(t *testing.T) {
+	t.Parallel()
+	pre := Snapshot{"keep": "h", "changed": "old", "onlypre": "x"}
+	post := Snapshot{"keep": "h", "changed": "new", "onlypost": "y"}
+
+	fwd := Diff(pre, post)
+	rev := Diff(post, pre)
+
+	if !reflect.DeepEqual(fwd.Created, rev.Deleted) {
+		t.Errorf("forward Created %v != reverse Deleted %v", fwd.Created, rev.Deleted)
+	}
+	if !reflect.DeepEqual(fwd.Deleted, rev.Created) {
+		t.Errorf("forward Deleted %v != reverse Created %v", fwd.Deleted, rev.Created)
+	}
+	fm, rm := append([]string(nil), fwd.Modified...), append([]string(nil), rev.Modified...)
+	sort.Strings(fm)
+	sort.Strings(rm)
+	if !reflect.DeepEqual(fm, rm) {
+		t.Errorf("Modified set differs by direction: %v vs %v", fm, rm)
+	}
+	if len(fwd.Modified) != 1 || fwd.Modified[0] != "changed" {
+		t.Errorf("Modified = %v, want [changed]", fwd.Modified)
+	}
+}
+
+// TestDiff_EmptySnapshots covers the trivial edges: two empty snapshots produce
+// an all-empty delta, and a scan-against-nothing reports everything created.
+func TestDiff_EmptySnapshots(t *testing.T) {
+	t.Parallel()
+	empty := Snapshot{}
+	if d := Diff(empty, empty); len(d.Created)+len(d.Modified)+len(d.Deleted) != 0 {
+		t.Errorf("Diff(empty,empty) = %+v, want all empty", d)
+	}
+	post := Snapshot{"a": "1", "b": "2"}
+	d := Diff(empty, post)
+	want := []string{"a", "b"}
+	if !reflect.DeepEqual(d.Created, want) || len(d.Modified) != 0 || len(d.Deleted) != 0 {
+		t.Errorf("Diff(empty, post) = %+v, want Created %v", d, want)
+	}
 }

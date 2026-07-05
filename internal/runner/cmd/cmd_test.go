@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -497,4 +498,171 @@ func TestShellPath(t *testing.T) {
 			t.Errorf("shellPath() = %q, want an absolute path", got)
 		}
 	})
+}
+
+// TestCommandLine_ShellAndArgv covers CommandLine for the shell path, the
+// argv-tokenized path, the empty-command error, and the unparseable-command
+// error (unclosed quote on POSIX).
+func TestCommandLine_ShellAndArgv(t *testing.T) {
+	t.Parallel()
+	// Shell form: POSIX returns the shell with -c; the exact shell binary depends
+	// on the host, so assert on the -c flag and command argument.
+	name, args, err := CommandLine("echo hi | wc -l", true)
+	if err != nil {
+		t.Fatalf("shell CommandLine error: %v", err)
+	}
+	if runtime.GOOS == "windows" {
+		if name != "cmd" || len(args) != 2 || args[0] != "/c" {
+			t.Errorf("windows shell argv = %q %v, want cmd /c ...", name, args)
+		}
+	} else {
+		if len(args) != 2 || args[0] != "-c" || args[1] != "echo hi | wc -l" {
+			t.Errorf("posix shell argv = %q %v, want <sh> -c <command>", name, args)
+		}
+	}
+
+	// Argv form: the first field is the program, the rest are arguments.
+	name, args, err = CommandLine(argvCommand("echo a b c", "cmd /c echo a b c"), false)
+	if err != nil {
+		t.Fatalf("argv CommandLine error: %v", err)
+	}
+	if name == "" || len(args) == 0 {
+		t.Errorf("argv CommandLine returned name=%q args=%v", name, args)
+	}
+
+	// Empty command is an error, not a silent empty argv.
+	if _, _, err := CommandLine("   ", false); err == nil {
+		t.Error("empty command should be rejected")
+	}
+
+	// A syntactically broken command (unclosed quote) is a parse error on both
+	// POSIX (go-shellwords) and Windows (windowsFields).
+	if _, _, err := CommandLine(`echo "unclosed`, false); err == nil {
+		t.Error("unclosed quote should be a parse error")
+	}
+}
+
+// TestShellPath_EnvOverride covers shellPath's ATAGO_SHELL override branch and
+// its default. It cannot be parallel because it mutates process env.
+func TestShellPath_EnvOverride(t *testing.T) {
+	t.Setenv("ATAGO_SHELL", "/custom/shell")
+	if got := shellPath(); got != "/custom/shell" {
+		t.Errorf("shellPath with ATAGO_SHELL = %q, want /custom/shell", got)
+	}
+	t.Setenv("ATAGO_SHELL", "")
+	// With no override, the default is an absolute path (never empty); on POSIX
+	// hosts /bin/sh normally exists.
+	if got := shellPath(); got == "" {
+		t.Error("shellPath default must not be empty")
+	}
+}
+
+// TestParseTimeout covers the empty (zero), valid, and invalid branches.
+func TestParseTimeout(t *testing.T) {
+	t.Parallel()
+	if d, err := parseTimeout(""); err != nil || d != 0 {
+		t.Errorf("parseTimeout(\"\") = %v, %v; want 0, nil", d, err)
+	}
+	if d, err := parseTimeout("250ms"); err != nil || d.Milliseconds() != 250 {
+		t.Errorf("parseTimeout(250ms) = %v, %v", d, err)
+	}
+	if _, err := parseTimeout("soon"); err == nil {
+		t.Error("parseTimeout(soon) should error")
+	}
+}
+
+// TestResolveDir covers every branch of resolveDir: empty and "." collapse to the
+// workdir, an absolute cwd is used verbatim, and a relative cwd joins onto workdir
+// (via filepath.Join, so the separator matches the host — backslash on Windows).
+func TestResolveDir(t *testing.T) {
+	t.Parallel()
+	const wd = "/work/dir"
+	cases := []struct {
+		cwd, want string
+	}{
+		{"", wd},
+		{".", wd},
+		{"sub", filepath.Join(wd, "sub")},
+		{"a/b", filepath.Join(wd, "a", "b")},
+	}
+	for _, c := range cases {
+		if got := resolveDir(wd, c.cwd); got != c.want {
+			t.Errorf("resolveDir(%q, %q) = %q, want %q", wd, c.cwd, got, c.want)
+		}
+	}
+	if runtime.GOOS != "windows" {
+		if got := resolveDir(wd, "/abs/path"); got != "/abs/path" {
+			t.Errorf("resolveDir with absolute cwd = %q, want /abs/path", got)
+		}
+	}
+}
+
+// TestBuildEnv_Precedence pins the documented precedence step env > sandbox >
+// pass_env > host (#16, #71). os/exec keeps the LAST value for a duplicated key,
+// so the contract is expressed as "the winning source appears last in the slice".
+// An inverted append order here would silently leak the host home past an enabled
+// sandbox, so this is a security-relevant invariant, not cosmetics.
+func TestBuildEnv_Precedence(t *testing.T) {
+	// clear_env inherits nothing except the pass_env allowlist, so set a host var
+	// we can pass through. Not parallel: mutates process env.
+	t.Setenv("LEAKY", "host-value")
+
+	env := BuildEnv(
+		map[string]string{"SHARED": "from-override"},
+		true, // clearEnv
+		[]string{"LEAKY"},
+		map[string]string{"SHARED": "from-sandbox", "LEAKY": "from-sandbox"},
+	)
+
+	// SHARED is set by both sandbox and override; override must win (appear last).
+	if last := lastValue(env, "SHARED"); last != "from-override" {
+		t.Errorf("SHARED effective value = %q, want from-override (step env wins)", last)
+	}
+	// LEAKY is passed from host AND overlaid by sandbox; sandbox must win so the
+	// host value cannot leak past the isolated home.
+	if last := lastValue(env, "LEAKY"); last != "from-sandbox" {
+		t.Errorf("LEAKY effective value = %q, want from-sandbox (sandbox beats pass_env host)", last)
+	}
+
+	// Without clear_env and without overrides/sandbox, buildEnv returns nil so
+	// exec inherits os.Environ() directly.
+	if got := BuildEnv(nil, false, nil, nil); got != nil {
+		t.Errorf("BuildEnv(nil,false,nil,nil) = %v, want nil (inherit host)", got)
+	}
+}
+
+// TestLookupHostEnv covers the present and absent branches.
+func TestLookupHostEnv(t *testing.T) {
+	t.Setenv("ATAGO_TEST_PRESENT", "yes")
+	if v, ok := lookupHostEnv("ATAGO_TEST_PRESENT"); !ok || v != "yes" {
+		t.Errorf("lookupHostEnv(present) = %q, %v", v, ok)
+	}
+	if _, ok := lookupHostEnv("ATAGO_TEST_DEFINITELY_ABSENT_XYZ"); ok {
+		t.Error("lookupHostEnv(absent) should report not found")
+	}
+}
+
+// lastValue returns the value of the last "KEY=VALUE" entry for key, mirroring
+// how os/exec resolves a duplicated environment key.
+func lastValue(env []string, key string) string {
+	val := ""
+	for _, kv := range env {
+		if strings.HasPrefix(kv, key+"=") {
+			val = kv[len(key)+1:]
+		}
+	}
+	return val
+}
+
+// TestConfigureShell_NoopOnPOSIX covers the POSIX ConfigureShell, which is a
+// deliberate no-op (the sh -c argv from CommandLine needs no re-quoting). It must
+// not panic or mutate the command.
+func TestConfigureShell_NoopOnPOSIX(t *testing.T) {
+	t.Parallel()
+	c := exec.CommandContext(context.Background(), "sh", "-c", "echo hi")
+	before := append([]string(nil), c.Args...)
+	ConfigureShell(c, "echo hi")
+	if len(c.Args) != len(before) {
+		t.Errorf("ConfigureShell mutated argv: %v -> %v", before, c.Args)
+	}
 }

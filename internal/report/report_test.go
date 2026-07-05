@@ -2,13 +2,16 @@ package report
 
 import (
 	"bytes"
+	"encoding/json"
 	"encoding/xml"
+	"os"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/nao1215/atago/internal/assert"
 	"github.com/nao1215/atago/internal/engine"
+	"github.com/nao1215/atago/internal/runner"
 )
 
 func sampleResults() []*engine.SuiteResult {
@@ -415,5 +418,532 @@ func TestProgress_Markers(t *testing.T) {
 	p.Done()
 	if got := b.String(); got != ".sFE\n" {
 		t.Errorf("progress markers = %q, want %q", got, ".sFE\n")
+	}
+}
+
+// suiteWithSetupAndTeardownFailures builds a suite that has real scenario rows
+// (so it is NOT the "errored without scenarios" synthetic path) but whose
+// suite.setup AND suite.teardown each carry a failed assertion check and an
+// errored step. This is the almost-untested writeSuiteSteps / suiteStepFailures
+// path (#7): a suite whose bootstrap or cleanup broke.
+func suiteWithSetupAndTeardownFailures() *engine.SuiteResult {
+	setupCheck := &assert.CheckResult{
+		OK:   false,
+		Desc: "assert file db.sock exists",
+		// Multi-line artifacts trigger the unified-diff rendering branch.
+		ArtifactExpected: []byte("ready\nport 5432\n"),
+		ArtifactActual:   []byte("ready\nport 5433\n"),
+		Hint:             "the service came up on the wrong port",
+	}
+	teardownCheck := &assert.CheckResult{
+		OK:       false,
+		Desc:     "assert dir /tmp/scratch does not exist",
+		Expected: "absent",
+		Actual:   "present",
+		Hint:     "scratch dir was left behind",
+	}
+	return &engine.SuiteResult{
+		Suite:    "svc-suite",
+		SpecPath: "svc.atago.yaml",
+		Status:   engine.StatusFailed,
+		Duration: 4 * time.Millisecond,
+		Setup: []engine.StepResult{
+			{Index: 1, Kind: "assert", Checks: []*assert.CheckResult{setupCheck}},
+			{Index: 2, Kind: "run", ErrMsg: "migrate: connection refused"},
+		},
+		Teardown: []engine.StepResult{
+			{Index: 1, Kind: "assert", Checks: []*assert.CheckResult{teardownCheck}},
+			{Index: 2, Kind: "run", ErrMsg: "docker rm: no such container"},
+		},
+		Scenarios: []engine.ScenarioResult{
+			{Name: "ok", Status: engine.StatusPassed, Duration: time.Millisecond,
+				Steps: []engine.StepResult{{Kind: "assert", Checks: []*assert.CheckResult{{OK: true}}}}},
+		},
+	}
+}
+
+// TestConsole_SuiteSetupAndTeardownBlocks exercises writeSuiteSteps for both the
+// setup and teardown labels, including the unified-diff branch, the
+// Expected/Actual branch, the Hint line, and the per-step ErrMsg line.
+func TestConsole_SuiteSetupAndTeardownBlocks(t *testing.T) {
+	t.Parallel()
+	out := render(t, FormatConsole, suiteWithSetupAndTeardownFailures())
+	for _, want := range []string{
+		"SUITE SETUP FAILED:",
+		"svc-suite",
+		"assert file db.sock exists",
+		"Diff (-expected +actual):",
+		"-port 5432", // the differing line rendered as a removal
+		"+port 5433", // and the actual as an addition
+		"the service came up on the wrong port",
+		"step 2 (run): migrate: connection refused",
+		"SUITE TEARDOWN FAILED:",
+		"assert dir /tmp/scratch does not exist",
+		"Expected:",
+		"Actual:",
+		"scratch dir was left behind",
+		"step 2 (run): docker rm: no such container",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("console suite block missing %q\n--- got ---\n%s", want, out)
+		}
+	}
+}
+
+// TestJSON_SuiteSetupAndTeardownFailures verifies suiteStepFailures maps both
+// suite.setup and suite.teardown failures into the machine-readable document,
+// with the suite name as the scenario label and the diff embedded.
+func TestJSON_SuiteSetupAndTeardownFailures(t *testing.T) {
+	t.Parallel()
+	var doc jsonDocument
+	if err := json.Unmarshal([]byte(render(t, FormatJSON, suiteWithSetupAndTeardownFailures())), &doc); err != nil {
+		t.Fatalf("json invalid: %v", err)
+	}
+	rep := doc.Suites[0]
+	if len(rep.SetupFailures) != 2 {
+		t.Fatalf("setup_failures = %d, want 2: %+v", len(rep.SetupFailures), rep.SetupFailures)
+	}
+	if len(rep.TeardownFailures) != 2 {
+		t.Fatalf("suite teardown_failures = %d, want 2: %+v", len(rep.TeardownFailures), rep.TeardownFailures)
+	}
+	// The suite name labels a suite-level failure (there is no scenario for it).
+	if rep.SetupFailures[0].Scenario != "svc-suite" {
+		t.Errorf("setup failure scenario label = %q, want the suite name", rep.SetupFailures[0].Scenario)
+	}
+	if rep.SetupFailures[0].Diff == "" {
+		t.Errorf("multi-line suite setup failure should carry a diff: %+v", rep.SetupFailures[0])
+	}
+	// The errored step is captured with its phase label and error text.
+	var sawSetupErr, sawTeardownErr bool
+	for _, f := range rep.SetupFailures {
+		if f.Error == "migrate: connection refused" && f.Step == "run" {
+			sawSetupErr = true
+		}
+	}
+	for _, f := range rep.TeardownFailures {
+		if f.Error == "docker rm: no such container" && f.Step == "run" {
+			sawTeardownErr = true
+		}
+	}
+	if !sawSetupErr || !sawTeardownErr {
+		t.Errorf("suite setup/teardown step errors not both mapped: %+v / %+v", rep.SetupFailures, rep.TeardownFailures)
+	}
+}
+
+// scenarioTeardownFailure builds a passing scenario whose TEARDOWN failed — a
+// failed cleanup check (carrying a sidecar artifact) plus an errored teardown
+// step. The verdict stays passed; the failure must still surface.
+func scenarioTeardownFailure() *engine.SuiteResult {
+	return &engine.SuiteResult{
+		Suite:    "td",
+		SpecPath: "td.atago.yaml",
+		Status:   engine.StatusPassed,
+		Duration: 2 * time.Millisecond,
+		Scenarios: []engine.ScenarioResult{
+			{
+				Name:     "leaves-clean",
+				Status:   engine.StatusPassed,
+				Duration: time.Millisecond,
+				Steps:    []engine.StepResult{{Kind: "assert", Checks: []*assert.CheckResult{{OK: true}}}},
+				Teardown: []engine.StepResult{
+					{Index: 1, Kind: "assert", Checks: []*assert.CheckResult{{
+						OK: false, Desc: "assert file lock removed", Hint: "lockfile survived cleanup",
+						ArtifactFiles: []assert.ArtifactFile{{Role: "actual", Path: "artifacts/td/lock.txt"}},
+					}}},
+					{Index: 2, Kind: "run", ErrMsg: "rm: permission denied"},
+				},
+				ServiceLogs: []engine.ServiceLog{{Name: "api", Path: "artifacts/td/api.log"}},
+			},
+		},
+	}
+}
+
+// TestConsole_ScenarioTeardownFailure exercises writeDetail's teardown block and
+// the service-logs footer for a scenario whose verdict stays passed.
+func TestConsole_ScenarioTeardownFailure(t *testing.T) {
+	t.Parallel()
+	out := render(t, FormatConsole, scenarioTeardownFailure())
+	for _, want := range []string{
+		"TEARDOWN FAILED:",
+		"td / leaves-clean",
+		"assert file lock removed",
+		"lockfile survived cleanup",
+		"teardown step 2 (run): rm: permission denied",
+		"Service logs:",
+		"api: artifacts/td/api.log",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("console teardown block missing %q\n--- got ---\n%s", want, out)
+		}
+	}
+	// A passing-with-failed-teardown scenario keeps the verdict green.
+	if strings.Contains(out, "FAILED  ") {
+		t.Errorf("a failed teardown must not flip the summary verdict:\n%s", out)
+	}
+}
+
+// TestJSON_ScenarioTeardownFailures exercises teardownFailuresOf: the failed
+// check (with its artifact) and the errored step must both appear under the
+// scenario's teardown_failures, and never in the top-level failures[] bucket.
+func TestJSON_ScenarioTeardownFailures(t *testing.T) {
+	t.Parallel()
+	var doc jsonDocument
+	if err := json.Unmarshal([]byte(render(t, FormatJSON, scenarioTeardownFailure())), &doc); err != nil {
+		t.Fatalf("json invalid: %v", err)
+	}
+	rep := doc.Suites[0]
+	if len(rep.Failures) != 0 {
+		t.Errorf("a passing scenario with a failed teardown must not populate failures[]: %+v", rep.Failures)
+	}
+	sc := rep.Scenarios[0]
+	if len(sc.TeardownFailures) != 2 {
+		t.Fatalf("scenario teardown_failures = %d, want 2: %+v", len(sc.TeardownFailures), sc.TeardownFailures)
+	}
+	var sawArtifact, sawErr bool
+	for _, f := range sc.TeardownFailures {
+		if len(f.Artifacts) == 1 && f.Artifacts[0].Path == "artifacts/td/lock.txt" {
+			sawArtifact = true
+		}
+		if f.Error == "rm: permission denied" {
+			sawErr = true
+		}
+	}
+	if !sawArtifact {
+		t.Errorf("teardown check artifact not mapped: %+v", sc.TeardownFailures)
+	}
+	if !sawErr {
+		t.Errorf("teardown step error not mapped: %+v", sc.TeardownFailures)
+	}
+	if len(sc.ServiceLogs) != 1 || sc.ServiceLogs[0].Name != "api" {
+		t.Errorf("service logs not mapped: %+v", sc.ServiceLogs)
+	}
+}
+
+// TestConsole_FailedScenarioArtifacts exercises writeDetail's Artifacts footer
+// for a failed check that wrote sidecar files (#48).
+func TestConsole_FailedScenarioArtifacts(t *testing.T) {
+	t.Parallel()
+	res := &engine.SuiteResult{
+		Suite:  "art",
+		Status: engine.StatusFailed,
+		Scenarios: []engine.ScenarioResult{
+			{Name: "diffy", Status: engine.StatusFailed, Steps: []engine.StepResult{
+				{Kind: "run", Run: nil},
+				{Kind: "assert", Checks: []*assert.CheckResult{{
+					OK: false, Desc: "assert stdout equals golden",
+					ArtifactExpected: []byte("a\nb\nc\n"), ArtifactActual: []byte("a\nX\nc\n"),
+					ArtifactFiles: []assert.ArtifactFile{
+						{Role: "expected", Path: "artifacts/art/expected.txt"},
+						{Role: "actual", Path: "artifacts/art/actual.txt"},
+					},
+				}}},
+			}},
+		},
+	}
+	out := render(t, FormatConsole, res)
+	for _, want := range []string{"Artifacts:", "expected: artifacts/art/expected.txt", "actual: artifacts/art/actual.txt", "Diff (-expected +actual):"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("console artifacts footer missing %q\n--- got ---\n%s", want, out)
+		}
+	}
+}
+
+// TestSuiteFailureMessage covers every branch of the one-line message picker.
+func TestSuiteFailureMessage(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name string
+		in   jsonFailure
+		want string
+	}{
+		{"error wins", jsonFailure{Error: "boom", Hint: "h", Step: "s"}, "boom"},
+		{"hint next", jsonFailure{Hint: "check the port", Step: "s"}, "check the port"},
+		{"expected+actual", jsonFailure{Expected: "0", Actual: "3", Step: "s"}, "expected 0, got 3"},
+		{"only expected", jsonFailure{Expected: "x", Step: "s"}, "expected x, got "},
+		{"step fallback", jsonFailure{Step: "service setup"}, "service setup"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := suiteFailureMessage(tc.in); got != tc.want {
+				t.Errorf("suiteFailureMessage(%+v) = %q, want %q", tc.in, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestSuiteFailureBody covers the multi-line detail assembly, including the
+// empty (no detail) case.
+func TestSuiteFailureBody(t *testing.T) {
+	t.Parallel()
+	if got := suiteFailureBody(jsonFailure{Expected: "e", Actual: "a", Hint: "h"}); got != "Expected: e\nActual: a\nHint: h" {
+		t.Errorf("full body = %q", got)
+	}
+	if got := suiteFailureBody(jsonFailure{Hint: "only hint"}); got != "Hint: only hint" {
+		t.Errorf("hint-only body = %q", got)
+	}
+	if got := suiteFailureBody(jsonFailure{Error: "e"}); got != "" {
+		t.Errorf("error-only failure has no detail body, got %q", got)
+	}
+}
+
+// TestJUnit_MessageFallbacks proves the firstFailureMessage/firstErrorMessage
+// fallbacks fire when a failed/errored scenario carries no failing check or no
+// step error (a shape a folded --retry result can produce).
+func TestJUnit_MessageFallbacks(t *testing.T) {
+	t.Parallel()
+	res := &engine.SuiteResult{
+		Suite:  "fb",
+		Status: engine.StatusFailed,
+		Scenarios: []engine.ScenarioResult{
+			// Failed status but every check OK -> "assertion failed" fallback.
+			{Name: "f", Status: engine.StatusFailed, Steps: []engine.StepResult{
+				{Kind: "assert", Checks: []*assert.CheckResult{{OK: true}}},
+			}},
+			// Errored status but no step ErrMsg -> "execution error" fallback.
+			{Name: "e", Status: engine.StatusError, Steps: []engine.StepResult{
+				{Kind: "run"},
+			}},
+		},
+	}
+	var root junitTestsuites
+	if err := xml.Unmarshal([]byte(render(t, FormatJUnit, res)), &root); err != nil {
+		t.Fatalf("junit invalid: %v", err)
+	}
+	out := render(t, FormatJUnit, res)
+	if !strings.Contains(out, "assertion failed") {
+		t.Errorf("missing firstFailureMessage fallback:\n%s", out)
+	}
+	if !strings.Contains(out, "execution error") {
+		t.Errorf("missing firstErrorMessage fallback:\n%s", out)
+	}
+}
+
+// TestDetailText_WithDiff proves the JUnit/TAP plain-text body embeds the
+// uncolored unified diff for a multi-line equals/snapshot failure (#28).
+func TestDetailText_WithDiff(t *testing.T) {
+	t.Parallel()
+	sc := &engine.ScenarioResult{
+		Name:   "d",
+		Status: engine.StatusFailed,
+		Steps: []engine.StepResult{
+			{Kind: "assert", Checks: []*assert.CheckResult{{
+				OK: false, Desc: "assert stdout equals golden",
+				ArtifactExpected: []byte("one\ntwo\n"), ArtifactActual: []byte("one\nTWO\n"),
+			}}},
+			{Index: 1, Kind: "run", ErrMsg: "later boom"},
+		},
+	}
+	got := detailText(sc)
+	for _, want := range []string{"Step: assert stdout equals golden", "Diff (-expected +actual):", "-two", "+TWO", "Error in run step: later boom"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("detailText missing %q\n--- got ---\n%s", want, got)
+		}
+	}
+	// The XML/TAP body must never carry an ANSI escape.
+	if strings.Contains(got, "\x1b[") {
+		t.Errorf("detailText leaked an ANSI escape:\n%q", got)
+	}
+}
+
+// TestProgress_AllMarkers pins every marker glyph including the flaky 'f' and the
+// unknown-status '?' fallback.
+func TestProgress_AllMarkers(t *testing.T) {
+	t.Parallel()
+	var b bytes.Buffer
+	p := NewProgress(&b)
+	p.Scenario(engine.ScenarioResult{Status: engine.StatusPassed})
+	p.Scenario(engine.ScenarioResult{Status: engine.StatusFailed})
+	p.Scenario(engine.ScenarioResult{Status: engine.StatusError})
+	p.Scenario(engine.ScenarioResult{Status: engine.StatusSkipped})
+	p.Scenario(engine.ScenarioResult{Status: engine.StatusFlaky})
+	p.Scenario(engine.ScenarioResult{Status: engine.Status("weird")})
+	p.Done()
+	if got := b.String(); got != ".FEsf?\n" {
+		t.Errorf("markers = %q, want %q", got, ".FEsf?\n")
+	}
+}
+
+// TestProgress_DoneNoMarkers proves Done prints nothing when no scenario ran.
+func TestProgress_DoneNoMarkers(t *testing.T) {
+	t.Parallel()
+	var b bytes.Buffer
+	NewProgress(&b).Done()
+	if b.Len() != 0 {
+		t.Errorf("Done printed %q with no markers", b.String())
+	}
+}
+
+// TestTAP_UnknownStatusIsNotOk proves the default arm of writeTAP emits a
+// failing point for a status TAP has no dedicated arm for.
+func TestTAP_UnknownStatusIsNotOk(t *testing.T) {
+	t.Parallel()
+	res := &engine.SuiteResult{
+		Suite:     "u",
+		Status:    engine.StatusFailed,
+		Scenarios: []engine.ScenarioResult{{Name: "weird", Status: engine.Status("bogus")}},
+	}
+	out := render(t, FormatTAP, res)
+	if !strings.Contains(out, "not ok 1 - u / weird") {
+		t.Errorf("unknown status should emit a not-ok point:\n%s", out)
+	}
+}
+
+// TestVerbose_SetupStepAndErrorAndHeaderColors covers writeStep's setup label and
+// error line, plus headerColor for the flaky and unknown-status arms.
+func TestVerbose_SetupStepAndErrorAndHeaderColors(t *testing.T) {
+	t.Parallel()
+	// A setup step (Setup=true) is labeled with the shared "service setup" phrase,
+	// and its ErrMsg renders on its own line.
+	res := engine.ScenarioResult{
+		Suite:  "v",
+		Name:   "boot",
+		Status: engine.StatusError,
+		Steps: []engine.StepResult{
+			{Index: 0, Setup: true, ErrMsg: "service never came up"},
+		},
+	}
+	var b strings.Builder
+	NewVerbose(&b).Scenario(res)
+	out := b.String()
+	if !strings.Contains(out, setupPhaseLabel) {
+		t.Errorf("verbose setup step should carry the setup label:\n%s", out)
+	}
+	if !strings.Contains(out, "error: service never came up") {
+		t.Errorf("verbose setup error line missing:\n%s", out)
+	}
+
+	// headerColor arms: flaky and unknown both have deterministic returns.
+	if headerColor(engine.StatusFlaky) != cYellow {
+		t.Errorf("flaky header color = %q, want yellow", headerColor(engine.StatusFlaky))
+	}
+	if headerColor(engine.Status("weird")) != "" {
+		t.Errorf("unknown status header color must be empty, got %q", headerColor(engine.Status("weird")))
+	}
+	if headerColor(engine.StatusPassed) != cGreen {
+		t.Errorf("passed header color = %q, want green", headerColor(engine.StatusPassed))
+	}
+}
+
+// TestIsTTY covers the NO_COLOR short-circuit and the non-*os.File path.
+func TestIsTTY(t *testing.T) {
+	// Not parallel: mutates the NO_COLOR environment variable.
+	if isTTY(&bytes.Buffer{}) {
+		t.Error("a bytes.Buffer is not a TTY")
+	}
+	t.Setenv("NO_COLOR", "1")
+	// NO_COLOR forces false even for a real terminal-like file; os.Stdout is not a
+	// char device under `go test`, but the env short-circuit returns first anyway.
+	if isTTY(os.Stdout) {
+		t.Error("NO_COLOR must force isTTY to false")
+	}
+}
+
+// TestConsole_RepeatRates exercises writeRepeatRates for a --repeat run: a
+// per-scenario pass-rate line, red when not every iteration passed.
+func TestConsole_RepeatRates(t *testing.T) {
+	t.Parallel()
+	res := &engine.SuiteResult{
+		Suite:  "rp",
+		Status: engine.StatusFailed,
+		Scenarios: []engine.ScenarioResult{
+			{Name: "race-prone", Status: engine.StatusFailed, Iterations: []engine.Status{
+				engine.StatusPassed, engine.StatusFailed, engine.StatusPassed,
+			}},
+			{Name: "steady", Status: engine.StatusPassed, Iterations: []engine.Status{
+				engine.StatusPassed, engine.StatusPassed,
+			}},
+		},
+	}
+	out := render(t, FormatConsole, res)
+	if !strings.Contains(out, "REPEAT: race-prone: 2/3 passed") {
+		t.Errorf("missing flaky repeat rate:\n%s", out)
+	}
+	if !strings.Contains(out, "REPEAT: steady: 2/2 passed") {
+		t.Errorf("missing steady repeat rate:\n%s", out)
+	}
+}
+
+// TestConsole_FailedScenarioShowsCommand proves writeDetail prints the last run
+// command for a failed scenario so the reader has the invocation context.
+func TestConsole_FailedScenarioShowsCommand(t *testing.T) {
+	t.Parallel()
+	res := &engine.SuiteResult{
+		Suite:  "c",
+		Status: engine.StatusFailed,
+		Scenarios: []engine.ScenarioResult{
+			{Name: "cmd", Status: engine.StatusFailed, Steps: []engine.StepResult{
+				{Kind: "run", Run: &runner.Result{Command: "tool --flag"}},
+				{Kind: "assert", Checks: []*assert.CheckResult{{
+					OK: false, Desc: "assert exit_code is 0", Expected: "0", Actual: "1", Hint: "nonzero",
+				}}},
+			}},
+		},
+	}
+	out := render(t, FormatConsole, res)
+	if !strings.Contains(out, "Command:\n  tool --flag") {
+		t.Errorf("failed-scenario command context missing:\n%s", out)
+	}
+}
+
+// TestSuiteFailurePoints_GenericFallback proves the runtime-creation path (a
+// suite that errored without scenarios AND without any recorded suite.setup
+// detail) still synthesizes one generic failure point so the failure is never
+// rendered green. Regression oracle for the len(pts)==0 branch.
+func TestSuiteFailurePoints_GenericFallback(t *testing.T) {
+	t.Parallel()
+	res := &engine.SuiteResult{Suite: "rt", Status: engine.StatusError} // no scenarios, no Setup
+	pts := suiteFailurePoints(res)
+	if len(pts) != 1 || !strings.Contains(pts[0].message, "errored before any scenario ran") {
+		t.Fatalf("generic fallback point = %+v", pts)
+	}
+	// It must surface in tap and junit as a failing/errored entry.
+	tap := render(t, FormatTAP, res)
+	if !strings.Contains(tap, "not ok 1 - rt / "+setupPhaseLabel) {
+		t.Errorf("generic suite failure not emitted by tap:\n%s", tap)
+	}
+	var root junitTestsuites
+	if err := xml.Unmarshal([]byte(render(t, FormatJUnit, res)), &root); err != nil {
+		t.Fatalf("junit invalid: %v", err)
+	}
+	if root.Errors != 1 {
+		t.Errorf("junit errors = %d, want 1 for the generic suite failure", root.Errors)
+	}
+}
+
+// errWriter fails every write, to exercise the error-return paths of the
+// writers that other tests always feed a bytes.Buffer.
+type errWriter struct{}
+
+func (errWriter) Write([]byte) (int, error) { return 0, errFakeWrite }
+
+var errFakeWrite = &writeError{}
+
+type writeError struct{}
+
+func (*writeError) Error() string { return "boom" }
+
+// TestWriters_PropagateWriteErrors proves each format's Render surfaces a write
+// error instead of swallowing it.
+func TestWriters_PropagateWriteErrors(t *testing.T) {
+	t.Parallel()
+	for _, f := range []Format{FormatConsole, FormatJSON, FormatJUnit, FormatGHA, FormatTAP} {
+		if err := Render(errWriter{}, f, []*engine.SuiteResult{sampleResults()[0]}); err == nil {
+			t.Errorf("%s: Render swallowed a write error", f)
+		}
+	}
+}
+
+// TestColorize covers both arms of the tiny colorize helper.
+func TestColorize(t *testing.T) {
+	t.Parallel()
+	if got := colorize(false, cRed, "x"); got != "x" {
+		t.Errorf("color off = %q, want plain", got)
+	}
+	if got := colorize(true, "", "x"); got != "x" {
+		t.Errorf("empty code = %q, want plain", got)
+	}
+	if got := colorize(true, cRed, "x"); got != cRed+"x"+cReset {
+		t.Errorf("colorized = %q", got)
 	}
 }

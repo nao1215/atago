@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/goccy/go-yaml"
+
 	"github.com/nao1215/atago/internal/engine"
 	"github.com/nao1215/atago/internal/loader"
 )
@@ -240,5 +242,38 @@ func TestGenerate_Snapshot(t *testing.T) {
 	}
 	if strings.Contains(string(out), "contains:") {
 		t.Errorf("snapshot mode must replace the contains matcher:\n%s", out)
+	}
+}
+
+// TestYAMLScalar_ExoticControlBytesRoundTrip is a metamorphic law for the record
+// escaper: for any string, embedding yamlScalar(s) as a flow scalar and parsing
+// the resulting YAML back must yield s byte-for-byte. It targets the escape
+// branches yaml.Marshal cannot safely inline — an arbitrary C0 control byte
+// (ESC), a backslash, and an embedded double quote — which route through
+// yamlDoubleQuoted's `\xNN` / `\\` / `\"` cases. A regression here would make
+// `atago record` emit a spec whose recorded assertion no longer matches the real
+// output.
+func TestYAMLScalar_ExoticControlBytesRoundTrip(t *testing.T) {
+	t.Parallel()
+	cases := []string{
+		"esc\x1bhere",                 // ESC → \x1b (the arbitrary-control-byte branch)
+		"bell\aring",                  // BEL (0x07)
+		"vtab\vand\ff",                // VT (0x0b) + FF (0x0c)
+		"back\\slash",                 // literal backslash → \\
+		`has "quotes" inside`,         // embedded double quote → \"
+		"mixed\ttab\nnewline\rcr end", // the common control trio
+		"plain punctuation: # * ? &",  // no control bytes → yaml.Marshal path
+		"日本語と\x1bエスケープ",               // multibyte + control byte together
+	}
+	for _, s := range cases {
+		scalar := yamlScalar(s)
+		var doc map[string]string
+		if err := yaml.Unmarshal([]byte("v: "+scalar+"\n"), &doc); err != nil {
+			t.Errorf("yamlScalar(%q) = %s produced unparseable YAML: %v", s, scalar, err)
+			continue
+		}
+		if doc["v"] != s {
+			t.Errorf("round-trip mismatch: yamlScalar(%q) = %s parsed back as %q", s, scalar, doc["v"])
+		}
 	}
 }

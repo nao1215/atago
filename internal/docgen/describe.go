@@ -145,6 +145,12 @@ func describeHeader(h *spec.HeaderMatch) string {
 		return markdown.Code(h.Name) + " contains " + markdown.Code(*h.Contains)
 	case h.Equals != nil:
 		return markdown.Code(h.Name) + " equals " + markdown.Code(*h.Equals)
+	// A header `matches` regexp is a real matcher (the natural shape for auth
+	// headers like "^Bearer "); without this case it fell to the generic "is
+	// checked" and the documented constraint vanished from the doc, so a reviewer
+	// could not see it. Kept in step with explain.describeHeader.
+	case h.Matches != nil:
+		return markdown.Code(h.Name) + " matches " + markdown.Code("/"+*h.Matches+"/")
 	default:
 		return markdown.Code(h.Name) + " is checked"
 	}
