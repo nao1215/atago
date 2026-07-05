@@ -10,9 +10,12 @@ import (
 
 // writeSummary prints the final tally line. The uppercase status word
 // (PASSED/FAILED) anchors the line and is part of the stable output contract.
-func writeSummary(b *strings.Builder, color bool, c engine.Counts, total int, d time.Duration) {
+func writeSummary(b *strings.Builder, color bool, c engine.Counts, total int, d time.Duration, hardFail bool) {
 	status, code := "PASSED", cGreen
-	if c.Failed > 0 || c.Errored > 0 {
+	// hardFail covers a suite that errored before producing any scenario row (#7):
+	// the counts are all zero, but the verdict must still read FAILED to match the
+	// non-zero exit code and the SUITE SETUP FAILED block printed above.
+	if c.Failed > 0 || c.Errored > 0 || hardFail {
 		status, code = "FAILED", cRed
 	}
 	plural := "scenarios"

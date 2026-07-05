@@ -9,6 +9,14 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- A suite that fails in `suite.setup` with no scenario selected to run (every
+  scenario filtered out by `--filter`/`--tag`, or an empty scenario list) is no
+  longer rendered as a green, empty result by the junit, tap, and gha reports,
+  and the console verdict now reads FAILED. The run already exits non-zero and
+  the console/json output showed the failure, but junit emitted `tests="0"`, tap
+  a bare `1..0` plan, and gha no error annotation, so a CI step gating on those
+  reports read the errored suite as passing. Each format now surfaces the setup
+  failure as a failing entry.
 - The TAP report now emits a passing `ok` point for a flaky scenario (one that
   failed and then passed under `--retry-failed`), matching the exit code and the
   console, gha, and junit reports, which all treat a recovered scenario as green.

@@ -32,6 +32,15 @@ func writeGHA(w io.Writer, results []*engine.SuiteResult) error {
 					ghaEscapeProp(res.Suite+" / "+sc.Name), ghaEscapeData(fmt.Sprintf("flaky: passed after %d attempts", sc.Attempts)))
 			}
 		}
+		// A suite that errored before any scenario ran (#7) surfaces its cause as
+		// an error annotation, so the Actions UI is never silent for a non-zero
+		// exit that produced no scenario rows.
+		if suiteErroredWithoutScenarios(res) {
+			for _, p := range suiteFailurePoints(res) {
+				fmt.Fprintf(&b, "::error title=%s::%s\n",
+					ghaEscapeProp(res.Suite+" / "+p.name), ghaEscapeData(p.message))
+			}
+		}
 		c := res.Counts()
 		agg.Passed += c.Passed
 		agg.Failed += c.Failed

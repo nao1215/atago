@@ -21,6 +21,7 @@ func Render(w io.Writer, f Format, results []*engine.SuiteResult) error {
 		var agg engine.Counts
 		var total int
 		var dur time.Duration
+		hardFail := false
 		for _, res := range results {
 			for i := range res.Scenarios {
 				writeDetail(&b, color, res.Suite, &res.Scenarios[i])
@@ -36,8 +37,13 @@ func Render(w io.Writer, f Format, results []*engine.SuiteResult) error {
 			agg.Flaky += c.Flaky
 			total += len(res.Scenarios)
 			dur += res.Duration
+			// A suite that errored before producing any scenario row (#7) has
+			// zero counts; force the summary verdict to FAILED regardless.
+			if suiteErroredWithoutScenarios(res) {
+				hardFail = true
+			}
 		}
-		writeSummary(&b, color, agg, total, dur)
+		writeSummary(&b, color, agg, total, dur, hardFail)
 		_, err := io.WriteString(w, b.String())
 		return err
 	case FormatJSON:

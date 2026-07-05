@@ -78,6 +78,20 @@ func buildJUnit(results []*engine.SuiteResult) junitTestsuites {
 			ts.Testcases = append(ts.Testcases, tc)
 			ts.Tests++
 		}
+		// A suite that errored before producing any scenario row (a suite.setup
+		// failure with nothing selected, #7) has no testcase to carry the error;
+		// synthesize one so the suite is never a green empty <testsuite> while the
+		// process exits non-zero.
+		if suiteErroredWithoutScenarios(res) {
+			for _, p := range suiteFailurePoints(res) {
+				ts.Testcases = append(ts.Testcases, junitTestcase{
+					Name:  p.name,
+					Error: &junitMessage{Message: p.message, Body: p.body},
+				})
+				ts.Errors++
+				ts.Tests++
+			}
+		}
 		root.Suites = append(root.Suites, ts)
 		root.Tests += ts.Tests
 		root.Failures += ts.Failures
