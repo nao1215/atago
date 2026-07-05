@@ -2,11 +2,71 @@ package grpc
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/k1LoW/grpcstub"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
+
+// pastDeadlineCtx models the race window Invoke must survive: the deadline has
+// already elapsed, but the local timer goroutine has not yet run, so Err() is
+// still nil while Deadline() is in the past. A real context.WithDeadline cannot
+// be held in this state (its Err flips the instant the deadline passes), so the
+// test uses a fake.
+type pastDeadlineCtx struct {
+	context.Context
+	deadline time.Time
+}
+
+func (c pastDeadlineCtx) Deadline() (time.Time, bool) { return c.deadline, true }
+func (c pastDeadlineCtx) Err() error                  { return nil }
+
+// TestDeadlineFailure covers the timeout-detection logic that keeps a hung
+// server from passing as Result{GRPCStatus:4}. The ctx.Err()-only guard flaked
+// on a server-enforced deadline whose DeadlineExceeded status arrived over the
+// wire before the local timer marked the context Done (main CI:
+// TestInvoke_CallTimeoutIsError).
+func TestDeadlineFailure(t *testing.T) {
+	t.Parallel()
+
+	deadlineErr := status.Error(codes.DeadlineExceeded, "context deadline exceeded")
+
+	t.Run("no invoke error is not a timeout", func(t *testing.T) {
+		t.Parallel()
+		if err := deadlineFailure(context.Background(), nil); err != nil {
+			t.Errorf("deadlineFailure(nil) = %v, want nil", err)
+		}
+	})
+
+	t.Run("a canceled context reports its error", func(t *testing.T) {
+		t.Parallel()
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		if err := deadlineFailure(ctx, deadlineErr); !errors.Is(err, context.Canceled) {
+			t.Errorf("deadlineFailure(canceled) = %v, want context.Canceled", err)
+		}
+	})
+
+	t.Run("an elapsed deadline with a nil Err is still a timeout", func(t *testing.T) {
+		t.Parallel()
+		ctx := pastDeadlineCtx{Context: context.Background(), deadline: time.Now().Add(-time.Second)}
+		if err := deadlineFailure(ctx, deadlineErr); !errors.Is(err, context.DeadlineExceeded) {
+			t.Errorf("deadlineFailure(past deadline, nil Err) = %v, want context.DeadlineExceeded; a hung server must not pass", err)
+		}
+	})
+
+	t.Run("a live deadline leaves a real status alone", func(t *testing.T) {
+		t.Parallel()
+		ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
+		defer cancel()
+		if err := deadlineFailure(ctx, deadlineErr); err != nil {
+			t.Errorf("deadlineFailure(live deadline) = %v, want nil so the status is recorded as a Result", err)
+		}
+	})
+}
 
 func TestSplitMethod(t *testing.T) {
 	t.Parallel()

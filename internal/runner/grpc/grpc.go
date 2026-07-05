@@ -105,14 +105,13 @@ func (r *Runner) Invoke(ctx context.Context, method string, header map[string]st
 	if !ok {
 		return nil, fmt.Errorf("grpc invoke %s: %w", method, invErr)
 	}
-	// A non-nil ctx error means OUR per-call deadline (run.timeout) or a cancel
-	// fired: the call never completed, so it is a transport failure, not a
-	// captured status. status.FromError otherwise maps a timed-out/dropped call
-	// to codes.DeadlineExceeded(4)/Unavailable(14) with ok=true, which would be
-	// recorded as a passing Result — a false pass against a hung or unreachable
+	// OUR per-call deadline (run.timeout) or a cancel firing means the call never
+	// completed: a transport failure, not a captured status. status.FromError
+	// otherwise maps a timed-out call to codes.DeadlineExceeded(4) with ok=true,
+	// which would be recorded as a passing Result — a false pass against a hung
 	// server unless the spec happens to assert grpc_status.
-	if invErr != nil && ctx.Err() != nil {
-		return nil, fmt.Errorf("grpc invoke %s: %w", method, ctx.Err())
+	if cause := deadlineFailure(ctx, invErr); cause != nil {
+		return nil, fmt.Errorf("grpc invoke %s: %w", method, cause)
 	}
 
 	out := &runner.Result{Command: method, IsGRPC: true, GRPCStatus: int(stat.Code())}
@@ -126,6 +125,31 @@ func (r *Runner) Invoke(ctx context.Context, method string, header map[string]st
 		out.MessageJSON = []byte("{}")
 	}
 	return out, nil
+}
+
+// deadlineFailure reports the cause when a failed invoke is our per-call timeout
+// (or a cancel) rather than a captured gRPC status, or nil when it is a real
+// status to record. It detects the timeout two ways:
+//
+//   - ctx.Err() — set once the local deadline timer (or a cancel) has run.
+//   - an already-elapsed deadline with ctx.Err() still nil — the race the
+//     ctx.Err() check alone misses: a gRPC server enforcing the propagated
+//     deadline can deliver DeadlineExceeded over the wire, and Invoke can return
+//     it, before our local timer goroutine marks the context Done. A live
+//     deadline that has not yet elapsed is left alone, so a server that returns
+//     DeadlineExceeded as a fast application status is still recorded as a
+//     Result rather than swallowed.
+func deadlineFailure(ctx context.Context, invErr error) error {
+	if invErr == nil {
+		return nil
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if dl, ok := ctx.Deadline(); ok && !time.Now().Before(dl) {
+		return context.DeadlineExceeded
+	}
+	return nil
 }
 
 // resolveMethod fetches the method descriptor for service/method via server

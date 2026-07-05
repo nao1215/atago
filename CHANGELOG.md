@@ -9,6 +9,15 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- A `grpc` step against a hung server no longer passes as a normal
+  `Result{grpc_status: 4}` when its per-call timeout fires. The timeout was
+  detected only through `ctx.Err()`, which a server enforcing the propagated
+  deadline could beat: its `DeadlineExceeded` status arrived over the wire, and
+  the call returned, before the local deadline timer marked the context done, so
+  the timed-out call was recorded as a captured status instead of a hard error.
+  A call is now treated as a timeout whenever the per-call deadline has already
+  elapsed, closing the race; a live deadline still records a real status as a
+  Result. This also fixes a flaky `TestInvoke_CallTimeoutIsError` on CI.
 - A suite that fails in `suite.setup` with no scenario selected to run (every
   scenario filtered out by `--filter`/`--tag`, or an empty scenario list) is no
   longer rendered as a green, empty result by the junit, tap, and gha reports,
