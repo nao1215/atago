@@ -501,6 +501,70 @@ func TestCheck_YAML_UnsignedInteger(t *testing.T) {
 	}
 }
 
+// TestCheck_JSON_LargeInteger is a regression for numeric matchers on integers
+// that exceed float64's 53-bit exact range. oj decodes an integer beyond int64
+// as json.Number; both cases previously misbehaved: equals compared through
+// float64 and reported two distinct ids equal, and gt/gte/lt/lte rejected a
+// json.Number as "not numeric".
+func TestCheck_JSON_LargeInteger(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name   string
+		data   string
+		j      *spec.JSONAssert
+		wantOK bool
+	}{
+		// int64 values one apart, both beyond 2^53: must NOT be equal.
+		{"distinct int64 not equal", `{"id":9007199254740993}`, &spec.JSONAssert{Path: "$.id", Equals: int64(9007199254740992)}, false},
+		{"same int64 equal", `{"id":9007199254740993}`, &spec.JSONAssert{Path: "$.id", Equals: int64(9007199254740993)}, true},
+		// A value beyond int64 decodes as json.Number; comparisons must work.
+		{"json.Number gt", `{"n":10000000000000000000}`, &spec.JSONAssert{Path: "$.n", Gt: f64p(1)}, true},
+		{"json.Number lt", `{"n":10000000000000000000}`, &spec.JSONAssert{Path: "$.n", Lt: f64p(2e19)}, true},
+		// Distinct integers beyond uint64, one apart: equals stays exact.
+		{"distinct huge not equal", `{"n":100000000000000000001}`, &spec.JSONAssert{Path: "$.n", Equals: "100000000000000000000"}, false},
+		{"same huge equal", `{"n":100000000000000000000}`, &spec.JSONAssert{Path: "$.n", Equals: "100000000000000000000"}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			res := &runner.Result{Stdout: []byte(tt.data)}
+			got := Check(&spec.Assert{Stdout: &spec.StreamAssert{JSON: tt.j}}, res, Env{})
+			if got.OK != tt.wantOK {
+				t.Errorf("OK = %v, want %v (%s)", got.OK, tt.wantOK, got.Hint)
+			}
+		})
+	}
+}
+
+// TestCheck_JSON_MatchesWholeNumberFloat is a regression: a JSON whole-number
+// float (1000000.0) was rendered with %v as "1e+06", so a matches pattern
+// written against the digits ("^1000000$") failed. Numeric nodes must render
+// without scientific notation.
+func TestCheck_JSON_MatchesWholeNumberFloat(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name   string
+		data   string
+		j      *spec.JSONAssert
+		wantOK bool
+	}{
+		{"whole float matches digits", `{"n":1000000.0}`, &spec.JSONAssert{Path: "$.n", Matches: strp("^1000000$")}, true},
+		{"whole float not scientific", `{"n":1000000.0}`, &spec.JSONAssert{Path: "$.n", Matches: strp("e\\+")}, false},
+		{"integer matches digits", `{"n":9007199254740993}`, &spec.JSONAssert{Path: "$.n", Matches: strp("^9007199254740993$")}, true},
+		{"fractional float still matches", `{"n":0.0001}`, &spec.JSONAssert{Path: "$.n", Matches: strp("^0.0001$")}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			res := &runner.Result{Stdout: []byte(tt.data)}
+			got := Check(&spec.Assert{Stdout: &spec.StreamAssert{JSON: tt.j}}, res, Env{})
+			if got.OK != tt.wantOK {
+				t.Errorf("OK = %v, want %v (%s)", got.OK, tt.wantOK, got.Hint)
+			}
+		})
+	}
+}
+
 // TestCheck_JSON_EqualsStructural verifies json.equals compares nested
 // objects/arrays structurally and is insensitive to map key ordering (#40),
 // rather than relying on fmt.Sprintf("%v") of the decoded Go values.
