@@ -73,7 +73,7 @@ scenarios:
           grpc_status: 0
 `, ts.Addr())
 
-	res := runHTTPSpec(t, src)
+	res := runSpec(t, src)
 	if res.Status != StatusPassed {
 		t.Fatalf("status = %s, want passed: %+v", res.Status, res.Scenarios[0].Steps)
 	}
@@ -105,7 +105,7 @@ scenarios:
           grpc_status: 5
 `, ts.Addr())
 
-	res := runHTTPSpec(t, src)
+	res := runSpec(t, src)
 	if res.Status != StatusFailed {
 		t.Fatalf("status = %s, want failed", res.Status)
 	}
@@ -138,7 +138,7 @@ scenarios:
           method: atago.test.Greeter/SayHello
 `, ts.Addr())
 
-	res := runHTTPSpec(t, src)
+	res := runSpec(t, src)
 	if res.Status != StatusError {
 		t.Fatalf("status = %s, want error (denied host)", res.Status)
 	}

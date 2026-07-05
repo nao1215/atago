@@ -1,7 +1,6 @@
 package engine
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -38,15 +37,6 @@ func loginServer(t *testing.T) *httptest.Server {
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 	return srv
-}
-
-func runHTTPSpec(t *testing.T, src string) *SuiteResult {
-	t.Helper()
-	s, err := loader.LoadBytes("t.atago.yaml", []byte(src))
-	if err != nil {
-		t.Fatalf("load: %v", err)
-	}
-	return New().Run(context.Background(), s, "t.atago.yaml")
 }
 
 func TestEngine_HTTPWorkflow_Passing(t *testing.T) {
@@ -96,7 +86,7 @@ scenarios:
               equals: "Bearer secret-xyz"
 `, srv.URL)
 
-	res := runHTTPSpec(t, src)
+	res := runSpec(t, src)
 	if res.Status != StatusPassed {
 		t.Fatalf("status = %s, want passed: %+v", res.Status, res.Scenarios[0].Steps)
 	}
@@ -124,7 +114,7 @@ scenarios:
           status: 500
 `, srv.URL)
 
-	res := runHTTPSpec(t, src)
+	res := runSpec(t, src)
 	if res.Status != StatusFailed {
 		t.Fatalf("status = %s, want failed", res.Status)
 	}
@@ -154,7 +144,7 @@ scenarios:
           path: /me
 `, srv.URL)
 
-	res := runHTTPSpec(t, src)
+	res := runSpec(t, src)
 	if res.Status != StatusError {
 		t.Errorf("status = %s, want error", res.Status)
 	}
@@ -250,7 +240,7 @@ scenarios:
               equals: done
 `, srv.URL)
 
-	res := runHTTPSpec(t, src)
+	res := runSpec(t, src)
 	if res.Status != StatusPassed {
 		t.Fatalf("status = %s, want passed: %+v", res.Status, res.Scenarios)
 	}
@@ -286,7 +276,7 @@ scenarios:
                   equals: done
 `, srv.URL)
 
-	res := runHTTPSpec(t, src)
+	res := runSpec(t, src)
 	if res.Status != StatusFailed {
 		t.Fatalf("status = %s, want failed: %+v", res.Status, res.Scenarios)
 	}

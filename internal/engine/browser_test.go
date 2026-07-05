@@ -113,7 +113,7 @@ scenarios:
           value:
             contains: title
 `, url)
-	res := runHTTPSpec(t, src)
+	res := runSpec(t, src)
 	if res.Status != StatusPassed {
 		t.Fatalf("status = %s, want passed: %+v", res.Status, res.Scenarios[0].Steps)
 	}
@@ -242,7 +242,7 @@ scenarios:
             path: shot.png
             format: png
 `, url)
-	res := runHTTPSpec(t, src)
+	res := runSpec(t, src)
 	if res.Status != StatusPassed {
 		t.Fatalf("status = %s, want passed: %+v", res.Status, res.Scenarios[0].Steps)
 	}
@@ -341,7 +341,7 @@ scenarios:
             path: downloads/report.txt
             contains: "hello download"
 `, url)
-	res := runHTTPSpec(t, src)
+	res := runSpec(t, src)
 	if res.Status != StatusPassed {
 		t.Fatalf("status = %s, want passed: %+v", res.Status, res.Scenarios[0].Steps)
 	}
