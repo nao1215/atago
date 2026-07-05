@@ -142,6 +142,68 @@ scenarios:
 	}
 }
 
+// TestLoadBytes_EmptyRegexpRejected proves an empty matches/not_matches pattern
+// is a validation error, mirroring the empty-string contains/not_contains case:
+// an empty regexp matches everything, so `matches: ""` is an always-true no-op
+// and `not_matches: ""` can never pass. Covered for the stream, json, and
+// header matchers that expose a regexp field.
+func TestLoadBytes_EmptyRegexpRejected(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name    string
+		matcher string
+	}{
+		{"stream matches", `            matches: ""`},
+		{"stream not_matches", `            not_matches: ""`},
+		{"json matches", "            json:\n              path: $.x\n              matches: \"\""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			src := `
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: ok
+    steps:
+      - run: {command: echo hi}
+      - assert:
+          stdout:
+` + tc.matcher + "\n"
+			_, err := LoadBytes("sample.atago.yaml", []byte(src))
+			if err == nil || !strings.Contains(err.Error(), "empty regexp") {
+				t.Fatalf("LoadBytes() error = %v, want an 'empty regexp' validation error", err)
+			}
+		})
+	}
+}
+
+// TestLoadBytes_NegativeJSONLengthRejected proves a negative json/yaml length is
+// a validation error: no array, object, or string has a negative length, so the
+// matcher could never pass and the mistake is caught at load time.
+func TestLoadBytes_NegativeJSONLengthRejected(t *testing.T) {
+	t.Parallel()
+	src := `
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: ok
+    steps:
+      - run: {command: echo hi}
+      - assert:
+          stdout:
+            json:
+              path: $.items
+              length: -1
+`
+	_, err := LoadBytes("sample.atago.yaml", []byte(src))
+	if err == nil || !strings.Contains(err.Error(), "length must be >= 0") {
+		t.Fatalf("LoadBytes() error = %v, want a 'length must be >= 0' validation error", err)
+	}
+}
+
 // TestLoadBytes_ShellMetacharWithoutShell proves a command carrying shell syntax
 // is rejected when shell is not enabled, with a fix-forward hint. Each metachar
 // in the guarded set is exercised.
