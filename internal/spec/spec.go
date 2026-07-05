@@ -676,6 +676,17 @@ func (p *PTYSend) UnmarshalYAML(unmarshal func(any) error) error {
 	return nil
 }
 
+// MarshalYAML emits the same shape UnmarshalYAML accepts — the scalar text form,
+// or the {key: <name>} mapping — so a loaded send round-trips back to a loadable
+// spec. Without it the default struct marshal writes a `text:` key the custom
+// unmarshaler rejects.
+func (p PTYSend) MarshalYAML() (any, error) {
+	if p.Text != nil {
+		return *p.Text, nil
+	}
+	return map[string]string{"key": p.Key}, nil
+}
+
 // ptyKeySequences maps each named key (#26) to the xterm byte sequence it
 // transmits. Documented bytes: enter=\r, tab=\t, esc=\x1b, space=" ",
 // backspace=\x7f (DEL, the modern erase), delete=\x1b[3~, arrows
@@ -1112,6 +1123,24 @@ func (s *Stdin) UnmarshalYAML(unmarshal func(any) error) error {
 	return nil
 }
 
+// MarshalYAML emits the scalar inline form or the {file}/{base64} mapping the
+// author used, mirroring UnmarshalYAML so a loaded stdin round-trips. The
+// default struct marshal would instead write an `inline:` key the unmarshaler
+// rejects.
+func (s Stdin) MarshalYAML() (any, error) {
+	if s.mapped {
+		m := make(map[string]string, 1)
+		if s.File != "" {
+			m["file"] = s.File
+		}
+		if s.Base64 != "" {
+			m["base64"] = s.Base64
+		}
+		return m, nil
+	}
+	return s.Inline, nil
+}
+
 // ExitCode accepts a bare integer, {not: <int>}, or {in: [<int>, ...]} (#19).
 // The `in` set is the contract shape real CLIs document (grep's 0/1,
 // terraform plan -detailed-exitcode's 0/2): membership in an accepted set.
@@ -1152,6 +1181,24 @@ func (e *ExitCode) UnmarshalYAML(b []byte) error {
 	e.Not = m.Not
 	e.In = m.In
 	return nil
+}
+
+// MarshalYAML emits the same shape UnmarshalYAML accepts — a bare integer, a
+// {not: <int>} map, or an {in: [<int>, ...]} map — so a loaded exit_code
+// round-trips. The default struct marshal writes all three fields at once
+// (equals/not/in), and the unmarshaler's inner mapping decode then silently
+// drops `equals` and rejects the empty `in`, losing the assertion.
+func (e ExitCode) MarshalYAML() (any, error) {
+	switch {
+	case e.Equals != nil:
+		return *e.Equals, nil
+	case e.Not != nil:
+		return map[string]int{"not": *e.Not}, nil
+	case len(e.In) > 0:
+		return map[string][]int{"in": e.In}, nil
+	default:
+		return nil, nil
+	}
 }
 
 // StreamAssert matches a captured text stream (stdout/stderr/body). One matcher.
