@@ -9,8 +9,49 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/nao1215/atago/internal/engine"
 	"github.com/nao1215/atago/internal/loader"
 )
+
+// TestCollectFailures_ClassifiesStatuses pins which scenario outcomes are
+// recorded for --rerun-failed: only failed and errored scenarios are, in a
+// deterministic order. A flaky scenario (one that recovered on retry, #29) is
+// green and must NOT be recorded, or the red-green loop would keep re-running a
+// scenario that already passes; passed and skipped are likewise excluded.
+func TestCollectFailures_ClassifiesStatuses(t *testing.T) {
+	t.Parallel()
+	results := []*engine.SuiteResult{
+		{SpecPath: "b.atago.yaml", Scenarios: []engine.ScenarioResult{
+			{Name: "passes", Status: engine.StatusPassed},
+			{Name: "errs", Status: engine.StatusError},
+			{Name: "flakes", Status: engine.StatusFlaky},
+		}},
+		{SpecPath: "a.atago.yaml", Scenarios: []engine.ScenarioResult{
+			{Name: "fails", Status: engine.StatusFailed},
+			{Name: "skipped", Status: engine.StatusSkipped},
+		}},
+		nil, // a nil suite result (e.g. a spec that failed to load) is skipped
+	}
+	got := collectFailures(results)
+
+	want := []failedEntry{
+		{SpecPath: "b.atago.yaml", Scenario: "errs"},
+		{SpecPath: "a.atago.yaml", Scenario: "fails"},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("collectFailures = %+v, want only the failed/errored entries %+v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("entry %d = %+v, want %+v (order follows results, statuses filtered)", i, got[i], want[i])
+		}
+	}
+	for _, e := range got {
+		if e.Scenario == "flakes" || e.Scenario == "passes" || e.Scenario == "skipped" {
+			t.Errorf("collectFailures recorded a non-failing scenario %q; the rerun loop would never converge", e.Scenario)
+		}
+	}
+}
 
 // --- #62 completion --------------------------------------------------------
 
