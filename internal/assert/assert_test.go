@@ -1,6 +1,11 @@
 package assert
 
 import (
+	"bytes"
+	"compress/zlib"
+	"image"
+	"image/color"
+	"image/png"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -8,8 +13,11 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
+	"github.com/nao1215/atago/internal/fsdelta"
 	"github.com/nao1215/atago/internal/runner"
+	"github.com/nao1215/atago/internal/runner/mock"
 	"github.com/nao1215/atago/internal/spec"
 )
 
@@ -738,5 +746,1138 @@ func TestCheck_File_ExistsUnreadable(t *testing.T) {
 	got = Check(&spec.Assert{File: &spec.FileAssert{Path: target, Exists: boolp(true)}}, nil, Env{Workdir: dir})
 	if got.OK {
 		t.Fatalf("unreadable path with exists:true should fail; hint=%s", got.Hint)
+	}
+}
+
+// TestBorderedScreen_MultibyteAligns is a regression test for a width bug in the
+// screen-assert failure box: it measured line width and padding in bytes, so a
+// rendered TUI screen containing box-drawing characters (─│┌, 3 bytes each) or
+// CJK text produced a ragged right border — exactly the screens atago's pty/TUI
+// assertions exist to check. Every framed content row must have the same rune
+// width so the closing "|" column lines up.
+func TestBorderedScreen_MultibyteAligns(t *testing.T) {
+	t.Parallel()
+	// An ASCII line and a multibyte line of different byte lengths but knowable
+	// rune widths. Byte-based padding would give these rows different rune widths.
+	screen := "abc\n日本\n┌──┐"
+	out := borderedScreen(screen)
+
+	lines := strings.Split(out, "\n")
+	if len(lines) < 3 {
+		t.Fatalf("bordered output has too few lines:\n%s", out)
+	}
+	// The top bar sets the box width; every subsequent row (content rows and the
+	// bottom bar) must match it rune-for-rune.
+	want := utf8.RuneCountInString(lines[0])
+	for i, l := range lines {
+		if got := utf8.RuneCountInString(l); got != want {
+			t.Errorf("row %d rune width = %d, want %d (ragged border)\nrow: %q\nfull:\n%s", i, got, want, l, out)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// pdf.go: inflate, readPDFString, unescapePDFByte, metadataActual, parsePDF
+// ---------------------------------------------------------------------------
+
+// TestInflate_RoundTripAndError exercises the FlateDecode success path (a real
+// zlib stream) and the raw-stream error path (a non-Flate stream returns an
+// error so parsePDF keeps the raw bytes).
+func TestInflate_RoundTripAndError(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	zw := zlib.NewWriter(&buf)
+	payload := []byte("BT (Compressed body) Tj ET")
+	if _, err := zw.Write(payload); err != nil {
+		t.Fatal(err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	// Prepend stray CR/LF so we exercise the TrimLeft in inflate.
+	compressed := append([]byte("\r\n"), buf.Bytes()...)
+	out, err := inflate(compressed)
+	if err != nil {
+		t.Fatalf("inflate valid zlib: %v", err)
+	}
+	if !bytes.Equal(out, payload) {
+		t.Errorf("inflate roundtrip = %q, want %q", out, payload)
+	}
+
+	if _, err := inflate([]byte("this is not zlib data at all")); err == nil {
+		t.Error("inflate on raw (non-zlib) bytes must return an error so the caller keeps raw bytes")
+	}
+	// Empty input must not panic and must error.
+	if _, err := inflate(nil); err == nil {
+		t.Error("inflate(nil) should error, not silently succeed")
+	}
+}
+
+// TestReadPDFString_Escapes covers unescapePDFByte (all mapped escapes plus the
+// default passthrough) and balanced/nested/unbalanced parentheses.
+func TestReadPDFString_Escapes(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		lit  string
+		want string
+	}{
+		{"plain", `(hello)`, "hello"},
+		{"newline-escape", `(a\nb)`, "a\nb"},
+		{"tab-escape", `(a\tb)`, "a\tb"},
+		{"cr-escape", `(a\rb)`, "a\rb"},
+		{"escaped-paren", `(a\)b)`, "a)b"},
+		{"escaped-open-paren", `(a\(b)`, "a(b"},
+		{"escaped-backslash", `(a\\b)`, `a\b`},
+		{"default-passthrough", `(a\zb)`, "azb"}, // \z is not special -> literal z
+		{"nested-balanced", `(a (b) c)`, "a (b) c"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := decodePDFString([]byte(tt.lit)); got != tt.want {
+				t.Errorf("decodePDFString(%q) = %q, want %q", tt.lit, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestReadPDFString_Boundaries feeds out-of-range / non-paren openings and a
+// trailing backslash so the function never panics.
+func TestReadPDFString_Boundaries(t *testing.T) {
+	t.Parallel()
+	data := []byte(`(abc)`)
+	if _, ok := readPDFString(data, -1); ok {
+		t.Error("negative open index must return false")
+	}
+	if _, ok := readPDFString(data, len(data)); ok {
+		t.Error("open index at len must return false")
+	}
+	if _, ok := readPDFString([]byte("xyz"), 0); ok {
+		t.Error("a non-'(' opening byte must return false")
+	}
+	// Trailing backslash with no following byte: must not panic.
+	if _, ok := readPDFString([]byte(`(ab\`), 0); !ok {
+		t.Error("unterminated string is read leniently and returns true")
+	}
+	// Unbalanced open paren: lenient parser returns what it has.
+	if s, ok := readPDFString([]byte(`(unclosed`), 0); !ok || s != "unclosed" {
+		t.Errorf("unbalanced literal = %q ok=%v", s, ok)
+	}
+}
+
+// TestParsePDF_Compressed proves parsePDF extracts text from a FlateDecode
+// content stream, exercising the inflate branch inside parsePDF.
+func TestParsePDF_Compressed(t *testing.T) {
+	t.Parallel()
+	var zbuf bytes.Buffer
+	zw := zlib.NewWriter(&zbuf)
+	if _, err := zw.Write([]byte("BT (Zlib hidden text) Tj ET")); err != nil {
+		t.Fatal(err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	var pdf bytes.Buffer
+	pdf.WriteString("%PDF-1.5\n1 0 obj\n<< /Type /Page >>\nendobj\n4 0 obj\n<< /Length 99 /Filter /FlateDecode >>\nstream\n")
+	pdf.Write(zbuf.Bytes())
+	pdf.WriteString("\nendstream\nendobj\n%%EOF\n")
+
+	doc := parsePDF(pdf.Bytes())
+	if !strings.Contains(doc.text, "Zlib hidden text") {
+		t.Errorf("compressed text not extracted: %q", doc.text)
+	}
+}
+
+// TestParsePDF_Malformed feeds garbage / truncated bodies (after the header,
+// which checkPDF requires) and asserts parsePDF never panics and returns a
+// zero-ish doc.
+func TestParsePDF_Malformed(t *testing.T) {
+	t.Parallel()
+	inputs := [][]byte{
+		[]byte("%PDF-1.4\n"),
+		[]byte("%PDF-1.4\nstream\n"),                    // truncated stream, no endstream
+		[]byte("%PDF-1.4\nstream\n\xff\xfe\nendstream"), // binary garbage stream
+		[]byte("%PDF-1.4\n/Type /Page /Title ("),        // dangling metadata literal
+		append([]byte("%PDF-1.4\n"), bytes.Repeat([]byte{0x00}, 512)...),
+	}
+	for i, in := range inputs {
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					t.Errorf("parsePDF panicked on input %d: %v", i, r)
+				}
+			}()
+			_ = parsePDF(in)
+		}()
+	}
+}
+
+// TestCheckPDF_PageBoundaries hits the min/max off-by-one edges and the
+// metadataActual "field not present" branch.
+func TestCheckPDF_PageBoundaries(t *testing.T) {
+	t.Parallel()
+	wd := writePDF(t, minimalPDF) // 1 page
+	// min == pages passes, min == pages+1 fails.
+	if cr := checkPDFOK(t, wd, &spec.PDFAssert{Path: "doc.pdf", MinPages: ptrInt(1)}); !cr.OK {
+		t.Errorf("min 1 on a 1-page PDF should pass: %+v", cr)
+	}
+	if cr := checkPDFOK(t, wd, &spec.PDFAssert{Path: "doc.pdf", MinPages: ptrInt(2)}); cr.OK {
+		t.Error("min 2 on a 1-page PDF must fail")
+	}
+	// max == pages passes, max == pages-1 fails.
+	if cr := checkPDFOK(t, wd, &spec.PDFAssert{Path: "doc.pdf", MaxPages: ptrInt(1)}); !cr.OK {
+		t.Errorf("max 1 on a 1-page PDF should pass: %+v", cr)
+	}
+	if cr := checkPDFOK(t, wd, &spec.PDFAssert{Path: "doc.pdf", MaxPages: ptrInt(0)}); cr.OK {
+		t.Error("max 0 on a 1-page PDF must fail")
+	}
+	// A metadata field absent from the doc reports "field not present".
+	cr := checkPDFOK(t, wd, &spec.PDFAssert{Path: "doc.pdf", Metadata: map[string]string{"subject": "anything"}})
+	if cr.OK {
+		t.Fatal("absent metadata field must fail")
+	}
+	if !strings.Contains(cr.Actual, "field not present") {
+		t.Errorf("Actual = %q, want it to say the field is not present", cr.Actual)
+	}
+}
+
+func TestMetadataActual(t *testing.T) {
+	t.Parallel()
+	if got := metadataActual("", false); got != "field not present" {
+		t.Errorf("metadataActual(_, false) = %q", got)
+	}
+	if got := metadataActual("value", true); got != "value" {
+		t.Errorf("metadataActual present = %q", got)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// screen.go: checkScreen, borderedScreen
+// ---------------------------------------------------------------------------
+
+func TestCheckScreen_NoPTY(t *testing.T) {
+	t.Parallel()
+	sa := &spec.StreamAssert{Contains: spec.StringList{"x"}}
+	if cr := checkScreen(sa, nil, Env{}); cr.OK {
+		t.Error("screen assert with no result should not pass")
+	}
+	if cr := checkScreen(sa, &runner.Result{IsPTY: false}, Env{}); cr.OK {
+		t.Error("screen assert with a non-pty result should not pass")
+	}
+}
+
+func TestCheckScreen_PassAndFail(t *testing.T) {
+	t.Parallel()
+	res := &runner.Result{IsPTY: true, Screen: []byte("hello\nworld")}
+	if cr := checkScreen(&spec.StreamAssert{Contains: spec.StringList{"world"}}, res, Env{}); !cr.OK {
+		t.Errorf("matching screen should pass: %+v", cr)
+	}
+	fail := checkScreen(&spec.StreamAssert{Contains: spec.StringList{"absent"}}, res, Env{})
+	if fail.OK {
+		t.Fatal("non-matching screen should fail")
+	}
+	if !strings.Contains(fail.Actual, "+---") || !strings.Contains(fail.Actual, "| hello") {
+		t.Errorf("failure Actual should be a bordered screen, got:\n%s", fail.Actual)
+	}
+	if fail.ArtifactKind != "screen" {
+		t.Errorf("ArtifactKind = %q, want screen", fail.ArtifactKind)
+	}
+	if !bytes.Equal(fail.ArtifactActual, res.Screen) {
+		t.Error("ArtifactActual should carry the raw screen bytes")
+	}
+}
+
+func TestBorderedScreen(t *testing.T) {
+	t.Parallel()
+	// Ragged lines: the border width follows the widest line and every row is
+	// right-padded to it, so trailing whitespace stays visible.
+	out := borderedScreen("ab\nabcd\n")
+	lines := strings.Split(out, "\n")
+	width := len(lines[0])
+	for _, l := range lines {
+		if len(l) != width {
+			t.Errorf("uneven border row %q (len %d != %d)", l, len(l), width)
+		}
+	}
+	// Single empty screen must not panic and still frames a zero-width box.
+	_ = borderedScreen("")
+}
+
+// ---------------------------------------------------------------------------
+// jsonmatch.go: toFloat, jsonMatches, single, opSymbol, applyJSONMatch, checkYAML
+// ---------------------------------------------------------------------------
+
+func TestToFloat_AllKinds(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name   string
+		in     any
+		wantOK bool
+		want   float64
+	}{
+		{"int", int(3), true, 3},
+		{"int8", int8(-3), true, -3},
+		{"int16", int16(300), true, 300},
+		{"int32", int32(-9), true, -9},
+		{"int64", int64(1 << 40), true, float64(int64(1) << 40)},
+		{"uint", uint(7), true, 7},
+		{"uint8", uint8(255), true, 255},
+		{"uint16", uint16(65535), true, 65535},
+		{"uint32", uint32(1), true, 1},
+		{"uint64-huge", uint64(1) << 62, true, float64(uint64(1) << 62)},
+		{"float32", float32(1.5), true, 1.5},
+		{"float64", float64(2.25), true, 2.25},
+		{"numeric-string", "42", true, 42},
+		{"trimmed-string", "  3.5  ", true, 3.5},
+		{"non-numeric-string", "abc", false, 0},
+		{"version-string-not-a-float", "1.2.3", false, 0}, // #: full-consume guard
+		{"trailing-junk", "3abc", false, 0},
+		{"bool-not-numeric", true, false, 0},
+		{"nil-not-numeric", nil, false, 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, ok := toFloat(tt.in)
+			if ok != tt.wantOK {
+				t.Fatalf("toFloat(%v) ok = %v, want %v", tt.in, ok, tt.wantOK)
+			}
+			if ok && got != tt.want {
+				t.Errorf("toFloat(%v) = %v, want %v", tt.in, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestOpSymbol(t *testing.T) {
+	t.Parallel()
+	for op, sym := range map[string]string{"gt": ">", "gte": ">=", "lt": "<", "lte": "<=", "weird": "weird"} {
+		if got := opSymbol(op); got != sym {
+			t.Errorf("opSymbol(%q) = %q, want %q", op, got, sym)
+		}
+	}
+}
+
+// TestJSONCompare_Metamorphic proves gt and lt can never both pass for the same
+// value/threshold, and that a non-numeric selected value fails cleanly.
+func TestJSONCompare_Metamorphic(t *testing.T) {
+	t.Parallel()
+	data := []byte(`{"n": 5, "s": "hello"}`)
+	gt := checkJSON("d", "stdout", data, &spec.JSONAssert{Path: "$.n", Gt: f64p(5)})
+	lt := checkJSON("d", "stdout", data, &spec.JSONAssert{Path: "$.n", Lt: f64p(5)})
+	if gt.OK && lt.OK {
+		t.Error("gt 5 and lt 5 must not both pass for value 5")
+	}
+	// gte 5 and lte 5 both pass (boundary) — that is correct, not contradictory.
+	gte := checkJSON("d", "stdout", data, &spec.JSONAssert{Path: "$.n", Gte: f64p(5)})
+	lte := checkJSON("d", "stdout", data, &spec.JSONAssert{Path: "$.n", Lte: f64p(5)})
+	if !gte.OK || !lte.OK {
+		t.Error("gte 5 and lte 5 should both pass at the boundary")
+	}
+	// Non-numeric node cannot be compared.
+	if cr := checkJSON("d", "stdout", data, &spec.JSONAssert{Path: "$.s", Gt: f64p(0)}); cr.OK {
+		t.Error("gt on a string value must fail")
+	}
+}
+
+func TestJSONMatches_Errors(t *testing.T) {
+	t.Parallel()
+	data := []byte(`{"v": "abc123"}`)
+	if cr := checkJSON("d", "stdout", data, &spec.JSONAssert{Path: "$.v", Matches: strp(`\d+`)}); !cr.OK {
+		t.Errorf("matches digits should pass: %+v", cr)
+	}
+	if cr := checkJSON("d", "stdout", data, &spec.JSONAssert{Path: "$.v", Matches: strp(`^zzz$`)}); cr.OK {
+		t.Error("non-matching pattern should fail")
+	}
+	if cr := checkJSON("d", "stdout", data, &spec.JSONAssert{Path: "$.v", Matches: strp(`(`)}); cr.OK {
+		t.Error("invalid regexp should fail, not panic")
+	}
+}
+
+func TestSingle_ZeroAndMultiple(t *testing.T) {
+	t.Parallel()
+	data := []byte(`{"a": [1, 2, 3]}`)
+	// Zero matches.
+	if cr := checkJSON("d", "stdout", data, &spec.JSONAssert{Path: "$.missing", Equals: 1}); cr.OK {
+		t.Error("no-match path should fail via single()")
+	}
+	// Multiple matches (wildcard) → single() rejects.
+	cr := checkJSON("d", "stdout", data, &spec.JSONAssert{Path: "$.a[*]", Equals: 1})
+	if cr.OK {
+		t.Fatal("multiple matches should fail single()")
+	}
+	if !strings.Contains(cr.Actual, "matches") {
+		t.Errorf("Actual = %q, want it to report the match count", cr.Actual)
+	}
+}
+
+func TestApplyJSONMatch_NoMatcherAndBadPath(t *testing.T) {
+	t.Parallel()
+	if cr := checkJSON("d", "stdout", []byte(`{"a":1}`), &spec.JSONAssert{Path: "$.a"}); cr.OK {
+		t.Error("a matcher with no operator must fail")
+	}
+	if cr := checkJSON("d", "stdout", []byte(`{"a":1}`), &spec.JSONAssert{Path: "$[", Equals: 1}); cr.OK {
+		t.Error("an invalid JSON path must fail, not panic")
+	}
+}
+
+func TestCheckYAML(t *testing.T) {
+	t.Parallel()
+	yamlData := []byte("name: Ada\nage: 42\n")
+	if cr := checkYAML("d", "stdout", yamlData, &spec.JSONAssert{Path: "$.name", Equals: "Ada"}); !cr.OK {
+		t.Errorf("yaml equals should pass: %+v", cr)
+	}
+	if cr := checkYAML("d", "stdout", []byte("   \n"), &spec.JSONAssert{Path: "$.name", Equals: "Ada"}); cr.OK {
+		t.Error("empty YAML should fail")
+	}
+	if cr := checkYAML("d", "stdout", []byte("a: [b, c"), &spec.JSONAssert{Path: "$.a", Length: intp(2)}); cr.OK {
+		t.Error("malformed YAML should fail, not panic")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// dir.go: dirStatActual error branch, count boundaries, glob error
+// ---------------------------------------------------------------------------
+
+func TestCheckDir_CountBoundaries(t *testing.T) {
+	t.Parallel()
+	wd := makeTree(t) // site has 3 direct entries
+	// min == n passes, min == n+1 fails.
+	if cr := checkDirOK(t, wd, &spec.DirAssert{Path: "site", MinCount: ptrInt(3)}); !cr.OK {
+		t.Errorf("min 3 should pass: %+v", cr)
+	}
+	if cr := checkDirOK(t, wd, &spec.DirAssert{Path: "site", MinCount: ptrInt(4)}); cr.OK {
+		t.Error("min 4 must fail on 3 entries")
+	}
+	// max == n passes, max == n-1 fails.
+	if cr := checkDirOK(t, wd, &spec.DirAssert{Path: "site", MaxCount: ptrInt(3)}); !cr.OK {
+		t.Errorf("max 3 should pass: %+v", cr)
+	}
+	if cr := checkDirOK(t, wd, &spec.DirAssert{Path: "site", MaxCount: ptrInt(2)}); cr.OK {
+		t.Error("max 2 must fail on 3 entries")
+	}
+}
+
+// TestCheckDir_CountOnMissing hits the dirStatActual error branch: a count
+// constraint on a non-existent directory (no exists field) reports the stat
+// error rather than "not a directory".
+func TestCheckDir_CountOnMissing(t *testing.T) {
+	t.Parallel()
+	wd := makeTree(t)
+	cr := checkDirOK(t, wd, &spec.DirAssert{Path: "does-not-exist", Count: ptrInt(0)})
+	if cr.OK {
+		t.Fatal("count on a missing dir must fail")
+	}
+	if cr.Actual == "not a directory" || cr.Actual == "" {
+		t.Errorf("Actual = %q, want the underlying stat error", cr.Actual)
+	}
+}
+
+func TestCheckDir_GlobInvalid(t *testing.T) {
+	t.Parallel()
+	wd := makeTree(t)
+	cr := checkDirOK(t, wd, &spec.DirAssert{Path: "site", Glob: "["})
+	if cr.OK {
+		t.Error("an invalid glob pattern must fail, not match")
+	}
+	if !strings.Contains(cr.Hint, "invalid glob") {
+		t.Errorf("Hint = %q, want it to flag the invalid glob", cr.Hint)
+	}
+}
+
+func TestDirStatActual(t *testing.T) {
+	t.Parallel()
+	if got := dirStatActual(nil, os.ErrNotExist); got != os.ErrNotExist.Error() {
+		t.Errorf("err branch = %q", got)
+	}
+	// A regular file's FileInfo → "not a directory".
+	f := filepath.Join(t.TempDir(), "x")
+	if err := os.WriteFile(f, []byte("y"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := dirStatActual(info, nil); got != "not a directory" {
+		t.Errorf("not-a-dir branch = %q", got)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// file.go: not_contains, executable, exists:false, default, readFile error
+// ---------------------------------------------------------------------------
+
+func writeWorkFile(t *testing.T, name, body string, mode os.FileMode) string {
+	t.Helper()
+	wd := t.TempDir()
+	if err := os.WriteFile(filepath.Join(wd, name), []byte(body), mode); err != nil {
+		t.Fatal(err)
+	}
+	return wd
+}
+
+func checkFileOK(t *testing.T, wd string, f *spec.FileAssert) *CheckResult {
+	t.Helper()
+	return Check(&spec.Assert{File: f}, nil, Env{Workdir: wd})
+}
+
+func TestCheckFile_ExistsFalseAndDefault(t *testing.T) {
+	t.Parallel()
+	wd := writeWorkFile(t, "a.txt", "hi", 0o600)
+	if cr := checkFileOK(t, wd, &spec.FileAssert{Path: "missing.txt", Exists: boolp(false)}); !cr.OK {
+		t.Errorf("exists:false on a missing file should pass: %+v", cr)
+	}
+	if cr := checkFileOK(t, wd, &spec.FileAssert{Path: "a.txt", Exists: boolp(false)}); cr.OK {
+		t.Error("exists:false on a present file must fail")
+	}
+	// No matcher set → hint.
+	if cr := checkFileOK(t, wd, &spec.FileAssert{Path: "a.txt"}); cr.OK {
+		t.Error("a file assertion with no field must fail")
+	}
+}
+
+func TestCheckFile_NotContains(t *testing.T) {
+	t.Parallel()
+	wd := writeWorkFile(t, "a.txt", "hello world", 0o600)
+	if cr := checkFileOK(t, wd, &spec.FileAssert{Path: "a.txt", NotContains: spec.StringList{"absent"}}); !cr.OK {
+		t.Errorf("not_contains absent should pass: %+v", cr)
+	}
+	present := checkFileOK(t, wd, &spec.FileAssert{Path: "a.txt", NotContains: spec.StringList{"world"}})
+	if present.OK {
+		t.Error("not_contains present should fail")
+	}
+	if present.ArtifactKind != "file" {
+		t.Errorf("ArtifactKind = %q, want file", present.ArtifactKind)
+	}
+	// Reading a missing file for a contains check surfaces a read error.
+	if cr := checkFileOK(t, wd, &spec.FileAssert{Path: "missing.txt", Contains: spec.StringList{"x"}}); cr.OK {
+		t.Error("contains on a missing file must fail to read")
+	}
+}
+
+func TestCheckFile_Executable(t *testing.T) {
+	t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows ignores POSIX executable bits, so a 0755 file is not observably executable")
+	}
+	wd := writeWorkFile(t, "run.sh", "#!/bin/sh\n", 0o755)
+	if err := os.WriteFile(filepath.Join(wd, "plain.txt"), []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if cr := checkFileOK(t, wd, &spec.FileAssert{Path: "run.sh", Executable: boolp(true)}); !cr.OK {
+		t.Errorf("executable:true on a 0755 file should pass: %+v", cr)
+	}
+	if cr := checkFileOK(t, wd, &spec.FileAssert{Path: "plain.txt", Executable: boolp(false)}); !cr.OK {
+		t.Errorf("executable:false on a 0600 file should pass: %+v", cr)
+	}
+	if cr := checkFileOK(t, wd, &spec.FileAssert{Path: "plain.txt", Executable: boolp(true)}); cr.OK {
+		t.Error("executable:true on a non-exec file must fail")
+	}
+	// Stat error on a missing file.
+	if cr := checkFileOK(t, wd, &spec.FileAssert{Path: "missing", Executable: boolp(true)}); cr.OK {
+		t.Error("executable on a missing file must fail")
+	}
+}
+
+func TestExistenceAndExecutabilityWords(t *testing.T) {
+	t.Parallel()
+	if existence(true) != "exist" || existence(false) != "not exist" {
+		t.Error("existence phrasing wrong")
+	}
+	if executability(true) != "be" || executability(false) != "not be" {
+		t.Error("executability phrasing wrong")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// http.go: grpc_status, dbRows/grpcMessage/cdpValue, header value matchers
+// ---------------------------------------------------------------------------
+
+func TestCheckGRPCStatus(t *testing.T) {
+	t.Parallel()
+	if cr := checkGRPCStatus(intp(0), nil); cr.OK {
+		t.Error("grpc_status with no result must fail")
+	}
+	if cr := checkGRPCStatus(intp(0), &runner.Result{IsGRPC: false}); cr.OK {
+		t.Error("grpc_status without a gRPC call must fail")
+	}
+	res := &runner.Result{IsGRPC: true, GRPCStatus: 5}
+	if cr := checkGRPCStatus(intp(5), res); !cr.OK {
+		t.Errorf("matching grpc status should pass: %+v", cr)
+	}
+	if cr := checkGRPCStatus(intp(0), res); cr.OK {
+		t.Error("mismatched grpc status must fail")
+	}
+}
+
+func TestCapturedBytesHelpers(t *testing.T) {
+	t.Parallel()
+	if dbRows(nil) != nil || grpcMessage(nil) != nil || cdpValue(nil) != nil || httpBody(nil) != nil {
+		t.Error("captured-bytes helpers should return nil for a nil result")
+	}
+	res := &runner.Result{
+		RowsJSON:    []byte(`[{"id":1}]`),
+		MessageJSON: []byte(`{"ok":true}`),
+		CDPValue:    []byte("value"),
+		Body:        []byte("body"),
+	}
+	if string(dbRows(res)) != `[{"id":1}]` {
+		t.Error("dbRows mismatch")
+	}
+	if string(grpcMessage(res)) != `{"ok":true}` {
+		t.Error("grpcMessage mismatch")
+	}
+	if string(cdpValue(res)) != "value" {
+		t.Error("cdpValue mismatch")
+	}
+	if string(httpBody(res)) != "body" {
+		t.Error("httpBody mismatch")
+	}
+}
+
+func TestCheckHeaderValue_AllMatchers(t *testing.T) {
+	t.Parallel()
+	h := func(m *spec.HeaderMatch) *CheckResult {
+		return checkHeaderValue(m, "application/json; charset=utf-8", "response")
+	}
+	if cr := h(&spec.HeaderMatch{Name: "Content-Type", Equals: strp("application/json; charset=utf-8")}); !cr.OK {
+		t.Errorf("equals should pass: %+v", cr)
+	}
+	if cr := h(&spec.HeaderMatch{Name: "Content-Type", Equals: strp("text/plain")}); cr.OK {
+		t.Error("equals mismatch must fail")
+	}
+	if cr := h(&spec.HeaderMatch{Name: "Content-Type", Contains: strp("json")}); !cr.OK {
+		t.Errorf("contains should pass: %+v", cr)
+	}
+	if cr := h(&spec.HeaderMatch{Name: "Content-Type", Contains: strp("xml")}); cr.OK {
+		t.Error("contains mismatch must fail")
+	}
+	if cr := h(&spec.HeaderMatch{Name: "Content-Type", Matches: strp(`^application/`)}); !cr.OK {
+		t.Errorf("matches should pass: %+v", cr)
+	}
+	if cr := h(&spec.HeaderMatch{Name: "Content-Type", Matches: strp(`^text/`)}); cr.OK {
+		t.Error("matches mismatch must fail")
+	}
+	if cr := h(&spec.HeaderMatch{Name: "Content-Type", Matches: strp(`(`)}); cr.OK {
+		t.Error("invalid regexp must fail, not panic")
+	}
+	// No matcher set → hint.
+	if cr := h(&spec.HeaderMatch{Name: "Content-Type"}); cr.OK {
+		t.Error("a header match with no matcher must fail")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// mock.go: checkMock, mockFilterLabel, plural, summarizeRecords
+// ---------------------------------------------------------------------------
+
+func mockEnv(records map[string][]mock.Record) Env {
+	return Env{MockRecords: func(name string) ([]mock.Record, bool) {
+		r, ok := records[name]
+		return r, ok
+	}}
+}
+
+func TestCheckMock_NoServerAndNilProvider(t *testing.T) {
+	t.Parallel()
+	if cr := checkMock(&spec.MockAssert{Name: "api"}, Env{}); cr.OK {
+		t.Error("mock assert with no provider must fail")
+	}
+	env := mockEnv(map[string][]mock.Record{})
+	if cr := checkMock(&spec.MockAssert{Name: "unknown"}, env); cr.OK {
+		t.Error("mock assert for an unknown server must fail")
+	}
+}
+
+func TestCheckMock_CountAndFilter(t *testing.T) {
+	t.Parallel()
+	records := []mock.Record{
+		{Method: "GET", Path: "/a", Status: 200},
+		{Method: "POST", Path: "/a", Status: 201},
+		{Method: "GET", Path: "/b", Status: 200},
+	}
+	env := mockEnv(map[string][]mock.Record{"api": records})
+
+	// Exact count over all routes.
+	if cr := checkMock(&spec.MockAssert{Name: "api", Count: intp(3)}, env); !cr.OK {
+		t.Errorf("count 3 (any route) should pass: %+v", cr)
+	}
+	// Wrong count reports the summary of recorded requests.
+	wrong := checkMock(&spec.MockAssert{Name: "api", Count: intp(2)}, env)
+	if wrong.OK {
+		t.Fatal("count 2 must fail")
+	}
+	if !strings.Contains(wrong.Actual, "GET /a -> 200") {
+		t.Errorf("Actual should summarize recorded requests, got:\n%s", wrong.Actual)
+	}
+	// Filter by method+path.
+	if cr := checkMock(&spec.MockAssert{Name: "api", Method: "get", Path: "/a", Count: intp(1)}, env); !cr.OK {
+		t.Errorf("GET /a count 1 should pass: %+v", cr)
+	}
+	// Without count: at least one match required.
+	if cr := checkMock(&spec.MockAssert{Name: "api", Path: "/b"}, env); !cr.OK {
+		t.Errorf("path /b (>=1) should pass: %+v", cr)
+	}
+	if cr := checkMock(&spec.MockAssert{Name: "api", Path: "/zzz"}, env); cr.OK {
+		t.Error("no request for /zzz must fail")
+	}
+}
+
+func TestCheckMock_HeaderAndBody(t *testing.T) {
+	t.Parallel()
+	rec := mock.Record{Method: "POST", Path: "/ingest", Status: 200, Body: []byte(`{"k":"v"}`)}
+	rec.Header = map[string][]string{"X-Token": {"secret"}}
+	env := mockEnv(map[string][]mock.Record{"api": {rec}})
+
+	pass := checkMock(&spec.MockAssert{
+		Name:   "api",
+		Header: &spec.HeaderMatch{Name: "X-Token", Equals: strp("secret")},
+		Body:   &spec.StreamAssert{Contains: spec.StringList{`"k":"v"`}},
+	}, env)
+	if !pass.OK {
+		t.Errorf("matching header+body should pass: %+v", pass)
+	}
+	// Header mismatch surfaces as failure.
+	if cr := checkMock(&spec.MockAssert{Name: "api", Header: &spec.HeaderMatch{Name: "X-Token", Equals: strp("nope")}}, env); cr.OK {
+		t.Error("header mismatch must fail")
+	}
+	// Body mismatch surfaces as failure.
+	if cr := checkMock(&spec.MockAssert{Name: "api", Body: &spec.StreamAssert{Contains: spec.StringList{"absent"}}}, env); cr.OK {
+		t.Error("body mismatch must fail")
+	}
+}
+
+func TestMockFilterLabelAndPlural(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		m    *spec.MockAssert
+		want string
+	}{
+		{&spec.MockAssert{}, "(any route)"},
+		{&spec.MockAssert{Path: "/x"}, "for /x"},
+		{&spec.MockAssert{Method: "get"}, "for GET"},
+		{&spec.MockAssert{Method: "post", Path: "/y"}, "for POST /y"},
+	}
+	for _, c := range cases {
+		if got := mockFilterLabel(c.m); got != c.want {
+			t.Errorf("mockFilterLabel = %q, want %q", got, c.want)
+		}
+	}
+	if plural("request", 1) != "request" || plural("request", 0) != "requests" || plural("request", 2) != "requests" {
+		t.Error("plural wrong")
+	}
+	if summarizeRecords(nil) != "  (no requests recorded)" {
+		t.Error("empty summarizeRecords wrong")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// changes.go: describeChangesExpected with all three categories
+// ---------------------------------------------------------------------------
+
+func TestDescribeChangesExpected(t *testing.T) {
+	t.Parallel()
+	c := &spec.ChangesAssert{Created: list("a"), Modified: list("b"), Deleted: list("c")}
+	got := describeChangesExpected(c)
+	for _, want := range []string{"created [a]", "modified [b]", "deleted [c]"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("describeChangesExpected = %q, want it to contain %q", got, want)
+		}
+	}
+	if describeChangesExpected(&spec.ChangesAssert{}) != "" {
+		t.Error("an empty changes assert should describe as empty string")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// image.go: isSVG, format on garbage, similar_to on undecodable data
+// ---------------------------------------------------------------------------
+
+func TestIsSVG(t *testing.T) {
+	t.Parallel()
+	if !isSVG([]byte(`<?xml version="1.0"?>` + "\n" + `<svg xmlns="http://www.w3.org/2000/svg"></svg>`)) {
+		t.Error("an SVG with an XML declaration should be detected")
+	}
+	if !isSVG([]byte("<svg></svg>")) {
+		t.Error("a bare <svg should be detected")
+	}
+	if isSVG([]byte("<html><body></body></html>")) {
+		t.Error("HTML must not be detected as SVG")
+	}
+	// A large blob whose "<svg" would sit past the 1024-byte scan window.
+	big := append(bytes.Repeat([]byte(" "), 2000), []byte("<svg")...)
+	if isSVG(big) {
+		t.Error("an <svg past the 1024-byte head window must not be detected")
+	}
+}
+
+func TestCheckImage_FormatUnknown(t *testing.T) {
+	t.Parallel()
+	wd := t.TempDir()
+	writeImage(t, wd, "junk.png", []byte("not an image at all"))
+	cr := Check(&spec.Assert{Image: &spec.ImageAssert{Path: "junk.png", Format: "png"}}, nil, Env{Workdir: wd})
+	if cr.OK {
+		t.Fatal("garbage bytes should not match format png")
+	}
+	if !strings.Contains(cr.Actual, "unknown") {
+		t.Errorf("Actual = %q, want it to say unknown", cr.Actual)
+	}
+}
+
+// TestCheckImage_SimilarTo_Undecodable proves an undecodable actual image fails
+// cleanly (no panic) and still attaches image artifacts.
+func TestCheckImage_SimilarTo_Undecodable(t *testing.T) {
+	t.Parallel()
+	wd := t.TempDir()
+	baseline := makePNG(t, 2, 2, color.RGBA{R: 255, A: 255})
+	writeImage(t, wd, "base.png", baseline)
+	writeImage(t, wd, "actual.png", []byte("\x89PNG\r\n\x1a\ntruncated"))
+	cr := Check(&spec.Assert{Image: &spec.ImageAssert{Path: "actual.png", SimilarTo: "base.png"}},
+		nil, Env{Workdir: wd, SpecDir: wd})
+	if cr.OK {
+		t.Fatal("an undecodable actual image must fail similar_to")
+	}
+	if cr.ArtifactKind != "image" {
+		t.Errorf("ArtifactKind = %q, want image", cr.ArtifactKind)
+	}
+}
+
+func TestMeanPixelDiff_IdenticalAndDifferent(t *testing.T) {
+	t.Parallel()
+	red := image.NewNRGBA(image.Rect(0, 0, 4, 4))
+	blue := image.NewNRGBA(image.Rect(0, 0, 4, 4))
+	for y := 0; y < 4; y++ {
+		for x := 0; x < 4; x++ {
+			red.SetNRGBA(x, y, color.NRGBA{R: 255, A: 255})
+			blue.SetNRGBA(x, y, color.NRGBA{B: 255, A: 255})
+		}
+	}
+	if d := meanPixelDiff(red, red); d != 0 {
+		t.Errorf("identical images diff = %v, want 0", d)
+	}
+	d := meanPixelDiff(red, blue)
+	if d <= 0 || d > 1 {
+		t.Errorf("different images diff = %v, want in (0,1]", d)
+	}
+	// Heatmap of two different images encodes to a valid PNG the same size.
+	hm := renderDiffHeatmap(red, blue)
+	img, err := png.Decode(bytes.NewReader(hm))
+	if err != nil {
+		t.Fatalf("heatmap not a valid PNG: %v", err)
+	}
+	if img.Bounds().Dx() != 4 || img.Bounds().Dy() != 4 {
+		t.Errorf("heatmap size = %v, want 4x4", img.Bounds())
+	}
+}
+
+// ---------------------------------------------------------------------------
+// stream.go: excerpt truncation, line selector out of range, splitLines
+// ---------------------------------------------------------------------------
+
+func TestExcerpt_Truncation(t *testing.T) {
+	t.Parallel()
+	short := "small"
+	if excerpt(short) != short {
+		t.Error("short strings pass through unchanged")
+	}
+	long := strings.Repeat("a", excerptLimit+50)
+	got := excerpt(long)
+	if !strings.HasSuffix(got, "... (truncated)") {
+		t.Error("long strings get a truncation marker")
+	}
+	if len(got) >= len(long) {
+		t.Error("truncated excerpt should be shorter than the input")
+	}
+}
+
+func TestCheckStream_LineOutOfRange(t *testing.T) {
+	t.Parallel()
+	sa := &spec.StreamAssert{Line: intp(9), Contains: spec.StringList{"x"}}
+	cr := checkStream("stdout", sa, []byte("only one line\n"), true, Env{})
+	if cr.OK {
+		t.Fatal("selecting line 9 of a 1-line stream must fail")
+	}
+	if !strings.Contains(cr.Hint, "out of range") {
+		t.Errorf("Hint = %q, want an out-of-range message", cr.Hint)
+	}
+	// A deliberate trailing blank line stays addressable.
+	if _, ok := selectLine("a\n\n", 2); !ok {
+		t.Error("a deliberate trailing blank line should be addressable as line 2")
+	}
+	if got := countLines(""); got != 0 {
+		t.Errorf("countLines(empty) = %d, want 0", got)
+	}
+	if got := countLines("\n"); got != 1 {
+		t.Errorf("countLines(single newline) = %d, want 1", got)
+	}
+}
+
+// TestStreamMatchers_Metamorphic proves a matcher and its negation never both
+// pass on the same data (contains/not_contains, matches/not_matches,
+// equals/not_equals).
+func TestStreamMatchers_Metamorphic(t *testing.T) {
+	t.Parallel()
+	data := []byte("The quick brown fox\n")
+	pairs := []struct {
+		name string
+		pos  *spec.StreamAssert
+		neg  *spec.StreamAssert
+	}{
+		{"contains", &spec.StreamAssert{Contains: spec.StringList{"quick"}}, &spec.StreamAssert{NotContains: spec.StringList{"quick"}}},
+		{"contains-absent", &spec.StreamAssert{Contains: spec.StringList{"zzz"}}, &spec.StreamAssert{NotContains: spec.StringList{"zzz"}}},
+		{"matches", &spec.StreamAssert{Matches: strp(`fox`)}, &spec.StreamAssert{NotMatches: strp(`fox`)}},
+		{"equals", &spec.StreamAssert{Equals: strp("The quick brown fox\n")}, &spec.StreamAssert{NotEquals: strp("The quick brown fox\n")}},
+	}
+	for _, p := range pairs {
+		pos := checkStream("stdout", p.pos, data, true, Env{})
+		neg := checkStream("stdout", p.neg, data, true, Env{})
+		if pos.OK == neg.OK {
+			t.Errorf("%s: a matcher and its negation returned the same verdict (both %v)", p.name, pos.OK)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// tree.go: hashFile error, walkTree error, ignoredPath patterns
+// ---------------------------------------------------------------------------
+
+func TestHashFile_Error(t *testing.T) {
+	t.Parallel()
+	if _, err := hashFile(filepath.Join(t.TempDir(), "nope")); err == nil {
+		t.Error("hashFile on a missing path must error")
+	}
+}
+
+func TestWalkTree_MissingDir(t *testing.T) {
+	t.Parallel()
+	if _, err := walkTree(filepath.Join(t.TempDir(), "absent"), nil); err == nil {
+		t.Error("walkTree on a missing dir must error")
+	}
+}
+
+func TestIgnoredPath(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		rel    string
+		ignore []string
+		want   bool
+	}{
+		{"node_modules", []string{"node_modules/**"}, true},
+		{"node_modules/pkg/x.js", []string{"node_modules/**"}, true},
+		{"src/main.go", []string{"node_modules/**"}, false},
+		{"a/b/c.log", []string{"*.log"}, true}, // basename match for /-less pattern
+		{"a/b/c.txt", []string{"*.log"}, false},
+		{"dist/app.js", []string{"dist/*.js"}, true}, // full-path path.Match
+		{"deep/dist/app.js", []string{"dist/*.js"}, false},
+	}
+	for _, tt := range tests {
+		if got := ignoredPath(tt.rel, tt.ignore); got != tt.want {
+			t.Errorf("ignoredPath(%q, %v) = %v, want %v", tt.rel, tt.ignore, got, tt.want)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// assert.go: CheckAll no targets, checkTarget default, streamBytes stderr,
+// checkExitCode no result / default
+// ---------------------------------------------------------------------------
+
+func TestCheckAll_NoTargets(t *testing.T) {
+	t.Parallel()
+	results := CheckAll(&spec.Assert{}, nil, Env{})
+	if len(results) != 1 || results[0].OK {
+		t.Errorf("an assert with no targets should yield one failing result, got %+v", results)
+	}
+}
+
+func TestStreamBytes_Stderr(t *testing.T) {
+	t.Parallel()
+	res := &runner.Result{Stdout: []byte("OUT"), Stderr: []byte("ERR")}
+	if string(streamBytes(res, "stdout")) != "OUT" {
+		t.Error("streamBytes stdout mismatch")
+	}
+	if string(streamBytes(res, "stderr")) != "ERR" {
+		t.Error("streamBytes stderr mismatch")
+	}
+	if streamBytes(nil, "stdout") != nil {
+		t.Error("streamBytes(nil) should be nil")
+	}
+}
+
+func TestCheckExitCode_NoResultAndDefault(t *testing.T) {
+	t.Parallel()
+	if cr := checkExitCode(&spec.ExitCode{Equals: intp(0)}, nil); cr.OK {
+		t.Error("exit_code with no result must fail")
+	}
+	// An exit_code with no operator set falls to the default hint.
+	if cr := checkExitCode(&spec.ExitCode{}, &runner.Result{ExitCode: 0}); cr.OK {
+		t.Error("exit_code with no operator must fail")
+	}
+}
+
+// TestCheckTarget_AllFamilies drives every remaining target family through the
+// public Check entry point so the checkTarget switch is exercised end-to-end.
+func TestCheckTarget_AllFamilies(t *testing.T) {
+	t.Parallel()
+	// DB rows.
+	db := &runner.Result{IsDB: true, RowsJSON: []byte(`[{"id":1}]`)}
+	if cr := Check(&spec.Assert{Rows: &spec.StreamAssert{JSON: &spec.JSONAssert{Path: "$[0].id", Equals: 1}}}, db, Env{}); !cr.OK {
+		t.Errorf("rows target should pass: %+v", cr)
+	}
+	// gRPC status + message.
+	g := &runner.Result{IsGRPC: true, GRPCStatus: 0, MessageJSON: []byte(`{"ok":true}`)}
+	if cr := Check(&spec.Assert{GRPCStatus: intp(0)}, g, Env{}); !cr.OK {
+		t.Errorf("grpc_status target should pass: %+v", cr)
+	}
+	if cr := Check(&spec.Assert{Message: &spec.StreamAssert{Contains: spec.StringList{`"ok":true`}}}, g, Env{}); !cr.OK {
+		t.Errorf("message target should pass: %+v", cr)
+	}
+	// CDP value.
+	cdp := &runner.Result{IsCDP: true, CDPValue: []byte("Ready")}
+	if cr := Check(&spec.Assert{Value: &spec.StreamAssert{Equals: strp("Ready")}}, cdp, Env{}); !cr.OK {
+		t.Errorf("value target should pass: %+v", cr)
+	}
+	// Screen.
+	pty := &runner.Result{IsPTY: true, Screen: []byte("menu")}
+	if cr := Check(&spec.Assert{Screen: &spec.StreamAssert{Contains: spec.StringList{"menu"}}}, pty, Env{}); !cr.OK {
+		t.Errorf("screen target should pass: %+v", cr)
+	}
+	// Duration.
+	dur := &runner.Result{Duration: 5 * time.Millisecond}
+	if cr := Check(&spec.Assert{Duration: &spec.DurationAssert{LT: "1s"}}, dur, Env{}); !cr.OK {
+		t.Errorf("duration target should pass: %+v", cr)
+	}
+	// Changes.
+	ch := &runner.Result{Changes: &fsdelta.Delta{Created: []string{"out.txt"}}}
+	if cr := Check(&spec.Assert{Changes: &spec.ChangesAssert{Created: list("out.txt")}}, ch, Env{}); !cr.OK {
+		t.Errorf("changes target should pass: %+v", cr)
+	}
+	// Image + Dir + PDF + Mock via Check so their checkTarget cases run.
+	wd := t.TempDir()
+	writeImage(t, wd, "p.png", makePNG(t, 3, 3, color.RGBA{A: 255}))
+	if cr := Check(&spec.Assert{Image: &spec.ImageAssert{Path: "p.png", Format: "png"}}, nil, Env{Workdir: wd}); !cr.OK {
+		t.Errorf("image target should pass: %+v", cr)
+	}
+	if cr := Check(&spec.Assert{Dir: &spec.DirAssert{Path: ".", Exists: boolp(true)}}, nil, Env{Workdir: wd}); !cr.OK {
+		t.Errorf("dir target should pass: %+v", cr)
+	}
+	pwd := writePDF(t, minimalPDF)
+	if cr := Check(&spec.Assert{PDF: &spec.PDFAssert{Path: "doc.pdf", Pages: ptrInt(1)}}, nil, Env{Workdir: pwd}); !cr.OK {
+		t.Errorf("pdf target should pass: %+v", cr)
+	}
+	menv := mockEnv(map[string][]mock.Record{"api": {{Method: "GET", Path: "/", Status: 200}}})
+	if cr := Check(&spec.Assert{Mock: &spec.MockAssert{Name: "api"}}, nil, menv); !cr.OK {
+		t.Errorf("mock target should pass: %+v", cr)
+	}
+}
+
+// TestCheckDirRecursive_FailureBranches hits the recursive not_contains,
+// file-count off-by-one, and glob-no-match failure branches (#25). Counts in
+// recursive mode are over FILES only, so a directory does not inflate the count.
+func TestCheckDirRecursive_FailureBranches(t *testing.T) {
+	t.Parallel()
+	wd := makeTree(t) // site: index.html, about.html, assets/app.css -> 3 files, 1 dir
+	rec := func(d *spec.DirAssert) *CheckResult {
+		d.Recursive = true
+		return checkDirOK(t, wd, d)
+	}
+	// not_contains a path that is present -> fail.
+	if cr := rec(&spec.DirAssert{Path: "site", NotContains: []string{"index.html"}}); cr.OK {
+		t.Error("recursive not_contains of a present path must fail")
+	}
+	// Exactly 3 files (dirs excluded) passes; 4 fails; 2 fails.
+	if cr := rec(&spec.DirAssert{Path: "site", Count: ptrInt(3)}); !cr.OK {
+		t.Errorf("recursive count 3 files should pass: %+v", cr)
+	}
+	if cr := rec(&spec.DirAssert{Path: "site", Count: ptrInt(4)}); cr.OK {
+		t.Error("recursive count 4 must fail (only 3 files, dir not counted)")
+	}
+	if cr := rec(&spec.DirAssert{Path: "site", MinCount: ptrInt(4)}); cr.OK {
+		t.Error("recursive min 4 must fail")
+	}
+	if cr := rec(&spec.DirAssert{Path: "site", MaxCount: ptrInt(2)}); cr.OK {
+		t.Error("recursive max 2 must fail")
+	}
+	// glob matching nothing in the tree -> fail.
+	if cr := rec(&spec.DirAssert{Path: "site", Glob: "*.pdf"}); cr.OK {
+		t.Error("recursive glob *.pdf must fail (no match)")
+	}
+	// glob matching a nested basename -> pass.
+	if cr := rec(&spec.DirAssert{Path: "site", Glob: "*.css"}); !cr.OK {
+		t.Errorf("recursive glob *.css should match assets/app.css: %+v", cr)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// snapshot.go: missing, update, mismatch, path escape
+// ---------------------------------------------------------------------------
+
+func TestCheckSnapshot_Lifecycle(t *testing.T) {
+	t.Parallel()
+	specDir := t.TempDir()
+	env := Env{SpecDir: specDir, Workdir: specDir}
+
+	// Missing snapshot.
+	miss := checkSnapshot("d", "stdout", "snap.txt", []byte("hello\n"), env)
+	if miss.OK || !strings.Contains(miss.Actual, "missing") {
+		t.Errorf("missing snapshot should fail with 'missing': %+v", miss)
+	}
+
+	// Update writes it.
+	up := checkSnapshot("d", "stdout", "snap.txt", []byte("hello\n"), Env{SpecDir: specDir, Workdir: specDir, UpdateSnapshots: true})
+	if !up.OK {
+		t.Fatalf("update should pass: %+v", up)
+	}
+	if _, err := os.Stat(filepath.Join(specDir, "snap.txt")); err != nil {
+		t.Fatalf("snapshot file not written: %v", err)
+	}
+
+	// Now a match passes.
+	if cr := checkSnapshot("d", "stdout", "snap.txt", []byte("hello\n"), env); !cr.OK {
+		t.Errorf("matching snapshot should pass: %+v", cr)
+	}
+	// And a mismatch fails with artifacts.
+	mismatch := checkSnapshot("d", "stdout", "snap.txt", []byte("changed\n"), env)
+	if mismatch.OK {
+		t.Fatal("changed data should mismatch the snapshot")
+	}
+	if mismatch.ArtifactKind != "snapshot" {
+		t.Errorf("ArtifactKind = %q, want snapshot", mismatch.ArtifactKind)
+	}
+
+	// A snapshot path escaping the spec dir is rejected.
+	if cr := checkSnapshot("d", "stdout", "../escape.txt", []byte("x"), env); cr.OK {
+		t.Error("a snapshot path escaping the spec dir must be rejected")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Fuzz-style smoke: feed detectImageFormat and parsePDF a batch of adversarial
+// byte patterns and assert they never panic.
+// ---------------------------------------------------------------------------
+
+func TestParsersNeverPanicOnGarbage(t *testing.T) {
+	t.Parallel()
+	seeds := [][]byte{
+		nil, {}, {0x00}, {0xff, 0xd8}, {'B', 'M'},
+		[]byte("RIFF"), []byte("GIF8"), []byte("<svg"),
+		bytes.Repeat([]byte{0xff}, 100),
+		[]byte("\x89PNG\r\n\x1a\n"),
+	}
+	for i, s := range seeds {
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					t.Errorf("panic on seed %d: %v", i, r)
+				}
+			}()
+			_ = detectImageFormat(s)
+			_ = isBMP(s)
+			_ = isAVIF(s)
+			_ = isSVG(s)
+			_ = parsePDF(append([]byte("%PDF-1.4\n"), s...))
+		}()
 	}
 }

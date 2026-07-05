@@ -2,8 +2,12 @@ package loader
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/goccy/go-yaml"
 )
 
 func TestLoadBytes_Valid(t *testing.T) {
@@ -697,6 +701,412 @@ func TestLoadBytes_Errors(t *testing.T) {
 			if tt.wantMsg != "" && !strings.Contains(lerr.Msg, tt.wantMsg) {
 				t.Errorf("msg = %q, want substring %q", lerr.Msg, tt.wantMsg)
 			}
+		})
+	}
+}
+
+// specSteps assembles a minimal one-scenario spec whose steps are the given
+// flow-style step entries (each is the text after "- " in a steps list). It
+// keeps the many one-off validation cases readable without hand-indenting YAML.
+func specSteps(steps ...string) string {
+	var b strings.Builder
+	b.WriteString("version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n")
+	for _, s := range steps {
+		b.WriteString("      - " + s + "\n")
+	}
+	return b.String()
+}
+
+// mustReject asserts LoadBytes fails with a validation/parse error whose message
+// contains want.
+func mustReject(t *testing.T, name, src, want string) {
+	t.Helper()
+	_, err := LoadBytes("t.atago.yaml", []byte(src))
+	if err == nil {
+		t.Fatalf("%s: LoadBytes() error = nil, want error containing %q", name, want)
+	}
+	if !strings.Contains(err.Error(), want) {
+		t.Errorf("%s: error = %q, want substring %q", name, err.Error(), want)
+	}
+}
+
+// mustAccept asserts LoadBytes loads src cleanly.
+func mustAccept(t *testing.T, name, src string) {
+	t.Helper()
+	if _, err := LoadBytes("t.atago.yaml", []byte(src)); err != nil {
+		t.Errorf("%s: LoadBytes() error = %v, want clean load", name, err)
+	}
+}
+
+// TestBugHunt_Rejections drives the validation-error paths — the untrusted-input
+// surface — asserting each malformed spec is rejected with an accurate message.
+func TestBugHunt_Rejections(t *testing.T) {
+	t.Parallel()
+
+	dbRunner := "runners:\n  d: {type: db, dsn: \"sqlite::memory:\"}\n"
+	grpcRunner := "runners:\n  g: {type: grpc, target: \"127.0.0.1:50051\"}\n"
+	browserRunner := "runners:\n  b: {type: browser}\n"
+
+	// withRunner prepends a runners: block to a specSteps body (which has no
+	// runners of its own).
+	withRunner := func(runner, body string) string {
+		// body starts with `version: "1"\nsuite:\n  name: x\n...`; splice the
+		// runner block in after the suite name line.
+		const anchor = "  name: x\n"
+		i := strings.Index(body, anchor) + len(anchor)
+		return body[:i] + runner + body[i:]
+	}
+
+	// scenarioSpec builds a spec whose single scenario has extra scenario-level
+	// blocks (services/mock_servers) plus steps.
+	mockScenario := func(step string) string {
+		return "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n" +
+			"    mock_servers:\n      - name: api\n        routes:\n          - {method: GET, path: /, status: 200}\n" +
+			"    steps:\n      - " + step + "\n"
+	}
+	svcScenario := func(step string) string {
+		return "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n" +
+			"    services:\n      - {name: s, command: sleep 10}\n" +
+			"    steps:\n      - " + step + "\n"
+	}
+	scenarioTop := func(extra, step string) string {
+		return "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    " + extra + "\n    steps:\n      - " + step + "\n"
+	}
+
+	tests := []struct{ name, src, want string }{
+		// ---- store / validateStoreJSONPath / validateStore ----
+		{"store name required", specSteps("store: {from: {header: X-Foo}}"), "store.name is required"},
+		{"store shadows builtin", specSteps("store: {name: workdir, from: {header: X}}"), "shadows a built-in variable"},
+		{"store from required", specSteps("store: {name: v}"), "store.from is required"},
+		{"store from empty", specSteps("store: {name: v, from: {}}"), "must set one of stdout/body/file/header/rows/message/value"},
+		{"store from two sources", specSteps("store: {name: v, from: {header: X, stdout: {json: {path: \"$.a\"}}}}"), "must set exactly one source"},
+		{"store selector no json/matches", specSteps("store: {name: v, from: {stdout: {}}}"), "must set a json path or a matches regexp"},
+		{"store selector bad matches", specSteps("store: {name: v, from: {stdout: {matches: \"a[\"}}}"), "is not a valid regexp"},
+		{"store selector json path required", specSteps("store: {name: v, from: {stdout: {json: {}}}}"), "path is required"},
+		{"store selector bad json path", specSteps("store: {name: v, from: {stdout: {json: {path: \"$[\"}}}}"), "is not a valid JSON path"},
+		{"store file bad json path", specSteps("store: {name: v, from: {file: {path: out.txt, json: {path: \"$.\"}}}}"), "is not a valid JSON path"},
+
+		// ---- validateAssert / validateAssertTarget ----
+		{"assert no target", specSteps("assert: {}"), "must set at least one assertion target"},
+
+		// ---- validateExitCode ----
+		{"exit_code none set", specSteps("assert: {exit_code: {}}"), "must be an int, {not: int}, or {in: [int, ...]}"},
+		{"exit_code two forms", specSteps("assert: {exit_code: {not: 1, in: [2]}}"), "set exactly one of a bare int, not, or in"},
+		{"exit_code in empty", specSteps("assert: {exit_code: {in: []}}"), "in must list at least one accepted exit code"},
+		{"exit_code in dup", specSteps("assert: {exit_code: {in: [0, 0]}}"), "in lists 0 more than once"},
+
+		// ---- validateStream ----
+		{"stream no matcher", specSteps("assert: {stdout: {}}"), "must set exactly one matcher"},
+		{"stream two matchers", specSteps("assert: {stdout: {contains: a, equals: b}}"), "must set exactly one matcher, but set"},
+		{"stream line with snapshot", specSteps("assert: {stdout: {line: 1, snapshot: snap}}"), "line cannot be combined with json/yaml/snapshot"},
+		{"stream contains empty list", specSteps("assert: {stdout: {contains: []}}"), "contains must not be empty"},
+		{"stream contains empty element", specSteps("assert: {stdout: {contains: [\"\"]}}"), "is an empty string"},
+
+		// ---- validateFile ----
+		{"file path required", specSteps("assert: {file: {exists: true}}"), "file.path is required"},
+		{"file no matcher", specSteps("assert: {file: {path: out.txt}}"), "must set one of exists/contains/not_contains/executable/json/snapshot"},
+		{"file two matchers", specSteps("assert: {file: {path: out.txt, exists: true, snapshot: s}}"), "must set exactly one of exists/contains/not_contains/executable/json/snapshot"},
+		{"file not_contains empty", specSteps("assert: {file: {path: out.txt, not_contains: []}}"), "not_contains must not be empty"},
+
+		// ---- validateHeaderMatch ----
+		{"header name required", specSteps("assert: {header: {equals: text/html}}"), "header.name is required"},
+		{"header no matcher", specSteps("assert: {header: {name: Content-Type}}"), "must set one of contains/equals/matches"},
+		{"header two matchers", specSteps("assert: {header: {name: X, contains: a, equals: b}}"), "must set exactly one of contains/equals/matches"},
+		{"header bad matches", specSteps("assert: {header: {name: X, matches: \"a[\"}}"), "is not a valid regexp"},
+
+		// ---- validateJSON ----
+		{"json path required", specSteps("assert: {stdout: {json: {equals: 1}}}"), "json.path is required"},
+		{"json no matcher", specSteps("assert: {stdout: {json: {path: \"$.a\"}}}"), "must set one of equals/matches/length/gt/gte/lt/lte"},
+		{"json two matchers", specSteps("assert: {stdout: {json: {path: \"$.a\", equals: 1, length: 2}}}"), "must set exactly one of equals/matches/length/gt/gte/lt/lte"},
+		{"json bad matches", specSteps("assert: {stdout: {json: {path: \"$.a\", matches: \"a[\"}}}"), "is not a valid regexp"},
+
+		// ---- validateMockAssert ----
+		{"mock name required", specSteps("assert: {mock: {count: 1}}"), "mock.name is required"},
+		{"mock undeclared", specSteps("assert: {mock: {name: nope, count: 1}}"), "is not a declared mock server"},
+		{"mock count negative", mockScenario("assert: {mock: {name: api, count: -1}}"), "count must be >= 0"},
+		{"mock count zero with matcher", mockScenario("assert: {mock: {name: api, count: 0, header: {name: X, equals: y}}}"), "count: 0 cannot be combined"},
+		{"mock header invalid", mockScenario("assert: {mock: {name: api, header: {name: X}}}"), "must set one of contains/equals/matches"},
+		{"mock body invalid", mockScenario("assert: {mock: {name: api, body: {}}}"), "must set exactly one matcher"},
+
+		// ---- validateCondition ----
+		{"skip bad os", scenarioTop("skip: {os: solaris}", "run: {command: echo}"), "skip.os \"solaris\" is invalid"},
+		{"only bad os", scenarioTop("only: {os: bsd}", "run: {command: echo}"), "only.os \"bsd\" is invalid"},
+
+		// ---- validateStep ----
+		{"step no action", specSteps("{}"), "step must set exactly one of fixture/run/http/query/grpc/cdp/assert/store/pty/signal (got none)"},
+		{"step two actions", specSteps("{run: {command: x}, store: {name: v, from: {header: X}}}"), "step must set exactly one action, but set"},
+		{"query missing runner", withRunner(dbRunner, specSteps("query: {sql: \"SELECT 1\"}")), "query.runner is required"},
+		{"query missing sql", withRunner(dbRunner, specSteps("query: {runner: d}")), "query.sql is required"},
+		{"grpc missing runner", withRunner(grpcRunner, specSteps("grpc: {method: m}")), "grpc.runner is required"},
+		{"grpc missing method", withRunner(grpcRunner, specSteps("grpc: {runner: g}")), "grpc.method is required"},
+		{"cdp missing runner", withRunner(browserRunner, specSteps("cdp: {actions: [{navigate: \"https://x\"}]}")), "cdp.runner is required"},
+		{"cdp empty actions", withRunner(browserRunner, specSteps("cdp: {runner: b, actions: []}")), "cdp.actions must contain at least one action"},
+		{"service step in scenario", specSteps("service: {name: s, command: x}"), "service steps are only allowed in suite.setup"},
+
+		// ---- validateCDPActions ----
+		{"cdp no action key", withRunner(browserRunner, specSteps("cdp: {runner: b, actions: [{}]}")), "sets no recognized action"},
+		{"cdp multiple actions", withRunner(browserRunner, specSteps("cdp: {runner: b, actions: [{navigate: x, click: \"#a\"}]}")), "sets multiple actions"},
+		{"cdp press incomplete", withRunner(browserRunner, specSteps("cdp: {runner: b, actions: [{press: {selector: \"#a\"}}]}")), "press requires selector and key"},
+		{"cdp select incomplete", withRunner(browserRunner, specSteps("cdp: {runner: b, actions: [{select: {value: v}}]}")), "select requires a selector"},
+		{"cdp screenshot incomplete", withRunner(browserRunner, specSteps("cdp: {runner: b, actions: [{screenshot: {}}]}")), "screenshot requires a path"},
+		{"cdp attribute incomplete", withRunner(browserRunner, specSteps("cdp: {runner: b, actions: [{attribute: {selector: \"#a\"}}]}")), "attribute requires selector and name"},
+		{"cdp send_keys incomplete", withRunner(browserRunner, specSteps("cdp: {runner: b, actions: [{send_keys: {value: hi}}]}")), "send_keys requires a selector"},
+		{"cdp upload incomplete", withRunner(browserRunner, specSteps("cdp: {runner: b, actions: [{upload: {selector: \"#a\"}}]}")), "upload requires selector and file"},
+		{"cdp download incomplete", withRunner(browserRunner, specSteps("cdp: {runner: b, actions: [{download: {}}]}")), "download requires a click selector"},
+
+		// ---- validateFixture ----
+		{"fixture file required", specSteps("fixture: {content: hi}"), "fixture.file is required"},
+		{"fixture two sources", specSteps("fixture: {file: a.txt, content: x, base64: eA==}"), "set only one of content, base64, from, or symlink"},
+		{"fixture symlink with mode", specSteps("fixture: {file: a, symlink: b, mode: \"0644\"}"), "mode cannot be applied to a symlink"},
+		{"fixture bad mode", specSteps("fixture: {file: a, mode: \"999\"}"), "is not an octal file mode"},
+		{"fixture bad mtime", specSteps("fixture: {file: a, mtime: nope}"), "is not an RFC3339 timestamp"},
+
+		// ---- validateSignal ----
+		{"signal service required", svcScenario("signal: {signal: TERM}"), "signal.service is required"},
+		{"signal undeclared", svcScenario("signal: {service: nope, signal: TERM}"), "is not a declared service"},
+		{"signal signal required", svcScenario("signal: {service: s}"), "signal.signal is required"},
+		{"signal bad name", svcScenario("signal: {service: s, signal: BOGUS}"), "is not an accepted signal"},
+		{"signal wait bad duration", svcScenario("signal: {service: s, signal: TERM, wait: {timeout: abc}}"), "is not a valid duration"},
+		{"signal wait nonpositive", svcScenario("signal: {service: s, signal: TERM, wait: {timeout: \"-1s\"}}"), "must be positive"},
+
+		// ---- validatePTY ----
+		{"pty command required", specSteps("pty: {session: [{expect: hi}]}"), "pty.command is required"},
+		{"pty bad timeout", specSteps("pty: {command: sh, timeout: abc}"), "is not a valid duration"},
+		{"pty nonpositive timeout", specSteps("pty: {command: sh, timeout: \"-1s\"}"), "must be positive"},
+		{"pty size overflow", specSteps("pty: {command: sh, rows: 70000}"), "rows/cols must be between 0 and 65535"},
+		{"pty expect and send", specSteps("pty: {command: sh, session: [{expect: hi, send: x}]}"), "set exactly one of expect/send (got both)"},
+		{"pty neither expect nor send", specSteps("pty: {command: sh, session: [{}]}"), "set exactly one of expect/send"},
+		{"pty bad expect regexp", specSteps("pty: {command: sh, session: [{expect: \"a[\"}]}"), "is not a valid regexp"},
+		{"pty bad send key", specSteps("pty: {command: sh, session: [{send: {key: BOGUS}}]}"), "is not a supported key"},
+
+		// ---- validateMockRoutes (scenario) ----
+		{"route method required", "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    mock_servers:\n      - name: m\n        routes:\n          - {path: /}\n    steps:\n      - run: {command: echo}\n", "method is required"},
+		{"route path required", "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    mock_servers:\n      - name: m\n        routes:\n          - {method: GET}\n    steps:\n      - run: {command: echo}\n", "path is required"},
+		{"route path no slash", "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    mock_servers:\n      - name: m\n        routes:\n          - {method: GET, path: foo}\n    steps:\n      - run: {command: echo}\n", "must start with \"/\""},
+		{"route two payloads", "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    mock_servers:\n      - name: m\n        routes:\n          - {method: GET, path: /, body: hi, body_file: f.txt}\n    steps:\n      - run: {command: echo}\n", "set at most one of json/body/body_file"},
+		{"route bad status", "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    mock_servers:\n      - name: m\n        routes:\n          - {method: GET, path: /, status: 700}\n    steps:\n      - run: {command: echo}\n", "is not a valid HTTP status"},
+		{"route bad delay", "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    mock_servers:\n      - name: m\n        routes:\n          - {method: GET, path: /, delay: xyz}\n    steps:\n      - run: {command: echo}\n", "is not a valid duration"},
+
+		// ---- validateSuiteBlock ----
+		{"suite http rejected", "version: \"1\"\nsuite:\n  name: x\n  setup:\n    - http: {runner: api, method: GET, path: /}\nrunners:\n  api: {type: http, base_url: \"http://127.0.0.1:1\"}\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n", "steps are per-scenario"},
+		{"suite service in teardown", "version: \"1\"\nsuite:\n  name: x\n  teardown:\n    - service: {name: s, command: x}\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n", "service steps are only allowed in suite.setup"},
+		{"suite duplicate service", "version: \"1\"\nsuite:\n  name: x\n  setup:\n    - service: {name: s, command: x}\n    - service: {name: s, command: y}\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n", "duplicate suite service name"},
+		{"suite service missing command", "version: \"1\"\nsuite:\n  name: x\n  setup:\n    - service: {name: s}\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n", "service.command is required"},
+		{"suite service missing name", "version: \"1\"\nsuite:\n  name: x\n  setup:\n    - service: {command: x}\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n", "service.name is required"},
+		{"suite mock in teardown", "version: \"1\"\nsuite:\n  name: x\n  teardown:\n    - mock_server: {name: m, routes: []}\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n", "mock_server steps are only allowed in suite.setup"},
+		{"suite duplicate mock", "version: \"1\"\nsuite:\n  name: x\n  setup:\n    - mock_server: {name: m, routes: []}\n    - mock_server: {name: m, routes: []}\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n", "duplicate suite mock server name"},
+		{"suite mock missing name", "version: \"1\"\nsuite:\n  name: x\n  setup:\n    - mock_server: {routes: []}\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n", "mock_server.name is required"},
+		{"suite step no action", "version: \"1\"\nsuite:\n  name: x\n  setup:\n    - {}\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n", "step must set exactly one action"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			mustReject(t, tt.name, tt.src, tt.want)
+		})
+	}
+}
+
+// TestBugHunt_Acceptances pins the accept side of each accept/reject boundary so
+// a future over-eager validation rule that starts rejecting a legal spec is
+// caught here.
+func TestBugHunt_Acceptances(t *testing.T) {
+	t.Parallel()
+
+	browserRunner := "runners:\n  b: {type: browser}\n"
+	withRunner := func(runner, body string) string {
+		const anchor = "  name: x\n"
+		i := strings.Index(body, anchor) + len(anchor)
+		return body[:i] + runner + body[i:]
+	}
+	mockScenario := func(step string) string {
+		return "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n" +
+			"    mock_servers:\n      - name: api\n        routes:\n          - {method: GET, path: /, status: 200}\n" +
+			"    steps:\n      - " + step + "\n"
+	}
+	svcScenario := func(step string) string {
+		return "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n" +
+			"    services:\n      - {name: s, command: sleep 10}\n" +
+			"    steps:\n      - " + step + "\n"
+	}
+	scenarioTop := func(extra, step string) string {
+		return "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    " + extra + "\n    steps:\n      - " + step + "\n"
+	}
+
+	tests := []struct{ name, src string }{
+		{"store stdout json", specSteps("store: {name: v, from: {stdout: {json: {path: \"$.a\"}}}}")},
+		{"store header", specSteps("store: {name: v, from: {header: X-Request-Id}}")},
+		{"store stdout matches", specSteps("store: {name: v, from: {stdout: {matches: \"id=(\\\\d+)\"}}}")},
+		{"store file json", specSteps("store: {name: v, from: {file: {path: out.json, json: {path: \"$.id\"}}}}")},
+		{"exit_code in", specSteps("run: {command: echo}", "assert: {exit_code: {in: [0, 1, 2]}}")},
+		{"exit_code not", specSteps("run: {command: echo}", "assert: {exit_code: {not: 1}}")},
+		{"file exists", specSteps("assert: {file: {path: out.txt, exists: true}}")},
+		{"header equals", specSteps("assert: {header: {name: Content-Type, equals: text/html}}")},
+		{"json gt", specSteps("assert: {stdout: {json: {path: \"$.count\", gt: 5}}}")},
+		{"mock count", mockScenario("assert: {mock: {name: api, count: 2}}")},
+		{"signal valid", svcScenario("signal: {service: s, signal: TERM}")},
+		{"signal var target", svcScenario("signal: {service: \"${svc}\", signal: KILL}")},
+		{"cdp navigate", withRunner(browserRunner, specSteps("cdp: {runner: b, actions: [{navigate: \"https://x\"}, {click: \"#go\"}]}"))},
+		{"fixture content", specSteps("fixture: {file: a.txt, content: hello}")},
+		{"pty valid", specSteps("pty: {command: sh, session: [{expect: \"[$] \"}, {send: \"ls\\n\"}]}")},
+		{"assert message", specSteps("assert: {message: {equals: ok}}")},
+		{"assert value", specSteps("assert: {value: {contains: hi}}")},
+		{"assert grpc_status", specSteps("assert: {grpc_status: 0}")},
+		{"assert screen after pty", specSteps("pty: {command: sh}", "assert: {screen: {contains: prompt}}")},
+		{"assert duration after run", specSteps("run: {command: echo}", "assert: {duration: {lt: \"5s\"}}")},
+		{"skip valid os", scenarioTop("skip: {os: darwin}", "run: {command: echo}")},
+		{"only valid os", scenarioTop("only: {os: windows}", "run: {command: echo}")},
+		{"suite setup kinds", "version: \"1\"\nsuite:\n  name: x\n  setup:\n    - fixture: {file: seed.txt, content: hi}\n    - run: {command: echo}\n    - store: {name: v, from: {stdout: {json: {path: \"$.a\"}}}}\n    - assert: {exit_code: 0}\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			mustAccept(t, tt.name, tt.src)
+		})
+	}
+}
+
+// TestBugHunt_RoundTrip is a metamorphic check: a spec that loads cleanly must,
+// after being re-marshaled to YAML and reloaded, still load cleanly. It catches
+// any decode/marshal asymmetry that would silently change validation outcome.
+func TestBugHunt_RoundTrip(t *testing.T) {
+	t.Parallel()
+	srcs := []string{
+		specSteps("run: {command: echo}", "assert: {exit_code: {in: [0, 1]}}"),
+		specSteps("store: {name: v, from: {stdout: {json: {path: \"$.a\"}}}}"),
+		specSteps("fixture: {file: a.txt, content: hello}"),
+		specSteps("assert: {stdout: {contains: [\"a\", \"b\"]}}"),
+	}
+	for i, src := range srcs {
+		s1, err := LoadBytes("t.atago.yaml", []byte(src))
+		if err != nil {
+			t.Fatalf("case %d: initial load failed: %v", i, err)
+		}
+		out, err := yaml.Marshal(s1)
+		if err != nil {
+			t.Fatalf("case %d: marshal failed: %v", i, err)
+		}
+		if _, err := LoadBytes("t.atago.yaml", out); err != nil {
+			t.Errorf("case %d: reload after round-trip failed: %v\nmarshaled:\n%s", i, err, out)
+		}
+	}
+}
+
+// TestBugHunt_LoadFromDisk covers Load / LoadWithSource error and success paths
+// against the filesystem (the entry points the CLI actually calls).
+func TestBugHunt_LoadFromDisk(t *testing.T) {
+	t.Parallel()
+
+	// Missing file: Load and LoadWithSource both surface a path-annotated error.
+	if _, err := Load(filepath.Join(t.TempDir(), "nope.atago.yaml")); err == nil {
+		t.Error("Load(missing) error = nil, want error")
+	}
+	if _, _, err := LoadWithSource(filepath.Join(t.TempDir(), "nope.atago.yaml")); err == nil {
+		t.Error("LoadWithSource(missing) error = nil, want error")
+	}
+
+	// Invalid spec on disk: LoadWithSource returns the validation error, not a source.
+	bad := filepath.Join(t.TempDir(), "bad.atago.yaml")
+	if err := os.WriteFile(bad, []byte("version: \"2\"\nsuite: {name: x}\nscenarios: []"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, src, err := LoadWithSource(bad); err == nil || src != nil {
+		t.Errorf("LoadWithSource(bad) = src %v err %v, want nil src + error", src, err)
+	}
+
+	// Valid spec on disk loads.
+	good := filepath.Join(t.TempDir(), "good.atago.yaml")
+	if err := os.WriteFile(good, []byte(specSteps("run: {command: echo}")), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Load(good); err != nil {
+		t.Errorf("Load(good) error = %v", err)
+	}
+}
+
+// TestBugHunt_ErrorString exercises Error.Error's path-less branch.
+func TestBugHunt_ErrorString(t *testing.T) {
+	t.Parallel()
+	if got := (&Error{Msg: "boom"}).Error(); got != "boom" {
+		t.Errorf("path-less Error() = %q, want %q", got, "boom")
+	}
+	if got := (&Error{Path: "f.yaml", Msg: "boom"}).Error(); got != "f.yaml: boom" {
+		t.Errorf("Error() = %q, want %q", got, "f.yaml: boom")
+	}
+}
+
+// TestBugHunt_DirAssert drives validateDir's accept/reject boundary (#25/#74):
+// the tree-snapshot vs matcher-family split, count sanity, and glob validity.
+func TestBugHunt_DirAssert(t *testing.T) {
+	t.Parallel()
+
+	dir := func(body string) string { return specSteps("assert: {dir: " + body + "}") }
+
+	reject := []struct{ name, src, want string }{
+		{"dir path required", dir("{exists: true}"), "dir.path is required"},
+		{"dir no matcher", dir("{path: out}"), "must set at least one of exists/contains/not_contains/count/min_count/max_count/glob/snapshot"},
+		{"dir snapshot with matcher", dir("{path: out, snapshot: tree, exists: true}"), "snapshot cannot be combined with the matcher family"},
+		{"dir snapshot with recursive", dir("{path: out, snapshot: tree, recursive: true}"), "recursive is implied by snapshot; drop it"},
+		{"dir recursive without matcher", dir("{path: out, recursive: true}"), "recursive needs at least one of"},
+		{"dir ignore without recursive", dir("{path: out, count: 1, ignore: [\"*.tmp\"]}"), "ignore only applies to recursive or snapshot"},
+		{"dir negative count", dir("{path: out, count: -1}"), "counts must be >= 0"},
+		{"dir min exceeds max", dir("{path: out, min_count: 5, max_count: 2}"), "min_count 5 exceeds max_count 2"},
+		{"dir bad ignore glob", dir("{path: out, recursive: true, count: 1, ignore: [\"[\"]}"), "is not a valid glob"},
+	}
+	for _, tt := range reject {
+		t.Run("reject/"+tt.name, func(t *testing.T) {
+			t.Parallel()
+			mustReject(t, tt.name, tt.src, tt.want)
+		})
+	}
+
+	accept := []struct{ name, src string }{
+		{"dir exists", dir("{path: out, exists: true}")},
+		{"dir count", dir("{path: out, count: 3}")},
+		{"dir min max", dir("{path: out, min_count: 1, max_count: 4}")},
+		{"dir glob", dir("{path: out, glob: \"*.txt\"}")},
+		{"dir snapshot", dir("{path: out, snapshot: tree}")},
+		{"dir recursive with matcher and ignore", dir("{path: out, recursive: true, count: 2, ignore: [\"*.tmp\", \"logs/**\"]}")},
+		// KNOWN GAP (not a crash, intentionally pinned): `recursive: true` alongside
+		// only `exists` is accepted, because `exists` counts toward n so the
+		// recursive-needs-a-matcher guard (n==0) never fires — even though that
+		// guard's own message excludes exists from the composable matchers. The
+		// recursive flag is effectively a silent no-op here. Pinned so a future
+		// tightening is a deliberate, visible change.
+		{"dir recursive with only exists (gap)", dir("{path: out, exists: true, recursive: true}")},
+	}
+	for _, tt := range accept {
+		t.Run("accept/"+tt.name, func(t *testing.T) {
+			t.Parallel()
+			mustAccept(t, tt.name, tt.src)
+		})
+	}
+}
+
+// TestBugHunt_FileAndJSONExtras closes the remaining file/json matcher branches
+// (executable, snapshot, the numeric json bounds) on the accept side.
+func TestBugHunt_FileAndJSONExtras(t *testing.T) {
+	t.Parallel()
+	accept := []struct{ name, src string }{
+		{"file executable", specSteps("assert: {file: {path: bin/tool, executable: true}}")},
+		{"file snapshot", specSteps("assert: {file: {path: out.txt, snapshot: golden}}")},
+		{"file contains list", specSteps("assert: {file: {path: out.txt, contains: [\"a\", \"b\"]}}")},
+		{"file json", specSteps("assert: {file: {path: out.json, json: {path: \"$.id\", equals: 7}}}")},
+		{"json lt", specSteps("assert: {stdout: {json: {path: \"$.n\", lt: 10}}}")},
+		{"json lte", specSteps("assert: {stdout: {json: {path: \"$.n\", lte: 10}}}")},
+		{"json gte", specSteps("assert: {stdout: {json: {path: \"$.n\", gte: 1}}}")},
+		{"json length", specSteps("assert: {stdout: {json: {path: \"$.items\", length: 3}}}")},
+		{"yaml matcher", specSteps("assert: {stdout: {yaml: {path: \"$.k\", equals: v}}}")},
+		{"store from body matches", specSteps("store: {name: v, from: {body: {matches: \"tok=(\\\\w+)\"}}}")},
+		{"store from rows json", specSteps("store: {name: v, from: {rows: {json: {path: \"$[0].id\"}}}}")},
+		{"store from message json", specSteps("store: {name: v, from: {message: {json: {path: \"$.ok\"}}}}")},
+		{"store from value matches", specSteps("store: {name: v, from: {value: {matches: \"^ok$\"}}}")},
+	}
+	for _, tt := range accept {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			mustAccept(t, tt.name, tt.src)
 		})
 	}
 }

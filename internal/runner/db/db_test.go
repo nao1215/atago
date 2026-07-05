@@ -219,3 +219,111 @@ func TestIsRowReturning(t *testing.T) {
 		}
 	}
 }
+
+// TestNormalizeValue covers the []byte→string conversion (so a TEXT/BLOB column
+// serializes as a string, not a base64 byte array in JSON) and the passthrough
+// for every other type.
+func TestNormalizeValue(t *testing.T) {
+	t.Parallel()
+	if got := normalizeValue([]byte("hi")); got != "hi" {
+		t.Errorf("normalizeValue([]byte) = %v, want \"hi\"", got)
+	}
+	if got := normalizeValue(int64(7)); got != int64(7) {
+		t.Errorf("normalizeValue(int64) = %v, want 7", got)
+	}
+	if got := normalizeValue(nil); got != nil {
+		t.Errorf("normalizeValue(nil) = %v, want nil", got)
+	}
+}
+
+// TestSchemeOf covers dsn scheme extraction: a scheme is the lowercased text
+// before the first ':', but only when that ':' is not the first character (a
+// leading ':', like ":memory:", has no scheme).
+func TestSchemeOf(t *testing.T) {
+	t.Parallel()
+	cases := map[string]string{
+		"sqlite:./a.db":      "sqlite",
+		"POSTGRES://x":       "postgres",
+		"mysql://u@tcp(h)/d": "mysql",
+		"plainpath":          "",
+		":memory:":           "",
+		"":                   "",
+	}
+	for dsn, want := range cases {
+		if got := schemeOf(dsn); got != want {
+			t.Errorf("schemeOf(%q) = %q, want %q", dsn, got, want)
+		}
+	}
+}
+
+// TestValidateDriver covers the loader-facing driver check: empty is valid
+// (inferred later), every alias is accepted, and an unknown/typo'd name is
+// rejected with a helpful message.
+func TestValidateDriver(t *testing.T) {
+	t.Parallel()
+	for _, ok := range []string{"", "sqlite", "sqlite3", "postgres", "postgresql", "pgx", "mysql", "  MySQL  "} {
+		if err := ValidateDriver(ok); err != nil {
+			t.Errorf("ValidateDriver(%q) = %v, want nil", ok, err)
+		}
+	}
+	for _, bad := range []string{"sqllite", "mariadb", "oracle", "x"} {
+		if err := ValidateDriver(bad); err == nil {
+			t.Errorf("ValidateDriver(%q) = nil, want error", bad)
+		}
+	}
+}
+
+// TestDataSource covers the driver-specific DSN rewriting: sqlite strips a
+// sqlite:/sqlite3: prefix (and preserves ":memory:" and bare paths), postgres is
+// passed through verbatim, and a mysql:// URL is converted to the native form.
+func TestDataSource(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		driver, dsn, want string
+	}{
+		{"sqlite", "sqlite:./a.db", "./a.db"},
+		{"sqlite", "sqlite3:./a.db", "./a.db"},
+		{"sqlite", ":memory:", ":memory:"},
+		{"sqlite", "/abs/path.db", "/abs/path.db"},
+		{"postgres", "postgres://u@h/d", "postgres://u@h/d"},
+		{"mysql", "user:pass@tcp(127.0.0.1:3306)/db", "user:pass@tcp(127.0.0.1:3306)/db"},
+	}
+	for _, c := range cases {
+		got, err := dataSource(c.driver, c.dsn)
+		if err != nil {
+			t.Errorf("dataSource(%q, %q) error = %v", c.driver, c.dsn, err)
+			continue
+		}
+		if got != c.want {
+			t.Errorf("dataSource(%q, %q) = %q, want %q", c.driver, c.dsn, got, c.want)
+		}
+	}
+	// A mysql:// URL is rewritten to the native user:pass@tcp(host)/db form.
+	got, err := dataSource("mysql", "mysql://u:p@h:3306/d")
+	if err != nil {
+		t.Fatalf("dataSource(mysql url) error = %v", err)
+	}
+	if got == "mysql://u:p@h:3306/d" {
+		t.Errorf("dataSource did not rewrite mysql:// URL: %q", got)
+	}
+}
+
+// TestSkipQuotedEdges exercises skipQuoted through isRowReturning for a doubled
+// (escaped) quote and an unterminated quote — the classifier must not panic and
+// must treat the quoted region as opaque data.
+func TestSkipQuotedEdges(t *testing.T) {
+	t.Parallel()
+	// Doubled single quote is an escaped literal; the string spans to the real
+	// close, so the leading verb is still INSERT (row-returning false).
+	if isRowReturning("INSERT INTO t VALUES ('it''s RETURNING x')") {
+		t.Error("doubled-quote literal containing RETURNING should not route as row-returning")
+	}
+	// An unterminated quote must not panic and consumes to end of input.
+	if isRowReturning("INSERT INTO t VALUES ('unterminated") {
+		t.Error("unterminated quote after INSERT should not be row-returning")
+	}
+	// A SELECT with an empty doubled-quote pair still classifies as row-returning.
+	if !isRowReturning("SELECT '''' AS q") {
+		t.Error("SELECT with doubled-quote literal should be row-returning")
+	}
+}

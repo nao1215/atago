@@ -279,3 +279,38 @@ func indexOf(s, sub string) int {
 	}
 	return -1
 }
+
+// TestExpandCDP_UploadDownload is a regression: a browser upload's file path and
+// selector, and a download's click selector and capture dir, are ${name}
+// references the engine must expand — spec.CollectStepVars already reports them
+// as used, so leaving them literal meant a variable the summaries advertise as
+// live was silently passed to the browser unexpanded. Upload.File and
+// Download.Dir are workdir-relative paths, so a `${workdir}`- or store-derived
+// value that stays literal targets the wrong file.
+func TestExpandCDP_UploadDownload(t *testing.T) {
+	t.Parallel()
+	st := store.New()
+	st.Set("workdir", "/wd")
+	st.Set("field", "#chooser")
+	st.Set("btn", "#dl")
+
+	c := &spec.CDP{Actions: []spec.CDPAction{
+		{Upload: &spec.CDPUpload{Selector: "${field}", File: "${workdir}/in.png"}},
+		{Download: &spec.CDPDownload{Click: "${btn}", Dir: "${workdir}/out"}},
+	}}
+	out := expandCDP(st, c)
+
+	up := out.Actions[0].Upload
+	if up.Selector != "#chooser" || up.File != "/wd/in.png" {
+		t.Errorf("upload not expanded: selector=%q file=%q", up.Selector, up.File)
+	}
+	dl := out.Actions[1].Download
+	if dl.Click != "#dl" || dl.Dir != "/wd/out" {
+		t.Errorf("download not expanded: click=%q dir=%q", dl.Click, dl.Dir)
+	}
+
+	// The input must not be mutated: expansion returns a fresh copy.
+	if c.Actions[0].Upload.File != "${workdir}/in.png" {
+		t.Error("expandCDP mutated the input upload action")
+	}
+}

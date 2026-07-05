@@ -1,6 +1,7 @@
 package report
 
 import (
+	"fmt"
 	"math/rand"
 	"slices"
 	"strings"
@@ -169,5 +170,49 @@ func TestColorizeDiff(t *testing.T) {
 	}
 	if !strings.Contains(yaml, cGreen+"+++"+cReset) {
 		t.Errorf("added ++ content not green: %q", yaml)
+	}
+}
+
+// TestUnifiedDiff_OutputTruncationAndMultiHunk covers the rendered-output cap
+// (a diff longer than diffMaxOutputLines is truncated with a marker) and
+// multi-hunk grouping (two changes separated by more than 2*context common lines
+// produce two @@ headers), plus the actual-side no-newline marker.
+func TestUnifiedDiff_OutputTruncationAndMultiHunk(t *testing.T) {
+	t.Parallel()
+
+	// Output truncation: 130 wholly-different lines (< diffMaxInputLines, so no
+	// input truncation) diff to 260 hunk lines, exceeding diffMaxOutputLines.
+	var exp, act strings.Builder
+	for i := 0; i < 130; i++ {
+		fmt.Fprintf(&exp, "old-%d\n", i)
+		fmt.Fprintf(&act, "new-%d\n", i)
+	}
+	got := unifiedDiff(exp.String(), act.String(), "expected", "actual")
+	if !strings.Contains(got, "... (diff truncated)") {
+		t.Errorf("expected output-truncation marker, got %d bytes", len(got))
+	}
+	if strings.Contains(got, "inputs truncated") {
+		t.Errorf("130 lines should not trip input truncation:\n%s", got)
+	}
+
+	// Multi-hunk: a long shared body with an isolated change at each end.
+	base := make([]string, 0, 40)
+	for i := 0; i < 40; i++ {
+		base = append(base, fmt.Sprintf("line-%d", i))
+	}
+	a := append([]string{"HEAD-A"}, base...)
+	a = append(a, "TAIL-A")
+	b := append([]string{"HEAD-B"}, base...)
+	b = append(b, "TAIL-B")
+	md := unifiedDiff(strings.Join(a, "\n"), strings.Join(b, "\n"), "expected", "actual")
+	if n := strings.Count(md, "@@ -"); n < 2 {
+		t.Errorf("expected >= 2 hunks for two far-apart changes, got %d:\n%s", n, md)
+	}
+
+	// The actual-side no-newline marker fires when expected ends in \n but actual
+	// does not (the mirror of the existing expected-side test).
+	nl := unifiedDiff("a\n", "a", "expected", "actual")
+	if !strings.Contains(nl, noNewlineMarker+" (actual)") {
+		t.Errorf("actual-side no-newline marker missing:\n%s", nl)
 	}
 }

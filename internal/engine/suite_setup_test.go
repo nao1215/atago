@@ -234,3 +234,87 @@ scenarios:
 		t.Errorf("no-block spec recorded setup/teardown results: %+v / %+v", res.Setup, res.Teardown)
 	}
 }
+
+// TestEngine_SuiteSetup_FixtureStoreAssertKinds exercises the fixture, store, and
+// assert step kinds inside suite.setup (not only run/service), covering the
+// per-kind branches of runSuiteSteps that the other suite tests skip. A fixture
+// written in setup lands in ${suitedir} and is visible to scenarios, and a setup
+// assert against a setup run's output participates in the setup verdict.
+func TestEngine_SuiteSetup_FixtureStoreAssertKinds(t *testing.T) {
+	t.Parallel()
+	src := `
+version: "1"
+suite:
+  name: s
+  setup:
+    - fixture:
+        file: seed.txt
+        content: "hello from setup"
+    - run:
+        shell: true
+        command: echo boot-42
+    - assert:
+        exit_code: 0
+        stdout: {contains: boot-42}
+    - store:
+        name: bootid
+        from:
+          stdout:
+            matches: "boot-[0-9]+"
+scenarios:
+  - name: sees the setup store
+    steps:
+      # The fixture/store/assert setup steps above run once before this scenario
+      # regardless of what it does, so they are what exercises runSuiteSteps'
+      # per-kind branches; the scenario just confirms the captured store reached
+      # it with a cross-platform echo (no cat/;, which cmd.exe does not honor).
+      - run: {shell: true, command: "echo id=${bootid}"}
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: id=boot-42
+`
+	s, err := loader.LoadBytes("t.atago.yaml", []byte(src))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	res := New().Run(context.Background(), s, "t.atago.yaml")
+	if res.Status != StatusPassed {
+		t.Fatalf("status = %s, want passed: %+v", res.Status, res.Scenarios)
+	}
+	if len(res.Setup) != 4 {
+		t.Fatalf("recorded %d setup step results, want 4", len(res.Setup))
+	}
+}
+
+// TestEngine_SuiteSetup_FailingAssertErrsScenarios covers the suite-setup failure
+// path triggered by a failing assert (not a run error): a false setup assertion
+// aborts the suite and errors every scenario, exercising the assert-failure and
+// stop-on-failure branches of runSuiteSteps.
+func TestEngine_SuiteSetup_FailingAssertErrsScenarios(t *testing.T) {
+	t.Parallel()
+	src := `
+version: "1"
+suite:
+  name: s
+  setup:
+    - run: {shell: true, command: echo actual}
+    - assert:
+        stdout: {contains: expected-but-absent}
+scenarios:
+  - name: never runs
+    steps:
+      - run: {shell: true, command: echo unreached}
+`
+	s, err := loader.LoadBytes("t.atago.yaml", []byte(src))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	res := New().Run(context.Background(), s, "t.atago.yaml")
+	if res.Status != StatusError {
+		t.Fatalf("status = %s, want error: %+v", res.Status, res.Scenarios)
+	}
+	if len(res.Scenarios) != 1 || res.Scenarios[0].Status != StatusError {
+		t.Fatalf("scenario should be errored by the setup failure: %+v", res.Scenarios)
+	}
+}

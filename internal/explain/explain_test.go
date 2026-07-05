@@ -565,3 +565,526 @@ scenarios:
 		}
 	}
 }
+
+// TestExplain_SuiteSetupTeardownBlocks exercises explainSuiteBlock across every
+// step kind that suite.setup/teardown accepts (run, service, mock_server,
+// fixture, store, assert). The validator (validateSuiteBlock) permits exactly
+// these kinds, so explain must render each — a dropped kind would hide part of
+// the once-per-suite bootstrap from a reviewer.
+func TestExplain_SuiteSetupTeardownBlocks(t *testing.T) {
+	t.Parallel()
+	src := `
+version: "1"
+suite:
+  name: bootstrap
+  setup:
+    - fixture:
+        file: seed.json
+        content: "{}"
+    - run:
+        command: ./build-helper
+    - store:
+        name: token
+        from:
+          stdout:
+            matches: "tok-[0-9]+"
+    - service:
+        name: broker
+        command: ./broker
+        ready:
+          delay: 50ms
+    - mock_server:
+        name: api
+        routes:
+          - {method: GET, path: /health, body: ok}
+    - assert:
+        exit_code: 0
+  teardown:
+    - run:
+        command: ./cleanup
+    - store:
+        name: bye
+        from:
+          stdout:
+            matches: "bye-[0-9]+"
+scenarios:
+  - name: trivial
+    steps:
+      - run: {command: echo hi}
+      - assert: {exit_code: 0}
+`
+	out := mustExplain(t, src)
+	for _, want := range []string{
+		"Suite setup (runs once before any scenario):",
+		"seed.json (inline content)",
+		"./build-helper",
+		"start suite service \"broker\": ./broker",
+		"mock server api: 1 canned route(s), serves ${api.url}",
+		"store token",
+		"expect exit code is 0",
+		"Suite teardown (always runs after the last scenario):",
+		"./cleanup",
+		"store bye",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("explain suite block missing %q\n--- got ---\n%s", want, out)
+		}
+	}
+}
+
+// TestExplain_SignalStep covers describeSignal for both the fire-and-forget form
+// and the wait form. The default wait timeout rendered here (5s) must match the
+// engine's defaultSignalWait constant; a drift would mislead a reviewer about how
+// long a teardown blocks.
+func TestExplain_SignalStep(t *testing.T) {
+	t.Parallel()
+	src := `
+version: "1"
+suite:
+  name: signals
+scenarios:
+  - name: send signals
+    services:
+      - name: server
+        command: ./server
+        ready:
+          delay: 10ms
+    steps:
+      - run: {command: echo go}
+      - signal:
+          service: server
+          signal: HUP
+      - signal:
+          service: server
+          signal: TERM
+          wait: {}
+      - signal:
+          service: server
+          signal: INT
+          wait:
+            timeout: 2s
+      - assert: {exit_code: 0}
+`
+	out := mustExplain(t, src)
+	for _, want := range []string{
+		"send SIGHUP to service server",
+		"send SIGTERM to service server  [wait up to 5s for exit]",
+		"send SIGINT to service server  [wait up to 2s for exit]",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("explain signal missing %q\n--- got ---\n%s", want, out)
+		}
+	}
+}
+
+// TestExplain_ChangesAssert covers describeChangesExplain: a populated category,
+// an explicitly-empty category ("modified: []" renders "modified nothing"), and
+// the mix. This is the workdir-delta assertion (#70).
+func TestExplain_ChangesAssert(t *testing.T) {
+	t.Parallel()
+	src := `
+version: "1"
+suite:
+  name: delta
+scenarios:
+  - name: workdir changes
+    steps:
+      - run: {command: ./generate}
+      - assert:
+          changes:
+            created: [out.txt, log/run.log]
+            modified: []
+            deleted: [stale.tmp]
+`
+	out := mustExplain(t, src)
+	for _, want := range []string{
+		"changed exactly created out.txt, log/run.log; modified nothing; deleted stale.tmp",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("explain changes missing %q\n--- got ---\n%s", want, out)
+		}
+	}
+}
+
+// TestExplain_MockAssertVariants covers describeMockAssert (#24): a bare "received
+// a request", a method+path filter, and a count. It also exercises describeMockServer
+// via the scenario's mock_servers list.
+func TestExplain_MockAssertVariants(t *testing.T) {
+	t.Parallel()
+	src := `
+version: "1"
+suite:
+  name: mocks
+scenarios:
+  - name: assert against mock
+    mock_servers:
+      - name: up
+        routes:
+          - {method: POST, path: /events, status: 202}
+          - {method: GET, path: /health, body: ok}
+    steps:
+      - run: {command: ./client}
+      - assert:
+          mock:
+            name: up
+      - assert:
+          mock:
+            name: up
+            method: post
+            path: /events
+      - assert:
+          mock:
+            name: up
+            path: /health
+            count: 3
+`
+	out := mustExplain(t, src)
+	for _, want := range []string{
+		"mock server up: 2 canned route(s), serves ${up.url}",
+		"mock up received a request",
+		"mock up received POST /events",
+		"mock up received /health x3",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("explain mock assert missing %q\n--- got ---\n%s", want, out)
+		}
+	}
+}
+
+// TestExplain_DirAssert covers describeDir (#74) across every constraint field so
+// a directory/tree assertion is fully summarized.
+func TestExplain_DirAssert(t *testing.T) {
+	t.Parallel()
+	src := `
+version: "1"
+suite:
+  name: dirs
+scenarios:
+  - name: check a tree
+    steps:
+      - run: {command: ./build}
+      - assert:
+          dir:
+            path: dist
+            exists: true
+            contains: [index.html]
+            not_contains: [.DS_Store]
+            min_count: 1
+            max_count: 100
+            glob: "*.html"
+            recursive: true
+            ignore: [tmp, cache]
+      - assert:
+          dir:
+            path: empty
+            exists: false
+      - assert:
+          dir:
+            path: exact
+            count: 2
+      - assert:
+          dir:
+            path: snap
+            snapshot: tree.snap
+`
+	out := mustExplain(t, src)
+	for _, want := range []string{
+		`dir "dist" exists, contains index.html, does not contain .DS_Store, has >= 1 entries, has <= 100 entries, matches glob *.html, (recursive), ignoring tmp, cache`,
+		`dir "empty" does not exist`,
+		`dir "exact" has 2 entries`,
+		`dir "snap" tree matches snapshot tree.snap`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("explain dir assert missing %q\n--- got ---\n%s", want, out)
+		}
+	}
+}
+
+// TestExplain_PDFAssert covers describePDF (#73) across page-count bounds, sorted
+// metadata, and extracted-text matching.
+func TestExplain_PDFAssert(t *testing.T) {
+	t.Parallel()
+	src := `
+version: "1"
+suite:
+  name: pdfs
+scenarios:
+  - name: check a pdf
+    steps:
+      - run: {command: ./render}
+      - assert:
+          pdf:
+            path: out.pdf
+            pages: 3
+            metadata:
+              Title: Report
+              Author: nao
+            text:
+              contains: Summary
+      - assert:
+          pdf:
+            path: bounded.pdf
+            min_pages: 1
+            max_pages: 10
+`
+	out := mustExplain(t, src)
+	for _, want := range []string{
+		`pdf "out.pdf" 3 pages`,
+		// Metadata keys are sorted, so Author precedes Title regardless of map order.
+		`Author contains "nao", Title contains "Report"`,
+		`text contains "Summary"`,
+		`pdf "bounded.pdf" >= 1 pages, <= 10 pages`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("explain pdf assert missing %q\n--- got ---\n%s", want, out)
+		}
+	}
+}
+
+// TestExplain_ExitCodeInAndNot covers intList (exit code in {…}) and the
+// exit-code "not" / bare forms (#19) in describeTarget.
+func TestExplain_ExitCodeInAndNot(t *testing.T) {
+	t.Parallel()
+	src := `
+version: "1"
+suite:
+  name: codes
+scenarios:
+  - name: exit code sets
+    steps:
+      - run: {command: ./maybe-fail}
+      - assert:
+          exit_code:
+            in: [0, 2, 3]
+`
+	out := mustExplain(t, src)
+	if !strings.Contains(out, "exit code in [0, 2, 3]") {
+		t.Errorf("explain exit-code-in missing\n--- got ---\n%s", out)
+	}
+}
+
+// TestExplain_JSONMatcherOperators covers jsonMatcher for the numeric-bound
+// operators (gte/lt/lte) not exercised elsewhere, so every comparison branch is
+// rendered.
+func TestExplain_JSONMatcherOperators(t *testing.T) {
+	t.Parallel()
+	src := `
+version: "1"
+suite:
+  name: jsonops
+scenarios:
+  - name: numeric bounds
+    steps:
+      - run: {command: echo hi}
+      - assert:
+          stdout:
+            json:
+              path: $.gte
+              gte: 5
+      - assert:
+          stdout:
+            json:
+              path: $.lt
+              lt: 9
+      - assert:
+          stdout:
+            json:
+              path: $.lte
+              lte: 7
+`
+	out := mustExplain(t, src)
+	for _, want := range []string{
+		"$.gte >= 5",
+		"$.lt < 9",
+		"$.lte <= 7",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("explain json operator missing %q\n--- got ---\n%s", want, out)
+		}
+	}
+}
+
+// TestExplain_FixtureBase64AndRunNotes covers describeFixture's base64 branch and
+// describeRun with a timeout and env (the notes path), plus describeStream's
+// empty:true/false via body asserts on an HTTP response.
+func TestExplain_FixtureBase64AndRunNotes(t *testing.T) {
+	t.Parallel()
+	src := `
+version: "1"
+suite:
+  name: misc
+runners:
+  api: {type: http, base_url: "http://127.0.0.1:8080"}
+scenarios:
+  - name: assorted rendering
+    steps:
+      - fixture:
+          file: blob.bin
+          base64: "aGVsbG8="
+      - run:
+          command: ./slow
+          timeout: 30s
+          env:
+            MODE: fast
+      - http:
+          runner: api
+          method: GET
+          path: /health
+      - assert:
+          body:
+            empty: false
+      - assert:
+          body:
+            empty: true
+`
+	out := mustExplain(t, src)
+	for _, want := range []string{
+		"blob.bin (base64 binary)",
+		"./slow  (timeout 30s, env: MODE)",
+		"body is not empty",
+		"body is empty",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("explain misc missing %q\n--- got ---\n%s", want, out)
+		}
+	}
+}
+
+// TestExplain_TeardownStepKinds covers the teardown branch of explainScenario
+// across every step kind teardown accepts (run, http, query, grpc, cdp, fixture,
+// assert, store, signal) plus the http header `matches` matcher (describeHeader)
+// and a stream YAML matcher (describeStream). A teardown block always runs, so a
+// reviewer must see what external cleanup a spec performs.
+func TestExplain_TeardownStepKinds(t *testing.T) {
+	t.Parallel()
+	src := `
+version: "1"
+suite:
+  name: teardowns
+runners:
+  api: {type: http, base_url: "http://127.0.0.1:8080"}
+  d: {type: db, dsn: "sqlite::memory:"}
+  g: {type: grpc, target: "localhost:50051"}
+  web: {type: browser}
+scenarios:
+  - name: rich teardown
+    services:
+      - name: worker
+        command: ./worker
+        ready: {delay: 10ms}
+    steps:
+      - run: {command: echo go}
+      - assert: {exit_code: 0}
+    teardown:
+      - run: {command: ./cleanup}
+      - http: {runner: api, method: DELETE, path: /session}
+      - assert:
+          header:
+            name: X-Trace
+            matches: "^t-[0-9]+$"
+      - assert:
+          body:
+            yaml:
+              path: $.status
+              equals: done
+      - query: {runner: d, sql: "DELETE FROM tmp"}
+      - grpc: {runner: g, method: pkg.Svc/Cleanup}
+      - cdp:
+          runner: web
+          actions:
+            - navigate: http://localhost:8080/logout
+      - fixture: {file: marker.txt, content: bye}
+      - store:
+          name: final
+          from:
+            stdout:
+              matches: "done-[0-9]+"
+      - signal:
+          service: worker
+          signal: TERM
+`
+	out := mustExplain(t, src)
+	for _, want := range []string{
+		"Teardown (always runs):",
+		"./cleanup",
+		"HTTP DELETE /session",
+		`"X-Trace" matches /^t-[0-9]+$/`,
+		"body YAML $.status",
+		"SQL query via d: DELETE FROM tmp",
+		"gRPC pkg.Svc/Cleanup via g",
+		"CDP via web: navigate http://localhost:8080/logout",
+		"marker.txt (inline content)",
+		"store final",
+		"send SIGTERM to service worker",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("explain teardown missing %q\n--- got ---\n%s", want, out)
+		}
+	}
+}
+
+// TestExplain_FileContains covers describeFile's contains branch (a multi-element
+// contains list renders each quoted element).
+func TestExplain_FileContains(t *testing.T) {
+	t.Parallel()
+	src := `
+version: "1"
+suite:
+  name: edges
+scenarios:
+  - name: file contains
+    steps:
+      - run: {command: ./noop}
+      - assert:
+          file:
+            path: log.txt
+            contains: [started, finished]
+`
+	out := mustExplain(t, src)
+	if want := `file "log.txt" contains "started", "finished"`; !strings.Contains(out, want) {
+		t.Errorf("explain file-contains missing %q\n--- got ---\n%s", want, out)
+	}
+}
+
+// TestExplain_RunStdinVariants covers describeRun's stdin-from-file and
+// binary-stdin (base64) note branches (#…): a reviewer must see where a command's
+// stdin comes from.
+func TestExplain_RunStdinVariants(t *testing.T) {
+	t.Parallel()
+	fileSrc := `
+version: "1"
+suite:
+  name: stdinfile
+scenarios:
+  - name: stdin from file
+    steps:
+      - fixture: {file: in.txt, content: "data"}
+      - run:
+          command: cat
+          stdin:
+            file: in.txt
+      - assert: {exit_code: 0}
+`
+	out := mustExplain(t, fileSrc)
+	if !strings.Contains(out, "stdin from file in.txt") {
+		t.Errorf("explain stdin-file missing\n--- got ---\n%s", out)
+	}
+
+	b64Src := `
+version: "1"
+suite:
+  name: stdinb64
+scenarios:
+  - name: binary stdin
+    steps:
+      - run:
+          command: cat
+          stdin:
+            base64: "aGVsbG8="
+      - assert: {exit_code: 0}
+`
+	out = mustExplain(t, b64Src)
+	if !strings.Contains(out, "binary stdin (base64)") {
+		t.Errorf("explain binary-stdin missing\n--- got ---\n%s", out)
+	}
+}

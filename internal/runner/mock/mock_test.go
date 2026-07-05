@@ -173,3 +173,38 @@ func TestRecords_ThreadSafe(t *testing.T) {
 		t.Errorf("records = %d, want 20", got)
 	}
 }
+
+// TestRequestLog renders the per-request artifact line for a matched and an
+// unmatched request, covering RequestLog and the 404 recording path.
+func TestRequestLog(t *testing.T) {
+	t.Parallel()
+	s := startTest(t, &spec.MockServer{
+		Name: "api",
+		Routes: []spec.MockRoute{
+			{Method: "GET", Path: "/health", Body: "ok"},
+		},
+	}, t.TempDir())
+
+	do(t, http.MethodGet, s.URL()+"/health", nil)
+	do(t, http.MethodPost, s.URL()+"/missing", strings.NewReader("payload"))
+
+	log := s.RequestLog()
+	if !strings.Contains(log, "1: GET /health -> 200") {
+		t.Errorf("RequestLog missing matched line:\n%s", log)
+	}
+	if !strings.Contains(log, "2: POST /missing -> 404") {
+		t.Errorf("RequestLog missing unmatched line:\n%s", log)
+	}
+	if !strings.Contains(log, "7 body bytes") {
+		t.Errorf("RequestLog missing recorded body size:\n%s", log)
+	}
+}
+
+// TestStop_NilSafe covers the nil/zero guards in Stop so a double-stop or a
+// never-started server does not panic.
+func TestStop_NilSafe(t *testing.T) {
+	t.Parallel()
+	var nilServer *Server
+	nilServer.Stop() // must not panic
+	(&Server{}).Stop()
+}
