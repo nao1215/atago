@@ -8,6 +8,8 @@ import (
 	"os"
 	"sort"
 	"strings"
+
+	"github.com/nao1215/atago/internal/buildinfo"
 )
 
 // starterSpec is the default scaffold written by `atago init` (the `cli`
@@ -423,7 +425,11 @@ func initCmd(args []string, stdout, stderr io.Writer) int {
 		return ExitConfig
 	}
 
-	if err := os.WriteFile(path, []byte(tmpl.body), 0o600); err != nil {
+	// Prepend a resolvable schema header so a freshly scaffolded spec gets
+	// editor completion for step types, matchers, and ${...} forms out of the
+	// box — the only delivery path for the DSL reference (#121).
+	body := buildinfo.SchemaHeader() + tmpl.body
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
 		fmt.Fprintf(stderr, "atago init: %v\n", err)
 		return ExitConfig
 	}

@@ -44,6 +44,29 @@ func TestGenerate_Skeleton(t *testing.T) {
 	}
 }
 
+// TestGenerate_EmitsSchemaHeader proves a recorded spec starts with the
+// resolvable yaml-language-server schema header, so `atago record` output gets
+// editor completion for the DSL out of the box, and the spec still loads with
+// the header present (it is an ignored YAML comment) (#121).
+func TestGenerate_EmitsSchemaHeader(t *testing.T) {
+	t.Parallel()
+	out, err := Generate(Observation{
+		Command:  "echo hi",
+		ExitCode: 0,
+		Stdout:   []byte("hi\n"),
+	}, Options{SuiteName: "echo"})
+	if err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+	first, _, _ := strings.Cut(string(out), "\n")
+	if !strings.HasPrefix(first, "# yaml-language-server: $schema=https://") {
+		t.Errorf("first line = %q, want an absolute schema header", first)
+	}
+	if strings.Contains(first, "./schema/") {
+		t.Errorf("schema URL must be absolute, not repo-relative: %q", first)
+	}
+}
+
 // TestGenerate_EscapesVariableReferences proves the round-trip law for
 // observed text containing ${...}: the engine expands ${name} in run.command
 // and assert values at replay (and errors on an unresolved reference in a
