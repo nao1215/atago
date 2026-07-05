@@ -18,6 +18,11 @@ func writeTAP(w io.Writer, results []*engine.SuiteResult) error {
 	total := 0
 	for _, res := range results {
 		total += len(res.Scenarios)
+		// A suite that errored before any scenario ran (#7) still contributes a
+		// failing point, so the plan is never a bare "1..0" for a non-zero exit.
+		if suiteErroredWithoutScenarios(res) {
+			total += len(suiteFailurePoints(res))
+		}
 	}
 	b.WriteString("TAP version 13\n")
 	fmt.Fprintf(&b, "1..%d\n", total)
@@ -48,6 +53,13 @@ func writeTAP(w io.Writer, results []*engine.SuiteResult) error {
 				writeTAPDiagnostic(&b, firstErrorMessage(sc), detailText(sc))
 			default:
 				fmt.Fprintf(&b, "not ok %d - %s\n", n, name)
+			}
+		}
+		if suiteErroredWithoutScenarios(res) {
+			for _, p := range suiteFailurePoints(res) {
+				n++
+				fmt.Fprintf(&b, "not ok %d - %s\n", n, tapDescription(res.Suite, p.name))
+				writeTAPDiagnostic(&b, p.message, p.body)
 			}
 		}
 	}

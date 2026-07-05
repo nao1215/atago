@@ -276,6 +276,134 @@ func TestRender_FlakyIsGreenAcrossFormats(t *testing.T) {
 	})
 }
 
+// suiteSetupErrorEmpty builds a suite that errored in suite.setup (#7) with no
+// scenario rows — the shape the engine produces when suite.setup fails and
+// nothing was selected to run (all scenarios filtered out, or an empty scenario
+// list). exitForSuite maps StatusError to a non-zero code, and console/JSON both
+// show the failure, so no report format may render this as a green suite.
+func suiteSetupErrorEmpty() []*engine.SuiteResult {
+	return []*engine.SuiteResult{{
+		Suite:     "s1",
+		Status:    engine.StatusError,
+		Scenarios: nil,
+		Setup: []engine.StepResult{
+			{Index: 0, Kind: "", Setup: true, ErrMsg: `service "api" not ready: timed out after 5s`},
+		},
+	}}
+}
+
+// TestRender_SuiteSetupErrorEmptyIsNotGreen is a metamorphic parity check: a
+// suite that errored before producing any scenario row exits non-zero, so every
+// report format must surface the failure. Regression: junit reported
+// tests=0/errors=0, tap emitted a bare "1..0" plan, gha emitted no error
+// annotation, and the console verdict read PASSED — each contradicting the
+// non-zero exit code and the JSON "error" status.
+func TestRender_SuiteSetupErrorEmptyIsNotGreen(t *testing.T) {
+	t.Parallel()
+
+	t.Run("junit records an error testcase, not an empty green suite", func(t *testing.T) {
+		t.Parallel()
+		var b bytes.Buffer
+		if err := Render(&b, FormatJUnit, suiteSetupErrorEmpty()); err != nil {
+			t.Fatal(err)
+		}
+		var root junitTestsuites
+		if err := xml.Unmarshal(b.Bytes(), &root); err != nil {
+			t.Fatalf("JUnit output is not valid XML: %v\n%s", err, b.String())
+		}
+		if root.Errors == 0 && root.Failures == 0 {
+			t.Errorf("junit rendered a green suite (errors=%d failures=%d tests=%d) for a setup-errored suite:\n%s",
+				root.Errors, root.Failures, root.Tests, b.String())
+		}
+		if root.Tests == 0 {
+			t.Errorf("junit tests=0 for a setup-errored suite; the failure has no testcase:\n%s", b.String())
+		}
+		if !strings.Contains(b.String(), "not ready") {
+			t.Errorf("junit should carry the setup failure message:\n%s", b.String())
+		}
+	})
+
+	t.Run("tap emits a not-ok point, not a bare 1..0 plan", func(t *testing.T) {
+		t.Parallel()
+		var b bytes.Buffer
+		if err := Render(&b, FormatTAP, suiteSetupErrorEmpty()); err != nil {
+			t.Fatal(err)
+		}
+		out := b.String()
+		if !strings.Contains(out, "not ok") {
+			t.Errorf("tap emitted no failing point for a setup-errored suite:\n%s", out)
+		}
+		if strings.Contains(out, "1..0") {
+			t.Errorf("tap emitted an empty 1..0 plan for a setup-errored suite:\n%s", out)
+		}
+		// The plan count must equal the number of emitted points.
+		points := strings.Count(out, "\nok ") + strings.Count(out, "\nnot ok ")
+		if !strings.Contains(out, "1.."+itoa(points)) {
+			t.Errorf("tap plan does not match the %d emitted points:\n%s", points, out)
+		}
+	})
+
+	t.Run("gha emits an error annotation", func(t *testing.T) {
+		t.Parallel()
+		var b bytes.Buffer
+		if err := Render(&b, FormatGHA, suiteSetupErrorEmpty()); err != nil {
+			t.Fatal(err)
+		}
+		out := b.String()
+		if !strings.Contains(out, "::error") {
+			t.Errorf("gha emitted no error annotation for a setup-errored suite:\n%s", out)
+		}
+	})
+
+	t.Run("console verdict reads FAILED", func(t *testing.T) {
+		t.Parallel()
+		var b bytes.Buffer
+		if err := Render(&b, FormatConsole, suiteSetupErrorEmpty()); err != nil {
+			t.Fatal(err)
+		}
+		out := b.String()
+		// The summary line's verdict word (not the SUITE SETUP FAILED block) must
+		// read FAILED, matching the non-zero exit code.
+		if !strings.Contains(out, "FAILED  0 scenarios") {
+			t.Errorf("console summary verdict read PASSED for a setup-errored suite:\n%s", out)
+		}
+		if strings.Contains(out, "PASSED  0 scenarios") {
+			t.Errorf("console summary verdict must not read PASSED for a setup-errored suite:\n%s", out)
+		}
+		if !strings.Contains(out, "SUITE SETUP FAILED") {
+			t.Errorf("console should show the setup failure block:\n%s", out)
+		}
+	})
+
+	t.Run("json reports an error status with setup_failures", func(t *testing.T) {
+		t.Parallel()
+		var b bytes.Buffer
+		if err := Render(&b, FormatJSON, suiteSetupErrorEmpty()); err != nil {
+			t.Fatal(err)
+		}
+		out := b.String()
+		if !strings.Contains(out, `"status": "error"`) {
+			t.Errorf("json should report the suite status as error:\n%s", out)
+		}
+		if !strings.Contains(out, "setup_failures") {
+			t.Errorf("json should carry setup_failures:\n%s", out)
+		}
+	})
+}
+
+// itoa avoids the strconv import churn for the small counts this test uses.
+func itoa(n int) string {
+	if n == 0 {
+		return "0"
+	}
+	var b []byte
+	for n > 0 {
+		b = append([]byte{byte('0' + n%10)}, b...)
+		n /= 10
+	}
+	return string(b)
+}
+
 func TestProgress_Markers(t *testing.T) {
 	t.Parallel()
 	var b bytes.Buffer
