@@ -9,6 +9,13 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- A `query`/`db` step whose SELECT is preceded by a SQL comment (a `-- ...` line
+  or a `/* ... */` block) no longer misroutes to ExecContext and returns no rows.
+  The statement classifier read the leading verb without stripping comments, so a
+  commented SELECT looked like a non-row statement and its result set was lost.
+  Comments outside string literals are now stripped before classification; a
+  comment marker inside a quoted value is still treated as data.
+
 - `atago record` no longer generates a spec that cannot replay when the observed
   command or output carries a `${` not followed by a valid variable name (a tool
   that prints `${1}`, `${}`, or `${ }`). The recorder escaped every `${` to

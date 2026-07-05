@@ -129,6 +129,44 @@ func TestRunner_Query_ModifyingCTE(t *testing.T) {
 	}
 }
 
+// TestRunner_Query_CommentedSelect is a regression: a SELECT preceded by a SQL
+// comment must still route through QueryContext and return its rows. A leading
+// comment hid the SELECT verb, misrouting the statement to ExecContext, which
+// returns no rows — so the row assertion saw nothing.
+func TestRunner_Query_CommentedSelect(t *testing.T) {
+	t.Parallel()
+	cfg, err := Resolve("", "sqlite::memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, err := Open(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = r.Close() }()
+
+	ctx := context.Background()
+	if _, err := r.Query(ctx, "CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT)"); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if _, err := r.Query(ctx, "INSERT INTO t (name) VALUES ('alice')"); err != nil {
+		t.Fatalf("insert: %v", err)
+	}
+
+	for _, q := range []string{
+		"-- fetch the row\nSELECT id, name FROM t",
+		"/* preamble */ SELECT id, name FROM t",
+	} {
+		sel, err := r.Query(ctx, q)
+		if err != nil {
+			t.Fatalf("query %q: %v", q, err)
+		}
+		if !strings.Contains(string(sel.RowsJSON), `"name":"alice"`) {
+			t.Errorf("commented SELECT %q returned no rows: RowsJSON=%q (misrouted to Exec?)", q, sel.RowsJSON)
+		}
+	}
+}
+
 func TestRunner_Query_SyntaxError(t *testing.T) {
 	t.Parallel()
 	cfg, _ := Resolve("", "sqlite::memory:")
@@ -163,6 +201,17 @@ func TestIsRowReturning(t *testing.T) {
 		"INSERT INTO logs (msg) VALUES ('order RETURNING to sender')":    false,
 		"UPDATE t SET note = 'see RETURNING policy' WHERE id = 1":        false,
 		"WITH x AS (SELECT 1) INSERT INTO logs VALUES ('a RETURNING b')": false,
+		// A leading or embedded SQL comment must not hide the main verb: a
+		// commented SELECT was misrouted to Exec, losing its rows.
+		"-- fetch users\nSELECT 1":              true,
+		"/* preamble */ SELECT 1":               true,
+		"SELECT/* inline */1":                   true,
+		"-- note\nINSERT INTO t VALUES (1)":     false,
+		"/* c */ WITH x AS (SELECT 1) SELECT 1": true,
+		// A comment marker inside a string literal is data, not a comment: it must
+		// not be stripped, and the statement still routes to Exec.
+		"INSERT INTO logs (msg) VALUES ('a -- b')": false,
+		"INSERT INTO logs (msg) VALUES ('a /* b')": false,
 	}
 	for q, want := range cases {
 		if got := isRowReturning(q); got != want {
