@@ -1,10 +1,12 @@
 package record
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
 
+	"github.com/nao1215/atago/internal/engine"
 	"github.com/nao1215/atago/internal/loader"
 )
 
@@ -181,6 +183,50 @@ func TestGenerate_ControlBytesRoundTrip(t *testing.T) {
 		Stdout:   []byte("ab\n"),
 	}, Options{SuiteName: "demo"}); err != nil {
 		t.Errorf("Generate(multi-line command) failed: %v", err)
+	}
+}
+
+// TestGenerate_RecordRunRoundTrip is the metamorphic law for record (#30): a
+// spec generated from an observed run must itself replay green. The other tests
+// check the generated text and that it loads; this replays the generated spec
+// through the real engine against the same command and asserts it passes. The
+// dollar-brace-digit case is the regression: a tool whose output carries a ${
+// not followed by a valid name (${1}) produced a contains matcher that could
+// never match, because the escape blindly wrote ${1} as $${1} but the expander
+// only restores $${<valid-name>}.
+func TestGenerate_RecordRunRoundTrip(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name string
+		obs  Observation
+	}{
+		{"plain echo", Observation{Command: "echo hello", ExitCode: 0, Stdout: []byte("hello\n")}},
+		{"nonzero exit", Observation{Command: "false", ExitCode: 1}},
+		{"shell pipe", Observation{Command: "echo abc | grep b", Shell: true, ExitCode: 0, Stdout: []byte("abc\n")}},
+		{"literal valid var ref", Observation{Command: "echo ${x}", ExitCode: 0, Stdout: []byte("${x}\n")}},
+		{"tab output", Observation{Command: `printf 'a\tb\n'`, Shell: true, ExitCode: 0, Stdout: []byte("a\tb\n")}},
+		{"leading whitespace line", Observation{Command: `printf '   indented\n'`, Shell: true, ExitCode: 0, Stdout: []byte("   indented\n")}},
+		{"hash in output", Observation{Command: "echo '# not a comment'", Shell: true, ExitCode: 0, Stdout: []byte("# not a comment\n")}},
+		// The command text has no ${ of its own, so the observed ${1} is
+		// independent of it — the escape must still leave a matcher that replays.
+		{"dollar-brace-digit output", Observation{Command: "printf '$'; printf '{1}\\n'", Shell: true, ExitCode: 0, Stdout: []byte("${1}\n")}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			out, err := Generate(tc.obs, Options{SuiteName: "rt"})
+			if err != nil {
+				t.Fatalf("Generate: %v", err)
+			}
+			s, err := loader.LoadBytes("rt.atago.yaml", out)
+			if err != nil {
+				t.Fatalf("load generated: %v\n%s", err, out)
+			}
+			res := engine.New().Run(context.Background(), s, "rt.atago.yaml")
+			if res.Status != engine.StatusPassed {
+				t.Errorf("recorded spec did not replay green: status=%s\n--- spec ---\n%s", res.Status, out)
+			}
+		})
 	}
 }
 

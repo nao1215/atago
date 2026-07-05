@@ -9,6 +9,14 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- `atago record` no longer generates a spec that cannot replay when the observed
+  command or output carries a `${` not followed by a valid variable name (a tool
+  that prints `${1}`, `${}`, or `${ }`). The recorder escaped every `${` to
+  `$${` unconditionally, but the replay expander only restores `$${<valid-name>}`
+  — so `$${1}` stayed literal and the generated `contains`/`command`/file-path
+  matcher could never match the real `${1}`. Escaping now mirrors the expander
+  exactly (only genuine references are escaped), so the recorded spec replays
+  green. The same fix covers `atago record --pty` transcripts and sends.
 - A `grpc` step against a hung server no longer passes as a normal
   `Result{grpc_status: 4}` when its per-call timeout fires. The timeout was
   detected only through `ctx.Err()`, which a server enforcing the propagated

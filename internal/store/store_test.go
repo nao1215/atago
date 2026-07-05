@@ -1,6 +1,10 @@
 package store
 
-import "testing"
+import (
+	"math/rand"
+	"testing"
+	"testing/quick"
+)
 
 func TestGet(t *testing.T) {
 	t.Parallel()
@@ -83,6 +87,57 @@ func TestExpandMap(t *testing.T) {
 	out := s.ExpandMap(map[string]string{"GOBIN": "${dir}/bin"})
 	if out["GOBIN"] != "/tmp/x/bin" {
 		t.Errorf("GOBIN = %q, want /tmp/x/bin", out["GOBIN"])
+	}
+}
+
+// TestEscapeExpandRoundTrip proves store.Escape is the exact inverse of Expand:
+// Expand(Escape(x)) == x for any observed text. record relies on this to embed a
+// raw recorded command/output/pty-send in a spec without it being re-expanded at
+// replay. A blind ${→$${ rewrite broke it for a ${ not followed by a valid name
+// (e.g. a tool that prints ${1}): the expander only unescapes $${<valid-name>},
+// so $${1} never round-tripped back to ${1}.
+func TestEscapeExpandRoundTrip(t *testing.T) {
+	t.Parallel()
+	s := New()
+	s.Set("name", "Alice")
+	s.Set("user_id", "42")
+	cases := []string{
+		"plain text with no refs",
+		"live ${name} reference",
+		"unknown ${missing} reference",
+		"${user_id} and ${name} together",
+		"already escaped $${name}",
+		"double escaped $$${user_id}",
+		"digit name ${1}",
+		"leading-digit name ${9zzz}",
+		"empty name ${}",
+		"space in name ${ x}",
+		"unclosed ${name",
+		"env ref ${env:PATH}",
+		"bare pid $$ and price $$5",
+		"adjacent ${name}${user_id}",
+		"mixed ${name}/${1}/$${user_id}/${}",
+		"dollar-brace-digit output val=${1} end",
+	}
+	for _, in := range cases {
+		if got := s.Expand(Escape(in)); got != in {
+			t.Errorf("Expand(Escape(%q)) = %q, want %q (round-trip broken)", in, got, in)
+		}
+	}
+}
+
+// TestEscapeExpandRoundTrip_Quick fuzzes the same inverse law over random inputs
+// with a fixed seed, so a future change to the reference grammar that breaks the
+// escape/expand symmetry is caught.
+func TestEscapeExpandRoundTrip_Quick(t *testing.T) {
+	t.Parallel()
+	s := New()
+	s.Set("a", "X")
+	s.Set("name", "Alice")
+	roundTrips := func(in string) bool { return s.Expand(Escape(in)) == in }
+	cfg := &quick.Config{Rand: rand.New(rand.NewSource(1)), MaxCount: 3000}
+	if err := quick.Check(roundTrips, cfg); err != nil {
+		t.Errorf("escape/expand round-trip law broken: %v", err)
 	}
 }
 

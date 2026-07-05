@@ -10,6 +10,7 @@ import (
 
 	"github.com/goccy/go-yaml"
 	"github.com/nao1215/atago/internal/loader"
+	"github.com/nao1215/atago/internal/store"
 )
 
 // maxFileAsserts caps the generated file.exists asserts so a command that
@@ -102,16 +103,18 @@ func Generate(obs Observation, opts Options) ([]byte, error) {
 	return out, nil
 }
 
-// escapeVarRefs rewrites every "${" in observed text as the documented "$${"
-// literal escape. Recorded commands, output anchors, file paths, and typed
-// pty input are RAW text — any ${...} in them is literal — but the engine
-// expands ${name} in run.command, assert values, and pty sends at replay (and
-// rejects an unresolved reference in a no-shell command), so an unescaped
-// reference would make the generated spec diverge from, or fail to replay,
-// the recorded run. The uniform rewrite round-trips: the expander turns
-// "$${" back into the literal "${" the tool actually saw.
+// escapeVarRefs escapes the variable references in observed text so the
+// generated spec replays it verbatim. Recorded commands, output anchors, file
+// paths, and typed pty input are RAW text — any ${...} in them is literal — but
+// the engine expands ${name} in run.command, assert values, and pty sends at
+// replay (and rejects an unresolved reference in a no-shell command), so an
+// unescaped reference would make the generated spec diverge from, or fail to
+// replay, the recorded run. store.Escape is the exact inverse of the expander:
+// it escapes only what the expander would act on, so a ${ not followed by a
+// valid name (e.g. a tool that prints ${1}) is left alone rather than turned
+// into a $${1} that the expander never restores and that could never match.
 func escapeVarRefs(s string) string {
-	return strings.ReplaceAll(s, "${", "$${")
+	return store.Escape(s)
 }
 
 // firstLine returns the first non-empty line, trimmed.
