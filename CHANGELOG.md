@@ -18,6 +18,10 @@ and this project follows [Semantic Versioning](https://semver.org/).
   A call is now treated as a timeout whenever the per-call deadline has already
   elapsed, closing the race; a live deadline still records a real status as a
   Result. This also fixes a flaky `TestInvoke_CallTimeoutIsError` on CI.
+- Loading an empty spec file (empty, whitespace-only, or comments only) now
+  reports `spec is empty: expected a YAML document with version, suite, and
+  scenarios` instead of the bare decoder `EOF`, which named neither the file's
+  problem nor what a spec needs.
 - A suite that fails in `suite.setup` with no scenario selected to run (every
   scenario filtered out by `--filter`/`--tag`, or an empty scenario list) is no
   longer rendered as a green, empty result by the junit, tap, and gha reports,
