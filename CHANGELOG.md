@@ -7,6 +7,15 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- `defaults.run.timeout` now bounds `http`, `query`, and `grpc` steps, not just
+  `run` steps. The precedence chain (step > runner > defaults.run > suite >
+  built-in 60s) documents these steps as members, but the http and connection
+  config builders passed an empty defaults.run level, so a spec relying on
+  `defaults.run.timeout` to bound a slow request or query silently fell through
+  to `suite.timeout` or the 60s default.
+
 ## [0.3.2] - 2026-07-05
 
 A bug-fix release hardening the runners and the reporters. No new features.

@@ -18,9 +18,10 @@ import (
 // wantType is the required runner.Type; open builds and opens the typed
 // connection from the runner definition and its parsed timeout. defaultBounded
 // opts the runner family into the step-timeout precedence chain (#17): query
-// and grpc steps fall back to suite.timeout and the built-in 60s default when
-// the runner declares no timeout, while ssh and browser keep their historical
-// "empty means unbounded" behavior (their long-lived sessions are not steps).
+// and grpc steps fall back to defaults.run.timeout, then suite.timeout, then the
+// built-in 60s default when the runner declares no timeout, while ssh and
+// browser keep their historical "empty means unbounded" behavior (their
+// long-lived sessions are not steps).
 func resolveConn[T io.Closer](
 	name, stepVerb, wantType string,
 	rc runConfig,
@@ -41,7 +42,7 @@ func resolveConn[T io.Closer](
 	}
 	timeoutStr := rdef.Timeout
 	if defaultBounded {
-		timeoutStr, _ = resolveTimeout("", rdef.Timeout, "", rc.suiteTimeout)
+		timeoutStr, _ = resolveTimeout("", rdef.Timeout, rc.defaultsRunTimeout, rc.suiteTimeout)
 	}
 	var timeout time.Duration
 	if timeoutStr != "" {

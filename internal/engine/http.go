@@ -96,8 +96,9 @@ func resolveHTTPConfig(h *spec.HTTP, st *store.Store, rc runConfig) (httprunner.
 		runnerTimeout = r.Timeout
 	}
 	// http requests join the step-timeout precedence chain (#17): runner
-	// timeout > suite.timeout > built-in 60s ("0" disables).
-	timeoutStr, _ := resolveTimeout("", runnerTimeout, "", rc.suiteTimeout)
+	// timeout > defaults.run.timeout > suite.timeout > built-in 60s ("0"
+	// disables). An http step has no step-level timeout of its own.
+	timeoutStr, _ := resolveTimeout("", runnerTimeout, rc.defaultsRunTimeout, rc.suiteTimeout)
 	d, err := time.ParseDuration(timeoutStr)
 	if err != nil {
 		return cfg, fmt.Errorf("runner %q has invalid timeout %q: %w", h.Runner, timeoutStr, err)
