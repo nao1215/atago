@@ -27,10 +27,7 @@ func buildScenario(sc *spec.Scenario, src SourceLocator) Scenario {
 	for i := range sc.Services {
 		svc := &sc.Services[i]
 		out.Services = append(out.Services, buildService(svc))
-		spec.CollectVars(vars, svc.Command, svc.Cwd)
-		for _, v := range svc.Env {
-			spec.CollectVars(vars, v)
-		}
+		spec.CollectServiceVars(vars, svc)
 	}
 	for i := range sc.MockServers {
 		out.MockServers = append(out.MockServers, MockServer{Name: sc.MockServers[i].Name, Routes: len(sc.MockServers[i].Routes)})
@@ -82,11 +79,11 @@ func buildService(svc *spec.Service) Service {
 // notes are derived separately from the shared spec model (#56).
 func buildStep(index int, step *spec.Step, vars map[string]bool) Step {
 	st := Step{Index: index, Kind: string(step.Kind())}
+	spec.CollectStepVars(vars, step)
 	switch step.Kind() {
 	case spec.StepFixture:
 		st.File = step.Fixture.File
 		st.Action = "write fixture " + step.Fixture.File
-		spec.CollectVars(vars, step.Fixture.File, step.Fixture.Content, step.Fixture.Symlink)
 
 	case spec.StepService:
 		svc := step.Service
@@ -96,7 +93,6 @@ func buildStep(index int, step *spec.Step, vars map[string]bool) Step {
 		st.PassEnv = svc.PassEnv
 		st.Target = svc.Name
 		st.Action = "start suite service " + svc.Name
-		spec.CollectVars(vars, svc.Command, svc.Cwd)
 
 	case spec.StepRun:
 		r := step.Run
@@ -109,10 +105,6 @@ func buildStep(index int, step *spec.Step, vars map[string]bool) Step {
 		if r.Retry != nil {
 			st.Retry = &Retry{Times: r.Retry.Times, Interval: r.Retry.Interval}
 		}
-		spec.CollectVars(vars, r.Command, r.Cwd, r.Stdin.Inline, r.Stdin.File)
-		for _, v := range r.Env {
-			spec.CollectVars(vars, v)
-		}
 
 	case spec.StepHTTP:
 		h := step.HTTP
@@ -123,58 +115,23 @@ func buildStep(index int, step *spec.Step, vars map[string]bool) Step {
 		if h.Retry != nil {
 			st.Retry = &Retry{Times: h.Retry.Times, Interval: h.Retry.Interval}
 		}
-		spec.CollectVars(vars, h.Path)
-		spec.CollectVars(vars, h.Body)
-		spec.CollectVars(vars, h.BodyFile, h.BodyTo)
-		for _, v := range h.Form {
-			spec.CollectVars(vars, v)
-		}
-		for _, f := range h.Files {
-			spec.CollectVars(vars, f.Path)
-		}
 
 	case spec.StepQuery:
 		q := step.Query
 		st.SQL = q.SQL
 		st.Runner = q.Runner
 		st.Action = "SQL query via " + q.Runner
-		spec.CollectVars(vars, q.SQL)
 
 	case spec.StepGRPC:
 		g := step.GRPC
 		st.Method = g.Method
 		st.Runner = g.Runner
 		st.Action = "gRPC " + g.Method + " via " + g.Runner
-		spec.CollectVars(vars, g.Method)
 
 	case spec.StepCDP:
 		c := step.CDP
 		st.Runner = c.Runner
 		st.Action = spec.CDPActionSummary(c)
-		for _, a := range c.Actions {
-			spec.CollectVars(vars, a.Navigate, a.WaitVisible, a.WaitHidden, a.Click, a.Check, a.Uncheck, a.Text, a.Eval)
-			if a.SendKeys != nil {
-				spec.CollectVars(vars, a.SendKeys.Selector, a.SendKeys.Value)
-			}
-			if a.Press != nil {
-				spec.CollectVars(vars, a.Press.Selector, a.Press.Key)
-			}
-			if a.Select != nil {
-				spec.CollectVars(vars, a.Select.Selector, a.Select.Value)
-			}
-			if a.Screenshot != nil {
-				spec.CollectVars(vars, a.Screenshot.Path, a.Screenshot.Selector)
-			}
-			if a.Attribute != nil {
-				spec.CollectVars(vars, a.Attribute.Selector, a.Attribute.Name)
-			}
-			if a.Upload != nil {
-				spec.CollectVars(vars, a.Upload.Selector, a.Upload.File)
-			}
-			if a.Download != nil {
-				spec.CollectVars(vars, a.Download.Click, a.Download.Dir)
-			}
-		}
 
 	case spec.StepMockServer:
 		ms := step.MockServer
@@ -192,7 +149,6 @@ func buildStep(index int, step *spec.Step, vars map[string]bool) Step {
 			}
 			st.Action += ", wait up to " + timeout + " for exit"
 		}
-		spec.CollectVars(vars, sg.Service)
 
 	case spec.StepPTY:
 		pt := step.PTY
@@ -201,16 +157,6 @@ func buildStep(index int, step *spec.Step, vars map[string]bool) Step {
 		st.ClearEnv = pt.ClearEnvEnabled()
 		st.PassEnv = pt.PassEnv
 		st.Action = "interactive (pty) " + pt.Command
-		spec.CollectVars(vars, pt.Command, pt.Cwd)
-		for _, v := range pt.Env {
-			spec.CollectVars(vars, v)
-		}
-		for _, a := range pt.Session {
-			if a.Send != nil && a.Send.Text != nil {
-				spec.CollectVars(vars, *a.Send.Text)
-			}
-			spec.CollectVars(vars, a.Expect)
-		}
 
 	case spec.StepAssert:
 		st.Target = assertTarget(step.Assert)

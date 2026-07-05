@@ -94,7 +94,7 @@ func explainScenario(b *strings.Builder, sc *spec.Scenario) {
 	for i := range sc.Services {
 		svc := &sc.Services[i]
 		services = append(services, describeService(svc))
-		spec.CollectVars(vars, svc.Command, svc.Cwd)
+		spec.CollectServiceVars(vars, svc)
 		if svc.Ready != nil && svc.Ready.Store != "" {
 			stores = append(stores, svc.Ready.Store)
 		}
@@ -105,13 +105,15 @@ func explainScenario(b *strings.Builder, sc *spec.Scenario) {
 
 	for i := range sc.Steps {
 		step := &sc.Steps[i]
+		// Variable references are collected by the shared spec walk so explain and
+		// manifest never disagree about which ${name}s a step uses; the switch
+		// below only formats the human-facing summary lines.
+		spec.CollectStepVars(vars, step)
 		switch step.Kind() {
 		case spec.StepFixture:
 			fixtures = append(fixtures, describeFixture(step.Fixture))
-			spec.CollectVars(vars, step.Fixture.File, step.Fixture.Content)
 		case spec.StepRun:
 			commands = append(commands, describeRun(step.Run))
-			spec.CollectVars(vars, step.Run.Command, step.Run.Cwd, step.Run.Stdin.Inline, step.Run.Stdin.File)
 		case spec.StepAssert:
 			expects = append(expects, describeAsserts(step.Assert)...)
 		case spec.StepStore:
@@ -121,18 +123,14 @@ func explainScenario(b *strings.Builder, sc *spec.Scenario) {
 		case spec.StepHTTP:
 			if step.HTTP != nil {
 				commands = append(commands, fmt.Sprintf("HTTP %s %s", step.HTTP.Method, step.HTTP.Path))
-				spec.CollectVars(vars, step.HTTP.Path)
-				spec.CollectVars(vars, step.HTTP.Body)
 			}
 		case spec.StepQuery:
 			if step.Query != nil {
 				commands = append(commands, fmt.Sprintf("SQL query via %s: %s", step.Query.Runner, step.Query.SQL))
-				spec.CollectVars(vars, step.Query.SQL)
 			}
 		case spec.StepGRPC:
 			if step.GRPC != nil {
 				commands = append(commands, fmt.Sprintf("gRPC %s via %s", step.GRPC.Method, step.GRPC.Runner))
-				spec.CollectVars(vars, step.GRPC.Method)
 			}
 		case spec.StepPTY:
 			if step.PTY != nil {
@@ -148,20 +146,10 @@ func explainScenario(b *strings.Builder, sc *spec.Scenario) {
 					desc += "  (isolated home)"
 				}
 				commands = append(commands, desc)
-				spec.CollectVars(vars, step.PTY.Command, step.PTY.Cwd)
-				for _, v := range step.PTY.Env {
-					spec.CollectVars(vars, v)
-				}
 				var keys []string
 				for _, a := range step.PTY.Session {
-					spec.CollectVars(vars, a.Expect)
-					if a.Send != nil {
-						if a.Send.Text != nil {
-							spec.CollectVars(vars, *a.Send.Text)
-						}
-						if a.Send.Key != "" {
-							keys = append(keys, a.Send.Key)
-						}
+					if a.Send != nil && a.Send.Key != "" {
+						keys = append(keys, a.Send.Key)
 					}
 				}
 				if len(keys) > 0 {
@@ -171,29 +159,10 @@ func explainScenario(b *strings.Builder, sc *spec.Scenario) {
 		case spec.StepCDP:
 			if step.CDP != nil {
 				commands = append(commands, spec.CDPActionSummary(step.CDP))
-				for _, a := range step.CDP.Actions {
-					spec.CollectVars(vars, a.Navigate, a.WaitVisible, a.WaitHidden, a.Click, a.Check, a.Uncheck, a.Text, a.Eval)
-					if a.SendKeys != nil {
-						spec.CollectVars(vars, a.SendKeys.Selector, a.SendKeys.Value)
-					}
-					if a.Press != nil {
-						spec.CollectVars(vars, a.Press.Selector, a.Press.Key)
-					}
-					if a.Select != nil {
-						spec.CollectVars(vars, a.Select.Selector, a.Select.Value)
-					}
-					if a.Screenshot != nil {
-						spec.CollectVars(vars, a.Screenshot.Path, a.Screenshot.Selector)
-					}
-					if a.Attribute != nil {
-						spec.CollectVars(vars, a.Attribute.Selector, a.Attribute.Name)
-					}
-				}
 			}
 		case spec.StepSignal:
 			if step.Signal != nil {
 				commands = append(commands, describeSignal(step.Signal))
-				spec.CollectVars(vars, step.Signal.Service)
 			}
 		}
 	}
@@ -203,19 +172,16 @@ func explainScenario(b *strings.Builder, sc *spec.Scenario) {
 	var teardown []string
 	for i := range sc.Teardown {
 		step := &sc.Teardown[i]
+		spec.CollectStepVars(vars, step)
 		switch step.Kind() {
 		case spec.StepRun:
 			teardown = append(teardown, describeRun(step.Run))
-			spec.CollectVars(vars, step.Run.Command, step.Run.Cwd, step.Run.Stdin.Inline, step.Run.Stdin.File)
 		case spec.StepHTTP:
 			teardown = append(teardown, fmt.Sprintf("HTTP %s %s", step.HTTP.Method, step.HTTP.Path))
-			spec.CollectVars(vars, step.HTTP.Path, step.HTTP.Body)
 		case spec.StepQuery:
 			teardown = append(teardown, fmt.Sprintf("SQL query via %s: %s", step.Query.Runner, step.Query.SQL))
-			spec.CollectVars(vars, step.Query.SQL)
 		case spec.StepGRPC:
 			teardown = append(teardown, fmt.Sprintf("gRPC %s via %s", step.GRPC.Method, step.GRPC.Runner))
-			spec.CollectVars(vars, step.GRPC.Method)
 		case spec.StepCDP:
 			teardown = append(teardown, spec.CDPActionSummary(step.CDP))
 		case spec.StepFixture:
@@ -226,7 +192,6 @@ func explainScenario(b *strings.Builder, sc *spec.Scenario) {
 			teardown = append(teardown, "store "+step.Store.Name)
 		case spec.StepSignal:
 			teardown = append(teardown, describeSignal(step.Signal))
-			spec.CollectVars(vars, step.Signal.Service)
 		}
 	}
 

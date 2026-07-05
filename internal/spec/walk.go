@@ -46,6 +46,94 @@ func CollectVars(set map[string]bool, fields ...string) {
 	}
 }
 
+// CollectServiceVars folds every ${name} reference in a service's fields
+// (command, cwd, env values) into set. Shared by explain and manifest so their
+// "variables used" summaries agree on a scenario's services.
+func CollectServiceVars(set map[string]bool, svc *Service) {
+	CollectVars(set, svc.Command, svc.Cwd)
+	for _, v := range svc.Env {
+		CollectVars(set, v)
+	}
+}
+
+// CollectStepVars folds every ${name} reference in a step's fields into set.
+// It is the single source of truth for which fields of each step kind carry
+// variables, so the explain summary and the manifest never disagree about a
+// step's referenced variables (they previously drifted: explain under-reported
+// run env, http body_file/body_to/form/files, and cdp upload/download).
+func CollectStepVars(set map[string]bool, step *Step) {
+	switch step.Kind() {
+	case StepFixture:
+		CollectVars(set, step.Fixture.File, step.Fixture.Content, step.Fixture.Symlink)
+	case StepService:
+		CollectVars(set, step.Service.Command, step.Service.Cwd)
+	case StepRun:
+		r := step.Run
+		CollectVars(set, r.Command, r.Cwd, r.Stdin.Inline, r.Stdin.File)
+		for _, v := range r.Env {
+			CollectVars(set, v)
+		}
+	case StepHTTP:
+		h := step.HTTP
+		CollectVars(set, h.Path, h.Body, h.BodyFile, h.BodyTo)
+		for _, v := range h.Form {
+			CollectVars(set, v)
+		}
+		for _, f := range h.Files {
+			CollectVars(set, f.Path)
+		}
+	case StepQuery:
+		CollectVars(set, step.Query.SQL)
+	case StepGRPC:
+		CollectVars(set, step.GRPC.Method)
+	case StepCDP:
+		for _, a := range step.CDP.Actions {
+			collectCDPActionVars(set, a)
+		}
+	case StepPTY:
+		pt := step.PTY
+		CollectVars(set, pt.Command, pt.Cwd)
+		for _, v := range pt.Env {
+			CollectVars(set, v)
+		}
+		for _, a := range pt.Session {
+			if a.Send != nil && a.Send.Text != nil {
+				CollectVars(set, *a.Send.Text)
+			}
+			CollectVars(set, a.Expect)
+		}
+	case StepSignal:
+		CollectVars(set, step.Signal.Service)
+	}
+}
+
+// collectCDPActionVars folds the ${name} references of one browser action into
+// set, covering every field the action set can carry.
+func collectCDPActionVars(set map[string]bool, a CDPAction) {
+	CollectVars(set, a.Navigate, a.WaitVisible, a.WaitHidden, a.Click, a.Check, a.Uncheck, a.Text, a.Eval)
+	if a.SendKeys != nil {
+		CollectVars(set, a.SendKeys.Selector, a.SendKeys.Value)
+	}
+	if a.Press != nil {
+		CollectVars(set, a.Press.Selector, a.Press.Key)
+	}
+	if a.Select != nil {
+		CollectVars(set, a.Select.Selector, a.Select.Value)
+	}
+	if a.Screenshot != nil {
+		CollectVars(set, a.Screenshot.Path, a.Screenshot.Selector)
+	}
+	if a.Attribute != nil {
+		CollectVars(set, a.Attribute.Selector, a.Attribute.Name)
+	}
+	if a.Upload != nil {
+		CollectVars(set, a.Upload.Selector, a.Upload.File)
+	}
+	if a.Download != nil {
+		CollectVars(set, a.Download.Click, a.Download.Dir)
+	}
+}
+
 // WalkAssertStrings returns a deep copy of a in which visit has been applied to
 // every interpolatable (${name}) string field — the single field list the
 // engine's expansion needs (issue #23). Pass a substituting visit (e.g.

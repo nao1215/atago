@@ -501,3 +501,67 @@ func mustExplain(t *testing.T, src string) string {
 	}
 	return b.String()
 }
+
+// TestExplain_CollectsAllVariableBearingFields is a regression test for a bug
+// where the explain "Variables used" summary under-reported ${name} references:
+// it scanned only http path/body and part of the cdp action set, missing run
+// env, http body_file/body_to/form/files, and cdp upload/download (the manifest
+// already scanned them). explain and manifest now share spec.CollectStepVars,
+// so every variable-bearing field is counted. Each variable below is referenced
+// only from a field the old code skipped, so a miss regresses the fix.
+func TestExplain_CollectsAllVariableBearingFields(t *testing.T) {
+	t.Parallel()
+	src := `
+version: "1"
+suite:
+  name: vars
+runners:
+  api:
+    type: http
+    base_url: http://localhost:9999
+  web:
+    type: browser
+scenarios:
+  - name: exercises previously-unscanned variable-bearing fields
+    steps:
+      - run:
+          shell: true
+          command: echo hi
+          env:
+            TOKEN: "${runenv_ref}"
+      - http:
+          runner: api
+          method: PUT
+          path: /put
+          body_file: "${bodyfile_ref}"
+          body_to: "${bodyto_ref}"
+      - http:
+          runner: api
+          method: POST
+          path: /form
+          form:
+            field1: "${form_ref}"
+          files:
+            - field: upload
+              path: "${files_ref}"
+      - cdp:
+          runner: web
+          actions:
+            - navigate: http://localhost
+            - upload:
+                selector: "#file"
+                file: "${upload_ref}"
+            - download:
+                click: "#dl"
+                dir: "${download_ref}"
+`
+	out := mustExplain(t, src)
+	for _, v := range []string{
+		"runenv_ref", "bodyfile_ref", "bodyto_ref",
+		"form_ref", "files_ref", "upload_ref", "download_ref",
+	} {
+		if !strings.Contains(out, v) {
+			t.Errorf("explain output missing variable %q from a previously-unscanned field\n--- got ---\n%s", v, out)
+		}
+	}
+}
