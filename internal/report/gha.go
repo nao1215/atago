@@ -65,11 +65,14 @@ func oneLine(s string) string {
 }
 
 // ghaEscapeData escapes a workflow-command message body per the GitHub spec.
+// Beyond the required %/CR/LF encoding it folds any other raw control byte from
+// captured output (an ANSI escape, a bell) to U+FFFD, so an annotation never
+// carries a byte the Actions UI would mangle.
 func ghaEscapeData(s string) string {
 	s = strings.ReplaceAll(s, "%", "%25")
 	s = strings.ReplaceAll(s, "\r", "%0D")
 	s = strings.ReplaceAll(s, "\n", "%0A")
-	return s
+	return sanitizeControlBytes(s)
 }
 
 // ghaEscapeProp escapes a workflow-command property value (stricter than data).

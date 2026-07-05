@@ -8,6 +8,27 @@ import (
 	"github.com/nao1215/atago/internal/engine"
 )
 
+// sanitizeControlBytes replaces control characters a machine-readable report
+// cannot carry verbatim with the Unicode replacement rune, matching what the
+// XML encoder already does for junit. A TAP 13 diagnostic is a YAML block and a
+// GitHub Actions annotation is a single line; both reject raw C0/C1 control
+// bytes, so a captured ANSI escape, bell, or DEL byte in a command's output
+// would otherwise make the surrounding document malformed. Tab and newline are
+// structural and kept; invalid UTF-8 is folded to the replacement rune too,
+// since a YAML stream must be valid UTF-8.
+func sanitizeControlBytes(s string) string {
+	s = strings.ToValidUTF8(s, "�")
+	return strings.Map(func(r rune) rune {
+		if r == '\t' || r == '\n' {
+			return r
+		}
+		if r < 0x20 || r == 0x7f || (r >= 0x80 && r <= 0x9f) {
+			return '�'
+		}
+		return r
+	}, s)
+}
+
 // suiteErroredWithoutScenarios reports a suite that failed or errored before it
 // produced any scenario row: a suite.setup failure (#7) with nothing selected to
 // run (all scenarios filtered out, or an empty scenario list), or a

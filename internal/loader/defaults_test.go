@@ -606,6 +606,8 @@ scenarios:
 		{"empty interval", step("{gt: 2s, lt: 1s}"), "empty interval"},
 		{"touching strict", step("{gt: 1s, lt: 1s}"), "empty interval"},
 		{"bad duration", step("{lt: soon}"), "not a valid duration"},
+		{"negative lower bound", step("{gt: -1s}"), "must not be negative"},
+		{"negative upper bound", step("{lt: -5ms}"), "must not be negative"},
 		{"valid interval loads", step("{gte: 100ms, lt: 60s}"), ""},
 		{"inclusive point loads", step("{gte: 1s, lte: 1s}"), ""},
 		{

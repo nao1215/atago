@@ -114,14 +114,10 @@ func validateStream(add func(string, ...any), where string, s *spec.StreamAssert
 			validateJSON(add, where+".yaml", s.YAML)
 		}
 		if s.Matches != nil {
-			if _, err := regexp.Compile(*s.Matches); err != nil {
-				add("%s.matches %q is not a valid regexp: %v", where, *s.Matches, err)
-			}
+			validateRegexp(add, where, "matches", *s.Matches)
 		}
 		if s.NotMatches != nil {
-			if _, err := regexp.Compile(*s.NotMatches); err != nil {
-				add("%s.not_matches %q is not a valid regexp: %v", where, *s.NotMatches, err)
-			}
+			validateRegexp(add, where, "not_matches", *s.NotMatches)
 		}
 	default:
 		add("%s: must set exactly one matcher, but set %v", where, matchers)
@@ -187,9 +183,7 @@ func validateHeaderMatch(add func(string, ...any), where string, h *spec.HeaderM
 	}
 	if h.Matches != nil {
 		n++
-		if _, err := regexp.Compile(*h.Matches); err != nil {
-			add("%s.matches %q is not a valid regexp: %v", where, *h.Matches, err)
-		}
+		validateRegexp(add, where, "matches", *h.Matches)
 	}
 	switch n {
 	case 0:
@@ -210,12 +204,13 @@ func validateJSON(add func(string, ...any), where string, j *spec.JSONAssert) {
 	}
 	if j.Matches != nil {
 		n++
-		if _, err := regexp.Compile(*j.Matches); err != nil {
-			add("%s.matches %q is not a valid regexp: %v", where, *j.Matches, err)
-		}
+		validateRegexp(add, where, "matches", *j.Matches)
 	}
 	if j.Length != nil {
 		n++
+		if *j.Length < 0 {
+			add("%s.length must be >= 0 (got %d); no array, object, or string has a negative length", where, *j.Length)
+		}
 	}
 	if j.Gt != nil {
 		n++
@@ -253,6 +248,21 @@ func validateStringList(add func(string, ...any), where, key string, l spec.Stri
 	}
 }
 
+// validateRegexp rejects an empty pattern and an uncompilable one for a
+// matches/not_matches matcher. An empty regexp matches everything, so `matches:
+// ""` is an always-true no-op and `not_matches: ""` can never pass — either is
+// an authoring mistake, caught at load time like the empty-string contains/
+// not_contains case in validateStringList.
+func validateRegexp(add func(string, ...any), where, key, pattern string) {
+	if pattern == "" {
+		add("%s.%s must not be an empty regexp, which matches everything (matches) or nothing (not_matches); remove it or give a real pattern", where, key)
+		return
+	}
+	if _, err := regexp.Compile(pattern); err != nil {
+		add("%s.%s %q is not a valid regexp: %v", where, key, pattern, err)
+	}
+}
+
 // validateDuration checks a duration assert (#31): at least one bound, lt/lte
 // and gt/gte mutually exclusive, every bound a valid Go duration, and any
 // interval non-empty (lower < upper).
@@ -264,6 +274,13 @@ func validateDuration(add func(string, ...any), where string, d *spec.DurationAs
 		dur, err := time.ParseDuration(val)
 		if err != nil {
 			add("%s.%s %q is not a valid duration (e.g. \"2s\", \"100ms\")", where, field, val)
+			return 0, false
+		}
+		// A measured wall-clock duration is never negative, so a negative bound
+		// is always an authoring mistake: gt/gte trivially hold and lt/lte can
+		// never pass. Caught at load time like the empty-interval case below.
+		if dur < 0 {
+			add("%s.%s must not be negative (got %q); a measured duration is never below zero", where, field, val)
 			return 0, false
 		}
 		return dur, true

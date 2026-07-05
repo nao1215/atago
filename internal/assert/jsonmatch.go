@@ -1,7 +1,10 @@
 package assert
 
 import (
+	"encoding/json"
 	"fmt"
+	"math"
+	"math/big"
 	"regexp"
 	"strconv"
 	"strings"
@@ -168,8 +171,25 @@ func jsonEquals(desc, path string, nodes []any, want any) *CheckResult {
 	return &CheckResult{
 		Desc:     d,
 		Expected: fmt.Sprintf("%s == %v", path, want),
-		Actual:   fmt.Sprintf("%s = %v", path, node),
+		Actual:   fmt.Sprintf("%s = %s", path, renderNode(node)),
 		Hint:     fmt.Sprintf("value at %s did not equal %v", path, want),
+	}
+}
+
+// renderNode renders a selected JSON value for a matcher subject or a failure
+// message. Floating-point numbers print without scientific notation — a whole
+// number like 1000000.0 reads as "1000000", not "1e+06" — so `matches` sees the
+// digits a spec author wrote and a failure message stays readable. Everything
+// else falls back to the default Go rendering (json.Number already carries its
+// exact digits as a string).
+func renderNode(v any) string {
+	switch t := v.(type) {
+	case float64:
+		return formatNum(t)
+	case float32:
+		return formatNum(float64(t))
+	default:
+		return fmt.Sprintf("%v", v)
 	}
 }
 
@@ -182,7 +202,7 @@ func jsonMatches(desc, path string, nodes []any, pattern string) *CheckResult {
 	if err != nil {
 		return &CheckResult{Desc: desc, Hint: fmt.Sprintf("invalid regexp %q: %v", pattern, err)}
 	}
-	got := fmt.Sprintf("%v", node)
+	got := renderNode(node)
 	if re.MatchString(got) {
 		return pass(desc)
 	}
@@ -268,6 +288,15 @@ func valuesEqual(node, want any) bool {
 	// operand keeps number/numeric-string equality while making string-vs-string
 	// byte-exact.
 	if isNumericKind(node) || isNumericKind(want) {
+		// Prefer exact integer comparison. Two distinct integers beyond 2^53 (a
+		// JSON id, or a value beyond int64 that decodes as json.Number) round to
+		// the same float64, so a float compare would report them equal. big.Int
+		// keeps every digit.
+		if ni, ok := toBigInt(node); ok {
+			if wi, ok := toBigInt(want); ok {
+				return ni.Cmp(wi) == 0
+			}
+		}
 		if nf, ok := toFloat(node); ok {
 			if wf, ok := toFloat(want); ok {
 				return nf == wf
@@ -302,15 +331,18 @@ func valuesEqual(node, want any) bool {
 	return fmt.Sprintf("%v", node) == fmt.Sprintf("%v", want)
 }
 
-// isNumericKind reports whether v is a genuine numeric type (not a numeric
+// isNumericKind reports whether v is a genuine number (not an arbitrary numeric
 // string). It gates valuesEqual's numeric coercion so string-vs-string equality
 // stays byte-exact. Unsigned kinds are included because goccy/go-yaml decodes a
-// large integer that overflows int64 as uint64.
+// large integer that overflows int64 as uint64, and json.Number because oj
+// decodes an integer beyond int64/uint64 as one — both are real numbers from a
+// parsed document, so an `equals` against a numeric spec value must compare them
+// numerically (via toBigInt/toFloat), not lexically.
 func isNumericKind(v any) bool {
 	switch v.(type) {
 	case int, int8, int16, int32, int64,
 		uint, uint8, uint16, uint32, uint64,
-		float32, float64:
+		float32, float64, json.Number:
 		return true
 	default:
 		return false
@@ -343,6 +375,14 @@ func toFloat(v any) (float64, bool) {
 		return float64(t), true
 	case float64:
 		return t, true
+	case json.Number:
+		// oj decodes a JSON integer beyond int64/uint64 range as json.Number
+		// (a string carrying the exact digits). Without this case the numeric
+		// matchers (gt/gte/lt/lte) reject a perfectly valid large number as
+		// "not numeric".
+		if f, err := strconv.ParseFloat(strings.TrimSpace(string(t)), 64); err == nil {
+			return f, true
+		}
 	case string:
 		// strconv.ParseFloat requires the WHOLE (trimmed) string to be a valid
 		// float. fmt.Sscanf("%g") used to be used here, but it stops at the first
@@ -355,4 +395,60 @@ func toFloat(v any) (float64, bool) {
 		}
 	}
 	return 0, false
+}
+
+// toBigInt returns v as an exact arbitrary-precision integer when it is an
+// integer value: a signed/unsigned integer kind, an integer-valued float, a
+// json.Number, or a numeric string with no fractional part. It is the exact
+// half of the numeric comparison — non-integers (2.5) return false so the
+// caller falls back to float comparison. Using big.Int keeps large integers
+// (JSON ids beyond 2^53, values beyond uint64) byte-exact where float64 would
+// silently collapse distinct values.
+func toBigInt(v any) (*big.Int, bool) {
+	switch t := v.(type) {
+	case int:
+		return big.NewInt(int64(t)), true
+	case int8:
+		return big.NewInt(int64(t)), true
+	case int16:
+		return big.NewInt(int64(t)), true
+	case int32:
+		return big.NewInt(int64(t)), true
+	case int64:
+		return big.NewInt(t), true
+	case uint:
+		return new(big.Int).SetUint64(uint64(t)), true
+	case uint8:
+		return new(big.Int).SetUint64(uint64(t)), true
+	case uint16:
+		return new(big.Int).SetUint64(uint64(t)), true
+	case uint32:
+		return new(big.Int).SetUint64(uint64(t)), true
+	case uint64:
+		return new(big.Int).SetUint64(t), true
+	case float32:
+		return floatToBigInt(float64(t))
+	case float64:
+		return floatToBigInt(t)
+	case json.Number:
+		if i, ok := new(big.Int).SetString(strings.TrimSpace(string(t)), 10); ok {
+			return i, true
+		}
+	case string:
+		if i, ok := new(big.Int).SetString(strings.TrimSpace(t), 10); ok {
+			return i, true
+		}
+	}
+	return nil, false
+}
+
+// floatToBigInt returns a finite, integer-valued float as an exact integer.
+// A fractional or non-finite value returns false so numeric equality falls back
+// to float comparison.
+func floatToBigInt(f float64) (*big.Int, bool) {
+	if math.IsInf(f, 0) || math.IsNaN(f) || f != math.Trunc(f) {
+		return nil, false
+	}
+	bi, _ := big.NewFloat(f).Int(nil)
+	return bi, true
 }

@@ -233,4 +233,26 @@ func TestRender_HostileCharsStayWellFormed(t *testing.T) {
 		}
 		_ = render(t, FormatGHA, res)
 	})
+
+	// A raw control byte (here \x01, but a captured ANSI escape is the common
+	// case) must not survive into a TAP YAML diagnostic or a GHA annotation, or
+	// the surrounding document is malformed. Tab and newline are structural.
+	t.Run("tap and gha carry no raw control bytes", func(t *testing.T) {
+		t.Parallel()
+		for _, f := range []Format{FormatTAP, FormatGHA} {
+			out := render(t, f, res)
+			if i := strings.IndexFunc(out, rejectedControlRune); i >= 0 {
+				t.Errorf("%v output carries a raw control byte at offset %d:\n%q", f, i, out)
+			}
+		}
+	})
+}
+
+// rejectedControlRune reports a control character no machine-readable report may
+// carry verbatim: any C0 byte other than tab/newline, DEL, or a C1 control.
+func rejectedControlRune(r rune) bool {
+	if r == '\t' || r == '\n' {
+		return false
+	}
+	return r < 0x20 || r == 0x7f || (r >= 0x80 && r <= 0x9f)
 }
