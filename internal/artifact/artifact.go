@@ -25,9 +25,6 @@ type Dir struct {
 // the --artifacts-dir flag, so an unset flag yields a nil *Dir.
 func NewDir(root string) *Dir { return &Dir{root: filepath.Clean(root)} }
 
-// Root reports the absolute-or-relative root the Dir writes under.
-func (d *Dir) Root() string { return d.root }
-
 // Write stores content at relPath (a slash-separated path relative to the root)
 // and returns the same relPath for embedding in reports. Parent directories are
 // created as needed. Write is safe for concurrent use across distinct relPaths,

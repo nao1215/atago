@@ -2,7 +2,6 @@ package engine
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	servicerunner "github.com/nao1215/atago/internal/runner/service"
@@ -61,10 +60,3 @@ func findServiceProc(name string, scenarioServices, suiteServices []*servicerunn
 	}
 	return nil
 }
-
-// signalNames is the accepted signal set (#23), shared with the loader's
-// validation message.
-var signalNames = []string{"TERM", "INT", "HUP", "USR1", "USR2", "KILL"}
-
-// SignalNameList renders the accepted signal names for error messages.
-func SignalNameList() string { return strings.Join(signalNames, ", ") }
