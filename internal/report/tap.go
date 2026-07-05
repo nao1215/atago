@@ -76,7 +76,11 @@ func writeTAPDiagnostic(b *strings.Builder, message, body string) {
 	if body != "" {
 		b.WriteString("  data: |\n")
 		for _, line := range strings.Split(body, "\n") {
-			fmt.Fprintf(b, "    %s\n", line)
+			// The literal block is copied verbatim into the reader's YAML, so a
+			// raw control byte from captured output (an ANSI escape, a bell)
+			// would make the diagnostic unparseable. Tab survives; the rest
+			// becomes U+FFFD.
+			fmt.Fprintf(b, "    %s\n", sanitizeControlBytes(line))
 		}
 	}
 	b.WriteString("  ...\n")
@@ -94,5 +98,9 @@ func tapInline(s string) string {
 	s = strings.ReplaceAll(s, "\n", " ")
 	s = strings.ReplaceAll(s, "\r", " ")
 	s = strings.ReplaceAll(s, "#", "\\#")
+	// A captured control byte (ANSI escape, bell, DEL) has no place on a TAP
+	// line; fold it so the ok/not-ok description and any SKIP directive stay
+	// clean. Newlines are already flattened above, so none survive here.
+	s = sanitizeControlBytes(s)
 	return strings.TrimSpace(s)
 }
