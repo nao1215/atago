@@ -7,6 +7,36 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- `json:`/`yaml:` `equals` no longer reports two distinct large integers as
+  equal. The comparison rounded both operands through float64, so a 64-bit id
+  like `9007199254740993` matched `9007199254740992`. Integer operands are now
+  compared at full precision.
+- `json:`/`yaml:` `gt`/`gte`/`lt`/`lte` now compare integers larger than int64.
+  Such a number decodes as a JSON number the numeric path did not recognize, so
+  a valid large value failed with "not numeric, so it cannot be compared".
+- `json:`/`yaml:` `matches:` now sees a whole-number float as its digits. A
+  value like `1000000.0` rendered as `1e+06`, so a pattern written against the
+  digits (`^1000000$`) never matched; it now renders as `1000000`, and the
+  `equals` failure message reads the same way.
+- The loader now rejects an empty `matches:`/`not_matches:` pattern on the
+  `stdout`/`stderr`/`body`, `json:`/`yaml:`, and `header:` matchers. An empty
+  regexp matches everything, so `matches: ""` is an always-true no-op and
+  `not_matches: ""` can never pass — mirroring the existing empty-string
+  `contains`/`not_contains` rejection.
+- The loader now rejects a negative `json:`/`yaml:` `length:` and a negative
+  `duration:` bound. No array, object, or string has a negative length, and a
+  measured wall-clock duration is never below zero, so either bound could only
+  ever be an authoring mistake.
+- The TAP (`--report tap`) failure diagnostic stays valid YAML. A captured
+  control byte from a command's output — most often an ANSI color escape —
+  landed verbatim in the diagnostic's `data:` block, so a TAP consumer parsing
+  it failed with "control characters are not allowed". Such bytes are now folded
+  to the Unicode replacement character, keeping tab and newline, as junit
+  already does through its XML encoder; the GitHub Actions (`--report gha`)
+  annotations are cleaned the same way.
+
 ## [0.4.1] - 2026-07-05
 
 A correctness pass over five independent surfaces — record, the equals matcher,
