@@ -133,6 +133,69 @@ func TestManifestDiff_PathsWithSpaces(t *testing.T) {
 	}
 }
 
+// TestManifestLine_EscapesControlBytes is a regression: a filesystem name
+// carrying a newline (legal on POSIX) must render as ONE manifest line, or a
+// single such entry produces the same manifest text as a structurally different
+// multi-entry tree and falsely matches its golden. The escape must also be
+// unambiguous, so a name containing a literal backslash-n does not collide with
+// a name containing a real newline.
+func TestManifestLine_EscapesControlBytes(t *testing.T) {
+	t.Parallel()
+	newlineDir := treeEntry{rel: "a\ndir b", kind: "dir"}.manifestLine()
+	if strings.ContainsAny(newlineDir, "\n\r") {
+		t.Errorf("manifestLine leaked a raw control byte, breaking one-line-per-entry: %q", newlineDir)
+	}
+	// The single newline-named entry must not equal the two-entry manifest it
+	// previously collided with.
+	twoEntries := treeEntry{rel: "a", kind: "dir"}.manifestLine() + "\n" +
+		treeEntry{rel: "dir b", kind: "dir"}.manifestLine()
+	if newlineDir == twoEntries {
+		t.Errorf("newline-named entry still collides with a two-entry tree: %q", newlineDir)
+	}
+	// A literal backslash-n name and a real-newline name must stay distinct.
+	if literal := (treeEntry{rel: `a\ndir b`, kind: "dir"}).manifestLine(); literal == newlineDir {
+		t.Errorf("literal backslash-n name collides with the real-newline name: %q", literal)
+	}
+	// Ordinary names are untouched, so existing goldens are unaffected.
+	if got := (treeEntry{rel: "content/posts/hello.md", kind: "file", hash: "abc"}).manifestLine(); got != "file content/posts/hello.md sha256:abc" {
+		t.Errorf("ordinary name changed: %q", got)
+	}
+}
+
+// TestCheckDir_SnapshotNewlineNameNoFalseMatch proves the escape end to end: a
+// tree of two dirs and a tree of one dir whose name embeds a newline must not
+// match each other's golden. POSIX-only — Windows forbids newlines in names.
+func TestCheckDir_SnapshotNewlineNameNoFalseMatch(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("newlines are not legal in Windows filenames")
+	}
+	t.Parallel()
+	specDir := t.TempDir()
+
+	// Golden recorded from a tree of two sibling dirs.
+	twoDirs := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(twoDirs, "root", "a"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(twoDirs, "root", "dir b"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	d := &spec.DirAssert{Path: "root", Snapshot: "tree_golden"}
+	if cr := checkDir(d, Env{Workdir: twoDirs, SpecDir: specDir, UpdateSnapshots: true}); !cr.OK {
+		t.Fatalf("update failed: %+v", cr)
+	}
+
+	// A different tree: one dir whose name is "a<newline>dir b".
+	oneDir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(oneDir, "root", "a\ndir b"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	cr := checkDir(d, Env{Workdir: oneDir, SpecDir: specDir})
+	if cr.OK {
+		t.Error("a one-entry tree with a newline in its name falsely matched a two-dir golden")
+	}
+}
+
 // TestCheckDir_SnapshotRoundTrip proves record → green compare → mutation
 // diff naming exactly the changed path (#25).
 func TestCheckDir_SnapshotRoundTrip(t *testing.T) {
