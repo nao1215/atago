@@ -7,6 +7,18 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- `atago record` no longer pins its own scratch directory into the generated
+  stdout anchor. A command that prints an absolute path under its workdir (the
+  canonical case is `atago record -- pwd`) recorded a `contains:` matcher on the
+  dead `/tmp/atago-record-NNN` scratch path, which the replay's own isolated
+  workdir could never match — so the very spec `record` produced failed on its
+  first `run`. The record-time workdir is now rewritten to the built-in
+  `${workdir}` reference, which expands to the replay workdir, matching the
+  masking `record --snapshot` already applied. The record→run round-trip is
+  green again (#30).
+
 ## [0.4.0] - 2026-07-05
 
 Runner-selection and reporting polish surfaced while migrating real E2E suites

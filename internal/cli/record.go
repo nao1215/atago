@@ -110,7 +110,7 @@ recording is a non-goal for now — write those steps by hand.
 		Stderr:       res.Stderr,
 		CreatedFiles: created,
 	}
-	opts := record.Options{SuiteName: suiteNameFor(cmdArgs[0])}
+	opts := record.Options{SuiteName: suiteNameFor(cmdArgs[0]), Workdir: workdir}
 	if *snap {
 		opts.Snapshot = true
 		opts.SnapshotPath = "snapshots/" + strings.TrimSuffix(filepath.Base(*out), ".atago.yaml") + ".stdout.txt"

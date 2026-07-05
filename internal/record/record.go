@@ -43,6 +43,13 @@ type Options struct {
 	// SnapshotPath (spec-relative).
 	Snapshot     bool
 	SnapshotPath string
+	// Workdir is the record-time scratch directory the command ran in. Any
+	// occurrence of it in the generated stdout anchor is rewritten to the
+	// built-in ${workdir} reference, so a command that prints an absolute path
+	// under its workdir (e.g. `pwd`) still replays green: the anchor expands to
+	// the replay's own isolated workdir instead of pinning the dead scratch path
+	// the record run happened to use.
+	Workdir string
 }
 
 // Generate renders the spec skeleton and proves it loads cleanly — a
@@ -74,7 +81,8 @@ func Generate(obs Observation, opts Options) ([]byte, error) {
 	case firstLine(obs.Stdout) != "":
 		b.WriteString("      - assert:\n")
 		b.WriteString("          stdout:\n")
-		fmt.Fprintf(&b, "            contains: %s # first non-empty line, trimmed\n", yamlScalar(escapeVarRefs(firstLine(obs.Stdout))))
+		anchor := maskWorkdir(escapeVarRefs(firstLine(obs.Stdout)), opts.Workdir)
+		fmt.Fprintf(&b, "            contains: %s # first non-empty line, trimmed\n", yamlScalar(anchor))
 	}
 	if len(obs.Stderr) == 0 {
 		b.WriteString("      - assert:\n")
@@ -117,6 +125,23 @@ func Generate(obs Observation, opts Options) ([]byte, error) {
 // into a $${1} that the expander never restores and that could never match.
 func escapeVarRefs(s string) string {
 	return store.Escape(s)
+}
+
+// maskWorkdir rewrites the record-time scratch directory to the built-in
+// ${workdir} reference so the stdout anchor replays green. A command that
+// prints an absolute path under its workdir (`pwd`, a tool echoing an output
+// path) would otherwise pin the dead scratch dir the record run used, which the
+// replay's own isolated workdir can never match — the round-trip law (#30)
+// broken by construction. It runs after escapeVarRefs so the injected reference
+// is a live one the expander restores, not a $${...} literal. The scratch path
+// is a plain filesystem path with no ${...} of its own, so escaping never
+// touches it. Snapshot mode masks the same path via snapshot.Normalize already;
+// this brings the default contains anchor to parity.
+func maskWorkdir(s, workdir string) string {
+	if workdir == "" {
+		return s
+	}
+	return strings.ReplaceAll(s, workdir, "${workdir}")
 }
 
 // firstLine returns the first non-empty line, trimmed.

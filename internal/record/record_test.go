@@ -3,6 +3,7 @@ package record
 import (
 	"context"
 	"fmt"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -246,6 +247,69 @@ func TestGenerate_RecordRunRoundTrip(t *testing.T) {
 				t.Errorf("recorded spec did not replay green: status=%s\n--- spec ---\n%s", res.Status, out)
 			}
 		})
+	}
+}
+
+// TestGenerate_MasksScratchWorkdirInAnchor is a regression for the record→run
+// round-trip (#30): a command that prints an absolute path under the
+// record-time scratch dir must not pin that path as a literal contains anchor.
+// The replay runs in a *different* isolated workdir, so a literal scratch path
+// can never match and the generated spec fails on its first replay. The
+// record-time workdir is rewritten to the built-in ${workdir} reference, which
+// expands to the replay workdir. This is deterministic and OS-independent
+// (`atago record -- pwd` is the canonical trigger).
+func TestGenerate_MasksScratchWorkdirInAnchor(t *testing.T) {
+	t.Parallel()
+	const wd = "/tmp/atago-record-4242"
+	out, err := Generate(Observation{
+		Command:  "pwd",
+		ExitCode: 0,
+		Stdout:   []byte("cwd is " + wd + "/logs\n"),
+	}, Options{SuiteName: "pwd", Workdir: wd})
+	if err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+	got := string(out)
+	if strings.Contains(got, wd) {
+		t.Errorf("generated anchor pins the literal scratch workdir %q:\n%s", wd, got)
+	}
+	if !strings.Contains(got, "contains: cwd is ${workdir}/logs") {
+		t.Errorf("anchor did not rewrite the scratch workdir to ${workdir}:\n%s", got)
+	}
+	// The rewrite must be a live reference: re-escaping must not neutralize it
+	// into the $${workdir} literal the expander would leave untouched.
+	if strings.Contains(got, "$${workdir}") {
+		t.Errorf("workdir reference was escaped to a literal:\n%s", got)
+	}
+}
+
+// TestGenerate_WorkdirAnchorReplaysGreen proves the metamorphic law end to end
+// for the workdir case: a recorded `pwd` replays green because its anchor
+// expands to the replay's workdir. POSIX-only (`pwd` is not a cmd.exe builtin);
+// the rewrite itself is proven OS-independently by
+// TestGenerate_MasksScratchWorkdirInAnchor.
+func TestGenerate_WorkdirAnchorReplaysGreen(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("pwd is POSIX-only; the rewrite is proven cross-platform elsewhere")
+	}
+	t.Parallel()
+	const wd = "/tmp/atago-record-9999"
+	out, err := Generate(Observation{
+		Command:  "pwd",
+		Shell:    true,
+		ExitCode: 0,
+		Stdout:   []byte(wd + "\n"),
+	}, Options{SuiteName: "pwd", Workdir: wd})
+	if err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+	s, err := loader.LoadBytes("rt.atago.yaml", out)
+	if err != nil {
+		t.Fatalf("load generated: %v\n%s", err, out)
+	}
+	res := engine.New().Run(context.Background(), s, "rt.atago.yaml")
+	if res.Status != engine.StatusPassed {
+		t.Errorf("recorded pwd spec did not replay green: status=%s\n%s", res.Status, out)
 	}
 }
 
