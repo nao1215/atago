@@ -23,16 +23,35 @@ type treeEntry struct {
 	target string // symlink target, links only
 }
 
-// manifestLine renders the entry's snapshot-manifest line.
+// manifestLine renders the entry's snapshot-manifest line. Paths and link
+// targets are escaped so each entry stays exactly one line — see
+// escapeManifestField.
 func (e treeEntry) manifestLine() string {
 	switch e.kind {
 	case "file":
-		return "file " + e.rel + " sha256:" + e.hash
+		return "file " + escapeManifestField(e.rel) + " sha256:" + e.hash
 	case "link":
-		return "link " + e.rel + " -> " + e.target
+		return "link " + escapeManifestField(e.rel) + " -> " + escapeManifestField(e.target)
 	default:
-		return "dir " + e.rel
+		return "dir " + escapeManifestField(e.rel)
 	}
+}
+
+// escapeManifestField escapes the bytes that would break the one-line-per-entry
+// manifest grammar: a backslash (so the escape stays unambiguous) and the CR/LF
+// a filename may legally carry on POSIX. Without this, a name embedding a
+// newline renders as several manifest lines, so a single such entry produces the
+// same manifest as a structurally different multi-entry tree and falsely matches
+// its golden. Ordinary names (no backslash, CR, or LF) are returned unchanged,
+// so existing goldens are unaffected.
+func escapeManifestField(s string) string {
+	if !strings.ContainsAny(s, "\\\r\n") {
+		return s
+	}
+	s = strings.ReplaceAll(s, `\`, `\\`)
+	s = strings.ReplaceAll(s, "\n", `\n`)
+	s = strings.ReplaceAll(s, "\r", `\r`)
+	return s
 }
 
 // walkTree walks dirPath depth-first and returns every entry (root excluded)

@@ -9,6 +9,13 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- A `dir:` tree `snapshot:` manifest now escapes control bytes in entry paths and
+  link targets, so a filesystem name embedding a newline (legal on POSIX) can no
+  longer masquerade as several manifest lines. Before, a single entry named
+  `a<newline>dir b` produced the same manifest text as a structurally different
+  two-entry tree and falsely matched its golden. Ordinary names — with no
+  backslash, CR, or LF — render unchanged, so existing goldens are unaffected
+  (#25).
 - `atago run --rerun-failed` narrowed to a subset of the recorded specs no longer
   drops the recorded failures in the specs it did not run. It rewrote the whole
   `.atago/last-failed.json` ledger from only the scenarios that ran, so
