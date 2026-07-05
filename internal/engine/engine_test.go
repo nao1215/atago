@@ -377,6 +377,65 @@ scenarios:
 	}
 }
 
+// parityScenarios builds a spec with n scenarios cycling passed/failed/skipped so
+// the parallel scheduler has real mixed outcomes to interleave.
+func parityScenarios(n int) string {
+	var b strings.Builder
+	b.WriteString("version: \"1\"\nsuite:\n  name: par\nscenarios:\n")
+	for i := range n {
+		fmt.Fprintf(&b, "  - name: sc-%03d\n", i)
+		switch i % 3 {
+		case 0: // passes
+			b.WriteString("    steps:\n      - run: {command: \"true\"}\n      - assert: {exit_code: 0}\n")
+		case 1: // fails: false exits 1, asserted 0
+			b.WriteString("    steps:\n      - run: {command: \"false\"}\n      - assert: {exit_code: 0}\n")
+		default: // skipped: an only-probe that never passes
+			b.WriteString("    only: {command: \"false\"}\n    steps:\n      - run: {command: \"true\"}\n")
+		}
+	}
+	return b.String()
+}
+
+// TestEngine_ParallelMatchesSerial is a metamorphic parity check: --parallel N
+// must not change the outcome. For a spec with mixed passed/failed/skipped
+// scenarios, every per-scenario verdict and the definition order must be
+// identical to a serial (--parallel 1) run, at every worker count. The scheduler
+// shares results/done across workers, so a concurrency defect would surface as a
+// changed status, a dropped scenario, or reordering; run under -race in CI it
+// also guards the shared state against data races.
+func TestEngine_ParallelMatchesSerial(t *testing.T) {
+	t.Parallel()
+	s, err := loader.LoadBytes("par.atago.yaml", []byte(parityScenarios(18)))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	runAt := func(workers int) []ScenarioResult {
+		e := New()
+		e.Parallel = workers
+		return e.Run(context.Background(), s, "par.atago.yaml").Scenarios
+	}
+
+	serial := runAt(1)
+	for _, workers := range []int{2, 4, 8} {
+		for iter := range 4 {
+			got := runAt(workers)
+			if len(got) != len(serial) {
+				t.Fatalf("parallel=%d iter=%d: %d scenarios, serial had %d", workers, iter, len(got), len(serial))
+			}
+			for i := range serial {
+				if got[i].Name != serial[i].Name {
+					t.Fatalf("parallel=%d iter=%d: order changed at %d: %q vs serial %q",
+						workers, iter, i, got[i].Name, serial[i].Name)
+				}
+				if got[i].Status != serial[i].Status {
+					t.Fatalf("parallel=%d iter=%d: %s status = %s, serial = %s",
+						workers, iter, got[i].Name, got[i].Status, serial[i].Status)
+				}
+			}
+		}
+	}
+}
+
 func TestEngine_FailFastSkipsRemaining(t *testing.T) {
 	t.Parallel()
 	src := `
