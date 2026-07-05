@@ -25,7 +25,7 @@ type HTTP struct {
 	Files []FilePart `yaml:"files,omitempty"`
 	// BodyTo writes the response body to this workdir-relative file
 	// (create/truncate), so a downloaded artifact can be inspected with the
-	// file/image/pdf assertion targets — the http analogue of run's stdout_to.
+	// file/image/pdf assertion targets — the http analog of run's stdout_to.
 	BodyTo string `yaml:"body_to,omitempty"`
 	// FollowRedirects controls whether 3xx responses are followed. It defaults
 	// to true (matching every HTTP client a user knows); set false to assert on

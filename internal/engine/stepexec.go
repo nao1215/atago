@@ -172,12 +172,12 @@ func (x *scenarioRun) runSteps(ctx context.Context, leadingFixtures int) {
 	for i := leadingFixtures; i < len(x.sc.Steps); i++ {
 		step := &x.sc.Steps[i]
 
-		// Stop before running a step if the run was cancelled (Ctrl-C / parent
+		// Stop before running a step if the run was canceled (Ctrl-C / parent
 		// cancel / deadline). Without this the loop would keep executing steps and
 		// evaluating assertions after a cancellation (issue #30).
 		if ctx.Err() != nil {
 			x.out.Status = StatusError
-			x.out.Steps = append(x.out.Steps, StepResult{Index: i, Kind: step.Kind(), ErrMsg: fmt.Sprintf("run cancelled: %v", ctx.Err())})
+			x.out.Steps = append(x.out.Steps, StepResult{Index: i, Kind: step.Kind(), ErrMsg: fmt.Sprintf("run canceled: %v", ctx.Err())})
 			break
 		}
 
