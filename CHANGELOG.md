@@ -9,6 +9,12 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- The unresolved-variable guard now fires for a named `cmd` runner, not only the
+  default (unnamed) local runner. A no-shell run executes its command as argv, so
+  a typo like `run: {runner: local, command: "echo ${typo}"}` leaked the literal
+  `${typo}` into argv and ran a garbled command instead of erroring with the
+  reference named. Any local (non-ssh) run is now guarded; only an ssh runner,
+  where a remote shell may expand it, stays exempt.
 - A service `ready.delay` is now bounded by `ready.timeout`, as the docs promise
   ("Timeout bounds the readiness wait"). The delay branch waited the full
   duration regardless of the timeout, so `delay: 30s` with `timeout: 500ms`
