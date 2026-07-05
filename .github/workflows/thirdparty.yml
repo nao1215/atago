@@ -52,6 +52,11 @@ jobs:
           - name: fzf
             dir: ./test/e2e/thirdparty/fzf
             install: go install github.com/junegunn/fzf@latest
+          # htop drives the pty runner's alternate-screen rendering and named
+          # function keys; from apt where the runner image lacks it.
+          - name: htop
+            dir: ./test/e2e/thirdparty/htop
+            install: command -v htop >/dev/null || (sudo apt-get update && sudo apt-get install -y htop)
           - name: redis
             dir: ./test/e2e/thirdparty/redis
             install: command -v redis-server >/dev/null || (sudo apt-get update && sudo apt-get install -y redis-server redis-tools)

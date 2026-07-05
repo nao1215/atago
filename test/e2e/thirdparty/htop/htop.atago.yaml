@@ -1,0 +1,76 @@
+version: "1"
+
+suite:
+  name: htop (third-party CLI, full-screen TUI testbed)
+
+# htop is the archetype of a FULL-SCREEN TUI: it switches to the alternate
+# screen buffer, paints meters and a process table with cursor moves and
+# colors, and restores the primary screen when it quits. That makes it the
+# real-world testbed for the pty runner's screen rendering (#27) that fzf — a
+# partial-screen finder — does not reach: the vt100 emulator must track the
+# alternate-screen switch to render the live frame, and a full-screen program
+# must run and quit cleanly under the pty. Every scenario probes for htop first
+# so the suite skips cleanly where it is absent; the interactive scenarios are
+# POSIX-only (the pty runner does not support Windows).
+scenarios:
+  - name: version prints a semantic version
+    only:
+      command: htop --version
+    steps:
+      - run:
+          command: htop --version
+      - assert:
+          exit_code: 0
+          stdout:
+            matches: "^htop [0-9]+\\.[0-9]+"
+
+  - name: the finder loads its function-key bar and quits on q
+    only:
+      command: htop --version
+    skip:
+      os: windows
+    steps:
+      # htop paints on the alternate screen; the transcript still carries the
+      # rendered text, so `expect` waits for the F10 quit label to prove the UI
+      # loaded. `q` quits, htop restores the primary screen, and the process
+      # exits 0 — the full clean lifecycle of an alt-screen TUI under the pty
+      # runner.
+      - pty:
+          command: htop
+          cols: 100
+          rows: 30
+          timeout: 20s
+          session:
+            - expect: "F10"
+            - send: "q"
+      - assert:
+          exit_code: 0
+
+  - name: the rendered screen shows the live meters and column header
+    only:
+      command: htop --version
+    skip:
+      os: windows
+    steps:
+      # The `screen:` assertion replays the transcript through the vt100
+      # emulator and pins what the user actually SEES. htop must still be on its
+      # alternate screen for the frame to hold its UI: quitting would restore
+      # the (empty) primary screen, so this scenario deliberately does NOT send
+      # q — the per-step timeout ends it while htop is live, and the assertion
+      # checks the final rendered frame rather than the exit code.
+      - pty:
+          command: htop
+          cols: 100
+          rows: 30
+          timeout: 4s
+          session:
+            - expect: "F10"
+      - assert:
+          screen:
+            contains: "CPU%"
+      - assert:
+          screen:
+            contains: "Command"
+      - assert:
+          screen:
+            contains: "F10"
