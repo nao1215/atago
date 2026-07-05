@@ -10,10 +10,33 @@ import (
 	"github.com/nao1215/atago/internal/engine"
 )
 
+// Option configures an optional aspect of a Render call. It keeps the common
+// three-argument form unchanged while letting callers pass extra run-level
+// context (e.g. spec-load failures) without a signature churn.
+type Option func(*renderOptions)
+
+type renderOptions struct {
+	// loadFailures is the number of spec files that failed to load (parse/schema
+	// errors) before any scenario could run. Such files contribute to no suite in
+	// results, so the console summary reports them separately and reads FAILED
+	// rather than a misleading PASSED that contradicts the non-zero exit code (#120).
+	loadFailures int
+}
+
+// WithLoadFailures records how many spec files failed to load for this run, so
+// the summary can reflect them instead of silently omitting them (#120).
+func WithLoadFailures(n int) Option {
+	return func(o *renderOptions) { o.loadFailures = n }
+}
+
 // Render writes one or more suite results in the requested format. Console
 // renders each suite in turn; JSON emits one stable top-level document
 // ({"schema_version","suites":[...]}) regardless of suite count (#43).
-func Render(w io.Writer, f Format, results []*engine.SuiteResult) error {
+func Render(w io.Writer, f Format, results []*engine.SuiteResult, opts ...Option) error {
+	var o renderOptions
+	for _, opt := range opts {
+		opt(&o)
+	}
 	switch f {
 	case FormatConsole:
 		var b strings.Builder
@@ -43,7 +66,7 @@ func Render(w io.Writer, f Format, results []*engine.SuiteResult) error {
 				hardFail = true
 			}
 		}
-		writeSummary(&b, color, agg, total, dur, hardFail)
+		writeSummary(&b, color, agg, total, dur, hardFail, o.loadFailures)
 		_, err := io.WriteString(w, b.String())
 		return err
 	case FormatJSON:

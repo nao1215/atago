@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-55 suites · 218 scenarios
+55 suites · 219 scenarios
 ## Contents
 - [atago self-hosting / variable expansion in assertion matcher values](#atago-self-hosting--variable-expansion-in-assertion-matcher-values) — 6 scenarios
   - [stdout.equals expands ${workdir}](#scenario-stdoutequals-expands-workdir)
@@ -61,9 +61,10 @@
   - [an impossible bound fails and shows the measured duration](#scenario-an-impossible-bound-fails-and-shows-the-measured-duration)
   - [a deliberate wait satisfies a lower bound](#scenario-a-deliberate-wait-satisfies-a-lower-bound)
   - [a duration assert with no preceding step is a load-time error](#scenario-a-duration-assert-with-no-preceding-step-is-a-load-time-error)
-- [atago self-hosting / edge cases](#atago-self-hosting--edge-cases) — 2 scenarios
+- [atago self-hosting / edge cases](#atago-self-hosting--edge-cases) — 3 scenarios
   - [JSON assertion on empty stdout reports an empty stream](#scenario-json-assertion-on-empty-stdout-reports-an-empty-stream)
   - [an unsupported matcher is a parse error](#scenario-an-unsupported-matcher-is-a-parse-error)
+  - [a mixed valid+invalid run reads FAILED and counts the dropped spec](#scenario-a-mixed-validinvalid-run-reads-failed-and-counts-the-dropped-spec)
 - [atago self-hosting / workdir + scenario env + not_contains](#atago-self-hosting--workdir--scenario-env--not_contains) — 6 scenarios
   - [run.stdout_to redirects stdout to a workdir file without a shell](#scenario-runstdout_to-redirects-stdout-to-a-workdir-file-without-a-shell)
   - [scenario env is shared by every run step and overridable per step](#scenario-scenario-env-is-shared-by-every-run-step-and-overridable-per-step)
@@ -1347,6 +1348,40 @@ ${atago} run bad.atago.yaml
 ```
 #### Then
 - exit code is `2`
+### Scenario: a mixed valid+invalid run reads FAILED and counts the dropped spec
+#### Given
+- Fixture file `good.atago.yaml` is created.
+- Fixture file `broken.atago.yaml` is created.
+#### Inputs
+_Fixture `good.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: good
+scenarios:
+  - name: echo works
+    steps:
+      - run: {shell: true, command: echo hi}
+      - assert: {exit_code: 0}
+```
+_Fixture `broken.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: broken
+scenarios:
+  - name: uses an unknown field
+    steps:
+      - nonsense_field: {command: echo nope}
+```
+#### When
+```shell
+${atago} run good.atago.yaml broken.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stdout contains `1 spec failed to load`
+- stdout does not contain `PASSED`
 ## atago self-hosting / workdir + scenario env + not_contains
 Source: `test/e2e/atago/env_workdir.atago.yaml`
 ### Scenario: run.stdout_to redirects stdout to a workdir file without a shell

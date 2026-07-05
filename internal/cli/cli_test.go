@@ -353,6 +353,32 @@ func TestRunCmd_ValidationErrorExit2(t *testing.T) {
 	}
 }
 
+// TestRunCmd_MixedLoadFailureSummary proves that when a directory mixes a
+// loadable spec with one that fails schema validation, the console summary
+// reads FAILED (not a misleading PASSED), surfaces the dropped file with a
+// "spec failed to load" count, and exits 2 (#120). Before the fix the headline
+// read "PASSED ... 0 errored" while the process exited 2.
+func TestRunCmd_MixedLoadFailureSummary(t *testing.T) {
+	dir := t.TempDir()
+	writeSpec(t, dir, "good.atago.yaml", passingSpec)
+	writeSpec(t, dir, "bad.atago.yaml",
+		"version: \"1\"\nsuite:\n  name: bad\nscenarios:\n  - name: uses an unknown field\n    steps:\n      - nonsense_field: {command: echo nope}")
+	var out, errb bytes.Buffer
+	if got := Main([]string{"run", dir}, &out, &errb); got != ExitParse {
+		t.Fatalf("exit = %d, want %d (stderr=%s)", got, ExitParse, errb.String())
+	}
+	summary := out.String()
+	if strings.Contains(summary, "PASSED") {
+		t.Errorf("summary must not read PASSED when a spec failed to load:\n%s", summary)
+	}
+	if !strings.Contains(summary, "FAILED") {
+		t.Errorf("summary should read FAILED to match the exit code:\n%s", summary)
+	}
+	if !strings.Contains(summary, "1 spec failed to load") {
+		t.Errorf("summary should report the dropped spec:\n%s", summary)
+	}
+}
+
 // Issue #21: exit 3 (ExitConfig) is returned for CLI-invocation problems, e.g. a
 // target that matches no spec files.
 func TestRunCmd_NoFilesExit3(t *testing.T) {
