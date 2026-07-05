@@ -3,7 +3,56 @@ package engine
 import (
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/nao1215/atago/internal/spec"
+	"github.com/nao1215/atago/internal/store"
 )
+
+// TestResolveHTTPConfig_DefaultsRunTimeout proves an http step honors
+// defaults.run.timeout when it declares no runner or step timeout (#17). The
+// suite comment puts http in the same precedence chain as run, but the config
+// builder dropped the defaults.run level, so an http step fell straight through
+// to suite.timeout / the built-in 60s.
+func TestResolveHTTPConfig_DefaultsRunTimeout(t *testing.T) {
+	t.Parallel()
+	cfg, err := resolveHTTPConfig(&spec.HTTP{Path: "/"}, store.New(), runConfig{defaultsRunTimeout: "150ms"})
+	if err != nil {
+		t.Fatalf("resolveHTTPConfig: %v", err)
+	}
+	if cfg.Timeout != 150*time.Millisecond {
+		t.Errorf("cfg.Timeout = %s, want 150ms (defaults.run.timeout must bound an http step)", cfg.Timeout)
+	}
+}
+
+// fakeCloser is a no-op io.Closer for the resolveConn timeout test.
+type fakeCloser struct{}
+
+func (fakeCloser) Close() error { return nil }
+
+// TestResolveConn_DefaultsRunTimeout proves query/grpc connections honor
+// defaults.run.timeout when the runner declares none (#17). resolveConn opted
+// into the precedence chain but passed an empty defaults.run level, so these
+// steps skipped defaults.run and used suite.timeout / the built-in 60s instead.
+func TestResolveConn_DefaultsRunTimeout(t *testing.T) {
+	t.Parallel()
+	rc := runConfig{
+		defaultsRunTimeout: "150ms",
+		runners:            map[string]spec.Runner{"db": {Type: "db", DSN: "sqlite::memory:"}},
+	}
+	var got time.Duration
+	_, err := resolveConn("db", "query step", "db", rc, map[string]fakeCloser{}, true,
+		func(_ spec.Runner, timeout time.Duration) (fakeCloser, error) {
+			got = timeout
+			return fakeCloser{}, nil
+		})
+	if err != nil {
+		t.Fatalf("resolveConn: %v", err)
+	}
+	if got != 150*time.Millisecond {
+		t.Errorf("open received timeout %s, want 150ms (defaults.run.timeout must bound a query/grpc step)", got)
+	}
+}
 
 // TestResolveTimeout proves the five-level precedence chain (#17): step >
 // runner > defaults.run > suite > built-in 60s, with an explicit "0" at any
