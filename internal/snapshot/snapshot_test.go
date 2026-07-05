@@ -1,12 +1,46 @@
 package snapshot
 
 import (
+	"bytes"
 	"errors"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
+
+// TestNormalize_Idempotent proves normalizing already-normalized output is a
+// no-op: Normalize(Normalize(x)) == Normalize(x). A committed golden is the
+// normalized form, and Compare re-normalizes the actual before matching, so a
+// non-idempotent rule would make a golden fail to match its own source output —
+// a spurious failure on every snapshot assertion. Random splices of the exact
+// fragments each rule targets (ANSI/OSC, UUID, timestamp, loopback port, the
+// workdir) exercise the interactions between rules.
+func TestNormalize_Idempotent(t *testing.T) {
+	t.Parallel()
+	rng := rand.New(rand.NewSource(1))
+	frags := []string{
+		"\x1b[32m", "\x1b[0m", "\x1b[?25l", "\x1b[?1049h", "\x1b[38:2:1:2:3m",
+		"\x1b]0;title\x07", "\x1b]8;;http://x\x1b\\",
+		"550e8400-e29b-41d4-a716-446655440000",
+		"2026-06-30T09:00:00Z", "2026-06-30 09:00:00", "2026-06-30T09:00:00.123+09:00",
+		"127.0.0.1:54321", "localhost:8080", "[::1]:22", "0.0.0.0:1",
+		"/tmp/atago-xyz", "plain text ", "\r\n", "\n", "$", "{", "}", "abc",
+		"127.0.0.1:", ":", "-", "T", "Z",
+	}
+	opt := Options{Workdir: "/tmp/atago-xyz"}
+	for iter := range 10000 {
+		var in []byte
+		for n := rng.Intn(8); n > 0; n-- {
+			in = append(in, frags[rng.Intn(len(frags))]...)
+		}
+		once := Normalize(in, opt)
+		if twice := Normalize(once, opt); !bytes.Equal(once, twice) {
+			t.Fatalf("iter %d: Normalize not idempotent\n in:    %q\n once:  %q\n twice: %q", iter, in, once, twice)
+		}
+	}
+}
 
 func TestNormalize(t *testing.T) {
 	t.Parallel()
