@@ -9,6 +9,14 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- `stdout`/`stderr` `equals` and `not_equals` now tolerate only a single
+  trailing newline, not an arbitrary run of trailing blank lines. The matcher
+  trimmed every trailing newline, so `equals: "hello"` passed against output
+  that was `hello` followed by extra blank lines, and `not_equals` reported a
+  false "equal" for the same output — an exact-text assertion silently ignoring
+  real trailing content. It now drops at most one trailing newline per side,
+  consistent with the `line:` selector, which already keeps a deliberate
+  trailing blank line addressable.
 - `atago record` no longer pins its own scratch directory into the generated
   stdout anchor. A command that prints an absolute path under its workdir (the
   canonical case is `atago record -- pwd`) recorded a `contains:` matcher on the

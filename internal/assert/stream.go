@@ -189,15 +189,20 @@ func containsDesc(name string, subs spec.StringList, want bool) string {
 	return fmt.Sprintf("assert %s contains none of %s", name, quoteList(subs))
 }
 
-// equalsNormalized compares ignoring a single trailing newline difference, since
-// most commands emit a trailing newline that YAML block scalars also carry.
-// CRLF line endings are folded to LF first so a spec written with `equals:`
-// passes against cmd.exe output on Windows exactly as it does against POSIX
-// output — line endings are an OS artifact, not observable CLI behavior.
+// equalsNormalized compares ignoring at most one trailing newline per side — the
+// single phantom final newline most commands emit, which a YAML block scalar
+// also carries — not an arbitrary run of trailing blank lines. Trimming EVERY
+// trailing newline (strings.TrimRight) made `equals "x"` pass against "x\n\n\n"
+// and `not_equals` report a false "equal"; it also disagreed with the line:
+// matcher, whose splitLines drops exactly one trailing newline so a deliberate
+// trailing blank line stays addressable. CRLF is folded to LF first so a spec
+// written with `equals:` passes against cmd.exe output on Windows exactly as it
+// does against POSIX output — line endings are an OS artifact, not observable
+// CLI behavior.
 func equalsNormalized(got, want string) bool {
 	got = strings.ReplaceAll(got, "\r\n", "\n")
 	want = strings.ReplaceAll(want, "\r\n", "\n")
-	return got == want || strings.TrimRight(got, "\n") == strings.TrimRight(want, "\n")
+	return strings.TrimSuffix(got, "\n") == strings.TrimSuffix(want, "\n")
 }
 
 // selectLine returns the n-th (1-based) line of s, ignoring a single trailing
