@@ -7,6 +7,18 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-07-05
+
+A bug-fix release hardening the runners and the reporters. No new features.
+
+Highlights: a `query`/`db` SELECT preceded by a SQL comment no longer misroutes
+to ExecContext and drops its rows; `atago record` escapes only genuine variable
+references, so a recorded spec whose output carries a literal `${1}` replays
+green; and a hung `grpc` server no longer passes on a per-call timeout. Reporting
+is steadier too — a suite that errors in `suite.setup` with nothing selected is
+no longer a green empty junit/tap/gha result, and TAP marks a recovered flaky
+scenario `ok`.
+
 ### Fixed
 
 - A `query`/`db` step whose SELECT is preceded by a SQL comment (a `-- ...` line
@@ -15,7 +27,6 @@ and this project follows [Semantic Versioning](https://semver.org/).
   commented SELECT looked like a non-row statement and its result set was lost.
   Comments outside string literals are now stripped before classification; a
   comment marker inside a quoted value is still treated as data.
-
 - `atago record` no longer generates a spec that cannot replay when the observed
   command or output carries a `${` not followed by a valid variable name (a tool
   that prints `${1}`, `${}`, or `${ }`). The recorder escaped every `${` to
