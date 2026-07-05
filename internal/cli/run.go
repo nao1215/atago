@@ -30,7 +30,8 @@ func runCmd(args []string, stdout, stderr io.Writer) int {
 	ci := fs.Bool("ci", false, "CI-safe defaults: deterministic, no color (sets NO_COLOR), secret masking")
 	parallel := fs.Int("parallel", runtime.NumCPU(), "number of scenarios to run concurrently; scenarios are isolated, each in its own temp dir")
 	failFast := fs.Bool("fail-fast", false, "stop scheduling new scenarios after the first failure")
-	filter := fs.String("filter", "", "run only scenarios whose name contains this substring")
+	var filter csvFlag
+	fs.Var(&filter, "filter", "run only scenarios whose name contains any of these comma-separated substrings (repeatable; OR semantics like --tag)")
 	tag := fs.String("tag", "", "run only scenarios with any of these comma-separated tags")
 	skipTag := fs.String("skip-tag", "", "skip scenarios with any of these comma-separated tags")
 	artifactsDir := fs.String("artifacts-dir", "", "write deterministic failure artifacts (actual/expected payloads) under DIR for review tooling")
@@ -91,7 +92,7 @@ func runCmd(args []string, stdout, stderr io.Writer) int {
 	eng.FailFast = *failFast
 	eng.Repeat = *repeat
 	eng.RetryFailed = *retryFailed
-	eng.FilterName = *filter
+	eng.FilterNames = filter
 	eng.Tags = splitCSV(*tag)
 	eng.SkipTags = splitCSV(*skipTag)
 	if strings.TrimSpace(*artifactsDir) != "" {
@@ -210,15 +211,15 @@ func runCmd(args []string, stdout, stderr io.Writer) int {
 	// A selection that matches nothing still exits 0 (nothing ran, nothing
 	// failed), but stay loud about it: a typo'd --filter/--tag in CI would
 	// otherwise greenlight silently.
-	if *filter != "" || *tag != "" || *skipTag != "" {
+	if len(filter) > 0 || *tag != "" || *skipTag != "" {
 		total := 0
 		for _, r := range results {
 			total += len(r.Scenarios)
 		}
 		if total == 0 && ctx.Err() == nil {
 			var sel []string
-			if *filter != "" {
-				sel = append(sel, fmt.Sprintf("--filter %q", *filter))
+			if len(filter) > 0 {
+				sel = append(sel, fmt.Sprintf("--filter %q", strings.Join(filter, ",")))
 			}
 			if *tag != "" {
 				sel = append(sel, fmt.Sprintf("--tag %q", *tag))
@@ -363,6 +364,20 @@ func walkSpecDir(dir string, add func(string)) error {
 
 func isSpecFile(p string) bool {
 	return strings.HasSuffix(p, ".atago.yaml") || strings.HasSuffix(p, ".atago.yml")
+}
+
+// csvFlag is a repeatable flag whose every occurrence is split on commas and
+// accumulated, giving OR semantics across both forms: `--filter a,b` and
+// `--filter a --filter b` both select names containing "a" or "b". This fixes
+// the old single-string --filter, which treated a comma list as one literal
+// substring and silently kept only the last of repeated flags (#119).
+type csvFlag []string
+
+func (c *csvFlag) String() string { return strings.Join(*c, ",") }
+
+func (c *csvFlag) Set(v string) error {
+	*c = append(*c, splitCSV(v)...)
+	return nil
 }
 
 // splitCSV splits a comma-separated flag value into trimmed, non-empty tokens.

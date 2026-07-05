@@ -65,13 +65,14 @@ type Engine struct {
 	// worker pool). When nil, only this suite's own Parallel workers bound it.
 	Sem chan struct{}
 
-	// FilterName, Tags, and SkipTags select which scenarios run.
-	// FilterName is a substring match on the scenario name; Tags keeps only
-	// scenarios carrying at least one listed tag; SkipTags drops scenarios
-	// carrying any listed tag. Unselected scenarios are excluded entirely.
-	FilterName string
-	Tags       []string
-	SkipTags   []string
+	// FilterNames, Tags, and SkipTags select which scenarios run.
+	// FilterNames keeps a scenario whose name contains ANY listed substring
+	// (OR semantics, mirroring Tags); Tags keeps only scenarios carrying at
+	// least one listed tag; SkipTags drops scenarios carrying any listed tag.
+	// Unselected scenarios are excluded entirely.
+	FilterNames []string
+	Tags        []string
+	SkipTags    []string
 
 	// Select, when non-nil, restricts execution to the exact scenario identities
 	// it contains, keyed by ScenarioID(specPath, scenarioName). It composes with
@@ -293,7 +294,7 @@ func (e *Engine) selectScenarios(s *spec.Spec, specPath string) []int {
 }
 
 func (e *Engine) matches(sc *spec.Scenario, specPath string) bool {
-	if e.FilterName != "" && !strings.Contains(sc.Name, e.FilterName) {
+	if len(e.FilterNames) > 0 && !nameMatchesAny(sc.Name, e.FilterNames) {
 		return false
 	}
 	if len(e.Tags) > 0 && !hasAnyTag(sc, e.Tags) {
@@ -313,6 +314,17 @@ func (e *Engine) matches(sc *spec.Scenario, specPath string) bool {
 // by the --rerun-failed state file and Engine.Select (#64).
 func ScenarioID(specPath, scenarioName string) string {
 	return specPath + "\x00" + scenarioName
+}
+
+// nameMatchesAny reports whether name contains any of the substrings (OR),
+// giving --filter the same multi-value semantics as --tag.
+func nameMatchesAny(name string, subs []string) bool {
+	for _, sub := range subs {
+		if strings.Contains(name, sub) {
+			return true
+		}
+	}
+	return false
 }
 
 func hasAnyTag(sc *spec.Scenario, tags []string) bool {

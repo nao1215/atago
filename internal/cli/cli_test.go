@@ -194,6 +194,89 @@ func TestRunCmd_SelectionMatchesNothingWarns(t *testing.T) {
 	}
 }
 
+// filterSpec has three distinctly-named scenarios so --filter selection can be
+// asserted precisely (#119).
+const filterSpec = `version: "1"
+suite:
+  name: filterchk
+scenarios:
+  - name: alpha one
+    steps:
+      - run: {shell: true, command: "true"}
+      - assert: {exit_code: 0}
+  - name: beta two
+    steps:
+      - run: {shell: true, command: "true"}
+      - assert: {exit_code: 0}
+  - name: gamma three
+    steps:
+      - run: {shell: true, command: "true"}
+      - assert: {exit_code: 0}
+`
+
+// TestRunCmd_FilterMultiple proves --filter selects by name with OR semantics
+// across both a comma list and repeated flags, and that a single substring is
+// unchanged (#119). Before this, a comma list was one literal substring and
+// repeated flags silently kept only the last.
+func TestRunCmd_FilterMultiple(t *testing.T) {
+	dir := t.TempDir()
+	p := writeSpec(t, dir, "f.atago.yaml", filterSpec)
+
+	run := func(args ...string) (int, string, string) {
+		var out, errb bytes.Buffer
+		code := Main(append([]string{"run", "--report", "json"}, append(args, p)...), &out, &errb)
+		return code, out.String(), errb.String()
+	}
+	ran := func(stdout string, names ...string) {
+		t.Helper()
+		for _, n := range names {
+			if !strings.Contains(stdout, n) {
+				t.Errorf("scenario %q did not run; stdout=%s", n, stdout)
+			}
+		}
+	}
+	notRan := func(stdout string, names ...string) {
+		t.Helper()
+		for _, n := range names {
+			if strings.Contains(stdout, n) {
+				t.Errorf("scenario %q ran but should have been filtered out; stdout=%s", n, stdout)
+			}
+		}
+	}
+
+	// Comma OR: alpha,beta selects alpha one and beta two, not gamma three.
+	if code, out, errb := run("--filter", "alpha,beta"); code != ExitOK {
+		t.Fatalf("comma-OR exit = %d, want %d (stderr=%s)", code, ExitOK, errb)
+	} else {
+		ran(out, "alpha one", "beta two")
+		notRan(out, "gamma three")
+	}
+
+	// Repeatable OR: --filter alpha --filter gamma selects both (old bug silently
+	// dropped the first).
+	if code, out, errb := run("--filter", "alpha", "--filter", "gamma"); code != ExitOK {
+		t.Fatalf("repeat-OR exit = %d, want %d (stderr=%s)", code, ExitOK, errb)
+	} else {
+		ran(out, "alpha one", "gamma three")
+		notRan(out, "beta two")
+	}
+
+	// Single substring is unchanged.
+	if code, out, errb := run("--filter", "alpha"); code != ExitOK {
+		t.Fatalf("single exit = %d, want %d (stderr=%s)", code, ExitOK, errb)
+	} else {
+		ran(out, "alpha one")
+		notRan(out, "beta two", "gamma three")
+	}
+
+	// No match still warns and exits 0.
+	if code, _, errb := run("--filter", "zzz,qqq"); code != ExitOK {
+		t.Fatalf("no-match exit = %d, want %d (stderr=%s)", code, ExitOK, errb)
+	} else if !strings.Contains(errb, "no scenarios matched") {
+		t.Errorf("no-match stderr = %q, want a no-match warning", errb)
+	}
+}
+
 func TestRunCmd_Failing(t *testing.T) {
 	dir := t.TempDir()
 	p := writeSpec(t, dir, "fail.atago.yaml", failingSpec)
