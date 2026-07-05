@@ -1,18 +1,27 @@
 package engine
 
 import (
+	"fmt"
 	"runtime"
 	"testing"
 )
 
+// mutateWorkdirCmd returns a shell command that modifies change.txt, deletes
+// gone.txt, and creates a nested out/new.txt — the multi-file delta the changes
+// assertion below pins. The command is the only OS-specific part: atago
+// normalizes recorded paths to forward slashes, so the assertion is portable.
+func mutateWorkdirCmd() string {
+	if runtime.GOOS == "windows" {
+		return `echo after >change.txt& del gone.txt& mkdir out& echo hi >out\new.txt`
+	}
+	return "echo after > change.txt && rm gone.txt && mkdir -p out && echo hi > out/new.txt"
+}
+
 // TestEngine_Changes_CreatedModifiedDeleted proves the delta assertion pins
 // exactly what a run step created, modified, and deleted in the workdir (#70).
 func TestEngine_Changes_CreatedModifiedDeleted(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("uses POSIX shell for the multi-file setup")
-	}
 	t.Parallel()
-	res := runSpec(t, `
+	res := runSpec(t, fmt.Sprintf(`
 version: "1"
 suite:
   name: changes
@@ -32,7 +41,7 @@ scenarios:
           content: bye
       - run:
           shell: true
-          command: 'echo after > change.txt && rm gone.txt && mkdir -p out && echo hi > out/new.txt'
+          command: '%s'
       - assert:
           exit_code: 0
           changes:
@@ -42,7 +51,7 @@ scenarios:
               - change.txt
             deleted:
               - gone.txt
-`)
+`, mutateWorkdirCmd()))
 	if res.Status != StatusPassed {
 		t.Fatalf("status = %s, want passed: %+v", res.Status, res.Scenarios[0].Steps)
 	}
@@ -118,11 +127,12 @@ scenarios:
 // TestEngine_Changes_UnexpectedFileFails proves an unexpected created file
 // fails the assertion (the exhaustive contract) (#70).
 func TestEngine_Changes_UnexpectedFileFails(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("uses POSIX shell")
-	}
 	t.Parallel()
-	res := runSpec(t, `
+	create := "echo a > a.txt && echo b > b.txt"
+	if runtime.GOOS == "windows" {
+		create = `echo a >a.txt& echo b >b.txt`
+	}
+	res := runSpec(t, fmt.Sprintf(`
 version: "1"
 suite:
   name: changes
@@ -131,12 +141,12 @@ scenarios:
     steps:
       - run:
           shell: true
-          command: 'echo a > a.txt && echo b > b.txt'
+          command: '%s'
       - assert:
           changes:
             created:
               - a.txt
-`)
+`, create))
 	if res.Status != StatusFailed {
 		t.Fatalf("status = %s, want failed (b.txt is an unexpected creation): %+v", res.Status, res.Scenarios[0].Steps)
 	}
