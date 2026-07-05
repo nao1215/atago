@@ -662,6 +662,79 @@ scenarios:
 	}
 }
 
+// TestEngine_SelectionSetAlgebra pins the set semantics of --filter/--tag/
+// --skip-tag beyond the single-condition cases in TestEngine_Selection: tags
+// are OR-ed (a scenario matches if it carries any listed tag), filter and tag
+// compose as intersection (not union), and a skip-tag drops a scenario even when
+// a tag it also carries was included — skip is applied last and wins. An empty
+// selection (every scenario skipped) is a valid, non-error outcome.
+func TestEngine_SelectionSetAlgebra(t *testing.T) {
+	t.Parallel()
+	src := `
+version: "1"
+suite:
+  name: sel
+scenarios:
+  - name: login
+    tags: [fast, auth]
+    steps: [{run: {shell: true, command: echo x}}, {assert: {exit_code: 0}}]
+  - name: logout
+    tags: [fast, auth]
+    steps: [{run: {shell: true, command: echo x}}, {assert: {exit_code: 0}}]
+  - name: signup
+    tags: [slow, auth]
+    steps: [{run: {shell: true, command: echo x}}, {assert: {exit_code: 0}}]
+  - name: search
+    tags: [fast, core]
+    steps: [{run: {shell: true, command: echo x}}, {assert: {exit_code: 0}}]
+  - name: billing
+    tags: [slow, core, fast]
+    steps: [{run: {shell: true, command: echo x}}, {assert: {exit_code: 0}}]
+`
+	s, err := loader.LoadBytes("t.atago.yaml", []byte(src))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	tests := []struct {
+		name      string
+		configure func(*Engine)
+		want      []string
+	}{
+		{"tag matches any listed tag", func(e *Engine) { e.Tags = []string{"auth"} },
+			[]string{"login", "logout", "signup"}},
+		{"multiple tags union", func(e *Engine) { e.Tags = []string{"fast", "slow"} },
+			[]string{"login", "logout", "signup", "search", "billing"}},
+		{"skip-tag wins over an included tag", func(e *Engine) { e.Tags = []string{"fast"}; e.SkipTags = []string{"slow"} },
+			[]string{"login", "logout", "search"}},
+		{"filter intersects tag", func(e *Engine) { e.FilterName = "log"; e.Tags = []string{"fast"} },
+			[]string{"login", "logout"}},
+		{"skip-tag alone", func(e *Engine) { e.SkipTags = []string{"core"} },
+			[]string{"login", "logout", "signup"}},
+		{"skip-tag can empty the selection", func(e *Engine) { e.Tags = []string{"core"}; e.SkipTags = []string{"fast"} },
+			nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			eng := New()
+			tt.configure(eng)
+			res := eng.Run(context.Background(), s, "t.atago.yaml")
+			var got []string
+			for _, sc := range res.Scenarios {
+				got = append(got, sc.Name)
+			}
+			if len(got) != len(tt.want) {
+				t.Fatalf("selected %v, want %v", got, tt.want)
+			}
+			for i, w := range tt.want {
+				if got[i] != w {
+					t.Errorf("selected[%d] = %q, want %q (%v)", i, got[i], w, got)
+				}
+			}
+		})
+	}
+}
+
 func TestEngine_SkipOnlyByOS(t *testing.T) {
 	t.Parallel()
 	otherOS := "darwin"
