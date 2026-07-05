@@ -148,7 +148,7 @@ func normalizeValue(v any) any {
 // isRowReturning reports whether a statement yields a result set and so should be
 // run with QueryContext rather than ExecContext.
 func isRowReturning(query string) bool {
-	head := strings.ToUpper(strings.TrimSpace(query))
+	head := strings.ToUpper(strings.TrimSpace(stripSQLComments(query)))
 	// A WITH (CTE) statement is only row-returning when its main statement is a
 	// SELECT/VALUES (or it has RETURNING). A data-modifying CTE like
 	// `WITH x AS (...) INSERT/UPDATE/DELETE ...` without RETURNING must run through
@@ -162,6 +162,50 @@ func isRowReturning(query string) bool {
 		}
 	}
 	return hasReturningKeyword(head)
+}
+
+// stripSQLComments replaces SQL comments outside string/identifier literals with
+// a single space, so the statement classifier sees the real leading verb. A `--`
+// line comment runs to end of line; a `/* */` block comment to its close (an
+// unterminated one to end of input). Quoted regions are skipped with the same
+// rule as the keyword scans, so a `--` or `/*` inside a string literal stays as
+// data. A commented `SELECT` was otherwise misrouted to ExecContext, losing its
+// rows.
+func stripSQLComments(s string) string {
+	var b strings.Builder
+	b.Grow(len(s))
+	for i := 0; i < len(s); {
+		c := s[i]
+		switch {
+		case c == '\'' || c == '"' || c == '`':
+			j := skipQuoted(s, i)
+			b.WriteString(s[i:j])
+			i = j
+		case c == '-' && i+1 < len(s) && s[i+1] == '-':
+			j := i + 2
+			for j < len(s) && s[j] != '\n' {
+				j++
+			}
+			b.WriteByte(' ')
+			i = j
+		case c == '/' && i+1 < len(s) && s[i+1] == '*':
+			j := i + 2
+			for j+1 < len(s) && (s[j] != '*' || s[j+1] != '/') {
+				j++
+			}
+			if j+1 < len(s) {
+				j += 2 // consume the closing */
+			} else {
+				j = len(s) // unterminated block comment
+			}
+			b.WriteByte(' ')
+			i = j
+		default:
+			b.WriteByte(c)
+			i++
+		}
+	}
+	return b.String()
 }
 
 // hasReturningKeyword reports whether head contains a RETURNING keyword OUTSIDE
