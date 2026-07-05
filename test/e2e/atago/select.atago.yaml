@@ -24,6 +24,36 @@ scenarios:
           stdout:
             contains: "1 passed"
 
+  - name: --filter selects multiple scenarios with OR (comma and repeated)
+    steps:
+      - fixture:
+          file: three.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: three
+            scenarios:
+              - name: alpha one
+                steps: [{run: {shell: true, command: echo a}}, {assert: {exit_code: 0}}]
+              - name: beta two
+                steps: [{run: {shell: true, command: echo b}}, {assert: {exit_code: 0}}]
+              - name: gamma three
+                steps: [{run: {shell: true, command: echo c}}, {assert: {exit_code: 0}}]
+      # Comma list ORs the substrings: alpha + beta run, gamma does not.
+      - run:
+          command: ${atago} run --filter alpha,beta three.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "2 passed"
+      # Repeating the flag ORs too (the old behavior silently kept only the last).
+      - run:
+          command: ${atago} run --filter alpha --filter gamma three.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "2 passed"
+
   - name: --skip-tag drops tagged scenarios
     steps:
       - fixture:

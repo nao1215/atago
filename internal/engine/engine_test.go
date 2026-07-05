@@ -644,7 +644,8 @@ scenarios:
 		configure         func(*Engine)
 		wantScenarioNames []string
 	}{
-		{"filter substring", func(e *Engine) { e.FilterName = "bet" }, []string{"beta"}},
+		{"filter substring", func(e *Engine) { e.FilterNames = []string{"bet"} }, []string{"beta"}},
+		{"filter OR selects multiple", func(e *Engine) { e.FilterNames = []string{"alph", "gam"} }, []string{"alpha", "gamma"}},
 		{"tag include", func(e *Engine) { e.Tags = []string{"fast"} }, []string{"alpha", "gamma"}},
 		{"skip tag", func(e *Engine) { e.SkipTags = []string{"slow"} }, []string{"alpha", "gamma"}},
 		{"no selection runs all", func(e *Engine) {}, []string{"alpha", "beta", "gamma"}},
@@ -715,7 +716,7 @@ scenarios:
 			[]string{"login", "logout", "signup", "search", "billing"}},
 		{"skip-tag wins over an included tag", func(e *Engine) { e.Tags = []string{"fast"}; e.SkipTags = []string{"slow"} },
 			[]string{"login", "logout", "search"}},
-		{"filter intersects tag", func(e *Engine) { e.FilterName = "log"; e.Tags = []string{"fast"} },
+		{"filter intersects tag", func(e *Engine) { e.FilterNames = []string{"log"}; e.Tags = []string{"fast"} },
 			[]string{"login", "logout"}},
 		{"skip-tag alone", func(e *Engine) { e.SkipTags = []string{"core"} },
 			[]string{"login", "logout", "signup"}},
@@ -1213,13 +1214,17 @@ func TestEngineMatches(t *testing.T) {
 	}
 
 	byName := New()
-	byName.FilterName = "login"
+	byName.FilterNames = []string{"login"}
 	if !byName.matches(sc, "s.yaml") {
 		t.Error("name substring should match")
 	}
-	byName.FilterName = "logout"
+	byName.FilterNames = []string{"logout"}
 	if byName.matches(sc, "s.yaml") {
 		t.Error("non-matching name substring should reject")
+	}
+	byName.FilterNames = []string{"logout", "login"}
+	if !byName.matches(sc, "s.yaml") {
+		t.Error("OR of substrings should match when any matches")
 	}
 
 	byTag := New()

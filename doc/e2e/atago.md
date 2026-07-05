@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-55 suites · 217 scenarios
+55 suites · 218 scenarios
 ## Contents
 - [atago self-hosting / variable expansion in assertion matcher values](#atago-self-hosting--variable-expansion-in-assertion-matcher-values) — 6 scenarios
   - [stdout.equals expands ${workdir}](#scenario-stdoutequals-expands-workdir)
@@ -208,8 +208,9 @@
   - [declared secrets are masked in failure output](#scenario-declared-secrets-are-masked-in-failure-output)
   - [a file assertion path may not escape the scenario workdir](#scenario-a-file-assertion-path-may-not-escape-the-scenario-workdir)
   - [a snapshot path may not escape the spec directory](#scenario-a-snapshot-path-may-not-escape-the-spec-directory)
-- [atago self-hosting / selection](#atago-self-hosting--selection) — 2 scenarios
+- [atago self-hosting / selection](#atago-self-hosting--selection) — 3 scenarios
   - [--filter runs only matching scenarios](#scenario---filter-runs-only-matching-scenarios)
+  - [--filter selects multiple scenarios with OR (comma and repeated)](#scenario---filter-selects-multiple-scenarios-with-or-comma-and-repeated)
   - [--skip-tag drops tagged scenarios](#scenario---skip-tag-drops-tagged-scenarios)
 - [atago self-hosting / background services](#atago-self-hosting--background-services) — 7 scenarios
   - [file readiness captures a dynamic value into a variable](#scenario-file-readiness-captures-a-dynamic-value-into-a-variable)
@@ -3761,6 +3762,35 @@ ${atago} run --filter keep many.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `1 passed`
+### Scenario: --filter selects multiple scenarios with OR (comma and repeated)
+#### Given
+- Fixture file `three.atago.yaml` is created.
+#### Inputs
+_Fixture `three.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: three
+scenarios:
+  - name: alpha one
+    steps: [{run: {shell: true, command: echo a}}, {assert: {exit_code: 0}}]
+  - name: beta two
+    steps: [{run: {shell: true, command: echo b}}, {assert: {exit_code: 0}}]
+  - name: gamma three
+    steps: [{run: {shell: true, command: echo c}}, {assert: {exit_code: 0}}]
+```
+#### When
+```shell
+${atago} run --filter alpha,beta three.atago.yaml
+${atago} run --filter alpha --filter gamma three.atago.yaml
+```
+#### Then
+- after `${atago} run --filter alpha,beta three.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `2 passed`
+- after `${atago} run --filter alpha --filter gamma three.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `2 passed`
 ### Scenario: --skip-tag drops tagged scenarios
 #### Given
 - Fixture file `tagged.atago.yaml` is created.
