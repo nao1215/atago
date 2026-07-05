@@ -1,0 +1,69 @@
+version: "1"
+suite:
+  name: extend-host-env
+# A scenario's env: values are ${name}-expanded, and ${env:NAME} reads the
+# launcher's own environment — so a value can EXTEND an inherited variable
+# instead of replacing it. The classic case: put a stub binary earlier on PATH
+# while keeping the real toolchain resolvable. ${env:NAME} is opt-in: a bare
+# ${NAME} (no env: prefix) is left literal, so existing suites are unaffected.
+scenarios:
+  # Prepend a stub dir to PATH: the stub wins, and the inherited PATH still
+  # resolves real tools — impossible if PATH could only be replaced.
+  - name: extend PATH with a stub directory, keeping the inherited PATH
+    skip:
+      os: windows # POSIX PATH syntax (":" separator, sh, command -v)
+    env:
+      PATH: "${workdir}/stub:${env:PATH}"
+    steps:
+      - fixture:
+          file: stub/foo
+          content: |
+            #!/bin/sh
+            echo stubbed-foo
+          mode: "0755"
+      - run:
+          shell: true
+          command: command -v foo # resolves to the stub, not any system foo
+      - assert:
+          stdout:
+            contains: /stub/foo
+      - run:
+          shell: true
+          command: foo
+      - assert:
+          stdout:
+            equals: stubbed-foo
+      - run:
+          shell: true
+          command: command -v sh # a real tool from the inherited PATH still resolves
+      - assert:
+          exit_code: 0
+
+  # Opt-in guard: a bare ${NAME} without the env: prefix stays literal, so
+  # ${env:PATH} never silently changes the meaning of an existing value.
+  - name: "a bare ${NAME} without env: prefix is left literal"
+    skip:
+      os: windows
+    env:
+      LITERAL: "keep:${NOT_DEFINED}"
+    steps:
+      - run:
+          command: printenv LITERAL
+      - assert:
+          stdout:
+            equals: "keep:${NOT_DEFINED}"
+
+  # An unset host variable is left literal (the same unresolved-variable policy
+  # as a bare ${NAME}), so a typo'd or absent host var stays visible instead of
+  # collapsing to a silent empty segment.
+  - name: an unset host variable is left literal, not silently blank
+    skip:
+      os: windows
+    env:
+      MAYBE: "a:${env:DEFINITELY_NOT_SET_XYZ}:b"
+    steps:
+      - run:
+          command: printenv MAYBE
+      - assert:
+          stdout:
+            equals: "a:${env:DEFINITELY_NOT_SET_XYZ}:b"
