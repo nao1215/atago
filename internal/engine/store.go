@@ -99,6 +99,13 @@ func jsonValue(data []byte, path string) (string, error) {
 	if len(nodes) != 1 {
 		return "", fmt.Errorf("JSON path %q selected %d values, want exactly 1", path, len(nodes))
 	}
+	// Why: a JSON null selects exactly one node whose Go value is nil, and
+	// fmt.Sprint(nil) yields the literal string "<nil>". Storing that would leak
+	// a Go-ism into a user-visible variable and silently mask "the field was
+	// null" as a captured value. Surface it as a clean error instead.
+	if nodes[0] == nil {
+		return "", fmt.Errorf("JSON path %q selected a null value", path)
+	}
 	return fmt.Sprint(nodes[0]), nil
 }
 

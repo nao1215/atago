@@ -54,6 +54,12 @@ func CollectServiceVars(set map[string]bool, svc *Service) {
 	for _, v := range svc.Env {
 		CollectVars(set, v)
 	}
+	// The readiness file/port/log probes are ${name}-expanded by the engine
+	// (expandService), so a `ready: {port: ${db.port}}` or a log regexp with
+	// ${workdir} references variables the summaries must report.
+	if svc.Ready != nil {
+		CollectVars(set, svc.Ready.File, svc.Ready.Port, svc.Ready.Log)
+	}
 }
 
 // CollectStepVars folds every ${name} reference in a step's fields into set.
@@ -64,7 +70,10 @@ func CollectServiceVars(set map[string]bool, svc *Service) {
 func CollectStepVars(set map[string]bool, step *Step) {
 	switch step.Kind() {
 	case StepFixture:
-		CollectVars(set, step.Fixture.File, step.Fixture.Content, step.Fixture.Symlink)
+		// From is ${name}-expanded by the engine (expandFixture), so a
+		// `from: ${srcdir}/seed.bin` reference is a real variable use and must be
+		// counted like file/content/symlink — omitting it under-reported it.
+		CollectVars(set, step.Fixture.File, step.Fixture.Content, step.Fixture.Symlink, step.Fixture.From)
 	case StepService:
 		CollectVars(set, step.Service.Command, step.Service.Cwd)
 	case StepRun:
@@ -79,13 +88,29 @@ func CollectStepVars(set map[string]bool, step *Step) {
 		for _, v := range h.Form {
 			CollectVars(set, v)
 		}
+		// Header values and the JSON request body are ${name}-expanded by the
+		// engine (expandHTTP: ExpandMap(header), WalkJSONValueStrings(json)), the
+		// exact binding that flows a stored token into `Authorization: Bearer
+		// ${token}` or a request body. Omitting them under-reported those vars.
+		for _, v := range h.Header {
+			CollectVars(set, v)
+		}
+		collectJSONVars(set, h.JSON)
 		for _, f := range h.Files {
 			CollectVars(set, f.Path)
 		}
 	case StepQuery:
 		CollectVars(set, step.Query.SQL)
 	case StepGRPC:
-		CollectVars(set, step.GRPC.Method)
+		g := step.GRPC
+		CollectVars(set, g.Method)
+		// Header values and the JSON request message are ${name}-expanded by the
+		// engine (expandGRPC), mirroring http; count them so a metadata or
+		// message reference is not silently dropped.
+		for _, v := range g.Header {
+			CollectVars(set, v)
+		}
+		collectJSONVars(set, g.JSON)
 	case StepCDP:
 		for _, a := range step.CDP.Actions {
 			collectCDPActionVars(set, a)
@@ -104,7 +129,38 @@ func CollectStepVars(set map[string]bool, step *Step) {
 		}
 	case StepSignal:
 		CollectVars(set, step.Signal.Service)
+	case StepAssert:
+		// An assert step's matcher arguments are ${name}-expanded by the engine
+		// (expandAssert -> WalkAssertStrings), so an `equals: ${expected}` or a
+		// `path: ${dir}/out.txt` is a genuine variable use. Walking through the
+		// SAME helper the engine expands with keeps collection and expansion in
+		// exact lockstep; the whole StepAssert kind was previously uncounted.
+		if step.Assert != nil {
+			WalkAssertStrings(step.Assert, func(s string) string {
+				CollectVars(set, s)
+				return s
+			})
+		}
+	case StepStore:
+		// The engine ${name}-expands a store's file-source path (expandStore),
+		// so `store: {from: {file: {path: ${workdir}/out.json}}}` references a
+		// variable the summaries must report.
+		if step.Store != nil && step.Store.From != nil && step.Store.From.File != nil {
+			CollectVars(set, step.Store.From.File.Path)
+		}
 	}
+}
+
+// collectJSONVars folds every ${name} reference in the string leaves of a
+// decoded JSON request body (http/grpc `json:`) into set. The engine expands
+// those leaves through WalkJSONValueStrings at request time
+// (expandHTTP/expandGRPC), so a body like {token: "${token}"} references a
+// variable the manifest and explain summaries must report.
+func collectJSONVars(set map[string]bool, v any) {
+	WalkJSONValueStrings(v, func(s string) string {
+		CollectVars(set, s)
+		return s
+	})
 }
 
 // collectCDPActionVars folds the ${name} references of one browser action into

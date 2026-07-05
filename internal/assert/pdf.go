@@ -211,8 +211,34 @@ func readPDFString(data []byte, open int) (string, bool) {
 		c := data[i]
 		switch c {
 		case '\\':
-			if i+1 < len(data) {
-				b.WriteByte(unescapePDFByte(data[i+1]))
+			if i+1 >= len(data) {
+				break // trailing backslash: nothing to escape
+			}
+			nc := data[i+1]
+			switch {
+			case nc >= '0' && nc <= '7':
+				// Octal escape \ddd (1–3 digits): the canonical way PDFs encode a
+				// non-ASCII byte in a literal string. Consume up to three octal
+				// digits and emit the resulting byte.
+				val := 0
+				n := 0
+				for n < 3 && i+1 < len(data) && data[i+1] >= '0' && data[i+1] <= '7' {
+					val = val*8 + int(data[i+1]-'0')
+					i++
+					n++
+				}
+				b.WriteByte(byte(val))
+			case nc == '\n':
+				// Backslash-newline is a line continuation: both bytes are dropped.
+				i++
+			case nc == '\r':
+				// Same, tolerating a CRLF line ending after the backslash.
+				i++
+				if i+1 < len(data) && data[i+1] == '\n' {
+					i++
+				}
+			default:
+				b.WriteByte(unescapePDFByte(nc))
 				i++
 			}
 		case '(':
@@ -247,7 +273,12 @@ func unescapePDFByte(c byte) byte {
 		return '\r'
 	case 't':
 		return '\t'
+	case 'b':
+		return '\b'
+	case 'f':
+		return '\f'
 	default:
+		// \( \) \\ and any other escaped byte pass through literally.
 		return c
 	}
 }

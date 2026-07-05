@@ -2,6 +2,7 @@ package assert
 
 import (
 	"strings"
+	"unicode/utf8"
 
 	"github.com/nao1215/atago/internal/runner"
 	"github.com/nao1215/atago/internal/spec"
@@ -29,20 +30,23 @@ func checkScreen(sa *spec.StreamAssert, res *runner.Result, env Env) *CheckResul
 }
 
 // borderedScreen frames the rendered screen so trailing spaces and width are
-// visible in failure output.
+// visible in failure output. Width and padding are measured in runes, not bytes:
+// a pty/TUI screen routinely contains box-drawing characters (─│┌, 3 bytes each)
+// and CJK text, and a byte-based measure would pad those rows short and produce a
+// ragged right border in exactly the screens this assertion exists to check.
 func borderedScreen(screen string) string {
 	lines := strings.Split(screen, "\n")
 	width := 0
 	for _, l := range lines {
-		if len(l) > width {
-			width = len(l)
+		if n := utf8.RuneCountInString(l); n > width {
+			width = n
 		}
 	}
 	var b strings.Builder
 	bar := "+" + strings.Repeat("-", width+2) + "+"
 	b.WriteString(bar + "\n")
 	for _, l := range lines {
-		b.WriteString("| " + l + strings.Repeat(" ", width-len(l)) + " |\n")
+		b.WriteString("| " + l + strings.Repeat(" ", width-utf8.RuneCountInString(l)) + " |\n")
 	}
 	b.WriteString(bar)
 	return b.String()

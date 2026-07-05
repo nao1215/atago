@@ -424,6 +424,12 @@ func describeHeader(h *spec.HeaderMatch) string {
 		return fmt.Sprintf("%q contains %q", h.Name, *h.Contains)
 	case h.Equals != nil:
 		return fmt.Sprintf("%q equals %q", h.Name, *h.Equals)
+	// A header `matches` regexp is a real matcher (the natural shape for auth
+	// headers like "^Bearer "); without this case it fell to the name-only
+	// default and the documented constraint vanished from the explain output.
+	// Kept in step with docgen.describeHeader.
+	case h.Matches != nil:
+		return fmt.Sprintf("%q matches /%s/", h.Name, *h.Matches)
 	default:
 		return fmt.Sprintf("%q", h.Name)
 	}

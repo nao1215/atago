@@ -177,6 +177,23 @@ func expandCDP(st *store.Store, c *spec.CDP) *spec.CDP {
 			at.Name = st.Expand(at.Name)
 			a.Attribute = &at
 		}
+		if a.Upload != nil {
+			// Upload.File is a workdir-relative path; expand it (and the selector)
+			// so a ${workdir}/store-derived file is uploaded, matching what
+			// CollectStepVars reports as a live variable use.
+			up := *a.Upload
+			up.Selector = st.Expand(up.Selector)
+			up.File = st.Expand(up.File)
+			a.Upload = &up
+		}
+		if a.Download != nil {
+			// Download.Dir is a workdir-relative capture directory; expand it (and
+			// the click selector) for the same reason as Upload above.
+			dl := *a.Download
+			dl.Click = st.Expand(dl.Click)
+			dl.Dir = st.Expand(dl.Dir)
+			a.Download = &dl
+		}
 		out.Actions[i] = a
 	}
 	return &out

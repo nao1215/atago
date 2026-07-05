@@ -7,6 +7,32 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- PDF text extraction now decodes octal `\ddd`, `\b`, `\f`, and backslash-newline
+  line-continuation escapes in literal strings (ISO 32000), so a `pdf: {text:
+  {...}}` assertion matches non-ASCII text as written by pandoc/LaTeX/wkhtmltopdf
+  instead of seeing the literal escape sequence (e.g. `caf\351` now yields the
+  byte for `é`, not `caf351`).
+- The `screen` assertion's failure box measures line width and padding in runes,
+  not bytes, so a rendered pty/TUI screen with box-drawing characters or CJK text
+  frames with an aligned right border instead of a ragged one.
+- A store step capturing a JSON `null` (`from.stdout.json`) now returns a clear
+  error instead of storing Go's `"<nil>"` string into the variable, so a null
+  field can no longer masquerade as a captured value.
+- Browser `cdp` upload and download actions now expand `${name}` references in
+  their file path, capture directory, and selectors, matching every other cdp
+  action; a stored or `${workdir}`-derived path previously reached the browser
+  literally.
+- `atago explain` and `atago doc` now render an HTTP header `matches:` regexp
+  matcher; it was silently dropped, hiding a security-relevant header constraint
+  from the generated summaries.
+- The shared variable walk (`explain`/`manifest`/`doc`) now counts `${name}`
+  references in `fixture.from`, HTTP/gRPC header values and JSON bodies, assert
+  matcher arguments, a service `ready` probe, and a store file-source path — every
+  field the engine expands — so the "Variables used" summary no longer
+  under-reports them.
+
 ## [0.3.4] - 2026-07-05
 
 A bug-fix release that bounds and guards the run engine. No new features.
