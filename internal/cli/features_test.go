@@ -487,6 +487,103 @@ func TestRerunFailed_GreenRunClearsState(t *testing.T) {
 	})
 }
 
+// singleFailSpec renders a one-scenario spec named <name> whose only scenario
+// <name>_fail asserts exit_code 0. When passes is false the command exits 1 (the
+// assertion fails); when true it exits 0 (passes). Used to build multi-spec
+// rerun-ledger fixtures.
+func singleFailSpec(name string, passes bool) string {
+	code := "1"
+	if passes {
+		code = "0"
+	}
+	return `version: "1"
+suite:
+  name: ` + name + `
+scenarios:
+  - name: ` + name + `_fail
+    steps:
+      - run: {shell: true, command: "exit ` + code + `"}
+      - assert: {exit_code: 0}
+`
+}
+
+// TestRerunFailed_NarrowedTargetPreservesOtherFailures is a regression: a
+// `--rerun-failed` narrowed to a subset of the recorded specs must not drop the
+// recorded failures in the specs it did not run. Rewriting the whole ledger from
+// only the narrowed subset forgot still-failing work elsewhere — a red-green
+// loop that silently loses a broken scenario the moment you rerun a single spec.
+func TestRerunFailed_NarrowedTargetPreservesOtherFailures(t *testing.T) {
+	dir := t.TempDir()
+	writeSpec(t, dir, "a.atago.yaml", singleFailSpec("a", false))
+	writeSpec(t, dir, "b.atago.yaml", singleFailSpec("b", false))
+
+	withWorkdir(t, dir, func() {
+		var out, errb bytes.Buffer
+		// A full run records both a_fail and b_fail.
+		if got := Main([]string{"run", "."}, &out, &errb); got != ExitFailures {
+			t.Fatalf("first run exit = %d, want %d (stderr=%s)", got, ExitFailures, errb.String())
+		}
+		st, err := loadRerunState()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(st.Failed) != 2 {
+			t.Fatalf("recorded failures = %+v, want both a_fail and b_fail", st.Failed)
+		}
+
+		// Rerun only a (still failing). b was not re-verified and is still broken,
+		// so it must survive in the ledger alongside the freshly-recorded a_fail.
+		out.Reset()
+		errb.Reset()
+		if got := Main([]string{"run", "--rerun-failed", "a.atago.yaml"}, &out, &errb); got != ExitFailures {
+			t.Fatalf("narrowed rerun exit = %d, want %d (stderr=%s)", got, ExitFailures, errb.String())
+		}
+		st, err = loadRerunState()
+		if err != nil {
+			t.Fatal(err)
+		}
+		names := map[string]bool{}
+		for _, e := range st.Failed {
+			names[e.Scenario] = true
+		}
+		if !names["a_fail"] || !names["b_fail"] {
+			t.Errorf("ledger after narrowed rerun = %+v, want both a_fail (re-verified) and b_fail (preserved)", st.Failed)
+		}
+	})
+}
+
+// TestRerunFailed_NarrowedGreenKeepsOtherFailures is the greenlight variant: a
+// narrowed `--rerun-failed` whose target now passes must not wipe the ledger
+// and exit green while another recorded spec is still broken. Only the specs it
+// actually re-ran may be cleared.
+func TestRerunFailed_NarrowedGreenKeepsOtherFailures(t *testing.T) {
+	dir := t.TempDir()
+	writeSpec(t, dir, "a.atago.yaml", singleFailSpec("a", false))
+	writeSpec(t, dir, "b.atago.yaml", singleFailSpec("b", false))
+
+	withWorkdir(t, dir, func() {
+		var out, errb bytes.Buffer
+		if got := Main([]string{"run", "."}, &out, &errb); got != ExitFailures {
+			t.Fatalf("first run exit = %d (stderr=%s)", got, errb.String())
+		}
+		// Fix a so its narrowed rerun passes; leave b broken and un-run.
+		writeSpec(t, dir, "a.atago.yaml", singleFailSpec("a", true))
+
+		out.Reset()
+		errb.Reset()
+		if got := Main([]string{"run", "--rerun-failed", "a.atago.yaml"}, &out, &errb); got != ExitOK {
+			t.Fatalf("narrowed green rerun exit = %d, want %d (stderr=%s)", got, ExitOK, errb.String())
+		}
+		st, err := loadRerunState()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(st.Failed) != 1 || st.Failed[0].Scenario != "b_fail" {
+			t.Errorf("ledger = %+v, want only b_fail preserved (a cleared, b kept)", st.Failed)
+		}
+	})
+}
+
 // TestCompletion_HelpFlag proves --help behaves like every other subcommand's
 // --help (usage on stdout, exit 0) instead of being mistaken for a shell name.
 func TestCompletion_HelpFlag(t *testing.T) {
