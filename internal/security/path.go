@@ -46,6 +46,50 @@ func resolveInRoot(field, rootLabel, root, p string) (string, error) {
 	return dest, nil
 }
 
+// ReadFileNoFollow reads path but refuses to follow a symlink planted at the
+// leaf. Lexical containment (ResolveWorkdirPath/ResolveSpecPath) proves path is
+// inside its root, but the untrusted program under test may have replaced the
+// leaf with a link pointing outside the root — os.ReadFile would follow it and
+// disclose an arbitrary host file (issue #16). An existing symlink is rejected
+// outright, mirroring WriteFileNoFollow's guard on the write path so every
+// path-taking feature enforces the same rule instead of a plain, link-following
+// os.ReadFile.
+func ReadFileNoFollow(path string) ([]byte, error) {
+	if fi, err := os.Lstat(path); err == nil && fi.Mode()&os.ModeSymlink != 0 {
+		return nil, fmt.Errorf("refusing to read through the symlink %q (it escapes the scenario root)", path)
+	}
+	return os.ReadFile(path) //nolint:gosec // path is containment-checked by the caller and Lstat-guarded against a leaf symlink
+}
+
+// WriteFileNoFollow writes data to dest without following a symlink planted at
+// dest. Lexical containment proves dest is inside its root, but the untrusted
+// program under test may have created a link there pointing outside the root;
+// following it on write would escape containment and clobber a host file (TOCTOU,
+// issue #16). An existing symlink is rejected outright; an existing regular file
+// is removed and re-created with O_EXCL so a link planted in the race is never
+// written through (O_EXCL fails atomically on any existing path). This is
+// portable — unlike O_NOFOLLOW, which is not available on all platforms.
+func WriteFileNoFollow(dest string, data []byte, perm os.FileMode) error {
+	if fi, err := os.Lstat(dest); err == nil {
+		if fi.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("refusing to write through the existing symlink %q (it escapes the scenario root)", dest)
+		}
+		if err := os.Remove(dest); err != nil {
+			return err
+		}
+	}
+	f, err := os.OpenFile(dest, os.O_WRONLY|os.O_CREATE|os.O_EXCL, perm) //nolint:gosec // dest is containment-checked by the caller; O_EXCL guards against a planted link
+	if err != nil {
+		return err
+	}
+	_, werr := f.Write(data)
+	cerr := f.Close()
+	if werr != nil {
+		return werr
+	}
+	return cerr
+}
+
 // WithinRoot reports whether resolved lies inside root (root itself counts).
 // Callers that resolve a path with non-default semantics — a symlink target
 // resolved against the link's own directory, say — can reuse this single

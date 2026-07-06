@@ -153,7 +153,9 @@ func (r *Runner) Run(ctx context.Context, actions []spec.CDPAction, workdir stri
 	// Persist any screenshots after the run completes, so the captured bytes are
 	// on disk before the scenario's file/image assertions read them (#50).
 	for _, s := range shots {
-		if err := os.WriteFile(s.path, *s.buf, 0o600); err != nil {
+		// The page under test may have planted a symlink at the screenshot target
+		// pointing outside the workdir; write without following it (issue #16).
+		if err := security.WriteFileNoFollow(s.path, *s.buf, 0o600); err != nil {
 			return nil, fmt.Errorf("cdp screenshot: writing %q: %w", s.path, err)
 		}
 	}

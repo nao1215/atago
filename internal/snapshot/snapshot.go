@@ -12,6 +12,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/nao1215/atago/internal/security"
 )
 
 // ErrMissing reports that a snapshot file does not exist yet; the caller should
@@ -133,7 +135,7 @@ func isComponentBoundary(c byte) bool {
 // It returns the normalized expected and actual text for diffing. If the
 // snapshot does not exist it returns ErrMissing.
 func Compare(path string, actual []byte, opt Options) (ok bool, expected, actualNorm string, err error) {
-	stored, rerr := os.ReadFile(path) //nolint:gosec // snapshot path is user-declared
+	stored, rerr := security.ReadFileNoFollow(path)
 	if rerr != nil {
 		if os.IsNotExist(rerr) {
 			return false, "", string(Normalize(actual, opt)), ErrMissing
@@ -155,5 +157,7 @@ func Update(path string, actual []byte, opt Options) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		return err
 	}
-	return os.WriteFile(path, Normalize(actual, opt), 0o600)
+	// The program under test may have planted a symlink at the snapshot target
+	// pointing outside the spec directory; write without following it (issue #16).
+	return security.WriteFileNoFollow(path, Normalize(actual, opt), 0o600)
 }

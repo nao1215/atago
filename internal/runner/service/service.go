@@ -256,10 +256,19 @@ func (p *Proc) waitFile(ctx context.Context, path, store string, timeout time.Du
 }
 
 // poll calls check every pollInterval until it returns true, the service exits,
-// the timeout elapses, or ctx is canceled.
+// the timeout elapses, or ctx is canceled. A non-positive timeout means
+// "unbounded" (matching the documented ready semantics and the delay probe): the
+// deadline channel stays nil so it never fires, and the wait is bounded only by
+// the process staying alive or the scenario context. Without this, ready.timeout
+// "0" made the file/port/log probes fail immediately via a zero-duration timer,
+// contradicting the delay probe which already treated 0 as unbounded.
 func (p *Proc) poll(ctx context.Context, timeout time.Duration, check func() bool) error {
-	deadline := time.NewTimer(timeout)
-	defer deadline.Stop()
+	var deadlineC <-chan time.Time
+	if timeout > 0 {
+		deadline := time.NewTimer(timeout)
+		defer deadline.Stop()
+		deadlineC = deadline.C
+	}
 	tick := time.NewTicker(pollInterval)
 	defer tick.Stop()
 	for {
@@ -275,7 +284,7 @@ func (p *Proc) poll(ctx context.Context, timeout time.Duration, check func() boo
 				return nil
 			}
 			return errExitedEarly
-		case <-deadline.C:
+		case <-deadlineC:
 			return fmt.Errorf("timed out after %s waiting for readiness", timeout)
 		case <-ctx.Done():
 			return ctx.Err()

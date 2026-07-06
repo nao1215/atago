@@ -87,7 +87,7 @@ func Write(f *spec.Fixture, workdir, specDir string) error {
 	// dest is contained within workdir by safeJoin above (cannot escape) — but the
 	// untrusted program under test may have planted a symlink at dest pointing
 	// outside the workdir; writing must not follow it (TOCTOU, issue #16).
-	if err := writeNoFollow(dest, data, 0o600); err != nil {
+	if err := security.WriteFileNoFollow(dest, data, 0o600); err != nil {
 		return fmt.Errorf("fixture %q: %w", f.File, err)
 	}
 	if err := applyMode(f, dest); err != nil {
@@ -145,34 +145,6 @@ func checkSymlinkTarget(workdir, dest, target string) error {
 		return fmt.Errorf("symlink target %q escapes the scenario workdir", target)
 	}
 	return nil
-}
-
-// writeNoFollow writes data to dest without following a symlink planted at dest.
-// The untrusted program under test may have created a link there pointing outside
-// the workdir; following it on write would escape containment (issue #16). An
-// existing symlink is rejected outright; an existing regular file is removed and
-// re-created with O_EXCL so a link planted in the race is never written through
-// (O_EXCL fails atomically on any existing path). This is portable — unlike
-// O_NOFOLLOW, which is not available on all platforms.
-func writeNoFollow(dest string, data []byte, perm os.FileMode) error {
-	if fi, err := os.Lstat(dest); err == nil {
-		if fi.Mode()&os.ModeSymlink != 0 {
-			return fmt.Errorf("refusing to write through the existing symlink %q", dest)
-		}
-		if err := os.Remove(dest); err != nil {
-			return err
-		}
-	}
-	f, err := os.OpenFile(dest, os.O_WRONLY|os.O_CREATE|os.O_EXCL, perm) //nolint:gosec // dest sanitized by safeJoin; O_EXCL guards against a planted link
-	if err != nil {
-		return err
-	}
-	_, werr := f.Write(data)
-	cerr := f.Close()
-	if werr != nil {
-		return werr
-	}
-	return cerr
 }
 
 // safeJoin joins rel onto base and ensures the result stays within base, so a

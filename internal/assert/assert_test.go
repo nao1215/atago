@@ -805,6 +805,35 @@ func TestCheck_File_TraversalRejected(t *testing.T) {
 	}
 }
 
+// TestCheck_File_SymlinkEscapeRejected proves that lexical containment is not
+// enough: a file assertion target that is a symlink inside the workdir but points
+// at a host file outside it must not be read through (issue #16). The untrusted
+// program under test could plant such a link to disclose /etc/passwd et al. into
+// the report; checkFile must refuse to follow it.
+func TestCheck_File_SymlinkEscapeRejected(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink creation is not reliably available on Windows CI")
+	}
+	t.Parallel()
+	workdir := t.TempDir()
+	secret := filepath.Join(t.TempDir(), "secret.txt")
+	if err := os.WriteFile(secret, []byte("top-secret"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	// A link planted inside the workdir (so lexical containment passes) that
+	// resolves to the out-of-root secret.
+	if err := os.Symlink(secret, filepath.Join(workdir, "leak.txt")); err != nil {
+		t.Fatal(err)
+	}
+	got := Check(&spec.Assert{File: &spec.FileAssert{Path: "leak.txt", Contains: spec.StringList{"top-secret"}}}, nil, Env{Workdir: workdir})
+	if got.OK {
+		t.Fatalf("read through a workdir symlink pointing outside the root")
+	}
+	if strings.Contains(got.Actual, "top-secret") || strings.Contains(got.Hint, "top-secret") || strings.Contains(string(got.ArtifactActual), "top-secret") {
+		t.Errorf("the out-of-root secret leaked into the result: %+v", got)
+	}
+}
+
 // TestCheck_Snapshot_TraversalRejected proves a relative snapshot path may not
 // escape the spec directory.
 func TestCheck_Snapshot_TraversalRejected(t *testing.T) {

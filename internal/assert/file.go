@@ -125,7 +125,10 @@ func checkFile(f *spec.FileAssert, env Env) *CheckResult {
 }
 
 func readFile(label, path string) ([]byte, *CheckResult) {
-	data, err := os.ReadFile(path) //nolint:gosec // path is the user-declared assertion target
+	// The program under test may have planted a symlink at the assertion target
+	// pointing outside the workdir; reading through it would disclose an arbitrary
+	// host file into the report/artifacts, so refuse to follow it (issue #16).
+	data, err := security.ReadFileNoFollow(path)
 	if err != nil {
 		return nil, &CheckResult{
 			Desc:     fmt.Sprintf("assert file %q", label),

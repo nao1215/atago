@@ -160,6 +160,36 @@ func TestStart_DelayBoundedByTimeout(t *testing.T) {
 	}
 }
 
+// TestStart_ZeroTimeoutReadinessIsUnbounded is a regression: ready.timeout "0"
+// documents an unbounded readiness wait, and the delay probe already honored it,
+// but the file/port/log probes handed 0 straight to a zero-duration timer and
+// failed on the first tick. A ready file that appears shortly after start must
+// still be detected under timeout "0", not lose a race to an instant timeout.
+func TestStart_ZeroTimeoutReadinessIsUnbounded(t *testing.T) {
+	skipWindows(t)
+	wd := t.TempDir()
+	svc := &spec.Service{
+		Name:  "late",
+		Shell: spec.Bool(true),
+		// Publish the ready file only after a short delay, so the first poll check
+		// misses it — exactly the case a zero-duration timer would fail instantly.
+		Command: "sleep 0.3; printf '127.0.0.1:5555' > ready.txt; " + sleepCmd(5),
+		Ready:   &spec.Ready{File: "ready.txt", Store: "addr", Timeout: "0"},
+	}
+	start := time.Now()
+	p, captured, err := Start(context.Background(), svc, wd)
+	if err != nil {
+		t.Fatalf("Start() with ready.timeout 0 error = %v; want an unbounded wait to detect the late file", err)
+	}
+	defer p.Stop()
+	if captured != "127.0.0.1:5555" {
+		t.Errorf("captured = %q, want the published address", captured)
+	}
+	if elapsed := time.Since(start); elapsed < 200*time.Millisecond {
+		t.Errorf("returned after %s; a zero timeout must wait for the file, not return before it appears", elapsed)
+	}
+}
+
 // TestStart_BarePortReadyRejected is a regression: a host-less ready.port must
 // fail fast with a clear message, not swallow "missing port in address" and run
 // to the full readiness timeout.

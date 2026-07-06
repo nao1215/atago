@@ -1,6 +1,7 @@
 package security
 
 import (
+	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -81,6 +82,82 @@ func TestResolve_RelativeRoot(t *testing.T) {
 	}
 	if _, err := ResolveWorkdirPath("f", ".", "sub/out.txt"); err != nil {
 		t.Fatalf("nested relative path rejected under root %q: %v", ".", err)
+	}
+}
+
+// TestReadFileNoFollow verifies a leaf symlink pointing outside the root is
+// refused (issue #16): the untrusted program under test could plant such a link
+// at an assertion/snapshot read target to disclose an arbitrary host file. A
+// plain regular file inside the root is read normally.
+func TestReadFileNoFollow(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink creation is not reliably available on Windows CI")
+	}
+	t.Parallel()
+	root := t.TempDir()
+
+	regular := filepath.Join(root, "real.txt")
+	if err := os.WriteFile(regular, []byte("in-root"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := ReadFileNoFollow(regular); err != nil || string(got) != "in-root" {
+		t.Fatalf("ReadFileNoFollow(regular) = %q, %v; want %q, nil", got, err, "in-root")
+	}
+
+	// A host secret outside the root, and a link to it planted inside the root.
+	secret := filepath.Join(t.TempDir(), "secret.txt")
+	if err := os.WriteFile(secret, []byte("top-secret"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(root, "leak.txt")
+	if err := os.Symlink(secret, link); err != nil {
+		t.Fatal(err)
+	}
+	got, err := ReadFileNoFollow(link)
+	if err == nil {
+		t.Fatalf("ReadFileNoFollow followed the symlink and read %q; want error", got)
+	}
+	if !strings.Contains(err.Error(), "symlink") {
+		t.Errorf("error %q should name the refused symlink", err)
+	}
+}
+
+// TestWriteFileNoFollow verifies a leaf symlink at the write target is refused
+// (so a redirect/snapshot write cannot clobber a host file through a link the
+// program under test planted), while a fresh write and an overwrite of a plain
+// regular file both succeed.
+func TestWriteFileNoFollow(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink creation is not reliably available on Windows CI")
+	}
+	t.Parallel()
+	root := t.TempDir()
+
+	fresh := filepath.Join(root, "out.txt")
+	if err := WriteFileNoFollow(fresh, []byte("v1"), 0o600); err != nil {
+		t.Fatalf("fresh write: %v", err)
+	}
+	if err := WriteFileNoFollow(fresh, []byte("v2"), 0o600); err != nil {
+		t.Fatalf("overwrite of regular file: %v", err)
+	}
+	if got, err := os.ReadFile(fresh); err != nil || string(got) != "v2" {
+		t.Fatalf("after overwrite = %q, %v; want %q", got, err, "v2")
+	}
+
+	// A host file outside the root must not be clobbered through a planted link.
+	victim := filepath.Join(t.TempDir(), "victim.txt")
+	if err := os.WriteFile(victim, []byte("original"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(root, "redirect.txt")
+	if err := os.Symlink(victim, link); err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteFileNoFollow(link, []byte("pwned"), 0o600); err == nil {
+		t.Fatal("WriteFileNoFollow wrote through the symlink; want error")
+	}
+	if got, _ := os.ReadFile(victim); string(got) != "original" {
+		t.Errorf("host file was modified through the symlink: %q", got)
 	}
 }
 
