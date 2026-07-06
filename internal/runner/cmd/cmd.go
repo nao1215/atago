@@ -126,7 +126,7 @@ func (r *Runner) Run(ctx context.Context, run *spec.Run, workdir string) (*runne
 	case runErr == nil:
 		res.ExitCode = 0
 	case errors.As(runErr, &exitErr):
-		res.ExitCode = exitErr.ExitCode()
+		res.ExitCode = exitCodeFor(exitErr)
 	default:
 		// Could not start the process at all (not found, permission, ...).
 		return nil, fmt.Errorf("failed to execute %q: %w", run.Command, runErr)

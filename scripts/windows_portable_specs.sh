@@ -23,6 +23,7 @@ printf '%s\n' \
   ./test/e2e/atago/edge.atago.yaml \
   ./test/e2e/atago/argv_quotes.atago.yaml \
   ./test/e2e/atago/paths_portable.atago.yaml \
+  ./test/e2e/atago/exit_codes.atago.yaml \
   ./test/e2e/atago/file_equals.atago.yaml \
   ./test/e2e/atago/store_whole.atago.yaml \
   ./test/e2e/atago/json_list.atago.yaml \

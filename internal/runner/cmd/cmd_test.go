@@ -544,6 +544,45 @@ func TestWindowsFields_MatchesShellwords(t *testing.T) {
 	}
 }
 
+// TestRun_SignalExitCode proves a process terminated by a signal reports the
+// POSIX 128+signal convention (SIGKILL→137, SIGTERM→143, SIGINT→130) rather than
+// Go's raw -1, so a spec can assert a CLI's signal-handling contract. atago's own
+// timeout/cancel is handled earlier and stays -1; a signal reaching here is the
+// program's own termination.
+func TestRun_SignalExitCode(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX signals only; Windows has no 128+signal convention")
+	}
+	t.Parallel()
+	cases := []struct {
+		name   string
+		signal string
+		want   int
+	}{
+		{"SIGKILL", "KILL", 137},
+		{"SIGTERM", "TERM", 143},
+		{"SIGINT", "INT", 130},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			res, err := New().Run(context.Background(), &spec.Run{
+				Shell:   spec.Bool(true),
+				Command: "kill -" + c.signal + " $$",
+			}, t.TempDir())
+			if err != nil {
+				t.Fatalf("Run() error = %v", err)
+			}
+			if res.ExitCode != c.want {
+				t.Errorf("exit code = %d, want %d (128+signal)", res.ExitCode, c.want)
+			}
+			if res.TimedOut {
+				t.Error("TimedOut = true; a self-delivered signal is not an atago timeout")
+			}
+		})
+	}
+}
+
 func TestRun_CommandNotFound(t *testing.T) {
 	t.Parallel()
 	r := New()
