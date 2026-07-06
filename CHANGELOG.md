@@ -17,6 +17,14 @@ and this project follows [Semantic Versioning](https://semver.org/).
   onto an argument on Windows alone, silently breaking a cross-platform suite on
   `windows-latest`. Windows now treats carriage return and newline as field
   separators too, completing the tokenization parity begun in #154.
+- Every stdout/stderr text matcher folds CRLF, matching the `equals` matcher.
+  `contains`, `not_contains`, `matches`, and `not_matches` compared raw bytes, so
+  a multi-line `contains` needle or a `(?m)`-anchored `matches` written with LF
+  passed against POSIX output but failed against cmd.exe's CRLF output on
+  Windows, while `equals` on the same output passed everywhere. Line endings are
+  an OS artifact for all stream text matchers now; byte-exact comparison
+  (including the exact line ending) stays with the file matchers (`equals_file`,
+  `dir` `sha256`).
 
 ## [0.6.0] - 2026-07-07
 

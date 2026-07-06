@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-60 suites · 241 scenarios
+61 suites · 253 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -153,6 +153,19 @@
   - [line selector narrows stdout to a single 1-based line](#scenario-line-selector-narrows-stdout-to-a-single-1-based-line)
   - [a trailing newline does not add a phantom final line](#scenario-a-trailing-newline-does-not-add-a-phantom-final-line)
   - [an out-of-range line fails the inner spec](#scenario-an-out-of-range-line-fails-the-inner-spec)
+- [atago self-hosting / stream text matchers fold CRLF](#atago-self-hosting--stream-text-matchers-fold-crlf) — 12 scenarios
+  - [equals folds a CRLF body to its LF form](#scenario-equals-folds-a-crlf-body-to-its-lf-form)
+  - [equals tolerates the phantom trailing CRLF](#scenario-equals-tolerates-the-phantom-trailing-crlf)
+  - [contains folds CRLF for a multi-line needle](#scenario-contains-folds-crlf-for-a-multi-line-needle)
+  - [contains authored with CRLF matches LF-folded output](#scenario-contains-authored-with-crlf-matches-lf-folded-output)
+  - [contains list every multi-line element folds](#scenario-contains-list-every-multi-line-element-folds)
+  - [matches anchors a line over CRLF with the multiline flag](#scenario-matches-anchors-a-line-over-crlf-with-the-multiline-flag)
+  - [matches a literal newline in the pattern over CRLF](#scenario-matches-a-literal-newline-in-the-pattern-over-crlf)
+  - [not_contains stays clear of an absent multi-line needle](#scenario-not_contains-stays-clear-of-an-absent-multi-line-needle)
+  - [not_matches passes for an anchored line that is absent](#scenario-not_matches-passes-for-an-anchored-line-that-is-absent)
+  - [the line selector strips the trailing CR](#scenario-the-line-selector-strips-the-trailing-cr)
+  - [json parses a CRLF-formatted document](#scenario-json-parses-a-crlf-formatted-document)
+  - [folding does not make an absent multi-line needle match](#scenario-folding-does-not-make-an-absent-multi-line-needle-match)
 - [atago self-hosting / list](#atago-self-hosting--list) — 2 scenarios
   - [list surfaces suites, scenarios, tags, and gates](#scenario-list-surfaces-suites-scenarios-tags-and-gates)
   - [list --json is a stable machine contract](#scenario-list---json-is-a-stable-machine-contract)
@@ -2686,6 +2699,123 @@ ${atago} run oor.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `out of range`
+## atago self-hosting / stream text matchers fold CRLF
+Source: `test/e2e/atago/line_endings.atago.yaml`
+### Scenario: equals folds a CRLF body to its LF form
+#### When
+```shell
+printf 'first\r\nsecond\r\n'
+```
+#### Then
+- stdout equals an exact value
+#### Expected output
+_expected stdout:_
+```text
+first
+second
+```
+### Scenario: equals tolerates the phantom trailing CRLF
+#### When
+```shell
+printf 'only\r\n'
+```
+#### Then
+- stdout equals an exact value
+### Scenario: contains folds CRLF for a multi-line needle
+#### When
+```shell
+printf 'alpha\r\nbeta\r\ngamma\r\n'
+```
+#### Then
+- stdout contains `alpha
+beta`
+### Scenario: contains authored with CRLF matches LF-folded output
+#### When
+```shell
+printf 'alpha\r\nbeta\r\n'
+```
+#### Then
+- stdout contains `alpha
+beta`
+### Scenario: contains list every multi-line element folds
+#### When
+```shell
+printf 'a\r\nb\r\nc\r\nd\r\n'
+```
+#### Then
+- stdout contains `a
+b`, `c
+d`
+### Scenario: matches anchors a line over CRLF with the multiline flag
+#### When
+```shell
+printf 'hello\r\nworld\r\n'
+```
+#### Then
+- stdout matches `/(?m)^world$/`
+### Scenario: matches a literal newline in the pattern over CRLF
+#### When
+```shell
+printf 'up\r\ndown\r\n'
+```
+#### Then
+- stdout matches `/up
+down/`
+### Scenario: not_contains stays clear of an absent multi-line needle
+#### When
+```shell
+printf 'red\r\ngreen\r\n'
+```
+#### Then
+- stdout does not contain `red
+blue`
+### Scenario: not_matches passes for an anchored line that is absent
+#### When
+```shell
+printf 'north\r\nsouth\r\n'
+```
+#### Then
+- stdout does not match `/(?m)^east$/`
+### Scenario: the line selector strips the trailing CR
+#### When
+```shell
+printf 'header\r\npayload\r\n'
+```
+#### Then
+- stdout equals an exact value
+### Scenario: json parses a CRLF-formatted document
+#### When
+```shell
+printf '{\r\n"count":3\r\n}\r\n'
+```
+#### Then
+- stdout at `$.count` equals `3`
+### Scenario: folding does not make an absent multi-line needle match
+#### Given
+- Fixture file `inner.atago.yaml` is created.
+#### Inputs
+_Fixture `inner.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: an absent multi-line needle still fails
+    steps:
+      - run:
+          shell: true
+          command: printf 'one\r\ntwo\r\n'
+      - assert:
+          stdout:
+            contains: "one\nMISSING"
+```
+#### When
+```shell
+${atago} run inner.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `was not present`
 ## atago self-hosting / list
 Source: `test/e2e/atago/list.atago.yaml`
 ### Scenario: list surfaces suites, scenarios, tags, and gates

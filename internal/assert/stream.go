@@ -103,12 +103,19 @@ func checkStream(name string, s *spec.StreamAssert, data []byte, hasData bool, e
 
 	// The text matchers compose: every one that is set must hold (AND). Return
 	// the first failure; if all pass, return the last passing result.
+	//
+	// They run on a CRLF-folded copy so line endings are an OS artifact here too,
+	// matching the equals matcher: a multi-line contains or a (?m)-anchored regex
+	// authored with LF matches cmd.exe's CRLF output on Windows exactly as it
+	// matches POSIX LF output. Byte-exact comparison (including CRLF) is the file
+	// matchers' domain (equals_file / sha256), not the stream text matchers'.
+	folded := foldCRLF(got)
 	var last *CheckResult
 	for _, r := range []*CheckResult{
-		streamContains(name, got, s.Contains),
-		streamNotContains(name, got, s.NotContains),
-		streamMatches(name, got, s.Matches),
-		streamNotMatches(name, got, s.NotMatches),
+		streamContains(name, folded, s.Contains),
+		streamNotContains(name, folded, s.NotContains),
+		streamMatches(name, folded, s.Matches),
+		streamNotMatches(name, folded, s.NotMatches),
 	} {
 		if r == nil {
 			continue
@@ -124,12 +131,14 @@ func checkStream(name string, s *spec.StreamAssert, data []byte, hasData bool, e
 	return &CheckResult{Desc: "assert " + name, Hint: "matcher not supported yet"}
 }
 
-// streamContains runs the contains matcher, or returns nil when it is unset.
+// streamContains runs the contains matcher, or returns nil when it is unset. The
+// needles are CRLF-folded to match the folded stream, so a needle authored with
+// CRLF (a spec written in a CRLF editor) still compares equal to LF output.
 func streamContains(name, got string, subs spec.StringList) *CheckResult {
 	if subs == nil {
 		return nil
 	}
-	return checkContainsAll(name, got, subs)
+	return checkContainsAll(name, got, foldCRLFList(subs))
 }
 
 // streamNotContains runs the not_contains matcher, or returns nil when unset.
@@ -137,7 +146,7 @@ func streamNotContains(name, got string, subs spec.StringList) *CheckResult {
 	if subs == nil {
 		return nil
 	}
-	return checkNotContainsAll(name, got, subs)
+	return checkNotContainsAll(name, got, foldCRLFList(subs))
 }
 
 // streamMatches runs the matches matcher, or returns nil when it is unset.
@@ -240,9 +249,23 @@ func containsDesc(name string, subs spec.StringList, want bool) string {
 // does against POSIX output — line endings are an OS artifact, not observable
 // CLI behavior.
 func equalsNormalized(got, want string) bool {
-	got = strings.ReplaceAll(got, "\r\n", "\n")
-	want = strings.ReplaceAll(want, "\r\n", "\n")
-	return strings.TrimSuffix(got, "\n") == strings.TrimSuffix(want, "\n")
+	return strings.TrimSuffix(foldCRLF(got), "\n") == strings.TrimSuffix(foldCRLF(want), "\n")
+}
+
+// foldCRLF collapses Windows CRLF line endings to LF so text comparison treats
+// line endings as an OS artifact. A lone CR (an old-Mac line ending) stays
+// observable, matching equalsNormalized — only the CR that precedes an LF is
+// dropped.
+func foldCRLF(s string) string { return strings.ReplaceAll(s, "\r\n", "\n") }
+
+// foldCRLFList folds CRLF in every element so a needle authored with CRLF
+// compares equal to LF-folded output.
+func foldCRLFList(list spec.StringList) spec.StringList {
+	out := make(spec.StringList, len(list))
+	for i, s := range list {
+		out[i] = foldCRLF(s)
+	}
+	return out
 }
 
 // selectLine returns the n-th (1-based) line of s, ignoring a single trailing
