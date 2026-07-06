@@ -182,7 +182,9 @@ func writeRedirects(run *spec.Run, workdir, stdout, stderr string) error {
 		if err != nil {
 			return err
 		}
-		if err := os.WriteFile(abs, []byte(r.data), 0o644); err != nil { //nolint:gosec // user-declared redirect target inside the workdir
+		// The program under test may have planted a symlink at the redirect target
+		// pointing outside the workdir; write without following it (issue #16).
+		if err := security.WriteFileNoFollow(abs, []byte(r.data), 0o644); err != nil {
 			return fmt.Errorf("%s: %w", r.field, err)
 		}
 	}

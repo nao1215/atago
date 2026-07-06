@@ -154,7 +154,9 @@ func (r *Runner) Do(ctx context.Context, h *spec.HTTP) (*runner.Result, error) {
 		if perr := os.MkdirAll(filepath.Dir(dst), 0o750); perr != nil {
 			return nil, fmt.Errorf("creating directory for http.body_to %q: %w", h.BodyTo, perr)
 		}
-		if perr := os.WriteFile(dst, data, 0o600); perr != nil {
+		// The program under test may have planted a symlink at the body_to target
+		// pointing outside the workdir; write without following it (issue #16).
+		if perr := security.WriteFileNoFollow(dst, data, 0o600); perr != nil {
 			return nil, fmt.Errorf("writing http.body_to %q: %w", h.BodyTo, perr)
 		}
 	}
