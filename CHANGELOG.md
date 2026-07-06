@@ -7,6 +7,58 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-07-07
+
+An assertion-and-capture ergonomics release: byte-exact file round-trips,
+regex-free whole-content capture, multi-check json/yaml matchers, and a
+cross-platform tokenization fix. Every change landed test-first and expanded the
+Windows-portable self-hosted E2E subset.
+
+### Added
+
+- Byte-exact file content matchers for round-trip and idempotence tests (#155).
+  `file: { path: out.hex, equals_file: in.hex }` compares two runtime-produced
+  files byte-for-byte, and `file: { path: out.hex, equals: "<literal>" }`
+  compares a file's bytes to an inline literal. Neither normalizes CRLF or a
+  trailing newline (matching the `dir` snapshot hashing semantics), so the
+  natural "these two files the run just produced are equal" assertion — which a
+  `shell: true` POSIX `cmp` cannot express portably — is now declarative. Both
+  paths are confined to the workdir. See
+  [examples/files_and_fixtures.atago.yaml](examples/files_and_fixtures.atago.yaml).
+- `store` can capture a whole stream or file without a regex (#158). A stream
+  source takes `trim` (`{ stdout: { trim: true } }` grabs the whole stdout and
+  strips the trailing newline; `trim: false` keeps bytes verbatim) and a file
+  source takes `text: true` (`{ file: { path: out.bin, text: true } }` captures
+  the whole file verbatim). Previously the only way to capture an opaque value
+  (a token, an id, a signed blob) was to invent a regex that matched the whole
+  thing. Exactly one selector per source is still enforced. See
+  [examples/store_and_variables.atago.yaml](examples/store_and_variables.atago.yaml).
+- `json:` and `yaml:` matchers accept a list of checks (#156). A single response
+  can now assert several JSONPaths in one block —
+  `json: [ { path: "$[0].name", equals: … }, { path: "$[0].default", equals: … } ]` —
+  where each entry is an independent check and all must hold, instead of
+  repeating the whole `assert:` block once per path. The single-mapping form is
+  unchanged and still valid. See
+  [examples/json_and_yaml.atago.yaml](examples/json_and_yaml.atago.yaml).
+
+### Fixed
+
+- A no-shell command (`shell: false`, the default) now tokenizes to the same
+  argv on every OS (#154). `windowsFields` treated a single quote as an ordinary
+  character while POSIX (`go-shellwords`) grouped and stripped it, so a spec
+  passing single-quoted inline JSON — `mycli '{"k":"v"}'` — reached the CLI as
+  valid JSON on Linux/macOS but as `'{k:v}'` on Windows, silently breaking a
+  cross-platform suite on `windows-latest` alone. Windows now groups single
+  quotes too (keeping backslashes literal so `C:\` paths are unaffected), and an
+  unmatched single quote is an error like an unmatched double quote.
+
+### Docs
+
+- The README names the real fixture inline-source key `content:` (and
+  `base64:`/`from:`/`symlink:`) instead of describing it as "text", so a reader
+  can no longer guess a non-existent `text:` key and hit an unknown-field error
+  (#157).
+
 ## [0.5.1] - 2026-07-06
 
 A security and robustness patch, each fix landed with a reproduction test first.
