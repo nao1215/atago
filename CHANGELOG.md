@@ -25,6 +25,11 @@ and this project follows [Semantic Versioning](https://semver.org/).
   an OS artifact for all stream text matchers now; byte-exact comparison
   (including the exact line ending) stays with the file matchers (`equals_file`,
   `dir` `sha256`).
+- `stdout_to` / `stderr_to` create the parent directory of a nested redirect
+  target, mirroring the fixture writer. A redirect to `logs/out.txt` failed with
+  a raw "no such file or directory" when `logs/` did not exist yet, while a
+  fixture at the same path created it; the two path-taking features now behave
+  the same. The parent stays inside the scenario workdir.
 
 ## [0.6.0] - 2026-07-07
 

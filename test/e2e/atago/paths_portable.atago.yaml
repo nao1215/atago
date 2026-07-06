@@ -1,0 +1,111 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / forward-slash spec paths resolve on every OS
+
+# A portable spec writes paths with forward slashes; atago resolves them to the
+# host's native separator (backslash on Windows) at every path-taking feature, so
+# the same spec addresses the same file on Windows as on POSIX. These drive atago
+# itself with only builtins shared by /bin/sh and cmd.exe (echo, `1>&2`), so they
+# run in the Windows portable subset and prove `/` handling on windows-latest —
+# not just via the security unit tests. Content assertions use contains, not a
+# byte-exact equals, because cmd.exe's echo appends CRLF where /bin/sh appends LF.
+scenarios:
+  - name: stdout_to creates a nested parent directory
+    steps:
+      - run:
+          shell: true
+          command: echo produced
+          stdout_to: out/logs/result.txt
+      - assert:
+          exit_code: 0
+          file:
+            path: out/logs/result.txt
+            contains: "produced"
+
+  - name: stderr_to creates its own nested parent directory
+    steps:
+      - run:
+          shell: true
+          command: echo oops 1>&2
+          stderr_to: errs/deep/err.txt
+      - assert:
+          exit_code: 0
+          file:
+            path: errs/deep/err.txt
+            contains: "oops"
+
+  - name: a fixture at a nested forward-slash path is created and addressable
+    steps:
+      - fixture:
+          file: data/config/app.json
+          content: '{"k":1}'
+      - assert:
+          file:
+            path: data/config/app.json
+            json:
+              - path: "$.k"
+                equals: 1
+
+  - name: a file assert reaches a deeply nested fixture by forward-slash path
+    steps:
+      - fixture:
+          file: a/b/c/leaf.txt
+          content: "at the bottom"
+      - assert:
+          file:
+            path: a/b/c/leaf.txt
+            contains: "at the bottom"
+
+  - name: a dir assert addresses a nested tree and child by forward-slash path
+    steps:
+      - fixture:
+          file: pkg/mod/one.go
+          content: "package mod\n"
+      - fixture:
+          file: pkg/mod/two.go
+          content: "package mod\n"
+      - fixture:
+          file: pkg/mod/sub/three.go
+          content: "package sub\n"
+      - assert:
+          dir:
+            path: pkg/mod
+            exists: true
+            contains: [one.go, two.go, sub/three.go]
+            not_contains: [missing.go]
+
+  - name: equals_file compares two files addressed by forward-slash paths
+    steps:
+      - fixture:
+          file: golden/expected.bin
+          base64: "AAEC/w=="
+      - fixture:
+          file: build/actual.bin
+          base64: "AAEC/w=="
+      - assert:
+          file:
+            path: build/actual.bin
+            equals_file: golden/expected.bin
+
+  - name: a redirect path may not escape the workdir via a nested traversal
+    steps:
+      - fixture:
+          file: probe.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: escape
+            scenarios:
+              - name: nested traversal is rejected
+                steps:
+                  - run:
+                      shell: true
+                      command: echo x
+                      stdout_to: sub/../../escape.txt
+      - run:
+          command: ${atago} run probe.atago.yaml
+      - assert:
+          exit_code: 4
+          stdout:
+            contains: "escapes the scenario workdir"

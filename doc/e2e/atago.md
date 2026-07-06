@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-61 suites · 253 scenarios
+62 suites · 260 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -194,6 +194,14 @@
 - [atago self-hosting / parallel](#atago-self-hosting--parallel) — 2 scenarios
   - [parallel run passes and stays deterministic](#scenario-parallel-run-passes-and-stays-deterministic)
   - [fail-fast stops after the first failure](#scenario-fail-fast-stops-after-the-first-failure)
+- [atago self-hosting / forward-slash spec paths resolve on every OS](#atago-self-hosting--forward-slash-spec-paths-resolve-on-every-os) — 7 scenarios
+  - [stdout_to creates a nested parent directory](#scenario-stdout_to-creates-a-nested-parent-directory)
+  - [stderr_to creates its own nested parent directory](#scenario-stderr_to-creates-its-own-nested-parent-directory)
+  - [a fixture at a nested forward-slash path is created and addressable](#scenario-a-fixture-at-a-nested-forward-slash-path-is-created-and-addressable)
+  - [a file assert reaches a deeply nested fixture by forward-slash path](#scenario-a-file-assert-reaches-a-deeply-nested-fixture-by-forward-slash-path)
+  - [a dir assert addresses a nested tree and child by forward-slash path](#scenario-a-dir-assert-addresses-a-nested-tree-and-child-by-forward-slash-path)
+  - [equals_file compares two files addressed by forward-slash paths](#scenario-equals_file-compares-two-files-addressed-by-forward-slash-paths)
+  - [a redirect path may not escape the workdir via a nested traversal](#scenario-a-redirect-path-may-not-escape-the-workdir-via-a-nested-traversal)
 - [atago self-hosting / pdf assertion](#atago-self-hosting--pdf-assertion) — 2 scenarios
   - [pdf assertions cover page count, metadata, and text](#scenario-pdf-assertions-cover-page-count-metadata-and-text)
   - [a non-pdf file fails the pdf target](#scenario-a-non-pdf-file-fails-the-pdf-target)
@@ -3274,6 +3282,98 @@ ${atago} run --parallel 1 --fail-fast ff.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `1 skipped`
+## atago self-hosting / forward-slash spec paths resolve on every OS
+Source: `test/e2e/atago/paths_portable.atago.yaml`
+### Scenario: stdout_to creates a nested parent directory
+#### When
+```shell
+echo produced
+```
+#### Then
+- exit code is `0`
+- file `out/logs/result.txt` contains `produced`
+#### Generated artifacts
+- `out/logs/result.txt`
+### Scenario: stderr_to creates its own nested parent directory
+#### When
+```shell
+echo oops 1>&2
+```
+#### Then
+- exit code is `0`
+- file `errs/deep/err.txt` contains `oops`
+#### Generated artifacts
+- `errs/deep/err.txt`
+### Scenario: a fixture at a nested forward-slash path is created and addressable
+#### Given
+- Fixture file `data/config/app.json` is created.
+#### Inputs
+_Fixture `data/config/app.json`:_
+```text
+{"k":1}
+```
+#### Then
+- file `data/config/app.json` at `$.k` equals `1`
+### Scenario: a file assert reaches a deeply nested fixture by forward-slash path
+#### Given
+- Fixture file `a/b/c/leaf.txt` is created.
+#### Inputs
+_Fixture `a/b/c/leaf.txt`:_
+```text
+at the bottom
+```
+#### Then
+- file `a/b/c/leaf.txt` contains `at the bottom`
+### Scenario: a dir assert addresses a nested tree and child by forward-slash path
+#### Given
+- Fixture file `pkg/mod/one.go` is created.
+- Fixture file `pkg/mod/two.go` is created.
+- Fixture file `pkg/mod/sub/three.go` is created.
+#### Inputs
+_Fixture `pkg/mod/one.go`:_
+```text
+package mod
+```
+_Fixture `pkg/mod/two.go`:_
+```text
+package mod
+```
+_Fixture `pkg/mod/sub/three.go`:_
+```text
+package sub
+```
+#### Then
+- dir `pkg/mod` exists, contains `one.go`, contains `two.go`, contains `sub/three.go`, does not contain `missing.go`
+### Scenario: equals_file compares two files addressed by forward-slash paths
+#### Given
+- Fixture file `golden/expected.bin` is created.
+- Fixture file `build/actual.bin` is created.
+#### Then
+- file `build/actual.bin` is byte-identical to `golden/expected.bin`
+### Scenario: a redirect path may not escape the workdir via a nested traversal
+#### Given
+- Fixture file `probe.atago.yaml` is created.
+#### Inputs
+_Fixture `probe.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: escape
+scenarios:
+  - name: nested traversal is rejected
+    steps:
+      - run:
+          shell: true
+          command: echo x
+          stdout_to: sub/../../escape.txt
+```
+#### When
+```shell
+${atago} run probe.atago.yaml
+```
+#### Then
+- exit code is `4`
+- stdout contains `escapes the scenario workdir`
 ## atago self-hosting / pdf assertion
 Source: `test/e2e/atago/pdf.atago.yaml`
 ### Scenario: pdf assertions cover page count, metadata, and text
