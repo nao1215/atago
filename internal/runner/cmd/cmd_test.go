@@ -437,6 +437,14 @@ func TestWindowsFields(t *testing.T) {
 		{`empty ''`, []string{"empty", ""}},
 		// A single quote inside a double-quoted group is literal (and vice versa).
 		{`tool "it's" x`, []string{"tool", "it's", "x"}},
+		// Newline and carriage return separate fields exactly like space/tab, so a
+		// command authored as a YAML block scalar (a trailing newline from `>`, or
+		// interior newlines from `|`) tokenizes to the same argv on every OS (#154).
+		{"tool --flag value\n", []string{"tool", "--flag", "value"}},
+		{"tool\n--flag value", []string{"tool", "--flag", "value"}},
+		{"a\r\nb", []string{"a", "b"}},
+		// A newline inside a quoted group stays literal, as it does under go-shellwords.
+		{"\"a\nb\" c", []string{"a\nb", "c"}},
 	}
 	for _, tt := range tests {
 		got, err := windowsFields(tt.in)
@@ -476,6 +484,12 @@ func TestWindowsFields_MatchesShellwords(t *testing.T) {
 		`x 'has space' y`,
 		`tool "a b" c`,
 		`plain args here`,
+		// Block-scalar commands: a trailing newline (`>`), interior newlines (`|`),
+		// and a CRLF-authored spec must all tokenize identically on Windows and POSIX.
+		"tool --flag value\n",
+		"tool\n--flag value",
+		"a\r\nb c",
+		"\"a\nb\" c",
 	}
 	for _, in := range parity {
 		win, werr := windowsFields(in)
