@@ -16,6 +16,7 @@ import (
 	runnercmd "github.com/nao1215/atago/internal/runner/cmd"
 	mockrunner "github.com/nao1215/atago/internal/runner/mock"
 	servicerunner "github.com/nao1215/atago/internal/runner/service"
+	"github.com/nao1215/atago/internal/scrub"
 	"github.com/nao1215/atago/internal/security"
 	"github.com/nao1215/atago/internal/spec"
 )
@@ -49,8 +50,10 @@ type Engine struct {
 	FailFast bool
 
 	// Repeat runs each selected scenario this many times (#29) to surface
-	// flakiness: any failing iteration fails the scenario, and the per-
-	// iteration statuses are recorded. Values < 2 disable it.
+	// flakiness. The per-iteration statuses are recorded and the fold is
+	// classified (#138): all-clean passes, a partial failure is flaky (green,
+	// with a flake rate), and an all-failed repeat is a deterministic failure.
+	// Values < 2 disable it.
 	Repeat int
 
 	// RetryFailed re-runs a failed/errored scenario up to this many times in
@@ -122,6 +125,7 @@ func (e *Engine) Run(ctx context.Context, s *spec.Spec, specPath string) *SuiteR
 		specDir:      filepath.Dir(specPath),
 		specPath:     specPath,
 		masker:       security.NewMaskerForSpec(s),
+		scrubber:     newScrubber(s),
 		runners:      s.Runners,
 		allow:        allowedHosts(s),
 		suiteTimeout: s.Suite.Timeout,
@@ -345,6 +349,10 @@ type runConfig struct {
 	specDir  string
 	specPath string
 	masker   *security.Masker
+	// scrubber applies the spec's declarative snapshot scrub rules (#137). Nil
+	// when the spec declares no `scrub:`; its Apply method is nil-safe, so it is
+	// always safe to pass scrubber.Apply as the assert Env's Scrub hook.
+	scrubber *scrub.Scrubber
 	runners  map[string]spec.Runner
 	allow    []string
 	// suiteVars is the suite store snapshot (#7): ${suitedir} plus values

@@ -17,7 +17,7 @@ func checkSnapshot(desc, label, snapPath string, data []byte, env Env) *CheckRes
 	if err != nil {
 		return &CheckResult{Desc: desc, Hint: err.Error()}
 	}
-	opt := snapshot.Options{Workdir: env.Workdir, Secrets: env.Secrets}
+	opt := snapshot.Options{Workdir: env.Workdir, Secrets: env.Secrets, Scrub: env.Scrub}
 
 	if env.UpdateSnapshots {
 		if err := snapshot.Update(path, data, opt); err != nil {

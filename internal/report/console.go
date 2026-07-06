@@ -150,8 +150,14 @@ func writeRepeatRates(b *strings.Builder, color bool, res *engine.SuiteResult) {
 				passed++
 			}
 		}
+		// Color by the fold's verdict: all clean is green, a partial failure is
+		// flaky (yellow, green for the exit code), and an all-failed repeat is a
+		// deterministic red failure (#138).
 		code := cGreen
-		if passed < len(sc.Iterations) {
+		switch sc.Status {
+		case engine.StatusFlaky:
+			code = cYellow
+		case engine.StatusFailed, engine.StatusError:
 			code = cRed
 		}
 		fmt.Fprintf(b, "\n%s %s: %d/%d passed\n",
@@ -159,12 +165,14 @@ func writeRepeatRates(b *strings.Builder, color bool, res *engine.SuiteResult) {
 	}
 }
 
-// writeFlaky prints one line per recovered scenario (#29): green for the
-// verdict, but never hidden.
+// writeFlaky prints one line per --retry-failed recovery (#29): green for the
+// verdict, but never hidden. A --repeat flake (Iterations set) is reported by
+// writeRepeatRates instead, with its rate; skip it here so it is not
+// double-reported with a meaningless "0 attempts".
 func writeFlaky(b *strings.Builder, color bool, res *engine.SuiteResult) {
 	for i := range res.Scenarios {
 		sc := &res.Scenarios[i]
-		if sc.Status != engine.StatusFlaky {
+		if sc.Status != engine.StatusFlaky || len(sc.Iterations) > 0 {
 			continue
 		}
 		fmt.Fprintf(b, "\n%s %s / %s: passed after %d attempts\n",

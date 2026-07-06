@@ -58,6 +58,19 @@
       }
     },
     "secrets": { "type": "array", "items": { "type": "string" } },
+    "scrub": {
+      "type": "array",
+      "description": "Declarative output-normalization rules (#137): each replaces every regex match in captured output with a literal placeholder before a snapshot is compared or written. Where `secrets` masks known values, `scrub` normalizes volatile patterns the built-in normalizers do not cover (auto-increment IDs, request identifiers, custom timestamps). Rules apply in order, after secret masking and before the built-in ANSI/UUID/timestamp/port/path normalization.",
+      "items": {
+        "type": "object",
+        "required": ["pattern"],
+        "additionalProperties": false,
+        "properties": {
+          "pattern": { "type": "string", "minLength": 1, "description": "A Go (RE2) regular expression; every match is replaced. Required." },
+          "placeholder": { "type": "string", "description": "Literal replacement text (no $1 expansion), e.g. \"<ID>\". Defaults to empty, which deletes matches." }
+        }
+      }
+    },
     "defaults": { "$ref": "#/$defs/defaults" },
     "scenarios": {
       "type": "array",

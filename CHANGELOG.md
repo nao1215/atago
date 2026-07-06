@@ -9,8 +9,31 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 A correctness pass across `record`, `snapshot`, the report formats, the loader,
 the assertion matchers, secret masking, and the run engine. Each defect was
-surfaced by an edge-case bug hunt and fixed with a reproduction test first. No
-new features.
+surfaced by an edge-case bug hunt and fixed with a reproduction test first, plus
+two flaky-test tooling improvements described below.
+
+### Added
+
+- `scrub:` (#137) — spec-wide declarative output normalization for snapshots. Each rule
+  rewrites every regex match in captured output to a literal placeholder
+  (`{pattern: 'id=\d+', placeholder: 'id=<ID>'}`) before a snapshot is compared
+  or written. Where the built-in normalizers fold a fixed set of volatile forms
+  (ANSI, UUID, timestamp, port, path) and `secrets:` masks known values, `scrub:`
+  handles the open set of volatile patterns only the author knows about —
+  auto-increment IDs, request identifiers, custom timestamps — so a snapshot that
+  flaked every run becomes deterministic. Rules apply after secret masking and
+  before the built-in normalization. See [examples/scrub.atago.yaml](examples/scrub.atago.yaml).
+
+### Changed
+
+- `--repeat` (#138) now distinguishes an unstable scenario from a broken one. A run
+  where some iterations passed and some failed folds to `flaky` (green for the
+  exit code, surfaced with its flake rate, e.g. `2/10 iterations failed`) instead
+  of a hard `failed`; a scenario that failed *every* iteration stays a
+  deterministic `failed`. Previously any failing iteration collapsed the whole
+  fold to `failed`, so "3/10 flaked" was indistinguishable from "10/10 is a real
+  bug" — the exact signal `--repeat` exists to surface. This matches how
+  `--retry-failed` already reports a recovery as `flaky`.
 
 ### Fixed
 

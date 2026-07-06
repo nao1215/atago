@@ -28,7 +28,7 @@ func (e *Engine) runHTTPStep(ctx context.Context, h *spec.HTTP, st *store.Store,
 
 	interval, _ := time.ParseDuration(h.Retry.Interval) // validated at load time
 	until := expandAssert(st, h.Retry.Until)
-	env := assert.Env{Workdir: workdir, SpecDir: specDir, UpdateSnapshots: e.UpdateSnapshots, Secrets: rc.masker.MaskBytes}
+	env := assert.Env{Workdir: workdir, SpecDir: specDir, UpdateSnapshots: e.UpdateSnapshots, Secrets: rc.masker.MaskBytes, Scrub: rc.scrubber.Apply}
 
 	var last *runner.Result
 	var checks []*assert.CheckResult

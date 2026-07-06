@@ -10,6 +10,19 @@ import (
 	"github.com/nao1215/atago/internal/engine"
 )
 
+// flakyMessage renders the one-line reason a scenario is flaky, in a form that
+// fits whichever knob produced the instability (#138): a --repeat run reports
+// its flake rate ("2/10 iterations failed"), while a --retry-failed recovery
+// reports its attempt count ("passed after 2 attempts"). Every format (tap, gha,
+// junit) shares this so the wording never drifts between them.
+func flakyMessage(sc *engine.ScenarioResult) string {
+	if len(sc.Iterations) > 0 {
+		total := len(sc.Iterations)
+		return fmt.Sprintf("flaky: %d/%d iterations failed", total-sc.PassedIterations(), total)
+	}
+	return fmt.Sprintf("flaky: passed after %d attempts", sc.Attempts)
+}
+
 // Option configures an optional aspect of a Render call. It keeps the common
 // three-argument form unchanged while letting callers pass extra run-level
 // context (e.g. spec-load failures) without a signature churn.

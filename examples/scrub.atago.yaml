@@ -1,0 +1,37 @@
+version: "1"
+
+# scrub normalizes volatile OUTPUT PATTERNS the built-in snapshot normalizers do
+# not know about — auto-increment IDs, request identifiers, epoch times — so a
+# raw-stdout snapshot stops flaking. Each rule replaces every regex match with a
+# literal placeholder, in order, before the snapshot is compared.
+#
+# (The built-ins already fold ANSI, temp paths, UUIDs, ISO timestamps, and
+# ports; `secrets:` masks known values. `scrub:` is the open-ended layer for
+# everything else.)
+#
+#   atago run examples/scrub.atago.yaml               # compare
+#   atago snapshot update examples/scrub.atago.yaml   # (re)record
+#
+# Runs green as-is: the id and epoch below change every run, but both scrub to a
+# stable placeholder, so the committed golden always matches.
+
+suite:
+  name: scrub
+
+scrub:
+  - {pattern: 'id=\d+', placeholder: 'id=<ID>'}
+  - {pattern: 'at \d+', placeholder: 'at <TIME>'}
+
+scenarios:
+  - name: a volatile id and epoch normalize to a stable golden
+    # Uses POSIX shell expansion ($$, $(date +%s)) to synthesize volatile
+    # output; skipped on Windows (cmd.exe would not expand them).
+    skip:
+      os: windows
+    steps:
+      - run:
+          shell: true
+          command: echo "request id=$$ finished at $(date +%s)"
+      - assert:
+          stdout:
+            snapshot: snapshots/scrub.txt
