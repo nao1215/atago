@@ -31,7 +31,9 @@ scenarios:
               - "<h1"
               - "<em>emphasis</em>"
               - "<strong>bold text</strong>"
-      # docx is a binary (zip) artifact — assert it was produced.
+      # docx is a binary OOXML (zip) artifact. Assert its content, not just its
+      # existence: unzip the main document part and check the text survived the
+      # conversion.
       - run:
           command: pandoc doc.md -o doc.docx
       - assert:
@@ -39,6 +41,14 @@ scenarios:
           file:
             path: doc.docx
             exists: true
+      - run:
+          command: unzip -p doc.docx word/document.xml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - Title
+              - "bold text"
 
   - name: pandoc is a stdin-to-stdout filter
     only:
@@ -116,3 +126,45 @@ scenarios:
             in: [21, 22, 23]
           stderr:
             contains: "Unknown output format"
+
+  - name: markdown survives a round-trip through HTML
+    only:
+      command: pandoc --version
+    steps:
+      # Metamorphic: md -> html -> md must preserve the emphasis and strong
+      # markup. Converting there and back is a stronger contract than a single
+      # fixed output.
+      - fixture:
+          file: doc.md
+          content: |
+            Some *emphasis* and **bold text**.
+      - run:
+          command: pandoc doc.md -o rt.html
+      - assert:
+          exit_code: 0
+      - run:
+          command: pandoc -f html -t markdown rt.html -o rt.md
+      - assert:
+          exit_code: 0
+          file:
+            path: rt.md
+            contains:
+              - "*emphasis*"
+              - "**bold text**"
+
+  - name: a missing input file fails cleanly
+    only:
+      command: pandoc --version
+    steps:
+      # The second failure dimension (the unknown-format case covers bad
+      # output): a nonexistent input exits non-zero, names the missing file on
+      # stderr, and writes nothing to stdout.
+      - run:
+          command: pandoc no-such-file.md
+      - assert:
+          exit_code:
+            not: 0
+          stdout:
+            empty: true
+          stderr:
+            contains: "does not exist"

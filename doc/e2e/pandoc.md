@@ -1,15 +1,17 @@
 # atago Behavior Specs
 ## Summary
-2 suites · 6 scenarios
+2 suites · 8 scenarios
 ## Contents
 - [pandoc + changes (a conversion writes exactly its output)](#pandoc--changes-a-conversion-writes-exactly-its-output) — 1 scenario
   - [markdown-to-html creates exactly the output file](#scenario-markdown-to-html-creates-exactly-the-output-file)
-- [pandoc (document conversion filter)](#pandoc-document-conversion-filter) — 5 scenarios
+- [pandoc (document conversion filter)](#pandoc-document-conversion-filter) — 7 scenarios
   - [markdown converts to HTML and a binary docx](#scenario-markdown-converts-to-html-and-a-binary-docx)
   - [pandoc is a stdin-to-stdout filter](#scenario-pandoc-is-a-stdin-to-stdout-filter)
   - [the JSON AST is a queryable contract](#scenario-the-json-ast-is-a-queryable-contract)
   - [standalone HTML carries the metadata title](#scenario-standalone-html-carries-the-metadata-title)
   - [an unknown output format is rejected](#scenario-an-unknown-output-format-is-rejected)
+  - [markdown survives a round-trip through HTML](#scenario-markdown-survives-a-round-trip-through-html)
+  - [a missing input file fails cleanly](#scenario-a-missing-input-file-fails-cleanly)
 ## pandoc + changes (a conversion writes exactly its output)
 Source: `test/e2e/thirdparty/pandoc/changes.atago.yaml`
 ### Scenario: markdown-to-html creates exactly the output file
@@ -48,6 +50,7 @@ Some *emphasis* and a [link](https://example.org).
 ```shell
 pandoc doc.md -o doc.html
 pandoc doc.md -o doc.docx
+unzip -p doc.docx word/document.xml
 ```
 #### Then
 - after `pandoc doc.md -o doc.html`:
@@ -56,6 +59,9 @@ pandoc doc.md -o doc.docx
 - after `pandoc doc.md -o doc.docx`:
   - exit code is `0`
   - file `doc.docx` exists
+- after `unzip -p doc.docx word/document.xml`:
+  - exit code is `0`
+  - stdout contains `Title`, `bold text`
 #### Generated artifacts
 - `doc.docx`
 ### Scenario: pandoc is a stdin-to-stdout filter
@@ -125,3 +131,31 @@ pandoc -t nosuchformat doc.md
 #### Then
 - exit code is one of `21`, `22`, `23`
 - stderr contains `Unknown output format`
+### Scenario: markdown survives a round-trip through HTML
+#### Given
+- Fixture file `doc.md` is created.
+#### Inputs
+_Fixture `doc.md`:_
+```text
+Some *emphasis* and **bold text**.
+```
+#### When
+```shell
+pandoc doc.md -o rt.html
+pandoc -f html -t markdown rt.html -o rt.md
+```
+#### Then
+- after `pandoc doc.md -o rt.html`:
+  - exit code is `0`
+- after `pandoc -f html -t markdown rt.html -o rt.md`:
+  - exit code is `0`
+  - file `rt.md` contains `*emphasis*`, `**bold text**`
+### Scenario: a missing input file fails cleanly
+#### When
+```shell
+pandoc no-such-file.md
+```
+#### Then
+- exit code is not `0`
+- stdout is empty
+- stderr contains `does not exist`

@@ -24,6 +24,21 @@ scenarios:
           stdout:
             matches: "^htop [0-9]+\\.[0-9]+"
 
+  - name: an unrecognized option is rejected without opening the TUI
+    only:
+      command: htop --version
+    steps:
+      # The failure branch the TUI scenarios cannot reach: an unknown flag makes
+      # htop exit non-zero with a usage error on stderr, before it ever switches
+      # to the alternate screen — no pty needed.
+      - run:
+          command: htop --nonexistent-flag
+      - assert:
+          exit_code:
+            not: 0
+          stderr:
+            contains: "unrecognized option"
+
   - name: the finder loads its function-key bar and quits on q
     only:
       command: htop --version
