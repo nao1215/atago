@@ -7,6 +7,31 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-07-06
+
+A security and robustness patch, each fix landed with a reproduction test first.
+
+### Security
+
+- Path containment is no longer purely lexical. `ResolveWorkdirPath` /
+  `ResolveSpecPath` validated a spec-declared path with `Join`/`Clean`/`Rel`
+  only, so a symlink planted **inside** the workdir or spec directory by the
+  program under test passed the check and the feature then followed the link
+  during I/O — reading or overwriting an arbitrary host file. Only `fixture`
+  self-defended, so the guard was inconsistent across features. The no-follow
+  guard is now centralized in the `security` package (`ReadFileNoFollow` /
+  `WriteFileNoFollow`) and enforced at every path-taking read/write site: file
+  assertions, `run.stdout_to` / `stderr_to`, `http.body_to`, the cdp
+  `screenshot` output, and snapshot `update`/`assert` (#16).
+
+### Fixed
+
+- `ready.timeout: "0"` now behaves as the documented unbounded wait for every
+  readiness probe. The `delay` probe already honored it, but the `file`/`port`/
+  `log` probes handed `0` to a zero-duration timer and failed on the first tick.
+  A non-positive timeout is now treated as unbounded (bounded only by the process
+  staying alive or the scenario context), matching the delay probe.
+
 ## [0.5.0] - 2026-07-06
 
 A correctness pass across `record`, `snapshot`, the report formats, the loader,
