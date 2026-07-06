@@ -137,6 +137,13 @@ func validateDir(add func(string, ...any), where string, d *spec.DirAssert) {
 	}
 	if d.Glob != "" {
 		n++
+		// Validate the pattern at load time like the sibling dir.ignore and changes
+		// globs, so a malformed glob (e.g. "a[") fails with a positioned message
+		// instead of only misbehaving when the assertion runs. dir.glob is matched
+		// with path.Match at check time, so validate with the same grammar.
+		if _, err := path.Match(d.Glob, "probe"); err != nil {
+			add("%s.glob %q is not a valid glob: %v", where, d.Glob, err)
+		}
 	}
 	if d.MinCount != nil && d.MaxCount != nil && *d.MinCount > *d.MaxCount {
 		add("%s: min_count %d exceeds max_count %d", where, *d.MinCount, *d.MaxCount)

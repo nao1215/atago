@@ -48,8 +48,10 @@ func validateRunners(add func(string, ...any), runners map[string]spec.Runner) {
 		// timeout is common to every runner type; catch a malformed value here
 		// instead of when the first step opens the connection.
 		if r.Timeout != "" {
-			if _, err := time.ParseDuration(r.Timeout); err != nil {
+			if d, err := time.ParseDuration(r.Timeout); err != nil {
 				add("%s.timeout %q is not a valid duration (e.g. \"30s\")", where, r.Timeout)
+			} else if d < 0 {
+				add("%s.timeout must not be negative (got %q); a wall-clock bound is never below zero", where, r.Timeout)
 			}
 		}
 		validateRunnerFields(add, where, &r)

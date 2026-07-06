@@ -125,8 +125,10 @@ func validateSuiteTimeout(add func(string, ...any), s *spec.Suite) {
 	if s.Timeout == "" {
 		return
 	}
-	if _, err := time.ParseDuration(s.Timeout); err != nil {
+	if d, err := time.ParseDuration(s.Timeout); err != nil {
 		add("suite.timeout %q is not a valid duration (e.g. \"2m\"); use \"0\" to disable the built-in default", s.Timeout)
+	} else if d < 0 {
+		add("suite.timeout must not be negative (got %q); a wall-clock bound is never below zero", s.Timeout)
 	}
 }
 
@@ -150,8 +152,10 @@ func validateDefaults(add func(string, ...any), d *spec.Defaults) {
 			add("defaults.run.stdin is not supported (stdin is per-step input data, like command)")
 		}
 		if r.Timeout != "" {
-			if _, err := time.ParseDuration(r.Timeout); err != nil {
+			if d, err := time.ParseDuration(r.Timeout); err != nil {
 				add("defaults.run.timeout %q is not a valid duration (e.g. \"30s\")", r.Timeout)
+			} else if d < 0 {
+				add("defaults.run.timeout must not be negative (got %q); a wall-clock bound is never below zero", r.Timeout)
 			}
 		}
 		validateHermeticEnv(add, "defaults.run", r.ClearEnv, r.PassEnv)
@@ -340,6 +344,8 @@ func validateStep(add func(string, ...any), where string, st *spec.Step, runners
 		validateStore(add, where, st.Store)
 	case spec.StepService:
 		add("%s: service steps are only allowed in suite.setup (scenario-scoped peers go under the scenario's services: list)", where)
+	case spec.StepMockServer:
+		add("%s: mock_server steps are only allowed in suite.setup (a scenario-scoped stub goes under the scenario's mock_servers: list)", where)
 	case spec.StepPTY:
 		validatePTY(add, where, st.PTY)
 	case spec.StepSignal:

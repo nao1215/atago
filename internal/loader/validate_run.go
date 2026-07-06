@@ -16,8 +16,10 @@ import (
 func validateRunStep(add func(string, ...any), where string, r *spec.Run, runners map[string]spec.Runner, full bool) {
 	validateRunnerRef(add, where, "run", r.Runner, runners)
 	if r.Timeout != "" {
-		if _, err := time.ParseDuration(r.Timeout); err != nil {
+		if d, err := time.ParseDuration(r.Timeout); err != nil {
 			add("%s.run.timeout %q is not a valid duration (e.g. \"30s\")", where, r.Timeout)
+		} else if d < 0 {
+			add("%s.run.timeout must not be negative (got %q); a wall-clock bound is never below zero", where, r.Timeout)
 		}
 	}
 	if r.Command == "" {
