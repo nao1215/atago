@@ -44,6 +44,18 @@ func TestDocs_NoStaleLintReferences(t *testing.T) {
 	}
 }
 
+// TestDocs_FixtureSourceKeyNamed guards #157: the README prose that introduces
+// fixtures must name the real inline-source key `content:` — not just the word
+// "text" — so a reader who skims the prose cannot guess a non-existent `text:`
+// key and hit an "unknown field" loader error. The example file uses `content:`;
+// this keeps the prose from drifting away from that schema.
+func TestDocs_FixtureSourceKeyNamed(t *testing.T) {
+	readme := readDoc(t, "README.md")
+	if !strings.Contains(readme, "`content:`") {
+		t.Errorf("README does not name the literal fixture source key `content:`; a reader could guess `text:` from prose and hit an unknown-field error")
+	}
+}
+
 // docSkipDirs are spec directories that deliberately ship no committed doc under
 // doc/e2e/. gup-offline is the fully offline variant of the gup suite, exercised
 // only by `make dogfood-gup`; it intentionally has no generated behavior doc.

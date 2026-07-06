@@ -152,7 +152,7 @@ Hint:
 
 ### 2. Check generated files and snapshots
 
-`fixture:` writes input files into the isolated workdir; `file:`/`dir:` assertions check what the command produced, and `snapshot:` pins output to a committed golden file (volatile details like temp paths, UUIDs, and timestamps are normalized):
+`fixture:` writes input files into the isolated workdir; `file:`/`dir:` assertions check what the command produced, and `snapshot:` pins output to a committed golden file (volatile details like temp paths, UUIDs, and timestamps are normalized). A fixture's source is one of `content:` (inline text), `base64:` (inline bytes), `from:` (copy an existing file), or `symlink:` (link to a target):
 
 ```yaml
 scenarios:
@@ -217,7 +217,7 @@ Every feature has a commented, runnable spec under [examples/](examples/). The e
 | [run_and_assert](examples/run_and_assert.atago.yaml) | exit code (exact, `not`, `in: [0, 2]` sets), stdout/stderr matchers (`contains`, `equals`, `matches`/`not_matches`, `empty: true`/`false`, lists, `line`), combining `contains`/`not_contains`/`matches`/`not_matches` in one block, multi-target asserts |
 | [shell_and_redirect](examples/shell_and_redirect.atago.yaml) | `shell: true` vs direct argv execution, `stdout_to`/`stderr_to` redirects |
 | [json_and_yaml](examples/json_and_yaml.atago.yaml) | JSONPath assertions, numeric bounds (`gt`/`lte`), the `yaml` matcher |
-| [files_and_fixtures](examples/files_and_fixtures.atago.yaml) | input fixtures (text and base64), `file` and `dir` assertions |
+| [files_and_fixtures](examples/files_and_fixtures.atago.yaml) | input fixtures (inline `content:` and `base64:`), `file` and `dir` assertions |
 | [store_and_variables](examples/store_and_variables.atago.yaml) | capturing values into `${name}`, `${workdir}`, `${env:NAME}` host-environment reads, the `$${...}` literal escape |
 | [teardown](examples/teardown.atago.yaml) | cleanup steps that always run — pass or fail — sharing the scenario's variables |
 | [hermetic_env](examples/hermetic_env.atago.yaml) | `clear_env: true` starts commands from an empty environment, `pass_env` re-admits an allowlist of host variables, `sandbox_home: true` isolates HOME and per-OS config/cache dirs |
