@@ -239,4 +239,10 @@ func TestUnifiedDiff_ZeroCountHunkHeader(t *testing.T) {
 	if strings.Contains(got, "No newline at end of file (actual)") {
 		t.Errorf("spurious no-newline marker for an empty actual side:\n%s", got)
 	}
+	// When BOTH non-empty sides lack a trailing newline, both are annotated —
+	// the marker is judged per side, not by comparing the two sides.
+	got = unifiedDiff("a", "b", "expected", "actual")
+	if !strings.Contains(got, noNewlineMarker+" (expected)") || !strings.Contains(got, noNewlineMarker+" (actual)") {
+		t.Errorf("both-no-newline sides not both annotated:\n%s", got)
+	}
 }

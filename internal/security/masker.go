@@ -137,7 +137,9 @@ func (m *Masker) Mask(s string) string {
 				covered[k] = true
 			}
 			any = true
-			i = start + len(v)
+			// Advance by one, not len(v), so overlapping occurrences of the same
+			// secret are all covered — "aaaa" occurs three times in "aaaaaa".
+			i = start + 1
 		}
 	}
 	if !any {

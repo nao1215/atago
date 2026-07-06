@@ -95,7 +95,7 @@ func maskPathPrefix(s, prefix, replacement string) string {
 	for i := 0; i < len(s); {
 		if strings.HasPrefix(s[i:], prefix) {
 			end := i + len(prefix)
-			if end >= len(s) || !isPathContinuation(s[end]) {
+			if end >= len(s) || isComponentBoundary(s[end]) {
 				b.WriteString(replacement)
 				i = end
 				continue
@@ -107,19 +107,14 @@ func maskPathPrefix(s, prefix, replacement string) string {
 	return b.String()
 }
 
-// isPathContinuation reports whether c can continue a filename component. A
-// masked prefix must not be applied when the next byte is one of these, or it
-// would swallow part of a longer name (/home/naoki for home /home/nao). A
-// separator or punctuation ends the component and is a safe masking boundary.
-func isPathContinuation(c byte) bool {
-	switch {
-	case c >= 'a' && c <= 'z', c >= 'A' && c <= 'Z', c >= '0' && c <= '9':
-		return true
-	case c == '.' || c == '-' || c == '_':
-		return true
-	default:
-		return false
-	}
+// isComponentBoundary reports whether byte c ends a path component so the prefix
+// before it can be masked: a path separator or a whitespace/control byte, where a
+// path token in captured output ends. Filename-legal bytes — letters, digits, and
+// punctuation like '.', '-', '_', '+', '@' — are NOT boundaries, so a longer
+// sibling path (/home/naoki for home /home/nao, /tmp/run1+cache for workdir
+// /tmp/run1) is left intact rather than corrupted.
+func isComponentBoundary(c byte) bool {
+	return c == '/' || c == '\\' || c <= ' '
 }
 
 // Compare normalizes actual and checks it against the stored snapshot at path.

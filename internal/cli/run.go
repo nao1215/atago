@@ -234,9 +234,14 @@ func runCmd(args []string, stdout, stderr io.Writer) int {
 		}
 	}
 
-	// Every spec failed to load; the errors are already on stderr. Don't print a
-	// misleading "0 scenarios" report.
+	// Every spec failed to load, or an interrupt skipped every suite before it
+	// produced a result. Don't print a misleading "0 scenarios" report — but a run
+	// that was interrupted before completing must never exit 0.
 	if len(results) == 0 {
+		if ctx.Err() != nil {
+			fmt.Fprintln(stderr, "atago run: interrupted")
+			return worseExit(exit, ExitExec)
+		}
 		return exit
 	}
 
@@ -339,7 +344,7 @@ func runSpecs(ctx context.Context, eng *engine.Engine, paths []string) ([]*engin
 	} else {
 		for i, p := range paths {
 			// Stop launching new suites once interrupted or --fail-fast has tripped;
-			// the already-cancelled ctx still flows into eng.Run so a partially-run
+			// the already-canceled ctx still flows into eng.Run so a partially-run
 			// suite reports cleanly.
 			if ctx.Err() != nil || failStop.Load() {
 				break

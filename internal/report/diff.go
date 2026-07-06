@@ -80,12 +80,13 @@ func unifiedDiff(expected, actual, expectedLabel, actualLabel string) string {
 	if aTrunc || bTrunc {
 		out = append(out, fmt.Sprintf("... (inputs truncated at %d lines; full payloads in artifacts)", diffMaxInputLines))
 	}
-	// The marker describes a side whose last line lacks a trailing newline; an
+	// The marker describes a side whose last line lacks a trailing newline, judged
+	// per side and independently: when both sides lack it, both are annotated. An
 	// empty side has no last line, so it never carries the marker.
-	if expected != "" && !strings.HasSuffix(expected, "\n") && strings.HasSuffix(actual, "\n") {
+	if expected != "" && !strings.HasSuffix(expected, "\n") {
 		out = append(out, noNewlineMarker+" (expected)")
 	}
-	if actual != "" && strings.HasSuffix(expected, "\n") && !strings.HasSuffix(actual, "\n") {
+	if actual != "" && !strings.HasSuffix(actual, "\n") {
 		out = append(out, noNewlineMarker+" (actual)")
 	}
 	return strings.Join(out, "\n")

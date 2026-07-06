@@ -56,6 +56,18 @@ func TestMasker_AdjacentOverlapNoLeak(t *testing.T) {
 	}
 }
 
+// TestMasker_SelfOverlappingSecret is a regression: a secret that overlaps its
+// own repeats must be masked at every occurrence. Advancing past a hit by the
+// secret's full length skipped the overlapping repeats, so "aaaa" in "aaaaaa"
+// masked only the first four bytes and leaked "aa".
+func TestMasker_SelfOverlappingSecret(t *testing.T) {
+	t.Parallel()
+	m := NewMasker([]string{"aaaa"})
+	if got := m.Mask("token=aaaaaa"); got != "token=***" {
+		t.Errorf("Mask self-overlap = %q, want %q", got, "token=***")
+	}
+}
+
 func TestMasker_MaskBytes(t *testing.T) {
 	t.Parallel()
 	m := NewMasker([]string{"supersecret"})

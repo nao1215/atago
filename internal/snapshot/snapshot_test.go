@@ -168,6 +168,18 @@ func TestNormalize_PathMaskingBoundaries(t *testing.T) {
 			t.Errorf("HOME=/ mangled unrelated paths: %q", got)
 		}
 	})
+	t.Run("workdir does not swallow a punctuation-suffixed sibling", func(t *testing.T) {
+		// '+' is a legal filename byte, so /tmp/run1+cache is a different directory
+		// and must be left intact; only a separator, whitespace, or end of token is
+		// a masking boundary.
+		got := string(Normalize([]byte("/tmp/run1/x and /tmp/run1+cache/y"), Options{Workdir: "/tmp/run1"}))
+		if !strings.Contains(got, "<workdir>/x") {
+			t.Errorf("workdir was not masked: %q", got)
+		}
+		if !strings.Contains(got, "/tmp/run1+cache/y") {
+			t.Errorf("workdir masking corrupted a punctuation-suffixed sibling: %q", got)
+		}
+	})
 	t.Run("workdir does not swallow a prefix-sibling temp dir", func(t *testing.T) {
 		got := string(Normalize([]byte("a /tmp/run1/x b /tmp/run10/y"), Options{Workdir: "/tmp/run1"}))
 		if !strings.Contains(got, "<workdir>/x") {

@@ -63,7 +63,7 @@ func (r *PTYRecording) AppendInput(b []byte, echoOff bool) {
 // ansiPattern matches the terminal control sequences that carry no visible
 // text: CSI (ESC [ ... final), OSC (ESC ] ... BEL/ST), and two-byte ESC forms.
 // Stripping them yields the plain prompt text an expect should anchor on.
-var ansiPattern = regexp.MustCompile(`\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[@-Z\\-_]`)
+var ansiPattern = regexp.MustCompile(`\x1b\[[0-9:;?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[@-Z\\-_]`)
 
 // GeneratePTY renders a spec skeleton whose single pty: step replays the
 // recorded session as expect/send pairs, and proves it loads cleanly before
