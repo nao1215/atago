@@ -1,7 +1,10 @@
 # atago Behavior Specs
 ## Summary
-56 suites · 226 scenarios
+57 suites · 228 scenarios
 ## Contents
+- [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 2 scenarios
+  - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
+  - [a single-quoted argument with a space stays one argument](#scenario-a-single-quoted-argument-with-a-space-stays-one-argument)
 - [atago self-hosting / variable expansion in assertion matcher values](#atago-self-hosting--variable-expansion-in-assertion-matcher-values) — 6 scenarios
   - [stdout.equals expands ${workdir}](#scenario-stdoutequals-expands-workdir)
   - [stdout.contains and not_contains expand a stored variable](#scenario-stdoutcontains-and-not_contains-expand-a-stored-variable)
@@ -284,6 +287,24 @@
 - [atago self-hosting / yaml stream matcher](#atago-self-hosting--yaml-stream-matcher) — 2 scenarios
   - [a yaml stream matcher selects and asserts a decoded value (#9)](#scenario-a-yaml-stream-matcher-selects-and-asserts-a-decoded-value-9)
   - [a yaml matcher mismatch fails the inner spec (#9)](#scenario-a-yaml-matcher-mismatch-fails-the-inner-spec-9)
+## atago self-hosting / cross-platform no-shell argv tokenization (#154)
+Source: `test/e2e/atago/argv_quotes.atago.yaml`
+### Scenario: a single-quoted JSON argument survives tokenization
+#### When
+```shell
+${atago} run '{"k":"v"}'
+```
+#### Then
+- exit code is `3`
+- stderr contains `{"k":"v"}`
+### Scenario: a single-quoted argument with a space stays one argument
+#### When
+```shell
+${atago} run 'no such file.yaml'
+```
+#### Then
+- exit code is `3`
+- stderr contains `no such file.yaml`
 ## atago self-hosting / variable expansion in assertion matcher values
 Source: `test/e2e/atago/assert_expand.atago.yaml`
 ### Scenario: stdout.equals expands ${workdir}

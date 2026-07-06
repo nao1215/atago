@@ -7,10 +7,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strings"
 	"testing"
 	"time"
+
+	shellwords "github.com/mattn/go-shellwords"
 
 	"github.com/nao1215/atago/internal/spec"
 )
@@ -414,7 +417,8 @@ func TestRun_ShellEmbeddedQuotes(t *testing.T) {
 }
 
 // TestWindowsFields pins the Windows argv tokenizer: backslashes are literal
-// (they are path separators, not escapes) and double quotes group fields.
+// (they are path separators, not escapes) and both single and double quotes
+// group fields.
 func TestWindowsFields(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -426,6 +430,13 @@ func TestWindowsFields(t *testing.T) {
 		{`tool --path "C:\Program Files\x"`, []string{"tool", "--path", `C:\Program Files\x`}},
 		{"  spaced   out  ", []string{"spaced", "out"}},
 		{`empty ""`, []string{"empty", ""}},
+		// A single-quoted group strips like a double-quoted one, and a double
+		// quote inside it is literal — so inline JSON survives (#154).
+		{`a '{"k":"v"}' b`, []string{"a", `{"k":"v"}`, "b"}},
+		{`x 'has space' y`, []string{"x", "has space", "y"}},
+		{`empty ''`, []string{"empty", ""}},
+		// A single quote inside a double-quoted group is literal (and vice versa).
+		{`tool "it's" x`, []string{"tool", "it's", "x"}},
 	}
 	for _, tt := range tests {
 		got, err := windowsFields(tt.in)
@@ -444,7 +455,51 @@ func TestWindowsFields(t *testing.T) {
 		}
 	}
 	if _, err := windowsFields(`broken "quote`); err == nil {
-		t.Error("windowsFields with an unclosed quote should error")
+		t.Error("windowsFields with an unclosed double quote should error")
+	}
+	if _, err := windowsFields(`broken 'quote`); err == nil {
+		t.Error("windowsFields with an unclosed single quote should error")
+	}
+}
+
+// TestWindowsFields_MatchesShellwords is the #154 cross-platform guard: for a
+// no-shell command, windowsFields must tokenize to the SAME argv that
+// go-shellwords (the POSIX tokenizer) produces, so a single spec cannot silently
+// diverge on Windows. The one deliberate exception is a bare backslash path,
+// which windowsFields keeps literal while shellwords treats as a C-style escape;
+// that case is asserted separately as a regression guard, not for parity.
+func TestWindowsFields_MatchesShellwords(t *testing.T) {
+	t.Parallel()
+	// Quote handling must be identical on both OSes.
+	parity := []string{
+		`a '{"k":"v"}' b`,
+		`x 'has space' y`,
+		`tool "a b" c`,
+		`plain args here`,
+	}
+	for _, in := range parity {
+		win, werr := windowsFields(in)
+		posix, perr := shellwords.Parse(in)
+		if werr != nil || perr != nil {
+			t.Errorf("tokenize(%q): windows err=%v, posix err=%v", in, werr, perr)
+			continue
+		}
+		if !reflect.DeepEqual(win, posix) {
+			t.Errorf("tokenize(%q): windows=%#v, posix=%#v (must be identical)", in, win, posix)
+		}
+	}
+	// Regression guard for the deliberate divergence: a bare Windows path stays
+	// literal under windowsFields (shellwords would mangle the backslashes).
+	if got, err := windowsFields(`run C:\tmp\x`); err != nil || !reflect.DeepEqual(got, []string{"run", `C:\tmp\x`}) {
+		t.Errorf(`windowsFields("run C:\tmp\x") = %#v, %v; want ["run" "C:\\tmp\\x"]`, got, err)
+	}
+	// An unmatched single quote is an error on both, mirroring the unmatched
+	// double-quote error.
+	if _, err := windowsFields(`bad 'quote`); err == nil {
+		t.Error("windowsFields: unmatched single quote should error")
+	}
+	if _, err := shellwords.Parse(`bad 'quote`); err == nil {
+		t.Error("shellwords: unmatched single quote should error")
 	}
 }
 
