@@ -1,0 +1,93 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / json and yaml matcher lists (#156)
+
+# A json: (and yaml:) matcher accepts either a single check or a LIST of checks
+# that must all hold — so several JSONPaths on one command's output no longer
+# need the whole assert: block repeated once per path. The file-based scenarios
+# are cross-platform (Windows portable subset); the stdout/yaml scenarios use a
+# shell echo and are POSIX-only.
+scenarios:
+  - name: a file json list asserts several paths at once
+    steps:
+      - fixture:
+          file: starters.json
+          content: |
+            [
+              {"name": "basei-starter", "default": true},
+              {"name": "spec-starter"},
+              {"name": "spec87bcd-starter"}
+            ]
+      - assert:
+          file:
+            path: starters.json
+            json:
+              - { path: "$[0].name", equals: "basei-starter" }
+              - { path: "$[0].default", equals: true }
+              - { path: "$[2].name", equals: "spec87bcd-starter" }
+
+  - name: a single mapping still works (backward compatible)
+    steps:
+      - fixture:
+          file: one.json
+          content: '{"id": 7}'
+      - assert:
+          file:
+            path: one.json
+            json:
+              path: "$.id"
+              equals: 7
+
+  - name: a json list fails the inner spec when one listed path mismatches
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: one listed path is wrong
+                steps:
+                  - fixture:
+                      file: data.json
+                      content: '{"a": 1, "b": 2}'
+                  - assert:
+                      file:
+                        path: data.json
+                        json:
+                          - { path: "$.a", equals: 1 }
+                          - { path: "$.b", equals: 999 }
+      - run:
+          command: ${atago} run bad.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: "did not equal"
+
+  - name: a stdout json list against a JSON-producing command
+    skip:
+      os: windows
+    steps:
+      - run:
+          shell: true
+          command: "echo '{\"count\": 3, \"name\": \"ok\"}'"
+      - assert:
+          stdout:
+            json:
+              - { path: "$.count", gte: 2 }
+              - { path: "$.name", equals: "ok" }
+
+  - name: a yaml list asserts several paths on one document
+    skip:
+      os: windows
+    steps:
+      - run:
+          shell: true
+          command: "printf 'name: ada\\nid: 42\\n'"
+      - assert:
+          stdout:
+            yaml:
+              - { path: "$.name", equals: "ada" }
+              - { path: "$.id", equals: 42 }

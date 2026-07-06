@@ -48,9 +48,9 @@ func TestWalkAssertStrings_CollectAndExpand(t *testing.T) {
 	emptyList := StringList{}
 	a := &Assert{
 		Stdout:  &StreamAssert{Contains: StringList{"${a}"}},
-		Rows:    &StreamAssert{JSON: &JSONAssert{Path: "$.${b}", Equals: "${c}"}},
+		Rows:    &StreamAssert{JSON: JSONChecks{{Path: "$.${b}", Equals: "${c}"}}},
 		Message: &StreamAssert{Equals: sp("${d}")},
-		Value:   &StreamAssert{YAML: &JSONAssert{Path: "$.x", Matches: sp("${e}")}},
+		Value:   &StreamAssert{YAML: JSONChecks{{Path: "$.x", Matches: sp("${e}")}}},
 		File:    &FileAssert{Path: "${f}", Contains: StringList{"${g}"}},
 		Header:  &HeaderMatch{Name: "X", Equals: sp("${h}"), Matches: sp("${r}")},
 		Image:   &ImageAssert{Path: "${i}", SimilarTo: "${j}"},

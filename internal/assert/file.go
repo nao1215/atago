@@ -149,12 +149,12 @@ func checkFile(f *spec.FileAssert, env Env) *CheckResult {
 			ArtifactExpected: other,
 		}
 
-	case f.JSON != nil:
+	case len(f.JSON) > 0:
 		data, cr := readFile(f.Path, path)
 		if cr != nil {
 			return cr
 		}
-		res := checkJSON(fmt.Sprintf("assert file %q json", f.Path), f.Path, data, f.JSON)
+		res := checkJSONChecks(fmt.Sprintf("assert file %q json", f.Path), f.Path, data, f.JSON, false)
 		if !res.OK && res.ArtifactKind == "" {
 			res.ArtifactKind = "file"
 			res.ArtifactActual = data

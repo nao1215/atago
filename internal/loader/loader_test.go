@@ -844,6 +844,13 @@ func TestBugHunt_Rejections(t *testing.T) {
 		{"stream contains empty list", specSteps("assert: {stdout: {contains: []}}"), "contains must not be empty"},
 		{"stream contains empty element", specSteps("assert: {stdout: {contains: [\"\"]}}"), "is an empty string"},
 
+		// ---- json/yaml list (#156) ----
+		{"stream json list element two matchers", specSteps("assert: {stdout: {json: [{path: \"$.a\", equals: 1}, {path: \"$.b\", equals: 2, length: 3}]}}"), "must set exactly one of equals/matches/length/gt/gte/lt/lte"},
+		{"stream json list missing matcher", specSteps("assert: {stdout: {json: [{path: \"$.a\", equals: 1}, {path: \"$.b\"}]}}"), "must set one of equals/matches/length/gt/gte/lt/lte"},
+		{"stream json list element path required", specSteps("assert: {stdout: {json: [{path: \"$.a\", equals: 1}, {equals: 2}]}}"), "path is required"},
+		{"stream json empty list", specSteps("assert: {stdout: {json: []}}"), "at least one check"},
+		{"store json list rejected", specSteps("store: {name: v, from: {stdout: {json: [{path: \"$.a\", equals: 1}, {path: \"$.b\", equals: 2}]}}}"), "single value with one json path"},
+
 		// ---- validateFile ----
 		{"file path required", specSteps("assert: {file: {exists: true}}"), "file.path is required"},
 		{"file no matcher", specSteps("assert: {file: {path: out.txt}}"), "must set one of exists/contains/not_contains/executable/equals/equals_file/json/snapshot"},

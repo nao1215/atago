@@ -293,17 +293,17 @@ func (e ExitCode) MarshalYAML() (any, error) {
 // still be set. Line does not compose with json/snapshot (those operate on the
 // whole document).
 type StreamAssert struct {
-	Line        *int        `yaml:"line,omitempty"`
-	Empty       *bool       `yaml:"empty,omitempty"`
-	Contains    StringList  `yaml:"contains,omitempty"`
-	NotContains StringList  `yaml:"not_contains,omitempty"`
-	Matches     *string     `yaml:"matches,omitempty"`
-	NotMatches  *string     `yaml:"not_matches,omitempty"`
-	Equals      *string     `yaml:"equals,omitempty"`
-	NotEquals   *string     `yaml:"not_equals,omitempty"`
-	JSON        *JSONAssert `yaml:"json,omitempty"`
-	YAML        *JSONAssert `yaml:"yaml,omitempty"`
-	Snapshot    string      `yaml:"snapshot,omitempty"`
+	Line        *int       `yaml:"line,omitempty"`
+	Empty       *bool      `yaml:"empty,omitempty"`
+	Contains    StringList `yaml:"contains,omitempty"`
+	NotContains StringList `yaml:"not_contains,omitempty"`
+	Matches     *string    `yaml:"matches,omitempty"`
+	NotMatches  *string    `yaml:"not_matches,omitempty"`
+	Equals      *string    `yaml:"equals,omitempty"`
+	NotEquals   *string    `yaml:"not_equals,omitempty"`
+	JSON        JSONChecks `yaml:"json,omitempty"`
+	YAML        JSONChecks `yaml:"yaml,omitempty"`
+	Snapshot    string     `yaml:"snapshot,omitempty"`
 
 	// Trim is a store-only selector (#158): when set, `store` captures the
 	// whole stream verbatim instead of extracting via a json path or regex.
@@ -351,15 +351,15 @@ func (l *StringList) UnmarshalYAML(unmarshal func(any) error) error {
 // the point is to prove two files are byte-identical (matching the `dir`
 // snapshot hashing semantics), which `cmp` cannot express portably.
 type FileAssert struct {
-	Path        string      `yaml:"path"`
-	Exists      *bool       `yaml:"exists,omitempty"`
-	Contains    StringList  `yaml:"contains,omitempty"`
-	NotContains StringList  `yaml:"not_contains,omitempty"`
-	Executable  *bool       `yaml:"executable,omitempty"`
-	Equals      *string     `yaml:"equals,omitempty"`
-	EqualsFile  *string     `yaml:"equals_file,omitempty"`
-	JSON        *JSONAssert `yaml:"json,omitempty"`
-	Snapshot    string      `yaml:"snapshot,omitempty"`
+	Path        string     `yaml:"path"`
+	Exists      *bool      `yaml:"exists,omitempty"`
+	Contains    StringList `yaml:"contains,omitempty"`
+	NotContains StringList `yaml:"not_contains,omitempty"`
+	Executable  *bool      `yaml:"executable,omitempty"`
+	Equals      *string    `yaml:"equals,omitempty"`
+	EqualsFile  *string    `yaml:"equals_file,omitempty"`
+	JSON        JSONChecks `yaml:"json,omitempty"`
+	Snapshot    string     `yaml:"snapshot,omitempty"`
 
 	// Text is a store-only selector (#158): when true, `store` captures the
 	// whole file content verbatim instead of extracting a value via a json path.
@@ -385,6 +385,53 @@ type JSONAssert struct {
 	Gte     *float64 `yaml:"gte,omitempty"`
 	Lt      *float64 `yaml:"lt,omitempty"`
 	Lte     *float64 `yaml:"lte,omitempty"`
+}
+
+// JSONChecks is the argument to a `json:` (and `yaml:`) matcher (#156). It
+// accepts EITHER a single mapping (one JSONPath check) OR a sequence of mappings
+// (several independent checks that must ALL hold) — the same "every set
+// constraint must hold" model ImageAssert/DirAssert use for multi-attribute
+// targets. The single-mapping form decodes to a one-element list and keeps
+// byte-identical behavior with the pre-list format, so existing specs are
+// unaffected.
+type JSONChecks []JSONAssert
+
+// UnmarshalYAML accepts a single mapping or a sequence of mappings, rejecting an
+// empty sequence. It probes the node's shape, then decodes strictly so an
+// unknown key inside a check (a typo like `equalss:`) is still rejected — a
+// custom unmarshaler otherwise bypasses the loader's document-wide yaml.Strict().
+func (c *JSONChecks) UnmarshalYAML(b []byte) error {
+	var probe any
+	if err := yaml.Unmarshal(b, &probe); err != nil {
+		return err
+	}
+	if _, isSeq := probe.([]any); isSeq {
+		var many []JSONAssert
+		if err := yaml.UnmarshalWithOptions(b, &many, yaml.Strict()); err != nil {
+			return err
+		}
+		if len(many) == 0 {
+			return fmt.Errorf("a json/yaml matcher list must have at least one check")
+		}
+		*c = JSONChecks(many)
+		return nil
+	}
+	var one JSONAssert
+	if err := yaml.UnmarshalWithOptions(b, &one, yaml.Strict()); err != nil {
+		return err
+	}
+	*c = JSONChecks{one}
+	return nil
+}
+
+// MarshalYAML emits the single-mapping form for a one-element list and the
+// sequence form otherwise, so a loaded json/yaml matcher round-trips to the
+// shape it was written in (a lone check stays a mapping, not a one-item list).
+func (c JSONChecks) MarshalYAML() (any, error) {
+	if len(c) == 1 {
+		return c[0], nil
+	}
+	return []JSONAssert(c), nil
 }
 
 // HeaderMatch checks an HTTP header (response headers on the `header` target,

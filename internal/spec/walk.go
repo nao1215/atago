@@ -210,7 +210,7 @@ func WalkAssertStrings(a *Assert, visit func(string) string) *Assert {
 		fc.Path = visit(a.File.Path)
 		fc.Contains = walkList(a.File.Contains, visit)
 		fc.NotContains = walkList(a.File.NotContains, visit)
-		fc.JSON = walkJSONAssert(a.File.JSON, visit)
+		fc.JSON = walkJSONChecks(a.File.JSON, visit)
 		c.File = &fc
 	}
 	c.Header = walkHeaderMatch(a.Header, visit)
@@ -290,9 +290,22 @@ func walkStream(s *StreamAssert, visit func(string) string) *StreamAssert {
 	c.NotMatches = walkPtr(s.NotMatches, visit)
 	c.Equals = walkPtr(s.Equals, visit)
 	c.NotEquals = walkPtr(s.NotEquals, visit)
-	c.JSON = walkJSONAssert(s.JSON, visit)
-	c.YAML = walkJSONAssert(s.YAML, visit)
+	c.JSON = walkJSONChecks(s.JSON, visit)
+	c.YAML = walkJSONChecks(s.YAML, visit)
 	return &c
+}
+
+// walkJSONChecks returns a copy of a json/yaml matcher list (#156) with visit
+// applied to each check's path, regex, and expected value.
+func walkJSONChecks(list JSONChecks, visit func(string) string) JSONChecks {
+	if list == nil {
+		return nil
+	}
+	out := make(JSONChecks, len(list))
+	for i := range list {
+		out[i] = *walkJSONAssert(&list[i], visit)
+	}
+	return out
 }
 
 // walkJSONAssert returns a copy of a json/yaml matcher with visit applied to its

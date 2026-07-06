@@ -91,11 +91,11 @@ func checkStream(name string, s *spec.StreamAssert, data []byte, hasData bool, e
 			Hint:     fmt.Sprintf("%s unexpectedly equaled the given text", name),
 		}
 
-	case s.JSON != nil:
-		return checkJSON("assert "+name+" json", name, data, s.JSON)
+	case len(s.JSON) > 0:
+		return checkJSONChecks("assert "+name+" json", name, data, s.JSON, false)
 
-	case s.YAML != nil:
-		return checkYAML("assert "+name+" yaml", name, data, s.YAML)
+	case len(s.YAML) > 0:
+		return checkJSONChecks("assert "+name+" yaml", name, data, s.YAML, true)
 
 	case s.Snapshot != "":
 		return checkSnapshot("assert "+name+" snapshot", name, s.Snapshot, data, env)

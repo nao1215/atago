@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-59 suites · 234 scenarios
+60 suites · 239 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 2 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -141,6 +141,12 @@
   - [comparators apply to rows and file json targets too](#scenario-comparators-apply-to-rows-and-file-json-targets-too)
   - [a value below the gt bound fails the inner spec](#scenario-a-value-below-the-gt-bound-fails-the-inner-spec)
   - [a non-numeric value cannot be compared and fails](#scenario-a-non-numeric-value-cannot-be-compared-and-fails)
+- [atago self-hosting / json and yaml matcher lists (#156)](#atago-self-hosting--json-and-yaml-matcher-lists-156) — 5 scenarios
+  - [a file json list asserts several paths at once](#scenario-a-file-json-list-asserts-several-paths-at-once)
+  - [a single mapping still works (backward compatible)](#scenario-a-single-mapping-still-works-backward-compatible)
+  - [a json list fails the inner spec when one listed path mismatches](#scenario-a-json-list-fails-the-inner-spec-when-one-listed-path-mismatches)
+  - [a stdout json list against a JSON-producing command](#scenario-a-stdout-json-list-against-a-json-producing-command)
+  - [a yaml list asserts several paths on one document](#scenario-a-yaml-list-asserts-several-paths-on-one-document)
 - [atago self-hosting / line selector](#atago-self-hosting--line-selector) — 3 scenarios
   - [line selector narrows stdout to a single 1-based line](#scenario-line-selector-narrows-stdout-to-a-single-1-based-line)
   - [a trailing newline does not add a phantom final line](#scenario-a-trailing-newline-does-not-add-a-phantom-final-line)
@@ -2544,6 +2550,77 @@ ${atago} run cmp.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `not numeric`
+## atago self-hosting / json and yaml matcher lists (#156)
+Source: `test/e2e/atago/json_list.atago.yaml`
+### Scenario: a file json list asserts several paths at once
+#### Given
+- Fixture file `starters.json` is created.
+#### Inputs
+_Fixture `starters.json`:_
+```text
+[
+  {"name": "basei-starter", "default": true},
+  {"name": "spec-starter"},
+  {"name": "spec87bcd-starter"}
+]
+```
+#### Then
+- file `starters.json` at `$[0].name` equals `basei-starter`; at `$[0].default` equals `true`; at `$[2].name` equals `spec87bcd-starter`
+### Scenario: a single mapping still works (backward compatible)
+#### Given
+- Fixture file `one.json` is created.
+#### Inputs
+_Fixture `one.json`:_
+```text
+{"id": 7}
+```
+#### Then
+- file `one.json` at `$.id` equals `7`
+### Scenario: a json list fails the inner spec when one listed path mismatches
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: one listed path is wrong
+    steps:
+      - fixture:
+          file: data.json
+          content: '{"a": 1, "b": 2}'
+      - assert:
+          file:
+            path: data.json
+            json:
+              - { path: "$.a", equals: 1 }
+              - { path: "$.b", equals: 999 }
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `did not equal`
+### Scenario: a stdout json list against a JSON-producing command
+_skipped on windows_
+#### When
+```shell
+echo '{"count": 3, "name": "ok"}'
+```
+#### Then
+- stdout at `$.count` is `>= 2`; at `$.name` equals `ok`
+### Scenario: a yaml list asserts several paths on one document
+_skipped on windows_
+#### When
+```shell
+printf 'name: ada\nid: 42\n'
+```
+#### Then
+- stdout YAML at `$.name` equals `ada`; YAML at `$.id` equals `42`
 ## atago self-hosting / line selector
 Source: `test/e2e/atago/line.atago.yaml`
 ### Scenario: line selector narrows stdout to a single 1-based line

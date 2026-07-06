@@ -811,8 +811,8 @@
         "not_matches": { "type": "string" },
         "equals": { "type": "string" },
         "not_equals": { "type": "string" },
-        "json": { "$ref": "#/$defs/jsonAssert" },
-        "yaml": { "$ref": "#/$defs/jsonAssert" },
+        "json": { "$ref": "#/$defs/jsonChecks" },
+        "yaml": { "$ref": "#/$defs/jsonChecks" },
         "snapshot": { "type": "string" },
         "trim": { "type": "boolean", "description": "Store-only (#158): capture the whole stream. trim: true strips surrounding whitespace; trim: false keeps bytes verbatim." }
       }
@@ -840,7 +840,7 @@
         "executable": { "type": "boolean" },
         "equals": { "type": "string", "description": "Byte-exact content match against an inline literal (no CRLF/newline normalization)." },
         "equals_file": { "type": "string", "minLength": 1, "description": "Byte-exact content match against another workdir-confined file (round-trip/idempotence; no CRLF/newline normalization)." },
-        "json": { "$ref": "#/$defs/jsonAssert" },
+        "json": { "$ref": "#/$defs/jsonChecks" },
         "snapshot": { "type": "string" },
         "text": { "type": "boolean", "description": "Store-only (#158): capture the whole file content verbatim instead of extracting a value via a json path." }
       }
@@ -873,6 +873,13 @@
         "similar_to": { "type": "string", "minLength": 1 },
         "max_diff": { "type": "number", "minimum": 0, "maximum": 1 }
       }
+    },
+    "jsonChecks": {
+      "description": "A json/yaml matcher (#156): either a single check (mapping) or a non-empty list of checks that must all hold.",
+      "oneOf": [
+        { "$ref": "#/$defs/jsonAssert" },
+        { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/jsonAssert" } }
+      ]
     },
     "jsonAssert": {
       "type": "object",

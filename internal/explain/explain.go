@@ -576,15 +576,26 @@ func describeStream(s *spec.StreamAssert) string {
 		return "equals exact text"
 	case s.NotEquals != nil:
 		return "does not equal exact text"
-	case s.JSON != nil:
-		return fmt.Sprintf("JSON %s %s", s.JSON.Path, jsonMatcher(s.JSON))
-	case s.YAML != nil:
-		return fmt.Sprintf("YAML %s %s", s.YAML.Path, jsonMatcher(s.YAML))
+	case len(s.JSON) > 0:
+		return jsonChecks("JSON", s.JSON)
+	case len(s.YAML) > 0:
+		return jsonChecks("YAML", s.YAML)
 	case s.Snapshot != "":
 		return "matches snapshot " + s.Snapshot
 	default:
 		return "(no matcher)"
 	}
+}
+
+// jsonChecks renders a json/yaml matcher list (#156): a single check reads as it
+// did before the list form ("<kind> <path> <matcher>"), several are joined with
+// "; ".
+func jsonChecks(kind string, list spec.JSONChecks) string {
+	parts := make([]string, len(list))
+	for i := range list {
+		parts[i] = fmt.Sprintf("%s %s %s", kind, list[i].Path, jsonMatcher(&list[i]))
+	}
+	return strings.Join(parts, "; ")
 }
 
 func describeFile(f *spec.FileAssert) string {
@@ -600,8 +611,8 @@ func describeFile(f *spec.FileAssert) string {
 		return fmt.Sprintf("%q equals exact bytes", f.Path)
 	case f.EqualsFile != nil:
 		return fmt.Sprintf("%q is byte-identical to %q", f.Path, *f.EqualsFile)
-	case f.JSON != nil:
-		return fmt.Sprintf("%q JSON %s %s", f.Path, f.JSON.Path, jsonMatcher(f.JSON))
+	case len(f.JSON) > 0:
+		return fmt.Sprintf("%q %s", f.Path, jsonChecks("JSON", f.JSON))
 	case f.Snapshot != "":
 		return fmt.Sprintf("%q matches snapshot %s", f.Path, f.Snapshot)
 	default:

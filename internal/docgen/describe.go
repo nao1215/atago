@@ -304,10 +304,10 @@ func describeStream(s *spec.StreamAssert) string {
 		return "equals an exact value"
 	case s.NotEquals != nil:
 		return "does not equal an exact value"
-	case s.JSON != nil:
-		return "at " + markdown.Code(s.JSON.Path) + " " + jsonMatcher(s.JSON)
-	case s.YAML != nil:
-		return "YAML at " + markdown.Code(s.YAML.Path) + " " + jsonMatcher(s.YAML)
+	case len(s.JSON) > 0:
+		return jsonChecks("at ", s.JSON)
+	case len(s.YAML) > 0:
+		return jsonChecks("YAML at ", s.YAML)
 	case s.Snapshot != "":
 		return "matches snapshot " + markdown.Code(s.Snapshot)
 	default:
@@ -328,13 +328,24 @@ func describeFile(f *spec.FileAssert) string {
 		return markdown.Code(f.Path) + " equals exact bytes"
 	case f.EqualsFile != nil:
 		return markdown.Code(f.Path) + " is byte-identical to " + markdown.Code(*f.EqualsFile)
-	case f.JSON != nil:
-		return markdown.Code(f.Path) + " at " + markdown.Code(f.JSON.Path) + " " + jsonMatcher(f.JSON)
+	case len(f.JSON) > 0:
+		return markdown.Code(f.Path) + " " + jsonChecks("at ", f.JSON)
 	case f.Snapshot != "":
 		return markdown.Code(f.Path) + " matches snapshot " + markdown.Code(f.Snapshot)
 	default:
 		return markdown.Code(f.Path) + " is checked"
 	}
+}
+
+// jsonChecks renders a json/yaml matcher list (#156). A single check reads
+// exactly as it did before the list form ("<prefix>`path` matcher"); several
+// checks are joined with "; " so every asserted path appears in the doc.
+func jsonChecks(prefix string, list spec.JSONChecks) string {
+	parts := make([]string, len(list))
+	for i := range list {
+		parts[i] = prefix + markdown.Code(list[i].Path) + " " + jsonMatcher(&list[i])
+	}
+	return strings.Join(parts, "; ")
 }
 
 func jsonMatcher(j *spec.JSONAssert) string {

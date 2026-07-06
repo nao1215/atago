@@ -68,37 +68,37 @@ func TestExpandAssert_JSONAndYAMLMatchers(t *testing.T) {
 	st.Set("key", "id")
 
 	in := &spec.Assert{
-		Stdout: &spec.StreamAssert{JSON: &spec.JSONAssert{
+		Stdout: &spec.StreamAssert{JSON: spec.JSONChecks{{
 			Path:   "$.${key}",
 			Equals: "${got_id}",
-		}},
-		Stderr: &spec.StreamAssert{YAML: &spec.JSONAssert{
+		}}},
+		Stderr: &spec.StreamAssert{YAML: spec.JSONChecks{{
 			Path:    "$.name",
 			Matches: ptr("^${re}$"),
-		}},
-		File: &spec.FileAssert{Path: "out.json", JSON: &spec.JSONAssert{
+		}}},
+		File: &spec.FileAssert{Path: "out.json", JSON: spec.JSONChecks{{
 			Path:   "$.token",
 			Equals: []any{"${got_id}", 1},
-		}},
+		}}},
 	}
 	out := expandAssert(st, in)
 
-	if got := out.Stdout.JSON.Path; got != "$.id" {
+	if got := out.Stdout.JSON[0].Path; got != "$.id" {
 		t.Errorf("stdout.json.path = %q, want $.id", got)
 	}
-	if got := out.Stdout.JSON.Equals; got != "42" {
+	if got := out.Stdout.JSON[0].Equals; got != "42" {
 		t.Errorf("stdout.json.equals = %v, want 42", got)
 	}
-	if got := *out.Stderr.YAML.Matches; got != "^ab+c$" {
+	if got := *out.Stderr.YAML[0].Matches; got != "^ab+c$" {
 		t.Errorf("stderr.yaml.matches = %q, want ^ab+c$", got)
 	}
-	arr, ok := out.File.JSON.Equals.([]any)
+	arr, ok := out.File.JSON[0].Equals.([]any)
 	if !ok || arr[0] != "42" || arr[1] != 1 {
-		t.Errorf("file.json.equals = %v, want [42 1]", out.File.JSON.Equals)
+		t.Errorf("file.json.equals = %v, want [42 1]", out.File.JSON[0].Equals)
 	}
 	// Original must be untouched.
-	if in.Stdout.JSON.Equals != "${got_id}" {
-		t.Errorf("input mutated: %v", in.Stdout.JSON.Equals)
+	if in.Stdout.JSON[0].Equals != "${got_id}" {
+		t.Errorf("input mutated: %v", in.Stdout.JSON[0].Equals)
 	}
 }
 
