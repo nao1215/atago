@@ -72,6 +72,33 @@ func TestRun_StdoutToStderrTo(t *testing.T) {
 	}
 }
 
+// TestRun_StdoutToCreatesParentDir proves a redirect to a nested path creates
+// the parent directory, mirroring the fixture writer, so a spec can declare
+// stdout_to: logs/out.txt without a prior mkdir step. Without this the write
+// failed with a raw "no such file or directory" on every OS.
+func TestRun_StdoutToCreatesParentDir(t *testing.T) {
+	t.Parallel()
+	wd := t.TempDir()
+	r := New()
+	res, err := r.Run(context.Background(), &spec.Run{
+		Command:  argvCommand("echo produced", "cmd /c echo produced"),
+		StdoutTo: "logs/deep/out.txt",
+		StderrTo: "errs/err.txt",
+	}, wd)
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if res.ExitCode != 0 {
+		t.Fatalf("exit code = %d, want 0", res.ExitCode)
+	}
+	if got := readTrim(t, filepath.Join(wd, "logs", "deep", "out.txt")); got != "produced" {
+		t.Errorf("nested stdout_to = %q, want produced", got)
+	}
+	if _, err := os.Stat(filepath.Join(wd, "errs", "err.txt")); err != nil {
+		t.Errorf("nested stderr_to file missing: %v", err)
+	}
+}
+
 // TestRun_StdoutToConfinedToWorkdir proves a redirect path may not escape the
 // scenario workdir.
 func TestRun_StdoutToConfinedToWorkdir(t *testing.T) {

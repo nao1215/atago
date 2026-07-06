@@ -169,7 +169,36 @@ func TestResolveWorkdirPath_Windows(t *testing.T) {
 	if _, err := ResolveWorkdirPath("f", root, `sub\out.txt`); err != nil {
 		t.Fatalf("in-workdir windows path rejected: %v", err)
 	}
+	// A spec written for portability uses forward slashes; on Windows they must
+	// resolve to the native separator and land inside the workdir.
+	got, err := ResolveWorkdirPath("f", root, "sub/out.txt")
+	if err != nil {
+		t.Fatalf("forward-slash windows path rejected: %v", err)
+	}
+	if want := `C:\work\scn\sub\out.txt`; got != want {
+		t.Errorf("forward-slash resolve = %q, want %q", got, want)
+	}
 	if _, err := ResolveWorkdirPath("f", root, `..\escape.txt`); err == nil {
 		t.Fatal("windows parent traversal accepted")
+	}
+}
+
+// TestResolveWorkdirPath_ForwardSlashRelative proves a forward-slash relative
+// path (how a portable spec is authored) resolves to the host's native separator
+// and stays inside the workdir on every OS — so the same spec addresses the same
+// file on Windows as on POSIX. On windows-latest CI this is the positive proof
+// that `/`-separated spec paths are normalized to `\`.
+func TestResolveWorkdirPath_ForwardSlashRelative(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	got, err := ResolveWorkdirPath("f", root, "sub/deep/out.txt")
+	if err != nil {
+		t.Fatalf("forward-slash relative path rejected: %v", err)
+	}
+	if want := filepath.Join(root, "sub", "deep", "out.txt"); got != want {
+		t.Errorf("resolve = %q, want %q (native separators)", got, want)
+	}
+	if !WithinRoot(root, got) {
+		t.Errorf("resolved path %q is not within root %q", got, root)
 	}
 }
