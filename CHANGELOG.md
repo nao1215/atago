@@ -7,6 +7,8 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-06
+
 A correctness pass across `record`, `snapshot`, the report formats, the loader,
 the assertion matchers, secret masking, and the run engine. Each defect was
 surfaced by an edge-case bug hunt and fixed with a reproduction test first, plus
