@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-62 suites · 260 scenarios
+63 suites · 278 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -298,6 +298,25 @@
 - [atago self-hosting / store whole-content trim and text selectors (#158)](#atago-self-hosting--store-whole-content-trim-and-text-selectors-158) — 2 scenarios
   - [trim captures an opaque token and round-trips it as an argument](#scenario-trim-captures-an-opaque-token-and-round-trips-it-as-an-argument)
   - [text captures a whole multi-line file verbatim](#scenario-text-captures-a-whole-multi-line-file-verbatim)
+- [atago self-hosting / stream matcher boundary values](#atago-self-hosting--stream-matcher-boundary-values) — 18 scenarios
+  - [equals a multibyte and emoji line](#scenario-equals-a-multibyte-and-emoji-line)
+  - [contains a multibyte substring inside a longer line](#scenario-contains-a-multibyte-substring-inside-a-longer-line)
+  - [a regex matches across multibyte runes](#scenario-a-regex-matches-across-multibyte-runes)
+  - [line selection returns a multibyte line intact](#scenario-line-selection-returns-a-multibyte-line-intact)
+  - [not_contains a multibyte needle that is absent](#scenario-not_contains-a-multibyte-needle-that-is-absent)
+  - [empty is true for a command that prints nothing](#scenario-empty-is-true-for-a-command-that-prints-nothing)
+  - [empty is true for whitespace-only output](#scenario-empty-is-true-for-whitespace-only-output)
+  - [equals tolerates output with no trailing newline](#scenario-equals-tolerates-output-with-no-trailing-newline)
+  - [a deliberate trailing blank line is addressable by index](#scenario-a-deliberate-trailing-blank-line-is-addressable-by-index)
+  - [contains treats a needle with regex metacharacters literally](#scenario-contains-treats-a-needle-with-regex-metacharacters-literally)
+  - [matches requires escaping a literal metacharacter](#scenario-matches-requires-escaping-a-literal-metacharacter)
+  - [not_matches passes when an unescaped-metachar pattern does not match](#scenario-not_matches-passes-when-an-unescaped-metachar-pattern-does-not-match)
+  - [a tab-separated record contains the exact tab byte](#scenario-a-tab-separated-record-contains-the-exact-tab-byte)
+  - [quotes and brackets survive an exact equals](#scenario-quotes-and-brackets-survive-an-exact-equals)
+  - [the last of many lines is selectable by index](#scenario-the-last-of-many-lines-is-selectable-by-index)
+  - [a line selector composes with contains](#scenario-a-line-selector-composes-with-contains)
+  - [a line selector composes with a regex](#scenario-a-line-selector-composes-with-a-regex)
+  - [stderr carries the same matcher semantics as stdout](#scenario-stderr-carries-the-same-matcher-semantics-as-stdout)
 - [atago self-hosting / suite setup](#atago-self-hosting--suite-setup) — 4 scenarios
   - [setup runs once, shares stores and env, and teardown always runs](#scenario-setup-runs-once-shares-stores-and-env-and-teardown-always-runs)
   - [a failing setup errors every scenario and none runs (exit 4)](#scenario-a-failing-setup-errors-every-scenario-and-none-runs-exit-4)
@@ -5136,6 +5155,135 @@ ${blob}
 ```
 #### Then
 - file `copy.txt` contains `first line`, `second line`
+## atago self-hosting / stream matcher boundary values
+Source: `test/e2e/atago/stream_edges.atago.yaml`
+### Scenario: equals a multibyte and emoji line
+#### When
+```shell
+printf 'テスト🎌\n'
+```
+#### Then
+- stdout equals an exact value
+### Scenario: contains a multibyte substring inside a longer line
+#### When
+```shell
+printf 'café ☕ の résumé\n'
+```
+#### Then
+- stdout contains `☕ の`
+### Scenario: a regex matches across multibyte runes
+#### When
+```shell
+printf 'αβγδ\n'
+```
+#### Then
+- stdout matches `/β.δ/`
+### Scenario: line selection returns a multibyte line intact
+#### When
+```shell
+printf 'ひらがな\nカタカナ\n漢字\n'
+```
+#### Then
+- stdout equals an exact value
+### Scenario: not_contains a multibyte needle that is absent
+#### When
+```shell
+printf '日本語\n'
+```
+#### Then
+- stdout does not contain `中文`
+### Scenario: empty is true for a command that prints nothing
+#### When
+```shell
+true
+```
+#### Then
+- stdout is empty
+### Scenario: empty is true for whitespace-only output
+#### When
+```shell
+printf '   \n\t\n'
+```
+#### Then
+- stdout is empty
+### Scenario: equals tolerates output with no trailing newline
+#### When
+```shell
+printf 'noeol'
+```
+#### Then
+- stdout equals an exact value
+### Scenario: a deliberate trailing blank line is addressable by index
+#### When
+```shell
+printf 'body\n\n'
+```
+#### Then
+- stdout equals an exact value
+### Scenario: contains treats a needle with regex metacharacters literally
+#### When
+```shell
+printf 'price is $3.50 (approx)\n'
+```
+#### Then
+- stdout contains `$3.50 (approx)`
+### Scenario: matches requires escaping a literal metacharacter
+#### When
+```shell
+printf 'v1.2.3\n'
+```
+#### Then
+- stdout matches `/v1\.2\.3/`
+### Scenario: not_matches passes when an unescaped-metachar pattern does not match
+#### When
+```shell
+printf 'ab\n'
+```
+#### Then
+- stdout does not match `/a.c/`
+### Scenario: a tab-separated record contains the exact tab byte
+#### When
+```shell
+printf 'name\tvalue\n'
+```
+#### Then
+- stdout contains `name	value`
+### Scenario: quotes and brackets survive an exact equals
+#### When
+```shell
+printf '[{"id":1}]\n'
+```
+#### Then
+- stdout equals an exact value
+### Scenario: the last of many lines is selectable by index
+#### When
+```shell
+seq 1 100
+```
+#### Then
+- stdout equals an exact value
+### Scenario: a line selector composes with contains
+#### When
+```shell
+printf 'alpha\nbeta-gamma\n'
+```
+#### Then
+- stdout contains `gamma`
+### Scenario: a line selector composes with a regex
+#### When
+```shell
+printf 'k=1\nk=2\n'
+```
+#### Then
+- stdout matches `/^k=[0-9]$/`
+### Scenario: stderr carries the same matcher semantics as stdout
+#### When
+```shell
+printf 'to stderr\n' 1>&2
+```
+#### Then
+- stdout is empty
+- stderr equals an exact value
 ## atago self-hosting / suite setup
 Source: `test/e2e/atago/suite_setup.atago.yaml`
 ### Scenario: setup runs once, shares stores and env, and teardown always runs
