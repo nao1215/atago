@@ -27,6 +27,15 @@ func (e *Engine) runScenarioWithPolicy(ctx context.Context, idx int, sc *spec.Sc
 // one scenario must never race themselves) and folds the outcomes: the
 // reported Steps belong to the FIRST failing iteration — the interesting one
 // — or the last iteration when all passed. Duration sums the iterations.
+//
+// The folded Status distinguishes the two failure shapes --repeat exists to
+// tell apart (#138): a scenario that failed EVERY iteration is a deterministic
+// bug (StatusFailed, or StatusError when the failures were execution errors),
+// while one that passed some iterations and failed others is unstable, not
+// broken, and folds to StatusFlaky — surfaced with its flake rate but green for
+// the exit code, exactly like a --retry-failed recovery. Collapsing a partial
+// failure into StatusFailed (the old behavior) erased that distinction, so
+// "3/10 flaked" was indistinguishable from "10/10 is a real bug".
 func (e *Engine) runRepeated(ctx context.Context, idx int, sc *spec.Scenario, rc runConfig) ScenarioResult {
 	var folded ScenarioResult
 	var iterations []Status
@@ -50,16 +59,34 @@ func (e *Engine) runRepeated(ctx context.Context, idx int, sc *spec.Scenario, rc
 	}
 	folded.Iterations = iterations
 	folded.Duration = total
-	if haveFailure && folded.Status != StatusError {
-		folded.Status = StatusFailed
-	}
-	// When the kept result failed with StatusError, keep it — error outranks
-	// failed everywhere else too.
+
+	// Classify the fold by how many iterations came out clean. A skip gate is
+	// deterministic (every iteration skips), so a skipped iteration counts as
+	// "not a failure" alongside a pass.
+	passed, errored := 0, 0
 	for _, st := range iterations {
-		if st == StatusError {
-			folded.Status = StatusError
-			break
+		switch st {
+		case StatusPassed, StatusSkipped:
+			passed++
+		case StatusError:
+			errored++
 		}
+	}
+	switch bad := len(iterations) - passed; {
+	case bad == 0:
+		// Every iteration was clean; folded already holds a passing/skipped run.
+	case passed == 0:
+		// Never passed: a deterministic failure, not instability. Error outranks
+		// failed (a step that could not execute is worse than an assertion miss).
+		if errored > 0 {
+			folded.Status = StatusError
+		} else {
+			folded.Status = StatusFailed
+		}
+	default:
+		// Passed some, failed some: unstable. This is the flake --repeat is built
+		// to catch; folded keeps the first failing iteration's steps.
+		folded.Status = StatusFlaky
 	}
 	return folded
 }

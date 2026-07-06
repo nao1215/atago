@@ -228,6 +228,7 @@ Every feature has a commented, runnable spec under [examples/](examples/). The e
 | [pty_screen](examples/pty_screen.atago.yaml) | TUI testing on the RENDERED terminal screen: vt100 emulation, row-addressed asserts, and screen snapshots (POSIX-only) |
 | [retry](examples/retry.atago.yaml) | polling a command until an assertion passes |
 | [snapshot](examples/snapshot.atago.yaml) | golden-file testing with normalized output |
+| [scrub](examples/scrub.atago.yaml) | `scrub:` rewrites volatile output patterns (auto-increment IDs, request identifiers, epoch times) to a placeholder before a snapshot compares — the flake-killer the built-in normalizers do not cover |
 | [duration](examples/duration.atago.yaml) | bound a step's wall-clock time with `duration: {lt: 2s, gte: 100ms}` (use generous bounds — CI runners are slow) |
 | [dir_tree](examples/dir_tree.atago.yaml) | recursive dir assertions and directory-tree snapshots: pin a generator's whole output tree with one golden manifest |
 | [changes](examples/changes.atago.yaml) | `changes:` pins the exact workdir delta of a step — which files it created, modified, and deleted, and nothing else |
@@ -295,6 +296,15 @@ atago list ./specs
 ```shell
 atago snapshot update spec.atago.yaml
 ```
+
+For volatile patterns the built-ins do not cover — auto-increment IDs, request identifiers, epoch times — declare spec-wide `scrub:` rules that rewrite each regex match to a placeholder before the compare (applied after `secrets:` masking):
+
+```yaml
+scrub:
+  - {pattern: 'id=\d+', placeholder: 'id=<ID>'}
+```
+
+See [scrub](examples/scrub.atago.yaml).
 
 ## Editor support (JSON Schema)
 

@@ -145,6 +145,7 @@ func (e *Engine) runSuiteSteps(ctx context.Context, steps []spec.Step, rt *suite
 				SpecDir:         rc.specDir,
 				UpdateSnapshots: e.UpdateSnapshots,
 				Secrets:         rc.masker.MaskBytes,
+				Scrub:           rc.scrubber.Apply,
 				MockRecords: func(name string) ([]mockrunner.Record, bool) {
 					for _, m := range rt.mocks {
 						if m.Name() == name {

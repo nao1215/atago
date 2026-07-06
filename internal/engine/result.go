@@ -20,9 +20,12 @@ const (
 	StatusSkipped Status = "skipped"
 	// StatusError means a step could not execute (e.g. command not found).
 	StatusError Status = "error"
-	// StatusFlaky means the scenario failed at least once and then passed on
-	// a --retry-failed re-run (#29): green for the exit code, but surfaced
-	// everywhere so instability is never silently hidden.
+	// StatusFlaky means the scenario was unstable, not broken: it failed at
+	// least once and passed at least once. Two paths produce it — a
+	// --retry-failed re-run that recovered (#29), or a --repeat run where some
+	// iterations passed and some failed (#138). Either way it is green for the
+	// exit code, but surfaced everywhere (with its attempt count or flake rate)
+	// so instability is never silently hidden.
 	StatusFlaky Status = "flaky"
 )
 
@@ -76,6 +79,20 @@ type ScenarioResult struct {
 	// visible Steps belong to the first failing iteration (or the last one
 	// when all passed).
 	Iterations []Status
+}
+
+// PassedIterations counts how many --repeat iterations came out clean (passed,
+// or skipped by a deterministic OS/env gate). Paired with len(Iterations) it is
+// the flake rate a repeat-flaky scenario reports ("7/10 passed"). Zero-valued
+// when --repeat was not used (Iterations is empty).
+func (s *ScenarioResult) PassedIterations() int {
+	n := 0
+	for _, st := range s.Iterations {
+		if st == StatusPassed || st == StatusSkipped {
+			n++
+		}
+	}
+	return n
 }
 
 // TeardownFailed reports whether any teardown step failed or errored. Reports

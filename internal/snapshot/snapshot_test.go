@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"testing"
@@ -72,6 +73,34 @@ func TestNormalize(t *testing.T) {
 				t.Errorf("Normalize(%q) = %q, want %q", tt.in, got, tt.want)
 			}
 		})
+	}
+}
+
+// TestNormalize_Scrub proves the user Scrub hook rewrites volatile patterns the
+// built-in normalizers do not know about (an auto-increment id), and that it runs
+// BEFORE the built-ins: a scrub whose placeholder overlaps a built-in target is
+// itself left alone by the built-in pass (the placeholder is literal text).
+func TestNormalize_Scrub(t *testing.T) {
+	t.Parallel()
+	reID := regexp.MustCompile(`id=\d+`)
+	scrub := func(b []byte) []byte { return reID.ReplaceAllLiteral(b, []byte("id=<ID>")) }
+	opt := Options{Scrub: scrub}
+
+	// The auto-increment id is scrubbed; the built-in timestamp masker still runs
+	// afterwards on the rest of the line.
+	in := "row id=4093 created 2026-06-30T09:00:00Z"
+	want := "row id=<ID> created <timestamp>"
+	if got := string(Normalize([]byte(in), opt)); got != want {
+		t.Errorf("Normalize(%q) = %q, want %q", in, got, want)
+	}
+
+	// Secrets run before scrub: a scrub rule sees the already-masked text.
+	opt2 := Options{
+		Secrets: func(b []byte) []byte { return []byte(strings.ReplaceAll(string(b), "topsecret", "***")) },
+		Scrub:   func(b []byte) []byte { return regexp.MustCompile(`\*\*\*`).ReplaceAllLiteral(b, []byte("<REDACTED>")) },
+	}
+	if got := string(Normalize([]byte("token=topsecret"), opt2)); got != "token=<REDACTED>" {
+		t.Errorf("secrets-then-scrub = %q, want %q", got, "token=<REDACTED>")
 	}
 }
 

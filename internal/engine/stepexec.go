@@ -77,6 +77,7 @@ func (x *scenarioRun) execStep(ctx context.Context, i int, step *spec.Step) (Ste
 			SpecDir:         x.specDir,
 			UpdateSnapshots: x.e.UpdateSnapshots,
 			Secrets:         x.masker.MaskBytes,
+			Scrub:           x.rc.scrubber.Apply,
 			MockRecords:     x.mockRecords,
 		})
 		x.e.recordChecks(x.masker, crs, x.rc.specPath, x.sc.Name, x.idx, i)
@@ -308,7 +309,7 @@ func (e *Engine) runStep(ctx context.Context, run *spec.Run, st *store.Store, wo
 
 	interval, _ := time.ParseDuration(run.Retry.Interval) // validated at load time
 	until := expandAssert(st, run.Retry.Until)
-	env := assert.Env{Workdir: workdir, SpecDir: specDir, UpdateSnapshots: e.UpdateSnapshots, Secrets: rc.masker.MaskBytes}
+	env := assert.Env{Workdir: workdir, SpecDir: specDir, UpdateSnapshots: e.UpdateSnapshots, Secrets: rc.masker.MaskBytes, Scrub: rc.scrubber.Apply}
 
 	var last *runner.Result
 	var checks []*assert.CheckResult

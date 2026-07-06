@@ -82,7 +82,7 @@ func buildJUnit(results []*engine.SuiteResult) junitTestsuites {
 				ts.Skipped++
 			case engine.StatusFlaky:
 				tc.FlakyFailure = &junitMessage{
-					Message: fmt.Sprintf("flaky: passed after %d attempts", sc.Attempts),
+					Message: flakyMessage(sc),
 					Body:    detailText(sc),
 				}
 			}

@@ -8,8 +8,22 @@ import (
 	"github.com/nao1215/atago/internal/assert"
 	"github.com/nao1215/atago/internal/runner"
 	servicerunner "github.com/nao1215/atago/internal/runner/service"
+	"github.com/nao1215/atago/internal/scrub"
 	"github.com/nao1215/atago/internal/security"
+	"github.com/nao1215/atago/internal/spec"
 )
+
+// newScrubber compiles the spec's declarative snapshot scrub rules (#137). The
+// loader already validated every pattern, so New cannot fail here; on the
+// impossible error path it returns a nil scrubber (a no-op) rather than aborting
+// the run — a broken scrub rule must never silently swallow a real assertion.
+func newScrubber(s *spec.Spec) *scrub.Scrubber {
+	sc, err := scrub.New(s.Scrub)
+	if err != nil {
+		return nil
+	}
+	return sc
+}
 
 // isPolicyViolation reports whether err is a network-allowlist denial, so the
 // engine can flag a security-policy violation for grpc/ssh steps (issue #17),

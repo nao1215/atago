@@ -445,6 +445,18 @@ func TestLoadBytes_Errors(t *testing.T) {
 			wantMsg:  "is not a valid regexp",
 		},
 		{
+			name:     "invalid scrub pattern fails at load",
+			src:      "version: \"1\"\nsuite:\n  name: x\nscrub:\n  - {pattern: \"a(\", placeholder: X}\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}",
+			wantKind: KindValidation,
+			wantMsg:  "scrub[0]",
+		},
+		{
+			name:     "empty scrub pattern fails at load",
+			src:      "version: \"1\"\nsuite:\n  name: x\nscrub:\n  - {pattern: \"\", placeholder: X}\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}",
+			wantKind: KindValidation,
+			wantMsg:  "scrub[0].pattern is required",
+		},
+		{
 			name:     "invalid not_matches regexp fails at load",
 			src:      "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n      - assert:\n          stdout:\n            not_matches: \"hi[\"",
 			wantKind: KindValidation,

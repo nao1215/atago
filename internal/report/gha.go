@@ -27,9 +27,9 @@ func writeGHA(w io.Writer, results []*engine.SuiteResult) error {
 				fmt.Fprintf(&b, "::error title=%s::%s\n",
 					ghaEscapeProp(res.Suite+" / "+sc.Name), ghaEscapeData(firstErrorMessage(sc)))
 			case engine.StatusFlaky:
-				// Green for the job, loud in the annotations (#29).
+				// Green for the job, loud in the annotations (#29, #138).
 				fmt.Fprintf(&b, "::warning title=%s::%s\n",
-					ghaEscapeProp(res.Suite+" / "+sc.Name), ghaEscapeData(fmt.Sprintf("flaky: passed after %d attempts", sc.Attempts)))
+					ghaEscapeProp(res.Suite+" / "+sc.Name), ghaEscapeData(flakyMessage(sc)))
 			}
 		}
 		// A suite that errored before any scenario ran (#7) surfaces its cause as

@@ -89,6 +89,11 @@ type Env struct {
 	// snapshot is written or compared, so a real credential is never committed to
 	// a golden file (issue #11).
 	Secrets func([]byte) []byte
+	// Scrub, when set, applies the spec's declarative regex→placeholder rewrites
+	// (#137) during snapshot normalization, so volatile output patterns the
+	// built-in normalizers do not cover (auto-increment IDs, request identifiers)
+	// are determinized before a snapshot is written or compared.
+	Scrub func([]byte) []byte
 	// MockRecords, when set, resolves a mock server's recorded requests by
 	// name for the `mock:` assertion target (#24). Nil in contexts with no
 	// mock servers (retry `until` asserts, direct API use).

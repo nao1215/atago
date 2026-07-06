@@ -1,7 +1,9 @@
 // Package snapshot stores and compares golden output. Captured
 // output is normalized — volatile details such as ANSI codes, temp paths, the
 // home directory, UUIDs, timestamps, and local ports are masked — so snapshots
-// stay stable across machines and runs.
+// stay stable across machines and runs. A spec may also declare its own
+// regex→placeholder rewrites via Options.Scrub (#137) for volatile patterns the
+// built-ins do not cover.
 package snapshot
 
 import (
@@ -26,6 +28,13 @@ type Options struct {
 	// never lands in a committed snapshot (issue #11). It is applied before the
 	// volatile-detail normalization below.
 	Secrets func([]byte) []byte
+	// Scrub, when set, applies the spec's user-declared regex→placeholder rewrites
+	// (#137) to captured output: the open set of volatile patterns the built-in
+	// normalizers below do not know about (auto-increment IDs, request
+	// identifiers, custom timestamps). It runs AFTER secret masking and BEFORE
+	// the built-in ANSI/UUID/timestamp/port/path normalization, so a rule sees the
+	// already-secret-masked text and the built-ins see the already-scrubbed text.
+	Scrub func([]byte) []byte
 }
 
 var (
@@ -53,6 +62,9 @@ var (
 func Normalize(data []byte, opt Options) []byte {
 	if opt.Secrets != nil {
 		data = opt.Secrets(data)
+	}
+	if opt.Scrub != nil {
+		data = opt.Scrub(data)
 	}
 	s := string(data)
 	// Line endings are an OS artifact, not observable behavior: fold CRLF so a

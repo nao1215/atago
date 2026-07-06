@@ -13,12 +13,32 @@ type Spec struct {
 	Runners     map[string]Runner `yaml:"runners,omitempty"`
 	Permissions *Permissions      `yaml:"permissions,omitempty"`
 	Secrets     []string          `yaml:"secrets,omitempty"`
+	// Scrub declares spec-wide regex→placeholder rewrites applied to captured
+	// output before it is compared against (or written to) a snapshot golden.
+	// Where `secrets:` masks known values, `scrub:` normalizes volatile
+	// patterns the built-in normalizers do not know about — auto-increment
+	// IDs, request identifiers, custom timestamps — so a flaky snapshot becomes
+	// deterministic (#137). Rules apply in order, after secret masking and
+	// before the built-in ANSI/UUID/timestamp/port/path normalization.
+	Scrub []ScrubRule `yaml:"scrub,omitempty"`
 	// Defaults declares spec-wide default fragments merged into every matching
 	// element at load time. It is authoring sugar only: the loader
 	// expands it into the concrete scenario/step/service model before validation,
 	// so nothing downstream (engine, manifest, explain) ever observes `defaults`.
 	Defaults  *Defaults  `yaml:"defaults,omitempty"`
 	Scenarios []Scenario `yaml:"scenarios"`
+}
+
+// ScrubRule is one declarative output-normalization rule (#137): every substring
+// matching Pattern (a Go RE2 regexp) is replaced with Placeholder, literally
+// (no `$1` expansion), before snapshot comparison. Ordering is significant —
+// earlier rules see the raw text, later rules see the output of earlier ones.
+type ScrubRule struct {
+	// Pattern is a Go regular expression (regexp/syntax). Required and must compile.
+	Pattern string `yaml:"pattern"`
+	// Placeholder is the literal replacement text, e.g. "<ID>". May be empty to
+	// delete matches outright.
+	Placeholder string `yaml:"placeholder"`
 }
 
 // Defaults holds the top-level `defaults:` block. Each fragment is

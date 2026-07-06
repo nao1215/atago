@@ -907,14 +907,16 @@ func TestIsTTY(t *testing.T) {
 }
 
 // TestConsole_RepeatRates exercises writeRepeatRates for a --repeat run: a
-// per-scenario pass-rate line, red when not every iteration passed.
+// per-scenario pass-rate line. A partial-failure repeat is flaky (#138), and it
+// must be reported ONCE via its rate line — not also via writeFlaky with a
+// meaningless "0 attempts".
 func TestConsole_RepeatRates(t *testing.T) {
 	t.Parallel()
 	res := &engine.SuiteResult{
 		Suite:  "rp",
-		Status: engine.StatusFailed,
+		Status: engine.StatusPassed,
 		Scenarios: []engine.ScenarioResult{
-			{Name: "race-prone", Status: engine.StatusFailed, Iterations: []engine.Status{
+			{Name: "race-prone", Status: engine.StatusFlaky, Iterations: []engine.Status{
 				engine.StatusPassed, engine.StatusFailed, engine.StatusPassed,
 			}},
 			{Name: "steady", Status: engine.StatusPassed, Iterations: []engine.Status{
@@ -928,6 +930,48 @@ func TestConsole_RepeatRates(t *testing.T) {
 	}
 	if !strings.Contains(out, "REPEAT: steady: 2/2 passed") {
 		t.Errorf("missing steady repeat rate:\n%s", out)
+	}
+	if strings.Contains(out, "passed after 0 attempts") || strings.Contains(out, "FLAKY: rp / race-prone") {
+		t.Errorf("repeat-flaky scenario double-reported via writeFlaky:\n%s", out)
+	}
+}
+
+// TestRepeatFlaky_MessageAcrossFormats proves a --repeat flake (Iterations set,
+// zero retry Attempts) reports its flake RATE — not a "0 attempts" retry phrase
+// — in every machine format, so a partial-failure repeat reads correctly in
+// tap/gha/junit (#138).
+func TestRepeatFlaky_MessageAcrossFormats(t *testing.T) {
+	t.Parallel()
+	res := []*engine.SuiteResult{{
+		Suite:  "rp",
+		Status: engine.StatusPassed,
+		Scenarios: []engine.ScenarioResult{
+			{Name: "race-prone", Status: engine.StatusFlaky, Duration: time.Millisecond, Iterations: []engine.Status{
+				engine.StatusPassed, engine.StatusFailed, engine.StatusPassed,
+			}},
+		},
+	}}
+	for _, tc := range []struct {
+		name   string
+		format Format
+	}{
+		{"tap", FormatTAP},
+		{"gha", FormatGHA},
+		{"junit", FormatJUnit},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var b strings.Builder
+			if err := Render(&b, tc.format, res); err != nil {
+				t.Fatalf("render: %v", err)
+			}
+			out := b.String()
+			if !strings.Contains(out, "flaky: 1/3 iterations failed") {
+				t.Errorf("%s missing repeat flake rate:\n%s", tc.name, out)
+			}
+			if strings.Contains(out, "passed after 0 attempts") {
+				t.Errorf("%s used the retry phrasing for a --repeat flake:\n%s", tc.name, out)
+			}
+		})
 	}
 }
 

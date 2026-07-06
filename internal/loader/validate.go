@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nao1215/atago/internal/scrub"
 	"github.com/nao1215/atago/internal/spec"
 )
 
@@ -27,6 +28,7 @@ func validate(s *spec.Spec) []string {
 		add("suite.name is required")
 	}
 	validateSuiteTimeout(add, &s.Suite)
+	validateScrub(add, s.Scrub)
 	if len(s.Scenarios) == 0 {
 		add("scenarios must contain at least one scenario")
 	}
@@ -129,6 +131,22 @@ func validateSuiteTimeout(add func(string, ...any), s *spec.Suite) {
 		add("suite.timeout %q is not a valid duration (e.g. \"2m\"); use \"0\" to disable the built-in default", s.Timeout)
 	} else if d < 0 {
 		add("suite.timeout must not be negative (got %q); a wall-clock bound is never below zero", s.Timeout)
+	}
+}
+
+// validateScrub checks the top-level `scrub:` rules (#137): every pattern must
+// be non-empty and compile as a Go regexp, so a broken rule fails at load rather
+// than silently normalizing nothing (or, for an empty pattern, matching between
+// every byte). The compile check reuses scrub.New so validation and runtime
+// agree on what a valid rule is.
+func validateScrub(add func(string, ...any), rules []spec.ScrubRule) {
+	for i, r := range rules {
+		if r.Pattern == "" {
+			add("scrub[%d].pattern is required (a regex to normalize; e.g. \"req-\\d+\")", i)
+		}
+	}
+	if _, err := scrub.New(rules); err != nil {
+		add("%v", err)
 	}
 }
 

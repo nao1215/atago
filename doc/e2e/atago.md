@@ -1730,6 +1730,7 @@ _skipped on windows_
 #### Given
 - Fixture file `green.atago.yaml` is created.
 - Fixture file `flaky.atago.yaml` is created.
+- Fixture file `broken.atago.yaml` is created.
 #### Inputs
 _Fixture `green.atago.yaml`:_
 ```text
@@ -1757,18 +1758,34 @@ scenarios:
       - assert:
           exit_code: 0
 ```
+_Fixture `broken.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: always fails
+    steps:
+      - run: {shell: true, command: exit 1}
+      - assert:
+          exit_code: 0
+```
 #### When
 ```shell
 ${atago} run --repeat 3 green.atago.yaml
 ${atago} run --repeat 3 flaky.atago.yaml
+${atago} run --repeat 3 broken.atago.yaml
 ```
 #### Then
 - after `${atago} run --repeat 3 green.atago.yaml`:
   - exit code is `0`
   - stdout contains `steady: 3/3 passed`
 - after `${atago} run --repeat 3 flaky.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `flaky once: 2/3 passed`, `1 flaky`
+- after `${atago} run --repeat 3 broken.atago.yaml`:
   - exit code is `1`
-  - stdout contains `flaky once: 2/3 passed`
+  - stdout contains `always fails: 0/3 passed`, `1 failed`
 ### Scenario: repeat and retry-failed are mutually exclusive
 #### Given
 - Fixture file `any.atago.yaml` is created.
