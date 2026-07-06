@@ -7,7 +7,6 @@
 [![UnitTest](https://github.com/nao1215/atago/actions/workflows/unit_test.yml/badge.svg)](https://github.com/nao1215/atago/actions/workflows/unit_test.yml)
 [![reviewdog](https://github.com/nao1215/atago/actions/workflows/reviewdog.yml/badge.svg)](https://github.com/nao1215/atago/actions/workflows/reviewdog.yml)
 [![Go Reference](https://pkg.go.dev/badge/github.com/nao1215/atago.svg)](https://pkg.go.dev/github.com/nao1215/atago)
-[![Go Report Card](https://goreportcard.com/badge/github.com/nao1215/atago)](https://goreportcard.com/report/github.com/nao1215/atago)
 ![GitHub](https://img.shields.io/github/license/nao1215/atago)
 
 <p align="center">
@@ -400,8 +399,6 @@ atago (愛宕) is named for Mount Atago in Kyoto, whose shrine enshrines a deity
 ## Contributing
 
 Issues and pull requests are welcome; see [CONTRIBUTING.md](./CONTRIBUTING.md). Contributions are not only about code: a GitHub Star also motivates development.
-
-[![Star History Chart](https://api.star-history.com/svg?repos=nao1215/atago&type=Date)](https://star-history.com/#nao1215/atago&Date)
 
 ## LICENSE
 
