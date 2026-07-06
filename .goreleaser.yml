@@ -24,6 +24,16 @@ archives:
     format_overrides:
       - goos: windows
         formats: [zip]
+# Linux system packages for apt/dnf/apk users (the same set gup and sqly ship).
+nfpms:
+  - maintainer: Naohiro CHIKAMATSU <n.chika156@gmail.com>
+    description: "Tests real CLI behavior from plain YAML: commands, files, snapshots, and interactive terminals"
+    homepage: https://github.com/nao1215/atago
+    license: MIT License
+    formats:
+      - deb
+      - rpm
+      - apk
 checksum:
   name_template: "checksums.txt"
 
