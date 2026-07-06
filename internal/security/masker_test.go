@@ -40,6 +40,22 @@ func TestMasker_OverlappingSecretsNoLeak(t *testing.T) {
 	}
 }
 
+// TestMasker_AdjacentOverlapNoLeak is a regression: two secrets that overlap
+// end-to-start (one ends with the bytes the other begins with) must both be
+// masked. Sequential ReplaceAll masked the first and consumed the shared bytes,
+// so the second secret's tail leaked though it appeared verbatim in the output.
+func TestMasker_AdjacentOverlapNoLeak(t *testing.T) {
+	t.Parallel()
+	m := NewMasker([]string{"abcXYZ", "XYZdef"})
+	got := m.Mask("token=abcXYZdef end")
+	if strings.Contains(got, "def") {
+		t.Errorf("overlapping secret tail leaked: %q", got)
+	}
+	if strings.Contains(got, "abc") {
+		t.Errorf("overlapping secret head leaked: %q", got)
+	}
+}
+
 func TestMasker_MaskBytes(t *testing.T) {
 	t.Parallel()
 	m := NewMasker([]string{"supersecret"})
