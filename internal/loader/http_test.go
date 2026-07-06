@@ -65,7 +65,7 @@ func TestLoadBytes_HTTPValidation(t *testing.T) {
 		{
 			name:    "store stdout without json or matches is rejected",
 			src:     "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo hi}\n      - store:\n          name: v\n          from:\n            stdout: {contains: hi}",
-			wantMsg: "json path or a matches regexp",
+			wantMsg: "json path, a matches regexp, or trim",
 		},
 		{
 			name:    "store name shadowing a built-in is rejected",

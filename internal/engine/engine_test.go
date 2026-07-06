@@ -847,17 +847,17 @@ func TestExtractValue_FileNeedsJSONSelector(t *testing.T) {
 	}
 	sp := &spec.Store{Name: "x", From: &spec.StoreFrom{File: &spec.FileAssert{Path: "f.json"}}}
 	_, err := extractValue(sp, &runner.Result{}, dir)
-	if err == nil || !strings.Contains(err.Error(), "needs a json selector") {
-		t.Fatalf("want json-selector error, got %v", err)
+	if err == nil || !strings.Contains(err.Error(), "needs a json or text selector") {
+		t.Fatalf("want json/text-selector error, got %v", err)
 	}
 }
 
-// TestExtractStream_NoSelector proves a stream source that sets neither json nor
-// matches is a clean error.
+// TestExtractStream_NoSelector proves a stream source that sets neither json,
+// matches, nor trim is a clean error.
 func TestExtractStream_NoSelector(t *testing.T) {
 	t.Parallel()
 	_, err := extractStream(&spec.StreamAssert{}, []byte("data"))
-	if err == nil || !strings.Contains(err.Error(), "json or matches") {
+	if err == nil || !strings.Contains(err.Error(), "json, matches, or trim") {
 		t.Fatalf("want selector error, got %v", err)
 	}
 }

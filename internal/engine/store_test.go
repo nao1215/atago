@@ -66,6 +66,63 @@ func TestRegexValue(t *testing.T) {
 	}
 }
 
+// TestExtractStream_Trim covers the #158 whole-stream selector: trim captures
+// the entire stream without a regex, optionally stripping surrounding
+// whitespace.
+func TestExtractStream_Trim(t *testing.T) {
+	t.Parallel()
+	yes, no := true, false
+	multiline := "line one\nline two\n"
+	tests := []struct {
+		name string
+		s    *spec.StreamAssert
+		data string
+		want string
+		err  bool
+	}{
+		{"trim true strips trailing newline", &spec.StreamAssert{Trim: &yes}, "token-abc\n", "token-abc", false},
+		{"trim true strips surrounding whitespace", &spec.StreamAssert{Trim: &yes}, "  spaced  ", "spaced", false},
+		{"trim false keeps bytes verbatim", &spec.StreamAssert{Trim: &no}, "token-abc\n", "token-abc\n", false},
+		{"trim true captures whole multi-line content", &spec.StreamAssert{Trim: &yes}, multiline, "line one\nline two", false},
+		{"trim false captures whole multi-line content verbatim", &spec.StreamAssert{Trim: &no}, multiline, multiline, false},
+		{"no selector errors", &spec.StreamAssert{}, "x", "", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := extractStream(tt.s, []byte(tt.data))
+			if tt.err {
+				if err == nil {
+					t.Errorf("extractStream(%+v) err = nil, want error", tt.s)
+				}
+				return
+			}
+			if err != nil || got != tt.want {
+				t.Errorf("extractStream = %q,%v, want %q", got, err, tt.want)
+			}
+		})
+	}
+}
+
+// TestExtractValue_FromFileText covers the #158 whole-file selector: text: true
+// captures the entire file content verbatim, with no json path.
+func TestExtractValue_FromFileText(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	content := "opaque\nmulti-line\nblob\n"
+	if err := os.WriteFile(filepath.Join(dir, "blob.txt"), []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	yes := true
+	sp := &spec.Store{Name: "t", From: &spec.StoreFrom{
+		File: &spec.FileAssert{Path: "blob.txt", Text: &yes},
+	}}
+	got, err := extractValue(sp, &runner.Result{}, dir)
+	if err != nil || got != content {
+		t.Fatalf("extractValue file text = %q,%v, want %q verbatim", got, err, content)
+	}
+}
+
 func TestExtractValue_NoCommand(t *testing.T) {
 	t.Parallel()
 	sp := &spec.Store{Name: "x", From: &spec.StoreFrom{Stdout: &spec.StreamAssert{JSON: &spec.JSONAssert{Path: "$.id"}}}}

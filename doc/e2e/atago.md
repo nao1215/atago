@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-58 suites · 232 scenarios
+59 suites · 234 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 2 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -266,6 +266,9 @@
 - [atago self-hosting / store](#atago-self-hosting--store) — 2 scenarios
   - [a stored JSON value is reusable in later commands](#scenario-a-stored-json-value-is-reusable-in-later-commands)
   - [storing from a missing JSON path is an execution error](#scenario-storing-from-a-missing-json-path-is-an-execution-error)
+- [atago self-hosting / store whole-content trim and text selectors (#158)](#atago-self-hosting--store-whole-content-trim-and-text-selectors-158) — 2 scenarios
+  - [trim captures an opaque token and round-trips it as an argument](#scenario-trim-captures-an-opaque-token-and-round-trips-it-as-an-argument)
+  - [text captures a whole multi-line file verbatim](#scenario-text-captures-a-whole-multi-line-file-verbatim)
 - [atago self-hosting / suite setup](#atago-self-hosting--suite-setup) — 4 scenarios
   - [setup runs once, shares stores and env, and teardown always runs](#scenario-setup-runs-once-shares-stores-and-env-and-teardown-always-runs)
   - [a failing setup errors every scenario and none runs (exit 4)](#scenario-a-failing-setup-errors-every-scenario-and-none-runs-exit-4)
@@ -4772,6 +4775,39 @@ ${atago} run bad-store.atago.yaml
 #### Then
 - exit code is `4`
 - stdout contains `ERROR`
+## atago self-hosting / store whole-content trim and text selectors (#158)
+Source: `test/e2e/atago/store_whole.atago.yaml`
+### Scenario: trim captures an opaque token and round-trips it as an argument
+#### When
+```shell
+echo opaque-token-abc123
+# capture ${token} from stdout
+${atago} run ${token}
+```
+#### Then
+- after `${atago} run ${token}`:
+  - exit code is `3`
+  - stderr contains `opaque-token-abc123`
+### Scenario: text captures a whole multi-line file verbatim
+#### Given
+- Fixture file `blob.txt` is created.
+- Fixture file `copy.txt` is created.
+#### Inputs
+_Fixture `blob.txt`:_
+```text
+first line
+second line
+```
+_Fixture `copy.txt`:_
+```text
+${blob}
+```
+#### When
+```shell
+# capture ${blob} from file blob.txt
+```
+#### Then
+- file `copy.txt` contains `first line`, `second line`
 ## atago self-hosting / suite setup
 Source: `test/e2e/atago/suite_setup.atago.yaml`
 ### Scenario: setup runs once, shares stores and env, and teardown always runs
