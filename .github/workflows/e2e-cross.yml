@@ -64,8 +64,9 @@ jobs:
       # Windows leg passes @portable, expanded from the shared spec list.
       - name: Run the self-hosted E2E specs
         run: |
-          targets="${{ matrix.targets }}"
-          if [ "$targets" = "@portable" ]; then
-            targets="$(bash scripts/windows_portable_specs.sh)"
+          if [ "${{ matrix.targets }}" = "@portable" ]; then
+            mapfile -t targets < <(bash scripts/windows_portable_specs.sh)
+          else
+            read -ra targets <<< "${{ matrix.targets }}"
           fi
-          go run . run $targets
+          go run . run "${targets[@]}"

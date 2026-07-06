@@ -99,4 +99,6 @@ jobs:
       # atago correctly without per-platform binary-name handling.
       - name: Run the portable self-hosted E2E subset
         shell: bash
-        run: go run . run $(bash scripts/windows_portable_specs.sh)
+        run: |
+          mapfile -t targets < <(bash scripts/windows_portable_specs.sh)
+          go run . run "${targets[@]}"
