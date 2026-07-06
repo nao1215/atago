@@ -403,10 +403,10 @@ func TestLoadBytes_Errors(t *testing.T) {
 			wantMsg:  "exactly one action",
 		},
 		{
-			name:     "assert with two matchers",
+			name:     "whole-stream matcher cannot combine with a text matcher",
 			src:      "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - assert:\n          stdout:\n            contains: a\n            equals: b",
 			wantKind: KindValidation,
-			wantMsg:  "exactly one matcher",
+			wantMsg:  "cannot be combined with another matcher",
 		},
 		{
 			name:     "line below 1",
@@ -461,12 +461,6 @@ func TestLoadBytes_Errors(t *testing.T) {
 			src:      "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n      - assert:\n          stdout:\n            not_matches: \"hi[\"",
 			wantKind: KindValidation,
 			wantMsg:  "not_matches \"hi[\" is not a valid regexp",
-		},
-		{
-			name:     "matches and not_matches together are rejected",
-			src:      "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n      - assert:\n          stdout:\n            matches: a\n            not_matches: b",
-			wantKind: KindValidation,
-			wantMsg:  "exactly one matcher",
 		},
 		{
 			name:     "invalid json matches regexp fails at load",
@@ -839,8 +833,8 @@ func TestBugHunt_Rejections(t *testing.T) {
 		{"exit_code in dup", specSteps("assert: {exit_code: {in: [0, 0]}}"), "in lists 0 more than once"},
 
 		// ---- validateStream ----
-		{"stream no matcher", specSteps("assert: {stdout: {}}"), "must set exactly one matcher"},
-		{"stream two matchers", specSteps("assert: {stdout: {contains: a, equals: b}}"), "must set exactly one matcher, but set"},
+		{"stream no matcher", specSteps("assert: {stdout: {}}"), "must set at least one matcher"},
+		{"stream text plus whole-stream matcher", specSteps("assert: {stdout: {contains: a, equals: b}}"), "cannot be combined with another matcher"},
 		{"stream line with snapshot", specSteps("assert: {stdout: {line: 1, snapshot: snap}}"), "line cannot be combined with json/yaml/snapshot"},
 		{"stream contains empty list", specSteps("assert: {stdout: {contains: []}}"), "contains must not be empty"},
 		{"stream contains empty element", specSteps("assert: {stdout: {contains: [\"\"]}}"), "is an empty string"},
@@ -869,7 +863,7 @@ func TestBugHunt_Rejections(t *testing.T) {
 		{"mock count negative", mockScenario("assert: {mock: {name: api, count: -1}}"), "count must be >= 0"},
 		{"mock count zero with matcher", mockScenario("assert: {mock: {name: api, count: 0, header: {name: X, equals: y}}}"), "count: 0 cannot be combined"},
 		{"mock header invalid", mockScenario("assert: {mock: {name: api, header: {name: X}}}"), "must set one of contains/equals/matches"},
-		{"mock body invalid", mockScenario("assert: {mock: {name: api, body: {}}}"), "must set exactly one matcher"},
+		{"mock body invalid", mockScenario("assert: {mock: {name: api, body: {}}}"), "must set at least one matcher"},
 
 		// ---- validateCondition ----
 		{"skip bad os", scenarioTop("skip: {os: solaris}", "run: {command: echo}"), "skip.os \"solaris\" is invalid"},

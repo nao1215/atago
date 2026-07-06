@@ -101,26 +101,41 @@ func validateExitCode(add func(string, ...any), where string, e *spec.ExitCode) 
 	}
 }
 
+// streamExclusiveMatchers pin the whole stream, so each is used on its own. The
+// text matchers (contains/not_contains/matches/not_matches) may be combined —
+// they all have to hold — which is the common "output has X but not Y" shape.
+var streamExclusiveMatchers = map[string]bool{
+	"empty": true, "equals": true, "not_equals": true,
+	"json": true, "yaml": true, "snapshot": true,
+}
+
 func validateStream(add func(string, ...any), where string, s *spec.StreamAssert) {
 	matchers := s.SetMatchers()
-	switch len(matchers) {
-	case 0:
-		add("%s: must set exactly one matcher (empty/contains/not_contains/matches/not_matches/equals/not_equals/json/yaml/snapshot)", where)
-	case 1:
-		if s.JSON != nil {
-			validateJSON(add, where+".json", s.JSON)
+	if len(matchers) == 0 {
+		add("%s: must set at least one matcher (empty/contains/not_contains/matches/not_matches/equals/not_equals/json/yaml/snapshot)", where)
+	}
+	// A whole-stream matcher cannot be combined with anything else; only the
+	// text matchers compose.
+	var exclusive []string
+	for _, m := range matchers {
+		if streamExclusiveMatchers[m] {
+			exclusive = append(exclusive, m)
 		}
-		if s.YAML != nil {
-			validateJSON(add, where+".yaml", s.YAML)
-		}
-		if s.Matches != nil {
-			validateRegexp(add, where, "matches", *s.Matches)
-		}
-		if s.NotMatches != nil {
-			validateRegexp(add, where, "not_matches", *s.NotMatches)
-		}
-	default:
-		add("%s: must set exactly one matcher, but set %v", where, matchers)
+	}
+	if len(exclusive) > 0 && len(matchers) > 1 {
+		add("%s: %v cannot be combined with another matcher (only contains/not_contains/matches/not_matches may be combined)", where, exclusive)
+	}
+	if s.JSON != nil {
+		validateJSON(add, where+".json", s.JSON)
+	}
+	if s.YAML != nil {
+		validateJSON(add, where+".yaml", s.YAML)
+	}
+	if s.Matches != nil {
+		validateRegexp(add, where, "matches", *s.Matches)
+	}
+	if s.NotMatches != nil {
+		validateRegexp(add, where, "not_matches", *s.NotMatches)
 	}
 	validateStringList(add, where, "contains", s.Contains)
 	validateStringList(add, where, "not_contains", s.NotContains)

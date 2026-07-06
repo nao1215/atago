@@ -786,15 +786,20 @@
       "additionalProperties": false,
       "oneOf": [
         { "required": ["empty"] },
-        { "required": ["contains"] },
-        { "required": ["not_contains"] },
-        { "required": ["matches"] },
-        { "required": ["not_matches"] },
         { "required": ["equals"] },
         { "required": ["not_equals"] },
         { "required": ["json"] },
         { "required": ["yaml"] },
-        { "required": ["snapshot"] }
+        { "required": ["snapshot"] },
+        {
+          "comment": "The text matchers contains/not_contains/matches/not_matches may be combined (all must hold); the whole-stream matchers above are each used alone.",
+          "anyOf": [
+            { "required": ["contains"] },
+            { "required": ["not_contains"] },
+            { "required": ["matches"] },
+            { "required": ["not_matches"] }
+          ]
+        }
       ],
       "properties": {
         "line": { "type": "integer", "minimum": 1 },

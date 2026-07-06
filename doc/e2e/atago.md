@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-55 suites · 220 scenarios
+56 suites · 226 scenarios
 ## Contents
 - [atago self-hosting / variable expansion in assertion matcher values](#atago-self-hosting--variable-expansion-in-assertion-matcher-values) — 6 scenarios
   - [stdout.equals expands ${workdir}](#scenario-stdoutequals-expands-workdir)
@@ -150,6 +150,13 @@
   - [count, header, and body-json asserts pass against a real client](#scenario-count-header-and-body-json-asserts-pass-against-a-real-client)
   - [a failing count summarizes the recorded requests](#scenario-a-failing-count-summarizes-the-recorded-requests)
   - [an unknown mock name in an assert is a load-time error](#scenario-an-unknown-mock-name-in-an-assert-is-a-load-time-error)
+- [atago self-hosting / combined stream matchers](#atago-self-hosting--combined-stream-matchers) — 6 scenarios
+  - [contains and not_contains hold together](#scenario-contains-and-not_contains-hold-together)
+  - [matches and not_matches hold together](#scenario-matches-and-not_matches-hold-together)
+  - [all four text matchers compose](#scenario-all-four-text-matchers-compose)
+  - [a combined matcher composes with a line selector](#scenario-a-combined-matcher-composes-with-a-line-selector)
+  - [a failing member fails the inner spec and names the offender](#scenario-a-failing-member-fails-the-inner-spec-and-names-the-offender)
+  - [mixing a whole-stream matcher with a text matcher is a load error](#scenario-mixing-a-whole-stream-matcher-with-a-text-matcher-is-a-load-error)
 - [atago self-hosting / not_equals matcher](#atago-self-hosting--not_equals-matcher) — 4 scenarios
   - [not_equals passes when stdout differs from the given text](#scenario-not_equals-passes-when-stdout-differs-from-the-given-text)
   - [not_equals is trailing-newline tolerant like equals](#scenario-not_equals-is-trailing-newline-tolerant-like-equals)
@@ -2745,6 +2752,88 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `not a declared mock server (declared: api)`
+## atago self-hosting / combined stream matchers
+Source: `test/e2e/atago/multi_matcher.atago.yaml`
+### Scenario: contains and not_contains hold together
+#### When
+```shell
+echo "hello world"
+```
+#### Then
+- stdout contains `hello`
+### Scenario: matches and not_matches hold together
+#### When
+```shell
+echo "release 1.2.3"
+```
+#### Then
+- stdout matches `/[0-9]+\.[0-9]+\.[0-9]+/`
+### Scenario: all four text matchers compose
+#### When
+```shell
+echo "Alice and Bob"
+```
+#### Then
+- stdout contains `Alice`, `Bob`
+### Scenario: a combined matcher composes with a line selector
+#### When
+```shell
+printf 'first line\nsecond line\n'
+```
+#### Then
+- stdout contains `second`
+### Scenario: a failing member fails the inner spec and names the offender
+#### Given
+- Fixture file `inner.atago.yaml` is created.
+#### Inputs
+_Fixture `inner.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: contains holds but not_contains does not
+    steps:
+      - run:
+          command: echo "hello goodbye"
+      - assert:
+          stdout:
+            contains: hello
+            not_contains: goodbye
+```
+#### When
+```shell
+${atago} run inner.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `goodbye`
+### Scenario: mixing a whole-stream matcher with a text matcher is a load error
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: bad
+scenarios:
+  - name: equals cannot combine
+    steps:
+      - run:
+          command: echo hi
+      - assert:
+          stdout:
+            equals: hi
+            contains: h
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `cannot be combined with another matcher`
 ## atago self-hosting / not_equals matcher
 Source: `test/e2e/atago/not_equals.atago.yaml`
 ### Scenario: not_equals passes when stdout differs from the given text

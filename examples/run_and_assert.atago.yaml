@@ -52,6 +52,24 @@ scenarios:
           stdout:
             not_contains: [panic, fatal]
 
+  - name: text matchers combine in one block
+    steps:
+      - run:
+          shell: true
+          command: echo "release 1.2.3 ready"
+      # contains/not_contains/matches/not_matches can be set together on one
+      # stream; every one has to hold (the common "has X but not Y" shape). The
+      # whole-stream matchers (equals/empty/snapshot/json/yaml) are used alone.
+      - assert:
+          stdout:
+            contains: ready
+            not_contains: error
+            matches: "[0-9]+\\.[0-9]+\\.[0-9]+"
+      # empty is a boolean: `empty: false` asserts the stream is NOT empty.
+      - assert:
+          stdout:
+            empty: false
+
   - name: negative exit code and line selection
     steps:
       - run:
