@@ -44,36 +44,81 @@ func TestDocs_NoStaleLintReferences(t *testing.T) {
 	}
 }
 
-// e2eDocSuites maps a committed generated doc under doc/e2e/ to the spec
-// directory it is rendered from. Keep this in sync with the `atago doc`
-// invocations recorded in doc/e2e/README.md.
-var e2eDocSuites = map[string]string{
-	"doc/e2e/atago.md":       "test/e2e/atago",
-	"doc/e2e/git.md":         "test/e2e/thirdparty/git",
-	"doc/e2e/caddy.md":       "test/e2e/thirdparty/caddy",
-	"doc/e2e/pushgateway.md": "test/e2e/thirdparty/pushgateway",
-	"doc/e2e/webhook.md":     "test/e2e/thirdparty/webhook",
-	"doc/e2e/gitea.md":       "test/e2e/thirdparty/gitea",
-	"doc/e2e/minio.md":       "test/e2e/thirdparty/minio",
-	"doc/e2e/prometheus.md":  "test/e2e/thirdparty/prometheus",
-	"doc/e2e/rclone.md":      "test/e2e/thirdparty/rclone",
-	"doc/e2e/restic.md":      "test/e2e/thirdparty/restic",
-	"doc/e2e/coredns.md":     "test/e2e/thirdparty/coredns",
-	"doc/e2e/nats.md":        "test/e2e/thirdparty/nats",
-	"doc/e2e/mailpit.md":     "test/e2e/thirdparty/mailpit",
-	"doc/e2e/ntfy.md":        "test/e2e/thirdparty/ntfy",
-	"doc/e2e/transfersh.md":  "test/e2e/thirdparty/transfersh",
-	"doc/e2e/gotify.md":      "test/e2e/thirdparty/gotify",
-	"doc/e2e/grafana.md":     "test/e2e/thirdparty/grafana",
-	"doc/e2e/gup.md":         "test/e2e/tools/gup",
-	"doc/e2e/sqly.md":        "test/e2e/tools/sqly",
-	"doc/e2e/truss.md":       "test/e2e/tools/truss",
-	"doc/e2e/iso8583tool.md": "test/e2e/tools/iso8583tool",
-	"doc/e2e/jose.md":        "test/e2e/tools/jose",
-	"doc/e2e/career.md":      "test/e2e/tools/career",
-	"doc/e2e/mimixbox.md":    "test/e2e/tools/mimixbox",
-	"doc/e2e/mobilepkg.md":   "test/e2e/tools/mobilepkg",
+// docSkipDirs are spec directories that deliberately ship no committed doc under
+// doc/e2e/. gup-offline is the fully offline variant of the gup suite, exercised
+// only by `make dogfood-gup`; it intentionally has no generated behavior doc.
+var docSkipDirs = map[string]bool{
+	"gup-offline": true,
 }
+
+// dirHasSpecs reports whether dir contains at least one *.atago.yaml/.yml spec
+// anywhere beneath it.
+func dirHasSpecs(t *testing.T, dir string) bool {
+	t.Helper()
+	found := false
+	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !d.IsDir() && (strings.HasSuffix(path, ".atago.yaml") || strings.HasSuffix(path, ".atago.yml")) {
+			found = true
+			return filepath.SkipAll
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk %s: %v", dir, err)
+	}
+	return found
+}
+
+// e2eDocSuites derives the committed doc/e2e/*.md → spec-directory mapping from
+// the filesystem, mirroring the `make docs` recipe: the self-hosted atago suite,
+// every third-party suite under test/e2e/thirdparty/*, and every dogfood suite
+// under test/e2e/tools/* (minus docSkipDirs). Deriving it — rather than hand-
+// maintaining a map — means a new suite is drift-guarded the moment its specs
+// land. A hand-maintained map is what let doc/e2e/{age,fzf,jq}.md silently rot:
+// they were generated and committed by `make docs` but never registered here, so
+// nothing caught that the committed docs had fallen behind their specs.
+func e2eDocSuites(t *testing.T) map[string]string {
+	t.Helper()
+	suites := map[string]string{
+		"doc/e2e/atago.md": "test/e2e/atago",
+	}
+	for _, parent := range []string{"test/e2e/thirdparty", "test/e2e/tools"} {
+		entries, err := os.ReadDir(parent)
+		if err != nil {
+			t.Fatalf("read %s: %v", parent, err)
+		}
+		for _, e := range entries {
+			if !e.IsDir() || docSkipDirs[e.Name()] {
+				continue
+			}
+			dir := filepath.Join(parent, e.Name())
+			if !dirHasSpecs(t, dir) {
+				continue
+			}
+			doc := "doc/e2e/" + e.Name() + ".md"
+			if existing, ok := suites[doc]; ok {
+				t.Fatalf("doc name collision: %s maps to both %s and %s", doc, existing, filepath.ToSlash(dir))
+			}
+			suites[doc] = filepath.ToSlash(dir)
+		}
+	}
+	return suites
+}
+
+var (
+	// makeDocOutRe extracts each doc/e2e/<name>.md target from the Makefile
+	// `docs` recipe's `atago doc --out` lines.
+	makeDocOutRe = regexp.MustCompile(`doc/e2e/([a-zA-Z0-9_-]+)\.md`)
+	// thirdpartyDirRe extracts each suite directory the thirdparty.yml CI matrix
+	// runs (`dir: ./test/e2e/thirdparty/<name>`).
+	thirdpartyDirRe = regexp.MustCompile(`dir:\s*\./test/e2e/thirdparty/([a-zA-Z0-9_-]+)`)
+	// windowsSpecRe extracts each ./test/e2e spec path listed in the single-source
+	// scripts/windows_portable_specs.sh.
+	windowsSpecRe = regexp.MustCompile(`(\./test/e2e/\S+)`)
+)
 
 // collectSpecs mirrors cli.collectSpecFiles for a single directory target: every
 // *.atago.yaml/.yml under dir in filepath.WalkDir's lexical order, cleaned. The
@@ -127,7 +172,7 @@ func firstDiff(want, got []byte) string {
 //
 //	atago doc --out doc/e2e/<tool>.md ./test/e2e/tools/<tool>
 func TestDocs_E2EDocsInSync(t *testing.T) {
-	for docPath, specDir := range e2eDocSuites {
+	for docPath, specDir := range e2eDocSuites(t) {
 		t.Run(docPath, func(t *testing.T) {
 			specs := collectSpecs(t, specDir)
 			if len(specs) == 0 {
@@ -159,6 +204,116 @@ func TestDocs_E2EDocsInSync(t *testing.T) {
 					docPath, specDir, docPath, specDir, firstDiff(want, buf.Bytes()))
 			}
 		})
+	}
+}
+
+// TestDocs_E2EDocSetMatchesCommitted asserts the derived suite set is exactly
+// the committed doc/e2e/*.md set (minus the README index), so a doc whose spec
+// directory was deleted — or a spec directory whose generated doc was never
+// committed — fails the build instead of rotting unnoticed.
+func TestDocs_E2EDocSetMatchesCommitted(t *testing.T) {
+	suites := e2eDocSuites(t)
+	committed := map[string]bool{}
+	entries, err := os.ReadDir("doc/e2e")
+	if err != nil {
+		t.Fatalf("read doc/e2e: %v", err)
+	}
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".md") || e.Name() == "README.md" {
+			continue
+		}
+		committed["doc/e2e/"+e.Name()] = true
+	}
+	for doc := range suites {
+		if !committed[doc] {
+			t.Errorf("%s derives from a spec directory but is not committed; run `make docs`", doc)
+		}
+	}
+	for doc := range committed {
+		if _, ok := suites[doc]; !ok {
+			t.Errorf("%s is committed but derives from no spec directory (stale doc, or a suite missing from docSkipDirs)", doc)
+		}
+	}
+}
+
+// TestDocs_MakefileGeneratesEverySuite asserts the `make docs` recipe emits a
+// doc for exactly the derived suite set, so adding a suite directory forces a
+// matching `atago doc --out` line and nothing generates an orphan doc. This is
+// what keeps the one remaining hand-maintained doc list — the Makefile recipe —
+// from drifting away from the specs on disk.
+func TestDocs_MakefileGeneratesEverySuite(t *testing.T) {
+	data, err := os.ReadFile("Makefile")
+	if err != nil {
+		t.Fatalf("read Makefile: %v", err)
+	}
+	generated := map[string]bool{}
+	for _, m := range makeDocOutRe.FindAllSubmatch(data, -1) {
+		generated["doc/e2e/"+string(m[1])+".md"] = true
+	}
+	suites := e2eDocSuites(t)
+	for doc := range suites {
+		if !generated[doc] {
+			t.Errorf("Makefile `docs` target does not generate %s; add an `atago doc --out %s ...` line", doc, doc)
+		}
+	}
+	for doc := range generated {
+		if _, ok := suites[doc]; !ok {
+			t.Errorf("Makefile `docs` generates %s but no spec directory derives it", doc)
+		}
+	}
+}
+
+// TestThirdParty_MatrixCoversEverySuite asserts the scheduled thirdparty.yml
+// matrix runs every test/e2e/thirdparty/* suite, so a suite with specs but no
+// matrix leg (which would silently never run in CI) fails the build. git is
+// exempt: it is push-gated in e2e.yml rather than in the scheduled matrix.
+func TestThirdParty_MatrixCoversEverySuite(t *testing.T) {
+	data, err := os.ReadFile(".github/workflows/thirdparty.yml")
+	if err != nil {
+		t.Fatalf("read thirdparty.yml: %v", err)
+	}
+	inMatrix := map[string]bool{}
+	for _, m := range thirdpartyDirRe.FindAllSubmatch(data, -1) {
+		inMatrix[string(m[1])] = true
+	}
+	entries, err := os.ReadDir("test/e2e/thirdparty")
+	if err != nil {
+		t.Fatalf("read test/e2e/thirdparty: %v", err)
+	}
+	exempt := map[string]bool{"git": true}
+	for _, e := range entries {
+		if !e.IsDir() || exempt[e.Name()] {
+			continue
+		}
+		if !dirHasSpecs(t, filepath.Join("test/e2e/thirdparty", e.Name())) {
+			continue
+		}
+		if !inMatrix[e.Name()] {
+			t.Errorf("test/e2e/thirdparty/%s has specs but no matrix leg in .github/workflows/thirdparty.yml", e.Name())
+		}
+	}
+}
+
+// TestWindowsPortableSubset_Exists asserts every spec path in the single-source
+// scripts/windows_portable_specs.sh resolves to a real file or directory, so a
+// spec rename fails here — a fast unit test — instead of only in the Windows CI
+// legs that read the script (e2e.yml and e2e-cross.yml).
+func TestWindowsPortableSubset_Exists(t *testing.T) {
+	data, err := os.ReadFile("scripts/windows_portable_specs.sh")
+	if err != nil {
+		t.Fatalf("read scripts/windows_portable_specs.sh: %v", err)
+	}
+	var paths []string
+	for _, m := range windowsSpecRe.FindAllSubmatch(data, -1) {
+		paths = append(paths, string(m[1]))
+	}
+	if len(paths) == 0 {
+		t.Fatal("no ./test/e2e spec paths found in scripts/windows_portable_specs.sh")
+	}
+	for _, p := range paths {
+		if _, err := os.Stat(filepath.FromSlash(p)); err != nil {
+			t.Errorf("scripts/windows_portable_specs.sh lists %q which does not resolve: %v", p, err)
+		}
 	}
 }
 
