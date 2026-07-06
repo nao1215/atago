@@ -61,16 +61,65 @@ func Normalize(data []byte, opt Options) []byte {
 	s = strings.ReplaceAll(s, "\r\n", "\n")
 	s = reCSI.ReplaceAllString(s, "")
 	s = reOSC.ReplaceAllString(s, "")
-	if opt.Workdir != "" {
-		s = strings.ReplaceAll(s, opt.Workdir, "<workdir>")
-	}
-	if home, err := os.UserHomeDir(); err == nil && home != "" {
-		s = strings.ReplaceAll(s, home, "~")
-	}
 	s = reUUID.ReplaceAllString(s, "<uuid>")
 	s = reTimestamp.ReplaceAllString(s, "<timestamp>")
 	s = rePort.ReplaceAllString(s, "$1:<port>")
+	// Path masking is component-boundary aware (it must not turn /home/naoki into
+	// ~ki), so it depends on the byte that follows the prefix. Run it AFTER the
+	// uuid/timestamp/port maskers so that neighbor byte is already in its final
+	// form — otherwise a workdir abutting a timestamp (".../tmp/x2026-..." → mask
+	// timestamp → ".../tmp/x<timestamp>") would flip the boundary between passes
+	// and break idempotence.
+	if opt.Workdir != "" {
+		s = maskPathPrefix(s, opt.Workdir, "<workdir>")
+	}
+	// Skip a root home ("/"): masking it would rewrite every absolute path. It is
+	// the home of some container/CI users, where os.UserHomeDir returns "/".
+	if home, err := os.UserHomeDir(); err == nil && home != "" && home != "/" {
+		s = maskPathPrefix(s, home, "~")
+	}
 	return []byte(s)
+}
+
+// maskPathPrefix replaces every occurrence of prefix in s with replacement, but
+// only where prefix ends a path component — the following byte is a separator or
+// other boundary character, or the match is at end of string. Masking a bare
+// substring instead would corrupt a longer sibling path: the home dir /home/nao
+// must not turn /home/naoki into ~ki, and the workdir /tmp/run1 must not turn
+// /tmp/run10 into <workdir>0.
+func maskPathPrefix(s, prefix, replacement string) string {
+	if prefix == "" {
+		return s
+	}
+	var b strings.Builder
+	for i := 0; i < len(s); {
+		if strings.HasPrefix(s[i:], prefix) {
+			end := i + len(prefix)
+			if end >= len(s) || !isPathContinuation(s[end]) {
+				b.WriteString(replacement)
+				i = end
+				continue
+			}
+		}
+		b.WriteByte(s[i])
+		i++
+	}
+	return b.String()
+}
+
+// isPathContinuation reports whether c can continue a filename component. A
+// masked prefix must not be applied when the next byte is one of these, or it
+// would swallow part of a longer name (/home/naoki for home /home/nao). A
+// separator or punctuation ends the component and is a safe masking boundary.
+func isPathContinuation(c byte) bool {
+	switch {
+	case c >= 'a' && c <= 'z', c >= 'A' && c <= 'Z', c >= '0' && c <= '9':
+		return true
+	case c == '.' || c == '-' || c == '_':
+		return true
+	default:
+		return false
+	}
 }
 
 // Compare normalizes actual and checks it against the stored snapshot at path.

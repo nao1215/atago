@@ -38,19 +38,22 @@ func (e treeEntry) manifestLine() string {
 }
 
 // escapeManifestField escapes the bytes that would break the one-line-per-entry
-// manifest grammar: a backslash (so the escape stays unambiguous) and the CR/LF
-// a filename may legally carry on POSIX. Without this, a name embedding a
-// newline renders as several manifest lines, so a single such entry produces the
-// same manifest as a structurally different multi-entry tree and falsely matches
-// its golden. Ordinary names (no backslash, CR, or LF) are returned unchanged,
-// so existing goldens are unaffected.
+// manifest grammar: a backslash (so the escape stays unambiguous), the CR/LF a
+// filename may legally carry on POSIX, and `>` so the ` -> ` that joins a
+// symlink's name and target can never appear inside either field. Without the
+// newline escaping a name renders as several manifest lines; without the `>`
+// escaping a name or target embedding ` -> ` collides with a structurally
+// different symlink (name "a -> b" → "c" vs name "a" → "b -> c") and falsely
+// matches its golden. Ordinary names (no backslash, CR, LF, or `>`) are returned
+// unchanged, so existing goldens are unaffected.
 func escapeManifestField(s string) string {
-	if !strings.ContainsAny(s, "\\\r\n") {
+	if !strings.ContainsAny(s, "\\\r\n>") {
 		return s
 	}
 	s = strings.ReplaceAll(s, `\`, `\\`)
 	s = strings.ReplaceAll(s, "\n", `\n`)
 	s = strings.ReplaceAll(s, "\r", `\r`)
+	s = strings.ReplaceAll(s, ">", `\>`)
 	return s
 }
 

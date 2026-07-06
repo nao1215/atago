@@ -162,6 +162,23 @@ func TestManifestLine_EscapesControlBytes(t *testing.T) {
 	}
 }
 
+// TestManifestLine_SymlinkSeparatorUnambiguous is a regression: the " -> " that
+// joins a symlink's name and target must be escaped inside either field, or two
+// structurally different symlinks render the same manifest line and one falsely
+// matches the other's golden. Name "a -> b" → target "c" collided with name "a"
+// → target "b -> c".
+func TestManifestLine_SymlinkSeparatorUnambiguous(t *testing.T) {
+	t.Parallel()
+	e1 := treeEntry{rel: "a -> b", kind: "link", target: "c"}.manifestLine()
+	e2 := treeEntry{rel: "a", kind: "link", target: "b -> c"}.manifestLine()
+	if e1 == e2 {
+		t.Errorf("distinct symlinks share a manifest line: %q", e1)
+	}
+	if strings.ContainsAny(e1, "\n\r") || strings.ContainsAny(e2, "\n\r") {
+		t.Errorf("manifest line is not single-line: %q / %q", e1, e2)
+	}
+}
+
 // TestCheckDir_SnapshotNewlineNameNoFalseMatch proves the escape end to end: a
 // tree of two dirs and a tree of one dir whose name embeds a newline must not
 // match each other's golden. POSIX-only — Windows forbids newlines in names.
