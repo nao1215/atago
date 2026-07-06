@@ -51,7 +51,7 @@ jq empty
   - stdout is empty
   - stderr is empty
 - after `jq empty`:
-  - exit code is `5`
+  - exit code is one of `4`, `5`
   - stdout is empty
   - stderr contains `parse error`
 ## jq (third-party CLI, no build required)

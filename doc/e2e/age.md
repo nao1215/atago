@@ -119,6 +119,8 @@ passphrase protected
 ## age + changes (single-artifact generator)
 Source: `test/e2e/thirdparty/age/changes.atago.yaml`
 ### Scenario: age-keygen writes exactly the key file (HOME untouched)
+#### Given
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### When
 ```shell
 age-keygen -o key.txt

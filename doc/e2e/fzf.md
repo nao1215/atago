@@ -1,8 +1,8 @@
 # atago Behavior Specs
 ## Summary
-1 suite · 7 scenarios
+1 suite · 8 scenarios
 ## Contents
-- [fzf (third-party CLI, pty testbed)](#fzf-third-party-cli-pty-testbed) — 7 scenarios
+- [fzf (third-party CLI, pty testbed)](#fzf-third-party-cli-pty-testbed) — 8 scenarios
   - [version prints a semantic version](#scenario-version-prints-a-semantic-version)
   - [filter mode matches fuzzily on stdin without a terminal](#scenario-filter-mode-matches-fuzzily-on-stdin-without-a-terminal)
   - [filter mode exits 1 when nothing matches](#scenario-filter-mode-exits-1-when-nothing-matches)
@@ -10,6 +10,7 @@
   - [interactive selection picks the queried line](#scenario-interactive-selection-picks-the-queried-line)
   - [multi-select accepts several lines at once](#scenario-multi-select-accepts-several-lines-at-once)
   - [aborting the finder exits 130](#scenario-aborting-the-finder-exits-130)
+  - [the finder screen narrows to the typed query](#scenario-the-finder-screen-narrows-to-the-typed-query)
 ## fzf (third-party CLI, pty testbed)
 Source: `test/e2e/thirdparty/fzf/fzf.atago.yaml`
 ### Scenario: version prints a semantic version
@@ -85,3 +86,12 @@ _skipped on windows_
 ```
 #### Then
 - exit code is `130`
+### Scenario: the finder screen narrows to the typed query
+_skipped on windows_
+#### When
+```shell
+# interactive (pty): printf 'apple\nbanana\ncherry\n' | fzf
+```
+#### Then
+- rendered screen contains `banana`
+- rendered screen does not contain `cherry`
