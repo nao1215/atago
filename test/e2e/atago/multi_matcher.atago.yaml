@@ -1,0 +1,100 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / combined stream matchers
+
+# Exercises combining the text matchers on a single stdout/stderr/body block:
+# contains/not_contains/matches/not_matches may be set together and all have to
+# hold (AND). The whole-stream matchers (equals/empty/snapshot/json/yaml) are
+# still used alone, and mixing one in is a load error.
+scenarios:
+  - name: contains and not_contains hold together
+    steps:
+      - run:
+          command: echo "hello world"
+      - assert:
+          stdout:
+            contains: hello
+            not_contains: goodbye
+
+  - name: matches and not_matches hold together
+    steps:
+      - run:
+          command: echo "release 1.2.3"
+      - assert:
+          stdout:
+            matches: "[0-9]+\\.[0-9]+\\.[0-9]+"
+            not_matches: "(?i)error"
+
+  - name: all four text matchers compose
+    steps:
+      - run:
+          command: echo "Alice and Bob"
+      - assert:
+          stdout:
+            contains:
+              - Alice
+              - Bob
+            not_contains: Carol
+            matches: "A.+e"
+            not_matches: Dave
+
+  - name: a combined matcher composes with a line selector
+    steps:
+      - run:
+          shell: true
+          command: "printf 'first line\\nsecond line\\n'"
+      - assert:
+          stdout:
+            line: 2
+            contains: second
+            not_contains: first
+
+  - name: a failing member fails the inner spec and names the offender
+    steps:
+      - fixture:
+          file: inner.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: contains holds but not_contains does not
+                steps:
+                  - run:
+                      command: echo "hello goodbye"
+                  - assert:
+                      stdout:
+                        contains: hello
+                        not_contains: goodbye
+      - run:
+          command: ${atago} run inner.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: "goodbye"
+            not_contains: "internal error"
+
+  - name: mixing a whole-stream matcher with a text matcher is a load error
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: bad
+            scenarios:
+              - name: equals cannot combine
+                steps:
+                  - run:
+                      command: echo hi
+                  - assert:
+                      stdout:
+                        equals: hi
+                        contains: h
+      - run:
+          command: ${atago} run bad.atago.yaml
+      - assert:
+          exit_code: 2
+          stderr:
+            contains: "cannot be combined with another matcher"

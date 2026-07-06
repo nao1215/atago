@@ -12,9 +12,8 @@ import (
 // hasData reports whether a command actually ran (to distinguish "no output"
 // from "no command").
 func checkStream(name string, s *spec.StreamAssert, data []byte, hasData bool, env Env) (out *CheckResult) {
-	matchers := s.SetMatchers()
-	if len(matchers) != 1 {
-		return &CheckResult{Desc: "assert " + name, Hint: "stream assertion must set exactly one matcher"}
+	if len(s.SetMatchers()) == 0 {
+		return &CheckResult{Desc: "assert " + name, Hint: "stream assertion must set at least one matcher"}
 	}
 	if !hasData {
 		return &CheckResult{Desc: "assert " + name, Hint: "no command has run in this scenario yet"}
@@ -50,6 +49,8 @@ func checkStream(name string, s *spec.StreamAssert, data []byte, hasData bool, e
 		name = fmt.Sprintf("%s line %d", name, *s.Line)
 	}
 
+	// Whole-stream matchers pin the entire output, so each is used on its own
+	// (the loader rejects combining them). Handle them first and return.
 	switch {
 	case s.Empty != nil:
 		want := *s.Empty
@@ -64,44 +65,6 @@ func checkStream(name string, s *spec.StreamAssert, data []byte, hasData bool, e
 			Actual:   excerpt(got),
 			Hint:     fmt.Sprintf("expected %s to be %s", name, emptiness(want)),
 		}
-
-	case s.Contains != nil:
-		return checkContainsAll(name, got, s.Contains)
-
-	case s.NotContains != nil:
-		return checkNotContainsAll(name, got, s.NotContains)
-
-	case s.Matches != nil:
-		re, err := regexp.Compile(*s.Matches)
-		if err != nil {
-			return &CheckResult{Desc: "assert " + name, Hint: fmt.Sprintf("invalid regexp %q: %v", *s.Matches, err)}
-		}
-		desc := fmt.Sprintf("assert %s matches %q", name, *s.Matches)
-		if re.MatchString(got) {
-			return pass(desc)
-		}
-		return &CheckResult{
-			Desc:     desc,
-			Expected: fmt.Sprintf("%s matches /%s/", name, *s.Matches),
-			Actual:   excerpt(got),
-			Hint:     fmt.Sprintf("regexp /%s/ did not match %s", *s.Matches, name),
-		}
-
-	case s.NotMatches != nil:
-		re, err := regexp.Compile(*s.NotMatches)
-		if err != nil {
-			return &CheckResult{Desc: "assert " + name, Hint: fmt.Sprintf("invalid regexp %q: %v", *s.NotMatches, err)}
-		}
-		desc := fmt.Sprintf("assert %s does not match %q", name, *s.NotMatches)
-		if loc := re.FindString(got); re.MatchString(got) {
-			return &CheckResult{
-				Desc:     desc,
-				Expected: fmt.Sprintf("%s without a match for /%s/", name, *s.NotMatches),
-				Actual:   excerpt(got),
-				Hint:     fmt.Sprintf("regexp /%s/ unexpectedly matched %q in %s", *s.NotMatches, loc, name),
-			}
-		}
-		return pass(desc)
 
 	case s.Equals != nil:
 		desc := fmt.Sprintf("assert %s equals exact text", name)
@@ -136,10 +99,87 @@ func checkStream(name string, s *spec.StreamAssert, data []byte, hasData bool, e
 
 	case s.Snapshot != "":
 		return checkSnapshot("assert "+name+" snapshot", name, s.Snapshot, data, env)
-
-	default:
-		return &CheckResult{Desc: "assert " + name, Hint: "matcher not supported yet"}
 	}
+
+	// The text matchers compose: every one that is set must hold (AND). Return
+	// the first failure; if all pass, return the last passing result.
+	var last *CheckResult
+	for _, r := range []*CheckResult{
+		streamContains(name, got, s.Contains),
+		streamNotContains(name, got, s.NotContains),
+		streamMatches(name, got, s.Matches),
+		streamNotMatches(name, got, s.NotMatches),
+	} {
+		if r == nil {
+			continue
+		}
+		if !r.OK {
+			return r
+		}
+		last = r
+	}
+	if last != nil {
+		return last
+	}
+	return &CheckResult{Desc: "assert " + name, Hint: "matcher not supported yet"}
+}
+
+// streamContains runs the contains matcher, or returns nil when it is unset.
+func streamContains(name, got string, subs spec.StringList) *CheckResult {
+	if subs == nil {
+		return nil
+	}
+	return checkContainsAll(name, got, subs)
+}
+
+// streamNotContains runs the not_contains matcher, or returns nil when unset.
+func streamNotContains(name, got string, subs spec.StringList) *CheckResult {
+	if subs == nil {
+		return nil
+	}
+	return checkNotContainsAll(name, got, subs)
+}
+
+// streamMatches runs the matches matcher, or returns nil when it is unset.
+func streamMatches(name, got string, pat *string) *CheckResult {
+	if pat == nil {
+		return nil
+	}
+	re, err := regexp.Compile(*pat)
+	if err != nil {
+		return &CheckResult{Desc: "assert " + name, Hint: fmt.Sprintf("invalid regexp %q: %v", *pat, err)}
+	}
+	desc := fmt.Sprintf("assert %s matches %q", name, *pat)
+	if re.MatchString(got) {
+		return pass(desc)
+	}
+	return &CheckResult{
+		Desc:     desc,
+		Expected: fmt.Sprintf("%s matches /%s/", name, *pat),
+		Actual:   excerpt(got),
+		Hint:     fmt.Sprintf("regexp /%s/ did not match %s", *pat, name),
+	}
+}
+
+// streamNotMatches runs the not_matches matcher, or returns nil when unset.
+func streamNotMatches(name, got string, pat *string) *CheckResult {
+	if pat == nil {
+		return nil
+	}
+	re, err := regexp.Compile(*pat)
+	if err != nil {
+		return &CheckResult{Desc: "assert " + name, Hint: fmt.Sprintf("invalid regexp %q: %v", *pat, err)}
+	}
+	desc := fmt.Sprintf("assert %s does not match %q", name, *pat)
+	if loc := re.FindString(got); re.MatchString(got) {
+		return &CheckResult{
+			Desc:     desc,
+			Expected: fmt.Sprintf("%s without a match for /%s/", name, *pat),
+			Actual:   excerpt(got),
+			Hint:     fmt.Sprintf("regexp /%s/ unexpectedly matched %q in %s", *pat, loc, name),
+		}
+	}
+	return pass(desc)
 }
 
 // checkContainsAll verifies every substring in subs is present in got. The whole

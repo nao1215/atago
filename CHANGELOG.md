@@ -14,6 +14,12 @@ two flaky-test tooling improvements described below.
 
 ### Added
 
+- Stream matchers now compose. `contains`, `not_contains`, `matches`, and
+  `not_matches` can be set together on one `stdout`/`stderr`/`body` block and all
+  have to hold — the common "output has X but not Y" shape, previously two
+  separate `assert:` steps. The whole-stream matchers (`equals`, `empty`,
+  `snapshot`, `json`, `yaml`) are still used alone; mixing one in with a text
+  matcher is a load error. See [examples/run_and_assert.atago.yaml](examples/run_and_assert.atago.yaml).
 - `scrub:` (#137) — spec-wide declarative output normalization for snapshots. Each rule
   rewrites every regex match in captured output to a literal placeholder
   (`{pattern: 'id=\d+', placeholder: 'id=<ID>'}`) before a snapshot is compared

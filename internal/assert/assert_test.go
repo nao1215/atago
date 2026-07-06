@@ -146,6 +146,12 @@ func TestCheck_Stream(t *testing.T) {
 		{"not_equals on a line", &spec.Assert{Stdout: &spec.StreamAssert{Line: intp(1), NotEquals: strp("nope")}}, true},
 		{"stderr empty", &spec.Assert{Stderr: &spec.StreamAssert{Empty: boolp(true)}}, true},
 		{"stdout not empty", &spec.Assert{Stdout: &spec.StreamAssert{Empty: boolp(false)}}, true},
+		// Text matchers compose (AND): every one that is set must hold.
+		{"contains and not_contains both hold", &spec.Assert{Stdout: &spec.StreamAssert{Contains: spec.StringList{"Alice"}, NotContains: spec.StringList{"Carol"}}}, true},
+		{"contains holds but not_contains fails", &spec.Assert{Stdout: &spec.StreamAssert{Contains: spec.StringList{"Alice"}, NotContains: spec.StringList{"Bob"}}}, false},
+		{"contains fails while not_contains holds", &spec.Assert{Stdout: &spec.StreamAssert{Contains: spec.StringList{"Carol"}, NotContains: spec.StringList{"Dave"}}}, false},
+		{"matches and not_matches both hold", &spec.Assert{Stdout: &spec.StreamAssert{Matches: strp("A.+e"), NotMatches: strp("(?i)error")}}, true},
+		{"contains not_contains and matches all hold", &spec.Assert{Stdout: &spec.StreamAssert{Contains: spec.StringList{"Alice"}, NotContains: spec.StringList{"Carol"}, Matches: strp("Bob")}}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
