@@ -10,6 +10,7 @@ A browsable, repo-local index of atago's documentation, generated from repositor
 ## Behavior docs (generated from executable specs)
 
 - [README.md](../doc/e2e/README.md)
+- [actionlint.md](../doc/e2e/actionlint.md)
 - [age.md](../doc/e2e/age.md)
 - [atago.md](../doc/e2e/atago.md)
 - [awscli.md](../doc/e2e/awscli.md)
