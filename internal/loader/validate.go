@@ -142,7 +142,7 @@ func validateSuiteTimeout(add func(string, ...any), s *spec.Suite) {
 func validateScrub(add func(string, ...any), rules []spec.ScrubRule) {
 	for i, r := range rules {
 		if r.Pattern == "" {
-			add("scrub[%d].pattern is required (a regex to normalize; e.g. \"req-\\\\d+\")", i)
+			add("scrub[%d].pattern is required (a regex to normalize; e.g. \"req-\\d+\")", i)
 		}
 	}
 	if _, err := scrub.New(rules); err != nil {
