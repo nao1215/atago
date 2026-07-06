@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-63 suites · 278 scenarios
+64 suites · 292 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -82,6 +82,21 @@
   - [an unlisted exit code fails and the output lists the set](#scenario-an-unlisted-exit-code-fails-and-the-output-lists-the-set)
   - [mixing not and in is a load-time error](#scenario-mixing-not-and-in-is-a-load-time-error)
   - [an empty in list is a load-time error](#scenario-an-empty-in-list-is-a-load-time-error)
+- [atago self-hosting / exit code semantics](#atago-self-hosting--exit-code-semantics) — 14 scenarios
+  - [a clean exit is zero](#scenario-a-clean-exit-is-zero)
+  - [a general error is one](#scenario-a-general-error-is-one)
+  - [a usage error is two](#scenario-a-usage-error-is-two)
+  - [an arbitrary code passes through unchanged](#scenario-an-arbitrary-code-passes-through-unchanged)
+  - [the single-byte ceiling is 255](#scenario-the-single-byte-ceiling-is-255)
+  - [the not matcher excludes a specific code](#scenario-the-not-matcher-excludes-a-specific-code)
+  - [the in matcher accepts any listed code](#scenario-the-in-matcher-accepts-any-listed-code)
+  - [an unlisted code fails the in matcher and names the set](#scenario-an-unlisted-code-fails-the-in-matcher-and-names-the-set)
+  - [SIGKILL is reported as 137](#scenario-sigkill-is-reported-as-137)
+  - [SIGTERM is reported as 143](#scenario-sigterm-is-reported-as-143)
+  - [SIGINT is reported as 130](#scenario-sigint-is-reported-as-130)
+  - [a signal exit composes with the in matcher alongside normal codes](#scenario-a-signal-exit-composes-with-the-in-matcher-alongside-normal-codes)
+  - [a missing command is 127 under the shell](#scenario-a-missing-command-is-127-under-the-shell)
+  - [POSIX exit codes wrap modulo 256](#scenario-posix-exit-codes-wrap-modulo-256)
 - [atago self-hosting / explain](#atago-self-hosting--explain) — 1 scenario
   - [explain summarizes a spec without running it](#scenario-explain-summarizes-a-spec-without-running-it)
 - [atago self-hosting / file equals and equals_file byte-equality (#155)](#atago-self-hosting--file-equals-and-equals_file-byte-equality-155) — 4 scenarios
@@ -1665,6 +1680,129 @@ ${atago} run empty.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `at least one accepted exit code`
+## atago self-hosting / exit code semantics
+Source: `test/e2e/atago/exit_codes.atago.yaml`
+### Scenario: a clean exit is zero
+#### When
+```shell
+exit 0
+```
+#### Then
+- exit code is `0`
+### Scenario: a general error is one
+#### When
+```shell
+exit 1
+```
+#### Then
+- exit code is `1`
+### Scenario: a usage error is two
+#### When
+```shell
+exit 2
+```
+#### Then
+- exit code is `2`
+### Scenario: an arbitrary code passes through unchanged
+#### When
+```shell
+exit 42
+```
+#### Then
+- exit code is `42`
+### Scenario: the single-byte ceiling is 255
+#### When
+```shell
+exit 255
+```
+#### Then
+- exit code is `255`
+### Scenario: the not matcher excludes a specific code
+#### When
+```shell
+exit 3
+```
+#### Then
+- exit code is not `0`
+### Scenario: the in matcher accepts any listed code
+#### When
+```shell
+exit 2
+```
+#### Then
+- exit code is one of `0`, `1`, `2`
+### Scenario: an unlisted code fails the in matcher and names the set
+#### Given
+- Fixture file `inner.atago.yaml` is created.
+#### Inputs
+_Fixture `inner.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: five is not in the accepted set
+    steps:
+      - run: {shell: true, command: "exit 5"}
+      - assert:
+          exit_code:
+            in: [0, 1, 2]
+```
+#### When
+```shell
+${atago} run inner.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `exit code in [0, 1, 2]`
+### Scenario: SIGKILL is reported as 137
+_skipped on windows_
+#### When
+```shell
+kill -KILL $$
+```
+#### Then
+- exit code is `137`
+### Scenario: SIGTERM is reported as 143
+_skipped on windows_
+#### When
+```shell
+kill -TERM $$
+```
+#### Then
+- exit code is `143`
+### Scenario: SIGINT is reported as 130
+_skipped on windows_
+#### When
+```shell
+kill -INT $$
+```
+#### Then
+- exit code is `130`
+### Scenario: a signal exit composes with the in matcher alongside normal codes
+_skipped on windows_
+#### When
+```shell
+kill -TERM $$
+```
+#### Then
+- exit code is one of `0`, `143`
+### Scenario: a missing command is 127 under the shell
+_skipped on windows_
+#### When
+```shell
+no_such_command_zzz
+```
+#### Then
+- exit code is `127`
+### Scenario: POSIX exit codes wrap modulo 256
+_skipped on windows_
+#### When
+```shell
+exit 257
+```
+#### Then
+- exit code is `1`
 ## atago self-hosting / explain
 Source: `test/e2e/atago/explain.atago.yaml`
 ### Scenario: explain summarizes a spec without running it

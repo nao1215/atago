@@ -30,6 +30,13 @@ and this project follows [Semantic Versioning](https://semver.org/).
   a raw "no such file or directory" when `logs/` did not exist yet, while a
   fixture at the same path created it; the two path-taking features now behave
   the same. The parent stays inside the scenario workdir.
+- A run command terminated by a POSIX signal reports the 128+signal exit code
+  (130 for SIGINT, 137 for SIGKILL, 143 for SIGTERM) instead of a bare `-1`, so a
+  spec can assert a CLI's signal-handling contract. Go's `ExitCode()` collapses
+  every signal to `-1`, which is also indistinguishable from atago's
+  timeout/cancel sentinel; the timeout and parent-cancel paths are resolved
+  before this point, so a signal here is the program's own termination. Windows
+  has no POSIX signals and is unaffected.
 
 ## [0.6.0] - 2026-07-07
 

@@ -1,0 +1,122 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / exit code semantics
+
+# The exit_code matcher is the most fundamental CLI contract atago checks.
+# These pin the whole equivalence set: a clean zero, the conventional 1/2, an
+# arbitrary pass-through code, the 255 single-byte ceiling, the not/in matchers,
+# and the POSIX 128+signal convention for a process a signal terminates (130
+# SIGINT, 137 SIGKILL, 143 SIGTERM) — atago reports that instead of a bare -1 so
+# a CLI's signal handling is assertable. `exit N` is a builtin of both /bin/sh
+# and cmd.exe, so the plain-code scenarios run on Windows; signals, 127, and
+# POSIX exit-code wrapping are POSIX-only and skip there.
+scenarios:
+  - name: a clean exit is zero
+    steps:
+      - run: {shell: true, command: "exit 0"}
+      - assert:
+          exit_code: 0
+
+  - name: a general error is one
+    steps:
+      - run: {shell: true, command: "exit 1"}
+      - assert:
+          exit_code: 1
+
+  - name: a usage error is two
+    steps:
+      - run: {shell: true, command: "exit 2"}
+      - assert:
+          exit_code: 2
+
+  - name: an arbitrary code passes through unchanged
+    steps:
+      - run: {shell: true, command: "exit 42"}
+      - assert:
+          exit_code: 42
+
+  - name: the single-byte ceiling is 255
+    steps:
+      - run: {shell: true, command: "exit 255"}
+      - assert:
+          exit_code: 255
+
+  - name: the not matcher excludes a specific code
+    steps:
+      - run: {shell: true, command: "exit 3"}
+      - assert:
+          exit_code:
+            not: 0
+
+  - name: the in matcher accepts any listed code
+    steps:
+      - run: {shell: true, command: "exit 2"}
+      - assert:
+          exit_code:
+            in: [0, 1, 2]
+
+  - name: an unlisted code fails the in matcher and names the set
+    steps:
+      - fixture:
+          file: inner.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: five is not in the accepted set
+                steps:
+                  - run: {shell: true, command: "exit 5"}
+                  - assert:
+                      exit_code:
+                        in: [0, 1, 2]
+      - run:
+          command: ${atago} run inner.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: "exit code in [0, 1, 2]"
+
+  - name: SIGKILL is reported as 137
+    skip: {os: windows}
+    steps:
+      - run: {shell: true, command: "kill -KILL $$"}
+      - assert:
+          exit_code: 137
+
+  - name: SIGTERM is reported as 143
+    skip: {os: windows}
+    steps:
+      - run: {shell: true, command: "kill -TERM $$"}
+      - assert:
+          exit_code: 143
+
+  - name: SIGINT is reported as 130
+    skip: {os: windows}
+    steps:
+      - run: {shell: true, command: "kill -INT $$"}
+      - assert:
+          exit_code: 130
+
+  - name: a signal exit composes with the in matcher alongside normal codes
+    skip: {os: windows}
+    steps:
+      - run: {shell: true, command: "kill -TERM $$"}
+      - assert:
+          exit_code:
+            in: [0, 143]
+
+  - name: a missing command is 127 under the shell
+    skip: {os: windows}
+    steps:
+      - run: {shell: true, command: "no_such_command_zzz"}
+      - assert:
+          exit_code: 127
+
+  - name: POSIX exit codes wrap modulo 256
+    skip: {os: windows}
+    steps:
+      - run: {shell: true, command: "exit 257"}
+      - assert:
+          exit_code: 1
