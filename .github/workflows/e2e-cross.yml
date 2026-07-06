@@ -42,38 +42,12 @@ jobs:
           - os: macos-latest
             targets: "./test/e2e/atago ./test/e2e/thirdparty/git"
           # Portable subset: specs whose commands are shell builtins of both
-          # /bin/sh and cmd.exe, or that only drive atago itself. Keep this
-          # list in sync with the e2e-windows job in e2e.yml.
+          # /bin/sh and cmd.exe, or that only drive atago itself. The list is
+          # the single source of truth in scripts/windows_portable_specs.sh
+          # (shared with the e2e-windows job in e2e.yml); the @portable sentinel
+          # is expanded from it in the run step below.
           - os: windows-latest
-            targets: >-
-              ./test/e2e/atago/version.atago.yaml
-              ./test/e2e/atago/completion.atago.yaml
-              ./test/e2e/atago/list.atago.yaml
-              ./test/e2e/atago/manifest.atago.yaml
-              ./test/e2e/atago/doc.atago.yaml
-              ./test/e2e/atago/explain.atago.yaml
-              ./test/e2e/atago/init.atago.yaml
-              ./test/e2e/atago/init_templates.atago.yaml
-              ./test/e2e/atago/edge.atago.yaml
-              ./test/e2e/atago/matrix.atago.yaml
-              ./test/e2e/atago/parallel.atago.yaml
-              ./test/e2e/atago/run.atago.yaml
-              ./test/e2e/atago/select.atago.yaml
-              ./test/e2e/atago/skip_command.atago.yaml
-              ./test/e2e/atago/rerun.atago.yaml
-              ./test/e2e/atago/db.atago.yaml
-              ./test/e2e/atago/http.atago.yaml
-              ./test/e2e/atago/mock_server.atago.yaml
-              ./test/e2e/atago/dir_tree.atago.yaml
-              ./test/e2e/atago/changes.atago.yaml
-              ./test/e2e/atago/record.atago.yaml
-              ./test/e2e/atago/duration.atago.yaml
-              ./test/e2e/atago/sandbox_home.atago.yaml
-              ./test/e2e/atago/grpc.atago.yaml
-              ./test/e2e/atago/ssh.atago.yaml
-              ./test/e2e/atago/cdp.atago.yaml
-              ./test/e2e/atago/pdf.atago.yaml
-              ./test/e2e/thirdparty/git
+            targets: "@portable"
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -86,6 +60,12 @@ jobs:
 
       # `go run .` compiles atago and runs it; os.Executable() (which seeds the
       # ${atago} spec variable) points at that binary, so specs self-invoke atago
-      # correctly on every OS without per-platform binary-name handling.
+      # correctly on every OS without per-platform binary-name handling. The
+      # Windows leg passes @portable, expanded from the shared spec list.
       - name: Run the self-hosted E2E specs
-        run: go run . run ${{ matrix.targets }}
+        run: |
+          targets="${{ matrix.targets }}"
+          if [ "$targets" = "@portable" ]; then
+            targets="$(bash scripts/windows_portable_specs.sh)"
+          fi
+          go run . run $targets

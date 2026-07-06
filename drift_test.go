@@ -115,6 +115,9 @@ var (
 	// thirdpartyDirRe extracts each suite directory the thirdparty.yml CI matrix
 	// runs (`dir: ./test/e2e/thirdparty/<name>`).
 	thirdpartyDirRe = regexp.MustCompile(`dir:\s*\./test/e2e/thirdparty/([a-zA-Z0-9_-]+)`)
+	// windowsSpecRe extracts each ./test/e2e spec path listed in the single-source
+	// scripts/windows_portable_specs.sh.
+	windowsSpecRe = regexp.MustCompile(`(\./test/e2e/\S+)`)
 )
 
 // collectSpecs mirrors cli.collectSpecFiles for a single directory target: every
@@ -287,6 +290,29 @@ func TestThirdParty_MatrixCoversEverySuite(t *testing.T) {
 		}
 		if !inMatrix[e.Name()] {
 			t.Errorf("test/e2e/thirdparty/%s has specs but no matrix leg in .github/workflows/thirdparty.yml", e.Name())
+		}
+	}
+}
+
+// TestWindowsPortableSubset_Exists asserts every spec path in the single-source
+// scripts/windows_portable_specs.sh resolves to a real file or directory, so a
+// spec rename fails here — a fast unit test — instead of only in the Windows CI
+// legs that read the script (e2e.yml and e2e-cross.yml).
+func TestWindowsPortableSubset_Exists(t *testing.T) {
+	data, err := os.ReadFile("scripts/windows_portable_specs.sh")
+	if err != nil {
+		t.Fatalf("read scripts/windows_portable_specs.sh: %v", err)
+	}
+	var paths []string
+	for _, m := range windowsSpecRe.FindAllSubmatch(data, -1) {
+		paths = append(paths, string(m[1]))
+	}
+	if len(paths) == 0 {
+		t.Fatal("no ./test/e2e spec paths found in scripts/windows_portable_specs.sh")
+	}
+	for _, p := range paths {
+		if _, err := os.Stat(filepath.FromSlash(p)); err != nil {
+			t.Errorf("scripts/windows_portable_specs.sh lists %q which does not resolve: %v", p, err)
 		}
 	}
 }
