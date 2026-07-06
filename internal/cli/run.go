@@ -13,7 +13,9 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
+	"time"
 
 	"github.com/nao1215/atago/internal/artifact"
 	"github.com/nao1215/atago/internal/engine"
@@ -32,8 +34,10 @@ func runCmd(args []string, stdout, stderr io.Writer) int {
 	failFast := fs.Bool("fail-fast", false, "stop scheduling new scenarios after the first failure")
 	var filter csvFlag
 	fs.Var(&filter, "filter", "run only scenarios whose name contains any of these comma-separated substrings (repeatable; OR semantics like --tag)")
-	tag := fs.String("tag", "", "run only scenarios with any of these comma-separated tags")
-	skipTag := fs.String("skip-tag", "", "skip scenarios with any of these comma-separated tags")
+	var tag csvFlag
+	fs.Var(&tag, "tag", "run only scenarios with any of these tags (comma-separated and repeatable; OR semantics)")
+	var skipTag csvFlag
+	fs.Var(&skipTag, "skip-tag", "skip scenarios with any of these tags (comma-separated and repeatable)")
 	artifactsDir := fs.String("artifacts-dir", "", "write deterministic failure artifacts (actual/expected payloads) under DIR for review tooling")
 	rerunFailed := fs.Bool("rerun-failed", false, "run only the scenarios that failed on the previous run (recorded in .atago/last-failed.json)")
 	repeat := fs.Int("repeat", 0, "run each selected scenario N times to surface flakiness; any failing iteration fails the run")
@@ -93,8 +97,8 @@ func runCmd(args []string, stdout, stderr io.Writer) int {
 	eng.Repeat = *repeat
 	eng.RetryFailed = *retryFailed
 	eng.FilterNames = filter
-	eng.Tags = splitCSV(*tag)
-	eng.SkipTags = splitCSV(*skipTag)
+	eng.Tags = tag
+	eng.SkipTags = skipTag
 	if strings.TrimSpace(*artifactsDir) != "" {
 		eng.Artifacts = artifact.NewDir(*artifactsDir)
 	}
@@ -168,7 +172,9 @@ func runCmd(args []string, stdout, stderr io.Writer) int {
 	if *parallel > 1 {
 		eng.Sem = make(chan struct{}, *parallel)
 	}
+	start := time.Now()
 	suiteResults, loadErrs := runSpecs(ctx, eng, paths)
+	elapsed := time.Since(start)
 
 	results := make([]*engine.SuiteResult, 0, len(paths))
 	exit := ExitOK
@@ -178,6 +184,11 @@ func runCmd(args []string, stdout, stderr io.Writer) int {
 			fmt.Fprintf(stderr, "%v\n", loadErrs[i])
 			exit = worseExit(exit, exitForLoadError(loadErrs[i]))
 			loadFailures++
+			continue
+		}
+		// A nil result with no load error is a spec fail-fast (or an interrupt)
+		// skipped before running: it contributes no scenarios, so omit it.
+		if suiteResults[i] == nil {
 			continue
 		}
 		results = append(results, suiteResults[i])
@@ -232,7 +243,7 @@ func runCmd(args []string, stdout, stderr io.Writer) int {
 	// A selection that matches nothing still exits 0 (nothing ran, nothing
 	// failed), but stay loud about it: a typo'd --filter/--tag in CI would
 	// otherwise greenlight silently.
-	if len(filter) > 0 || *tag != "" || *skipTag != "" {
+	if len(filter) > 0 || len(tag) > 0 || len(skipTag) > 0 {
 		total := 0
 		for _, r := range results {
 			total += len(r.Scenarios)
@@ -242,17 +253,17 @@ func runCmd(args []string, stdout, stderr io.Writer) int {
 			if len(filter) > 0 {
 				sel = append(sel, fmt.Sprintf("--filter %q", strings.Join(filter, ",")))
 			}
-			if *tag != "" {
-				sel = append(sel, fmt.Sprintf("--tag %q", *tag))
+			if len(tag) > 0 {
+				sel = append(sel, fmt.Sprintf("--tag %q", strings.Join(tag, ",")))
 			}
-			if *skipTag != "" {
-				sel = append(sel, fmt.Sprintf("--skip-tag %q", *skipTag))
+			if len(skipTag) > 0 {
+				sel = append(sel, fmt.Sprintf("--skip-tag %q", strings.Join(skipTag, ",")))
 			}
 			fmt.Fprintf(stderr, "atago run: warning: no scenarios matched %s (name matching is a case-sensitive substring)\n", strings.Join(sel, " "))
 		}
 	}
 
-	if err := report.Render(stdout, format, results, report.WithLoadFailures(loadFailures)); err != nil {
+	if err := report.Render(stdout, format, results, report.WithLoadFailures(loadFailures), report.WithElapsed(elapsed)); err != nil {
 		fmt.Fprintf(stderr, "atago run: failed to write report: %v\n", err)
 		return worseExit(exit, ExitInternal)
 	}
@@ -275,6 +286,11 @@ func runCmd(args []string, stdout, stderr io.Writer) int {
 func runSpecs(ctx context.Context, eng *engine.Engine, paths []string) ([]*engine.SuiteResult, []error) {
 	suiteResults := make([]*engine.SuiteResult, len(paths))
 	loadErrs := make([]error, len(paths))
+	// failStop threads --fail-fast ACROSS spec files. The engine's own fail-fast
+	// stops scenarios only within one suite; without this a failing first spec
+	// would still let every later spec run. Once a suite fails, no new spec is
+	// scheduled (specs already in flight under --parallel still finish).
+	var failStop atomic.Bool
 	runOne := func(i int, p string) {
 		s, lerr := loader.Load(p)
 		if lerr != nil {
@@ -282,6 +298,9 @@ func runSpecs(ctx context.Context, eng *engine.Engine, paths []string) ([]*engin
 			return
 		}
 		suiteResults[i] = eng.Run(ctx, s, p)
+		if eng.FailFast && suiteFailed(suiteResults[i]) {
+			failStop.Store(true)
+		}
 	}
 	if eng.Sem != nil {
 		// A fixed worker pool rather than one goroutine per spec: with a goroutine
@@ -307,7 +326,7 @@ func runSpecs(ctx context.Context, eng *engine.Engine, paths []string) ([]*engin
 			}()
 		}
 		for i := range paths {
-			if ctx.Err() != nil {
+			if ctx.Err() != nil || failStop.Load() {
 				break
 			}
 			select {
@@ -319,15 +338,22 @@ func runSpecs(ctx context.Context, eng *engine.Engine, paths []string) ([]*engin
 		wg.Wait()
 	} else {
 		for i, p := range paths {
-			// Stop launching new suites once interrupted; the already-cancelled ctx
-			// still flows into eng.Run so a partially-run suite reports cleanly.
-			if ctx.Err() != nil {
+			// Stop launching new suites once interrupted or --fail-fast has tripped;
+			// the already-cancelled ctx still flows into eng.Run so a partially-run
+			// suite reports cleanly.
+			if ctx.Err() != nil || failStop.Load() {
 				break
 			}
 			runOne(i, p)
 		}
 	}
 	return suiteResults, loadErrs
+}
+
+// suiteFailed reports whether a completed suite counts as a failure for
+// --fail-fast: a failed or errored verdict, or a security-policy violation.
+func suiteFailed(res *engine.SuiteResult) bool {
+	return res != nil && (res.Status == engine.StatusFailed || res.Status == engine.StatusError || res.SecurityViolation)
 }
 
 // collectSpecFiles resolves run targets into a deduplicated list of spec files.
