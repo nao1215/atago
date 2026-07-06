@@ -163,9 +163,11 @@ func TestCheck_Stream(t *testing.T) {
 	}
 }
 
-// TestCheck_Stream_CRLF proves `equals` treats CRLF output (cmd.exe on Windows)
-// like LF output, so the same spec asserts the same behavior on every OS. Line
-// endings are an OS artifact, not observable CLI behavior.
+// TestCheck_Stream_CRLF proves every stream text matcher treats CRLF output
+// (cmd.exe on Windows) like LF output, so the same spec asserts the same
+// behavior on every OS. Line endings are an OS artifact, not observable CLI
+// behavior; byte-exact comparison is the file matchers' job (equals_file /
+// sha256), not the stream text matchers'.
 func TestCheck_Stream_CRLF(t *testing.T) {
 	t.Parallel()
 	res := &runner.Result{Stdout: []byte("Alice and Bob\r\nsecond line\r\n")}
@@ -178,6 +180,15 @@ func TestCheck_Stream_CRLF(t *testing.T) {
 		{"equals still exact per line", &spec.Assert{Stdout: &spec.StreamAssert{Equals: strp("Alice and Bob\nsecond")}}, false},
 		{"not_equals folds CRLF", &spec.Assert{Stdout: &spec.StreamAssert{NotEquals: strp("Alice and Bob\nsecond line")}}, false},
 		{"line selector strips CR", &spec.Assert{Stdout: &spec.StreamAssert{Line: intp(2), Equals: strp("second line")}}, true},
+		// A multi-line contains/regex written with LF must match CRLF output the
+		// same way equals does, or a spec silently fails on Windows alone.
+		{"contains folds CRLF for a multi-line needle", &spec.Assert{Stdout: &spec.StreamAssert{Contains: spec.StringList{"Alice and Bob\nsecond line"}}}, true},
+		{"contains still misses an absent multi-line needle", &spec.Assert{Stdout: &spec.StreamAssert{Contains: spec.StringList{"Alice\nCarol"}}}, false},
+		{"not_contains sees the folded multi-line needle as present", &spec.Assert{Stdout: &spec.StreamAssert{NotContains: spec.StringList{"Alice and Bob\nsecond line"}}}, false},
+		{"not_contains stays clear of an absent multi-line needle", &spec.Assert{Stdout: &spec.StreamAssert{NotContains: spec.StringList{"Alice\nCarol"}}}, true},
+		{"matches folds CRLF for a multiline anchor", &spec.Assert{Stdout: &spec.StreamAssert{Matches: strp("(?m)^second line$")}}, true},
+		{"not_matches folds CRLF for a multiline anchor", &spec.Assert{Stdout: &spec.StreamAssert{NotMatches: strp("(?m)^second line$")}}, false},
+		{"contains needle authored with CRLF also folds", &spec.Assert{Stdout: &spec.StreamAssert{Contains: spec.StringList{"Alice and Bob\r\nsecond line"}}}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -822,6 +833,37 @@ func TestCheck_File(t *testing.T) {
 			got := Check(&spec.Assert{File: tt.f}, nil, Env{Workdir: dir})
 			if got.OK != tt.wantOK {
 				t.Errorf("OK = %v, want %v (%s)", got.OK, tt.wantOK, got.Hint)
+			}
+		})
+	}
+}
+
+// TestCheck_File_ContainsByteExact pins the deliberate asymmetry between the
+// stream and file matchers: stream contains folds CRLF (line endings are an OS
+// artifact of a process's output), but file contains is byte-exact, so an LF
+// needle does NOT match a CRLF file and a CRLF needle does. A test author who
+// needs to observe a file's exact bytes (including line endings) relies on this;
+// making file contains fold would silently hide a CRLF-vs-LF file difference.
+func TestCheck_File_ContainsByteExact(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "crlf.txt"), []byte("a\r\nb\r\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct {
+		name   string
+		needle string
+		wantOK bool
+	}{
+		{"LF needle does not match a CRLF file", "a\nb", false},
+		{"CRLF needle matches byte-for-byte", "a\r\nb", true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			got := Check(&spec.Assert{File: &spec.FileAssert{Path: "crlf.txt", Contains: spec.StringList{c.needle}}}, nil, Env{Workdir: dir})
+			if got.OK != c.wantOK {
+				t.Errorf("OK = %v, want %v (%s)", got.OK, c.wantOK, got.Hint)
 			}
 		})
 	}

@@ -1,0 +1,142 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / stream text matchers fold CRLF
+
+# Every stdout/stderr text matcher treats line endings as an OS artifact: a spec
+# written with LF asserts the same behavior whether the program emits LF (POSIX)
+# or CRLF (cmd.exe on Windows). equals already folded CRLF; contains, matches,
+# not_contains, and not_matches now fold too, so a multi-line assertion no longer
+# passes on Linux/macOS and fails on windows-latest alone. Byte-exact comparison
+# (including the exact line ending) stays the file matchers' job — see
+# file_equals.atago.yaml. printf emits CRLF deterministically so these run the
+# same on every POSIX host; the Windows guarantee is pinned by the assert unit
+# tests, which run on windows-latest.
+scenarios:
+  - name: equals folds a CRLF body to its LF form
+    steps:
+      - run:
+          shell: true
+          command: printf 'first\r\nsecond\r\n'
+      - assert:
+          stdout:
+            equals: "first\nsecond"
+
+  - name: equals tolerates the phantom trailing CRLF
+    steps:
+      - run:
+          shell: true
+          command: printf 'only\r\n'
+      - assert:
+          stdout:
+            equals: "only"
+
+  - name: contains folds CRLF for a multi-line needle
+    steps:
+      - run:
+          shell: true
+          command: printf 'alpha\r\nbeta\r\ngamma\r\n'
+      - assert:
+          stdout:
+            contains: "alpha\nbeta"
+
+  - name: contains authored with CRLF matches LF-folded output
+    steps:
+      - run:
+          shell: true
+          command: printf 'alpha\r\nbeta\r\n'
+      - assert:
+          stdout:
+            contains: "alpha\r\nbeta"
+
+  - name: contains list every multi-line element folds
+    steps:
+      - run:
+          shell: true
+          command: printf 'a\r\nb\r\nc\r\nd\r\n'
+      - assert:
+          stdout:
+            contains:
+              - "a\nb"
+              - "c\nd"
+
+  - name: matches anchors a line over CRLF with the multiline flag
+    steps:
+      - run:
+          shell: true
+          command: printf 'hello\r\nworld\r\n'
+      - assert:
+          stdout:
+            matches: "(?m)^world$"
+
+  - name: matches a literal newline in the pattern over CRLF
+    steps:
+      - run:
+          shell: true
+          command: printf 'up\r\ndown\r\n'
+      - assert:
+          stdout:
+            matches: "up\ndown"
+
+  - name: not_contains stays clear of an absent multi-line needle
+    steps:
+      - run:
+          shell: true
+          command: printf 'red\r\ngreen\r\n'
+      - assert:
+          stdout:
+            not_contains: "red\nblue"
+
+  - name: not_matches passes for an anchored line that is absent
+    steps:
+      - run:
+          shell: true
+          command: printf 'north\r\nsouth\r\n'
+      - assert:
+          stdout:
+            not_matches: "(?m)^east$"
+
+  - name: the line selector strips the trailing CR
+    steps:
+      - run:
+          shell: true
+          command: printf 'header\r\npayload\r\n'
+      - assert:
+          stdout:
+            line: 2
+            equals: "payload"
+
+  - name: json parses a CRLF-formatted document
+    steps:
+      - run:
+          shell: true
+          command: printf '{\r\n"count":3\r\n}\r\n'
+      - assert:
+          stdout:
+            json:
+              - path: "$.count"
+                equals: 3
+
+  - name: folding does not make an absent multi-line needle match
+    steps:
+      - fixture:
+          file: inner.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: an absent multi-line needle still fails
+                steps:
+                  - run:
+                      shell: true
+                      command: printf 'one\r\ntwo\r\n'
+                  - assert:
+                      stdout:
+                        contains: "one\nMISSING"
+      - run:
+          command: ${atago} run inner.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: "was not present"
