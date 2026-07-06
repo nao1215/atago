@@ -1,0 +1,120 @@
+version: "1"
+
+suite:
+  name: ecspresso + deploy (real ECS deploy against a mock)
+
+# Companion to ecspresso.atago.yaml: where that suite pins the offline render
+# surface, this one exercises ecspresso's essential function — deploying an ECS
+# service and rolling it on change — against a mock AWS endpoint (moto, an
+# in-memory Apache-2.0 AWS mock) so no real AWS account is used. ecspresso and
+# the aws CLI are pointed at moto with AWS_ENDPOINT_URL and dummy credentials;
+# the ECS state change is observed with `aws ecs describe-services`, not just
+# asserted from ecspresso's logs. `--no-wait` is used because moto never runs
+# tasks, so a wait-for-stable would hang; the registration and service update
+# are synchronous and complete before it returns.
+# Install:
+#   pip install 'moto[server]'
+#   go install github.com/kayac/ecspresso/v2/cmd/ecspresso@latest
+
+permissions:
+  network:
+    allow: [127.0.0.1]
+
+defaults:
+  scenario:
+    env:
+      AWS_ACCESS_KEY_ID: testing
+      AWS_SECRET_ACCESS_KEY: testing
+      AWS_REGION: us-east-1
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_ENDPOINT_URL: http://127.0.0.1:15111
+      AWS_EC2_METADATA_DISABLED: "true"
+
+scenarios:
+  - name: deploy registers the task definition, creates the service, and rolls it
+    only:
+      command: command -v ecspresso && command -v moto_server && command -v aws
+    services:
+      - name: moto
+        command: moto_server -H 127.0.0.1 -p 15111
+        ready:
+          port: 127.0.0.1:15111
+          timeout: 20s
+    steps:
+      - fixture:
+          file: ecspresso.yml
+          content: |
+            region: us-east-1
+            cluster: demo
+            service: web
+            task_definition: taskdef.json
+            service_definition: servicedef.json
+      - fixture:
+          file: taskdef.json
+          content: |
+            {
+              "family": "web",
+              "containerDefinitions": [
+                { "name": "web", "image": "nginx:1.0", "cpu": 128, "memory": 256, "essential": true }
+              ]
+            }
+      - fixture:
+          file: servicedef.json
+          content: |
+            { "launchType": "EC2", "desiredCount": 2, "schedulingStrategy": "REPLICA" }
+      # The cluster must exist before a service can be created; ecspresso does
+      # not create clusters, so the aws CLI seeds it against the mock.
+      - run:
+          command: aws --endpoint-url http://127.0.0.1:15111 ecs create-cluster --cluster-name demo
+      - assert:
+          exit_code: 0
+      # First deploy: ecspresso registers task definition web:1 and creates the
+      # service. --no-wait returns once the service update is submitted.
+      - run:
+          command: ecspresso deploy --config ecspresso.yml --no-wait
+      - assert:
+          exit_code: 0
+      # Observe the ECS state directly, not ecspresso's own logs: the service is
+      # ACTIVE, wired to web:1, with the desired count from the service def.
+      - run:
+          command: aws --endpoint-url http://127.0.0.1:15111 ecs describe-services --cluster demo --services web --query "services[0].status" --output text
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: ACTIVE
+      - run:
+          command: aws --endpoint-url http://127.0.0.1:15111 ecs describe-services --cluster demo --services web --query "services[0].taskDefinition" --output text
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "web:1"
+      - run:
+          command: aws --endpoint-url http://127.0.0.1:15111 ecs describe-services --cluster demo --services web --query "services[0].desiredCount" --output text
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "2"
+      # Change the image and deploy again: ecspresso registers a new revision
+      # and points the service at it — a state transition.
+      - run:
+          shell: true
+          command: sed 's/nginx:1.0/nginx:2.0/' taskdef.json > taskdef.new && mv taskdef.new taskdef.json
+      - assert:
+          exit_code: 0
+      - run:
+          command: ecspresso deploy --config ecspresso.yml --no-wait
+      - assert:
+          exit_code: 0
+      # The service now references web:2, and both revisions exist in ECS.
+      - run:
+          command: aws --endpoint-url http://127.0.0.1:15111 ecs describe-services --cluster demo --services web --query "services[0].taskDefinition" --output text
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "web:2"
+      - run:
+          command: aws --endpoint-url http://127.0.0.1:15111 ecs list-task-definitions --query "length(taskDefinitionArns)" --output text
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "2"
