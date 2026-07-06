@@ -596,6 +596,10 @@ func describeFile(f *spec.FileAssert) string {
 		return fmt.Sprintf("%q does not exist", f.Path)
 	case f.Contains != nil:
 		return fmt.Sprintf("%q contains %s", f.Path, quoteList(f.Contains))
+	case f.Equals != nil:
+		return fmt.Sprintf("%q equals exact bytes", f.Path)
+	case f.EqualsFile != nil:
+		return fmt.Sprintf("%q is byte-identical to %q", f.Path, *f.EqualsFile)
 	case f.JSON != nil:
 		return fmt.Sprintf("%q JSON %s %s", f.Path, f.JSON.Path, jsonMatcher(f.JSON))
 	case f.Snapshot != "":

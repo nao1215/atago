@@ -22,6 +22,7 @@ printf '%s\n' \
   ./test/e2e/atago/init_templates.atago.yaml \
   ./test/e2e/atago/edge.atago.yaml \
   ./test/e2e/atago/argv_quotes.atago.yaml \
+  ./test/e2e/atago/file_equals.atago.yaml \
   ./test/e2e/atago/matrix.atago.yaml \
   ./test/e2e/atago/parallel.atago.yaml \
   ./test/e2e/atago/run.atago.yaml \

@@ -841,9 +841,11 @@ func TestBugHunt_Rejections(t *testing.T) {
 
 		// ---- validateFile ----
 		{"file path required", specSteps("assert: {file: {exists: true}}"), "file.path is required"},
-		{"file no matcher", specSteps("assert: {file: {path: out.txt}}"), "must set one of exists/contains/not_contains/executable/json/snapshot"},
-		{"file two matchers", specSteps("assert: {file: {path: out.txt, exists: true, snapshot: s}}"), "must set exactly one of exists/contains/not_contains/executable/json/snapshot"},
+		{"file no matcher", specSteps("assert: {file: {path: out.txt}}"), "must set one of exists/contains/not_contains/executable/equals/equals_file/json/snapshot"},
+		{"file two matchers", specSteps("assert: {file: {path: out.txt, exists: true, snapshot: s}}"), "must set exactly one of exists/contains/not_contains/executable/equals/equals_file/json/snapshot"},
 		{"file not_contains empty", specSteps("assert: {file: {path: out.txt, not_contains: []}}"), "not_contains must not be empty"},
+		{"file equals and equals_file exclusive", specSteps("assert: {file: {path: out.txt, equals: x, equals_file: in.txt}}"), "must set exactly one of exists/contains/not_contains/executable/equals/equals_file/json/snapshot"},
+		{"file equals_file empty", specSteps("assert: {file: {path: out.txt, equals_file: \"\"}}"), "equals_file must not be empty"},
 
 		// ---- validateHeaderMatch ----
 		{"header name required", specSteps("assert: {header: {equals: text/html}}"), "header.name is required"},

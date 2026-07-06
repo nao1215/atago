@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-57 suites · 228 scenarios
+58 suites · 232 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 2 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -82,6 +82,11 @@
   - [an empty in list is a load-time error](#scenario-an-empty-in-list-is-a-load-time-error)
 - [atago self-hosting / explain](#atago-self-hosting--explain) — 1 scenario
   - [explain summarizes a spec without running it](#scenario-explain-summarizes-a-spec-without-running-it)
+- [atago self-hosting / file equals and equals_file byte-equality (#155)](#atago-self-hosting--file-equals-and-equals_file-byte-equality-155) — 4 scenarios
+  - [equals_file passes for two byte-identical files](#scenario-equals_file-passes-for-two-byte-identical-files)
+  - [equals matches an inline literal byte-for-byte](#scenario-equals-matches-an-inline-literal-byte-for-byte)
+  - [equals_file fails the inner spec when the two files differ by one byte](#scenario-equals_file-fails-the-inner-spec-when-the-two-files-differ-by-one-byte)
+  - [equals_file is byte-exact — a CRLF vs LF difference fails](#scenario-equals_file-is-byte-exact--a-crlf-vs-lf-difference-fails)
 - [atago self-hosting / fixture from (copy committed testdata)](#atago-self-hosting--fixture-from-copy-committed-testdata) — 2 scenarios
   - [a committed binary blob is copied verbatim into the workdir](#scenario-a-committed-binary-blob-is-copied-verbatim-into-the-workdir)
   - [copying from a missing source errors the scenario](#scenario-copying-from-a-missing-source-errors-the-scenario)
@@ -1618,6 +1623,93 @@ ${atago} explain target.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `Suite: sample`, `Scenario: list as json`, `Commands:`, `Network policy:`
+## atago self-hosting / file equals and equals_file byte-equality (#155)
+Source: `test/e2e/atago/file_equals.atago.yaml`
+### Scenario: equals_file passes for two byte-identical files
+#### Given
+- Fixture file `in.hex` is created.
+- Fixture file `out.hex` is created.
+#### Inputs
+_Fixture `in.hex`:_
+```text
+DEADBEEF
+```
+_Fixture `out.hex`:_
+```text
+DEADBEEF
+```
+#### Then
+- file `out.hex` is byte-identical to `in.hex`
+### Scenario: equals matches an inline literal byte-for-byte
+#### Given
+- Fixture file `token.txt` is created.
+#### Inputs
+_Fixture `token.txt`:_
+```text
+opaque-value-42
+```
+#### Then
+- file `token.txt` equals exact bytes
+### Scenario: equals_file fails the inner spec when the two files differ by one byte
+#### Given
+- Fixture file `neq.atago.yaml` is created.
+#### Inputs
+_Fixture `neq.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: two files differ by one byte
+    steps:
+      - fixture:
+          file: a.hex
+          content: "DEADBEEF"
+      - fixture:
+          file: b.hex
+          content: "DEADBEEE"
+      - assert:
+          file:
+            path: a.hex
+            equals_file: b.hex
+```
+#### When
+```shell
+${atago} run neq.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `not byte-identical`
+### Scenario: equals_file is byte-exact — a CRLF vs LF difference fails
+#### Given
+- Fixture file `crlf.atago.yaml` is created.
+#### Inputs
+_Fixture `crlf.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: LF and CRLF files are not byte-identical
+    steps:
+      - fixture:
+          file: lf.txt
+          base64: "bGluZQo="
+      - fixture:
+          file: crlf.txt
+          base64: "bGluZQ0K"
+      - assert:
+          file:
+            path: lf.txt
+            equals_file: crlf.txt
+```
+#### When
+```shell
+${atago} run crlf.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `not byte-identical`
 ## atago self-hosting / fixture from (copy committed testdata)
 Source: `test/e2e/atago/fixture_from.atago.yaml`
 ### Scenario: a committed binary blob is copied verbatim into the workdir

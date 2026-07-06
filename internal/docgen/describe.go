@@ -324,6 +324,10 @@ func describeFile(f *spec.FileAssert) string {
 		return markdown.Code(f.Path) + " does not exist"
 	case f.Contains != nil:
 		return markdown.Code(f.Path) + " contains " + codeList(f.Contains)
+	case f.Equals != nil:
+		return markdown.Code(f.Path) + " equals exact bytes"
+	case f.EqualsFile != nil:
+		return markdown.Code(f.Path) + " is byte-identical to " + markdown.Code(*f.EqualsFile)
 	case f.JSON != nil:
 		return markdown.Code(f.Path) + " at " + markdown.Code(f.JSON.Path) + " " + jsonMatcher(f.JSON)
 	case f.Snapshot != "":

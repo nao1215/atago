@@ -1,6 +1,7 @@
 package assert
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 
@@ -100,6 +101,54 @@ func checkFile(f *spec.FileAssert, env Env) *CheckResult {
 			Hint:     fmt.Sprintf("expected file %q to %s executable", f.Path, executability(*f.Executable)),
 		}
 
+	case f.Equals != nil:
+		data, cr := readFile(f.Path, path)
+		if cr != nil {
+			return cr
+		}
+		// Byte-exact: no CRLF or trailing-newline normalization, unlike the stdout
+		// equals matcher. A round-trip test needs to prove the bytes are identical.
+		desc := fmt.Sprintf("assert file %q equals exact bytes", f.Path)
+		if string(data) == *f.Equals {
+			return pass(desc)
+		}
+		return &CheckResult{
+			Desc:             desc,
+			Expected:         excerpt(*f.Equals),
+			Actual:           excerpt(string(data)),
+			Hint:             fmt.Sprintf("file %q did not equal the expected bytes exactly (no CRLF/newline normalization)", f.Path),
+			ArtifactKind:     "file",
+			ArtifactActual:   data,
+			ArtifactExpected: []byte(*f.Equals),
+		}
+
+	case f.EqualsFile != nil:
+		data, cr := readFile(f.Path, path)
+		if cr != nil {
+			return cr
+		}
+		otherPath, err := security.ResolveWorkdirPath("assert.file.equals_file", env.Workdir, *f.EqualsFile)
+		if err != nil {
+			return &CheckResult{Desc: fmt.Sprintf("assert file %q equals_file %q", f.Path, *f.EqualsFile), Hint: err.Error()}
+		}
+		other, cr := readFile(*f.EqualsFile, otherPath)
+		if cr != nil {
+			return cr
+		}
+		desc := fmt.Sprintf("assert file %q equals file %q", f.Path, *f.EqualsFile)
+		if bytes.Equal(data, other) {
+			return pass(desc)
+		}
+		return &CheckResult{
+			Desc:             desc,
+			Expected:         fmt.Sprintf("bytes identical to %q", *f.EqualsFile),
+			Actual:           excerpt(string(data)),
+			Hint:             fmt.Sprintf("file %q is not byte-identical to %q (no CRLF/newline normalization)", f.Path, *f.EqualsFile),
+			ArtifactKind:     "file",
+			ArtifactActual:   data,
+			ArtifactExpected: other,
+		}
+
 	case f.JSON != nil:
 		data, cr := readFile(f.Path, path)
 		if cr != nil {
@@ -120,7 +169,7 @@ func checkFile(f *spec.FileAssert, env Env) *CheckResult {
 		return checkSnapshot(fmt.Sprintf("assert file %q snapshot", f.Path), f.Path, f.Snapshot, data, env)
 
 	default:
-		return &CheckResult{Desc: "assert file", Hint: "file assertion must set exists/contains/not_contains/json/snapshot"}
+		return &CheckResult{Desc: "assert file", Hint: "file assertion must set exists/contains/not_contains/executable/equals/equals_file/json/snapshot"}
 	}
 }
 

@@ -335,12 +335,21 @@ func (l *StringList) UnmarshalYAML(unmarshal func(any) error) error {
 }
 
 // FileAssert checks a generated file.
+//
+// Equals and EqualsFile are byte-exact content matchers for round-trip and
+// idempotence tests (#155): Equals compares the file's bytes to an inline
+// literal, EqualsFile compares two runtime-produced files to each other. Unlike
+// the stdout `equals` matcher, neither normalizes CRLF or a trailing newline —
+// the point is to prove two files are byte-identical (matching the `dir`
+// snapshot hashing semantics), which `cmp` cannot express portably.
 type FileAssert struct {
 	Path        string      `yaml:"path"`
 	Exists      *bool       `yaml:"exists,omitempty"`
 	Contains    StringList  `yaml:"contains,omitempty"`
 	NotContains StringList  `yaml:"not_contains,omitempty"`
 	Executable  *bool       `yaml:"executable,omitempty"`
+	Equals      *string     `yaml:"equals,omitempty"`
+	EqualsFile  *string     `yaml:"equals_file,omitempty"`
 	JSON        *JSONAssert `yaml:"json,omitempty"`
 	Snapshot    string      `yaml:"snapshot,omitempty"`
 }
