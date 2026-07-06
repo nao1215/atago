@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites tests="2" failures="1" errors="0" skipped="0" time="0">
-  <testsuite name="demo" tests="2" failures="1" errors="0" skipped="0" time="0">
-    <testcase name="echo greets the world" time="0"></testcase>
-    <testcase name="detects a wrong greeting" time="0">
+<testsuites tests="2" failures="1" errors="0" skipped="0" time="0.000000">
+  <testsuite name="demo" tests="2" failures="1" errors="0" skipped="0" time="0.000000">
+    <testcase name="echo greets the world" time="0.000000"></testcase>
+    <testcase name="detects a wrong greeting" time="0.000000">
       <failure message="assert stdout contains &#34;Alice&#34;">Step: assert stdout contains &#34;Alice&#34;&#xA;Expected: stdout contains &#34;Alice&#34;&#xA;Actual: Bob&#xA;Hint: the substring &#34;Alice&#34; was not present in stdout</failure>
     </testcase>
   </testsuite>

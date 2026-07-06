@@ -72,7 +72,12 @@ func writeTAP(w io.Writer, results []*engine.SuiteResult) error {
 // body is defanged so it cannot close the block early.
 func writeTAPDiagnostic(b *strings.Builder, message, body string) {
 	b.WriteString("  ---\n")
-	fmt.Fprintf(b, "  message: %q\n", tapInline(message))
+	// The message is a double-quoted YAML scalar, where `#` is an ordinary
+	// character — so flatten and fold control bytes, but do NOT apply tapInline's
+	// `#`→`\#` directive escaping (that is only for the bare ok/not-ok line).
+	// Running it here and then %q would inject a spurious backslash the consumer
+	// decodes back into the message.
+	fmt.Fprintf(b, "  message: %q\n", tapFlatten(message))
 	if body != "" {
 		b.WriteString("  data: |\n")
 		for _, line := range strings.Split(body, "\n") {
@@ -95,12 +100,17 @@ func tapDescription(suite, name string) string {
 // tapInline flattens a string to a single line and escapes `#` so it cannot be
 // misread as the start of a TAP directive.
 func tapInline(s string) string {
+	return strings.TrimSpace(strings.ReplaceAll(tapFlatten(s), "#", "\\#"))
+}
+
+// tapFlatten collapses a string onto one clean line — newlines and CRs become
+// spaces and any captured control byte (ANSI escape, bell, DEL) is folded — but
+// applies no TAP-directive escaping. It backs a quoted YAML diagnostic message,
+// where `#` is an ordinary character; tapInline adds the `#` escaping the bare
+// ok/not-ok line needs.
+func tapFlatten(s string) string {
 	s = strings.ReplaceAll(s, "\n", " ")
 	s = strings.ReplaceAll(s, "\r", " ")
-	s = strings.ReplaceAll(s, "#", "\\#")
-	// A captured control byte (ANSI escape, bell, DEL) has no place on a TAP
-	// line; fold it so the ok/not-ok description and any SKIP directive stay
-	// clean. Newlines are already flattened above, so none survive here.
 	s = sanitizeControlBytes(s)
 	return strings.TrimSpace(s)
 }

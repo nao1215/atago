@@ -256,3 +256,79 @@ func rejectedControlRune(r rune) bool {
 	}
 	return r < 0x20 || r == 0x7f || (r >= 0x80 && r <= 0x9f)
 }
+
+// TestTAP_DiagnosticMessageNotDoubleEscaped is a regression: a `#` inside a TAP
+// diagnostic message is not special (it is a plain char in a double-quoted YAML
+// scalar), so it must round-trip verbatim. The old code ran the message through
+// tapInline — which escapes `#`→`\#` for the bare ok/not-ok line — then %q,
+// injecting a spurious backslash a TAP consumer would decode.
+func TestTAP_DiagnosticMessageNotDoubleEscaped(t *testing.T) {
+	t.Parallel()
+	res := &engine.SuiteResult{
+		Suite: "s", SpecPath: "s.atago.yaml", Status: engine.StatusFailed, Duration: time.Millisecond,
+		Scenarios: []engine.ScenarioResult{
+			{Name: "sc", Status: engine.StatusFailed, Duration: time.Millisecond, Steps: []engine.StepResult{
+				{Kind: "assert", Checks: []*assert.CheckResult{{OK: false, Desc: "issue #42 body contains foo"}}},
+			}},
+		},
+	}
+	tap := render(t, FormatTAP, res)
+	if !strings.Contains(tap, `message: "issue #42 body contains foo"`) {
+		t.Errorf("tap diagnostic message double-escaped or altered:\n%s\nwant a plain `message: \"issue #42 body contains foo\"`", tap)
+	}
+	if strings.Contains(tap, `\#`) {
+		t.Errorf("tap diagnostic message injected a spurious backslash before #:\n%s", tap)
+	}
+}
+
+// TestJUnit_TimeAttrIsPlainDecimal is a regression: a sub-millisecond scenario
+// duration must render as a plain decimal seconds value, not Go's default float
+// %g scientific notation (e.g. "1.5e-06"), which the JUnit/Surefire schema and
+// strict parsers reject.
+func TestJUnit_TimeAttrIsPlainDecimal(t *testing.T) {
+	t.Parallel()
+	res := &engine.SuiteResult{
+		Suite: "s", SpecPath: "s.atago.yaml", Status: engine.StatusPassed, Duration: 1500,
+		Scenarios: []engine.ScenarioResult{
+			{Name: "quick", Status: engine.StatusPassed, Duration: 1500, // 1500ns
+				Steps: []engine.StepResult{{Kind: "assert", Checks: []*assert.CheckResult{{OK: true}}}}},
+		},
+	}
+	out := render(t, FormatJUnit, res)
+	if strings.Contains(out, "e-") || strings.Contains(out, "e+") {
+		t.Errorf("junit time attribute uses scientific notation:\n%s", out)
+	}
+	// It must still parse as XML with the documented shape.
+	var root junitTestsuites
+	if err := xml.Unmarshal([]byte(out), &root); err != nil {
+		t.Fatalf("junit XML not well-formed: %v", err)
+	}
+}
+
+// TestRender_SummaryUsesElapsedNotSuiteSum is a regression: the console summary
+// headline duration must be the run's real wall-clock time, not the sum of
+// per-suite durations, which overcounts when --parallel runs suites concurrently
+// (two one-second suites in parallel finish in ~1s, not 2s).
+func TestRender_SummaryUsesElapsedNotSuiteSum(t *testing.T) {
+	t.Parallel()
+	suite := func(name string) *engine.SuiteResult {
+		return &engine.SuiteResult{
+			Suite: name, SpecPath: name + ".atago.yaml", Status: engine.StatusPassed, Duration: time.Second,
+			Scenarios: []engine.ScenarioResult{
+				{Name: "sc", Status: engine.StatusPassed, Duration: time.Second,
+					Steps: []engine.StepResult{{Kind: "assert", Checks: []*assert.CheckResult{{OK: true}}}}},
+			},
+		}
+	}
+	var b strings.Builder
+	if err := Render(&b, FormatConsole, []*engine.SuiteResult{suite("a"), suite("b")}, WithElapsed(time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	out := b.String()
+	if !strings.Contains(out, "(1s)") {
+		t.Errorf("summary did not report the elapsed wall-clock (1s):\n%s", out)
+	}
+	if strings.Contains(out, "(2s)") {
+		t.Errorf("summary summed per-suite durations (2s) instead of using elapsed:\n%s", out)
+	}
+}

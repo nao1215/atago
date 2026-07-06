@@ -21,12 +21,25 @@ type renderOptions struct {
 	// results, so the console summary reports them separately and reads FAILED
 	// rather than a misleading PASSED that contradicts the non-zero exit code (#120).
 	loadFailures int
+	// elapsed, when set, is the run's real wall-clock time. The console summary
+	// prefers it over the sum of per-suite durations, which overcounts when
+	// --parallel runs suites concurrently (4 one-second suites in parallel finish
+	// in ~1s, not 4s).
+	elapsed    time.Duration
+	hasElapsed bool
 }
 
 // WithLoadFailures records how many spec files failed to load for this run, so
 // the summary can reflect them instead of silently omitting them (#120).
 func WithLoadFailures(n int) Option {
 	return func(o *renderOptions) { o.loadFailures = n }
+}
+
+// WithElapsed supplies the run's real wall-clock duration so the console summary
+// reports it instead of summing per-suite durations, which overcounts under
+// concurrent (--parallel) suites.
+func WithElapsed(d time.Duration) Option {
+	return func(o *renderOptions) { o.elapsed = d; o.hasElapsed = true }
 }
 
 // Render writes one or more suite results in the requested format. Console
@@ -65,6 +78,9 @@ func Render(w io.Writer, f Format, results []*engine.SuiteResult, opts ...Option
 			if suiteErroredWithoutScenarios(res) {
 				hardFail = true
 			}
+		}
+		if o.hasElapsed {
+			dur = o.elapsed
 		}
 		writeSummary(&b, color, agg, total, dur, hardFail, o.loadFailures)
 		_, err := io.WriteString(w, b.String())
