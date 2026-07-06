@@ -16,6 +16,32 @@ import (
 	"github.com/ohler55/ojg/oj"
 )
 
+// checkJSONChecks applies every JSONPath check in the list to data (all must
+// hold, #156), parsing it as JSON — or as YAML when isYAML is set. It returns
+// the first failing check, or the last passing result when they all pass. A
+// single-element list produces byte-identical output to the pre-list scalar
+// form so the common case is unchanged.
+func checkJSONChecks(desc, name string, data []byte, checks spec.JSONChecks, isYAML bool) *CheckResult {
+	var last *CheckResult
+	for i := range checks {
+		d := desc
+		if len(checks) > 1 {
+			d = fmt.Sprintf("%s[%d]", desc, i)
+		}
+		var r *CheckResult
+		if isYAML {
+			r = checkYAML(d, name, data, &checks[i])
+		} else {
+			r = checkJSON(d, name, data, &checks[i])
+		}
+		if !r.OK {
+			return r
+		}
+		last = r
+	}
+	return last
+}
+
 // checkJSON parses data as JSON, selects nodes with a JSONPath, and applies the
 // configured matcher.
 func checkJSON(desc, name string, data []byte, j *spec.JSONAssert) *CheckResult {

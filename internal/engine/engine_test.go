@@ -776,7 +776,7 @@ scenarios:
 func TestExtractValue_AllBranches(t *testing.T) {
 	t.Parallel()
 
-	jsonSel := &spec.StreamAssert{JSON: &spec.JSONAssert{Path: "$.v"}}
+	jsonSel := &spec.StreamAssert{JSON: spec.JSONChecks{{Path: "$.v"}}}
 	body := []byte(`{"v":"hit"}`)
 
 	httpRes := &runner.Result{IsHTTP: true, Body: body, Header: http.Header{"X-Token": {"abc"}}}

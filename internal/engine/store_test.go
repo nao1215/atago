@@ -125,7 +125,7 @@ func TestExtractValue_FromFileText(t *testing.T) {
 
 func TestExtractValue_NoCommand(t *testing.T) {
 	t.Parallel()
-	sp := &spec.Store{Name: "x", From: &spec.StoreFrom{Stdout: &spec.StreamAssert{JSON: &spec.JSONAssert{Path: "$.id"}}}}
+	sp := &spec.Store{Name: "x", From: &spec.StoreFrom{Stdout: &spec.StreamAssert{JSON: spec.JSONChecks{{Path: "$.id"}}}}}
 	if _, err := extractValue(sp, nil, ""); err == nil {
 		t.Error("extractValue with nil result should error")
 	}
@@ -172,7 +172,7 @@ func TestExtractValue_FromFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	sp := &spec.Store{Name: "t", From: &spec.StoreFrom{
-		File: &spec.FileAssert{Path: "out.json", JSON: &spec.JSONAssert{Path: "$.token"}},
+		File: &spec.FileAssert{Path: "out.json", JSON: spec.JSONChecks{{Path: "$.token"}}},
 	}}
 	got, err := extractValue(sp, &runner.Result{}, dir)
 	if err != nil || got != "xyz" {
@@ -193,7 +193,7 @@ func TestExtractValue_FromFile_TraversalRejected(t *testing.T) {
 		t.Fatal(err)
 	}
 	sp := &spec.Store{Name: "t", From: &spec.StoreFrom{
-		File: &spec.FileAssert{Path: "../secret.json", JSON: &spec.JSONAssert{Path: "$.token"}},
+		File: &spec.FileAssert{Path: "../secret.json", JSON: spec.JSONChecks{{Path: "$.token"}}},
 	}}
 	_, err := extractValue(sp, &runner.Result{}, workdir)
 	if err == nil {

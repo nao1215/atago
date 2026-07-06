@@ -100,8 +100,8 @@ func TestStreamAssert_SetMatchers(t *testing.T) {
 		{"matches", StreamAssert{Matches: strp("x")}, "matches"},
 		{"equals", StreamAssert{Equals: strp("x")}, "equals"},
 		{"not_equals", StreamAssert{NotEquals: strp("x")}, "not_equals"},
-		{"json", StreamAssert{JSON: &JSONAssert{}}, "json"},
-		{"yaml", StreamAssert{YAML: &JSONAssert{}}, "yaml"},
+		{"json", StreamAssert{JSON: JSONChecks{{}}}, "json"},
+		{"yaml", StreamAssert{YAML: JSONChecks{{}}}, "yaml"},
 		{"snapshot", StreamAssert{Snapshot: "s.snap"}, "snapshot"},
 	}
 	for _, tc := range cases {
@@ -115,6 +115,77 @@ func TestStreamAssert_SetMatchers(t *testing.T) {
 	emptyS := StreamAssert{}
 	if got := emptyS.SetMatchers(); len(got) != 0 {
 		t.Errorf("empty stream matchers = %v, want none", got)
+	}
+}
+
+// TestJSONChecks_UnmarshalYAML covers the #156 scalar-or-sequence decoding: a
+// single mapping decodes to a one-element list, a sequence to its elements, and
+// an empty sequence is rejected. It is decoded through a StreamAssert's json:
+// field so it exercises the real YAML the loader sees.
+func TestJSONChecks_UnmarshalYAML(t *testing.T) {
+	t.Parallel()
+
+	t.Run("single mapping", func(t *testing.T) {
+		var s StreamAssert
+		if err := yaml.Unmarshal([]byte("json:\n  path: $.a\n  equals: 1\n"), &s); err != nil {
+			t.Fatalf("unmarshal single: %v", err)
+		}
+		if len(s.JSON) != 1 || s.JSON[0].Path != "$.a" {
+			t.Fatalf("single mapping = %+v, want one check at $.a", s.JSON)
+		}
+	})
+
+	t.Run("list of mappings", func(t *testing.T) {
+		var s StreamAssert
+		src := "json:\n  - {path: $.a, equals: 1}\n  - {path: $.b, equals: 2}\n"
+		if err := yaml.Unmarshal([]byte(src), &s); err != nil {
+			t.Fatalf("unmarshal list: %v", err)
+		}
+		if len(s.JSON) != 2 || s.JSON[0].Path != "$.a" || s.JSON[1].Path != "$.b" {
+			t.Fatalf("list = %+v, want two checks at $.a and $.b", s.JSON)
+		}
+	})
+
+	t.Run("empty list rejected", func(t *testing.T) {
+		var s StreamAssert
+		if err := yaml.Unmarshal([]byte("json: []\n"), &s); err == nil {
+			t.Fatal("empty json list should be rejected")
+		}
+	})
+
+	t.Run("unknown key inside a check is rejected", func(t *testing.T) {
+		var s StreamAssert
+		if err := yaml.Unmarshal([]byte("json:\n  path: $.a\n  equalss: 1\n"), &s); err == nil {
+			t.Fatal("a typo'd key inside a json check should be rejected (strict)")
+		}
+	})
+}
+
+// TestJSONChecks_MarshalRoundTrip proves a single check round-trips to the
+// mapping form (not a one-item list) and a multi-check list round-trips to a
+// sequence, so a loaded json/yaml matcher re-marshals to the shape it was
+// written in.
+func TestJSONChecks_MarshalRoundTrip(t *testing.T) {
+	t.Parallel()
+	for _, src := range []string{
+		"json:\n  path: $.a\n  equals: 1\n",
+		"json:\n  - path: $.a\n    equals: 1\n  - path: $.b\n    equals: 2\n",
+	} {
+		var s StreamAssert
+		if err := yaml.Unmarshal([]byte(src), &s); err != nil {
+			t.Fatalf("unmarshal: %v", err)
+		}
+		out, err := yaml.Marshal(&s)
+		if err != nil {
+			t.Fatalf("marshal: %v", err)
+		}
+		var back StreamAssert
+		if err := yaml.Unmarshal(out, &back); err != nil {
+			t.Fatalf("re-unmarshal %q: %v", out, err)
+		}
+		if !reflect.DeepEqual(s.JSON, back.JSON) {
+			t.Errorf("round-trip mismatch: %+v -> %s -> %+v", s.JSON, out, back.JSON)
+		}
 	}
 }
 

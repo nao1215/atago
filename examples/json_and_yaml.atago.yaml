@@ -3,6 +3,8 @@ version: "1"
 # JSON assertions select a value with standard JSONPath ($.a.b[0]) and match it.
 # They work on any stream (stdout, body, rows, ...) and on files. Numeric
 # bounds (gt/gte/lt/lte) cover values that are non-deterministic but bounded.
+# A json: (or yaml:) matcher takes either one check or a LIST of checks that all
+# must hold, so several paths on one output need not repeat the assert block.
 # Runs green as-is: atago run examples/json_and_yaml.atago.yaml
 
 suite:
@@ -33,6 +35,22 @@ scenarios:
             json:
               path: "$.name"
               matches: "a.+"
+
+  - name: assert several JSONPaths in one json list
+    steps:
+      - fixture:
+          file: starters.json
+          content: |
+            [{"name":"basei-starter","default":true},{"name":"spec-starter"}]
+      # Each list entry is an independent check; all of them must hold. This
+      # replaces repeating the whole assert block once per path.
+      - assert:
+          file:
+            path: starters.json
+            json:
+              - { path: "$[0].name", equals: "basei-starter" }
+              - { path: "$[0].default", equals: true }
+              - { path: "$[1].name", equals: "spec-starter" }
 
   - name: numeric bounds for bounded but non-deterministic values
     steps:

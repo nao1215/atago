@@ -42,8 +42,8 @@ func extractValue(sp *spec.Store, current *runner.Result, workdir string) (strin
 			// Capture the whole file verbatim (#158); no json path needed for an
 			// opaque blob.
 			return string(data), nil
-		case from.File.JSON != nil:
-			return jsonValue(data, from.File.JSON.Path)
+		case len(from.File.JSON) > 0:
+			return jsonValue(data, from.File.JSON[0].Path)
 		default:
 			return "", fmt.Errorf("store %q: a file source needs a json or text selector", sp.Name)
 		}
@@ -83,8 +83,8 @@ func extractValue(sp *spec.Store, current *runner.Result, workdir string) (strin
 
 func extractStream(s *spec.StreamAssert, data []byte) (string, error) {
 	switch {
-	case s.JSON != nil:
-		return jsonValue(data, s.JSON.Path)
+	case len(s.JSON) > 0:
+		return jsonValue(data, s.JSON[0].Path)
 	case s.Matches != nil:
 		return regexValue(data, *s.Matches)
 	case s.Trim != nil:

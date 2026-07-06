@@ -83,9 +83,9 @@ func validateStore(add func(string, ...any), where string, s *spec.Store) {
 // #158).
 func validateStoreFileSelector(add func(string, ...any), where string, f *spec.FileAssert) {
 	n := 0
-	if f.JSON != nil {
+	if len(f.JSON) > 0 {
 		n++
-		validateStoreJSONPath(add, where+".json", f.JSON.Path)
+		validateStoreJSONSelector(add, where+".json", f.JSON)
 	}
 	if f.Text != nil {
 		n++
@@ -99,15 +99,26 @@ func validateStoreFileSelector(add func(string, ...any), where string, f *spec.F
 	}
 }
 
+// validateStoreJSONSelector checks the json selector of a store source: it
+// captures exactly one value, so a list of checks (#156) is rejected — a store
+// needs a single JSONPath, not several assertions.
+func validateStoreJSONSelector(add func(string, ...any), where string, list spec.JSONChecks) {
+	if len(list) > 1 {
+		add("%s must select a single value with one json path, not a list of checks", where)
+		return
+	}
+	validateStoreJSONPath(add, where, list[0].Path)
+}
+
 // validateStoreSelector checks a store.from stream selector: it must carry
 // exactly one of a json path, a matches regexp, or trim (capture the whole
 // stream, #158) — the selectors the extractor understands — and whichever is
 // present must be well-formed.
 func validateStoreSelector(add func(string, ...any), where string, s *spec.StreamAssert) {
 	n := 0
-	if s.JSON != nil {
+	if len(s.JSON) > 0 {
 		n++
-		validateStoreJSONPath(add, where+".json", s.JSON.Path)
+		validateStoreJSONSelector(add, where+".json", s.JSON)
 	}
 	if s.Matches != nil {
 		n++

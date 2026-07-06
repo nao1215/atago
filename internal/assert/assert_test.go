@@ -306,7 +306,7 @@ func TestCheck_HTTP(t *testing.T) {
 		{"header equals hit", &spec.Assert{Header: &spec.HeaderMatch{Name: "Content-Type", Equals: strp("application/json; charset=utf-8")}}, true},
 		{"header contains hit (case-insensitive name)", &spec.Assert{Header: &spec.HeaderMatch{Name: "content-type", Contains: strp("application/json")}}, true},
 		{"header contains miss", &spec.Assert{Header: &spec.HeaderMatch{Name: "Content-Type", Contains: strp("text/html")}}, false},
-		{"body json hit", &spec.Assert{Body: &spec.StreamAssert{JSON: &spec.JSONAssert{Path: "$.id", Equals: 7}}}, true},
+		{"body json hit", &spec.Assert{Body: &spec.StreamAssert{JSON: spec.JSONChecks{{Path: "$.id", Equals: 7}}}}, true},
 		{"body contains hit", &spec.Assert{Body: &spec.StreamAssert{Contains: spec.StringList{`"id":7`}}}, true},
 	}
 	for _, tt := range tests {
@@ -381,15 +381,15 @@ func TestCheck_JSON(t *testing.T) {
 	res := &runner.Result{Stdout: []byte(`{"name":"Alice","items":[{"id":1},{"id":2}]}`)}
 	tests := []struct {
 		name   string
-		j      *spec.JSONAssert
+		j      spec.JSONChecks
 		wantOK bool
 	}{
-		{"equals string", &spec.JSONAssert{Path: "$.name", Equals: "Alice"}, true},
-		{"equals number", &spec.JSONAssert{Path: "$.items[0].id", Equals: 1}, true},
-		{"equals number mismatch", &spec.JSONAssert{Path: "$.items[0].id", Equals: 9}, false},
-		{"length", &spec.JSONAssert{Path: "$.items", Length: intp(2)}, true},
-		{"matches", &spec.JSONAssert{Path: "$.name", Matches: strp("A.+")}, true},
-		{"no match path", &spec.JSONAssert{Path: "$.missing", Equals: "x"}, false},
+		{"equals string", spec.JSONChecks{{Path: "$.name", Equals: "Alice"}}, true},
+		{"equals number", spec.JSONChecks{{Path: "$.items[0].id", Equals: 1}}, true},
+		{"equals number mismatch", spec.JSONChecks{{Path: "$.items[0].id", Equals: 9}}, false},
+		{"length", spec.JSONChecks{{Path: "$.items", Length: intp(2)}}, true},
+		{"matches", spec.JSONChecks{{Path: "$.name", Matches: strp("A.+")}}, true},
+		{"no match path", spec.JSONChecks{{Path: "$.missing", Equals: "x"}}, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -402,6 +402,52 @@ func TestCheck_JSON(t *testing.T) {
 	}
 }
 
+// TestCheck_JSONList covers the #156 list form: several JSONPath checks under a
+// single json: matcher, all of which must hold. It also covers the yaml: list
+// and a file json: list.
+func TestCheck_JSONList(t *testing.T) {
+	t.Parallel()
+	res := &runner.Result{Stdout: []byte(`[{"name":"a","default":true},{"name":"b"},{"name":"c"}]`)}
+
+	allHold := spec.JSONChecks{
+		{Path: "$[0].name", Equals: "a"},
+		{Path: "$[0].default", Equals: true},
+		{Path: "$[2].name", Equals: "c"},
+	}
+	if got := Check(&spec.Assert{Stdout: &spec.StreamAssert{JSON: allHold}}, res, Env{}); !got.OK {
+		t.Errorf("all-hold list should pass, got: %s", got.Hint)
+	}
+
+	// One listed check mismatches -> the whole assertion fails.
+	oneFails := spec.JSONChecks{
+		{Path: "$[0].name", Equals: "a"},
+		{Path: "$[2].name", Equals: "WRONG"},
+	}
+	if got := Check(&spec.Assert{Stdout: &spec.StreamAssert{JSON: oneFails}}, res, Env{}); got.OK {
+		t.Error("a list with one failing check must fail the assertion")
+	}
+
+	// The yaml: list form behaves the same.
+	yamlRes := &runner.Result{Stdout: []byte("items:\n  - id: 1\n  - id: 2\n")}
+	yamlChecks := spec.JSONChecks{
+		{Path: "$.items[0].id", Equals: 1},
+		{Path: "$.items[1].id", Equals: 2},
+	}
+	if got := Check(&spec.Assert{Stdout: &spec.StreamAssert{YAML: yamlChecks}}, yamlRes, Env{}); !got.OK {
+		t.Errorf("yaml list should pass, got: %s", got.Hint)
+	}
+
+	// A file json: list is evaluated the same way.
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "out.json"), []byte(`{"a":1,"b":2}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	fileChecks := spec.JSONChecks{{Path: "$.a", Equals: 1}, {Path: "$.b", Equals: 2}}
+	if got := Check(&spec.Assert{File: &spec.FileAssert{Path: "out.json", JSON: fileChecks}}, nil, Env{Workdir: dir}); !got.OK {
+		t.Errorf("file json list should pass, got: %s", got.Hint)
+	}
+}
+
 // TestCheck_JSON_Compare covers the numeric bound matchers gt/gte/lt/lte, which
 // let a spec pin a non-deterministic-but-bounded metric (a count, a coverage
 // figure) without an exact equals. A non-numeric selected node must fail.
@@ -410,21 +456,21 @@ func TestCheck_JSON_Compare(t *testing.T) {
 	res := &runner.Result{Stdout: []byte(`{"count":3,"rate":0.5,"num_str":"7","name":"Alice"}`)}
 	tests := []struct {
 		name   string
-		j      *spec.JSONAssert
+		j      spec.JSONChecks
 		wantOK bool
 	}{
-		{"gt hit", &spec.JSONAssert{Path: "$.count", Gt: f64p(2)}, true},
-		{"gt equal is not gt", &spec.JSONAssert{Path: "$.count", Gt: f64p(3)}, false},
-		{"gt miss", &spec.JSONAssert{Path: "$.count", Gt: f64p(5)}, false},
-		{"gte equal", &spec.JSONAssert{Path: "$.count", Gte: f64p(3)}, true},
-		{"gte miss", &spec.JSONAssert{Path: "$.count", Gte: f64p(4)}, false},
-		{"lt hit", &spec.JSONAssert{Path: "$.count", Lt: f64p(4)}, true},
-		{"lt equal is not lt", &spec.JSONAssert{Path: "$.count", Lt: f64p(3)}, false},
-		{"lte equal", &spec.JSONAssert{Path: "$.count", Lte: f64p(3)}, true},
-		{"float rate lt", &spec.JSONAssert{Path: "$.rate", Lt: f64p(1)}, true},
-		{"numeric string compares", &spec.JSONAssert{Path: "$.num_str", Gte: f64p(7)}, true},
-		{"non-numeric fails gt", &spec.JSONAssert{Path: "$.name", Gt: f64p(0)}, false},
-		{"no match path fails", &spec.JSONAssert{Path: "$.missing", Gt: f64p(0)}, false},
+		{"gt hit", spec.JSONChecks{{Path: "$.count", Gt: f64p(2)}}, true},
+		{"gt equal is not gt", spec.JSONChecks{{Path: "$.count", Gt: f64p(3)}}, false},
+		{"gt miss", spec.JSONChecks{{Path: "$.count", Gt: f64p(5)}}, false},
+		{"gte equal", spec.JSONChecks{{Path: "$.count", Gte: f64p(3)}}, true},
+		{"gte miss", spec.JSONChecks{{Path: "$.count", Gte: f64p(4)}}, false},
+		{"lt hit", spec.JSONChecks{{Path: "$.count", Lt: f64p(4)}}, true},
+		{"lt equal is not lt", spec.JSONChecks{{Path: "$.count", Lt: f64p(3)}}, false},
+		{"lte equal", spec.JSONChecks{{Path: "$.count", Lte: f64p(3)}}, true},
+		{"float rate lt", spec.JSONChecks{{Path: "$.rate", Lt: f64p(1)}}, true},
+		{"numeric string compares", spec.JSONChecks{{Path: "$.num_str", Gte: f64p(7)}}, true},
+		{"non-numeric fails gt", spec.JSONChecks{{Path: "$.name", Gt: f64p(0)}}, false},
+		{"no match path fails", spec.JSONChecks{{Path: "$.missing", Gt: f64p(0)}}, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -447,26 +493,26 @@ func TestCheck_JSON_NumericStringStrict(t *testing.T) {
 	res := &runner.Result{Stdout: []byte(`{"ver":"1.2.3","other":"1.2.9","mixed":"3abc","spaced":"3 4","clean":"7"}`)}
 	tests := []struct {
 		name   string
-		j      *spec.JSONAssert
+		j      spec.JSONChecks
 		wantOK bool
 	}{
 		// Two distinct version strings must NOT be equal (both used to coerce to 1.2).
-		{"distinct versions not equal", &spec.JSONAssert{Path: "$.ver", Equals: "1.2.9"}, false},
+		{"distinct versions not equal", spec.JSONChecks{{Path: "$.ver", Equals: "1.2.9"}}, false},
 		// Same version string still equals itself via string fallback.
-		{"same version equals", &spec.JSONAssert{Path: "$.ver", Equals: "1.2.3"}, true},
+		{"same version equals", spec.JSONChecks{{Path: "$.ver", Equals: "1.2.3"}}, true},
 		// A version string is not a number, so a numeric compare must fail, not coerce to 1.2.
-		{"version not numeric for gt", &spec.JSONAssert{Path: "$.ver", Gt: f64p(1)}, false},
+		{"version not numeric for gt", spec.JSONChecks{{Path: "$.ver", Gt: f64p(1)}}, false},
 		// "3abc" is not numeric.
-		{"mixed not numeric", &spec.JSONAssert{Path: "$.mixed", Gte: f64p(3)}, false},
-		{"mixed not equal to 3", &spec.JSONAssert{Path: "$.mixed", Equals: 3}, false},
+		{"mixed not numeric", spec.JSONChecks{{Path: "$.mixed", Gte: f64p(3)}}, false},
+		{"mixed not equal to 3", spec.JSONChecks{{Path: "$.mixed", Equals: 3}}, false},
 		// "3 4" is not a single number.
-		{"spaced not numeric", &spec.JSONAssert{Path: "$.spaced", Lt: f64p(4)}, false},
+		{"spaced not numeric", spec.JSONChecks{{Path: "$.spaced", Lt: f64p(4)}}, false},
 		// A genuinely clean numeric string still coerces.
-		{"clean numeric string compares", &spec.JSONAssert{Path: "$.clean", Gte: f64p(7)}, true},
-		{"clean numeric string equals number", &spec.JSONAssert{Path: "$.clean", Equals: 7}, true},
+		{"clean numeric string compares", spec.JSONChecks{{Path: "$.clean", Gte: f64p(7)}}, true},
+		{"clean numeric string equals number", spec.JSONChecks{{Path: "$.clean", Equals: 7}}, true},
 		// Two distinct strings that merely parse to the same float must NOT be
 		// equal under exact `equals` (string-vs-string is byte-exact).
-		{"7 not equal to string 7.0", &spec.JSONAssert{Path: "$.clean", Equals: "7.0"}, false},
+		{"7 not equal to string 7.0", spec.JSONChecks{{Path: "$.clean", Equals: "7.0"}}, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -488,13 +534,13 @@ func TestCheck_YAML_UnsignedInteger(t *testing.T) {
 	res := &runner.Result{Stdout: []byte("big: 18446744073709551615\n")} // math.MaxUint64
 	tests := []struct {
 		name   string
-		j      *spec.JSONAssert
+		j      spec.JSONChecks
 		wantOK bool
 	}{
-		{"gt below", &spec.JSONAssert{Path: "$.big", Gt: f64p(1e19)}, true},
-		{"lt above", &spec.JSONAssert{Path: "$.big", Lt: f64p(2e19)}, true},
-		{"gte equal-ish", &spec.JSONAssert{Path: "$.big", Gte: f64p(1e19)}, true},
-		{"not gt above", &spec.JSONAssert{Path: "$.big", Gt: f64p(2e19)}, false},
+		{"gt below", spec.JSONChecks{{Path: "$.big", Gt: f64p(1e19)}}, true},
+		{"lt above", spec.JSONChecks{{Path: "$.big", Lt: f64p(2e19)}}, true},
+		{"gte equal-ish", spec.JSONChecks{{Path: "$.big", Gte: f64p(1e19)}}, true},
+		{"not gt above", spec.JSONChecks{{Path: "$.big", Gt: f64p(2e19)}}, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -517,22 +563,22 @@ func TestCheck_JSON_LargeInteger(t *testing.T) {
 	tests := []struct {
 		name   string
 		data   string
-		j      *spec.JSONAssert
+		j      spec.JSONChecks
 		wantOK bool
 	}{
 		// int64 values one apart, both beyond 2^53: must NOT be equal.
-		{"distinct int64 not equal", `{"id":9007199254740993}`, &spec.JSONAssert{Path: "$.id", Equals: int64(9007199254740992)}, false},
-		{"same int64 equal", `{"id":9007199254740993}`, &spec.JSONAssert{Path: "$.id", Equals: int64(9007199254740993)}, true},
+		{"distinct int64 not equal", `{"id":9007199254740993}`, spec.JSONChecks{{Path: "$.id", Equals: int64(9007199254740992)}}, false},
+		{"same int64 equal", `{"id":9007199254740993}`, spec.JSONChecks{{Path: "$.id", Equals: int64(9007199254740993)}}, true},
 		// A value beyond int64 decodes as json.Number; comparisons must work.
-		{"json.Number gt", `{"n":10000000000000000000}`, &spec.JSONAssert{Path: "$.n", Gt: f64p(1)}, true},
-		{"json.Number lt", `{"n":10000000000000000000}`, &spec.JSONAssert{Path: "$.n", Lt: f64p(2e19)}, true},
+		{"json.Number gt", `{"n":10000000000000000000}`, spec.JSONChecks{{Path: "$.n", Gt: f64p(1)}}, true},
+		{"json.Number lt", `{"n":10000000000000000000}`, spec.JSONChecks{{Path: "$.n", Lt: f64p(2e19)}}, true},
 		// Distinct integers beyond uint64, one apart: equals stays exact.
-		{"distinct huge not equal", `{"n":100000000000000000001}`, &spec.JSONAssert{Path: "$.n", Equals: "100000000000000000000"}, false},
-		{"same huge equal", `{"n":100000000000000000000}`, &spec.JSONAssert{Path: "$.n", Equals: "100000000000000000000"}, true},
+		{"distinct huge not equal", `{"n":100000000000000000001}`, spec.JSONChecks{{Path: "$.n", Equals: "100000000000000000000"}}, false},
+		{"same huge equal", `{"n":100000000000000000000}`, spec.JSONChecks{{Path: "$.n", Equals: "100000000000000000000"}}, true},
 		// A json.Number is a real number, so equals against a numeric spec value
 		// compares numerically, not lexically: whitespace around the expected
 		// digits does not defeat the match.
-		{"huge equals ignores surrounding space", `{"n":100000000000000000000}`, &spec.JSONAssert{Path: "$.n", Equals: " 100000000000000000000 "}, true},
+		{"huge equals ignores surrounding space", `{"n":100000000000000000000}`, spec.JSONChecks{{Path: "$.n", Equals: " 100000000000000000000 "}}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -555,13 +601,13 @@ func TestCheck_JSON_MatchesWholeNumberFloat(t *testing.T) {
 	tests := []struct {
 		name   string
 		data   string
-		j      *spec.JSONAssert
+		j      spec.JSONChecks
 		wantOK bool
 	}{
-		{"whole float matches digits", `{"n":1000000.0}`, &spec.JSONAssert{Path: "$.n", Matches: strp("^1000000$")}, true},
-		{"whole float not scientific", `{"n":1000000.0}`, &spec.JSONAssert{Path: "$.n", Matches: strp("e\\+")}, false},
-		{"integer matches digits", `{"n":9007199254740993}`, &spec.JSONAssert{Path: "$.n", Matches: strp("^9007199254740993$")}, true},
-		{"fractional float still matches", `{"n":0.0001}`, &spec.JSONAssert{Path: "$.n", Matches: strp("^0.0001$")}, true},
+		{"whole float matches digits", `{"n":1000000.0}`, spec.JSONChecks{{Path: "$.n", Matches: strp("^1000000$")}}, true},
+		{"whole float not scientific", `{"n":1000000.0}`, spec.JSONChecks{{Path: "$.n", Matches: strp("e\\+")}}, false},
+		{"integer matches digits", `{"n":9007199254740993}`, spec.JSONChecks{{Path: "$.n", Matches: strp("^9007199254740993$")}}, true},
+		{"fractional float still matches", `{"n":0.0001}`, spec.JSONChecks{{Path: "$.n", Matches: strp("^0.0001$")}}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -583,17 +629,17 @@ func TestCheck_JSON_EqualsStructural(t *testing.T) {
 	res := &runner.Result{Stdout: []byte(`{"user":{"name":"Alice","age":30},"tags":["a","b"]}`)}
 	tests := []struct {
 		name   string
-		j      *spec.JSONAssert
+		j      spec.JSONChecks
 		wantOK bool
 	}{
 		// Map key order differs from the JSON source; must still match.
-		{"object key order", &spec.JSONAssert{Path: "$.user", Equals: map[string]any{"age": 30, "name": "Alice"}}, true},
-		{"object value mismatch", &spec.JSONAssert{Path: "$.user", Equals: map[string]any{"name": "Bob", "age": 30}}, false},
-		{"object extra key", &spec.JSONAssert{Path: "$.user", Equals: map[string]any{"name": "Alice"}}, false},
-		{"array equal", &spec.JSONAssert{Path: "$.tags", Equals: []any{"a", "b"}}, true},
-		{"array order matters", &spec.JSONAssert{Path: "$.tags", Equals: []any{"b", "a"}}, false},
+		{"object key order", spec.JSONChecks{{Path: "$.user", Equals: map[string]any{"age": 30, "name": "Alice"}}}, true},
+		{"object value mismatch", spec.JSONChecks{{Path: "$.user", Equals: map[string]any{"name": "Bob", "age": 30}}}, false},
+		{"object extra key", spec.JSONChecks{{Path: "$.user", Equals: map[string]any{"name": "Alice"}}}, false},
+		{"array equal", spec.JSONChecks{{Path: "$.tags", Equals: []any{"a", "b"}}}, true},
+		{"array order matters", spec.JSONChecks{{Path: "$.tags", Equals: []any{"b", "a"}}}, false},
 		// Numeric normalization still holds inside nested structures.
-		{"nested numeric normalization", &spec.JSONAssert{Path: "$.user", Equals: map[string]any{"name": "Alice", "age": 30.0}}, true},
+		{"nested numeric normalization", spec.JSONChecks{{Path: "$.user", Equals: map[string]any{"name": "Alice", "age": 30.0}}}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -613,7 +659,7 @@ func TestCheck_JSON_EmptyStdout(t *testing.T) {
 	t.Parallel()
 	for _, data := range []string{"", "   ", "\n\t "} {
 		res := &runner.Result{Stdout: []byte(data)}
-		got := Check(&spec.Assert{Stdout: &spec.StreamAssert{JSON: &spec.JSONAssert{Path: "$.x", Equals: 1}}}, res, Env{})
+		got := Check(&spec.Assert{Stdout: &spec.StreamAssert{JSON: spec.JSONChecks{{Path: "$.x", Equals: 1}}}}, res, Env{})
 		if got.OK {
 			t.Errorf("empty stdout %q unexpectedly passed JSON assertion", data)
 		}
@@ -630,17 +676,17 @@ func TestCheck_JSON_Length(t *testing.T) {
 	res := &runner.Result{Stdout: []byte(`{"arr":[1,2,3],"str":"hello","obj":{"a":1,"b":2},"num":42}`)}
 	tests := []struct {
 		name     string
-		j        *spec.JSONAssert
+		j        spec.JSONChecks
 		wantOK   bool
 		wantHint string
 	}{
-		{"array length match", &spec.JSONAssert{Path: "$.arr", Length: intp(3)}, true, ""},
-		{"array length mismatch", &spec.JSONAssert{Path: "$.arr", Length: intp(2)}, false, "length at"},
-		{"string length match", &spec.JSONAssert{Path: "$.str", Length: intp(5)}, true, ""},
-		{"string length mismatch", &spec.JSONAssert{Path: "$.str", Length: intp(4)}, false, "length at"},
-		{"object length match", &spec.JSONAssert{Path: "$.obj", Length: intp(2)}, true, ""},
-		{"object length mismatch", &spec.JSONAssert{Path: "$.obj", Length: intp(1)}, false, "length at"},
-		{"number has no length", &spec.JSONAssert{Path: "$.num", Length: intp(2)}, false, "no length"},
+		{"array length match", spec.JSONChecks{{Path: "$.arr", Length: intp(3)}}, true, ""},
+		{"array length mismatch", spec.JSONChecks{{Path: "$.arr", Length: intp(2)}}, false, "length at"},
+		{"string length match", spec.JSONChecks{{Path: "$.str", Length: intp(5)}}, true, ""},
+		{"string length mismatch", spec.JSONChecks{{Path: "$.str", Length: intp(4)}}, false, "length at"},
+		{"object length match", spec.JSONChecks{{Path: "$.obj", Length: intp(2)}}, true, ""},
+		{"object length mismatch", spec.JSONChecks{{Path: "$.obj", Length: intp(1)}}, false, "length at"},
+		{"number has no length", spec.JSONChecks{{Path: "$.num", Length: intp(2)}}, false, "no length"},
 	}
 	// A multi-byte string's length is its character count, not its byte count:
 	// "café" is 4 (not 5). Verified separately so the shared table stays ASCII.
@@ -654,7 +700,7 @@ func TestCheck_JSON_Length(t *testing.T) {
 		{"$.name", 5, false}, // byte count would wrongly pass here
 		{"$.emoji", 3, true}, // a, →, b
 	} {
-		got := Check(&spec.Assert{Stdout: &spec.StreamAssert{JSON: &spec.JSONAssert{Path: tc.path, Length: intp(tc.n)}}}, unicodeRes, Env{})
+		got := Check(&spec.Assert{Stdout: &spec.StreamAssert{JSON: spec.JSONChecks{{Path: tc.path, Length: intp(tc.n)}}}}, unicodeRes, Env{})
 		if got.OK != tc.ok {
 			t.Errorf("unicode length %s == %d: OK = %v, want %v (%s)", tc.path, tc.n, got.OK, tc.ok, got.Hint)
 		}
@@ -706,15 +752,15 @@ func TestCheck_YAML(t *testing.T) {
 	res := &runner.Result{Stdout: []byte(doc)}
 	tests := []struct {
 		name   string
-		y      *spec.JSONAssert
+		y      spec.JSONChecks
 		wantOK bool
 	}{
-		{"equals string", &spec.JSONAssert{Path: "$.name", Equals: "alice"}, true},
-		{"equals number", &spec.JSONAssert{Path: "$.items[0].id", Equals: 1}, true},
-		{"equals mismatch", &spec.JSONAssert{Path: "$.name", Equals: "bob"}, false},
-		{"length", &spec.JSONAssert{Path: "$.items", Length: intp(2)}, true},
-		{"matches", &spec.JSONAssert{Path: "$.name", Matches: strp("a.+")}, true},
-		{"no match path", &spec.JSONAssert{Path: "$.missing", Equals: "x"}, false},
+		{"equals string", spec.JSONChecks{{Path: "$.name", Equals: "alice"}}, true},
+		{"equals number", spec.JSONChecks{{Path: "$.items[0].id", Equals: 1}}, true},
+		{"equals mismatch", spec.JSONChecks{{Path: "$.name", Equals: "bob"}}, false},
+		{"length", spec.JSONChecks{{Path: "$.items", Length: intp(2)}}, true},
+		{"matches", spec.JSONChecks{{Path: "$.name", Matches: strp("a.+")}}, true},
+		{"no match path", spec.JSONChecks{{Path: "$.missing", Equals: "x"}}, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -733,7 +779,7 @@ func TestCheck_YAML(t *testing.T) {
 func TestCheck_YAML_Empty(t *testing.T) {
 	t.Parallel()
 	res := &runner.Result{Stdout: []byte("   ")}
-	got := Check(&spec.Assert{Stdout: &spec.StreamAssert{YAML: &spec.JSONAssert{Path: "$.x", Equals: 1}}}, res, Env{})
+	got := Check(&spec.Assert{Stdout: &spec.StreamAssert{YAML: spec.JSONChecks{{Path: "$.x", Equals: 1}}}}, res, Env{})
 	if got.OK {
 		t.Fatal("empty stdout unexpectedly passed YAML assertion")
 	}
@@ -765,7 +811,7 @@ func TestCheck_File(t *testing.T) {
 		{"not_contains miss", &spec.FileAssert{Path: "out.json", NotContains: spec.StringList{"Alice"}}, false},
 		{"executable false for a 0600 file", &spec.FileAssert{Path: "out.json", Executable: boolp(false)}, true},
 		{"executable true mismatch", &spec.FileAssert{Path: "out.json", Executable: boolp(true)}, false},
-		{"json", &spec.FileAssert{Path: "out.json", JSON: &spec.JSONAssert{Path: "$.name", Equals: "Alice"}}, true},
+		{"json", &spec.FileAssert{Path: "out.json", JSON: spec.JSONChecks{{Path: "$.name", Equals: "Alice"}}}, true},
 		// A workdir-relative path must not escape the scenario workdir.
 		{"parent traversal rejected", &spec.FileAssert{Path: "../escape.txt", Exists: boolp(true)}, false},
 		{"deep traversal rejected", &spec.FileAssert{Path: "sub/../../escape.txt", Contains: spec.StringList{"x"}}, false},
@@ -1907,7 +1953,7 @@ func TestCheckTarget_AllFamilies(t *testing.T) {
 	t.Parallel()
 	// DB rows.
 	db := &runner.Result{IsDB: true, RowsJSON: []byte(`[{"id":1}]`)}
-	if cr := Check(&spec.Assert{Rows: &spec.StreamAssert{JSON: &spec.JSONAssert{Path: "$[0].id", Equals: 1}}}, db, Env{}); !cr.OK {
+	if cr := Check(&spec.Assert{Rows: &spec.StreamAssert{JSON: spec.JSONChecks{{Path: "$[0].id", Equals: 1}}}}, db, Env{}); !cr.OK {
 		t.Errorf("rows target should pass: %+v", cr)
 	}
 	// gRPC status + message.
@@ -2075,11 +2121,11 @@ func TestCheck_JSON_CompareLargeIntExact(t *testing.T) {
 	res := &runner.Result{Stdout: []byte(`{"big":9007199254740993}`)}
 	tests := []struct {
 		name   string
-		j      *spec.JSONAssert
+		j      spec.JSONChecks
 		wantOK bool
 	}{
-		{"gt its lower neighbor", &spec.JSONAssert{Path: "$.big", Gt: f64p(9007199254740992)}, true},
-		{"not lte its lower neighbor", &spec.JSONAssert{Path: "$.big", Lte: f64p(9007199254740992)}, false},
+		{"gt its lower neighbor", spec.JSONChecks{{Path: "$.big", Gt: f64p(9007199254740992)}}, true},
+		{"not lte its lower neighbor", spec.JSONChecks{{Path: "$.big", Lte: f64p(9007199254740992)}}, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -2100,12 +2146,12 @@ func TestCheck_JSON_BoolNotEqualStringSpelling(t *testing.T) {
 	t.Parallel()
 	res := &runner.Result{Stdout: []byte(`{"b":true}`)}
 	// bool true must NOT equal the string "true".
-	got := Check(&spec.Assert{Stdout: &spec.StreamAssert{JSON: &spec.JSONAssert{Path: "$.b", Equals: "true"}}}, res, Env{})
+	got := Check(&spec.Assert{Stdout: &spec.StreamAssert{JSON: spec.JSONChecks{{Path: "$.b", Equals: "true"}}}}, res, Env{})
 	if got.OK {
 		t.Errorf("JSON boolean true wrongly equals the string \"true\"")
 	}
 	// bool true must still equal the boolean true.
-	got = Check(&spec.Assert{Stdout: &spec.StreamAssert{JSON: &spec.JSONAssert{Path: "$.b", Equals: true}}}, res, Env{})
+	got = Check(&spec.Assert{Stdout: &spec.StreamAssert{JSON: spec.JSONChecks{{Path: "$.b", Equals: true}}}}, res, Env{})
 	if !got.OK {
 		t.Errorf("JSON boolean true did not equal true (%s)", got.Hint)
 	}

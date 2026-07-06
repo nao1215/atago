@@ -1,6 +1,7 @@
 package loader
 
 import (
+	"fmt"
 	"maps"
 	"regexp"
 	"slices"
@@ -129,12 +130,8 @@ func validateStream(add func(string, ...any), where string, s *spec.StreamAssert
 	if len(exclusive) > 0 && len(matchers) > 1 {
 		add("%s: %v cannot be combined with another matcher (only contains/not_contains/matches/not_matches may be combined)", where, exclusive)
 	}
-	if s.JSON != nil {
-		validateJSON(add, where+".json", s.JSON)
-	}
-	if s.YAML != nil {
-		validateJSON(add, where+".yaml", s.YAML)
-	}
+	validateJSONChecks(add, where+".json", s.JSON)
+	validateJSONChecks(add, where+".yaml", s.YAML)
 	if s.Matches != nil {
 		validateRegexp(add, where, "matches", *s.Matches)
 	}
@@ -150,7 +147,7 @@ func validateStream(add func(string, ...any), where string, s *spec.StreamAssert
 		}
 		// line narrows the stream to one line, so it only composes with the
 		// text matchers — json/snapshot operate on the whole document.
-		if s.JSON != nil || s.YAML != nil || s.Snapshot != "" {
+		if len(s.JSON) > 0 || len(s.YAML) > 0 || s.Snapshot != "" {
 			add("%s.line cannot be combined with json/yaml/snapshot (use contains/matches/equals/empty)", where)
 		}
 	}
@@ -188,9 +185,9 @@ func validateFile(add func(string, ...any), where string, f *spec.FileAssert) {
 			add("%s.equals_file must not be empty", where)
 		}
 	}
-	if f.JSON != nil {
+	if len(f.JSON) > 0 {
 		n++
-		validateJSON(add, where+".json", f.JSON)
+		validateJSONChecks(add, where+".json", f.JSON)
 	}
 	if f.Snapshot != "" {
 		n++
@@ -223,6 +220,20 @@ func validateHeaderMatch(add func(string, ...any), where string, h *spec.HeaderM
 	case 1:
 	default:
 		add("%s: must set exactly one of contains/equals/matches", where)
+	}
+}
+
+// validateJSONChecks validates each check in a json/yaml matcher list (#156).
+// The empty-list case is already rejected by JSONChecks.UnmarshalYAML; a nil
+// list (the matcher is absent) is a no-op. Each entry names its index in the
+// error location so a spec author can find the failing check.
+func validateJSONChecks(add func(string, ...any), where string, list spec.JSONChecks) {
+	if len(list) == 1 {
+		validateJSON(add, where, &list[0])
+		return
+	}
+	for i := range list {
+		validateJSON(add, fmt.Sprintf("%s[%d]", where, i), &list[i])
 	}
 }
 
