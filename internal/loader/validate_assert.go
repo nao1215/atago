@@ -171,6 +171,15 @@ func validateFile(add func(string, ...any), where string, f *spec.FileAssert) {
 	if f.Executable != nil {
 		n++
 	}
+	if f.Equals != nil {
+		n++
+	}
+	if f.EqualsFile != nil {
+		n++
+		if *f.EqualsFile == "" {
+			add("%s.equals_file must not be empty", where)
+		}
+	}
 	if f.JSON != nil {
 		n++
 		validateJSON(add, where+".json", f.JSON)
@@ -179,9 +188,9 @@ func validateFile(add func(string, ...any), where string, f *spec.FileAssert) {
 		n++
 	}
 	if n == 0 {
-		add("%s: must set one of exists/contains/not_contains/executable/json/snapshot", where)
+		add("%s: must set one of exists/contains/not_contains/executable/equals/equals_file/json/snapshot", where)
 	} else if n > 1 {
-		add("%s: must set exactly one of exists/contains/not_contains/executable/json/snapshot", where)
+		add("%s: must set exactly one of exists/contains/not_contains/executable/equals/equals_file/json/snapshot", where)
 	}
 }
 

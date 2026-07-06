@@ -824,6 +824,8 @@
         { "required": ["contains"] },
         { "required": ["not_contains"] },
         { "required": ["executable"] },
+        { "required": ["equals"] },
+        { "required": ["equals_file"] },
         { "required": ["json"] },
         { "required": ["snapshot"] }
       ],
@@ -833,6 +835,8 @@
         "contains": { "$ref": "#/$defs/stringOrList" },
         "not_contains": { "$ref": "#/$defs/stringOrList" },
         "executable": { "type": "boolean" },
+        "equals": { "type": "string", "description": "Byte-exact content match against an inline literal (no CRLF/newline normalization)." },
+        "equals_file": { "type": "string", "minLength": 1, "description": "Byte-exact content match against another workdir-confined file (round-trip/idempotence; no CRLF/newline normalization)." },
         "json": { "$ref": "#/$defs/jsonAssert" },
         "snapshot": { "type": "string" }
       }

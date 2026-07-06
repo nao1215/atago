@@ -781,6 +781,52 @@ func TestCheck_File(t *testing.T) {
 	}
 }
 
+// TestCheck_File_EqualsAndEqualsFile covers the byte-exact content matchers
+// (#155): equals against an inline literal, and equals_file against another
+// runtime-produced file — both without CRLF/newline normalization, which is the
+// whole point of a round-trip/idempotence assertion.
+func TestCheck_File_EqualsAndEqualsFile(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	write := func(name, content string) {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("a.hex", "DEADBEEF")
+	write("b.hex", "DEADBEEF")    // byte-identical to a.hex
+	write("c.hex", "DEADBEEE")    // differs by one byte
+	write("lf.txt", "line\n")     // LF
+	write("crlf.txt", "line\r\n") // CRLF — differs from lf.txt by one byte
+
+	tests := []struct {
+		name   string
+		f      *spec.FileAssert
+		wantOK bool
+	}{
+		{"equals literal match", &spec.FileAssert{Path: "a.hex", Equals: strp("DEADBEEF")}, true},
+		{"equals literal mismatch", &spec.FileAssert{Path: "a.hex", Equals: strp("DEADBEEE")}, false},
+		// Byte-exact: a trailing-newline difference is a real mismatch, unlike the
+		// stdout equals matcher which normalizes it.
+		{"equals literal byte-exact newline", &spec.FileAssert{Path: "lf.txt", Equals: strp("line")}, false},
+		{"equals_file identical", &spec.FileAssert{Path: "a.hex", EqualsFile: strp("b.hex")}, true},
+		{"equals_file one byte differs", &spec.FileAssert{Path: "a.hex", EqualsFile: strp("c.hex")}, false},
+		{"equals_file CRLF vs LF differs", &spec.FileAssert{Path: "lf.txt", EqualsFile: strp("crlf.txt")}, false},
+		{"equals_file missing target errors", &spec.FileAssert{Path: "a.hex", EqualsFile: strp("nope.hex")}, false},
+		// The compared file, like the subject file, may not escape the workdir.
+		{"equals_file traversal rejected", &spec.FileAssert{Path: "a.hex", EqualsFile: strp("../secret.hex")}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := Check(&spec.Assert{File: tt.f}, nil, Env{Workdir: dir})
+			if got.OK != tt.wantOK {
+				t.Errorf("OK = %v, want %v (%s)", got.OK, tt.wantOK, got.Hint)
+			}
+		})
+	}
+}
+
 // TestCheck_File_TraversalRejected proves a file assertion whose path escapes the
 // scenario workdir fails with a containment error naming the field, even when the
 // escaping target actually exists on disk.

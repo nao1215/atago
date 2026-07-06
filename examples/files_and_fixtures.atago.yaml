@@ -31,6 +31,27 @@ scenarios:
               - Alice
               - Bob
 
+  - name: byte-exact content matchers for round-trip and idempotence tests
+    steps:
+      - fixture:
+          file: in.hex
+          content: "DEADBEEF"
+      # A round-trip step would regenerate out.hex from in.hex; here both hold
+      # the same bytes. equals_file proves two runtime files are byte-identical
+      # (no CRLF/newline normalization), which POSIX `cmp` cannot express
+      # portably. equals compares a file's bytes to an inline literal.
+      - fixture:
+          file: out.hex
+          content: "DEADBEEF"
+      - assert:
+          file:
+            path: out.hex
+            equals_file: in.hex
+      - assert:
+          file:
+            path: out.hex
+            equals: "DEADBEEF"
+
   - name: dir asserts on a directory tree
     steps:
       - fixture:

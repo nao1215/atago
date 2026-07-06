@@ -1,0 +1,91 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / file equals and equals_file byte-equality (#155)
+
+# Byte-exact file content matchers for round-trip and idempotence tests:
+# `equals` compares a file's bytes to an inline literal, and `equals_file`
+# compares two runtime-produced files to each other. Neither normalizes CRLF or
+# a trailing newline — the point is to prove two files are byte-identical, which
+# a POSIX `cmp` step cannot express portably (it breaks on Windows cmd).
+scenarios:
+  - name: equals_file passes for two byte-identical files
+    steps:
+      - fixture:
+          file: in.hex
+          content: "DEADBEEF"
+      # A no-shell round-trip: atago writes the same bytes to out.hex via a
+      # stdout redirect, then equals_file proves the two files match.
+      - fixture:
+          file: out.hex
+          content: "DEADBEEF"
+      - assert:
+          file:
+            path: out.hex
+            equals_file: in.hex
+
+  - name: equals matches an inline literal byte-for-byte
+    steps:
+      - fixture:
+          file: token.txt
+          content: "opaque-value-42"
+      - assert:
+          file:
+            path: token.txt
+            equals: "opaque-value-42"
+
+  - name: equals_file fails the inner spec when the two files differ by one byte
+    steps:
+      - fixture:
+          file: neq.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: two files differ by one byte
+                steps:
+                  - fixture:
+                      file: a.hex
+                      content: "DEADBEEF"
+                  - fixture:
+                      file: b.hex
+                      content: "DEADBEEE"
+                  - assert:
+                      file:
+                        path: a.hex
+                        equals_file: b.hex
+      - run:
+          command: ${atago} run neq.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: "not byte-identical"
+
+  - name: equals_file is byte-exact — a CRLF vs LF difference fails
+    steps:
+      - fixture:
+          file: crlf.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: LF and CRLF files are not byte-identical
+                steps:
+                  - fixture:
+                      file: lf.txt
+                      base64: "bGluZQo="
+                  - fixture:
+                      file: crlf.txt
+                      base64: "bGluZQ0K"
+                  - assert:
+                      file:
+                        path: lf.txt
+                        equals_file: crlf.txt
+      - run:
+          command: ${atago} run crlf.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: "not byte-identical"
