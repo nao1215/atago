@@ -1,10 +1,12 @@
 # atago Behavior Specs
 ## Summary
-60 suites · 239 scenarios
+60 suites · 241 scenarios
 ## Contents
-- [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 2 scenarios
+- [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
   - [a single-quoted argument with a space stays one argument](#scenario-a-single-quoted-argument-with-a-space-stays-one-argument)
+  - [a block-scalar command splits on newlines like spaces](#scenario-a-block-scalar-command-splits-on-newlines-like-spaces)
+  - [a folded-scalar command drops its trailing newline](#scenario-a-folded-scalar-command-drops-its-trailing-newline)
 - [atago self-hosting / variable expansion in assertion matcher values](#atago-self-hosting--variable-expansion-in-assertion-matcher-values) — 6 scenarios
   - [stdout.equals expands ${workdir}](#scenario-stdoutequals-expands-workdir)
   - [stdout.contains and not_contains expand a stored variable](#scenario-stdoutcontains-and-not_contains-expand-a-stored-variable)
@@ -319,6 +321,25 @@ ${atago} run 'no such file.yaml'
 #### Then
 - exit code is `3`
 - stderr contains `no such file.yaml`
+### Scenario: a block-scalar command splits on newlines like spaces
+#### When
+```shell
+${atago} run
+no-such-file.yaml
+
+```
+#### Then
+- exit code is `3`
+- stderr contains `no-such-file.yaml`
+### Scenario: a folded-scalar command drops its trailing newline
+#### When
+```shell
+${atago} run no-such-file.yaml
+
+```
+#### Then
+- exit code is `3`
+- stderr contains `no-such-file.yaml`
 ## atago self-hosting / variable expansion in assertion matcher values
 Source: `test/e2e/atago/assert_expand.atago.yaml`
 ### Scenario: stdout.equals expands ${workdir}

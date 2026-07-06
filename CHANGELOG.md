@@ -7,6 +7,17 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- A no-shell command (`shell: false`, the default) authored as a YAML block
+  scalar now tokenizes to the same argv on every OS. `windowsFields` split only
+  on spaces and tabs while POSIX (`go-shellwords`) also splits on carriage
+  returns and newlines, so a command written with `>` (a trailing newline) or
+  `|` (interior newlines) — or authored in a CRLF file — glued a stray `\r`/`\n`
+  onto an argument on Windows alone, silently breaking a cross-platform suite on
+  `windows-latest`. Windows now treats carriage return and newline as field
+  separators too, completing the tokenization parity begun in #154.
+
 ## [0.6.0] - 2026-07-07
 
 An assertion-and-capture ergonomics release: byte-exact file round-trips,

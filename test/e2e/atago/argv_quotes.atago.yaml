@@ -36,3 +36,34 @@ scenarios:
           # the full "no such file.yaml".
           stderr:
             contains: "no such file.yaml"
+
+  - name: a block-scalar command splits on newlines like spaces
+    steps:
+      # A YAML literal block scalar carries interior newlines: this command
+      # reaches the tokenizer as "run\nno-such-file.yaml". Newlines must separate
+      # argv fields exactly like spaces, so `run` stays the subcommand and the
+      # path a separate argument (exit 3, file not found). A tokenizer that split
+      # only on spaces would fold "run\nno-such-file.yaml" into one field and
+      # atago would reject it as an unknown subcommand on Windows alone.
+      - run:
+          command: |
+            ${atago} run
+            no-such-file.yaml
+      - assert:
+          exit_code: 3
+          stderr:
+            contains: "no-such-file.yaml"
+
+  - name: a folded-scalar command drops its trailing newline
+    steps:
+      # A YAML folded block scalar appends a trailing newline: this command
+      # reaches the tokenizer as "run no-such-file.yaml\n". The trailing newline
+      # must not glue onto the final argument, so atago looks up the plain path
+      # (exit 3) rather than a path ending in a stray newline.
+      - run:
+          command: >
+            ${atago} run no-such-file.yaml
+      - assert:
+          exit_code: 3
+          stderr:
+            contains: "no-such-file.yaml"

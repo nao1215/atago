@@ -246,6 +246,12 @@ func splitArgv(command string) ([]string, error) {
 // cross-platform spec passing single-quoted inline JSON (`'{"k":"v"}'`) reached
 // the CLI as non-JSON on Windows and broke there alone.
 //
+// Unquoted whitespace is space, tab, carriage return, and newline — the same set
+// go-shellwords treats as a field separator. A command authored as a YAML block
+// scalar carries newlines (a trailing one from `>`, interior ones from `|`) and a
+// CRLF-authored spec carries `\r`; splitting on them keeps the argv identical to
+// POSIX instead of gluing a stray `\n` onto the final argument on Windows alone.
+//
 // A backslash stays literal OUTSIDE quotes so a bare C:\ path survives (sh
 // backslash-escape semantics would corrupt it); it is also literal inside either
 // quote. This keeps the deliberate Windows-path behavior while removing the
@@ -262,7 +268,7 @@ func windowsFields(command string) ([]string, error) {
 		case r == '\'' && !inDouble:
 			inSingle = !inSingle
 			started = true
-		case !inDouble && !inSingle && (r == ' ' || r == '\t'):
+		case !inDouble && !inSingle && isFieldSpace(r):
 			if started {
 				fields = append(fields, cur.String())
 				cur.Reset()
@@ -283,6 +289,13 @@ func windowsFields(command string) ([]string, error) {
 		fields = append(fields, cur.String())
 	}
 	return fields, nil
+}
+
+// isFieldSpace reports whether r separates argv fields outside quotes. It matches
+// go-shellwords' whitespace set (space, tab, carriage return, newline) so the
+// no-shell tokenizer agrees with POSIX on where fields begin and end.
+func isFieldSpace(r rune) bool {
+	return r == ' ' || r == '\t' || r == '\r' || r == '\n'
 }
 
 // shellPath returns an absolute path to the POSIX shell used for `shell: true`.
