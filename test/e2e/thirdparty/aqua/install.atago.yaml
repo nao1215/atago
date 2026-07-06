@@ -1,0 +1,105 @@
+version: "1"
+
+suite:
+  name: aqua + install (declarative install of a real tool)
+
+# Companion to aqua.atago.yaml: where that suite pins aqua's offline surface,
+# this one exercises aqua's essential function — declaratively installing a tool
+# and making it runnable — without reaching the live registry or GitHub for the
+# tool itself. A local registry (type: local) describes an http package whose
+# asset is a tiny self-authored "tool" served from a local HTTP file server, so
+# `aqua install` downloads it from 127.0.0.1, lands it under AQUA_ROOT_DIR, and
+# `aqua exec` runs it. AQUA_ROOT_DIR and the policy file are pinned inside the
+# workdir. (aqua still fetches its pinned aqua-proxy bootstrap from GitHub on
+# install, the one external dependency of aqua's own design.)
+# Install: go install github.com/aquaproj/aqua/v2/cmd/aqua@latest
+
+permissions:
+  network:
+    allow: [127.0.0.1]
+
+defaults:
+  scenario:
+    env:
+      AQUA_ROOT_DIR: ${workdir}/.aqua
+      AQUA_POLICY_CONFIG: ${workdir}/aqua-policy.yaml
+      AQUA_DISABLE_COSIGN: "true"
+      AQUA_DISABLE_SLSA: "true"
+
+scenarios:
+  - name: install downloads the tool and makes it runnable
+    only:
+      command: aqua version
+    services:
+      # A local static file server stands in for the package host; aqua pulls the
+      # asset from here rather than from GitHub.
+      - name: fileserver
+        command: python3 -m http.server 18595 --bind 127.0.0.1 --directory dist
+        ready:
+          port: 127.0.0.1:18595
+          timeout: 15s
+    steps:
+      # The "tool" is a one-line script that prints a marker when run.
+      - fixture:
+          file: dist/mytool
+          mode: "0755"
+          content: |
+            #!/bin/sh
+            echo installed-tool-ran-ok
+      - fixture:
+          file: registry.yaml
+          content: |
+            packages:
+              - type: http
+                name: mytool
+                url: "http://127.0.0.1:18595/mytool"
+                files:
+                  - name: mytool
+      - fixture:
+          file: aqua.yaml
+          content: |
+            checksum:
+              enabled: false
+            registries:
+              - type: local
+                name: local
+                path: registry.yaml
+            packages:
+              - name: mytool@0.1.0
+                registry: local
+      # The policy allows the local registry (aqua refuses unpoliced local
+      # registries by default — a security feature).
+      - fixture:
+          file: aqua-policy.yaml
+          content: |
+            ---
+            registries:
+              - name: local
+                type: local
+                path: registry.yaml
+            packages:
+              - registry: local
+      - run:
+          command: aqua --config aqua.yaml install
+      - assert:
+          exit_code: 0
+      # The tool binary now exists under the managed root and is executable —
+      # the observable effect of the install.
+      - assert:
+          file:
+            path: .aqua/pkgs/http/127.0.0.1:18595/mytool/mytool
+            executable: true
+      # aqua now resolves the command to that installed path,
+      - run:
+          command: aqua --config aqua.yaml which mytool
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: ".aqua/pkgs/http/127.0.0.1:18595/mytool/mytool"
+      # and running it through aqua produces the tool's output.
+      - run:
+          command: aqua --config aqua.yaml exec -- mytool
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: installed-tool-ran-ok

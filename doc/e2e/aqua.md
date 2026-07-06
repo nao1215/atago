@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-1 suite · 8 scenarios
+2 suites · 9 scenarios
 ## Contents
 - [aqua (declarative CLI version manager)](#aqua-declarative-cli-version-manager) — 8 scenarios
   - [version prints without error](#scenario-version-prints-without-error)
@@ -11,6 +11,8 @@
   - [completion generates a bash script](#scenario-completion-generates-a-bash-script)
   - [which reports an unknown command as not found](#scenario-which-reports-an-unknown-command-as-not-found)
   - [an unknown subcommand is a usage error](#scenario-an-unknown-subcommand-is-a-usage-error)
+- [aqua + install (declarative install of a real tool)](#aqua--install-declarative-install-of-a-real-tool) — 1 scenario
+  - [install downloads the tool and makes it runnable](#scenario-install-downloads-the-tool-and-makes-it-runnable)
 ## aqua (declarative CLI version manager)
 Source: `test/e2e/thirdparty/aqua/aqua.atago.yaml`
 ### Scenario: version prints without error
@@ -100,3 +102,65 @@ aqua bogus-subcommand-xyz
 #### Then
 - exit code is `3`
 - stderr contains `No help topic`
+## aqua + install (declarative install of a real tool)
+Source: `test/e2e/thirdparty/aqua/install.atago.yaml`
+### Scenario: install downloads the tool and makes it runnable
+#### Given
+- Background service `fileserver` is started: `python3 -m http.server 18595 --bind 127.0.0.1 --directory dist`.
+- Fixture file `dist/mytool` is created.
+- Fixture file `registry.yaml` is created.
+- Fixture file `aqua.yaml` is created.
+- Fixture file `aqua-policy.yaml` is created.
+#### Inputs
+_Fixture `dist/mytool`:_
+```text
+#!/bin/sh
+echo installed-tool-ran-ok
+```
+_Fixture `registry.yaml`:_
+```text
+packages:
+  - type: http
+    name: mytool
+    url: "http://127.0.0.1:18595/mytool"
+    files:
+      - name: mytool
+```
+_Fixture `aqua.yaml`:_
+```text
+checksum:
+  enabled: false
+registries:
+  - type: local
+    name: local
+    path: registry.yaml
+packages:
+  - name: mytool@0.1.0
+    registry: local
+```
+_Fixture `aqua-policy.yaml`:_
+```text
+---
+registries:
+  - name: local
+    type: local
+    path: registry.yaml
+packages:
+  - registry: local
+```
+#### When
+```shell
+aqua --config aqua.yaml install
+aqua --config aqua.yaml which mytool
+aqua --config aqua.yaml exec -- mytool
+```
+#### Then
+- after `aqua --config aqua.yaml install`:
+  - exit code is `0`
+  - file `.aqua/pkgs/http/127.0.0.1:18595/mytool/mytool` is checked
+- after `aqua --config aqua.yaml which mytool`:
+  - exit code is `0`
+  - stdout contains `.aqua/pkgs/http/127.0.0.1:18595/mytool/mytool`
+- after `aqua --config aqua.yaml exec -- mytool`:
+  - exit code is `0`
+  - stdout contains `installed-tool-ran-ok`
