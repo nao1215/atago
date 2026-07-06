@@ -1,0 +1,459 @@
+version: "1"
+
+suite:
+  name: kustomize (declarative Kubernetes config)
+
+# kustomize renders Kubernetes manifests declaratively: `kustomize build` reads a
+# kustomization.yaml plus its resources and emits the transformed, merged YAML on
+# stdout. It is fully offline and deterministic — no cluster, no network — which
+# makes it an exemplary contract to pin: the same inputs always render the same
+# bytes, transformations compose in a defined order, generators derive a content
+# hash, the load restrictor refuses to escape the kustomization root, and
+# failures report on stderr with exit 1. Every scenario authors its inputs with
+# fixtures inside the isolated workdir and probes for kustomize first so the
+# suite skips cleanly where it is absent.
+scenarios:
+  - name: version prints a semantic version
+    only:
+      command: kustomize version
+    steps:
+      - run:
+          command: kustomize version
+      - assert:
+          exit_code: 0
+          stdout:
+            matches: "^v[0-9]+\\.[0-9]+\\.[0-9]+"
+
+  - name: build applies name prefix, namespace, labels and image tag
+    only:
+      command: kustomize version
+    steps:
+      - fixture:
+          file: base/deploy.yaml
+          content: |
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: web
+            spec:
+              replicas: 1
+              template:
+                spec:
+                  containers:
+                  - name: web
+                    image: nginx:1.0
+      - fixture:
+          file: base/kustomization.yaml
+          content: |
+            apiVersion: kustomize.config.k8s.io/v1beta1
+            kind: Kustomization
+            namePrefix: prod-
+            namespace: production
+            labels:
+            - pairs:
+                app: myapp
+              includeSelectors: true
+            images:
+            - name: nginx
+              newTag: "2.0"
+            resources:
+            - deploy.yaml
+      - run:
+          command: kustomize build base
+      - assert:
+          exit_code: 0
+          # namePrefix, namespace, the injected label, the propagated selector,
+          # and the rewritten image tag are all observable in the rendered YAML.
+          stdout:
+            contains:
+              - "name: prod-web"
+              - "namespace: production"
+              - "app: myapp"
+              - "image: nginx:2.0"
+      # The label is propagated into the pod selector (includeSelectors: true).
+      - assert:
+          stdout:
+            matches: "(?s)selector:\\s+matchLabels:\\s+app: myapp"
+
+  - name: configMapGenerator appends a deterministic content hash
+    only:
+      command: kustomize version
+    steps:
+      # A generated ConfigMap gets a name suffix derived from its content, so a
+      # data change forces a rollout. The suffix is deterministic; the exact
+      # alphabet is kustomize's, so the name is pinned by pattern.
+      - fixture:
+          file: kustomization.yaml
+          content: |
+            apiVersion: kustomize.config.k8s.io/v1beta1
+            kind: Kustomization
+            configMapGenerator:
+            - name: settings
+              literals:
+              - LOG_LEVEL=info
+      - run:
+          command: kustomize build .
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "kind: ConfigMap"
+              - "LOG_LEVEL: info"
+      - assert:
+          stdout:
+            matches: "name: settings-[a-z0-9]+"
+
+  - name: disableNameSuffixHash drops the generated hash suffix
+    only:
+      command: kustomize version
+    steps:
+      # Metamorphic counterpart to the previous scenario: the same generator
+      # with generatorOptions.disableNameSuffixHash yields the bare name, so a
+      # static reference stays valid. The name is exactly "settings" — no suffix.
+      - fixture:
+          file: kustomization.yaml
+          content: |
+            apiVersion: kustomize.config.k8s.io/v1beta1
+            kind: Kustomization
+            generatorOptions:
+              disableNameSuffixHash: true
+            configMapGenerator:
+            - name: settings
+              literals:
+              - LOG_LEVEL=info
+      - run:
+          command: kustomize build .
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "name: settings"
+      # No hash suffix is appended (the name is not followed by "-<hash>").
+      - assert:
+          stdout:
+            not_matches: "name: settings-[a-z0-9]+"
+
+  - name: secretGenerator base64-encodes values and never leaks the plaintext
+    only:
+      command: kustomize version
+    steps:
+      # secretGenerator emits a Secret whose data values are base64-encoded, so
+      # the plaintext literal must not appear in the rendered output. The value
+      # is a plain, non-secret word chosen only to make the encoding observable.
+      - fixture:
+          file: kustomization.yaml
+          content: |
+            apiVersion: kustomize.config.k8s.io/v1beta1
+            kind: Kustomization
+            secretGenerator:
+            - name: creds
+              literals:
+              - greeting=konnichiwa
+      - run:
+          command: kustomize build .
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "kind: Secret"
+              - "type: Opaque"
+      # base64("konnichiwa") — the encoded form is what ships, not the plaintext.
+      - assert:
+          stdout:
+            contains: "greeting: a29ubmljaGl3YQ=="
+      # The plaintext literal is never rendered — only its base64 form ships.
+      - assert:
+          stdout:
+            not_contains: "konnichiwa"
+
+  - name: an overlay JSON6902-patches a base without editing it
+    only:
+      command: kustomize version
+    steps:
+      # The base declares replicas: 1; the overlay references it and applies a
+      # JSON6902 patch bumping replicas to 5. The base file is never mutated —
+      # only the rendered output changes.
+      - fixture:
+          file: base/deploy.yaml
+          content: |
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: web
+            spec:
+              replicas: 1
+              template:
+                spec:
+                  containers:
+                  - name: web
+                    image: nginx:1.0
+      - fixture:
+          file: base/kustomization.yaml
+          content: |
+            apiVersion: kustomize.config.k8s.io/v1beta1
+            kind: Kustomization
+            resources:
+            - deploy.yaml
+      - fixture:
+          file: overlay/kustomization.yaml
+          content: |
+            apiVersion: kustomize.config.k8s.io/v1beta1
+            kind: Kustomization
+            resources:
+            - ../base
+            patches:
+            - target:
+                kind: Deployment
+                name: web
+              patch: |-
+                - op: replace
+                  path: /spec/replicas
+                  value: 5
+      - run:
+          command: kustomize build overlay
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "replicas: 5"
+      # The base on disk is untouched: rendering it alone still shows replicas 1.
+      - run:
+          command: kustomize build base
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "replicas: 1"
+
+  - name: a strategic-merge patch overrides only the fields it names
+    only:
+      command: kustomize version
+    steps:
+      # A strategic-merge patch merges by field: it sets replicas to 4 while the
+      # untouched container image is preserved from the base — the merge is
+      # additive, not a wholesale replace.
+      - fixture:
+          file: deploy.yaml
+          content: |
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: web
+            spec:
+              replicas: 1
+              template:
+                spec:
+                  containers:
+                  - name: web
+                    image: nginx:1.0
+      - fixture:
+          file: replicas-patch.yaml
+          content: |
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: web
+            spec:
+              replicas: 4
+      - fixture:
+          file: kustomization.yaml
+          content: |
+            apiVersion: kustomize.config.k8s.io/v1beta1
+            kind: Kustomization
+            resources:
+            - deploy.yaml
+            patches:
+            - path: replicas-patch.yaml
+      - run:
+          command: kustomize build .
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "replicas: 4"
+              - "image: nginx:1.0"
+
+  - name: an empty resources list renders nothing
+    only:
+      command: kustomize version
+    steps:
+      # Boundary: a kustomization with zero resources is valid and produces an
+      # empty document on stdout with exit 0 — the empty input maps to empty
+      # output, not an error.
+      - fixture:
+          file: kustomization.yaml
+          content: |
+            apiVersion: kustomize.config.k8s.io/v1beta1
+            kind: Kustomization
+            resources: []
+      - run:
+          command: kustomize build .
+      - assert:
+          exit_code: 0
+          stdout:
+            empty: true
+
+  - name: resource order does not change the rendered output
+    only:
+      command: kustomize version
+    steps:
+      # Metamorphic order-invariance: two kustomizations list the same two
+      # resources in opposite order; kustomize renders both to the same bytes,
+      # so the input ordering is not observable in the output.
+      - fixture:
+          file: a/cm-a.yaml
+          content: |
+            apiVersion: v1
+            kind: ConfigMap
+            metadata:
+              name: a
+            data:
+              k: v
+      - fixture:
+          file: a/cm-b.yaml
+          content: |
+            apiVersion: v1
+            kind: ConfigMap
+            metadata:
+              name: b
+            data:
+              k: v
+      - fixture:
+          file: a/kustomization.yaml
+          content: |
+            apiVersion: kustomize.config.k8s.io/v1beta1
+            kind: Kustomization
+            resources:
+            - cm-a.yaml
+            - cm-b.yaml
+      - fixture:
+          file: b/cm-a.yaml
+          content: |
+            apiVersion: v1
+            kind: ConfigMap
+            metadata:
+              name: a
+            data:
+              k: v
+      - fixture:
+          file: b/cm-b.yaml
+          content: |
+            apiVersion: v1
+            kind: ConfigMap
+            metadata:
+              name: b
+            data:
+              k: v
+      - fixture:
+          file: b/kustomization.yaml
+          content: |
+            apiVersion: kustomize.config.k8s.io/v1beta1
+            kind: Kustomization
+            resources:
+            - cm-b.yaml
+            - cm-a.yaml
+      - run:
+          command: kustomize build a -o out-a.yaml
+      - assert:
+          exit_code: 0
+      - run:
+          command: kustomize build b -o out-b.yaml
+      - assert:
+          exit_code: 0
+      - run:
+          command: cmp out-a.yaml out-b.yaml
+      - assert:
+          exit_code: 0
+
+  - name: rendering is deterministic across repeated builds
+    only:
+      command: kustomize version
+    steps:
+      # Metamorphic contract: building the same target twice must yield
+      # byte-identical output. Render to two files and diff them with cmp.
+      - fixture:
+          file: kustomization.yaml
+          content: |
+            apiVersion: kustomize.config.k8s.io/v1beta1
+            kind: Kustomization
+            namePrefix: a-
+            configMapGenerator:
+            - name: c
+              literals:
+              - K=V
+      - run:
+          command: kustomize build . -o first.yaml
+      - assert:
+          exit_code: 0
+      - run:
+          command: kustomize build . -o second.yaml
+      - assert:
+          exit_code: 0
+      - run:
+          command: cmp first.yaml second.yaml
+      - assert:
+          exit_code: 0
+
+  - name: building a directory without a kustomization fails cleanly
+    only:
+      command: kustomize version
+    steps:
+      # No kustomization.yaml: kustomize reports the error on stderr, writes
+      # nothing to stdout, and exits 1 (input error, not a crash).
+      - fixture:
+          file: empty/.keep
+          content: ""
+      - run:
+          command: kustomize build empty
+      - assert:
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            contains: "unable to find one of 'kustomization.yaml'"
+
+  - name: a missing referenced resource is reported on stderr
+    only:
+      command: kustomize version
+    steps:
+      - fixture:
+          file: kustomization.yaml
+          content: |
+            apiVersion: kustomize.config.k8s.io/v1beta1
+            kind: Kustomization
+            resources:
+            - missing.yaml
+      - run:
+          command: kustomize build .
+      - assert:
+          exit_code: 1
+          stderr:
+            contains: "accumulating resources"
+
+  - name: the load restrictor refuses to read a file outside the root
+    only:
+      command: kustomize version
+    steps:
+      # Security contract: by default a resource path may not escape the
+      # kustomization root. Referencing ../outside.yaml is rejected with a
+      # "security" error and exit 1, so a kustomization cannot silently pull in
+      # files from outside its own tree.
+      - fixture:
+          file: outside.yaml
+          content: |
+            apiVersion: v1
+            kind: ConfigMap
+            metadata:
+              name: outside
+            data:
+              k: v
+      - fixture:
+          file: root/kustomization.yaml
+          content: |
+            apiVersion: kustomize.config.k8s.io/v1beta1
+            kind: Kustomization
+            resources:
+            - ../outside.yaml
+      - run:
+          command: kustomize build root
+      - assert:
+          exit_code: 1
+          stderr:
+            contains: "security"

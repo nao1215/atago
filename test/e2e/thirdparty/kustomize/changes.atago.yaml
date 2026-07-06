@@ -1,0 +1,127 @@
+version: "1"
+
+suite:
+  name: kustomize + changes (kustomization file authoring)
+
+# Companion to kustomize.atago.yaml: where that suite pins the render output,
+# this one pins the filesystem side effects of `kustomize create`, `kustomize
+# edit`, and `kustomize edit fix`. sandbox_home points HOME inside the workdir
+# so any stray home write would surface in the delta — the "touches only the
+# kustomization file" claim is enforced by the changes assert, not merely
+# asserted in prose. Gate: only where kustomize is installed.
+scenarios:
+  - name: create writes exactly the kustomization file
+    only:
+      command: kustomize version
+    steps:
+      - run:
+          sandbox_home: true
+          command: kustomize create
+      - assert:
+          exit_code: 0
+          changes:
+            created:
+              - kustomization.yaml
+            modified: []
+            deleted: []
+      - assert:
+          file:
+            path: kustomization.yaml
+            contains: "kind: Kustomization"
+
+  - name: edit set namespace modifies only the kustomization file
+    only:
+      command: kustomize version
+    steps:
+      - run:
+          command: kustomize create
+      - assert:
+          exit_code: 0
+      # `edit set` mutates the existing file in place and touches nothing else.
+      - run:
+          sandbox_home: true
+          command: kustomize edit set namespace staging
+      - assert:
+          exit_code: 0
+          changes:
+            created: []
+            modified:
+              - kustomization.yaml
+            deleted: []
+      - assert:
+          file:
+            path: kustomization.yaml
+            contains: "namespace: staging"
+
+  - name: edit set image records the image override in the file
+    only:
+      command: kustomize version
+    steps:
+      - run:
+          command: kustomize create
+      - assert:
+          exit_code: 0
+      # `edit set image` writes an images: entry pinning the new tag; the file
+      # is the only thing that changes.
+      - run:
+          sandbox_home: true
+          command: kustomize edit set image nginx=nginx:3.0
+      - assert:
+          exit_code: 0
+          changes:
+            created: []
+            modified:
+              - kustomization.yaml
+            deleted: []
+      - assert:
+          file:
+            path: kustomization.yaml
+            contains:
+              - "name: nginx"
+              - 'newTag: "3.0"'
+
+  - name: edit fix migrates the deprecated commonLabels field to labels
+    only:
+      command: kustomize version
+    steps:
+      # A kustomization written with the deprecated commonLabels field is
+      # migrated in place: `edit fix` rewrites it to the modern labels: form,
+      # exits 0, and modifies only that file.
+      - fixture:
+          file: kustomization.yaml
+          content: |
+            apiVersion: kustomize.config.k8s.io/v1beta1
+            kind: Kustomization
+            commonLabels:
+              app: x
+      - run:
+          sandbox_home: true
+          command: kustomize edit fix
+      - assert:
+          exit_code: 0
+          changes:
+            created: []
+            modified:
+              - kustomization.yaml
+            deleted: []
+      - assert:
+          file:
+            path: kustomization.yaml
+            contains: "labels:"
+      - assert:
+          file:
+            path: kustomization.yaml
+            not_contains: "commonLabels:"
+
+  - name: edit without a kustomization file fails
+    only:
+      command: kustomize version
+    steps:
+      # `edit` requires an existing kustomization file; without one it reports
+      # the missing file on stderr and exits 1 rather than creating it silently.
+      - run:
+          command: kustomize edit set namespace staging
+      - assert:
+          exit_code: 1
+          stderr:
+            contains: "Missing kustomization file"

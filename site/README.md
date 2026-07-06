@@ -27,6 +27,7 @@ A browsable, repo-local index of atago's documentation, generated from repositor
 - [iso8583tool.md](../doc/e2e/iso8583tool.md)
 - [jose.md](../doc/e2e/jose.md)
 - [jq.md](../doc/e2e/jq.md)
+- [kustomize.md](../doc/e2e/kustomize.md)
 - [mailpit.md](../doc/e2e/mailpit.md)
 - [mimixbox.md](../doc/e2e/mimixbox.md)
 - [minio.md](../doc/e2e/minio.md)
