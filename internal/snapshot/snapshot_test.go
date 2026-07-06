@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -144,6 +145,9 @@ func TestCompare_CRLFGolden(t *testing.T) {
 // whole path component, or it corrupts an unrelated sibling path.
 func TestNormalize_PathMaskingBoundaries(t *testing.T) {
 	t.Run("home does not swallow a longer sibling", func(t *testing.T) {
+		if runtime.GOOS == "windows" {
+			t.Skip("os.UserHomeDir ignores $HOME on Windows, so the POSIX home path cannot be forced")
+		}
 		t.Setenv("HOME", "/home/nao")
 		// /home/naoki is a different user; only the exact home dir is masked.
 		got := string(Normalize([]byte("/home/naoki/project and /home/nao/x"), Options{}))
@@ -155,6 +159,9 @@ func TestNormalize_PathMaskingBoundaries(t *testing.T) {
 		}
 	})
 	t.Run("root home does not turn every slash into tilde", func(t *testing.T) {
+		if runtime.GOOS == "windows" {
+			t.Skip("os.UserHomeDir ignores $HOME on Windows, so a root home cannot be forced")
+		}
 		t.Setenv("HOME", "/")
 		got := string(Normalize([]byte("path /usr/local/bin"), Options{}))
 		if got != "path /usr/local/bin" {
