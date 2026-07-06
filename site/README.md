@@ -44,6 +44,7 @@ A browsable, repo-local index of atago's documentation, generated from repositor
 - [rclone.md](../doc/e2e/rclone.md)
 - [redis.md](../doc/e2e/redis.md)
 - [restic.md](../doc/e2e/restic.md)
+- [sops.md](../doc/e2e/sops.md)
 - [sqlite3.md](../doc/e2e/sqlite3.md)
 - [sqly.md](../doc/e2e/sqly.md)
 - [ssh-keygen.md](../doc/e2e/ssh-keygen.md)
