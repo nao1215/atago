@@ -128,6 +128,11 @@ jobs:
               go install github.com/getsops/sops/v3/cmd/sops@latest
               go install filippo.io/age/cmd/age@latest
               go install filippo.io/age/cmd/age-keygen@latest
+          # aqua is a declarative CLI version manager; the suite exercises its
+          # offline surface (init/policy/completion/root-dir and exit codes).
+          - name: aqua
+            dir: ./test/e2e/thirdparty/aqua
+            install: go install github.com/aquaproj/aqua/v2/cmd/aqua@latest
           - name: terraform
             dir: ./test/e2e/thirdparty/terraform
             install: |

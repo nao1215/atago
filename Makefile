@@ -99,6 +99,7 @@ docs: ## Regenerate the committed behavior docs under doc/e2e/ from the specs
 	env CGO_ENABLED=0 $(GO_BUILD) $(GO_LDFLAGS) -o ./dist/$(APP) .
 	./dist/$(APP) doc --out doc/e2e/atago.md      ./test/e2e/atago
 	./dist/$(APP) doc --out doc/e2e/actionlint.md  ./test/e2e/thirdparty/actionlint
+	./dist/$(APP) doc --out doc/e2e/aqua.md        ./test/e2e/thirdparty/aqua
 	./dist/$(APP) doc --out doc/e2e/git.md         ./test/e2e/thirdparty/git
 	./dist/$(APP) doc --out doc/e2e/caddy.md       ./test/e2e/thirdparty/caddy
 	./dist/$(APP) doc --out doc/e2e/pushgateway.md ./test/e2e/thirdparty/pushgateway
