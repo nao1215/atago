@@ -17,23 +17,23 @@ import (
 )
 
 // checkJSONChecks applies every JSONPath check in the list to data (all must
-// hold, #156), parsing it as JSON — or as YAML when isYAML is set. It returns
-// the first failing check, or the last passing result when they all pass. A
-// single-element list produces byte-identical output to the pre-list scalar
-// form so the common case is unchanged.
+// hold, #156), parsing it as JSON — or as YAML when isYAML is set. The payload
+// is parsed ONCE and every check runs against the same decoded value. It
+// returns the first failing check, or the last passing result when they all
+// pass. A single-element list produces byte-identical output to the pre-list
+// scalar form so the common case is unchanged.
 func checkJSONChecks(desc, name string, data []byte, checks spec.JSONChecks, isYAML bool) *CheckResult {
+	parsed, cr := parseDoc(desc, name, data, isYAML)
+	if cr != nil {
+		return cr
+	}
 	var last *CheckResult
 	for i := range checks {
 		d := desc
 		if len(checks) > 1 {
 			d = fmt.Sprintf("%s[%d]", desc, i)
 		}
-		var r *CheckResult
-		if isYAML {
-			r = checkYAML(d, name, data, &checks[i])
-		} else {
-			r = checkJSON(d, name, data, &checks[i])
-		}
+		r := applyJSONMatch(d, parsed, &checks[i])
 		if !r.OK {
 			return r
 		}
@@ -42,29 +42,51 @@ func checkJSONChecks(desc, name string, data []byte, checks spec.JSONChecks, isY
 	return last
 }
 
-// checkJSON parses data as JSON, selects nodes with a JSONPath, and applies the
-// configured matcher.
-func checkJSON(desc, name string, data []byte, j *spec.JSONAssert) *CheckResult {
+// parseDoc decodes data as JSON (or YAML when isYAML is set) into the generic
+// value model the JSONPath engine walks, returning a failure CheckResult for
+// empty or malformed input. It is the shared parse step behind checkJSON/
+// checkYAML and the list form, so the payload is decoded once per assertion.
+func parseDoc(desc, name string, data []byte, isYAML bool) (any, *CheckResult) {
+	kind := "JSON"
+	if isYAML {
+		kind = "YAML"
+	}
 	// oj.Parse treats empty/whitespace input as a valid (nil) document, which
 	// would otherwise yield a misleading "selected no value" instead of telling
 	// the user the stream was empty. Surfaced by dogfooding `gup list --json`,
 	// which prints nothing when no tools are installed.
 	if strings.TrimSpace(string(data)) == "" {
-		return &CheckResult{
+		return nil, &CheckResult{
 			Desc:     desc,
-			Expected: "valid JSON",
+			Expected: "valid " + kind,
 			Actual:   "(empty)",
-			Hint:     fmt.Sprintf("%s was empty, so it is not valid JSON", name),
+			Hint:     fmt.Sprintf("%s was empty, so it is not valid %s", name, kind),
 		}
 	}
-	parsed, err := oj.Parse(data)
+	var parsed any
+	var err error
+	if isYAML {
+		err = yaml.Unmarshal(data, &parsed)
+	} else {
+		parsed, err = oj.Parse(data)
+	}
 	if err != nil {
-		return &CheckResult{
+		return nil, &CheckResult{
 			Desc:     desc,
-			Expected: "valid JSON",
+			Expected: "valid " + kind,
 			Actual:   excerpt(string(data)),
-			Hint:     fmt.Sprintf("%s was not valid JSON: %v", name, err),
+			Hint:     fmt.Sprintf("%s was not valid %s: %v", name, kind, err),
 		}
+	}
+	return parsed, nil
+}
+
+// checkJSON parses data as JSON, selects nodes with a JSONPath, and applies the
+// configured matcher.
+func checkJSON(desc, name string, data []byte, j *spec.JSONAssert) *CheckResult {
+	parsed, cr := parseDoc(desc, name, data, false)
+	if cr != nil {
+		return cr
 	}
 	return applyJSONMatch(desc, parsed, j)
 }
@@ -73,22 +95,9 @@ func checkJSON(desc, name string, data []byte, j *spec.JSONAssert) *CheckResult 
 // checkJSON, since a YAML document decodes to the same generic value model
 // (maps/slices/scalars) that the JSONPath engine walks (issue #9).
 func checkYAML(desc, name string, data []byte, j *spec.JSONAssert) *CheckResult {
-	if strings.TrimSpace(string(data)) == "" {
-		return &CheckResult{
-			Desc:     desc,
-			Expected: "valid YAML",
-			Actual:   "(empty)",
-			Hint:     fmt.Sprintf("%s was empty, so it is not valid YAML", name),
-		}
-	}
-	var parsed any
-	if err := yaml.Unmarshal(data, &parsed); err != nil {
-		return &CheckResult{
-			Desc:     desc,
-			Expected: "valid YAML",
-			Actual:   excerpt(string(data)),
-			Hint:     fmt.Sprintf("%s was not valid YAML: %v", name, err),
-		}
+	parsed, cr := parseDoc(desc, name, data, true)
+	if cr != nil {
+		return cr
 	}
 	return applyJSONMatch(desc, parsed, j)
 }
