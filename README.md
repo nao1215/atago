@@ -215,7 +215,7 @@ Every feature has a commented, runnable spec under [examples/](examples/). The e
 | Example | Shows |
 |---------|-------|
 | [run_and_assert](examples/run_and_assert.atago.yaml) | exit code (exact, `not`, `in: [0, 2]` sets), stdout/stderr matchers (`contains`, `equals`, `matches`/`not_matches`, `empty: true`/`false`, lists, `line`), combining `contains`/`not_contains`/`matches`/`not_matches` in one block, multi-target asserts |
-| [shell_and_redirect](examples/shell_and_redirect.atago.yaml) | `shell: true` vs direct argv execution, `stdout_to`/`stderr_to` redirects |
+| [shell_and_redirect](examples/shell_and_redirect.atago.yaml) | `shell: true` vs direct argv execution, `stdout_to`/`stderr_to` redirects, `ATAGO_SHELL` to run POSIX-syntax specs under Git Bash on Windows |
 | [json_and_yaml](examples/json_and_yaml.atago.yaml) | JSONPath assertions, numeric bounds (`gt`/`lte`), the `yaml` matcher |
 | [files_and_fixtures](examples/files_and_fixtures.atago.yaml) | input fixtures (text and base64), `file` and `dir` assertions |
 | [store_and_variables](examples/store_and_variables.atago.yaml) | capturing values into `${name}`, `${workdir}`, `${env:NAME}` host-environment reads, the `$${...}` literal escape |

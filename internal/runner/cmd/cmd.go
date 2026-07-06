@@ -206,10 +206,8 @@ func commandLine(run *spec.Run) (string, []string, error) {
 // by Go with MSVCRT quoting rules that cmd.exe does not follow.
 func CommandLine(command string, shell bool) (string, []string, error) {
 	if shell {
-		if runtime.GOOS == "windows" {
-			return "cmd", []string{"/c", command}, nil
-		}
-		return shellPath(), []string{"-c", command}, nil
+		name, args := shellArgv(runtime.GOOS, command, os.Getenv("ATAGO_SHELL"), shellPath())
+		return name, args, nil
 	}
 	fields, err := splitArgv(command)
 	if err != nil {
@@ -266,6 +264,34 @@ func windowsFields(command string) ([]string, error) {
 		fields = append(fields, cur.String())
 	}
 	return fields, nil
+}
+
+// shellArgv returns the program name and argument prefix that run `command`
+// through a shell on the given GOOS. POSIX always uses `<posixShell> -c
+// <command>`. Windows defaults to `cmd /c <command>`, but when the operator
+// sets ATAGO_SHELL (atagoShell != "") it switches to `<atagoShell> -c
+// <command>` so POSIX-syntax specs — pipes, `$(...)`, single-quoted JSON —
+// run under Git Bash on Windows CI instead of failing under cmd.exe. The
+// override mirrors the ATAGO_SHELL escape hatch shellPath already honors on
+// POSIX; atagoShell is ignored on non-Windows because posixShell (from
+// shellPath) has already resolved it there.
+func shellArgv(goos, command, atagoShell, posixShell string) (string, []string) {
+	if goos == "windows" {
+		if atagoShell != "" {
+			return atagoShell, []string{"-c", command}
+		}
+		return "cmd", []string{"/c", command}
+	}
+	return posixShell, []string{"-c", command}
+}
+
+// windowsUsesCmdExe reports whether a `shell: true` command runs through
+// cmd.exe on the given GOOS. It is true only on Windows and only when no
+// ATAGO_SHELL override selects a POSIX shell. It gates the cmd.exe raw
+// command-line quoting in ConfigureShell: a POSIX shell reached via
+// ATAGO_SHELL takes the same no-op path as POSIX.
+func windowsUsesCmdExe(goos, atagoShell string) bool {
+	return goos == "windows" && atagoShell == ""
 }
 
 // shellPath returns an absolute path to the POSIX shell used for `shell: true`.

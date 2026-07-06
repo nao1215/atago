@@ -5,6 +5,15 @@ version: "1"
 # shell: true). For "write output to a file" you do not need a shell at all:
 # stdout_to / stderr_to redirect the captured streams to workdir-relative files.
 # Runs green as-is: atago run examples/shell_and_redirect.atago.yaml
+#
+# Cross-platform shell: `shell: true` uses /bin/sh on POSIX and cmd.exe on
+# Windows, so keep shared specs portable (echo is a builtin in both). To run a
+# spec that relies on POSIX syntax (pipes, $(...), single-quoted JSON) on
+# Windows CI, point atago at a POSIX shell with the ATAGO_SHELL environment
+# variable — for example Git Bash's sh:
+#   ATAGO_SHELL="C:\\Program Files\\Git\\usr\\bin\\sh.exe" atago run ./specs
+# atago then runs `<sh> -c <command>` instead of cmd.exe. On POSIX ATAGO_SHELL
+# already overrides the default /bin/sh the same way.
 
 suite:
   name: shell and redirect
@@ -13,7 +22,7 @@ scenarios:
   - name: shell true runs the command through the shell
     steps:
       - run:
-          shell: true   # /bin/sh on POSIX, cmd.exe on Windows
+          shell: true   # /bin/sh on POSIX, cmd.exe on Windows (or ATAGO_SHELL)
           command: echo piped
       - assert:
           stdout:

@@ -654,6 +654,95 @@ func lastValue(env []string, key string) string {
 	return val
 }
 
+// TestShellArgv pins the argv prefix chosen for a `shell: true` command per
+// GOOS. POSIX always runs `<posixShell> -c <command>`. Windows runs `cmd /c`
+// by default, but an explicit ATAGO_SHELL override switches it to
+// `<shell> -c <command>` so POSIX-syntax specs (pipes, $(), quoting) run under
+// Git Bash on Windows CI.
+func TestShellArgv(t *testing.T) {
+	t.Parallel()
+	const cmdStr = "printf x | cat"
+	tests := []struct {
+		name       string
+		goos       string
+		atagoShell string
+		posixShell string
+		wantName   string
+		wantArgs   []string
+	}{
+		{"linux default", "linux", "", "/bin/sh", "/bin/sh", []string{"-c", cmdStr}},
+		{"linux ignores atago_shell here", "linux", "/opt/bash", "/bin/sh", "/bin/sh", []string{"-c", cmdStr}},
+		{"darwin default", "darwin", "", "/bin/sh", "/bin/sh", []string{"-c", cmdStr}},
+		{"windows default cmd.exe", "windows", "", "/bin/sh", "cmd", []string{"/c", cmdStr}},
+		{"windows atago_shell override", "windows", `C:\Git\usr\bin\sh.exe`, "/bin/sh", `C:\Git\usr\bin\sh.exe`, []string{"-c", cmdStr}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotName, gotArgs := shellArgv(tt.goos, cmdStr, tt.atagoShell, tt.posixShell)
+			if gotName != tt.wantName {
+				t.Errorf("shellArgv name = %q, want %q", gotName, tt.wantName)
+			}
+			if len(gotArgs) != len(tt.wantArgs) {
+				t.Fatalf("shellArgv args = %#v, want %#v", gotArgs, tt.wantArgs)
+			}
+			for i := range gotArgs {
+				if gotArgs[i] != tt.wantArgs[i] {
+					t.Errorf("shellArgv args[%d] = %q, want %q", i, gotArgs[i], tt.wantArgs[i])
+				}
+			}
+		})
+	}
+}
+
+// TestWindowsUsesCmdExe pins when the cmd.exe raw-command-line quoting hack
+// applies: only on Windows AND only when no ATAGO_SHELL override is in effect.
+// A POSIX shell reached via ATAGO_SHELL must NOT get the cmd.exe treatment.
+func TestWindowsUsesCmdExe(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		goos       string
+		atagoShell string
+		want       bool
+	}{
+		{"windows", "", true},
+		{"windows", `C:\Git\usr\bin\sh.exe`, false},
+		{"linux", "", false},
+		{"linux", "/opt/bash", false},
+		{"darwin", "", false},
+	}
+	for _, tt := range tests {
+		if got := windowsUsesCmdExe(tt.goos, tt.atagoShell); got != tt.want {
+			t.Errorf("windowsUsesCmdExe(%q, %q) = %v, want %v", tt.goos, tt.atagoShell, got, tt.want)
+		}
+	}
+}
+
+// TestRun_WindowsPOSIXShellViaAtagoShell drives the end-to-end Windows path: a
+// POSIX-syntax pipe command run under `shell: true` with ATAGO_SHELL pointing at
+// Git Bash's sh must produce the piped output, proving atago no longer forces
+// cmd.exe on Windows. It runs only on Windows where a `sh` is discoverable;
+// POSIX already uses sh -c so nothing new is exercised there.
+func TestRun_WindowsPOSIXShellViaAtagoShell(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("exercises the Windows-only ATAGO_SHELL routing; POSIX already uses sh -c")
+	}
+	sh, err := exec.LookPath("sh")
+	if err != nil {
+		t.Skip("no POSIX sh on PATH (Git Bash not installed)")
+	}
+	t.Setenv("ATAGO_SHELL", sh)
+	res, err := New().Run(context.Background(), &spec.Run{
+		Shell:   spec.Bool(true),
+		Command: `printf 'a\nb\nc\n' | grep b`,
+	}, t.TempDir())
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if got := strings.TrimSpace(string(res.Stdout)); got != "b" {
+		t.Errorf("stdout = %q, want %q (POSIX pipe must run via ATAGO_SHELL on Windows)", got, "b")
+	}
+}
+
 // TestConfigureShell_NoopOnPOSIX covers the POSIX ConfigureShell, which is a
 // deliberate no-op (the sh -c argv from CommandLine needs no re-quoting). It must
 // not panic or mutate the command.

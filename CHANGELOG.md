@@ -7,6 +7,17 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- `shell: true` now honors the `ATAGO_SHELL` environment variable on Windows.
+  Previously a shell command always ran through `cmd.exe` there, so a spec that
+  used POSIX syntax (pipes, `$(...)`, single-quoted JSON) could not run on
+  Windows CI. Setting `ATAGO_SHELL` to a POSIX shell (for example Git Bash's
+  `sh.exe`) routes shell commands through `<sh> -c <command>` instead, matching
+  the override atago already honored on POSIX. The default (no `ATAGO_SHELL`)
+  is unchanged: `cmd.exe` on Windows, `/bin/sh` on POSIX. See
+  [examples/shell_and_redirect.atago.yaml](examples/shell_and_redirect.atago.yaml).
+
 ## [0.5.1] - 2026-07-06
 
 A security and robustness patch, each fix landed with a reproduction test first.
