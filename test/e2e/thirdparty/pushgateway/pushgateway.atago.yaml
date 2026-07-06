@@ -24,6 +24,18 @@ runners:
     type: http
     base_url: http://127.0.0.1:18093
     timeout: 10s
+  push3:
+    type: http
+    base_url: http://127.0.0.1:18099
+    timeout: 10s
+  push4:
+    type: http
+    base_url: http://127.0.0.1:18100
+    timeout: 10s
+  push5:
+    type: http
+    base_url: http://127.0.0.1:18101
+    timeout: 10s
 
 scenarios:
   - name: a pushed metric appears on the scrape endpoint
@@ -87,3 +99,122 @@ scenarios:
           status: 200
           body:
             not_contains: ephemeral_metric
+
+  - name: a malformed exposition body is rejected and never ingested
+    services:
+      - name: pushgateway
+        command: pushgateway --web.listen-address=127.0.0.1:18099
+        ready:
+          port: 127.0.0.1:18099
+          timeout: 15s
+    steps:
+      # A line that is not valid exposition format is a 400, with the parser's
+      # reason on the body. This is the failure branch the happy pushes lack.
+      - http:
+          runner: push3
+          method: POST
+          path: /metrics/job/badjob
+          body: |
+            this is not a metric line
+      - assert:
+          status: 400
+          body:
+            contains: "text format parsing error"
+      # Negative space: the rejected input is not silently stored — a later
+      # scrape shows no trace of the bad job.
+      - http:
+          runner: push3
+          method: GET
+          path: /metrics
+      - assert:
+          status: 200
+          body:
+            not_contains: 'job="badjob"'
+
+  - name: POST merges into a group while PUT replaces it
+    services:
+      - name: pushgateway
+        command: pushgateway --web.listen-address=127.0.0.1:18100
+        ready:
+          port: 127.0.0.1:18100
+          timeout: 15s
+    steps:
+      # State-transition + metamorphic: the two write verbs have different group
+      # semantics. POST metric_a, then POST metric_b to the same group — POST
+      # merges, so both survive.
+      - http:
+          runner: push4
+          method: POST
+          path: /metrics/job/svc
+          body: |
+            metric_a 1
+      - assert:
+          status: 200
+      - http:
+          runner: push4
+          method: POST
+          path: /metrics/job/svc
+          body: |
+            metric_b 2
+      - assert:
+          status: 200
+      - http:
+          runner: push4
+          method: GET
+          path: /metrics
+      - assert:
+          status: 200
+          body:
+            contains:
+              - metric_a
+              - metric_b
+      # PUT replaces the whole group: after it, only metric_c remains and the
+      # merged metric_a/metric_b are gone.
+      - http:
+          runner: push4
+          method: PUT
+          path: /metrics/job/svc
+          body: |
+            metric_c 3
+      - assert:
+          status: 200
+      - http:
+          runner: push4
+          method: GET
+          path: /metrics
+      - assert:
+          status: 200
+          body:
+            contains: metric_c
+      - assert:
+          body:
+            not_contains:
+              - metric_a
+              - metric_b
+
+  - name: a grouping label decorates every metric in the group
+    services:
+      - name: pushgateway
+        command: pushgateway --web.listen-address=127.0.0.1:18101
+        ready:
+          port: 127.0.0.1:18101
+          timeout: 15s
+    steps:
+      # A second grouping dimension: pushing under /job/svc/instance/host1
+      # stamps instance="host1" onto the scraped sample, alongside job="svc".
+      - http:
+          runner: push5
+          method: POST
+          path: /metrics/job/svc/instance/host1
+          body: |
+            labeled_metric 9
+      - assert:
+          status: 200
+      - http:
+          runner: push5
+          method: GET
+          path: /metrics
+      - assert:
+          status: 200
+          body:
+            matches: 'labeled_metric\{[^}]*instance="host1"[^}]*job="svc"[^}]*\} 9'

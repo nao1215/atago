@@ -105,6 +105,7 @@ docs: ## Regenerate the committed behavior docs under doc/e2e/ from the specs
 	./dist/$(APP) doc --out doc/e2e/gitea.md       ./test/e2e/thirdparty/gitea
 	./dist/$(APP) doc --out doc/e2e/jq.md          ./test/e2e/thirdparty/jq
 	./dist/$(APP) doc --out doc/e2e/fzf.md         ./test/e2e/thirdparty/fzf
+	./dist/$(APP) doc --out doc/e2e/htop.md        ./test/e2e/thirdparty/htop
 	./dist/$(APP) doc --out doc/e2e/redis.md       ./test/e2e/thirdparty/redis
 	./dist/$(APP) doc --out doc/e2e/hugo.md        ./test/e2e/thirdparty/hugo
 	./dist/$(APP) doc --out doc/e2e/openssl.md     ./test/e2e/thirdparty/openssl

@@ -5,8 +5,14 @@ suite:
 
 # Exercises adnanh/webhook (from awesome-selfhosted's automation corner) as a
 # third-party target: the daemon reads its hook definitions from a JSON config
-# — written as a leading fixture, applied before the service starts — and a
-# JSON POST triggers a command whose output flows back into the response.
+# — written as a leading fixture, applied before the service starts — and an
+# HTTP request triggers a command whose real effect (a file written on disk)
+# and whose output are both observed. Beyond the happy path this pins the
+# contract's branches: trigger-rules gate execution (and prove the command did
+# not run when unsatisfied), an HMAC signature is verified against an
+# independently computed oracle, the http-methods allowlist rejects the wrong
+# verb, and a command that exits non-zero surfaces as a 500. Each scenario runs
+# its own daemon with a minimal hook config.
 # Install:
 #   go install github.com/adnanh/webhook@latest
 
@@ -14,14 +20,32 @@ permissions:
   network:
     allow: [127.0.0.1]
 
+# Each scenario binds its own port so the suite runs under the default parallel
+# scheduler without the daemons colliding on one address.
 runners:
-  hooks:
+  hooks_a:
     type: http
     base_url: http://127.0.0.1:18094
     timeout: 10s
+  hooks_b:
+    type: http
+    base_url: http://127.0.0.1:18095
+    timeout: 10s
+  hooks_c:
+    type: http
+    base_url: http://127.0.0.1:18096
+    timeout: 10s
+  hooks_d:
+    type: http
+    base_url: http://127.0.0.1:18097
+    timeout: 10s
+  hooks_e:
+    type: http
+    base_url: http://127.0.0.1:18098
+    timeout: 10s
 
 scenarios:
-  - name: a JSON post triggers the configured command
+  - name: a post runs the command, returns its output, and writes its file
     services:
       - name: webhook
         command: webhook -hooks hooks.json -ip 127.0.0.1 -port 18094
@@ -29,13 +53,24 @@ scenarios:
           port: 127.0.0.1:18094
           timeout: 15s
     steps:
+      # The hook runs a script that both prints (flows into the response) and
+      # writes out.txt (the real side effect), so the response body and the
+      # filesystem are two independent windows onto the same execution.
+      - fixture:
+          file: handler.sh
+          mode: "0755"
+          content: |
+            #!/bin/sh
+            printf 'handled %s\n' "$1" > out.txt
+            printf 'ran for %s' "$1"
       - fixture:
           file: hooks.json
           content: |
             [
               {
                 "id": "greet",
-                "execute-command": "/bin/echo",
+                "execute-command": "${workdir}/handler.sh",
+                "command-working-directory": "${workdir}",
                 "include-command-output-in-response": true,
                 "pass-arguments-to-command": [
                   { "source": "payload", "name": "name" }
@@ -43,7 +78,7 @@ scenarios:
               }
             ]
       - http:
-          runner: hooks
+          runner: hooks_a
           method: POST
           path: /hooks/greet
           json:
@@ -51,13 +86,224 @@ scenarios:
       - assert:
           status: 200
           body:
-            contains: Alice
-      # An unknown hook id is a 404, not an execution.
+            contains: "ran for Alice"
+      # The command's real effect is pinned, not just its echoed output.
+      - assert:
+          file:
+            path: out.txt
+            contains: "handled Alice"
+      # An unknown hook id is a 404, and it runs nothing.
       - http:
-          runner: hooks
+          runner: hooks_a
           method: POST
           path: /hooks/nope
           json:
             name: Bob
       - assert:
           status: 404
+
+  - name: a trigger-rule gates execution and blocks it when unsatisfied
+    services:
+      - name: webhook
+        command: webhook -hooks hooks.json -ip 127.0.0.1 -port 18095
+        ready:
+          port: 127.0.0.1:18095
+          timeout: 15s
+    steps:
+      - fixture:
+          file: handler.sh
+          mode: "0755"
+          content: |
+            #!/bin/sh
+            printf 'executed\n' > ran.txt
+            printf 'ok'
+      - fixture:
+          file: hooks.json
+          content: |
+            [
+              {
+                "id": "guarded",
+                "execute-command": "${workdir}/handler.sh",
+                "command-working-directory": "${workdir}",
+                "include-command-output-in-response": true,
+                "trigger-rule": {
+                  "match": {
+                    "type": "value",
+                    "value": "open-sesame",
+                    "parameter": { "source": "payload", "name": "token" }
+                  }
+                }
+              }
+            ]
+      # Wrong token: webhook answers 200 but reports the rules were not
+      # satisfied, and — the key negative-space assertion — the command never
+      # ran, so its side-effect file is absent.
+      - http:
+          runner: hooks_b
+          method: POST
+          path: /hooks/guarded
+          json:
+            token: wrong
+      - assert:
+          status: 200
+          body:
+            contains: "Hook rules were not satisfied"
+      - assert:
+          file:
+            path: ran.txt
+            exists: false
+      # Right token: the rule passes and the command runs, leaving its file.
+      - http:
+          runner: hooks_b
+          method: POST
+          path: /hooks/guarded
+          json:
+            token: open-sesame
+      - assert:
+          status: 200
+      - assert:
+          file:
+            path: ran.txt
+            contains: "executed"
+
+  - name: an HMAC signature is verified against an independent oracle
+    services:
+      - name: webhook
+        command: webhook -hooks hooks.json -ip 127.0.0.1 -port 18096
+        ready:
+          port: 127.0.0.1:18096
+          timeout: 15s
+    steps:
+      # The hook requires an HMAC-SHA256 of the raw body under a shared secret.
+      # The valid signature below was computed independently with openssl over
+      # the exact body bytes `{"name":"Zoe"}` and secret `atago-demo-secret`:
+      #   printf '%s' '{"name":"Zoe"}' | openssl dgst -sha256 -hmac atago-demo-secret
+      # so a passing request proves webhook computes the same MAC, not just that
+      # some header is present. The secret is a throwaway test value.
+      - fixture:
+          file: handler.sh
+          mode: "0755"
+          content: |
+            #!/bin/sh
+            printf 'signed\n' > ran.txt
+            printf 'ok'
+      - fixture:
+          file: hooks.json
+          content: |
+            [
+              {
+                "id": "signed",
+                "execute-command": "${workdir}/handler.sh",
+                "command-working-directory": "${workdir}",
+                "include-command-output-in-response": true,
+                "trigger-rule": {
+                  "match": {
+                    "type": "payload-hmac-sha256",
+                    "secret": "atago-demo-secret",
+                    "parameter": { "source": "header", "name": "X-Hub-Signature-256" }
+                  }
+                }
+              }
+            ]
+      # A wrong signature is rejected: webhook treats an HMAC mismatch as a rule
+      # evaluation error (500), and the command never runs.
+      - http:
+          runner: hooks_c
+          method: POST
+          path: /hooks/signed
+          header:
+            X-Hub-Signature-256: "sha256=0000000000000000000000000000000000000000000000000000000000000000"
+          body: '{"name":"Zoe"}'
+      - assert:
+          status: 500
+          body:
+            contains: "Error occurred while evaluating hook rules"
+      - assert:
+          file:
+            path: ran.txt
+            exists: false
+      # The independently computed signature passes and the command runs.
+      - http:
+          runner: hooks_c
+          method: POST
+          path: /hooks/signed
+          header:
+            X-Hub-Signature-256: "sha256=54e53745885e79adf10dbd78d0b0644986816b0c712664d2bdd1323a99ebece3"
+          body: '{"name":"Zoe"}'
+      - assert:
+          status: 200
+      - assert:
+          file:
+            path: ran.txt
+            contains: "signed"
+
+  - name: the http-methods allowlist rejects the wrong verb
+    services:
+      - name: webhook
+        command: webhook -hooks hooks.json -ip 127.0.0.1 -port 18097
+        ready:
+          port: 127.0.0.1:18097
+          timeout: 15s
+    steps:
+      - fixture:
+          file: handler.sh
+          mode: "0755"
+          content: |
+            #!/bin/sh
+            printf 'ok'
+      - fixture:
+          file: hooks.json
+          content: |
+            [
+              {
+                "id": "postonly",
+                "execute-command": "${workdir}/handler.sh",
+                "command-working-directory": "${workdir}",
+                "http-methods": ["POST"],
+                "include-command-output-in-response": true
+              }
+            ]
+      # GET is not in the allowlist: webhook refuses it with 405.
+      - http:
+          runner: hooks_d
+          method: GET
+          path: /hooks/postonly
+      - assert:
+          status: 405
+
+  - name: a command that exits non-zero surfaces as a 500
+    services:
+      - name: webhook
+        command: webhook -hooks hooks.json -ip 127.0.0.1 -port 18098
+        ready:
+          port: 127.0.0.1:18098
+          timeout: 15s
+    steps:
+      - fixture:
+          file: handler.sh
+          mode: "0755"
+          content: |
+            #!/bin/sh
+            printf 'boom\n' >&2
+            exit 3
+      - fixture:
+          file: hooks.json
+          content: |
+            [
+              {
+                "id": "failer",
+                "execute-command": "${workdir}/handler.sh",
+                "command-working-directory": "${workdir}",
+                "include-command-output-in-response": true
+              }
+            ]
+      - http:
+          runner: hooks_e
+          method: POST
+          path: /hooks/failer
+          json:
+            any: value
+      - assert:
+          status: 500
+          body:
+            contains: "Error occurred while executing the hook's command"
