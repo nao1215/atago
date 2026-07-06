@@ -1,0 +1,148 @@
+version: "1"
+
+suite:
+  name: aqua (declarative CLI version manager)
+
+# aqua manages CLI tools declaratively from an aqua.yaml. Installing tools needs
+# the network and the registry, so this suite pins aqua's offline, deterministic
+# surface instead: authoring a config and a policy (with their filesystem side
+# effects), the idempotence of init, the offline generators (completion,
+# root-dir), and the exit-code semantics that separate a usage error (3) from a
+# runtime error (1). Gate: only where aqua is installed.
+scenarios:
+  - name: version prints without error
+    only:
+      command: aqua version
+    steps:
+      # aqua exposes its version as a subcommand (there is no --version flag);
+      # a go-installed build reports "unknown", so this pins the exit code, not
+      # a specific string.
+      - run:
+          command: aqua version
+      - assert:
+          exit_code: 0
+          stdout:
+            matches: "\\S"
+
+  - name: init writes an aqua.yaml with the standard registry
+    only:
+      command: aqua version
+    steps:
+      # init scaffolds a config referencing the standard registry and an empty
+      # packages list, and writes nothing outside the workdir (HOME included).
+      - run:
+          sandbox_home: true
+          command: aqua init
+      - assert:
+          exit_code: 0
+          changes:
+            created:
+              - aqua.yaml
+            modified: []
+            deleted: []
+      - assert:
+          file:
+            path: aqua.yaml
+            contains:
+              - "registries:"
+              - "type: standard"
+              - "packages:"
+
+  - name: init is idempotent on an existing config
+    only:
+      command: aqua version
+    steps:
+      # Running init again neither errors nor rewrites the file: it reports the
+      # config already exists and leaves the tree untouched.
+      - run:
+          command: aqua init
+      - assert:
+          exit_code: 0
+      - run:
+          sandbox_home: true
+          command: aqua init
+      - assert:
+          exit_code: 0
+          changes:
+            created: []
+            modified: []
+            deleted: []
+          stderr:
+            contains: "configuration file already exists"
+
+  - name: policy init writes an aqua-policy.yaml
+    only:
+      command: aqua version
+    steps:
+      - run:
+          sandbox_home: true
+          command: aqua policy init
+      - assert:
+          exit_code: 0
+          changes:
+            created:
+              - aqua-policy.yaml
+            modified: []
+            deleted: []
+      - assert:
+          file:
+            path: aqua-policy.yaml
+            contains: "registries:"
+
+  - name: root-dir prints the aqua root path
+    only:
+      command: aqua version
+    steps:
+      # An offline environment query: root-dir prints the directory aqua manages
+      # installs under, which always ends in the aquaproj-aqua data path.
+      - run:
+          command: aqua root-dir
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "aquaproj-aqua"
+
+  - name: completion generates a bash script
+    only:
+      command: aqua version
+    steps:
+      # An offline generator: the bash completion script is emitted on stdout.
+      - run:
+          command: aqua completion bash
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "completion script"
+
+  - name: which reports an unknown command as not found
+    only:
+      command: aqua version
+    steps:
+      # which resolves a command against the config offline; an unmanaged
+      # command is a runtime error (exit 1) with a clear message on stderr.
+      - fixture:
+          file: aqua.yaml
+          content: |
+            registries:
+            - type: standard
+              ref: v4.531.0
+            packages:
+      - run:
+          command: aqua which definitely-not-a-real-tool-xyz
+      - assert:
+          exit_code: 1
+          stderr:
+            contains: "command is not found"
+
+  - name: an unknown subcommand is a usage error
+    only:
+      command: aqua version
+    steps:
+      # Exit-code semantics: an unknown subcommand is a usage error (3), distinct
+      # from the runtime error (1) that which returns above.
+      - run:
+          command: aqua bogus-subcommand-xyz
+      - assert:
+          exit_code: 3
+          stderr:
+            contains: "No help topic"

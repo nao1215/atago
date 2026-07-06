@@ -12,6 +12,7 @@ A browsable, repo-local index of atago's documentation, generated from repositor
 - [README.md](../doc/e2e/README.md)
 - [actionlint.md](../doc/e2e/actionlint.md)
 - [age.md](../doc/e2e/age.md)
+- [aqua.md](../doc/e2e/aqua.md)
 - [atago.md](../doc/e2e/atago.md)
 - [awscli.md](../doc/e2e/awscli.md)
 - [caddy.md](../doc/e2e/caddy.md)
