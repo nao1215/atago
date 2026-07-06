@@ -1,0 +1,38 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / cross-platform no-shell argv tokenization (#154)
+
+# A no-shell command (shell: false, the default) must tokenize to the SAME argv
+# on every OS. Before #154, a single-quoted segment was stripped on POSIX but
+# kept literal on Windows, so single-quoted inline JSON reached the CLI as
+# non-JSON on Windows alone — invisible until Windows CI ran.
+#
+# These scenarios drive atago itself: `atago run <path>` echoes the path it
+# could not access in its error, so a single-quoted argument round-trips through
+# atago's own tokenizer and we can assert what the argument actually became.
+# They use only the atago binary, so they belong in the Windows portable subset.
+scenarios:
+  - name: a single-quoted JSON argument survives tokenization
+    steps:
+      # The command carries a single-quoted '{"k":"v"}'. After tokenization the
+      # inner double quotes must be preserved literally and the single quotes
+      # stripped, so atago receives the JSON as one argument on every OS.
+      - run:
+          command: "${atago} run '{\"k\":\"v\"}'"
+      - assert:
+          exit_code: 3
+          stderr:
+            contains: '{"k":"v"}'
+
+  - name: a single-quoted argument with a space stays one argument
+    steps:
+      - run:
+          command: "${atago} run 'no such file.yaml'"
+      - assert:
+          exit_code: 3
+          # The space is inside the single quotes, so the whole phrase is one
+          # path argument; a broken tokenizer would split it and never mention
+          # the full "no such file.yaml".
+          stderr:
+            contains: "no such file.yaml"

@@ -226,9 +226,10 @@ func CommandLine(command string, shell bool) (string, []string, error) {
 // sh-style — `\t`/`\n` become a real tab/newline (sh would drop the backslash
 // and keep the letter), and a trailing `\` is an error rather than a line
 // continuation. Quote your command or set shell: true if you need a literal
-// backslash. Windows uses windowsFields, where a backslash is an ordinary path
-// character — sh backslash-escape semantics would corrupt every C:\ path (e.g.
-// the expanded ${atago} binary path).
+// backslash. Windows uses windowsFields, which groups the same single/double
+// quotes as go-shellwords (so a single-quoted argument tokenizes identically on
+// both OSes) but keeps a backslash literal — sh backslash-escape semantics would
+// corrupt every C:\ path (e.g. the expanded ${atago} binary path).
 func splitArgv(command string) ([]string, error) {
 	if runtime.GOOS == "windows" {
 		return windowsFields(command)
@@ -236,19 +237,32 @@ func splitArgv(command string) ([]string, error) {
 	return shellwords.Parse(command)
 }
 
-// windowsFields splits command on unquoted whitespace. Double quotes group a
-// field (and are stripped); every other character — including backslash — is
-// literal.
+// windowsFields splits command on unquoted whitespace. Both double and single
+// quotes group a field (and are stripped): inside a double-quoted group a single
+// quote is literal, and inside a single-quoted group a double quote is literal —
+// so a shell-free command tokenizes to the SAME argv on Windows as on POSIX
+// (go-shellwords), where a single-quoted segment groups and strips too (#154).
+// Before this, a single quote was an ordinary character on Windows only, so a
+// cross-platform spec passing single-quoted inline JSON (`'{"k":"v"}'`) reached
+// the CLI as non-JSON on Windows and broke there alone.
+//
+// A backslash stays literal OUTSIDE quotes so a bare C:\ path survives (sh
+// backslash-escape semantics would corrupt it); it is also literal inside either
+// quote. This keeps the deliberate Windows-path behavior while removing the
+// single-quote divergence, which was an unintended side effect, not a design goal.
 func windowsFields(command string) ([]string, error) {
 	var fields []string
 	var cur strings.Builder
-	inQuote, started := false, false
+	inDouble, inSingle, started := false, false, false
 	for _, r := range command {
 		switch {
-		case r == '"':
-			inQuote = !inQuote
+		case r == '"' && !inSingle:
+			inDouble = !inDouble
 			started = true
-		case !inQuote && (r == ' ' || r == '\t'):
+		case r == '\'' && !inDouble:
+			inSingle = !inSingle
+			started = true
+		case !inDouble && !inSingle && (r == ' ' || r == '\t'):
 			if started {
 				fields = append(fields, cur.String())
 				cur.Reset()
@@ -259,8 +273,11 @@ func windowsFields(command string) ([]string, error) {
 			started = true
 		}
 	}
-	if inQuote {
+	if inDouble {
 		return nil, fmt.Errorf("unclosed double quote")
+	}
+	if inSingle {
+		return nil, fmt.Errorf("unclosed single quote")
 	}
 	if started {
 		fields = append(fields, cur.String())
