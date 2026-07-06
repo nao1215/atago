@@ -110,6 +110,11 @@ jobs:
             install: |
               go install filippo.io/age/cmd/age@latest
               go install filippo.io/age/cmd/age-keygen@latest
+          # kustomize renders Kubernetes manifests offline and deterministically
+          # (build/create/edit); go-installed from the kustomize module.
+          - name: kustomize
+            dir: ./test/e2e/thirdparty/kustomize
+            install: go install sigs.k8s.io/kustomize/kustomize/v5@latest
           - name: terraform
             dir: ./test/e2e/thirdparty/terraform
             install: |
