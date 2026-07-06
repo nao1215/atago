@@ -1,0 +1,144 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / stream matcher boundary values
+
+# Boundary and equivalence-partition coverage for the stdout/stderr text
+# matchers: multibyte/emoji text, embedded metacharacters, whitespace-only and
+# no-trailing-newline output, an addressable trailing blank line, and line
+# selection at the extremes. printf emits the exact bytes on every POSIX host so
+# these are deterministic; the matcher logic is OS-independent (the CRLF and
+# Windows-portable path facets are pinned in line_endings/paths_portable).
+scenarios:
+  - name: equals a multibyte and emoji line
+    steps:
+      - run: {shell: true, command: "printf 'テスト🎌\\n'"}
+      - assert:
+          stdout:
+            equals: "テスト🎌"
+
+  - name: contains a multibyte substring inside a longer line
+    steps:
+      - run: {shell: true, command: "printf 'café ☕ の résumé\\n'"}
+      - assert:
+          stdout:
+            contains: "☕ の"
+
+  - name: a regex matches across multibyte runes
+    steps:
+      - run: {shell: true, command: "printf 'αβγδ\\n'"}
+      - assert:
+          stdout:
+            matches: "β.δ"
+
+  - name: line selection returns a multibyte line intact
+    steps:
+      - run: {shell: true, command: "printf 'ひらがな\\nカタカナ\\n漢字\\n'"}
+      - assert:
+          stdout:
+            line: 2
+            equals: "カタカナ"
+
+  - name: not_contains a multibyte needle that is absent
+    steps:
+      - run: {shell: true, command: "printf '日本語\\n'"}
+      - assert:
+          stdout:
+            not_contains: "中文"
+
+  - name: empty is true for a command that prints nothing
+    steps:
+      - run: {shell: true, command: "true"}
+      - assert:
+          stdout:
+            empty: true
+
+  - name: empty is true for whitespace-only output
+    steps:
+      - run: {shell: true, command: "printf '   \\n\\t\\n'"}
+      - assert:
+          stdout:
+            empty: true
+
+  - name: equals tolerates output with no trailing newline
+    steps:
+      - run: {shell: true, command: "printf 'noeol'"}
+      - assert:
+          stdout:
+            equals: "noeol"
+
+  - name: a deliberate trailing blank line is addressable by index
+    steps:
+      - run: {shell: true, command: "printf 'body\\n\\n'"}
+      - assert:
+          stdout:
+            line: 2
+            equals: ""
+
+  - name: contains treats a needle with regex metacharacters literally
+    steps:
+      - run: {shell: true, command: "printf 'price is $3.50 (approx)\\n'"}
+      - assert:
+          stdout:
+            contains: "$3.50 (approx)"
+
+  - name: matches requires escaping a literal metacharacter
+    steps:
+      - run: {shell: true, command: "printf 'v1.2.3\\n'"}
+      - assert:
+          stdout:
+            matches: "v1\\.2\\.3"
+
+  - name: not_matches passes when an unescaped-metachar pattern does not match
+    steps:
+      - run: {shell: true, command: "printf 'ab\\n'"}
+      - assert:
+          stdout:
+            not_matches: "a.c"
+
+  - name: a tab-separated record contains the exact tab byte
+    steps:
+      - run: {shell: true, command: "printf 'name\\tvalue\\n'"}
+      - assert:
+          stdout:
+            contains: "name\tvalue"
+
+  - name: quotes and brackets survive an exact equals
+    steps:
+      - run: {shell: true, command: "printf '[{\"id\":1}]\\n'"}
+      - assert:
+          stdout:
+            equals: "[{\"id\":1}]"
+
+  - name: the last of many lines is selectable by index
+    steps:
+      - run: {shell: true, command: "seq 1 100"}
+      - assert:
+          stdout:
+            line: 100
+            equals: "100"
+
+  - name: a line selector composes with contains
+    steps:
+      - run: {shell: true, command: "printf 'alpha\\nbeta-gamma\\n'"}
+      - assert:
+          stdout:
+            line: 2
+            contains: "gamma"
+
+  - name: a line selector composes with a regex
+    steps:
+      - run: {shell: true, command: "printf 'k=1\\nk=2\\n'"}
+      - assert:
+          stdout:
+            line: 2
+            matches: "^k=[0-9]$"
+
+  - name: stderr carries the same matcher semantics as stdout
+    steps:
+      - run: {shell: true, command: "printf 'to stderr\\n' 1>&2"}
+      - assert:
+          stderr:
+            equals: "to stderr"
+          stdout:
+            empty: true
