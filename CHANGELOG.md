@@ -7,6 +7,76 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+A correctness pass across `record`, `snapshot`, the report formats, the loader,
+the assertion matchers, secret masking, and the run engine. Each defect was
+surfaced by an edge-case bug hunt and fixed with a reproduction test first. No
+new features.
+
+### Fixed
+
+- `record --pty` now anchors its generated `expect`/`stdout: contains` on text
+  that is a verbatim substring of the raw transcript. It stripped ANSI from the
+  visible line and joined the result, so a colored prompt produced an anchor with
+  mid-line color codes removed that never matched the raw pty stdout — the
+  generated spec failed on replay. It now anchors on the longest color-free run
+  of the last visible line.
+- `record --pty` no longer explodes a typed password into one
+  `${env:ATAGO_SECRET_n}` placeholder per character. Raw-mode capture delivers
+  one keystroke per read, and consecutive input bursts were not coalesced, so a
+  six-character password generated seven single-character secret sends.
+  Consecutive input bursts with the same echo state are now merged.
+- A directory-tree snapshot no longer reports a false match when a symlink name
+  or target contains the ` -> ` that joins the two in the manifest. `>` is now
+  escaped inside a manifest field, so a symlink named `a -> b` pointing at `c` no
+  longer collides with one named `a` pointing at `b -> c`.
+- Snapshot normalization no longer corrupts a path that merely shares a prefix
+  with the home or scratch directory. The home dir `/home/nao` turned
+  `/home/naoki` into `~ki`, a container `HOME=/` turned every absolute path into
+  tildes, and the workdir `/tmp/run1` turned `/tmp/run10` into `<workdir>0`.
+  Masking is now path-component aware and skips a root home.
+- A unified diff now numbers a zero-line hunk side `0`, per the GNU convention
+  patch(1) relies on: a pure insertion emitted `@@ -1,0 +1,2 @@` instead of
+  `@@ -0,0 +1,2 @@`, and an empty side no longer carries a spurious
+  "No newline at end of file" marker.
+- A `--report tap` diagnostic message no longer injects a stray backslash before
+  a `#`. The message was escaped for the bare `ok`/`not ok` line and then quoted,
+  so `issue #42` reached the consumer as `issue \#42`; `#` is an ordinary
+  character inside the quoted YAML scalar and is left alone.
+- A `--report junit` `time` attribute is now a plain decimal. A sub-millisecond
+  duration serialized as `1.5e-06`, which the JUnit/Surefire schema and strict
+  parsers reject.
+- The console summary headline duration now reports the run's real wall-clock
+  time. It summed each suite's own duration, so `--parallel` running four
+  one-second suites concurrently printed `(4s)` for a run that took about one.
+- `--fail-fast` now stops scheduling across spec files, not only within a single
+  suite. A failing first spec still let every later spec run to completion.
+- `--tag` and `--skip-tag` are now repeatable and OR their values, like
+  `--filter`. `--tag a --tag b` silently kept only `b`.
+- `json:`/`yaml:` `gt`/`gte`/`lt`/`lte` now compare integers beyond 2^53 exactly,
+  like `equals` already does. The comparison rounded the selected value through
+  float64, so `9007199254740993` was reported not greater than
+  `9007199254740992`.
+- `json:`/`yaml:` `equals` no longer reports a JSON boolean as equal to the
+  string spelling of its value. A fallback compared the two by their printed
+  form, so `true` matched `equals: "true"`.
+- Secret masking no longer leaks part of an overlapping secret. Masking one
+  secret consumed bytes a second, overlapping secret needed, so its tail survived
+  in cleartext even though it appeared verbatim; every occurrence is now masked
+  in one pass over the original text.
+- The loader now rejects a `mock_server` step placed in a scenario's `steps` or
+  `teardown`. It is a `suite.setup`-only action, like `service`, but was silently
+  accepted and never started.
+- The loader now rejects an unknown key in the `exit_code` mapping form
+  (`exit_code: {not: 0, bogus: 5}`). The `{not}`/`{in}` decode bypassed the
+  document-wide strict decoding, silently dropping the typo.
+- The loader now validates a `dir.glob` pattern at load time, like the sibling
+  `dir.ignore` and `changes` globs, instead of only failing when the assertion
+  runs.
+- The loader now rejects a negative `timeout`/`delay` duration on the suite, run,
+  defaults, runner, service readiness, and mock-route fields. A negative
+  wall-clock bound yields an already-expired context that kills the step
+  immediately — the same rule the pty and signal timeouts already enforce.
+
 ## [0.4.2] - 2026-07-05
 
 A correctness pass over three surfaces — the JSON/YAML numeric matchers, the
