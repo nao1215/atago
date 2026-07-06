@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-64 suites · 292 scenarios
+65 suites · 299 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -243,6 +243,14 @@
   - [a prompt with regex metacharacters is escaped in the generated expect](#scenario-a-prompt-with-regex-metacharacters-is-escaped-in-the-generated-expect)
   - [recorded text containing dollar-brace round-trips as literal text](#scenario-recorded-text-containing-dollar-brace-round-trips-as-literal-text)
   - [a recorded secret placeholder replays green with the env set and is guarded when unset](#scenario-a-recorded-secret-placeholder-replays-green-with-the-env-set-and-is-guarded-when-unset)
+- [atago self-hosting / report formats agree on outcomes](#atago-self-hosting--report-formats-agree-on-outcomes) — 7 scenarios
+  - [json report carries per-scenario verdicts and a failures array](#scenario-json-report-carries-per-scenario-verdicts-and-a-failures-array)
+  - [junit report tallies tests, failures, skipped, and errors](#scenario-junit-report-tallies-tests-failures-skipped-and-errors)
+  - [tap report emits the plan, a not ok line, and a SKIP directive](#scenario-tap-report-emits-the-plan-a-not-ok-line-and-a-skip-directive)
+  - [gha report annotates the failure and summarizes the counts](#scenario-gha-report-annotates-the-failure-and-summarizes-the-counts)
+  - [console report prints the same counts in its summary line](#scenario-console-report-prints-the-same-counts-in-its-summary-line)
+  - [an all-passing run reports a zero-failure suite and exits zero](#scenario-an-all-passing-run-reports-a-zero-failure-suite-and-exits-zero)
+  - [an errored step is counted as an error, not a failure, across formats](#scenario-an-errored-step-is-counted-as-an-error-not-a-failure-across-formats)
 - [atago self-hosting / reports](#atago-self-hosting--reports) — 5 scenarios
   - [JUnit report is XML with a testsuite and testcase](#scenario-junit-report-is-xml-with-a-testsuite-and-testcase)
   - [GitHub Actions annotations are emitted on failure](#scenario-github-actions-annotations-are-emitted-on-failure)
@@ -3950,6 +3958,221 @@ ${atago} run sec.atago.yaml
 - after `${atago} run sec.atago.yaml`:
   - exit code is `4`
   - stdout contains `ATAGO_SECRET_1 is not set`
+## atago self-hosting / report formats agree on outcomes
+Source: `test/e2e/atago/report_formats.atago.yaml`
+### Scenario: json report carries per-scenario verdicts and a failures array
+#### Given
+- Fixture file `mixed.atago.yaml` is created.
+#### Inputs
+_Fixture `mixed.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: mixed
+scenarios:
+  - name: alpha passes
+    steps:
+      - run: {shell: true, command: "exit 0"}
+      - assert: {exit_code: 0}
+  - name: beta passes
+    steps:
+      - run: {shell: true, command: "echo hi"}
+      - assert: {stdout: {contains: hi}}
+  - name: gamma fails
+    steps:
+      - run: {shell: true, command: "exit 0"}
+      - assert: {exit_code: 9}
+  - name: delta is skipped
+    skip: {env: PATH}
+    steps:
+      - run: {shell: true, command: "exit 0"}
+```
+#### When
+```shell
+${atago} run --ci --report json mixed.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout at `$.suites[0].status` equals `failed`; at `$.suites[0].scenarios[0].status` equals `passed`; at `$.suites[0].scenarios[2].status` equals `failed`; at `$.suites[0].scenarios[3].status` equals `skipped`; at `$.suites[0].failures[0].scenario` equals `gamma fails`
+### Scenario: junit report tallies tests, failures, skipped, and errors
+#### Given
+- Fixture file `mixed.atago.yaml` is created.
+#### Inputs
+_Fixture `mixed.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: mixed
+scenarios:
+  - name: alpha passes
+    steps:
+      - run: {shell: true, command: "exit 0"}
+      - assert: {exit_code: 0}
+  - name: beta passes
+    steps:
+      - run: {shell: true, command: "echo hi"}
+      - assert: {stdout: {contains: hi}}
+  - name: gamma fails
+    steps:
+      - run: {shell: true, command: "exit 0"}
+      - assert: {exit_code: 9}
+  - name: delta is skipped
+    skip: {env: PATH}
+    steps:
+      - run: {shell: true, command: "exit 0"}
+```
+#### When
+```shell
+${atago} run --ci --report junit mixed.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `tests="4"`, `failures="1"`, `errors="0"`, `skipped="1"`, `<skipped`
+### Scenario: tap report emits the plan, a not ok line, and a SKIP directive
+#### Given
+- Fixture file `mixed.atago.yaml` is created.
+#### Inputs
+_Fixture `mixed.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: mixed
+scenarios:
+  - name: alpha passes
+    steps:
+      - run: {shell: true, command: "exit 0"}
+      - assert: {exit_code: 0}
+  - name: beta passes
+    steps:
+      - run: {shell: true, command: "echo hi"}
+      - assert: {stdout: {contains: hi}}
+  - name: gamma fails
+    steps:
+      - run: {shell: true, command: "exit 0"}
+      - assert: {exit_code: 9}
+  - name: delta is skipped
+    skip: {env: PATH}
+    steps:
+      - run: {shell: true, command: "exit 0"}
+```
+#### When
+```shell
+${atago} run --ci --report tap mixed.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `TAP version 13`, `1..4`, `not ok 3 - mixed / gamma fails`, `# SKIP`
+### Scenario: gha report annotates the failure and summarizes the counts
+#### Given
+- Fixture file `mixed.atago.yaml` is created.
+#### Inputs
+_Fixture `mixed.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: mixed
+scenarios:
+  - name: alpha passes
+    steps:
+      - run: {shell: true, command: "exit 0"}
+      - assert: {exit_code: 0}
+  - name: beta passes
+    steps:
+      - run: {shell: true, command: "echo hi"}
+      - assert: {stdout: {contains: hi}}
+  - name: gamma fails
+    steps:
+      - run: {shell: true, command: "exit 0"}
+      - assert: {exit_code: 9}
+  - name: delta is skipped
+    skip: {env: PATH}
+    steps:
+      - run: {shell: true, command: "exit 0"}
+```
+#### When
+```shell
+${atago} run --ci --report gha mixed.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `::error title=mixed / gamma fails::`, `::notice title=atago::4 scenarios: 2 passed, 1 failed, 0 errored, 1 skipped`
+### Scenario: console report prints the same counts in its summary line
+#### Given
+- Fixture file `mixed.atago.yaml` is created.
+#### Inputs
+_Fixture `mixed.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: mixed
+scenarios:
+  - name: alpha passes
+    steps:
+      - run: {shell: true, command: "exit 0"}
+      - assert: {exit_code: 0}
+  - name: beta passes
+    steps:
+      - run: {shell: true, command: "echo hi"}
+      - assert: {stdout: {contains: hi}}
+  - name: gamma fails
+    steps:
+      - run: {shell: true, command: "exit 0"}
+      - assert: {exit_code: 9}
+  - name: delta is skipped
+    skip: {env: PATH}
+    steps:
+      - run: {shell: true, command: "exit 0"}
+```
+#### When
+```shell
+${atago} run --ci --report console mixed.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `4 scenarios: 2 passed, 1 failed, 0 errored, 1 skipped`
+### Scenario: an all-passing run reports a zero-failure suite and exits zero
+#### Given
+- Fixture file `allpass.atago.yaml` is created.
+#### Inputs
+_Fixture `allpass.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: allpass
+scenarios:
+  - name: only passes
+    steps:
+      - run: {shell: true, command: "echo ok"}
+      - assert: {stdout: {contains: ok}}
+```
+#### When
+```shell
+${atago} run --ci --report json allpass.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout at `$.suites[0].status` equals `passed`; at `$.suites[0].scenarios[0].status` equals `passed`
+### Scenario: an errored step is counted as an error, not a failure, across formats
+#### Given
+- Fixture file `errored.atago.yaml` is created.
+#### Inputs
+_Fixture `errored.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: errored
+scenarios:
+  - name: missing stdin file errors
+    steps:
+      - run: {shell: true, command: "cat", stdin: {file: "nope.txt"}}
+```
+#### When
+```shell
+${atago} run --ci --report junit errored.atago.yaml
+```
+#### Then
+- exit code is `4`
+- stdout contains `errors="1"`, `failures="0"`, `<error`
 ## atago self-hosting / reports
 Source: `test/e2e/atago/reports.atago.yaml`
 ### Scenario: JUnit report is XML with a testsuite and testcase

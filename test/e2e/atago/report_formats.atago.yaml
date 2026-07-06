@@ -1,0 +1,152 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / report formats agree on outcomes
+
+# Metamorphic/differential coverage of the report writers: the SAME run rendered
+# as console, json, junit, gha, or tap must agree on the pass/fail/skip/error
+# counts and the per-scenario verdicts — only the encoding differs. A fixed inner
+# spec with a known outcome mix (2 passed, 1 failed, 1 skipped) is rendered in
+# each format and its structure asserted; a separate all-passed and an errored
+# inner pin the zero-failure and error branches. Uses shell builtins and env-set
+# skip, so it is deterministic on POSIX; report formatting has no OS-specific
+# behavior, so it stays out of the Windows portable subset (unit tests cover it).
+scenarios:
+  - name: json report carries per-scenario verdicts and a failures array
+    steps:
+      - fixture:
+          file: mixed.atago.yaml
+          content: &mixed |
+            version: "1"
+            suite:
+              name: mixed
+            scenarios:
+              - name: alpha passes
+                steps:
+                  - run: {shell: true, command: "exit 0"}
+                  - assert: {exit_code: 0}
+              - name: beta passes
+                steps:
+                  - run: {shell: true, command: "echo hi"}
+                  - assert: {stdout: {contains: hi}}
+              - name: gamma fails
+                steps:
+                  - run: {shell: true, command: "exit 0"}
+                  - assert: {exit_code: 9}
+              - name: delta is skipped
+                skip: {env: PATH}
+                steps:
+                  - run: {shell: true, command: "exit 0"}
+      - run:
+          command: ${atago} run --ci --report json mixed.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            json:
+              - path: "$.suites[0].status"
+                equals: "failed"
+              - path: "$.suites[0].scenarios[0].status"
+                equals: "passed"
+              - path: "$.suites[0].scenarios[2].status"
+                equals: "failed"
+              - path: "$.suites[0].scenarios[3].status"
+                equals: "skipped"
+              - path: "$.suites[0].failures[0].scenario"
+                equals: "gamma fails"
+
+  - name: junit report tallies tests, failures, skipped, and errors
+    steps:
+      - fixture: {file: mixed.atago.yaml, content: *mixed}
+      - run:
+          command: ${atago} run --ci --report junit mixed.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - 'tests="4"'
+              - 'failures="1"'
+              - 'errors="0"'
+              - 'skipped="1"'
+              - '<skipped'
+
+  - name: tap report emits the plan, a not ok line, and a SKIP directive
+    steps:
+      - fixture: {file: mixed.atago.yaml, content: *mixed}
+      - run:
+          command: ${atago} run --ci --report tap mixed.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - "TAP version 13"
+              - "1..4"
+              - "not ok 3 - mixed / gamma fails"
+              - "# SKIP"
+
+  - name: gha report annotates the failure and summarizes the counts
+    steps:
+      - fixture: {file: mixed.atago.yaml, content: *mixed}
+      - run:
+          command: ${atago} run --ci --report gha mixed.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - "::error title=mixed / gamma fails::"
+              - "::notice title=atago::4 scenarios: 2 passed, 1 failed, 0 errored, 1 skipped"
+
+  - name: console report prints the same counts in its summary line
+    steps:
+      - fixture: {file: mixed.atago.yaml, content: *mixed}
+      - run:
+          command: ${atago} run --ci --report console mixed.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: "4 scenarios: 2 passed, 1 failed, 0 errored, 1 skipped"
+
+  - name: an all-passing run reports a zero-failure suite and exits zero
+    steps:
+      - fixture:
+          file: allpass.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: allpass
+            scenarios:
+              - name: only passes
+                steps:
+                  - run: {shell: true, command: "echo ok"}
+                  - assert: {stdout: {contains: ok}}
+      - run:
+          command: ${atago} run --ci --report json allpass.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              - path: "$.suites[0].status"
+                equals: "passed"
+              - path: "$.suites[0].scenarios[0].status"
+                equals: "passed"
+
+  - name: an errored step is counted as an error, not a failure, across formats
+    steps:
+      - fixture:
+          file: errored.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: errored
+            scenarios:
+              - name: missing stdin file errors
+                steps:
+                  - run: {shell: true, command: "cat", stdin: {file: "nope.txt"}}
+      - run:
+          command: ${atago} run --ci --report junit errored.atago.yaml
+      - assert:
+          exit_code: 4
+          stdout:
+            contains:
+              - 'errors="1"'
+              - 'failures="0"'
+              - "<error"
