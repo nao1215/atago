@@ -1,0 +1,256 @@
+version: "1"
+
+suite:
+  name: sops + age (secrets encryption)
+
+# sops encrypts the values of a structured file while leaving its keys readable,
+# using age as the key backend here. The suite pins the contract that matters
+# for a secrets tool: encryption hides every value but the structure, decryption
+# recovers the values, a specific field can be extracted, the wrong key cannot
+# decrypt, a single flipped byte fails the MAC (the integrity guarantee), and a
+# regex can scope which keys are encrypted. Every age key is generated fresh
+# inside the workdir (never committed) and the plaintext values are throwaway
+# placeholders. Gate: only where both sops and age are installed.
+scenarios:
+  - name: version prints a semantic version offline
+    only:
+      command: sops --version --disable-version-check
+    steps:
+      # --disable-version-check keeps the probe and this check from reaching the
+      # network for a latest-version lookup.
+      - run:
+          command: sops --version --disable-version-check
+      - assert:
+          exit_code: 0
+          stdout:
+            matches: "sops [0-9]+\\.[0-9]+\\.[0-9]+"
+
+  - name: encryption hides values, keeps keys, and records metadata
+    only:
+      command: command -v sops && command -v age-keygen
+    steps:
+      - fixture:
+          file: secrets.yaml
+          content: |
+            database:
+              password: hunter2
+              host: db.internal
+            region: us-west-1
+      - run:
+          command: age-keygen -o key.txt
+      - assert:
+          exit_code: 0
+      - run:
+          command: age-keygen -y key.txt
+      - store:
+          name: recipient
+          from:
+            stdout:
+              matches: "age1[a-z0-9]+"
+      - run:
+          command: sops encrypt --age ${recipient} secrets.yaml
+      - assert:
+          exit_code: 0
+          # Keys stay readable and every value is replaced by an AES-GCM
+          # ciphertext; sops appends its own metadata block (the age recipient,
+          # a MAC, and its version).
+          stdout:
+            contains:
+              - "password:"
+              - "host:"
+              - "ENC[AES256_GCM"
+              - "sops:"
+              - "mac:"
+      # The plaintext values never appear in the encrypted output.
+      - assert:
+          stdout:
+            not_contains:
+              - hunter2
+              - db.internal
+
+  - name: encrypt then decrypt recovers the original values
+    only:
+      command: command -v sops && command -v age-keygen
+    steps:
+      # Round-trip (metamorphic): sops re-serializes on decrypt so the bytes are
+      # not identical, but every original value must return.
+      - fixture:
+          file: secrets.yaml
+          content: |
+            database:
+              password: hunter2
+              host: db.internal
+            region: us-west-1
+      - run:
+          command: age-keygen -o key.txt
+      - run:
+          command: age-keygen -y key.txt
+      - store:
+          name: recipient
+          from:
+            stdout:
+              matches: "age1[a-z0-9]+"
+      - run:
+          command: sops encrypt --age ${recipient} --output secrets.enc.yaml secrets.yaml
+      - assert:
+          exit_code: 0
+      - run:
+          command: sops decrypt secrets.enc.yaml
+          env:
+            SOPS_AGE_KEY_FILE: ${workdir}/key.txt
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "password: hunter2"
+              - "host: db.internal"
+              - "region: us-west-1"
+
+  - name: extract returns a single decrypted value exactly
+    only:
+      command: command -v sops && command -v age-keygen
+    steps:
+      # Oracle for one field: --extract decrypts just the named path and prints
+      # its exact value, nothing else.
+      - fixture:
+          file: secrets.yaml
+          content: |
+            database:
+              password: hunter2
+              host: db.internal
+            region: us-west-1
+      - run:
+          command: age-keygen -o key.txt
+      - run:
+          command: age-keygen -y key.txt
+      - store:
+          name: recipient
+          from:
+            stdout:
+              matches: "age1[a-z0-9]+"
+      - run:
+          command: sops encrypt --age ${recipient} --output secrets.enc.yaml secrets.yaml
+      - assert:
+          exit_code: 0
+      - run:
+          command: sops decrypt --extract '["region"]' secrets.enc.yaml
+          env:
+            SOPS_AGE_KEY_FILE: ${workdir}/key.txt
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: us-west-1
+
+  - name: decrypting with the wrong key fails
+    only:
+      command: command -v sops && command -v age-keygen
+    steps:
+      # A file encrypted for one recipient cannot be decrypted with a different
+      # age identity: sops cannot recover the data key and exits 128.
+      - fixture:
+          file: secrets.yaml
+          content: |
+            token: changeme
+      - run:
+          command: age-keygen -o key.txt
+      - run:
+          command: age-keygen -y key.txt
+      - store:
+          name: recipient
+          from:
+            stdout:
+              matches: "age1[a-z0-9]+"
+      - run:
+          command: sops encrypt --age ${recipient} --output secrets.enc.yaml secrets.yaml
+      - assert:
+          exit_code: 0
+      # A second, unrelated key is generated and pointed at as the identity.
+      - run:
+          command: age-keygen -o other.txt
+      - assert:
+          exit_code: 0
+      - run:
+          command: sops decrypt secrets.enc.yaml
+          env:
+            SOPS_AGE_KEY_FILE: ${workdir}/other.txt
+      - assert:
+          exit_code: 128
+          stderr:
+            contains: "Failed to get the data key"
+
+  - name: a tampered ciphertext fails the MAC
+    only:
+      command: command -v sops && command -v age-keygen
+    steps:
+      # Integrity: sops stores a MAC over the plaintext. Flipping a single
+      # character in a ciphertext value makes decryption fail authentication
+      # rather than returning corrupted data.
+      - fixture:
+          file: secrets.yaml
+          content: |
+            token: changeme
+      - run:
+          command: age-keygen -o key.txt
+      - run:
+          command: age-keygen -y key.txt
+      - store:
+          name: recipient
+          from:
+            stdout:
+              matches: "age1[a-z0-9]+"
+      - run:
+          command: sops encrypt --age ${recipient} --output secrets.enc.yaml secrets.yaml
+      - assert:
+          exit_code: 0
+      # Corrupt the first encrypted value by rewriting the first character of
+      # its data: field (only the first match, so the sops MAC block itself is
+      # left intact and the failure is a value MAC check, not a tree mismatch).
+      - run:
+          shell: true
+          command: sed '0,/data:/ s/data:\([A-Za-z0-9]\)/data:Z/' secrets.enc.yaml > tampered.yaml
+      - assert:
+          exit_code: 0
+      - run:
+          command: sops decrypt tampered.yaml
+          env:
+            SOPS_AGE_KEY_FILE: ${workdir}/key.txt
+      - assert:
+          exit_code: 25
+          stderr:
+            contains: "message authentication failed"
+
+  - name: an encrypted-regex scopes which keys are encrypted
+    only:
+      command: command -v sops && command -v age-keygen
+    steps:
+      # A regex selects which keys to encrypt; the rest stay in plaintext, so a
+      # config can keep non-secret fields readable while protecting one value.
+      - fixture:
+          file: secrets.yaml
+          content: |
+            database:
+              password: hunter2
+              host: db.internal
+            region: us-west-1
+      - run:
+          command: age-keygen -o key.txt
+      - run:
+          command: age-keygen -y key.txt
+      - store:
+          name: recipient
+          from:
+            stdout:
+              matches: "age1[a-z0-9]+"
+      - run:
+          command: sops encrypt --age ${recipient} --encrypted-regex '^password$' secrets.yaml
+      - assert:
+          exit_code: 0
+          # Only password is encrypted; host and region remain readable.
+          stdout:
+            contains:
+              - "host: db.internal"
+              - "region: us-west-1"
+              - "password: ENC[AES256_GCM"
+      - assert:
+          stdout:
+            not_contains: "password: hunter2"

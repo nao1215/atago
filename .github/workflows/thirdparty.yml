@@ -120,6 +120,14 @@ jobs:
           - name: actionlint
             dir: ./test/e2e/thirdparty/actionlint
             install: go install github.com/rhysd/actionlint/cmd/actionlint@latest
+          # sops encrypts structured files with age as the key backend; both are
+          # go-installed (age and age-keygen provide the throwaway keys).
+          - name: sops
+            dir: ./test/e2e/thirdparty/sops
+            install: |
+              go install github.com/getsops/sops/v3/cmd/sops@latest
+              go install filippo.io/age/cmd/age@latest
+              go install filippo.io/age/cmd/age-keygen@latest
           - name: terraform
             dir: ./test/e2e/thirdparty/terraform
             install: |
