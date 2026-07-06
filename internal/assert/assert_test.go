@@ -1984,3 +1984,48 @@ func TestParsersNeverPanicOnGarbage(t *testing.T) {
 		}()
 	}
 }
+
+// TestCheck_JSON_CompareLargeIntExact is a regression: the numeric bound
+// matchers (gt/gte/lt/lte) must compare integers beyond 2^53 exactly, like
+// equals already does, instead of collapsing distinct values to the same float64.
+func TestCheck_JSON_CompareLargeIntExact(t *testing.T) {
+	t.Parallel()
+	// 9007199254740993 = 2^53 + 1; float64 rounds it down to 2^53.
+	res := &runner.Result{Stdout: []byte(`{"big":9007199254740993}`)}
+	tests := []struct {
+		name   string
+		j      *spec.JSONAssert
+		wantOK bool
+	}{
+		{"gt its lower neighbor", &spec.JSONAssert{Path: "$.big", Gt: f64p(9007199254740992)}, true},
+		{"not lte its lower neighbor", &spec.JSONAssert{Path: "$.big", Lte: f64p(9007199254740992)}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := Check(&spec.Assert{Stdout: &spec.StreamAssert{JSON: tt.j}}, res, Env{})
+			if got.OK != tt.wantOK {
+				t.Errorf("OK = %v, want %v (%s)", got.OK, tt.wantOK, got.Hint)
+			}
+		})
+	}
+}
+
+// TestCheck_JSON_BoolNotEqualStringSpelling is a regression: a JSON boolean must
+// not equal the string spelling of its value — `true` (bool) and "true" (string)
+// are different JSON types. The old fmt.Sprintf fallback compared their printed
+// forms and reported a false pass.
+func TestCheck_JSON_BoolNotEqualStringSpelling(t *testing.T) {
+	t.Parallel()
+	res := &runner.Result{Stdout: []byte(`{"b":true}`)}
+	// bool true must NOT equal the string "true".
+	got := Check(&spec.Assert{Stdout: &spec.StreamAssert{JSON: &spec.JSONAssert{Path: "$.b", Equals: "true"}}}, res, Env{})
+	if got.OK {
+		t.Errorf("JSON boolean true wrongly equals the string \"true\"")
+	}
+	// bool true must still equal the boolean true.
+	got = Check(&spec.Assert{Stdout: &spec.StreamAssert{JSON: &spec.JSONAssert{Path: "$.b", Equals: true}}}, res, Env{})
+	if !got.OK {
+		t.Errorf("JSON boolean true did not equal true (%s)", got.Hint)
+	}
+}

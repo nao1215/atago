@@ -51,8 +51,10 @@ func validateReady(add func(string, ...any), where string, r *spec.Ready) {
 		key, val string
 	}{{"timeout", r.Timeout}, {"delay", r.Delay}} {
 		if d.val != "" {
-			if _, err := time.ParseDuration(d.val); err != nil {
+			if dur, err := time.ParseDuration(d.val); err != nil {
 				add("%s.ready.%s %q is not a valid duration", where, d.key, d.val)
+			} else if dur < 0 {
+				add("%s.ready.%s must not be negative (got %q); a wall-clock bound is never below zero", where, d.key, d.val)
 			}
 		}
 	}
@@ -114,8 +116,10 @@ func validateMockRoutes(add func(string, ...any), where string, routes []spec.Mo
 			add("%s.status %d is not a valid HTTP status", rw, rt.Status)
 		}
 		if rt.Delay != "" {
-			if _, err := time.ParseDuration(rt.Delay); err != nil {
+			if d, err := time.ParseDuration(rt.Delay); err != nil {
 				add("%s.delay %q is not a valid duration (e.g. \"500ms\")", rw, rt.Delay)
+			} else if d < 0 {
+				add("%s.delay must not be negative (got %q); a wall-clock bound is never below zero", rw, rt.Delay)
 			}
 		}
 	}

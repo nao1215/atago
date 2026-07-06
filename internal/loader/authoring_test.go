@@ -283,3 +283,144 @@ scenarios:
 		t.Errorf("stdout_to/stderr_to decoded as %q/%q, want out.txt/err.txt", run.StdoutTo, run.StderrTo)
 	}
 }
+
+// TestLoadBytes_MockServerRejectedInScenario proves a mock_server step is
+// rejected outside suite.setup, like a service step. It is a suite-setup-only
+// action, but validateStep (the scenario steps/teardown path) had no case for
+// it, so it was silently accepted and never started.
+func TestLoadBytes_MockServerRejectedInScenario(t *testing.T) {
+	t.Parallel()
+	specs := map[string]string{
+		"steps": `
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: ok
+    steps:
+      - mock_server:
+          name: api
+          routes:
+            - {method: GET, path: /}
+`,
+		"teardown": `
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: ok
+    steps:
+      - run: {command: echo hi}
+    teardown:
+      - mock_server:
+          name: api
+          routes:
+            - {method: GET, path: /}
+`,
+	}
+	for block, src := range specs {
+		_, err := LoadBytes("sample.atago.yaml", []byte(src))
+		if err == nil {
+			t.Fatalf("%s: LoadBytes() error = nil, want a 'mock_server steps are only allowed in suite.setup' error", block)
+		}
+		if !strings.Contains(err.Error(), "mock_server") || !strings.Contains(err.Error(), "suite.setup") {
+			t.Fatalf("%s: LoadBytes() error = %v, want it to mention mock_server and suite.setup", block, err)
+		}
+	}
+}
+
+// TestLoadBytes_ExitCodeUnknownKeyRejected proves the exit_code mapping form is
+// decoded strictly: an unknown key is an authoring typo and must be rejected,
+// matching the loader's yaml.Strict() decode for the rest of the document.
+func TestLoadBytes_ExitCodeUnknownKeyRejected(t *testing.T) {
+	t.Parallel()
+	src := `
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: ok
+    steps:
+      - run: {command: echo hi}
+      - assert:
+          exit_code: {not: 0, bogus: 5}
+`
+	_, err := LoadBytes("sample.atago.yaml", []byte(src))
+	if err == nil {
+		t.Fatalf("LoadBytes() error = nil, want an unknown-field error for exit_code.bogus")
+	}
+}
+
+// TestLoadBytes_DirGlobValidated proves a malformed dir.glob pattern is rejected
+// at load time, like the changes globs and dir.ignore patterns already are,
+// instead of only misbehaving at check time.
+func TestLoadBytes_DirGlobValidated(t *testing.T) {
+	t.Parallel()
+	src := `
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: ok
+    steps:
+      - run: {command: echo hi}
+      - assert:
+          dir:
+            path: out
+            glob: "a["
+`
+	_, err := LoadBytes("sample.atago.yaml", []byte(src))
+	if err == nil {
+		t.Fatalf("LoadBytes() error = nil, want a 'not a valid glob' error for dir.glob")
+	}
+	if !strings.Contains(err.Error(), "glob") {
+		t.Fatalf("LoadBytes() error = %v, want it to mention the invalid glob", err)
+	}
+}
+
+// TestLoadBytes_NegativeDurationRejected proves a negative timeout is rejected at
+// load time. A negative wall-clock bound is never meaningful — the same rule
+// validatePTY and validateSignal already enforce — and a negative step timeout
+// produces an already-expired context that kills the step immediately.
+func TestLoadBytes_NegativeDurationRejected(t *testing.T) {
+	t.Parallel()
+	cases := map[string]string{
+		"suite.timeout": `
+version: "1"
+suite:
+  name: sample
+  timeout: "-5s"
+scenarios:
+  - name: ok
+    steps:
+      - run: {command: echo hi}
+`,
+		"run.timeout": `
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: ok
+    steps:
+      - run: {command: echo hi, timeout: "-5s"}
+`,
+		"defaults.run.timeout": `
+version: "1"
+suite:
+  name: sample
+defaults:
+  run:
+    timeout: "-5s"
+scenarios:
+  - name: ok
+    steps:
+      - run: {command: echo hi}
+`,
+	}
+	for name, src := range cases {
+		_, err := LoadBytes("sample.atago.yaml", []byte(src))
+		if err == nil {
+			t.Fatalf("%s: LoadBytes() error = nil, want a negative-duration validation error", name)
+		}
+	}
+}

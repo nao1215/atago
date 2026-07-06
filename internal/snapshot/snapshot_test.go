@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -137,4 +138,55 @@ func TestCompare_CRLFGolden(t *testing.T) {
 	if !ok {
 		t.Error("a CRLF golden did not match LF-folded actual; CRLF must be folded on both sides")
 	}
+}
+
+// TestNormalize_PathMaskingBoundaries is a regression for the naive substring
+// masking of the home and workdir prefixes: a masked prefix must only replace a
+// whole path component, or it corrupts an unrelated sibling path.
+func TestNormalize_PathMaskingBoundaries(t *testing.T) {
+	t.Run("home does not swallow a longer sibling", func(t *testing.T) {
+		if runtime.GOOS == "windows" {
+			t.Skip("os.UserHomeDir ignores $HOME on Windows, so the POSIX home path cannot be forced")
+		}
+		t.Setenv("HOME", "/home/nao")
+		// /home/naoki is a different user; only the exact home dir is masked.
+		got := string(Normalize([]byte("/home/naoki/project and /home/nao/x"), Options{}))
+		if strings.Contains(got, "~ki") {
+			t.Errorf("home masking corrupted a sibling path: %q", got)
+		}
+		if !strings.Contains(got, "~/x") {
+			t.Errorf("home dir was not masked: %q", got)
+		}
+	})
+	t.Run("root home does not turn every slash into tilde", func(t *testing.T) {
+		if runtime.GOOS == "windows" {
+			t.Skip("os.UserHomeDir ignores $HOME on Windows, so a root home cannot be forced")
+		}
+		t.Setenv("HOME", "/")
+		got := string(Normalize([]byte("path /usr/local/bin"), Options{}))
+		if got != "path /usr/local/bin" {
+			t.Errorf("HOME=/ mangled unrelated paths: %q", got)
+		}
+	})
+	t.Run("workdir does not swallow a punctuation-suffixed sibling", func(t *testing.T) {
+		// '+' is a legal filename byte, so /tmp/run1+cache is a different directory
+		// and must be left intact; only a separator, whitespace, or end of token is
+		// a masking boundary.
+		got := string(Normalize([]byte("/tmp/run1/x and /tmp/run1+cache/y"), Options{Workdir: "/tmp/run1"}))
+		if !strings.Contains(got, "<workdir>/x") {
+			t.Errorf("workdir was not masked: %q", got)
+		}
+		if !strings.Contains(got, "/tmp/run1+cache/y") {
+			t.Errorf("workdir masking corrupted a punctuation-suffixed sibling: %q", got)
+		}
+	})
+	t.Run("workdir does not swallow a prefix-sibling temp dir", func(t *testing.T) {
+		got := string(Normalize([]byte("a /tmp/run1/x b /tmp/run10/y"), Options{Workdir: "/tmp/run1"}))
+		if !strings.Contains(got, "<workdir>/x") {
+			t.Errorf("workdir was not masked: %q", got)
+		}
+		if !strings.Contains(got, "/tmp/run10/y") {
+			t.Errorf("workdir masking corrupted a prefix-sibling: %q", got)
+		}
+	})
 }

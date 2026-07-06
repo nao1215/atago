@@ -212,3 +212,60 @@ func TestStableLine(t *testing.T) {
 		}
 	}
 }
+
+// TestStableLine_AnchorIsRawSubstring is a regression for the pty round-trip law
+// (#30/#69): the anchor an expect/contains is built from must be a verbatim
+// substring of the RAW transcript the replay matches against. Stripping ANSI and
+// concatenating the visible text produced an anchor with mid-line color codes
+// removed, so it was never a substring of the raw pty stdout and the generated
+// spec failed on replay.
+func TestStableLine_AnchorIsRawSubstring(t *testing.T) {
+	t.Parallel()
+	cases := []string{
+		"Welcome\r\n\x1b[32mLogged in as \x1b[1mroot\x1b[0m\r\n",
+		"\x1b[1mUsername\x1b[0m: ",
+		"progress: \x1b[33m75%\x1b[0m done\r\n",
+	}
+	for _, raw := range cases {
+		anchor := stableLine([]byte(raw))
+		if anchor == "" {
+			t.Errorf("stableLine(%q) = empty, want a non-empty anchor", raw)
+			continue
+		}
+		if !strings.Contains(raw, anchor) {
+			t.Errorf("stableLine(%q) = %q, which is NOT a substring of the raw transcript", raw, anchor)
+		}
+	}
+}
+
+// TestAppendInput_CoalescesConsecutiveBursts is a regression: raw-mode capture
+// delivers one keystroke per read, so a typed password arrives as many one-byte
+// echo-off bursts. Without coalescing each becomes its own ${env:ATAGO_SECRET_n}
+// placeholder, yielding an unusable spec that asks the author to set one env var
+// per character. Consecutive input bursts with the same echo state must merge.
+func TestAppendInput_CoalescesConsecutiveBursts(t *testing.T) {
+	t.Parallel()
+	var rec PTYRecording
+	rec.AppendOutput([]byte("Password: "))
+	for _, c := range []string{"s", "3", "c", "r", "3", "t"} {
+		rec.AppendInput([]byte(c), true)
+	}
+	rec.AppendInput([]byte("\r"), true)
+	inputs := 0
+	for _, seg := range rec.Segments {
+		if seg.Input != nil {
+			inputs++
+		}
+	}
+	if inputs != 1 {
+		t.Fatalf("consecutive echo-off keystrokes not coalesced: %d input segments, want 1", inputs)
+	}
+	rec.Command = "login"
+	got, err := GeneratePTY(rec, Options{SuiteName: "pw"})
+	if err != nil {
+		t.Fatalf("GeneratePTY: %v", err)
+	}
+	if strings.Contains(string(got), "ATAGO_SECRET_2") {
+		t.Errorf("password fragmented into multiple secret placeholders:\n%s", got)
+	}
+}

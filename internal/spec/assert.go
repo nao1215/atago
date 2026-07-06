@@ -255,7 +255,11 @@ func (e *ExitCode) UnmarshalYAML(b []byte) error {
 		Not *int  `yaml:"not"`
 		In  []int `yaml:"in"`
 	}
-	if err := yaml.Unmarshal(b, &m); err != nil {
+	// Decode strictly so an unknown key (a typo like {not: 0, bogus: 5}) is
+	// rejected here too. A custom unmarshaler bypasses the loader's document-wide
+	// yaml.Strict(), so without this the mapping form silently drops misspelled
+	// fields — the same reason PTYSend and Stdin reject unknown keys.
+	if err := yaml.UnmarshalWithOptions(b, &m, yaml.Strict()); err != nil {
 		return fmt.Errorf("exit_code must be an integer (exit_code: 0), a negation (exit_code: {not: 0}), or a set (exit_code: {in: [0, 2]}), got %q", strings.TrimSpace(string(b)))
 	}
 	e.Not = m.Not

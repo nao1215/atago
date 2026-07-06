@@ -216,3 +216,33 @@ func TestUnifiedDiff_OutputTruncationAndMultiHunk(t *testing.T) {
 		t.Errorf("actual-side no-newline marker missing:\n%s", nl)
 	}
 }
+
+// TestUnifiedDiff_ZeroCountHunkHeader is a regression: a hunk whose one side
+// contributes zero lines (a pure insertion or deletion) must number that side
+// 0, per the GNU unified-diff convention that patch(1) and strict parsers rely
+// on — not 1. The empty side also has no trailing-newline state to report.
+func TestUnifiedDiff_ZeroCountHunkHeader(t *testing.T) {
+	t.Parallel()
+	// Pure insertion: the expected side is empty (0 lines).
+	got := unifiedDiff("", "line1\nline2\n", "expected", "actual")
+	if !strings.Contains(got, "@@ -0,0 +1,2 @@") {
+		t.Errorf("insertion hunk header wrong:\n%s\nwant a \"@@ -0,0 +1,2 @@\" header", got)
+	}
+	if strings.Contains(got, "No newline at end of file (expected)") {
+		t.Errorf("spurious no-newline marker for an empty expected side:\n%s", got)
+	}
+	// Pure deletion: the actual side is empty (0 lines).
+	got = unifiedDiff("line1\nline2\n", "", "expected", "actual")
+	if !strings.Contains(got, "@@ -1,2 +0,0 @@") {
+		t.Errorf("deletion hunk header wrong:\n%s\nwant a \"@@ -1,2 +0,0 @@\" header", got)
+	}
+	if strings.Contains(got, "No newline at end of file (actual)") {
+		t.Errorf("spurious no-newline marker for an empty actual side:\n%s", got)
+	}
+	// When BOTH non-empty sides lack a trailing newline, both are annotated —
+	// the marker is judged per side, not by comparing the two sides.
+	got = unifiedDiff("a", "b", "expected", "actual")
+	if !strings.Contains(got, noNewlineMarker+" (expected)") || !strings.Contains(got, noNewlineMarker+" (actual)") {
+		t.Errorf("both-no-newline sides not both annotated:\n%s", got)
+	}
+}

@@ -61,7 +61,7 @@ func unifiedDiff(expected, actual, expectedLabel, actualLabel string) string {
 	out = append(out, "--- "+expectedLabel, "+++ "+actualLabel)
 	hunks := groupHunks(ops, 3)
 	for _, h := range hunks {
-		out = append(out, fmt.Sprintf("@@ -%d,%d +%d,%d @@", h.aStart+1, h.aCount, h.bStart+1, h.bCount))
+		out = append(out, fmt.Sprintf("@@ -%s +%s @@", hunkRange(h.aStart, h.aCount), hunkRange(h.bStart, h.bCount)))
 		for _, op := range h.ops {
 			switch op.kind {
 			case ' ':
@@ -80,13 +80,27 @@ func unifiedDiff(expected, actual, expectedLabel, actualLabel string) string {
 	if aTrunc || bTrunc {
 		out = append(out, fmt.Sprintf("... (inputs truncated at %d lines; full payloads in artifacts)", diffMaxInputLines))
 	}
-	if !strings.HasSuffix(expected, "\n") && strings.HasSuffix(actual, "\n") {
+	// The marker describes a side whose last line lacks a trailing newline, judged
+	// per side and independently: when both sides lack it, both are annotated. An
+	// empty side has no last line, so it never carries the marker.
+	if expected != "" && !strings.HasSuffix(expected, "\n") {
 		out = append(out, noNewlineMarker+" (expected)")
 	}
-	if strings.HasSuffix(expected, "\n") && !strings.HasSuffix(actual, "\n") {
+	if actual != "" && !strings.HasSuffix(actual, "\n") {
 		out = append(out, noNewlineMarker+" (actual)")
 	}
 	return strings.Join(out, "\n")
+}
+
+// hunkRange formats one side of a unified-diff `@@` header. A side that
+// contributes zero lines (a pure insertion or deletion) is numbered 0, the GNU
+// convention patch(1) and strict diff parsers rely on; otherwise the 1-based
+// start line and its count.
+func hunkRange(start, count int) string {
+	if count == 0 {
+		return fmt.Sprintf("%d,0", start)
+	}
+	return fmt.Sprintf("%d,%d", start+1, count)
 }
 
 // splitDiffLines splits text into lines for diffing (CRLF folded so an OS

@@ -63,9 +63,10 @@ func NewMasker(values []string) *Masker {
 			v = append(v, x)
 		}
 	}
-	// Mask longest-first: sequential ReplaceAll would otherwise let a short
-	// secret that is a substring of a longer one mask only its prefix and leak
-	// the rest (e.g. masking "abcd" before "abcdefgh" leaves "efgh" visible).
+	// Order the values longest-first for deterministic, stable output. Mask now
+	// unions the byte ranges of every occurrence over the original string, so
+	// correctness no longer depends on order (a substring or an overlapping
+	// secret is masked regardless), but a stable order keeps output reproducible.
 	sort.SliceStable(v, func(i, j int) bool { return len(v[i]) > len(v[j]) })
 	return &Masker{values: v}
 }
@@ -112,15 +113,51 @@ func NewMaskerForSpec(s *spec.Spec) *Masker {
 // Empty reports whether the masker has nothing to mask.
 func (m *Masker) Empty() bool { return m == nil || len(m.values) == 0 }
 
-// Mask replaces every known secret value in s with "***".
+// Mask replaces every known secret value in s with "***". It marks the byte
+// ranges of every secret occurrence over the ORIGINAL string in one pass, then
+// collapses each maximal covered run to a single placeholder. Scanning the
+// original (rather than a sequence of ReplaceAll that mutates s) is what keeps
+// two overlapping secrets — one ending with the bytes the next begins with, e.g.
+// "abcXYZ" and "XYZdef" in "abcXYZdef" — both masked; a sequential replace would
+// consume the shared bytes and leak the second secret's tail.
 func (m *Masker) Mask(s string) string {
 	if m.Empty() {
 		return s
 	}
+	covered := make([]bool, len(s))
+	any := false
 	for _, v := range m.values {
-		s = strings.ReplaceAll(s, v, "***")
+		for i := 0; ; {
+			j := strings.Index(s[i:], v)
+			if j < 0 {
+				break
+			}
+			start := i + j
+			for k := start; k < start+len(v); k++ {
+				covered[k] = true
+			}
+			any = true
+			// Advance by one, not len(v), so overlapping occurrences of the same
+			// secret are all covered — "aaaa" occurs three times in "aaaaaa".
+			i = start + 1
+		}
 	}
-	return s
+	if !any {
+		return s
+	}
+	var b strings.Builder
+	for i := 0; i < len(s); {
+		if covered[i] {
+			b.WriteString("***")
+			for i < len(s) && covered[i] {
+				i++
+			}
+			continue
+		}
+		b.WriteByte(s[i])
+		i++
+	}
+	return b.String()
 }
 
 // MaskBytes is Mask for byte slices, returning the input unchanged when there is

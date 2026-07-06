@@ -611,3 +611,65 @@ func TestSnapshot_HelpFlag(t *testing.T) {
 		}
 	}
 }
+
+// tagSelectSpec has one smoke-tagged scenario that FAILS and one slow-tagged
+// scenario that passes, so tag selection is observable through the exit code.
+const tagSelectSpec = `version: "1"
+suite:
+  name: tagged
+scenarios:
+  - name: alpha
+    tags: [smoke]
+    steps:
+      - run: {shell: true, command: "exit 1"}
+      - assert: {exit_code: 0}
+  - name: beta
+    tags: [slow]
+    steps:
+      - run: {command: "true"}
+      - assert: {exit_code: 0}
+`
+
+// TestRunTags_RepeatableFlagOrSemantics is a regression: --tag and --skip-tag
+// must be repeatable and OR their values, like --filter (#119). The old
+// single-string flags kept only the last occurrence, silently dropping earlier
+// selections.
+func TestRunTags_RepeatableFlagOrSemantics(t *testing.T) {
+	dir := t.TempDir()
+	writeSpec(t, dir, "s.atago.yaml", tagSelectSpec)
+	withWorkdir(t, dir, func() {
+		// --tag smoke --tag slow selects BOTH; alpha (smoke) fails, so the run
+		// fails. Last-flag-wins would have kept only slow (beta) and gone green.
+		var out, errb bytes.Buffer
+		if got := Main([]string{"run", "--tag", "smoke", "--tag", "slow", "."}, &out, &errb); got != ExitFailures {
+			t.Fatalf("--tag OR exit = %d, want %d; a repeated --tag dropped the smoke selection\n%s", got, ExitFailures, out.String())
+		}
+		// --skip-tag smoke --skip-tag slow skips BOTH, so the failing alpha never
+		// runs and the run is green. Last-flag-wins would skip only slow, run alpha,
+		// and fail.
+		out.Reset()
+		errb.Reset()
+		if got := Main([]string{"run", "--skip-tag", "smoke", "--skip-tag", "slow", "."}, &out, &errb); got != ExitOK {
+			t.Fatalf("--skip-tag OR exit = %d, want %d; a repeated --skip-tag dropped the smoke skip\n%s", got, ExitOK, out.String())
+		}
+	})
+}
+
+// TestFailFast_StopsSubsequentSpecFiles is a regression: --fail-fast must stop
+// scheduling across spec files, not only within one suite. The first spec fails;
+// the second (which would pass) must never run.
+func TestFailFast_StopsSubsequentSpecFiles(t *testing.T) {
+	dir := t.TempDir()
+	writeSpec(t, dir, "1first.atago.yaml", singleFailSpec("firstsuite", false))
+	writeSpec(t, dir, "2second.atago.yaml", singleFailSpec("secondsuite", true))
+	withWorkdir(t, dir, func() {
+		var out, errb bytes.Buffer
+		got := Main([]string{"run", "--fail-fast", "--parallel", "1", "--report", "json", "."}, &out, &errb)
+		if got != ExitFailures {
+			t.Fatalf("exit = %d, want %d (stderr=%s)", got, ExitFailures, errb.String())
+		}
+		if strings.Contains(out.String(), "secondsuite") {
+			t.Errorf("--fail-fast scheduled a spec after the first failure:\n%s", out.String())
+		}
+	})
+}

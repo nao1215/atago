@@ -47,15 +47,23 @@ func (r *PTYRecording) AppendOutput(b []byte) {
 }
 
 // AppendInput records one burst of user input, tagged with whether terminal
-// echo was off (a secret prompt) at the time it was typed.
+// echo was off (a secret prompt) at the time it was typed. Consecutive input
+// bursts with the same echo state are coalesced (mirroring AppendOutput): raw
+// mode delivers one keystroke per read, so a typed line arrives as many one-byte
+// bursts, and without coalescing an N-character password would render as N
+// separate ${env:ATAGO_SECRET_n} placeholders instead of one.
 func (r *PTYRecording) AppendInput(b []byte, echoOff bool) {
+	if n := len(r.Segments); n > 0 && r.Segments[n-1].Input != nil && r.Segments[n-1].EchoOff == echoOff {
+		r.Segments[n-1].Input = append(r.Segments[n-1].Input, b...)
+		return
+	}
 	r.Segments = append(r.Segments, PTYSegment{Input: append([]byte(nil), b...), EchoOff: echoOff})
 }
 
 // ansiPattern matches the terminal control sequences that carry no visible
 // text: CSI (ESC [ ... final), OSC (ESC ] ... BEL/ST), and two-byte ESC forms.
 // Stripping them yields the plain prompt text an expect should anchor on.
-var ansiPattern = regexp.MustCompile(`\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[@-Z\\-_]`)
+var ansiPattern = regexp.MustCompile(`\x1b\[[0-9:;?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[@-Z\\-_]`)
 
 // GeneratePTY renders a spec skeleton whose single pty: step replays the
 // recorded session as expect/send pairs, and proves it loads cleanly before
@@ -200,17 +208,48 @@ func endsWithNewline(b []byte) bool {
 	return len(b) > 0 && (b[len(b)-1] == '\r' || b[len(b)-1] == '\n')
 }
 
-// stableLine returns the last non-empty visible line of output with ANSI
-// control sequences stripped and surrounding whitespace trimmed — the
-// conservative literal an expect/contains anchors on (#69).
+// stableLine returns the conservative literal an expect/contains anchors on: the
+// longest run of plain text on the last visible line of the transcript that
+// carries no ANSI sequence or control byte (#69). The returned run is a VERBATIM
+// substring of the raw transcript — ANSI sequences are turned into a delimiter,
+// not stripped and concatenated — so an anchor built from it actually matches the
+// raw pty stdout the replay compares against. Stripping ANSI and joining the
+// visible text (the old behavior) produced an anchor with mid-line color codes
+// removed that was never a substring of the raw output, so a colored prompt made
+// the generated spec fail on replay.
 func stableLine(output []byte) string {
-	clean := ansiPattern.ReplaceAllString(string(output), "")
-	clean = strings.ReplaceAll(clean, "\r", "\n")
+	// Replace ANSI/OSC sequences with a NUL so the plain text on either side stays
+	// contiguous and verbatim; fold CR so a redraw does not merge lines.
+	s := ansiPattern.ReplaceAllString(string(output), "\x00")
+	s = strings.ReplaceAll(s, "\r", "\n")
 	best := ""
-	for _, line := range strings.Split(clean, "\n") {
-		if t := strings.TrimSpace(line); t != "" {
-			best = t
+	for _, line := range strings.Split(s, "\n") {
+		if run := longestPlainRun(line); run != "" {
+			best = run
 		}
 	}
+	return best
+}
+
+// longestPlainRun returns the longest run of line that contains no C0 control
+// byte (the NUL standing in for an ANSI sequence, a tab, or any other), trimmed
+// of surrounding whitespace. Each such run existed verbatim in the raw output.
+func longestPlainRun(line string) string {
+	best := ""
+	var cur strings.Builder
+	flush := func() {
+		if t := strings.TrimSpace(cur.String()); len(t) > len(best) {
+			best = t
+		}
+		cur.Reset()
+	}
+	for _, r := range line {
+		if r < 0x20 {
+			flush()
+			continue
+		}
+		cur.WriteRune(r)
+	}
+	flush()
 	return best
 }

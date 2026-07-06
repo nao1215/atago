@@ -104,7 +104,7 @@ func jsonCompare(desc, path string, nodes []any, op string, want float64) *Check
 	if cr != nil {
 		return cr
 	}
-	got, ok := toFloat(node)
+	cmp, ok := numericCmp(node, want)
 	if !ok {
 		return &CheckResult{
 			Desc:     desc,
@@ -116,13 +116,13 @@ func jsonCompare(desc, path string, nodes []any, op string, want float64) *Check
 	var okCmp bool
 	switch op {
 	case "gt":
-		okCmp = got > want
+		okCmp = cmp > 0
 	case "gte":
-		okCmp = got >= want
+		okCmp = cmp >= 0
 	case "lt":
-		okCmp = got < want
+		okCmp = cmp < 0
 	case "lte":
-		okCmp = got <= want
+		okCmp = cmp <= 0
 	}
 	d := fmt.Sprintf("%s %s %v", desc, opSymbol(op), want)
 	if okCmp {
@@ -131,8 +131,34 @@ func jsonCompare(desc, path string, nodes []any, op string, want float64) *Check
 	return &CheckResult{
 		Desc:     d,
 		Expected: fmt.Sprintf("%s %s %v", path, opSymbol(op), want),
-		Actual:   fmt.Sprintf("%s = %v", path, formatNum(got)),
-		Hint:     fmt.Sprintf("value at %s (%v) is not %s %v", path, formatNum(got), op, want),
+		Actual:   fmt.Sprintf("%s = %s", path, renderNode(node)),
+		Hint:     fmt.Sprintf("value at %s (%s) is not %s %v", path, renderNode(node), op, want),
+	}
+}
+
+// numericCmp returns the sign of node−want (−1, 0, +1) for a numeric ordering.
+// It prefers exact big.Int arithmetic so a JSON integer beyond 2^53 compares
+// exactly — the same precision equals uses — instead of collapsing distinct
+// values to the same float64; it falls back to float64 for fractional operands.
+// ok is false when node is not numeric (nor a numeric string).
+func numericCmp(node any, want float64) (int, bool) {
+	if ni, ok := toBigInt(node); ok {
+		if wf := big.NewFloat(want); wf.IsInt() {
+			wi, _ := wf.Int(nil)
+			return ni.Cmp(wi), true
+		}
+	}
+	nf, ok := toFloat(node)
+	if !ok {
+		return 0, false
+	}
+	switch {
+	case nf < want:
+		return -1, true
+	case nf > want:
+		return 1, true
+	default:
+		return 0, true
 	}
 }
 
@@ -327,6 +353,19 @@ func valuesEqual(node, want any) bool {
 			}
 		}
 		return true
+	case string:
+		// A non-numeric node vs a string is a string match (the string-vs-number
+		// case was already handled by the numeric branch above). Comparing by
+		// fmt.Sprintf would let a JSON string equal a like-printed non-string.
+		w, ok := want.(string)
+		return ok && n == w
+	case bool:
+		// A JSON boolean equals only a boolean: `true` must not equal the string
+		// "true", which the old fmt.Sprintf fallback reported as a false pass.
+		w, ok := want.(bool)
+		return ok && n == w
+	case nil:
+		return want == nil
 	}
 	return fmt.Sprintf("%v", node) == fmt.Sprintf("%v", want)
 }
