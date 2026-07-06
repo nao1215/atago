@@ -1,0 +1,211 @@
+version: "1"
+
+suite:
+  name: ecspresso (Amazon ECS deploy tool)
+
+# ecspresso deploys ECS services, which needs AWS — but its render subcommand
+# evaluates a task/service definition locally, so this suite pins that offline,
+# deterministic surface: template functions and their defaults, jsonnet with
+# external variables, config resolution, and the failure modes (an undefined
+# must_env, a missing config file) with their distinct exit codes. The rendered
+# task definition is checked as structured JSON. Gate: only where ecspresso is
+# installed. ecspresso logs a version line to stderr on every run, so stderr is
+# not asserted empty on success.
+scenarios:
+  - name: version prints without error
+    only:
+      command: ecspresso version
+    steps:
+      # A go-installed build reports an empty version string, so this pins the
+      # exit code rather than a specific version.
+      - run:
+          command: ecspresso version
+      - assert:
+          exit_code: 0
+
+  - name: render substitutes an env template function
+    only:
+      command: ecspresso version
+    steps:
+      # render evaluates the task definition locally: the env template function
+      # pulls IMAGE_TAG into the image, and the result is emitted as JSON on
+      # stdout (the version log line goes to stderr).
+      - fixture:
+          file: ecspresso.yml
+          content: |
+            region: ap-northeast-1
+            cluster: demo
+            service: web
+            task_definition: taskdef.json
+      - fixture:
+          file: taskdef.json
+          content: |
+            {
+              "family": "web",
+              "containerDefinitions": [
+                {
+                  "name": "web",
+                  "image": "nginx:{{ env `IMAGE_TAG` `latest` }}",
+                  "cpu": 128,
+                  "memory": 256
+                }
+              ]
+            }
+      - run:
+          command: ecspresso render --config ecspresso.yml taskdef
+          env:
+            IMAGE_TAG: 1.2.3
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              path: "$.containerDefinitions[0].image"
+              equals: "nginx:1.2.3"
+
+  - name: render falls back to the template default when the env is unset
+    only:
+      command: ecspresso version
+    steps:
+      # Boundary: with IMAGE_TAG unset the env function returns its default, so
+      # the same template renders nginx:latest.
+      - fixture:
+          file: ecspresso.yml
+          content: |
+            region: ap-northeast-1
+            cluster: demo
+            service: web
+            task_definition: taskdef.json
+      - fixture:
+          file: taskdef.json
+          content: |
+            {
+              "family": "web",
+              "containerDefinitions": [
+                {
+                  "name": "web",
+                  "image": "nginx:{{ env `IMAGE_TAG` `latest` }}",
+                  "cpu": 128,
+                  "memory": 256
+                }
+              ]
+            }
+      - run:
+          command: ecspresso render --config ecspresso.yml taskdef
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              path: "$.containerDefinitions[0].image"
+              equals: "nginx:latest"
+
+  - name: render evaluates a jsonnet task definition with an external variable
+    only:
+      command: ecspresso version
+    steps:
+      # ecspresso reads jsonnet task definitions natively; --ext-str injects an
+      # external variable that std.extVar reads, so the tag is resolved at
+      # render time.
+      - fixture:
+          file: ecspresso.yml
+          content: |
+            region: ap-northeast-1
+            cluster: demo
+            service: web
+            task_definition: task.jsonnet
+      - fixture:
+          file: task.jsonnet
+          content: |
+            {
+              family: "web",
+              containerDefinitions: [
+                {
+                  name: "web",
+                  image: "nginx:" + std.extVar("tag"),
+                  cpu: 64,
+                  memory: 128,
+                },
+              ],
+            }
+      - run:
+          command: ecspresso render --config ecspresso.yml --ext-str tag=9.9.9 taskdef
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              path: "$.containerDefinitions[0].image"
+              equals: "nginx:9.9.9"
+
+  - name: render config resolves the defaults
+    only:
+      command: ecspresso version
+    steps:
+      # Rendering the config itself echoes it back with defaults filled in, such
+      # as the deploy timeout that the file did not set.
+      - fixture:
+          file: ecspresso.yml
+          content: |
+            region: ap-northeast-1
+            cluster: demo
+            service: web
+            task_definition: taskdef.json
+      - fixture:
+          file: taskdef.json
+          content: |
+            {"family": "web", "containerDefinitions": []}
+      - run:
+          command: ecspresso render --config ecspresso.yml config
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "cluster: demo"
+              - "timeout:"
+
+  - name: an undefined must_env fails the render
+    only:
+      command: ecspresso version
+    steps:
+      # must_env has no default: an unset variable aborts the render. ecspresso
+      # surfaces this as a panic (a raw stack trace) rather than a clean error;
+      # this is the tool's actual behavior, asserted as-is (it is not ours to
+      # fix). The exit code is 2 and the message names the missing variable.
+      - fixture:
+          file: ecspresso.yml
+          content: |
+            region: ap-northeast-1
+            cluster: demo
+            service: web
+            task_definition: taskdef.json
+      - fixture:
+          file: taskdef.json
+          content: |
+            {
+              "family": "web",
+              "containerDefinitions": [
+                {
+                  "name": "web",
+                  "image": "nginx:{{ must_env `REQUIRED_TAG` }}",
+                  "cpu": 1,
+                  "memory": 1
+                }
+              ]
+            }
+      - run:
+          command: ecspresso render --config ecspresso.yml taskdef
+      - assert:
+          exit_code: 2
+          stderr:
+            contains: "REQUIRED_TAG is not defined"
+
+  - name: a missing config file fails cleanly
+    only:
+      command: ecspresso version
+    steps:
+      # A nonexistent config is a clean load error (exit 1), distinct from the
+      # template panic above.
+      - run:
+          command: ecspresso render --config nonexistent.yml taskdef
+      - assert:
+          exit_code: 1
+          stderr:
+            contains: "failed to load config file"
