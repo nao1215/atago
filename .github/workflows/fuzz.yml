@@ -1,0 +1,48 @@
+name: Fuzz
+
+# The repository ships fuzz targets (internal/loader, internal/store,
+# internal/assert), but the push/PR test workflows only exercise their seed
+# corpus. This job runs real mutation fuzzing on a schedule so the loader, the
+# ${...} expander, and the JSON matcher keep getting adversarial input over
+# time — atago parses untrusted specs and arbitrary program output, so its input
+# surface is exactly where fuzzing pays off. A newly discovered crasher fails the
+# scheduled run (its reproducer is printed in the log and written under
+# testdata/fuzz/); it never blocks a PR.
+on:
+  workflow_dispatch:
+  schedule:
+    # 04:00 UTC daily, before the cross-platform E2E run (05:00).
+    - cron: "0 4 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    name: fuzz (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - pkg: ./internal/loader
+            target: FuzzLoadBytes
+          - pkg: ./internal/store
+            target: FuzzExpand
+          - pkg: ./internal/assert
+            target: FuzzCheckJSON
+          - pkg: ./internal/assert
+            target: FuzzValuesEqual
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: "go.mod"
+
+      - name: Fuzz ${{ matrix.target }}
+        run: go test -run='^$' -fuzz='^${{ matrix.target }}$' -fuzztime=3m ${{ matrix.pkg }}
