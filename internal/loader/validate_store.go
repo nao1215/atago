@@ -73,24 +73,57 @@ func validateStore(add func(string, ...any), where string, s *spec.Store) {
 			validateStoreSelector(add, where+".store.from."+sel.name, sel.s)
 		}
 	}
-	if s.From.File != nil && s.From.File.JSON != nil {
-		validateStoreJSONPath(add, where+".store.from.file.json", s.From.File.JSON.Path)
+	if s.From.File != nil {
+		validateStoreFileSelector(add, where+".store.from.file", s.From.File)
 	}
 }
 
-// validateStoreSelector checks a store.from stream selector: it must carry a
-// json path or a matches regexp (the only two the extractor understands), and
-// whichever is present must be well-formed.
+// validateStoreFileSelector checks a store.from.file selector: exactly one of a
+// json path (extract a value) or text: true (capture the whole file verbatim,
+// #158).
+func validateStoreFileSelector(add func(string, ...any), where string, f *spec.FileAssert) {
+	n := 0
+	if f.JSON != nil {
+		n++
+		validateStoreJSONPath(add, where+".json", f.JSON.Path)
+	}
+	if f.Text != nil {
+		n++
+	}
+	switch n {
+	case 0:
+		add("%s must set a json path or text: true to capture a value", where)
+	case 1:
+	default:
+		add("%s must set exactly one selector (json or text)", where)
+	}
+}
+
+// validateStoreSelector checks a store.from stream selector: it must carry
+// exactly one of a json path, a matches regexp, or trim (capture the whole
+// stream, #158) — the selectors the extractor understands — and whichever is
+// present must be well-formed.
 func validateStoreSelector(add func(string, ...any), where string, s *spec.StreamAssert) {
-	switch {
-	case s.JSON != nil:
+	n := 0
+	if s.JSON != nil {
+		n++
 		validateStoreJSONPath(add, where+".json", s.JSON.Path)
-	case s.Matches != nil:
+	}
+	if s.Matches != nil {
+		n++
 		if _, err := regexp.Compile(*s.Matches); err != nil {
 			add("%s.matches %q is not a valid regexp: %v", where, *s.Matches, err)
 		}
+	}
+	if s.Trim != nil {
+		n++
+	}
+	switch n {
+	case 0:
+		add("%s must set a json path, a matches regexp, or trim to extract a value", where)
+	case 1:
 	default:
-		add("%s must set a json path or a matches regexp to extract a value", where)
+		add("%s must set exactly one selector (json, matches, or trim)", where)
 	}
 }
 

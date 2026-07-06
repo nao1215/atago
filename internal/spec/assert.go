@@ -304,6 +304,14 @@ type StreamAssert struct {
 	JSON        *JSONAssert `yaml:"json,omitempty"`
 	YAML        *JSONAssert `yaml:"yaml,omitempty"`
 	Snapshot    string      `yaml:"snapshot,omitempty"`
+
+	// Trim is a store-only selector (#158): when set, `store` captures the
+	// whole stream verbatim instead of extracting via a json path or regex.
+	// trim: true strips surrounding whitespace (the common "grab the whole
+	// token, drop the trailing newline" case, matching how the console trims);
+	// trim: false keeps the bytes verbatim. It is not an assertion matcher —
+	// the loader rejects it outside a store source.
+	Trim *bool `yaml:"trim,omitempty"`
 }
 
 // StringList is a matcher argument that accepts either a single YAML scalar
@@ -352,6 +360,12 @@ type FileAssert struct {
 	EqualsFile  *string     `yaml:"equals_file,omitempty"`
 	JSON        *JSONAssert `yaml:"json,omitempty"`
 	Snapshot    string      `yaml:"snapshot,omitempty"`
+
+	// Text is a store-only selector (#158): when true, `store` captures the
+	// whole file content verbatim instead of extracting a value via a json path.
+	// It is not an assertion matcher — the loader rejects it outside a store
+	// source.
+	Text *bool `yaml:"text,omitempty"`
 }
 
 // JSONAssert matches a value selected by a JSONPath. One matcher.

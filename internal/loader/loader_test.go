@@ -817,10 +817,15 @@ func TestBugHunt_Rejections(t *testing.T) {
 		{"store from required", specSteps("store: {name: v}"), "store.from is required"},
 		{"store from empty", specSteps("store: {name: v, from: {}}"), "must set one of stdout/body/file/header/rows/message/value"},
 		{"store from two sources", specSteps("store: {name: v, from: {header: X, stdout: {json: {path: \"$.a\"}}}}"), "must set exactly one source"},
-		{"store selector no json/matches", specSteps("store: {name: v, from: {stdout: {}}}"), "must set a json path or a matches regexp"},
+		{"store selector no json/matches", specSteps("store: {name: v, from: {stdout: {}}}"), "must set a json path, a matches regexp, or trim"},
 		{"store selector bad matches", specSteps("store: {name: v, from: {stdout: {matches: \"a[\"}}}"), "is not a valid regexp"},
 		{"store selector json path required", specSteps("store: {name: v, from: {stdout: {json: {}}}}"), "path is required"},
 		{"store selector bad json path", specSteps("store: {name: v, from: {stdout: {json: {path: \"$[\"}}}}"), "is not a valid JSON path"},
+		{"store selector json and trim", specSteps("store: {name: v, from: {stdout: {json: {path: \"$.a\"}, trim: true}}}"), "must set exactly one selector (json, matches, or trim)"},
+		{"store file no json/text", specSteps("store: {name: v, from: {file: {path: out.txt}}}"), "must set a json path or text: true"},
+		{"store file json and text", specSteps("store: {name: v, from: {file: {path: out.txt, json: {path: \"$.a\"}, text: true}}}"), "must set exactly one selector (json or text)"},
+		{"assert stream rejects trim", specSteps("assert: {stdout: {trim: true}}"), "trim is only valid in a store source"},
+		{"assert file rejects text", specSteps("assert: {file: {path: out.txt, text: true}}"), "text is only valid in a store source"},
 		{"store file bad json path", specSteps("store: {name: v, from: {file: {path: out.txt, json: {path: \"$.\"}}}}"), "is not a valid JSON path"},
 
 		// ---- validateAssert / validateAssertTarget ----

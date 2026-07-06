@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"strings"
 
 	"github.com/ohler55/ojg/jp"
 	"github.com/ohler55/ojg/oj"
@@ -36,10 +37,16 @@ func extractValue(sp *spec.Store, current *runner.Result, workdir string) (strin
 		if err != nil {
 			return "", fmt.Errorf("store %q: %w", sp.Name, err)
 		}
-		if from.File.JSON == nil {
-			return "", fmt.Errorf("store %q: a file source needs a json selector", sp.Name)
+		switch {
+		case from.File.Text != nil:
+			// Capture the whole file verbatim (#158); no json path needed for an
+			// opaque blob.
+			return string(data), nil
+		case from.File.JSON != nil:
+			return jsonValue(data, from.File.JSON.Path)
+		default:
+			return "", fmt.Errorf("store %q: a file source needs a json or text selector", sp.Name)
 		}
-		return jsonValue(data, from.File.JSON.Path)
 	case from.Body != nil:
 		if current == nil || !current.IsHTTP {
 			return "", fmt.Errorf("store %q: no HTTP request has run in this scenario yet", sp.Name)
@@ -80,8 +87,17 @@ func extractStream(s *spec.StreamAssert, data []byte) (string, error) {
 		return jsonValue(data, s.JSON.Path)
 	case s.Matches != nil:
 		return regexValue(data, *s.Matches)
+	case s.Trim != nil:
+		// Capture the whole stream (#158). trim: true strips surrounding
+		// whitespace (the common "grab the whole token, drop the trailing
+		// newline" case); trim: false keeps the bytes verbatim.
+		out := string(data)
+		if *s.Trim {
+			out = strings.TrimSpace(out)
+		}
+		return out, nil
 	default:
-		return "", fmt.Errorf("a stdout store source needs a json or matches selector")
+		return "", fmt.Errorf("a stdout store source needs a json, matches, or trim selector")
 	}
 }
 

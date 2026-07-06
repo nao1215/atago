@@ -1,0 +1,55 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / store whole-content trim and text selectors (#158)
+
+# `store` can capture the entire stream/file into a variable without inventing a
+# regex that happens to match the whole thing. `trim` grabs the whole stream
+# (trim: true drops the trailing newline); `text: true` grabs a whole file
+# verbatim. These drive atago itself (and cross-platform echo/fixtures), so they
+# belong in the Windows portable subset.
+scenarios:
+  - name: trim captures an opaque token and round-trips it as an argument
+    steps:
+      - run:
+          shell: true
+          command: echo opaque-token-abc123
+      - store:
+          name: token
+          from:
+            stdout:
+              trim: true
+      # Reuse the captured token verbatim as a positional argument; atago echoes
+      # the path it cannot access, so the round-tripped value comes back exactly.
+      # A broken capture (trailing newline kept) would change the path.
+      - run:
+          command: ${atago} run ${token}
+      - assert:
+          exit_code: 3
+          stderr:
+            contains: "opaque-token-abc123"
+
+  - name: text captures a whole multi-line file verbatim
+    steps:
+      - fixture:
+          file: blob.txt
+          content: |
+            first line
+            second line
+      - store:
+          name: blob
+          from:
+            file:
+              path: blob.txt
+              text: true
+      # A later step receives the multi-line content unchanged: re-expanding
+      # ${blob} into a new file must reproduce both lines.
+      - fixture:
+          file: copy.txt
+          content: "${blob}"
+      - assert:
+          file:
+            path: copy.txt
+            contains:
+              - "first line"
+              - "second line"

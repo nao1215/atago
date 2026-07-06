@@ -110,6 +110,10 @@ var streamExclusiveMatchers = map[string]bool{
 }
 
 func validateStream(add func(string, ...any), where string, s *spec.StreamAssert) {
+	// trim is a store-only selector (#158), not an assertion matcher.
+	if s.Trim != nil {
+		add("%s: trim is only valid in a store source, not an assertion", where)
+	}
 	matchers := s.SetMatchers()
 	if len(matchers) == 0 {
 		add("%s: must set at least one matcher (empty/contains/not_contains/matches/not_matches/equals/not_equals/json/yaml/snapshot)", where)
@@ -155,6 +159,10 @@ func validateStream(add func(string, ...any), where string, s *spec.StreamAssert
 func validateFile(add func(string, ...any), where string, f *spec.FileAssert) {
 	if f.Path == "" {
 		add("%s.path is required", where)
+	}
+	// text is a store-only selector (#158), not an assertion matcher.
+	if f.Text != nil {
+		add("%s: text is only valid in a store source, not an assertion", where)
 	}
 	n := 0
 	if f.Exists != nil {

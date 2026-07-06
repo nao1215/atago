@@ -791,6 +791,7 @@
         { "required": ["json"] },
         { "required": ["yaml"] },
         { "required": ["snapshot"] },
+        { "required": ["trim"] },
         {
           "comment": "The text matchers contains/not_contains/matches/not_matches may be combined (all must hold); the whole-stream matchers above are each used alone.",
           "anyOf": [
@@ -812,7 +813,8 @@
         "not_equals": { "type": "string" },
         "json": { "$ref": "#/$defs/jsonAssert" },
         "yaml": { "$ref": "#/$defs/jsonAssert" },
-        "snapshot": { "type": "string" }
+        "snapshot": { "type": "string" },
+        "trim": { "type": "boolean", "description": "Store-only (#158): capture the whole stream. trim: true strips surrounding whitespace; trim: false keeps bytes verbatim." }
       }
     },
     "file": {
@@ -827,7 +829,8 @@
         { "required": ["equals"] },
         { "required": ["equals_file"] },
         { "required": ["json"] },
-        { "required": ["snapshot"] }
+        { "required": ["snapshot"] },
+        { "required": ["text"] }
       ],
       "properties": {
         "path": { "type": "string", "minLength": 1 },
@@ -838,7 +841,8 @@
         "equals": { "type": "string", "description": "Byte-exact content match against an inline literal (no CRLF/newline normalization)." },
         "equals_file": { "type": "string", "minLength": 1, "description": "Byte-exact content match against another workdir-confined file (round-trip/idempotence; no CRLF/newline normalization)." },
         "json": { "$ref": "#/$defs/jsonAssert" },
-        "snapshot": { "type": "string" }
+        "snapshot": { "type": "string" },
+        "text": { "type": "boolean", "description": "Store-only (#158): capture the whole file content verbatim instead of extracting a value via a json path." }
       }
     },
     "image": {

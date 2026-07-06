@@ -48,6 +48,46 @@ scenarios:
           stdout:
             equals: releasing 1.2.3
 
+  - name: capture a whole opaque value with trim, no regex
+    steps:
+      # For an opaque single value (a token, an id, a signed blob) there is
+      # nothing to match — trim: true captures the entire stdout and drops the
+      # trailing newline, so you no longer need a whole-string regex.
+      - run:
+          shell: true
+          command: echo opaque-token-xyz
+      - store:
+          name: token
+          from:
+            stdout:
+              trim: true
+      - run:
+          shell: true
+          command: echo using ${token}
+      - assert:
+          stdout:
+            equals: using opaque-token-xyz
+
+  - name: capture a whole file verbatim with text
+    steps:
+      - fixture:
+          file: token.bin
+          content: "signed-blob-9f8e"
+      # text: true reads the whole file content into the variable verbatim,
+      # without a json path — the natural way to grab an opaque file value.
+      - store:
+          name: blob
+          from:
+            file:
+              path: token.bin
+              text: true
+      - run:
+          shell: true
+          command: echo verifying ${blob}
+      - assert:
+          stdout:
+            equals: verifying signed-blob-9f8e
+
   - name: read the host environment with env
     steps:
       # ${env:NAME} expands from the invoking environment — unlike shell `$VAR`
