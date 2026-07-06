@@ -97,13 +97,39 @@ scenarios:
                       command: "if [ -f '${workdir}/seen.txt' ]; then echo recovered; else touch '${workdir}/seen.txt'; exit 1; fi"
                   - assert:
                       exit_code: 0
-      # Any failing iteration fails the run — repeat DETECTS, never tolerates.
+      # A PARTIAL failure (some iterations pass, some fail) is instability, not a
+      # bug: repeat folds it to flaky — green for the exit code but surfaced with
+      # its rate and counted in the summary (#138).
       - run:
           command: ${atago} run --repeat 3 flaky.atago.yaml
       - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "flaky once: 2/3 passed"
+              - "1 flaky"
+      # An EVERY-iteration failure is a deterministic bug, not a flake: it stays
+      # a hard failure with a non-zero exit (#138).
+      - fixture:
+          file: broken.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: always fails
+                steps:
+                  - run: {shell: true, command: exit 1}
+                  - assert:
+                      exit_code: 0
+      - run:
+          command: ${atago} run --repeat 3 broken.atago.yaml
+      - assert:
           exit_code: 1
           stdout:
-            contains: "flaky once: 2/3 passed"
+            contains:
+              - "always fails: 0/3 passed"
+              - "1 failed"
 
   - name: repeat and retry-failed are mutually exclusive
     steps:
