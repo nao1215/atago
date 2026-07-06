@@ -115,6 +115,11 @@ jobs:
           - name: kustomize
             dir: ./test/e2e/thirdparty/kustomize
             install: go install sigs.k8s.io/kustomize/kustomize/v5@latest
+          # actionlint statically lints GitHub Actions workflows offline; the
+          # specs disable shellcheck so results do not depend on its presence.
+          - name: actionlint
+            dir: ./test/e2e/thirdparty/actionlint
+            install: go install github.com/rhysd/actionlint/cmd/actionlint@latest
           - name: terraform
             dir: ./test/e2e/thirdparty/terraform
             install: |

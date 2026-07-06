@@ -1,0 +1,241 @@
+version: "1"
+
+suite:
+  name: actionlint (GitHub Actions workflow linter)
+
+# actionlint statically checks GitHub Actions workflow YAML: it is fully offline
+# and deterministic, exits 0 with no output on a clean workflow, and exits 1
+# printing each problem (with file:line:col, a rule tag like [job-needs], and a
+# code snippet) to stdout. That makes its contract precise to pin: the exit code
+# splits clean from problematic, distinct rule categories produce distinct
+# tagged errors, the JSON format is a structured oracle over the same findings,
+# and -ignore removes a matching error. Every workflow here is authored as a
+# fixture, and shellcheck is disabled (-shellcheck=) so the results do not depend
+# on whether shellcheck is present on the runner.
+scenarios:
+  - name: version prints a semantic version
+    only:
+      command: actionlint -version
+    steps:
+      - run:
+          command: actionlint -version
+      - assert:
+          exit_code: 0
+          stdout:
+            matches: "^v[0-9]+\\.[0-9]+\\.[0-9]+"
+
+  - name: a valid workflow passes silently
+    only:
+      command: actionlint -version
+    steps:
+      # The clean contract: a well-formed workflow yields exit 0 and no output at
+      # all — the linter is silent on success.
+      - fixture:
+          file: good.yml
+          content: |
+            name: good
+            on: push
+            jobs:
+              build:
+                runs-on: ubuntu-latest
+                steps:
+                  - run: echo hello
+      - run:
+          command: actionlint -shellcheck= good.yml
+      - assert:
+          exit_code: 0
+          stdout:
+            empty: true
+          stderr:
+            empty: true
+
+  - name: an undefined needs dependency is reported on stdout
+    only:
+      command: actionlint -version
+    steps:
+      - fixture:
+          file: badneeds.yml
+          content: |
+            name: badneeds
+            on: push
+            jobs:
+              build:
+                runs-on: ubuntu-latest
+                needs: [nonexistent]
+                steps:
+                  - run: echo hi
+      - run:
+          command: actionlint -shellcheck= badneeds.yml
+      - assert:
+          exit_code: 1
+          # The finding names the missing job and carries the job-needs rule tag.
+          stdout:
+            contains:
+              - 'needs job "nonexistent" which does not exist'
+              - "[job-needs]"
+          # Findings go to stdout; stderr stays clean.
+          stderr:
+            empty: true
+
+  - name: an unknown runner label is reported
+    only:
+      command: actionlint -version
+    steps:
+      - fixture:
+          file: badlabel.yml
+          content: |
+            name: badlabel
+            on: push
+            jobs:
+              build:
+                runs-on: [ubuntu-nonsense-9999]
+                steps:
+                  - run: echo hi
+      - run:
+          command: actionlint -shellcheck= badlabel.yml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - 'label "ubuntu-nonsense-9999" is unknown'
+              - "[runner-label]"
+
+  - name: an invalid expression is reported
+    only:
+      command: actionlint -version
+    steps:
+      - fixture:
+          file: badexpr.yml
+          content: |
+            name: badexpr
+            on: push
+            jobs:
+              build:
+                runs-on: ubuntu-latest
+                steps:
+                  - run: echo ${{ github.event.foo.bar( }}
+      - run:
+          command: actionlint -shellcheck= badexpr.yml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: "[expression]"
+
+  - name: multiple problems in one file are all reported
+    only:
+      command: actionlint -version
+    steps:
+      # Completeness: two distinct problems in one workflow each surface with
+      # their own rule tag, not just the first.
+      - fixture:
+          file: two.yml
+          content: |
+            name: two
+            on: push
+            jobs:
+              build:
+                runs-on: [ubuntu-nonsense-9999]
+                needs: [ghost]
+                steps:
+                  - run: echo hi
+      - run:
+          command: actionlint -shellcheck= two.yml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - "[job-needs]"
+              - "[runner-label]"
+
+  - name: the JSON format is a structured oracle over the findings
+    only:
+      command: actionlint -version
+    steps:
+      # Differential oracle: -format '{{json .}}' emits the same findings as a
+      # machine-readable array, so the rule kind, line and column can be checked
+      # as structured data rather than scraped from the pretty output.
+      - fixture:
+          file: two.yml
+          content: |
+            name: two
+            on: push
+            jobs:
+              build:
+                runs-on: [ubuntu-nonsense-9999]
+                needs: [ghost]
+                steps:
+                  - run: echo hi
+      - run:
+          command: actionlint -shellcheck= -format '{{json .}}' two.yml
+      - assert:
+          exit_code: 1
+          stdout:
+            json:
+              path: "$"
+              length: 2
+      - assert:
+          stdout:
+            json:
+              path: "$[0].kind"
+              equals: job-needs
+      - assert:
+          stdout:
+            json:
+              path: "$[1].kind"
+              equals: runner-label
+
+  - name: -ignore removes a matching finding
+    only:
+      command: actionlint -version
+    steps:
+      # Negative space: an -ignore pattern suppresses the runner-label finding,
+      # so it no longer appears while the unignored job-needs finding remains.
+      - fixture:
+          file: two.yml
+          content: |
+            name: two
+            on: push
+            jobs:
+              build:
+                runs-on: [ubuntu-nonsense-9999]
+                needs: [ghost]
+                steps:
+                  - run: echo hi
+      - run:
+          command: actionlint -shellcheck= -ignore 'label .* is unknown' two.yml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: "[job-needs]"
+      - assert:
+          stdout:
+            not_contains: "[runner-label]"
+
+  - name: stdin mode lints piped content under the given filename
+    only:
+      command: actionlint -version
+    steps:
+      # Input dimension: with -stdin-filename actionlint reads the workflow from
+      # stdin and reports findings under that name — the shape a pre-commit hook
+      # or editor integration uses.
+      - fixture:
+          file: piped.yml
+          content: |
+            name: piped
+            on: push
+            jobs:
+              build:
+                runs-on: ubuntu-latest
+                needs: [ghost]
+                steps:
+                  - run: echo hi
+      - run:
+          command: actionlint -shellcheck= -stdin-filename fromstdin.yml -
+          stdin:
+            file: piped.yml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - "fromstdin.yml"
+              - "[job-needs]"
