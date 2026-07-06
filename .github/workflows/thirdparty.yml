@@ -135,11 +135,14 @@ jobs:
           - name: aqua
             dir: ./test/e2e/thirdparty/aqua
             install: go install github.com/aquaproj/aqua/v2/cmd/aqua@latest
-          # ecspresso deploys ECS services; the suite exercises its offline
-          # render surface (template functions, jsonnet, config, error codes).
+          # ecspresso deploys ECS services. The suite renders offline AND runs a
+          # real deploy against moto (an in-memory AWS mock, pip-installed) with
+          # the aws CLI (preinstalled on the runner) observing the ECS state.
           - name: ecspresso
             dir: ./test/e2e/thirdparty/ecspresso
-            install: go install github.com/kayac/ecspresso/v2/cmd/ecspresso@latest
+            install: |
+              go install github.com/kayac/ecspresso/v2/cmd/ecspresso@latest
+              pipx install 'moto[server]'
           - name: terraform
             dir: ./test/e2e/thirdparty/terraform
             install: |

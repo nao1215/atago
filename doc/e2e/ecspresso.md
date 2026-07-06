@@ -1,7 +1,9 @@
 # atago Behavior Specs
 ## Summary
-1 suite · 7 scenarios
+2 suites · 8 scenarios
 ## Contents
+- [ecspresso + deploy (real ECS deploy against a mock)](#ecspresso--deploy-real-ecs-deploy-against-a-mock) — 1 scenario
+  - [deploy registers the task definition, creates the service, and rolls it](#scenario-deploy-registers-the-task-definition-creates-the-service-and-rolls-it)
 - [ecspresso (Amazon ECS deploy tool)](#ecspresso-amazon-ecs-deploy-tool) — 7 scenarios
   - [version prints without error](#scenario-version-prints-without-error)
   - [render substitutes an env template function](#scenario-render-substitutes-an-env-template-function)
@@ -10,6 +12,72 @@
   - [render config resolves the defaults](#scenario-render-config-resolves-the-defaults)
   - [an undefined must_env fails the render](#scenario-an-undefined-must_env-fails-the-render)
   - [a missing config file fails cleanly](#scenario-a-missing-config-file-fails-cleanly)
+## ecspresso + deploy (real ECS deploy against a mock)
+Source: `test/e2e/thirdparty/ecspresso/deploy.atago.yaml`
+### Scenario: deploy registers the task definition, creates the service, and rolls it
+#### Given
+- Background service `moto` is started: `moto_server -H 127.0.0.1 -p 15111`.
+- Fixture file `ecspresso.yml` is created.
+- Fixture file `taskdef.json` is created.
+- Fixture file `servicedef.json` is created.
+#### Inputs
+_Fixture `ecspresso.yml`:_
+```text
+region: us-east-1
+cluster: demo
+service: web
+task_definition: taskdef.json
+service_definition: servicedef.json
+```
+_Fixture `taskdef.json`:_
+```text
+{
+  "family": "web",
+  "containerDefinitions": [
+    { "name": "web", "image": "nginx:1.0", "cpu": 128, "memory": 256, "essential": true }
+  ]
+}
+```
+_Fixture `servicedef.json`:_
+```text
+{ "launchType": "EC2", "desiredCount": 2, "schedulingStrategy": "REPLICA" }
+```
+#### When
+```shell
+aws --endpoint-url http://127.0.0.1:15111 ecs create-cluster --cluster-name demo
+ecspresso deploy --config ecspresso.yml --no-wait
+aws --endpoint-url http://127.0.0.1:15111 ecs describe-services --cluster demo --services web --query "services[0].status" --output text
+aws --endpoint-url http://127.0.0.1:15111 ecs describe-services --cluster demo --services web --query "services[0].taskDefinition" --output text
+aws --endpoint-url http://127.0.0.1:15111 ecs describe-services --cluster demo --services web --query "services[0].desiredCount" --output text
+sed 's/nginx:1.0/nginx:2.0/' taskdef.json > taskdef.new && mv taskdef.new taskdef.json
+ecspresso deploy --config ecspresso.yml --no-wait
+aws --endpoint-url http://127.0.0.1:15111 ecs describe-services --cluster demo --services web --query "services[0].taskDefinition" --output text
+aws --endpoint-url http://127.0.0.1:15111 ecs list-task-definitions --query "length(taskDefinitionArns)" --output text
+```
+#### Then
+- after `aws --endpoint-url http://127.0.0.1:15111 ecs create-cluster --cluster-name demo`:
+  - exit code is `0`
+- after `ecspresso deploy --config ecspresso.yml --no-wait`:
+  - exit code is `0`
+- after `aws --endpoint-url http://127.0.0.1:15111 ecs describe-services --cluster demo --services web --query "services[0].status" --output text`:
+  - exit code is `0`
+  - stdout contains `ACTIVE`
+- after `aws --endpoint-url http://127.0.0.1:15111 ecs describe-services --cluster demo --services web --query "services[0].taskDefinition" --output text`:
+  - exit code is `0`
+  - stdout contains `web:1`
+- after `aws --endpoint-url http://127.0.0.1:15111 ecs describe-services --cluster demo --services web --query "services[0].desiredCount" --output text`:
+  - exit code is `0`
+  - stdout contains `2`
+- after `sed 's/nginx:1.0/nginx:2.0/' taskdef.json > taskdef.new && mv taskdef.new taskdef.json`:
+  - exit code is `0`
+- after `ecspresso deploy --config ecspresso.yml --no-wait`:
+  - exit code is `0`
+- after `aws --endpoint-url http://127.0.0.1:15111 ecs describe-services --cluster demo --services web --query "services[0].taskDefinition" --output text`:
+  - exit code is `0`
+  - stdout contains `web:2`
+- after `aws --endpoint-url http://127.0.0.1:15111 ecs list-task-definitions --query "length(taskDefinitionArns)" --output text`:
+  - exit code is `0`
+  - stdout contains `2`
 ## ecspresso (Amazon ECS deploy tool)
 Source: `test/e2e/thirdparty/ecspresso/ecspresso.atago.yaml`
 ### Scenario: version prints without error
