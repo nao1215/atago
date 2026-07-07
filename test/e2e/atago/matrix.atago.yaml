@@ -65,3 +65,20 @@ scenarios:
             contains:
               - 'name="row [n=1]"'
               - 'name="row [n=2]"'
+
+  - name: stdout_to expands a matrix variable into the redirect target
+    matrix:
+      - { who: alice }
+      - { who: bob }
+    steps:
+      # The redirect target is a workdir-relative path like the assert path that
+      # reads it, so ${who} must resolve on both sides — a per-row output file.
+      - run:
+          shell: true
+          command: printf hello-${who}
+          stdout_to: out-${who}.txt
+      - assert:
+          exit_code: 0
+          file:
+            path: out-${who}.txt
+            contains: hello-${who}

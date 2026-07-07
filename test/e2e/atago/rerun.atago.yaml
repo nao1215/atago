@@ -67,3 +67,37 @@ scenarios:
           exit_code: 0
           stderr:
             contains: nothing to rerun
+
+  - name: rerun-failed with a filter preserves the still-failing scenarios it did not run
+    steps:
+      - fixture:
+          file: two.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: two
+            scenarios:
+              - name: red-a
+                steps:
+                  - run: {shell: true, command: "exit 1"}
+                  - assert: {exit_code: 0}
+              - name: red-b
+                steps:
+                  - run: {shell: true, command: "exit 1"}
+                  - assert: {exit_code: 0}
+      # Both scenarios fail, so the ledger records both.
+      - run:
+          command: ${atago} run two.atago.yaml
+      - assert:
+          exit_code: 1
+      # Rerun only red-a via --filter. red-b is excluded from this run but is still
+      # broken, so it must stay in the ledger rather than being silently dropped
+      # (which would greenlight a later plain --rerun-failed).
+      - run:
+          command: ${atago} run --rerun-failed --filter red-a two.atago.yaml
+      - assert:
+          exit_code: 1
+      - assert:
+          file:
+            path: .atago/last-failed.json
+            contains: [red-a, red-b]
