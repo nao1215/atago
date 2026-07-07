@@ -30,7 +30,7 @@ func Main(args []string, stdout, stderr io.Writer) int {
 	cmd, rest := args[0], args[1:]
 	switch cmd {
 	case "run":
-		return runCmd(rest, stdout, stderr)
+		return runCmd("atago run", rest, stdout, stderr)
 	case "init":
 		return initCmd(rest, stdout, stderr)
 	case "record":
@@ -116,5 +116,5 @@ func snapshotCmd(args []string, stdout, stderr io.Writer) int {
 		return ExitConfig
 	}
 	// `snapshot update` is `run` with snapshots written instead of compared.
-	return runCmd(append([]string{"--update-snapshots"}, args[1:]...), stdout, stderr)
+	return runCmd("atago snapshot update", append([]string{"--update-snapshots"}, args[1:]...), stdout, stderr)
 }

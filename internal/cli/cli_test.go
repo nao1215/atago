@@ -911,6 +911,21 @@ func TestSnapshotCmd_BadInvocation(t *testing.T) {
 	}
 }
 
+// TestSnapshotCmd_ErrorNamesSnapshot proves an error from `snapshot update`
+// names that command, not the `run` it delegates to. Reporting "atago run:" for
+// a `snapshot update` invocation misidentifies the command the user typed.
+func TestSnapshotCmd_ErrorNamesSnapshot(t *testing.T) {
+	t.Parallel()
+	var out, errb bytes.Buffer
+	got := Main([]string{"snapshot", "update", filepath.Join(t.TempDir(), "missing.atago.yaml")}, &out, &errb)
+	if got != ExitConfig {
+		t.Errorf("exit = %d, want %d", got, ExitConfig)
+	}
+	if s := errb.String(); !strings.Contains(s, "atago snapshot update:") || strings.Contains(s, "atago run:") {
+		t.Errorf("stderr = %q, want it to name 'atago snapshot update:' and not 'atago run:'", s)
+	}
+}
+
 // --- run argument parsing ---------------------------------------------------
 
 func TestRunCmd_ArgParsingErrors(t *testing.T) {

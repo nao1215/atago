@@ -23,9 +23,11 @@ import (
 	"github.com/nao1215/atago/internal/report"
 )
 
-// runCmd implements `atago run`.
-func runCmd(args []string, stdout, stderr io.Writer) int {
-	fs := flag.NewFlagSet("atago run", flag.ContinueOnError)
+// runCmd implements `atago run`. label is the command name to name in error
+// messages ("atago run", or "atago snapshot update" when snapshotCmd delegates
+// here), so a diagnostic identifies the command the user actually invoked.
+func runCmd(label string, args []string, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet(label, flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	reportFmt := fs.String("report", "console", "report format: console|json|junit|gha|tap")
 	updateSnapshots := fs.Bool("update-snapshots", false, "create or overwrite snapshot files instead of comparing")
@@ -60,7 +62,7 @@ func runCmd(args []string, stdout, stderr io.Writer) int {
 
 	format := report.Format(*reportFmt)
 	if !format.Valid() {
-		fmt.Fprintf(stderr, "atago run: unknown --report %q (want console, json, junit, gha, or tap)\n", *reportFmt)
+		fmt.Fprintf(stderr, label+": unknown --report %q (want console, json, junit, gha, or tap)\n", *reportFmt)
 		return ExitConfig
 	}
 
@@ -71,22 +73,22 @@ func runCmd(args []string, stdout, stderr io.Writer) int {
 
 	paths, err := collectSpecFiles(targets)
 	if err != nil {
-		fmt.Fprintf(stderr, "atago run: %v\n", err)
+		fmt.Fprintf(stderr, label+": %v\n", err)
 		return ExitConfig
 	}
 	if len(paths) == 0 {
-		fmt.Fprintln(stderr, "atago run: no *.atago.yaml files found")
+		fmt.Fprintln(stderr, label+": no *.atago.yaml files found")
 		return ExitConfig
 	}
 
 	// --repeat and --retry-failed answer opposite questions (does it flake? /
 	// keep CI green despite flakes) and would fight over the attempt loop.
 	if *repeat > 0 && *retryFailed > 0 {
-		fmt.Fprintln(stderr, "atago run: --repeat and --retry-failed are mutually exclusive (repeat detects flakiness, retry-failed tolerates it)")
+		fmt.Fprintln(stderr, label+": --repeat and --retry-failed are mutually exclusive (repeat detects flakiness, retry-failed tolerates it)")
 		return ExitConfig
 	}
 	if *repeat < 0 || *retryFailed < 0 {
-		fmt.Fprintln(stderr, "atago run: --repeat and --retry-failed must be >= 0")
+		fmt.Fprintln(stderr, label+": --repeat and --retry-failed must be >= 0")
 		return ExitConfig
 	}
 
@@ -118,17 +120,17 @@ func runCmd(args []string, stdout, stderr io.Writer) int {
 	if *rerunFailed {
 		state, lerr := loadRerunState()
 		if lerr != nil {
-			fmt.Fprintf(stderr, "atago run: cannot read %s: %v\n", rerunStatePath(), lerr)
+			fmt.Fprintf(stderr, label+": cannot read %s: %v\n", rerunStatePath(), lerr)
 			return ExitConfig
 		}
 		sel := state.selectSet()
 		if len(sel) == 0 {
-			fmt.Fprintln(stderr, "atago run: no previously failed scenarios recorded; nothing to rerun")
+			fmt.Fprintln(stderr, label+": no previously failed scenarios recorded; nothing to rerun")
 			return ExitOK
 		}
 		paths = intersectPaths(paths, state.specPaths())
 		if len(paths) == 0 {
-			fmt.Fprintln(stderr, "atago run: no previously failed scenarios under the given targets")
+			fmt.Fprintln(stderr, label+": no previously failed scenarios under the given targets")
 			return ExitOK
 		}
 		inScope := make(map[string]bool, len(paths))
@@ -213,7 +215,7 @@ func runCmd(args []string, stdout, stderr io.Writer) int {
 	// (already printed) are the real story, not a "renamed or removed" scenario.
 	rerunMatchedNothing := *rerunFailed && len(results) > 0 && ranScenarios == 0 && ctx.Err() == nil
 	if rerunMatchedNothing {
-		fmt.Fprintln(stderr, "atago run: warning: no recorded failing scenarios matched the current specs (renamed or removed?); the recorded failures were kept, not cleared")
+		fmt.Fprintln(stderr, label+": warning: no recorded failing scenarios matched the current specs (renamed or removed?); the recorded failures were kept, not cleared")
 		exit = worseExit(exit, ExitConfig)
 	}
 
@@ -230,7 +232,7 @@ func runCmd(args []string, stdout, stderr io.Writer) int {
 	// is a warning, not a fatal exit.
 	if len(results) > 0 && !rerunMatchedNothing {
 		if err := saveRerunState(append(collectFailures(results), rerunPreserved...)); err != nil {
-			fmt.Fprintf(stderr, "atago run: could not update %s: %v\n", rerunStatePath(), err)
+			fmt.Fprintf(stderr, label+": could not update %s: %v\n", rerunStatePath(), err)
 		}
 	}
 
@@ -239,7 +241,7 @@ func runCmd(args []string, stdout, stderr io.Writer) int {
 	// that was interrupted before completing must never exit 0.
 	if len(results) == 0 {
 		if ctx.Err() != nil {
-			fmt.Fprintln(stderr, "atago run: interrupted")
+			fmt.Fprintln(stderr, label+": interrupted")
 			return worseExit(exit, ExitExec)
 		}
 		return exit
@@ -264,19 +266,19 @@ func runCmd(args []string, stdout, stderr io.Writer) int {
 			if len(skipTag) > 0 {
 				sel = append(sel, fmt.Sprintf("--skip-tag %q", strings.Join(skipTag, ",")))
 			}
-			fmt.Fprintf(stderr, "atago run: warning: no scenarios matched %s (name matching is a case-sensitive substring)\n", strings.Join(sel, " "))
+			fmt.Fprintf(stderr, label+": warning: no scenarios matched %s (name matching is a case-sensitive substring)\n", strings.Join(sel, " "))
 		}
 	}
 
 	if err := report.Render(stdout, format, results, report.WithLoadFailures(loadFailures), report.WithElapsed(elapsed)); err != nil {
-		fmt.Fprintf(stderr, "atago run: failed to write report: %v\n", err)
+		fmt.Fprintf(stderr, label+": failed to write report: %v\n", err)
 		return worseExit(exit, ExitInternal)
 	}
 	// An interrupted run never reports success, even in the rare case where the
 	// signal landed between scenarios and every scheduled one was skipped: the run
 	// did not complete, so the exit code is at least an execution error (4).
 	if ctx.Err() != nil {
-		fmt.Fprintln(stderr, "atago run: interrupted")
+		fmt.Fprintln(stderr, label+": interrupted")
 		exit = worseExit(exit, ExitExec)
 	}
 	return exit

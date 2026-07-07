@@ -91,3 +91,15 @@ scenarios:
       - assert:
           stdout:
             not_contains: "PASSED"
+
+  # A snapshot-update error must name `snapshot update`, not the `run` it
+  # delegates to, so the diagnostic matches the command the user typed.
+  - name: a snapshot update error names the snapshot command, not run
+    steps:
+      - run:
+          command: ${atago} snapshot update no-such-spec.atago.yaml
+      - assert:
+          exit_code: 3
+          stderr:
+            contains: "atago snapshot update: cannot access"
+            not_contains: "atago run:"
