@@ -9,6 +9,13 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Loading a spec no longer crashes on malformed YAML. Some inputs (a bare `!`
+  tag over a broken mapping) made the underlying goccy/go-yaml decoder panic
+  with a nil pointer dereference, which propagated out of the loader and aborted
+  atago. Loading now recovers from a decoder panic and reports a clean parse
+  error, honoring the contract that loading untrusted spec bytes never crashes.
+  Found by FuzzLoadBytes; the crasher is kept as a regression seed.
+
 - An error from `atago snapshot update` now names that command instead of the
   `atago run` it delegates to internally. A missing target or a bad flag printed
   `atago run: ...` even though the user typed `snapshot update`; the diagnostic

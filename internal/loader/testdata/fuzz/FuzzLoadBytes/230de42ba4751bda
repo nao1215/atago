@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("A: 0\nrunners:\n 0: {0000000000000\"}\nscenarios:\n  ! 00")

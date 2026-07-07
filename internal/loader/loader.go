@@ -50,6 +50,23 @@ func Load(path string) (*spec.Spec, error) {
 	return LoadBytes(path, data)
 }
 
+// decodeSpec decodes one YAML document into s, converting a panic from the
+// third-party decoder into an ordinary error. goccy/go-yaml can nil-panic on
+// some malformed input (a bare `!` tag over a broken mapping, found by
+// FuzzLoadBytes); atago's contract is that loading untrusted spec bytes never
+// crashes the process, so recover here and let the caller report a parse error.
+func decodeSpec(dec *yaml.Decoder, s *spec.Spec) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			// Report a spec problem, not the raw runtime panic: "nil pointer
+			// dereference" reads like an atago crash, but the cause is malformed
+			// input the third-party decoder mishandled.
+			err = fmt.Errorf("malformed YAML: the document could not be parsed")
+		}
+	}()
+	return dec.Decode(s)
+}
+
 // LoadBytes parses and validates spec bytes, labeling errors with path.
 func LoadBytes(path string, data []byte) (*spec.Spec, error) {
 	// Strip a leading UTF-8 byte-order mark. Windows/Notepad-family editors emit
@@ -60,7 +77,7 @@ func LoadBytes(path string, data []byte) (*spec.Spec, error) {
 	data = bytes.TrimPrefix(data, []byte("\ufeff"))
 	var s spec.Spec
 	dec := yaml.NewDecoder(bytes.NewReader(data), yaml.Strict())
-	if err := dec.Decode(&s); err != nil {
+	if err := decodeSpec(dec, &s); err != nil {
 		// An empty document (empty file, whitespace, or comments only) decodes to
 		// io.EOF, whose bare "EOF" tells the user nothing. Name the problem and
 		// what a spec needs instead.
