@@ -1,0 +1,94 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / artifacts-dir failure payloads
+
+# --artifacts-dir writes the compared payloads of each FAILED assertion to a
+# durable tree for review tooling: the expected and actual bytes as sidecar
+# files, one directory per failing scenario, nothing for a passing one. These
+# drive atago against inner specs and inspect the written tree. The tree is
+# located with a shell glob (the per-suite directory carries a hash), so the
+# suite is POSIX-only; the artifact writer is unit-tested in internal/artifact.
+scenarios:
+  - name: a failing stdout equals writes expected and actual sidecars
+    steps:
+      - fixture:
+          file: fail.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: fail}
+            scenarios:
+              - name: stdout drifts
+                steps:
+                  - run: {shell: true, command: "printf 'actual-value\\n'"}
+                  - assert: {stdout: {equals: "expected-value"}}
+      - run: {command: "${atago} run --artifacts-dir arts fail.atago.yaml"}
+      - assert: {exit_code: 1}
+      - run:
+          shell: true
+          command: "cat arts/*/*/*.actual.txt arts/*/*/*.expected.txt"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "actual-value"
+              - "expected-value"
+
+  - name: a passing scenario writes no failure payload
+    steps:
+      - fixture:
+          file: pass.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: pass}
+            scenarios:
+              - name: all good
+                steps:
+                  - run: {shell: true, command: "printf 'ok\\n'"}
+                  - assert: {stdout: {equals: "ok"}}
+      - run: {command: "${atago} run --artifacts-dir arts2 pass.atago.yaml"}
+      - assert: {exit_code: 0}
+      - run:
+          shell: true
+          command: "find arts2 -name '*.actual.txt' 2>/dev/null | wc -l"
+      - assert:
+          stdout:
+            matches: "^\\s*0\\s*$"
+
+  - name: the artifacts directory is created when it does not exist
+    steps:
+      - fixture:
+          file: nested.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: nested}
+            scenarios:
+              - name: fails
+                steps:
+                  - run: {shell: true, command: "printf 'x\\n'"}
+                  - assert: {stdout: {equals: "y"}}
+      - run: {command: "${atago} run --artifacts-dir deep/made/arts nested.atago.yaml"}
+      - assert: {exit_code: 1}
+      - assert:
+          dir: {path: deep/made/arts, exists: true}
+
+  - name: a file-content mismatch also writes a payload
+    steps:
+      - fixture:
+          file: filefail.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: filefail}
+            scenarios:
+              - name: file drifts
+                steps:
+                  - fixture: {file: out.txt, content: "written-bytes"}
+                  - assert: {file: {path: out.txt, equals: "wanted-bytes"}}
+      - run: {command: "${atago} run --artifacts-dir farts filefail.atago.yaml"}
+      - assert: {exit_code: 1}
+      - run:
+          shell: true
+          command: "find farts -type f | wc -l"
+      - assert:
+          stdout:
+            not_matches: "^\\s*0\\s*$"
