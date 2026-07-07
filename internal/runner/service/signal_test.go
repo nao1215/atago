@@ -52,9 +52,15 @@ func TestSignal_GroupDelivery(t *testing.T) {
 	svc := &spec.Service{
 		Name:  "family",
 		Shell: spec.Bool(true),
-		// The backgrounded child writes its own marker when TERM arrives —
-		// it only can if the signal went to the whole group.
-		Command: `( trap 'echo child-got-term > child.txt; exit 0' TERM; while true; do sleep 0.1; done ) & echo ready; wait`,
+		// The backgrounded child writes its own marker when TERM arrives — it only
+		// can if the signal went to the whole group, not just the shell leader.
+		//
+		// The child prints the readiness marker itself, AFTER installing its trap,
+		// so "ready" proves the handler is armed. Emitting it from the parent (before
+		// the backgrounded subshell had run `trap`) raced: a TERM delivered in that
+		// window hit the default action and the child died without writing child.txt,
+		// flaking the test on a loaded runner.
+		Command: `( trap 'echo child-got-term > child.txt; exit 0' TERM; echo ready; while true; do sleep 0.1; done ) & wait`,
 		Ready:   &spec.Ready{Log: "ready", Timeout: "5s"},
 	}
 	p, _, err := Start(context.Background(), svc, wd)
