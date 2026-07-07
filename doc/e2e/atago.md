@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-69 suites · 337 scenarios
+70 suites · 342 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -224,6 +224,12 @@
 - [atago self-hosting / matrix scenarios](#atago-self-hosting--matrix-scenarios) — 2 scenarios
   - [matrix expands into one scenario per row](#scenario-matrix-expands-into-one-scenario-per-row)
   - [matrix without a templated name gets a deterministic suffix](#scenario-matrix-without-a-templated-name-gets-a-deterministic-suffix)
+- [atago self-hosting / matrix expansion boundary values](#atago-self-hosting--matrix-expansion-boundary-values) — 5 scenarios
+  - [each row substitutes into the scenario name](#scenario-each-row-substitutes-into-the-scenario-name)
+  - [a row with several variables substitutes all of them](#scenario-a-row-with-several-variables-substitutes-all-of-them)
+  - [a single-row matrix expands to exactly one scenario](#scenario-a-single-row-matrix-expands-to-exactly-one-scenario)
+  - [an empty matrix row list is a load-time error](#scenario-an-empty-matrix-row-list-is-a-load-time-error)
+  - [rows that expand to the same name are rejected as duplicates](#scenario-rows-that-expand-to-the-same-name-are-rejected-as-duplicates)
 - [atago self-hosting / mock http server (offline API-client testing)](#atago-self-hosting--mock-http-server-offline-api-client-testing) — 3 scenarios
   - [count, header, and body-json asserts pass against a real client](#scenario-count-header-and-body-json-asserts-pass-against-a-real-client)
   - [a failing count summarizes the recorded requests](#scenario-a-failing-count-summarizes-the-recorded-requests)
@@ -3763,6 +3769,116 @@ ${atago} run --report junit suffix.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `name="row [n=1]"`, `name="row [n=2]"`
+## atago self-hosting / matrix expansion boundary values
+Source: `test/e2e/atago/matrix_edges.atago.yaml`
+### Scenario: each row substitutes into the scenario name
+#### Given
+- Fixture file `names.atago.yaml` is created.
+#### Inputs
+_Fixture `names.atago.yaml`:_
+```text
+version: "1"
+suite: {name: names}
+scenarios:
+  - name: "case ${n}"
+    matrix:
+      - {n: "1"}
+      - {n: "2"}
+      - {n: "3"}
+    steps: [{run: {shell: true, command: "exit 0"}}, {assert: {exit_code: 0}}]
+```
+#### When
+```shell
+${atago} run --ci --report json names.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout at `$.suites[0].scenarios` has length 3; at `$.suites[0].scenarios[0].name` equals `case 1`; at `$.suites[0].scenarios[2].name` equals `case 3`
+### Scenario: a row with several variables substitutes all of them
+#### Given
+- Fixture file `multi.atago.yaml` is created.
+#### Inputs
+_Fixture `multi.atago.yaml`:_
+```text
+version: "1"
+suite: {name: multi}
+scenarios:
+  - name: "${who} speaks ${lang}"
+    matrix:
+      - {who: Alice, lang: en}
+      - {who: Bob, lang: fr}
+    steps: [{run: {shell: true, command: "exit 0"}}, {assert: {exit_code: 0}}]
+```
+#### When
+```shell
+${atago} run --ci --report json multi.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout at `$.suites[0].scenarios[0].name` equals `Alice speaks en`; at `$.suites[0].scenarios[1].name` equals `Bob speaks fr`
+### Scenario: a single-row matrix expands to exactly one scenario
+#### Given
+- Fixture file `single.atago.yaml` is created.
+#### Inputs
+_Fixture `single.atago.yaml`:_
+```text
+version: "1"
+suite: {name: single}
+scenarios:
+  - name: "only ${k}"
+    matrix:
+      - {k: solo}
+    steps: [{run: {shell: true, command: "exit 0"}}, {assert: {exit_code: 0}}]
+```
+#### When
+```shell
+${atago} run --ci --report json single.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout at `$.suites[0].scenarios` has length 1; at `$.suites[0].scenarios[0].name` equals `only solo`
+### Scenario: an empty matrix row list is a load-time error
+#### Given
+- Fixture file `emptymx.atago.yaml` is created.
+#### Inputs
+_Fixture `emptymx.atago.yaml`:_
+```text
+version: "1"
+suite: {name: emptymx}
+scenarios:
+  - name: "e ${n}"
+    matrix: []
+    steps: [{run: {shell: true, command: "exit 0"}}]
+```
+#### When
+```shell
+${atago} run emptymx.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `matrix must contain at least one row`
+### Scenario: rows that expand to the same name are rejected as duplicates
+#### Given
+- Fixture file `dupmx.atago.yaml` is created.
+#### Inputs
+_Fixture `dupmx.atago.yaml`:_
+```text
+version: "1"
+suite: {name: dupmx}
+scenarios:
+  - name: "dup ${n}"
+    matrix:
+      - {n: same}
+      - {n: same}
+    steps: [{run: {shell: true, command: "exit 0"}}]
+```
+#### When
+```shell
+${atago} run dupmx.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `duplicate scenario name "dup same"`
 ## atago self-hosting / mock http server (offline API-client testing)
 Source: `test/e2e/atago/mock_server.atago.yaml`
 ### Scenario: count, header, and body-json asserts pass against a real client
