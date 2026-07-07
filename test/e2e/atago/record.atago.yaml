@@ -346,3 +346,33 @@ scenarios:
           exit_code: 4
           stdout:
             contains: "ATAGO_SECRET_1 is not set"
+
+  - name: record --pty of a never-exiting program times out instead of hanging
+    skip:
+      os: windows
+    steps:
+      # #194: `record --pty` used to wait forever for the child to exit, so a
+      # server-like or wedged interactive program (here `tail -f /dev/null`,
+      # which ignores stdin and never exits) would hang with no way out but
+      # Ctrl-C. --timeout now bounds that wait. A plain run step drives the
+      # recorder from a non-terminal stdin — record --pty tolerates that (raw
+      # mode is best-effort) — so the bound is exercisable in CI without a
+      # pseudo-terminal on the driving side. taskkill/`tail` are POSIX here;
+      # the Windows ConPTY timeout path is covered by the record unit test.
+      - run:
+          command: ${atago} record --pty --timeout 2s --out wedged.atago.yaml -- tail -f /dev/null
+      # Non-zero exit (execution error) and a clear, actionable message — never a
+      # silent, unbounded block.
+      - assert:
+          exit_code: 4
+          stderr:
+            contains: "did not exit within 2s"
+      - assert:
+          stderr:
+            contains: "use --timeout to adjust"
+      # The transcript captured before the deadline is still written, so the
+      # partial recording is not thrown away.
+      - assert:
+          file:
+            path: wedged.atago.yaml
+            contains: "- pty:"

@@ -7,8 +7,11 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	shellwords "github.com/mattn/go-shellwords"
+
+	"github.com/nao1215/atago/internal/record"
 )
 
 // TestPOSIXJoin_RoundTrip proves posixJoin's output re-tokenizes to the same
@@ -63,6 +66,40 @@ func TestRecordPTY_ExistingOutExitsEarly(t *testing.T) {
 	}
 	if b, _ := os.ReadFile(out); string(b) != "precious" {
 		t.Errorf("existing file was modified: %q", b)
+	}
+}
+
+// TestPTYExitCode covers the --pty timeout verdict (#194): a clean session is
+// ExitOK and silent, while a timed-out one prints a specific, actionable
+// message (the elapsed bound plus the --timeout hint) and returns ExitExec so a
+// wedged recording never reports success. A non-positive timeout reports the
+// default bound, matching the value CapturePTY actually applied.
+func TestPTYExitCode(t *testing.T) {
+	t.Parallel()
+
+	var ok bytes.Buffer
+	if code := ptyExitCode(false, 30*time.Second, &ok); code != ExitOK {
+		t.Errorf("clean session exit = %d, want %d", code, ExitOK)
+	}
+	if ok.Len() != 0 {
+		t.Errorf("clean session wrote to stderr: %q", ok.String())
+	}
+
+	var timedOut bytes.Buffer
+	if code := ptyExitCode(true, 2*time.Second, &timedOut); code != ExitExec {
+		t.Errorf("timed-out session exit = %d, want %d", code, ExitExec)
+	}
+	msg := timedOut.String()
+	for _, want := range []string{"did not exit within 2s", "--timeout"} {
+		if !strings.Contains(msg, want) {
+			t.Errorf("timeout message %q missing %q", msg, want)
+		}
+	}
+
+	var defaulted bytes.Buffer
+	ptyExitCode(true, 0, &defaulted)
+	if want := "did not exit within " + record.DefaultCaptureTimeout.String(); !strings.Contains(defaulted.String(), want) {
+		t.Errorf("non-positive timeout message %q missing %q", defaulted.String(), want)
 	}
 }
 

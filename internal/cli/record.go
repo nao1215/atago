@@ -12,6 +12,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/nao1215/atago/internal/record"
 	runnercmd "github.com/nao1215/atago/internal/runner/cmd"
@@ -31,9 +32,10 @@ func recordCmd(args []string, stdout, stderr io.Writer) int {
 	shell := fs.Bool("shell", false, "record the command line verbatim with shell: true")
 	snap := fs.Bool("snapshot", false, "assert stdout against a snapshot golden (requires --out; the golden is written next to it)")
 	ptyMode := fs.Bool("pty", false, "record an interactive pty session and generate an expect/send spec")
+	ptyTimeout := fs.Duration("timeout", record.DefaultCaptureTimeout, "kill the pty session and fail if the program does not exit within this bound (--pty only)")
 	fs.Usage = func() {
 		fmt.Fprint(stderr, `Usage: atago record [--out FILE] [--force] [--shell] [--snapshot] -- <command> [args...]
-       atago record --pty [--out FILE] [--force] [--shell] -- <command> [args...]
+       atago record --pty [--out FILE] [--force] [--shell] [--timeout DUR] -- <command> [args...]
 
 Runs the command once in a scratch directory and prints a spec skeleton
 derived from what it observed: exit code, first stdout line, empty stderr,
@@ -43,8 +45,10 @@ With --pty, runs the command in a real pseudo-terminal wired to your
 terminal, lets you drive one interactive session by hand, and generates a
 spec whose pty: step replays it as expect/send pairs. On Windows it drives a
 ConPTY; a ConPTY exposes no echo state, so typed passwords are not auto-masked
-there — convert a secret send to a ${env:...} placeholder by hand. HTTP
-recording is a non-goal for now — write those steps by hand.
+there — convert a secret send to a ${env:...} placeholder by hand. A --pty
+session is bounded by --timeout (default 30s): if the program never exits,
+atago kills it, writes whatever was captured, and fails. HTTP recording is a
+non-goal for now — write those steps by hand.
 `)
 		fs.PrintDefaults()
 	}
@@ -69,7 +73,7 @@ recording is a non-goal for now — write those steps by hand.
 		return ExitConfig
 	}
 	if *ptyMode {
-		return recordPTY(cmdArgs, *shell, *out, *force, stdout, stderr)
+		return recordPTY(cmdArgs, *shell, *out, *force, *ptyTimeout, stdout, stderr)
 	}
 
 	// Preserve argv boundaries: the runner (and later the generated spec)
@@ -160,7 +164,7 @@ recording is a non-goal for now — write those steps by hand.
 // pseudo-terminal wired to the developer's own terminal, let them drive one
 // interactive session by hand, and generate a spec whose pty: step replays it
 // as expect/send pairs. Runs on POSIX (a real pty) and Windows (a ConPTY).
-func recordPTY(cmdArgs []string, shell bool, out string, force bool, stdout, stderr io.Writer) int {
+func recordPTY(cmdArgs []string, shell bool, out string, force bool, timeout time.Duration, stdout, stderr io.Writer) int {
 	// Refuse an existing --out up front, before driving the session: otherwise
 	// a user hand-drives the whole interactive session only to be told the file
 	// already exists once it is too late to save the transcript.
@@ -175,8 +179,12 @@ func recordPTY(cmdArgs []string, shell bool, out string, force bool, stdout, std
 	}
 
 	fmt.Fprintln(stderr, "recording pty session — drive it by hand; it ends when the program exits")
-	rec, err := record.CapturePTY(command, shell, os.Stdin, os.Stdout)
-	if err != nil {
+	rec, err := record.CapturePTY(command, shell, os.Stdin, os.Stdout, timeout)
+	// A timeout is not a hard failure: the child was killed but the transcript
+	// captured before the deadline is still worth writing. Any other error means
+	// the session never got off the ground, so there is nothing to save.
+	timedOut := errors.Is(err, record.ErrCaptureTimeout)
+	if err != nil && !timedOut {
 		fmt.Fprintf(stderr, "atago record: %v\n", err)
 		return ExitExec
 	}
@@ -198,7 +206,7 @@ func recordPTY(cmdArgs []string, shell bool, out string, force bool, stdout, std
 
 	if out == "" {
 		fmt.Fprint(stdout, string(generated))
-		return ExitOK
+		return ptyExitCode(timedOut, timeout, stderr)
 	}
 	if dir := filepath.Dir(out); dir != "." {
 		if err := os.MkdirAll(dir, 0o750); err != nil {
@@ -211,7 +219,23 @@ func recordPTY(cmdArgs []string, shell bool, out string, force bool, stdout, std
 		return ExitExec
 	}
 	fmt.Fprintf(stderr, "wrote %s\n", out)
-	return ExitOK
+	return ptyExitCode(timedOut, timeout, stderr)
+}
+
+// ptyExitCode reports the final status of a --pty recording: a clean ExitOK, or
+// — when the program never exited within the timeout — a clear message plus
+// ExitExec, so a wedged interactive recording never masquerades as success
+// (#194).
+func ptyExitCode(timedOut bool, timeout time.Duration, stderr io.Writer) int {
+	if !timedOut {
+		return ExitOK
+	}
+	effective := timeout
+	if effective <= 0 {
+		effective = record.DefaultCaptureTimeout
+	}
+	fmt.Fprintf(stderr, "atago record --pty: the program did not exit within %s (use --timeout to adjust)\n", effective)
+	return ExitExec
 }
 
 // listFiles walks the scratch dir and returns every file as a sorted,
