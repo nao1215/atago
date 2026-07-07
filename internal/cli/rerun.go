@@ -116,17 +116,30 @@ func saveRerunState(failed []failedEntry) error {
 	return os.WriteFile(rerunStatePath(), data, 0o600)
 }
 
+// absClean returns the absolute, cleaned form of p, falling back to a lexical
+// clean when the working directory is unavailable. It lets --rerun-failed match
+// a spec regardless of how its path is spelled (relative vs absolute) between the
+// recording run and the rerun; comparing raw strings would miss equivalent paths.
+func absClean(p string) string {
+	if abs, err := filepath.Abs(p); err == nil {
+		return abs
+	}
+	return filepath.Clean(p)
+}
+
 // intersectPaths returns the members of paths that also appear in keep,
-// preserving the order of paths. Both sides are already filepath.Clean'd by the
-// callers, so a plain string comparison is exact.
+// preserving the order of paths. Both sides are absolutized before comparison so
+// an equivalent-but-differently-spelled path (relative vs absolute) still
+// matches; without this, a rerun target that names the same spec by a different
+// spelling would find "nothing" and silently greenlight despite real failures.
 func intersectPaths(paths, keep []string) []string {
 	want := make(map[string]bool, len(keep))
 	for _, k := range keep {
-		want[k] = true
+		want[absClean(k)] = true
 	}
 	var out []string
 	for _, p := range paths {
-		if want[p] {
+		if want[absClean(p)] {
 			out = append(out, p)
 		}
 	}
