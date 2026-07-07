@@ -2906,9 +2906,16 @@ printf '{"pi":3.14}'
 #### Then
 - stdout at `$.pi` equals `3.14`
 ### Scenario: a string carrying a quote compares equal
+#### Given
+- Fixture file `quoted.json` is created.
+#### Inputs
+_Fixture `quoted.json`:_
+```text
+{"s":"a\"b"}
+```
 #### When
 ```shell
-printf '{"s":"a\"b"}'
+cat quoted.json
 ```
 #### Then
 - stdout at `$.s` equals `a"b`

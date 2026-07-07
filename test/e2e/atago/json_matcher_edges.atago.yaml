@@ -75,7 +75,13 @@ scenarios:
 
   - name: a string carrying a quote compares equal
     steps:
-      - run: {shell: true, command: 'printf ''{"s":"a\"b"}'''}
+      # The document is written by a fixture (byte-exact) and echoed with cat, so
+      # the embedded \" does not depend on a printf implementation's handling of
+      # an unrecognized escape, which varies across shells.
+      - fixture:
+          file: quoted.json
+          content: '{"s":"a\"b"}'
+      - run: {shell: true, command: "cat quoted.json"}
       - assert:
           stdout:
             json:
