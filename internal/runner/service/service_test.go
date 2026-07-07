@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -439,30 +440,89 @@ func TestStart_PortReadinessTimeout(t *testing.T) {
 
 // TestStop_TerminatesChildren verifies the whole process group is torn down: a
 // shell that backgrounds a child writing to a file must stop writing after Stop.
-func TestStop_TerminatesChildren(t *testing.T) {
-	skipWindows(t)
+// TestStop_TerminatesChildTree proves Stop tears down the WHOLE process tree, not
+// just the service's leader: a surviving grandchild would keep appending to the
+// marker after Stop. It runs on every OS by re-executing the test binary as the
+// service (the os/exec test idiom) instead of a shell one-liner, so the same
+// assertion covers the POSIX process-group kill and the Windows job-object kill.
+func TestStop_TerminatesChildTree(t *testing.T) {
 	wd := t.TempDir()
 	marker := filepath.Join(wd, "tick")
-	// A backgrounded grandchild appends to a file every 50ms. If Stop only killed
-	// the shell leader, the grandchild would keep ticking.
 	svc := &spec.Service{
-		Name:    "ticker",
-		Shell:   spec.Bool(true),
-		Command: `( while true; do echo tick >> tick; sleep 0.05; done ) & echo ready; wait`,
-		Ready:   &spec.Ready{Log: "ready", Timeout: "5s"},
+		Name:    "tree",
+		Command: helperServiceCommand(),
+		Env:     helperEnv("parent", marker),
+		Ready:   &spec.Ready{Log: "ready", Timeout: "10s"},
 	}
 	p, _, err := Start(context.Background(), svc, wd)
 	if err != nil {
 		t.Fatalf("Start() error = %v", err)
 	}
-	time.Sleep(150 * time.Millisecond)
+	// The parent announces "ready", then (after the job assignment has landed)
+	// spawns the ticking grandchild — give it time to write a few ticks.
+	time.Sleep(900 * time.Millisecond)
+	if n := fileLen(marker); n == 0 {
+		p.Stop()
+		t.Fatal("grandchild never ticked; the test's process tree never came up")
+	}
 	p.Stop()
-	time.Sleep(100 * time.Millisecond) // let any survivor tick
-	before, _ := os.ReadFile(marker)
-	time.Sleep(300 * time.Millisecond)
-	after, _ := os.ReadFile(marker)
-	if len(after) != len(before) {
-		t.Errorf("grandchild kept writing after Stop: %d -> %d bytes", len(before), len(after))
+	time.Sleep(150 * time.Millisecond) // let any survivor tick once
+	mid := fileLen(marker)
+	time.Sleep(500 * time.Millisecond)
+	if after := fileLen(marker); after != mid {
+		t.Errorf("grandchild kept writing after Stop: %d -> %d bytes (tree not fully killed)", mid, after)
+	}
+}
+
+// fileLen returns the byte length of a file, or 0 if it cannot be read.
+func fileLen(path string) int {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return 0
+	}
+	return len(b)
+}
+
+// helperServiceCommand is the command string that runs the test binary as the
+// service under test. The path is double-quoted so a space survives the runner's
+// argv tokenizer on both shells.
+func helperServiceCommand() string {
+	return `"` + os.Args[0] + `" -test.run=TestHelperProcess`
+}
+
+// helperEnv builds the environment that selects a TestHelperProcess mode.
+func helperEnv(mode, marker string) map[string]string {
+	return map[string]string{"ATAGO_SVC_HELPER": mode, "ATAGO_SVC_MARKER": marker}
+}
+
+// TestHelperProcess is not a real test: TestStop_TerminatesChildTree re-executes
+// the test binary as the service under test to build a real process tree on every
+// OS. With no ATAGO_SVC_HELPER set (a normal `go test` run) it is an instant
+// no-op. Mode "parent" announces readiness, waits for atago to tie it to its
+// teardown mechanism, spawns a "grandchild", then idles; mode "grandchild"
+// appends to the marker forever, so a survivor of Stop keeps the file growing.
+func TestHelperProcess(t *testing.T) {
+	marker := os.Getenv("ATAGO_SVC_MARKER")
+	switch os.Getenv("ATAGO_SVC_HELPER") {
+	case "grandchild":
+		// Append forever, but self-terminate after ~30s so a tree-kill regression
+		// leaves no lingering process behind — the assertion fires within ~2s.
+		for i := 0; i < 600; i++ {
+			if f, err := os.OpenFile(marker, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644); err == nil {
+				_, _ = f.WriteString("tick\n")
+				_ = f.Close()
+			}
+			time.Sleep(50 * time.Millisecond)
+		}
+	case "parent":
+		fmt.Println("ready") // service readiness; the job assignment runs before this
+		// Extra insurance on a busy CI that the assignment landed before the
+		// grandchild is spawned, so the grandchild is captured by the tree.
+		time.Sleep(200 * time.Millisecond)
+		child := exec.CommandContext(context.Background(), os.Args[0], "-test.run=TestHelperProcess")
+		child.Env = append(os.Environ(), "ATAGO_SVC_HELPER=grandchild", "ATAGO_SVC_MARKER="+marker)
+		_ = child.Start()
+		time.Sleep(60 * time.Second) // idle until teardown kills the tree; self-exit is the backstop
 	}
 }
 
