@@ -122,15 +122,6 @@ func CapturePTY(command string, shell bool, in, out *os.File) (PTYRecording, err
 	return rec, nil
 }
 
-// terminalSize returns the developer console's rows/cols, or the pty default
-// (24x80) when out is not a console.
-func terminalSize(out *os.File) (rows, cols int) {
-	if w, h, err := term.GetSize(int(out.Fd())); err == nil && w > 0 && h > 0 {
-		return h, w
-	}
-	return 24, 80
-}
-
 // enableVTOutput turns on ENABLE_VIRTUAL_TERMINAL_PROCESSING for the developer's
 // output console so the ConPTY's ANSI stream renders, and returns a func that
 // restores the previous mode. When out is not a console it is a no-op.
