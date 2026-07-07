@@ -122,15 +122,6 @@ func CapturePTY(command string, shell bool, in, out *os.File) (PTYRecording, err
 	return rec, nil
 }
 
-// terminalSize returns the invoking terminal's rows/cols, or the pty default
-// (24x80) when out is not a terminal.
-func terminalSize(out *os.File) (rows, cols int) {
-	if r, c, err := pty.Getsize(out); err == nil && r > 0 && c > 0 {
-		return r, c
-	}
-	return 24, 80
-}
-
 // echoDisabled reports whether the pty's terminal echo is currently off — the
 // signal of a password prompt, whose typed bytes must not be recorded (#69).
 func echoDisabled(master *os.File) bool {
