@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"os/exec"
+	"strconv"
 	"sync"
 	"time"
 	"unsafe"
@@ -13,13 +14,15 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// processCmd wraps an *exec.Cmd and, once started, ties the process to a
-// kill-on-close job object. Windows has no process groups, so a service launched
-// with `shell: true` that forks further children would orphan them on a bare
-// process kill (the previous behavior). A job object terminates the whole tree
-// at once, and JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE also reaps any survivors if
-// atago itself exits without a clean teardown — the closest Windows analog to
-// the POSIX runner's process-group kill.
+// processCmd wraps an *exec.Cmd and tears down the whole process tree on
+// teardown. Windows has no process groups, so a service launched with `shell:
+// true` that forks further children would orphan them on a bare process kill
+// (the previous behavior). Explicit teardown uses `taskkill /T`, which walks the
+// LIVE process tree at kill time — race-free, and the same mechanism the pty
+// runner uses. Separately, the process is tied to a kill-on-close job object
+// whose JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE reaps survivors if atago itself exits
+// without a clean teardown; that path is best-effort (a child forked before the
+// post-Start assignment lands would escape the job, though not taskkill).
 type processCmd struct {
 	cmd *exec.Cmd
 
@@ -38,12 +41,13 @@ func newProcessCmd(ctx context.Context, name string, args []string) *processCmd 
 	return p
 }
 
-// started ties the freshly-started process to a kill-on-close job object. Start
-// calls it right after cmd.Start(); every child the service spawns afterward is
-// captured by the job automatically. A child forked in the microseconds between
-// Start and this assignment would escape, but real services fork during their
-// own initialization, well after this returns. A failure here is non-fatal: the
-// service still runs, and killTree falls back to a single-process kill.
+// started ties the freshly-started process to a kill-on-close job object as
+// crash-insurance. Start calls it right after cmd.Start(); children the service
+// spawns afterward join the job automatically. A child forked before this
+// assignment lands would escape the job, but that only weakens the
+// atago-crashed-without-teardown path — explicit teardown goes through
+// killTree's race-free taskkill /T. A failure here is non-fatal: the service
+// still runs and killTree still tears the tree down.
 func (p *processCmd) started() error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -83,13 +87,13 @@ func (p *processCmd) started() error {
 }
 
 // terminate and kill are identical on Windows: there is no SIGTERM to deliver, so
-// a "graceful" stop is the same hard job termination as the escalated one. This
-// mirrors the pre-existing Windows behavior (both were a process kill); the only
-// change is that the whole tree now goes down, not just the leader.
+// a "graceful" stop is the same hard tree kill as the escalated one. This mirrors
+// the pre-existing Windows behavior (both were a process kill); the only change
+// is that the whole tree now goes down, not just the leader.
 func (p *processCmd) terminate() { p.killTree() }
 func (p *processCmd) kill()      { p.killTree() }
 
-// killTree terminates every process in the job and releases the handle. It is
+// killTree terminates the whole process tree and releases the job handle. It is
 // idempotent: the graceful-then-hard teardown in service.Stop calls it twice,
 // and once the tree is down the second call is a no-op.
 func (p *processCmd) killTree() {
@@ -99,17 +103,17 @@ func (p *processCmd) killTree() {
 		return
 	}
 	p.down = true
+	// Race-free explicit teardown: taskkill /T walks the LIVE process tree at
+	// kill time, so it reaps descendants even one spawned in the window between
+	// Start and the job assignment. Mirrors the pty runner's killTree.
+	if p.cmd.Process != nil {
+		_ = exec.CommandContext(context.Background(), "taskkill", "/T", "/F", "/PID", strconv.Itoa(p.cmd.Process.Pid)).Run() //nolint:gosec // fixed argv, pid from our own child
+	}
+	// Release the job. Its KILL_ON_JOB_CLOSE is crash-insurance (if atago dies
+	// without a clean teardown); the taskkill above already stopped the tree.
 	if p.job != 0 {
-		_ = windows.TerminateJobObject(p.job, 1)
 		_ = windows.CloseHandle(p.job)
 		p.job = 0
-		return
-	}
-	// The job was never assigned (started() failed or ran before the process
-	// existed): fall back to a single-process kill so teardown still stops the
-	// leader.
-	if p.cmd.Process != nil {
-		_ = p.cmd.Process.Kill()
 	}
 }
 

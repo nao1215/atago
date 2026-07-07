@@ -498,9 +498,11 @@ func helperEnv(mode, marker string) map[string]string {
 // TestHelperProcess is not a real test: TestStop_TerminatesChildTree re-executes
 // the test binary as the service under test to build a real process tree on every
 // OS. With no ATAGO_SVC_HELPER set (a normal `go test` run) it is an instant
-// no-op. Mode "parent" announces readiness, waits for atago to tie it to its
-// teardown mechanism, spawns a "grandchild", then idles; mode "grandchild"
-// appends to the marker forever, so a survivor of Stop keeps the file growing.
+// no-op. Mode "parent" announces readiness, IMMEDIATELY spawns a "grandchild",
+// then idles — the immediate spawn deliberately stresses the case where a child
+// appears before any post-Start bookkeeping, which race-free teardown must still
+// reap. Mode "grandchild" appends to the marker forever, so a survivor of Stop
+// keeps the file growing.
 func TestHelperProcess(t *testing.T) {
 	marker := os.Getenv("ATAGO_SVC_MARKER")
 	switch os.Getenv("ATAGO_SVC_HELPER") {
@@ -515,13 +517,12 @@ func TestHelperProcess(t *testing.T) {
 			time.Sleep(50 * time.Millisecond)
 		}
 	case "parent":
-		fmt.Println("ready") // service readiness; the job assignment runs before this
-		// Extra insurance on a busy CI that the assignment landed before the
-		// grandchild is spawned, so the grandchild is captured by the tree.
-		time.Sleep(200 * time.Millisecond)
+		// Spawn the grandchild first thing, before announcing readiness, so it is
+		// alive well before Stop and exercises the immediate-child-spawn path.
 		child := exec.CommandContext(context.Background(), os.Args[0], "-test.run=TestHelperProcess")
 		child.Env = append(os.Environ(), "ATAGO_SVC_HELPER=grandchild", "ATAGO_SVC_MARKER="+marker)
 		_ = child.Start()
+		fmt.Println("ready")         // service readiness
 		time.Sleep(60 * time.Second) // idle until teardown kills the tree; self-exit is the backstop
 	}
 }
