@@ -16,7 +16,7 @@ require (
 	github.com/lib/pq v1.12.3
 	github.com/mattn/go-shellwords v1.0.13
 	github.com/nao1215/markdown v0.13.0
-	github.com/ohler55/ojg v1.28.1
+	github.com/ohler55/ojg v1.28.2
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
 	golang.org/x/crypto v0.53.0
 	golang.org/x/image v0.43.0
