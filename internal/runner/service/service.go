@@ -74,6 +74,11 @@ func Start(ctx context.Context, svc *spec.Service, workdir string) (*Proc, strin
 	if err := pc.cmd.Start(); err != nil {
 		return nil, "", fmt.Errorf("service %q: failed to start %q: %w", svc.Name, svc.Command, err)
 	}
+	// Tie the process to its teardown mechanism now that it has a pid: a job
+	// object on Windows, a no-op on POSIX (the process group was set at spawn).
+	// A failure is non-fatal — the service runs and teardown degrades to a
+	// single-process kill — so it must not abort a working start.
+	_ = pc.started()
 
 	p := &Proc{name: svc.Name, c: pc, out: out, done: make(chan struct{})}
 	go func() {

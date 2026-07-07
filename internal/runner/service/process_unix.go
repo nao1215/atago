@@ -27,6 +27,11 @@ func newProcessCmd(ctx context.Context, name string, args []string) *processCmd 
 	return &processCmd{cmd: c}
 }
 
+// started is a no-op on POSIX: the process group is established at spawn time by
+// Setpgid, so there is nothing to wire up after Start (the Windows build assigns
+// a job object here instead).
+func (p *processCmd) started() error { return nil }
+
 func (p *processCmd) terminate() { _ = signalGroup(p.cmd, syscall.SIGTERM) }
 func (p *processCmd) kill()      { _ = signalGroup(p.cmd, syscall.SIGKILL) }
 
