@@ -9,6 +9,11 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- An error from `atago snapshot update` now names that command instead of the
+  `atago run` it delegates to internally. A missing target or a bad flag printed
+  `atago run: ...` even though the user typed `snapshot update`; the diagnostic
+  prefix now matches the invoked command.
+
 - A no-shell command (`shell: false`, the default) authored as a YAML block
   scalar now tokenizes to the same argv on every OS. `windowsFields` split only
   on spaces and tabs while POSIX (`go-shellwords`) also splits on carriage

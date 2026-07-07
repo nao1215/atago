@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-69 suites · 336 scenarios
+69 suites · 337 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -74,10 +74,11 @@
   - [an impossible bound fails and shows the measured duration](#scenario-an-impossible-bound-fails-and-shows-the-measured-duration)
   - [a deliberate wait satisfies a lower bound](#scenario-a-deliberate-wait-satisfies-a-lower-bound)
   - [a duration assert with no preceding step is a load-time error](#scenario-a-duration-assert-with-no-preceding-step-is-a-load-time-error)
-- [atago self-hosting / edge cases](#atago-self-hosting--edge-cases) — 3 scenarios
+- [atago self-hosting / edge cases](#atago-self-hosting--edge-cases) — 4 scenarios
   - [JSON assertion on empty stdout reports an empty stream](#scenario-json-assertion-on-empty-stdout-reports-an-empty-stream)
   - [an unsupported matcher is a parse error](#scenario-an-unsupported-matcher-is-a-parse-error)
   - [a mixed valid+invalid run reads FAILED and counts the dropped spec](#scenario-a-mixed-validinvalid-run-reads-failed-and-counts-the-dropped-spec)
+  - [a snapshot update error names the snapshot command, not run](#scenario-a-snapshot-update-error-names-the-snapshot-command-not-run)
 - [atago self-hosting / workdir + scenario env + not_contains](#atago-self-hosting--workdir--scenario-env--not_contains) — 6 scenarios
   - [run.stdout_to redirects stdout to a workdir file without a shell](#scenario-runstdout_to-redirects-stdout-to-a-workdir-file-without-a-shell)
   - [scenario env is shared by every run step and overridable per step](#scenario-scenario-env-is-shared-by-every-run-step-and-overridable-per-step)
@@ -1739,6 +1740,14 @@ ${atago} run good.atago.yaml broken.atago.yaml
 - exit code is `2`
 - stdout contains `1 spec failed to load`
 - stdout does not contain `PASSED`
+### Scenario: a snapshot update error names the snapshot command, not run
+#### When
+```shell
+${atago} snapshot update no-such-spec.atago.yaml
+```
+#### Then
+- exit code is `3`
+- stderr contains `atago snapshot update: cannot access`
 ## atago self-hosting / workdir + scenario env + not_contains
 Source: `test/e2e/atago/env_workdir.atago.yaml`
 ### Scenario: run.stdout_to redirects stdout to a workdir file without a shell
