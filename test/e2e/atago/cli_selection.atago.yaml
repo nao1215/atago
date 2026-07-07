@@ -1,0 +1,123 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / CLI scenario selection
+
+# Pins the set semantics of the run-selection flags against a fixed inner suite
+# of three scenarios — alpha [fast], beta [slow], gamma [fast, slow]. --filter
+# selects by name substring (OR across a comma list), --tag by tag membership
+# (OR when repeated), --skip-tag removes by tag, and the two compose as
+# (tag-selected \ skip-tagged). Selection is read back from the json report:
+# deselected scenarios are absent, so the scenarios array length is the size of
+# the selected set. exit 0 is a builtin of both shells, so this runs on Windows.
+scenarios:
+  - name: filter selects by a name substring
+    steps:
+      - fixture:
+          file: inner.atago.yaml
+          content: &inner |
+            version: "1"
+            suite: {name: inner}
+            scenarios:
+              - name: alpha
+                tags: [fast]
+                steps: [{run: {shell: true, command: "exit 0"}}, {assert: {exit_code: 0}}]
+              - name: beta
+                tags: [slow]
+                steps: [{run: {shell: true, command: "exit 0"}}, {assert: {exit_code: 0}}]
+              - name: gamma
+                tags: [fast, slow]
+                steps: [{run: {shell: true, command: "exit 0"}}, {assert: {exit_code: 0}}]
+      - run: {command: "${atago} run --ci --report json --filter alpha inner.atago.yaml"}
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              - path: "$.suites[0].scenarios"
+                length: 1
+      - assert:
+          stdout:
+            contains: '"alpha"'
+            not_contains: ['"beta"', '"gamma"']
+
+  - name: filter is OR across a comma-separated list
+    steps:
+      - fixture: {file: inner.atago.yaml, content: *inner}
+      - run: {command: "${atago} run --ci --report json --filter alpha,beta inner.atago.yaml"}
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              - path: "$.suites[0].scenarios"
+                length: 2
+      - assert:
+          stdout:
+            contains: ['"alpha"', '"beta"']
+            not_contains: '"gamma"'
+
+  - name: tag selects scenarios carrying the tag
+    steps:
+      - fixture: {file: inner.atago.yaml, content: *inner}
+      - run: {command: "${atago} run --ci --report json --tag fast inner.atago.yaml"}
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              - path: "$.suites[0].scenarios"
+                length: 2
+      - assert:
+          stdout:
+            contains: ['"alpha"', '"gamma"']
+            not_contains: '"beta"'
+
+  - name: a repeated tag flag is OR
+    steps:
+      - fixture: {file: inner.atago.yaml, content: *inner}
+      - run: {command: "${atago} run --ci --report json --tag fast --tag slow inner.atago.yaml"}
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              - path: "$.suites[0].scenarios"
+                length: 3
+
+  - name: skip-tag removes scenarios carrying the tag
+    steps:
+      - fixture: {file: inner.atago.yaml, content: *inner}
+      - run: {command: "${atago} run --ci --report json --skip-tag slow inner.atago.yaml"}
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              - path: "$.suites[0].scenarios"
+                length: 1
+      - assert:
+          stdout:
+            contains: '"alpha"'
+            not_contains: ['"beta"', '"gamma"']
+
+  - name: tag and skip-tag compose as selected minus skipped
+    steps:
+      - fixture: {file: inner.atago.yaml, content: *inner}
+      - run: {command: "${atago} run --ci --report json --tag fast --skip-tag slow inner.atago.yaml"}
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              - path: "$.suites[0].scenarios"
+                length: 1
+      - assert:
+          stdout:
+            contains: '"alpha"'
+            not_contains: '"gamma"'
+
+  - name: a filter that matches nothing selects an empty set and still exits zero
+    steps:
+      - fixture: {file: inner.atago.yaml, content: *inner}
+      - run: {command: "${atago} run --ci --report json --filter no_such_name inner.atago.yaml"}
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              - path: "$.suites[0].scenarios"
+                length: 0
