@@ -26,6 +26,7 @@ printf '%s\n' \
   ./test/e2e/atago/exit_codes.atago.yaml \
   ./test/e2e/atago/loader_errors.atago.yaml \
   ./test/e2e/atago/cli_selection.atago.yaml \
+  ./test/e2e/atago/matrix_edges.atago.yaml \
   ./test/e2e/atago/file_equals.atago.yaml \
   ./test/e2e/atago/store_whole.atago.yaml \
   ./test/e2e/atago/json_list.atago.yaml \

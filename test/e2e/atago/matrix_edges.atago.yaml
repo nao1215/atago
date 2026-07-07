@@ -1,0 +1,119 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / matrix expansion boundary values
+
+# A matrix turns one template scenario into one concrete scenario per row, with
+# each row's variables seeded for ${name} substitution — including in the
+# scenario name. These pin the boundaries: name substitution across rows, a
+# multi-variable row, a single row, and the two load-time rejections (an empty
+# row list, and rows that expand to the same name). Selection and validation are
+# OS-independent, and the commands are exit 0, a builtin of both shells, so the
+# suite runs in the Windows portable subset.
+scenarios:
+  - name: each row substitutes into the scenario name
+    steps:
+      - fixture:
+          file: names.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: names}
+            scenarios:
+              - name: "case ${n}"
+                matrix:
+                  - {n: "1"}
+                  - {n: "2"}
+                  - {n: "3"}
+                steps: [{run: {shell: true, command: "exit 0"}}, {assert: {exit_code: 0}}]
+      - run: {command: "${atago} run --ci --report json names.atago.yaml"}
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              - path: "$.suites[0].scenarios"
+                length: 3
+              - path: "$.suites[0].scenarios[0].name"
+                equals: "case 1"
+              - path: "$.suites[0].scenarios[2].name"
+                equals: "case 3"
+
+  - name: a row with several variables substitutes all of them
+    steps:
+      - fixture:
+          file: multi.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: multi}
+            scenarios:
+              - name: "${who} speaks ${lang}"
+                matrix:
+                  - {who: Alice, lang: en}
+                  - {who: Bob, lang: fr}
+                steps: [{run: {shell: true, command: "exit 0"}}, {assert: {exit_code: 0}}]
+      - run: {command: "${atago} run --ci --report json multi.atago.yaml"}
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              - path: "$.suites[0].scenarios[0].name"
+                equals: "Alice speaks en"
+              - path: "$.suites[0].scenarios[1].name"
+                equals: "Bob speaks fr"
+
+  - name: a single-row matrix expands to exactly one scenario
+    steps:
+      - fixture:
+          file: single.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: single}
+            scenarios:
+              - name: "only ${k}"
+                matrix:
+                  - {k: solo}
+                steps: [{run: {shell: true, command: "exit 0"}}, {assert: {exit_code: 0}}]
+      - run: {command: "${atago} run --ci --report json single.atago.yaml"}
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              - path: "$.suites[0].scenarios"
+                length: 1
+              - path: "$.suites[0].scenarios[0].name"
+                equals: "only solo"
+
+  - name: an empty matrix row list is a load-time error
+    steps:
+      - fixture:
+          file: emptymx.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: emptymx}
+            scenarios:
+              - name: "e ${n}"
+                matrix: []
+                steps: [{run: {shell: true, command: "exit 0"}}]
+      - run: {command: "${atago} run emptymx.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr:
+            contains: "matrix must contain at least one row"
+
+  - name: rows that expand to the same name are rejected as duplicates
+    steps:
+      - fixture:
+          file: dupmx.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: dupmx}
+            scenarios:
+              - name: "dup ${n}"
+                matrix:
+                  - {n: same}
+                  - {n: same}
+                steps: [{run: {shell: true, command: "exit 0"}}]
+      - run: {command: "${atago} run dupmx.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr:
+            contains: 'duplicate scenario name "dup same"'
