@@ -1,12 +1,17 @@
 # atago Behavior Specs
 ## Summary
-72 suites · 358 scenarios
+73 suites · 362 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
   - [a single-quoted argument with a space stays one argument](#scenario-a-single-quoted-argument-with-a-space-stays-one-argument)
   - [a block-scalar command splits on newlines like spaces](#scenario-a-block-scalar-command-splits-on-newlines-like-spaces)
   - [a folded-scalar command drops its trailing newline](#scenario-a-folded-scalar-command-drops-its-trailing-newline)
+- [atago self-hosting / artifacts-dir failure payloads](#atago-self-hosting--artifacts-dir-failure-payloads) — 4 scenarios
+  - [a failing stdout equals writes expected and actual sidecars](#scenario-a-failing-stdout-equals-writes-expected-and-actual-sidecars)
+  - [a passing scenario writes no failure payload](#scenario-a-passing-scenario-writes-no-failure-payload)
+  - [the artifacts directory is created when it does not exist](#scenario-the-artifacts-directory-is-created-when-it-does-not-exist)
+  - [a file-content mismatch also writes a payload](#scenario-a-file-content-mismatch-also-writes-a-payload)
 - [atago self-hosting / variable expansion in assertion matcher values](#atago-self-hosting--variable-expansion-in-assertion-matcher-values) — 6 scenarios
   - [stdout.equals expands ${workdir}](#scenario-stdoutequals-expands-workdir)
   - [stdout.contains and not_contains expand a stored variable](#scenario-stdoutcontains-and-not_contains-expand-a-stored-variable)
@@ -469,6 +474,102 @@ ${atago} run no-such-file.yaml
 #### Then
 - exit code is `3`
 - stderr contains `no-such-file.yaml`
+## atago self-hosting / artifacts-dir failure payloads
+Source: `test/e2e/atago/artifacts.atago.yaml`
+### Scenario: a failing stdout equals writes expected and actual sidecars
+#### Given
+- Fixture file `fail.atago.yaml` is created.
+#### Inputs
+_Fixture `fail.atago.yaml`:_
+```text
+version: "1"
+suite: {name: fail}
+scenarios:
+  - name: stdout drifts
+    steps:
+      - run: {shell: true, command: "printf 'actual-value\\n'"}
+      - assert: {stdout: {equals: "expected-value"}}
+```
+#### When
+```shell
+${atago} run --artifacts-dir arts fail.atago.yaml
+cat arts/*/*/*.actual.txt arts/*/*/*.expected.txt
+```
+#### Then
+- after `${atago} run --artifacts-dir arts fail.atago.yaml`:
+  - exit code is `1`
+- after `cat arts/*/*/*.actual.txt arts/*/*/*.expected.txt`:
+  - exit code is `0`
+  - stdout contains `actual-value`, `expected-value`
+### Scenario: a passing scenario writes no failure payload
+#### Given
+- Fixture file `pass.atago.yaml` is created.
+#### Inputs
+_Fixture `pass.atago.yaml`:_
+```text
+version: "1"
+suite: {name: pass}
+scenarios:
+  - name: all good
+    steps:
+      - run: {shell: true, command: "printf 'ok\\n'"}
+      - assert: {stdout: {equals: "ok"}}
+```
+#### When
+```shell
+${atago} run --artifacts-dir arts2 pass.atago.yaml
+find arts2 -name '*.actual.txt' 2>/dev/null | wc -l
+```
+#### Then
+- after `${atago} run --artifacts-dir arts2 pass.atago.yaml`:
+  - exit code is `0`
+- after `find arts2 -name '*.actual.txt' 2>/dev/null | wc -l`:
+  - stdout matches `/^\s*0\s*$/`
+### Scenario: the artifacts directory is created when it does not exist
+#### Given
+- Fixture file `nested.atago.yaml` is created.
+#### Inputs
+_Fixture `nested.atago.yaml`:_
+```text
+version: "1"
+suite: {name: nested}
+scenarios:
+  - name: fails
+    steps:
+      - run: {shell: true, command: "printf 'x\\n'"}
+      - assert: {stdout: {equals: "y"}}
+```
+#### When
+```shell
+${atago} run --artifacts-dir deep/made/arts nested.atago.yaml
+```
+#### Then
+- exit code is `1`
+- dir `deep/made/arts` exists
+### Scenario: a file-content mismatch also writes a payload
+#### Given
+- Fixture file `filefail.atago.yaml` is created.
+#### Inputs
+_Fixture `filefail.atago.yaml`:_
+```text
+version: "1"
+suite: {name: filefail}
+scenarios:
+  - name: file drifts
+    steps:
+      - fixture: {file: out.txt, content: "written-bytes"}
+      - assert: {file: {path: out.txt, equals: "wanted-bytes"}}
+```
+#### When
+```shell
+${atago} run --artifacts-dir farts filefail.atago.yaml
+find farts -type f | wc -l
+```
+#### Then
+- after `${atago} run --artifacts-dir farts filefail.atago.yaml`:
+  - exit code is `1`
+- after `find farts -type f | wc -l`:
+  - stdout does not match `/^\s*0\s*$/`
 ## atago self-hosting / variable expansion in assertion matcher values
 Source: `test/e2e/atago/assert_expand.atago.yaml`
 ### Scenario: stdout.equals expands ${workdir}
