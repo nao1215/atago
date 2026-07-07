@@ -116,15 +116,23 @@ func saveRerunState(failed []failedEntry) error {
 	return os.WriteFile(rerunStatePath(), data, 0o600)
 }
 
-// absClean returns the absolute, cleaned form of p, falling back to a lexical
-// clean when the working directory is unavailable. It lets --rerun-failed match
-// a spec regardless of how its path is spelled (relative vs absolute) between the
-// recording run and the rerun; comparing raw strings would miss equivalent paths.
+// absClean returns a canonical form of p so --rerun-failed matches a spec
+// regardless of how its path is spelled (relative vs absolute) between the
+// recording run and the rerun; comparing raw strings would miss equivalent
+// paths. Symlinks in the prefix are resolved too: os.Getwd (used by Abs) returns
+// the symlink-resolved directory, so on a platform whose temp dir is a symlink
+// (macOS /var -> /private/var) a relative recording and an explicit /var/...
+// target would otherwise canonicalize differently. EvalSymlinks needs the path
+// to exist; fall back to the absolute (then lexical) form when it does not.
 func absClean(p string) string {
-	if abs, err := filepath.Abs(p); err == nil {
-		return abs
+	abs, err := filepath.Abs(p)
+	if err != nil {
+		return filepath.Clean(p)
 	}
-	return filepath.Clean(p)
+	if resolved, rerr := filepath.EvalSymlinks(abs); rerr == nil {
+		return resolved
+	}
+	return abs
 }
 
 // intersectPaths returns the members of paths that also appear in keep,
