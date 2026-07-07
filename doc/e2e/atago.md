@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-68 suites · 329 scenarios
+69 suites · 336 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -34,6 +34,14 @@
   - [a pty step feeds the delta scan just like a run step (POSIX)](#scenario-a-pty-step-feeds-the-delta-scan-just-like-a-run-step-posix)
   - [a doublestar glob pins an arbitrary-depth generated tree exactly (POSIX)](#scenario-a-doublestar-glob-pins-an-arbitrary-depth-generated-tree-exactly-posix)
   - [a stray file outside the doublestar prefix breaks the exact contract (POSIX)](#scenario-a-stray-file-outside-the-doublestar-prefix-breaks-the-exact-contract-posix)
+- [atago self-hosting / CLI scenario selection](#atago-self-hosting--cli-scenario-selection) — 7 scenarios
+  - [filter selects by a name substring](#scenario-filter-selects-by-a-name-substring)
+  - [filter is OR across a comma-separated list](#scenario-filter-is-or-across-a-comma-separated-list)
+  - [tag selects scenarios carrying the tag](#scenario-tag-selects-scenarios-carrying-the-tag)
+  - [a repeated tag flag is OR](#scenario-a-repeated-tag-flag-is-or)
+  - [skip-tag removes scenarios carrying the tag](#scenario-skip-tag-removes-scenarios-carrying-the-tag)
+  - [tag and skip-tag compose as selected minus skipped](#scenario-tag-and-skip-tag-compose-as-selected-minus-skipped)
+  - [a filter that matches nothing selects an empty set and still exits zero](#scenario-a-filter-that-matches-nothing-selects-an-empty-set-and-still-exits-zero)
 - [atago self-hosting / completion](#atago-self-hosting--completion) — 5 scenarios
   - [bash completion emits a recognizable script](#scenario-bash-completion-emits-a-recognizable-script)
   - [zsh completion emits a compdef script](#scenario-zsh-completion-emits-a-compdef-script)
@@ -891,6 +899,195 @@ ${atago} run check.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `unexpected created file`
+## atago self-hosting / CLI scenario selection
+Source: `test/e2e/atago/cli_selection.atago.yaml`
+### Scenario: filter selects by a name substring
+#### Given
+- Fixture file `inner.atago.yaml` is created.
+#### Inputs
+_Fixture `inner.atago.yaml`:_
+```text
+version: "1"
+suite: {name: inner}
+scenarios:
+  - name: alpha
+    tags: [fast]
+    steps: [{run: {shell: true, command: "exit 0"}}, {assert: {exit_code: 0}}]
+  - name: beta
+    tags: [slow]
+    steps: [{run: {shell: true, command: "exit 0"}}, {assert: {exit_code: 0}}]
+  - name: gamma
+    tags: [fast, slow]
+    steps: [{run: {shell: true, command: "exit 0"}}, {assert: {exit_code: 0}}]
+```
+#### When
+```shell
+${atago} run --ci --report json --filter alpha inner.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout at `$.suites[0].scenarios` has length 1
+- stdout contains `"alpha"`
+### Scenario: filter is OR across a comma-separated list
+#### Given
+- Fixture file `inner.atago.yaml` is created.
+#### Inputs
+_Fixture `inner.atago.yaml`:_
+```text
+version: "1"
+suite: {name: inner}
+scenarios:
+  - name: alpha
+    tags: [fast]
+    steps: [{run: {shell: true, command: "exit 0"}}, {assert: {exit_code: 0}}]
+  - name: beta
+    tags: [slow]
+    steps: [{run: {shell: true, command: "exit 0"}}, {assert: {exit_code: 0}}]
+  - name: gamma
+    tags: [fast, slow]
+    steps: [{run: {shell: true, command: "exit 0"}}, {assert: {exit_code: 0}}]
+```
+#### When
+```shell
+${atago} run --ci --report json --filter alpha,beta inner.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout at `$.suites[0].scenarios` has length 2
+- stdout contains `"alpha"`, `"beta"`
+### Scenario: tag selects scenarios carrying the tag
+#### Given
+- Fixture file `inner.atago.yaml` is created.
+#### Inputs
+_Fixture `inner.atago.yaml`:_
+```text
+version: "1"
+suite: {name: inner}
+scenarios:
+  - name: alpha
+    tags: [fast]
+    steps: [{run: {shell: true, command: "exit 0"}}, {assert: {exit_code: 0}}]
+  - name: beta
+    tags: [slow]
+    steps: [{run: {shell: true, command: "exit 0"}}, {assert: {exit_code: 0}}]
+  - name: gamma
+    tags: [fast, slow]
+    steps: [{run: {shell: true, command: "exit 0"}}, {assert: {exit_code: 0}}]
+```
+#### When
+```shell
+${atago} run --ci --report json --tag fast inner.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout at `$.suites[0].scenarios` has length 2
+- stdout contains `"alpha"`, `"gamma"`
+### Scenario: a repeated tag flag is OR
+#### Given
+- Fixture file `inner.atago.yaml` is created.
+#### Inputs
+_Fixture `inner.atago.yaml`:_
+```text
+version: "1"
+suite: {name: inner}
+scenarios:
+  - name: alpha
+    tags: [fast]
+    steps: [{run: {shell: true, command: "exit 0"}}, {assert: {exit_code: 0}}]
+  - name: beta
+    tags: [slow]
+    steps: [{run: {shell: true, command: "exit 0"}}, {assert: {exit_code: 0}}]
+  - name: gamma
+    tags: [fast, slow]
+    steps: [{run: {shell: true, command: "exit 0"}}, {assert: {exit_code: 0}}]
+```
+#### When
+```shell
+${atago} run --ci --report json --tag fast --tag slow inner.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout at `$.suites[0].scenarios` has length 3
+### Scenario: skip-tag removes scenarios carrying the tag
+#### Given
+- Fixture file `inner.atago.yaml` is created.
+#### Inputs
+_Fixture `inner.atago.yaml`:_
+```text
+version: "1"
+suite: {name: inner}
+scenarios:
+  - name: alpha
+    tags: [fast]
+    steps: [{run: {shell: true, command: "exit 0"}}, {assert: {exit_code: 0}}]
+  - name: beta
+    tags: [slow]
+    steps: [{run: {shell: true, command: "exit 0"}}, {assert: {exit_code: 0}}]
+  - name: gamma
+    tags: [fast, slow]
+    steps: [{run: {shell: true, command: "exit 0"}}, {assert: {exit_code: 0}}]
+```
+#### When
+```shell
+${atago} run --ci --report json --skip-tag slow inner.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout at `$.suites[0].scenarios` has length 1
+- stdout contains `"alpha"`
+### Scenario: tag and skip-tag compose as selected minus skipped
+#### Given
+- Fixture file `inner.atago.yaml` is created.
+#### Inputs
+_Fixture `inner.atago.yaml`:_
+```text
+version: "1"
+suite: {name: inner}
+scenarios:
+  - name: alpha
+    tags: [fast]
+    steps: [{run: {shell: true, command: "exit 0"}}, {assert: {exit_code: 0}}]
+  - name: beta
+    tags: [slow]
+    steps: [{run: {shell: true, command: "exit 0"}}, {assert: {exit_code: 0}}]
+  - name: gamma
+    tags: [fast, slow]
+    steps: [{run: {shell: true, command: "exit 0"}}, {assert: {exit_code: 0}}]
+```
+#### When
+```shell
+${atago} run --ci --report json --tag fast --skip-tag slow inner.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout at `$.suites[0].scenarios` has length 1
+- stdout contains `"alpha"`
+### Scenario: a filter that matches nothing selects an empty set and still exits zero
+#### Given
+- Fixture file `inner.atago.yaml` is created.
+#### Inputs
+_Fixture `inner.atago.yaml`:_
+```text
+version: "1"
+suite: {name: inner}
+scenarios:
+  - name: alpha
+    tags: [fast]
+    steps: [{run: {shell: true, command: "exit 0"}}, {assert: {exit_code: 0}}]
+  - name: beta
+    tags: [slow]
+    steps: [{run: {shell: true, command: "exit 0"}}, {assert: {exit_code: 0}}]
+  - name: gamma
+    tags: [fast, slow]
+    steps: [{run: {shell: true, command: "exit 0"}}, {assert: {exit_code: 0}}]
+```
+#### When
+```shell
+${atago} run --ci --report json --filter no_such_name inner.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout at `$.suites[0].scenarios` has length 0
 ## atago self-hosting / completion
 Source: `test/e2e/atago/completion.atago.yaml`
 ### Scenario: bash completion emits a recognizable script
