@@ -7,6 +7,44 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-07-07
+
+Windows completes its interactive-terminal story. `pty:` steps and
+`atago record --pty` now drive a ConPTY pseudo-console on Windows, so the
+interactive specs that were gated `skip: {os: windows}` run everywhere, and a
+session recorded on Windows produces a spec that also replays on Windows. A
+background `service:` is now torn down with its whole process tree on Windows,
+not just its leader. The ConPTY layer is implemented in-repo on
+`golang.org/x/sys/windows` with no third-party dependency, and the POSIX pty
+path is unchanged. Only `signal:` remains POSIX-only — Windows has no POSIX
+signals to deliver.
+
+### Added
+
+- `pty:` steps run on Windows through a ConPTY pseudo-console (Windows 10 1809
+  or later), not just on POSIX. The expect/send session, named keys, and
+  rendered-screen asserts all work; the loader already accepted the step on
+  every platform, and the engine now drives it instead of returning an
+  "unsupported" error. The POSIX runner keeps using creack/pty unchanged — only
+  the platform-neutral expect/send loop is shared between the two. See
+  [examples/pty_portable.atago.yaml](examples/pty_portable.atago.yaml).
+- `atago record --pty` records an interactive session on Windows over a ConPTY,
+  and a session recorded there generates a spec whose `pty:` step also replays
+  on Windows. The ConPTY wrapper is shared with the pty runner in a new
+  `internal/conpty` package, built directly on `golang.org/x/sys/windows` (no
+  new dependency). One difference from POSIX: a ConPTY exposes no echo state, so
+  a typed password is not auto-masked on Windows — convert a secret send to a
+  `${env:...}` placeholder by hand.
+
+### Fixed
+
+- A background `service:` on Windows is now torn down with its whole process
+  tree, not just its leader. A service launched with `shell: true` that forked
+  further children would orphan them on teardown; teardown now uses
+  `taskkill /T` — a race-free kill of the live process tree — backed by a
+  kill-on-close job object as crash-insurance, the Windows analog of the POSIX
+  runner's process-group kill.
+
 ## [0.6.1] - 2026-07-07
 
 A robustness patch: seven fixes, each landed test-first. Two panics on malformed
