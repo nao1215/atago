@@ -34,3 +34,19 @@ scenarios:
           dir:
             path: never-created
             exists: false
+
+  - name: a dangling symlink is a present directory entry (membership uses Lstat)
+    skip: {os: windows}
+    steps:
+      # A broken symlink is still a directory entry the program left behind;
+      # membership must see it via the entry, not by resolving the missing target.
+      - run:
+          shell: true
+          command: mkdir -p linkdir && ln -s /nonexistent-target-xyz linkdir/planted
+      - assert:
+          exit_code: 0
+      - assert:
+          dir:
+            path: linkdir
+            contains: [planted]
+            not_contains: [never-planted]

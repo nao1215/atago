@@ -98,6 +98,31 @@ func TestCheckDir_PathConfinement(t *testing.T) {
 	}
 }
 
+// TestCheckDir_BrokenSymlinkMembership pins that contains/not_contains judge
+// membership by the directory entry, not by whether the link target resolves. A
+// dangling symlink is a real dirent, so not_contains must FAIL (the file was
+// left behind) and contains must PASS. Using os.Stat here would follow the link,
+// see IsNotExist, and wrongly report the entry absent — a dangerous false PASS
+// for not_contains.
+func TestCheckDir_BrokenSymlinkMembership(t *testing.T) {
+	wd := t.TempDir()
+	dir := filepath.Join(wd, "out")
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	// A symlink whose target does not exist: the dirent "planted" is present, but
+	// os.Stat on it returns IsNotExist.
+	if err := os.Symlink(filepath.Join(dir, "nonexistent-target"), filepath.Join(dir, "planted")); err != nil {
+		t.Skipf("symlinks unsupported on this platform: %v", err)
+	}
+	if cr := checkDirOK(t, wd, &spec.DirAssert{Path: "out", NotContains: []string{"planted"}}); cr.OK {
+		t.Error("not_contains must FAIL for a present (broken-symlink) entry")
+	}
+	if cr := checkDirOK(t, wd, &spec.DirAssert{Path: "out", Contains: []string{"planted"}}); !cr.OK {
+		t.Errorf("contains must PASS for a present (broken-symlink) entry: %+v", cr)
+	}
+}
+
 func TestCheckDir_NotADirectory(t *testing.T) {
 	wd := makeTree(t)
 	if err := os.WriteFile(filepath.Join(wd, "afile"), []byte("x"), 0o600); err != nil {

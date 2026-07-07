@@ -179,6 +179,48 @@ scenarios:
 	}
 }
 
+// TestLoadBytes_EmptyMatchingNotMatchesRejected proves that a not_matches pattern
+// that matches the empty string (e.g. "z*") is a load-time validation error:
+// such a pattern matches at position 0 of every input, so not_matches can never
+// pass — the same trap as an empty pattern. The identical pattern under matches
+// is legitimate (it matches everything, which the author may intend) and still
+// loads, and a pattern that requires at least one character (e.g. "z+") loads too.
+func TestLoadBytes_EmptyMatchingNotMatchesRejected(t *testing.T) {
+	t.Parallel()
+	build := func(matcher string) []byte {
+		return []byte(`
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: ok
+    steps:
+      - run: {command: echo hi}
+      - assert:
+          stdout:
+` + matcher + "\n")
+	}
+	t.Run("not_matches empty-matching rejected", func(t *testing.T) {
+		t.Parallel()
+		_, err := LoadBytes("sample.atago.yaml", build(`            not_matches: "z*"`))
+		if err == nil || !strings.Contains(err.Error(), "matches the empty string") {
+			t.Fatalf("LoadBytes() error = %v, want an empty-string not_matches error", err)
+		}
+	})
+	t.Run("matches empty-matching still loads", func(t *testing.T) {
+		t.Parallel()
+		if _, err := LoadBytes("sample.atago.yaml", build(`            matches: "z*"`)); err != nil {
+			t.Fatalf("LoadBytes() error = %v, want nil (an empty-matching matches is legitimate)", err)
+		}
+	})
+	t.Run("not_matches requiring a character still loads", func(t *testing.T) {
+		t.Parallel()
+		if _, err := LoadBytes("sample.atago.yaml", build(`            not_matches: "z+"`)); err != nil {
+			t.Fatalf("LoadBytes() error = %v, want nil (z+ needs at least one character)", err)
+		}
+	})
+}
+
 // TestLoadBytes_NegativeJSONLengthRejected proves a negative json/yaml length is
 // a validation error: no array, object, or string has a negative length, so the
 // matcher could never pass and the mistake is caught at load time.

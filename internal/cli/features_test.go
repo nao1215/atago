@@ -584,6 +584,170 @@ func TestRerunFailed_NarrowedGreenKeepsOtherFailures(t *testing.T) {
 	})
 }
 
+// twoFailingSpec has two failing scenarios in ONE spec file, so a --filter can
+// exclude one while the other reruns — the shape that exposes a filtered
+// --rerun-failed silently dropping the excluded (still-failing) scenario.
+const twoFailingSpec = `version: "1"
+suite:
+  name: multi
+scenarios:
+  - name: alpha_fail
+    steps:
+      - run: {shell: true, command: "exit 1"}
+      - assert: {exit_code: 0}
+  - name: beta_fail
+    steps:
+      - run: {shell: true, command: "exit 1"}
+      - assert: {exit_code: 0}
+`
+
+// TestRerunFailed_FilterExcludedFailurePreserved is a regression: a
+// `--rerun-failed --filter` that excludes a recorded failure must not drop it
+// from the ledger. Rewriting the ledger from only the scenarios that ran forgot
+// the filter-excluded failure — a false green the next time the filter is gone.
+func TestRerunFailed_FilterExcludedFailurePreserved(t *testing.T) {
+	dir := t.TempDir()
+	writeSpec(t, dir, "s.atago.yaml", twoFailingSpec)
+
+	withWorkdir(t, dir, func() {
+		var out, errb bytes.Buffer
+		// Full run records both alpha_fail and beta_fail.
+		if got := Main([]string{"run", "."}, &out, &errb); got != ExitFailures {
+			t.Fatalf("first run exit = %d, want %d (stderr=%s)", got, ExitFailures, errb.String())
+		}
+		st, err := loadRerunState()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(st.Failed) != 2 {
+			t.Fatalf("recorded failures = %+v, want both alpha_fail and beta_fail", st.Failed)
+		}
+
+		// Rerun only alpha (still failing). beta was excluded by the filter, not
+		// re-verified, and is still broken — it must survive in the ledger.
+		out.Reset()
+		errb.Reset()
+		if got := Main([]string{"run", "--rerun-failed", "--filter", "alpha", "."}, &out, &errb); got != ExitFailures {
+			t.Fatalf("filtered rerun exit = %d, want %d (stderr=%s)", got, ExitFailures, errb.String())
+		}
+		st, err = loadRerunState()
+		if err != nil {
+			t.Fatal(err)
+		}
+		names := map[string]bool{}
+		for _, e := range st.Failed {
+			names[e.Scenario] = true
+		}
+		if !names["beta_fail"] {
+			t.Errorf("ledger after filtered rerun = %+v, want beta_fail preserved (excluded by --filter, never re-verified)", st.Failed)
+		}
+	})
+}
+
+// TestRerunFailed_FilterExcludesAllNoRenamedWarning is a regression: when a
+// user's own --filter excludes every recorded failure, the run must not blame a
+// rename/removal — that diagnostic is wrong and contradicts the filter warning.
+// The recorded failures must also survive so a later unfiltered rerun finds them.
+func TestRerunFailed_FilterExcludesAllNoRenamedWarning(t *testing.T) {
+	dir := t.TempDir()
+	writeSpec(t, dir, "s.atago.yaml", twoFailingSpec)
+
+	withWorkdir(t, dir, func() {
+		var out, errb bytes.Buffer
+		if got := Main([]string{"run", "."}, &out, &errb); got != ExitFailures {
+			t.Fatalf("first run exit = %d, want %d (stderr=%s)", got, ExitFailures, errb.String())
+		}
+
+		// A filter that matches no recorded scenario: nothing runs because of the
+		// filter, not because anything was renamed or removed.
+		out.Reset()
+		errb.Reset()
+		Main([]string{"run", "--rerun-failed", "--filter", "no-such-scenario", "."}, &out, &errb)
+		if strings.Contains(errb.String(), "renamed or removed") {
+			t.Errorf("stderr claimed a rename/removal when the user's --filter excluded everything:\n%s", errb.String())
+		}
+		// The recorded failures must not be silently forgotten.
+		st, err := loadRerunState()
+		if err != nil {
+			t.Fatalf("rerun state unreadable: %v", err)
+		}
+		if len(st.Failed) != 2 {
+			t.Errorf("ledger = %+v, want both recorded failures preserved when a filter excludes them all", st.Failed)
+		}
+	})
+}
+
+// TestRerunFailed_AbsolutePathMatchesRelativeLedger is a regression: a rerun
+// addressed by an absolute path must match a recorded relative spec_path (and
+// vice versa). Comparing raw path strings meant an equivalent-but-differently
+// spelled target found "nothing" and greenlit despite real failures.
+func TestRerunFailed_AbsolutePathMatchesRelativeLedger(t *testing.T) {
+	dir := t.TempDir()
+	writeSpec(t, dir, "s.atago.yaml", twoScenarioSpec)
+
+	withWorkdir(t, dir, func() {
+		var out, errb bytes.Buffer
+		// Record a RELATIVE spec_path by running with a relative target.
+		if got := Main([]string{"run", "s.atago.yaml"}, &out, &errb); got != ExitFailures {
+			t.Fatalf("first run exit = %d, want %d (stderr=%s)", got, ExitFailures, errb.String())
+		}
+		st, err := loadRerunState()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(st.Failed) != 1 || filepath.IsAbs(st.Failed[0].SpecPath) {
+			t.Fatalf("recorded state = %+v, want one relative-path failure", st.Failed)
+		}
+
+		// Rerun with the ABSOLUTE spelling of the same spec: the recorded failure
+		// must still be selected and re-run (exit fails), not treated as "nothing".
+		out.Reset()
+		errb.Reset()
+		abs := filepath.Join(dir, "s.atago.yaml")
+		if got := Main([]string{"run", "--rerun-failed", abs}, &out, &errb); got != ExitFailures {
+			t.Fatalf("absolute-path rerun exit = %d, want %d (recorded failure was not selected); stderr=%s", got, ExitFailures, errb.String())
+		}
+	})
+}
+
+// TestRunCmd_NegativeParallelRejected proves a negative --parallel is a config
+// error, matching --repeat/--retry-failed, rather than being silently coerced to
+// sequential and exiting 0.
+func TestRunCmd_NegativeParallelRejected(t *testing.T) {
+	dir := t.TempDir()
+	p := writeSpec(t, dir, "ok.atago.yaml", passingSpec)
+
+	var out, errb bytes.Buffer
+	if got := Main([]string{"run", "--parallel", "-1", p}, &out, &errb); got != ExitConfig {
+		t.Errorf("--parallel -1 exit = %d, want %d (stderr=%s)", got, ExitConfig, errb.String())
+	}
+	// A valid positive value still runs.
+	out.Reset()
+	errb.Reset()
+	if got := Main([]string{"run", "--parallel", "2", p}, &out, &errb); got != ExitOK {
+		t.Errorf("--parallel 2 exit = %d, want %d (stderr=%s)", got, ExitOK, errb.String())
+	}
+}
+
+// TestRunCmd_Repeat1WithRetryFailedAccepted proves the mutual-exclusion guard
+// fires only for an ACTIVE --repeat (> 1): --repeat 1 is a documented no-op and
+// must not be rejected alongside --retry-failed, while --repeat 2 still is.
+func TestRunCmd_Repeat1WithRetryFailedAccepted(t *testing.T) {
+	dir := t.TempDir()
+	p := writeSpec(t, dir, "ok.atago.yaml", passingSpec)
+
+	var out, errb bytes.Buffer
+	if got := Main([]string{"run", "--repeat", "1", "--retry-failed", "3", p}, &out, &errb); got == ExitConfig {
+		t.Errorf("--repeat 1 --retry-failed 3 was rejected (exit %d); repeat 1 is a no-op (stderr=%s)", got, errb.String())
+	}
+	// An active --repeat (> 1) with --retry-failed is still mutually exclusive.
+	out.Reset()
+	errb.Reset()
+	if got := Main([]string{"run", "--repeat", "2", "--retry-failed", "1", p}, &out, &errb); got != ExitConfig {
+		t.Errorf("--repeat 2 --retry-failed 1 exit = %d, want %d (must stay mutually exclusive)", got, ExitConfig)
+	}
+}
+
 // TestCompletion_HelpFlag proves --help behaves like every other subcommand's
 // --help (usage on stdout, exit 0) instead of being mistaken for a shell name.
 func TestCompletion_HelpFlag(t *testing.T) {

@@ -94,11 +94,12 @@ func writeDetail(b *strings.Builder, color bool, suite string, sc *engine.Scenar
 				continue
 			}
 			// A setup-phase error comes from before any numbered step ran; rendering
-			// it as "step 0 ()" is misleading (issue #19). Use the shared setup label
-			// — the ErrMsg already names the service — so every report format agrees.
+			// it as "step 0 ()" is misleading. Use the phase label — distinguishing a
+			// suite.setup failure from service readiness so neither is mislabeled — so
+			// every report format agrees.
 			var where string
 			if isSetupError(step) {
-				where = setupPhaseLabel
+				where = setupPhaseLabelFor(step)
 			} else {
 				where = fmt.Sprintf("step %d (%s)", step.Index, step.Kind)
 			}

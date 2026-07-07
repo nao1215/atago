@@ -78,7 +78,10 @@ func CollectStepVars(set map[string]bool, step *Step) {
 		CollectVars(set, step.Service.Command, step.Service.Cwd)
 	case StepRun:
 		r := step.Run
-		CollectVars(set, r.Command, r.Cwd, r.Stdin.Inline, r.Stdin.File)
+		// stdout_to/stderr_to are ${name}-expanded by the engine (expandRun), so a
+		// redirect target like `out-${who}.txt` is a real variable use and must be
+		// counted like cwd/stdin — omitting it under-reported it.
+		CollectVars(set, r.Command, r.Cwd, r.Stdin.Inline, r.Stdin.File, r.StdoutTo, r.StderrTo)
 		for _, v := range r.Env {
 			CollectVars(set, v)
 		}

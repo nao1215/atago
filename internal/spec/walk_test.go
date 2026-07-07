@@ -225,9 +225,9 @@ func TestCollectServiceVars_ReadyProbes(t *testing.T) {
 // refactor cannot silently drop them.
 func TestCollectStepVars_KnownFields(t *testing.T) {
 	t.Parallel()
-	run := &Step{Run: &Run{Command: "echo ${cmd}", Cwd: "${cwd}", Env: map[string]string{"T": "${env}"}, Stdin: Stdin{Inline: "${in}"}}}
+	run := &Step{Run: &Run{Command: "echo ${cmd}", Cwd: "${cwd}", Env: map[string]string{"T": "${env}"}, Stdin: Stdin{Inline: "${in}"}, StdoutTo: "${outto}.txt", StderrTo: "${errto}.log"}}
 	got := collectStep(run)
-	for _, want := range []string{"cmd", "cwd", "env", "in"} {
+	for _, want := range []string{"cmd", "cwd", "env", "in", "outto", "errto"} {
 		if !hasVar(got, want) {
 			t.Errorf("run field %q not collected; got %v", want, got)
 		}

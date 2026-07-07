@@ -83,11 +83,23 @@ func unifiedDiff(expected, actual, expectedLabel, actualLabel string) string {
 	// The marker describes a side whose last line lacks a trailing newline, judged
 	// per side and independently: when both sides lack it, both are annotated. An
 	// empty side has no last line, so it never carries the marker.
+	surfaced := len(hunks) > 0
 	if expected != "" && !strings.HasSuffix(expected, "\n") {
 		out = append(out, noNewlineMarker+" (expected)")
+		surfaced = true
 	}
 	if actual != "" && !strings.HasSuffix(actual, "\n") {
 		out = append(out, noNewlineMarker+" (actual)")
+		surfaced = true
+	}
+	// A failing comparison must never render a header-only (blank) diff. When
+	// splitDiffLines folded CRLF→LF the visible lines can be identical, yielding
+	// no content hunk, yet the raw strings still differ — the assertion failed
+	// only because one side used CRLF line endings. Surface that explicitly so
+	// the reason is not invisible; the early return above guarantees the raw
+	// strings differ here.
+	if !surfaced {
+		out = append(out, "(only the line endings differ: CRLF vs LF)")
 	}
 	return strings.Join(out, "\n")
 }

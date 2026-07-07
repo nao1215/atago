@@ -19,6 +19,57 @@ and this project follows [Semantic Versioning](https://semver.org/).
   with a clear `did not exit within …` message — mirroring the `pty:` spec
   step's own `timeout:` bound. ([#194](https://github.com/nao1215/atago/issues/194))
 
+### Fixed
+
+- `run` no longer writes redirected output to a literal filename: `stdout_to`
+  and `stderr_to` are now `${name}`-expanded like the assertion paths that read
+  them, so a per-matrix-row or store-keyed target such as `out-${who}.txt`
+  resolves instead of failing the following assert with a spurious "no such
+  file".
+- `dir` `contains`/`not_contains` judged membership by following the symlink, so
+  a dangling symlink was reported absent — a dangerous false pass for
+  `not_contains`. Membership now reflects the directory entry (`Lstat`), matching
+  the recursive and glob paths.
+- `atago record` output containing non-UTF-8 bytes (binary, Latin-1, Shift-JIS)
+  now round-trips: the generated spec re-parsed lossily and failed on its first
+  replay. The recorder emits a `!!binary` scalar for such lines so `record` →
+  `run` is green.
+- `snapshot` normalization is idempotent again and no longer leaks secrets. A
+  stray escape spliced by OSC removal left a raw ANSI byte in the golden, and a
+  multi-line secret whose value uses LF reappeared in the golden when the output
+  used CRLF; both are now closed.
+- `--rerun-failed` combined with `--filter`/`--tag`/`--skip-tag` silently dropped
+  the still-failing scenarios it did not run from the ledger, greenlighting a
+  later rerun; those failures are now preserved, the "renamed or removed?"
+  warning is no longer shown for a filter exclusion, and an equivalent
+  absolute/relative spec path now matches the recorded ledger.
+- `pdf` assertions bound FlateDecode decompression at 64 MiB so a decompression
+  bomb in the tested CLI's output can no longer exhaust memory, and PDF
+  hex-string (`<…>`) metadata and text are now decoded instead of reported as a
+  missing field.
+- A byte-exact `file equals` failure that differs only in line endings now
+  renders `(only the line endings differ: CRLF vs LF)` instead of a blank diff.
+- The GitHub Actions `::notice::` summary counts a suite that errored before any
+  scenario ran, matching the junit and tap counts and its own `::error::`
+  annotation; a `suite.setup` failure is labeled `suite setup`, not
+  `service setup`.
+- `loader` rejects a `not_matches` pattern that also matches the empty string
+  (it can never pass), and explains a matrix name-template collapse by naming the
+  omitted row variable instead of a bare "duplicate scenario name".
+- A negative `--parallel` is rejected with a config error like `--repeat` and
+  `--retry-failed`, and `--repeat 1` no longer trips the `--retry-failed`
+  mutual-exclusion guard (repeat activates only at `> 1`).
+
+### Changed
+
+- An unresolved `${var}` in a run step's `cwd` now fails with an explained error
+  naming the reference, instead of the misleading "executable not found" the
+  child raised when it could not start in a literal `${var}` directory. Bare
+  `${…}` in `env` values and `stdin` keeps its documented literal passthrough.
+- Explicit `--help` on `explain`, `doc`, `list`, `manifest`, and `init` prints to
+  stdout, matching `completion` and the top-level help, so the usage text can be
+  piped.
+
 ## [0.7.0] - 2026-07-07
 
 Windows completes its interactive-terminal story. `pty:` steps and

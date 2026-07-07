@@ -18,6 +18,11 @@ func expandRun(st *store.Store, r *spec.Run) *spec.Run {
 	// fixture.base64 rule) (#18).
 	c.Stdin.Inline = st.Expand(r.Stdin.Inline)
 	c.Stdin.File = st.Expand(r.Stdin.File)
+	// The stdout_to/stderr_to redirect targets are workdir-relative paths, just
+	// like the assert paths that later read them; expand them so a per-matrix-row
+	// or store-derived filename resolves instead of being written verbatim.
+	c.StdoutTo = st.Expand(r.StdoutTo)
+	c.StderrTo = st.Expand(r.StderrTo)
 	c.Env = st.ExpandMap(r.Env)
 	return &c
 }

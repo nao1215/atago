@@ -66,7 +66,7 @@ func (v *Verbose) Scenario(res engine.ScenarioResult) {
 func (v *Verbose) writeStep(b *strings.Builder, phase string, sr *engine.StepResult) {
 	label := string(sr.Kind)
 	if sr.Setup {
-		label = setupPhaseLabel
+		label = setupPhaseLabelFor(*sr)
 	}
 	fmt.Fprintf(b, "  [%s%d] %s", phase, sr.Index, label)
 	if sr.Run != nil && sr.Run.Command != "" {

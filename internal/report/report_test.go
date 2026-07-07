@@ -191,6 +191,38 @@ func TestRender_SetupErrorContext_JUnitTAP(t *testing.T) {
 	}
 }
 
+// TestRender_SuiteSetupErrorNotMislabeled is a regression: a suite.setup step
+// failure (the shape engine.go builds — Setup:true, empty Kind, and a message
+// the engine already prefixes with "suite setup failed …") must not be rendered
+// under the "service setup" label, which is for background-service readiness.
+// The label was overloaded across service readiness, suite setup, and workdir
+// creation, so a suite.setup failure printed the misleading "service setup:".
+func TestRender_SuiteSetupErrorNotMislabeled(t *testing.T) {
+	t.Parallel()
+	results := []*engine.SuiteResult{{
+		Suite:  "s1",
+		Status: engine.StatusError,
+		Scenarios: []engine.ScenarioResult{
+			{Name: "svc", Status: engine.StatusError, Steps: []engine.StepResult{
+				{Index: 0, Kind: "", Setup: true, ErrMsg: "suite setup failed at step 2 (run): boom"},
+			}},
+		},
+	}}
+	for _, f := range []Format{FormatConsole, FormatJSON, FormatJUnit, FormatTAP} {
+		var b bytes.Buffer
+		if err := Render(&b, f, results); err != nil {
+			t.Fatalf("%s: %v", f, err)
+		}
+		out := b.String()
+		if strings.Contains(out, "service setup") {
+			t.Errorf("%s mislabeled a suite-setup failure as 'service setup':\n%s", f, out)
+		}
+		if !strings.Contains(out, "suite setup") {
+			t.Errorf("%s dropped the suite-setup attribution:\n%s", f, out)
+		}
+	}
+}
+
 func TestRender_JUnitValidXML(t *testing.T) {
 	t.Parallel()
 	var b bytes.Buffer

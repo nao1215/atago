@@ -116,17 +116,38 @@ func saveRerunState(failed []failedEntry) error {
 	return os.WriteFile(rerunStatePath(), data, 0o600)
 }
 
+// absClean returns a canonical form of p so --rerun-failed matches a spec
+// regardless of how its path is spelled (relative vs absolute) between the
+// recording run and the rerun; comparing raw strings would miss equivalent
+// paths. Symlinks in the prefix are resolved too: os.Getwd (used by Abs) returns
+// the symlink-resolved directory, so on a platform whose temp dir is a symlink
+// (macOS /var -> /private/var) a relative recording and an explicit /var/...
+// target would otherwise canonicalize differently. EvalSymlinks needs the path
+// to exist; fall back to the absolute (then lexical) form when it does not.
+func absClean(p string) string {
+	abs, err := filepath.Abs(p)
+	if err != nil {
+		return filepath.Clean(p)
+	}
+	if resolved, rerr := filepath.EvalSymlinks(abs); rerr == nil {
+		return resolved
+	}
+	return abs
+}
+
 // intersectPaths returns the members of paths that also appear in keep,
-// preserving the order of paths. Both sides are already filepath.Clean'd by the
-// callers, so a plain string comparison is exact.
+// preserving the order of paths. Both sides are absolutized before comparison so
+// an equivalent-but-differently-spelled path (relative vs absolute) still
+// matches; without this, a rerun target that names the same spec by a different
+// spelling would find "nothing" and silently greenlight despite real failures.
 func intersectPaths(paths, keep []string) []string {
 	want := make(map[string]bool, len(keep))
 	for _, k := range keep {
-		want[k] = true
+		want[absClean(k)] = true
 	}
 	var out []string
 	for _, p := range paths {
-		if want[p] {
+		if want[absClean(p)] {
 			out = append(out, p)
 		}
 	}

@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-74 suites · 375 scenarios
+74 suites · 379 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -65,9 +65,10 @@
   - [an unsupported defaults field is a load-time error (exit 2)](#scenario-an-unsupported-defaults-field-is-a-load-time-error-exit-2)
   - [defaults.run.env merges per key and a step env wins the collisions](#scenario-defaultsrunenv-merges-per-key-and-a-step-env-wins-the-collisions)
   - [a step opts out of defaults.run.shell with an explicit shell false](#scenario-a-step-opts-out-of-defaultsrunshell-with-an-explicit-shell-false)
-- [atago self-hosting / dir assertion](#atago-self-hosting--dir-assertion) — 2 scenarios
+- [atago self-hosting / dir assertion](#atago-self-hosting--dir-assertion) — 3 scenarios
   - [directory/tree assertions cover a multi-file generator](#scenario-directorytree-assertions-cover-a-multi-file-generator)
   - [a missing directory can be asserted absent](#scenario-a-missing-directory-can-be-asserted-absent)
+  - [a dangling symlink is a present directory entry (membership uses Lstat)](#scenario-a-dangling-symlink-is-a-present-directory-entry-membership-uses-lstat)
 - [atago self-hosting / recursive dir asserts + tree snapshots](#atago-self-hosting--recursive-dir-asserts--tree-snapshots) — 3 scenarios
   - [record, compare green, then a mutation names the changed paths](#scenario-record-compare-green-then-a-mutation-names-the-changed-paths)
   - [recursive matchers and ignore globs walk the tree](#scenario-recursive-matchers-and-ignore-globs-walk-the-tree)
@@ -231,9 +232,11 @@
 - [atago self-hosting / manifest](#atago-self-hosting--manifest) — 2 scenarios
   - [manifest emits a stable JSON summary without running the spec](#scenario-manifest-emits-a-stable-json-summary-without-running-the-spec)
   - [manifest does not execute the spec's commands](#scenario-manifest-does-not-execute-the-specs-commands)
-- [atago self-hosting / matrix scenarios](#atago-self-hosting--matrix-scenarios) — 2 scenarios
+- [atago self-hosting / matrix scenarios](#atago-self-hosting--matrix-scenarios) — 4 scenarios
   - [matrix expands into one scenario per row](#scenario-matrix-expands-into-one-scenario-per-row)
   - [matrix without a templated name gets a deterministic suffix](#scenario-matrix-without-a-templated-name-gets-a-deterministic-suffix)
+  - [stdout_to expands a matrix variable into the redirect target \[who=alice\]](#scenario-stdout_to-expands-a-matrix-variable-into-the-redirect-target-whoalice)
+  - [stdout_to expands a matrix variable into the redirect target \[who=bob\]](#scenario-stdout_to-expands-a-matrix-variable-into-the-redirect-target-whobob)
 - [atago self-hosting / matrix expansion boundary values](#atago-self-hosting--matrix-expansion-boundary-values) — 5 scenarios
   - [each row substitutes into the scenario name](#scenario-each-row-substitutes-into-the-scenario-name)
   - [a row with several variables substitutes all of them](#scenario-a-row-with-several-variables-substitutes-all-of-them)
@@ -317,9 +320,10 @@
   - [TAP report is a numbered TAP 13 stream with ok / not ok points](#scenario-tap-report-is-a-numbered-tap-13-stream-with-ok--not-ok-points)
   - [failure artifacts are written and referenced in the JSON report](#scenario-failure-artifacts-are-written-and-referenced-in-the-json-report)
   - [a multi-line snapshot failure renders a unified diff with hunks](#scenario-a-multi-line-snapshot-failure-renders-a-unified-diff-with-hunks)
-- [atago self-hosting / rerun-failed](#atago-self-hosting--rerun-failed) — 2 scenarios
+- [atago self-hosting / rerun-failed](#atago-self-hosting--rerun-failed) — 3 scenarios
   - [a failing run is recorded and rerun-failed selects only it](#scenario-a-failing-run-is-recorded-and-rerun-failed-selects-only-it)
   - [rerun-failed with nothing recorded is a no-op success](#scenario-rerun-failed-with-nothing-recorded-is-a-no-op-success)
+  - [rerun-failed with a filter preserves the still-failing scenarios it did not run](#scenario-rerun-failed-with-a-filter-preserves-the-still-failing-scenarios-it-did-not-run)
 - [atago self-hosting / retry until](#atago-self-hosting--retry-until) — 3 scenarios
   - [retry polls until the condition becomes true](#scenario-retry-polls-until-the-condition-becomes-true)
   - [retry fails the inner spec when until never holds](#scenario-retry-fails-the-inner-spec-when-until-never-holds)
@@ -1551,6 +1555,15 @@ mkdir -p site/assets && printf '<html>' > site/index.html && printf '<html>' > s
 ### Scenario: a missing directory can be asserted absent
 #### Then
 - dir `never-created` does not exist
+### Scenario: a dangling symlink is a present directory entry (membership uses Lstat)
+_skipped on windows_
+#### When
+```shell
+mkdir -p linkdir && ln -s /nonexistent-target-xyz linkdir/planted
+```
+#### Then
+- exit code is `0`
+- dir `linkdir` contains `planted`, does not contain `never-planted`
 ## atago self-hosting / recursive dir asserts + tree snapshots
 Source: `test/e2e/atago/dir_tree.atago.yaml`
 ### Scenario: record, compare green, then a mutation names the changed paths
@@ -4003,6 +4016,26 @@ ${atago} run --report junit suffix.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `name="row [n=1]"`, `name="row [n=2]"`
+### Scenario: stdout_to expands a matrix variable into the redirect target [who=alice]
+#### When
+```shell
+printf hello-alice
+```
+#### Then
+- exit code is `0`
+- file `out-alice.txt` contains `hello-alice`
+#### Generated artifacts
+- `out-${who}.txt`
+### Scenario: stdout_to expands a matrix variable into the redirect target [who=bob]
+#### When
+```shell
+printf hello-bob
+```
+#### Then
+- exit code is `0`
+- file `out-bob.txt` contains `hello-bob`
+#### Generated artifacts
+- `out-${who}.txt`
 ## atago self-hosting / matrix expansion boundary values
 Source: `test/e2e/atago/matrix_edges.atago.yaml`
 ### Scenario: each row substitutes into the scenario name
@@ -5449,6 +5482,36 @@ ${atago} run --rerun-failed green.atago.yaml
 #### Then
 - exit code is `0`
 - stderr contains `nothing to rerun`
+### Scenario: rerun-failed with a filter preserves the still-failing scenarios it did not run
+#### Given
+- Fixture file `two.atago.yaml` is created.
+#### Inputs
+_Fixture `two.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: two
+scenarios:
+  - name: red-a
+    steps:
+      - run: {shell: true, command: "exit 1"}
+      - assert: {exit_code: 0}
+  - name: red-b
+    steps:
+      - run: {shell: true, command: "exit 1"}
+      - assert: {exit_code: 0}
+```
+#### When
+```shell
+${atago} run two.atago.yaml
+${atago} run --rerun-failed --filter red-a two.atago.yaml
+```
+#### Then
+- after `${atago} run two.atago.yaml`:
+  - exit code is `1`
+- after `${atago} run --rerun-failed --filter red-a two.atago.yaml`:
+  - exit code is `1`
+  - file `.atago/last-failed.json` contains `red-a`, `red-b`
 ## atago self-hosting / retry until
 Source: `test/e2e/atago/retry.atago.yaml`
 ### Scenario: retry polls until the condition becomes true

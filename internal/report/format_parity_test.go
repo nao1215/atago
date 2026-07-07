@@ -177,6 +177,53 @@ func TestRender_CrossFormatCountParity(t *testing.T) {
 	})
 }
 
+// TestRender_CrossFormatCountParity_SetupErrored pins the format-cross count
+// invariant for a suite that errored before any scenario ran (all scenarios
+// filtered out, exit 4): junit, tap, and gha must agree on the count. junit
+// synthesizes tests=1/errors=1 and tap a 1..1 plan with one not-ok, so the gha
+// ::notice:: summary must likewise count the synthesized failure (1 errored),
+// not contradict its own ::error:: annotation with an all-zero line.
+func TestRender_CrossFormatCountParity_SetupErrored(t *testing.T) {
+	t.Parallel()
+	res := suiteSetupErrorEmpty()[0]
+
+	t.Run("junit", func(t *testing.T) {
+		t.Parallel()
+		var root junitTestsuites
+		if err := xml.Unmarshal([]byte(render(t, FormatJUnit, res)), &root); err != nil {
+			t.Fatalf("junit invalid: %v", err)
+		}
+		if root.Tests != 1 || root.Errors != 1 {
+			t.Errorf("junit tests=%d errors=%d, want 1/1", root.Tests, root.Errors)
+		}
+	})
+
+	t.Run("tap", func(t *testing.T) {
+		t.Parallel()
+		out := render(t, FormatTAP, res)
+		if !strings.Contains(out, "1..1\n") {
+			t.Errorf("tap plan is not 1..1:\n%s", out)
+		}
+		if n := strings.Count(out, "\nnot ok "); n != 1 {
+			t.Errorf("tap not-ok lines = %d, want 1:\n%s", n, out)
+		}
+	})
+
+	t.Run("gha notice reflects the error, not all-zero", func(t *testing.T) {
+		t.Parallel()
+		out := render(t, FormatGHA, res)
+		if !strings.Contains(out, "::error") {
+			t.Fatalf("gha emitted no ::error:: annotation:\n%s", out)
+		}
+		if strings.Contains(out, "0 scenarios: 0 passed, 0 failed, 0 errored, 0 skipped") {
+			t.Errorf("gha notice is all-zero, contradicting its own ::error:: and junit/tap:\n%s", out)
+		}
+		if !strings.Contains(out, "1 errored") {
+			t.Errorf("gha notice should count the synthesized failure as 1 errored:\n%s", out)
+		}
+	})
+}
+
 // TestRender_HostileCharsStayWellFormed feeds XML/JSON/TAP-hostile bytes through
 // the scenario name and failure detail — angle brackets, ampersands, a CDATA
 // terminator, quotes, an embedded newline, a C0 control byte, and a multibyte

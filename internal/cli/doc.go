@@ -21,14 +21,21 @@ func docCmd(args []string, stdout, stderr io.Writer) int {
 	out := fs.String("out", "", "write Markdown to this file instead of stdout")
 	outDir := fs.String("out-dir", "", "with --split-by-spec, write one file per spec plus index.md into this directory")
 	split := fs.Bool("split-by-spec", false, "emit one Markdown file per spec and an index.md linking them (requires --out-dir)")
-	fs.Usage = func() {
-		fmt.Fprint(stderr, "Usage: atago doc [--out file.md | --split-by-spec --out-dir DIR] <path | dir>...\n")
+	printUsage := func(w io.Writer) {
+		fmt.Fprint(w, "Usage: atago doc [--out file.md | --split-by-spec --out-dir DIR] <path | dir>...\n")
+		fs.SetOutput(w)
 		fs.PrintDefaults()
 	}
+	// Suppress the flag package's automatic usage print; usage is routed
+	// explicitly below — to stdout for an explicit --help (so it can be piped),
+	// to stderr for a genuine parse error.
+	fs.Usage = func() {}
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
+			printUsage(stdout)
 			return ExitOK
 		}
+		printUsage(stderr)
 		return ExitConfig
 	}
 	if *split && *outDir == "" {

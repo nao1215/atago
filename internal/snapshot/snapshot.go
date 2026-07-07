@@ -73,8 +73,26 @@ func Normalize(data []byte, opt Options) []byte {
 	// snapshot recorded on POSIX matches cmd.exe output on Windows (and the
 	// committed golden never carries CRs). Matches the equals matcher's rule.
 	s = strings.ReplaceAll(s, "\r\n", "\n")
-	s = reCSI.ReplaceAllString(s, "")
-	s = reOSC.ReplaceAllString(s, "")
+	// Folding CRLF can rejoin a multi-line secret whose stored value uses LF: the
+	// first masking pass saw the \r\n form and could not match it, so the raw
+	// credential would otherwise reappear here. Mask once more on the folded text
+	// before any of it can reach the golden.
+	if opt.Secrets != nil {
+		s = string(opt.Secrets([]byte(s)))
+	}
+	// Strip CSI and OSC escapes to a fixed point. Removing a complete OSC
+	// sequence can splice a stray leading ESC onto the bytes that followed it and
+	// form a fresh CSI escape, which a single CSI-then-OSC pass leaves behind —
+	// a raw escape byte then leaks into the golden the CSI rule exists to keep
+	// clean, and Normalize is no longer idempotent. Loop until the text is stable
+	// (each pass only deletes bytes, so this always terminates).
+	for {
+		stripped := reOSC.ReplaceAllString(reCSI.ReplaceAllString(s, ""), "")
+		if stripped == s {
+			break
+		}
+		s = stripped
+	}
 	s = reUUID.ReplaceAllString(s, "<uuid>")
 	s = reTimestamp.ReplaceAllString(s, "<timestamp>")
 	s = rePort.ReplaceAllString(s, "$1:<port>")

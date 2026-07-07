@@ -82,13 +82,23 @@ func runCmd(label string, args []string, stdout, stderr io.Writer) int {
 	}
 
 	// --repeat and --retry-failed answer opposite questions (does it flake? /
-	// keep CI green despite flakes) and would fight over the attempt loop.
-	if *repeat > 0 && *retryFailed > 0 {
+	// keep CI green despite flakes) and would fight over the attempt loop. --repeat
+	// only ACTIVATES at > 1 (a value < 2 is a documented no-op), so --repeat 1
+	// changes nothing and must not be rejected alongside --retry-failed.
+	if *repeat > 1 && *retryFailed > 0 {
 		fmt.Fprintln(stderr, label+": --repeat and --retry-failed are mutually exclusive (repeat detects flakiness, retry-failed tolerates it)")
 		return ExitConfig
 	}
 	if *repeat < 0 || *retryFailed < 0 {
 		fmt.Fprintln(stderr, label+": --repeat and --retry-failed must be >= 0")
+		return ExitConfig
+	}
+	// A negative --parallel is a typo, not a request: the engine would clamp it to
+	// sequential and exit 0, silently ignoring the mistake. Reject it with the same
+	// config error as --repeat/--retry-failed for consistent bounds checking. Zero
+	// is left to mean the default (like repeat/retry allow 0).
+	if *parallel < 0 {
+		fmt.Fprintln(stderr, label+": --parallel must be >= 0")
 		return ExitConfig
 	}
 
@@ -111,17 +121,34 @@ func runCmd(label string, args []string, stdout, stderr io.Writer) int {
 	// identity selector so only the recorded scenarios execute. With nothing
 	// recorded there is nothing to rerun, which is reported and treated as success.
 	//
-	// rerunPreserved holds recorded failures in specs OUTSIDE this run's target
-	// (a narrowed `--rerun-failed a.atago.yaml` when b.atago.yaml also had
-	// recorded failures). Those scenarios were not re-verified, so they must be
-	// carried back into the saved ledger below; overwriting it with only what ran
-	// would forget still-failing work and could greenlight the loop.
+	// rerunPreserved holds recorded failures this rerun did NOT execute, which must
+	// be carried back into the saved ledger below. A rerun skips a recorded failure
+	// two ways: its spec is outside this run's targets (a narrowed
+	// `--rerun-failed a.atago.yaml` when b.atago.yaml also had recorded failures),
+	// or an active --filter/--tag/--skip-tag excludes it. Either way the scenario
+	// was not re-verified and is still failing, so overwriting the ledger with only
+	// what ran would forget still-failing work and could greenlight the loop. It is
+	// computed after the run from what actually executed, which covers both cases
+	// uniformly (tag exclusion cannot be predicted from the ledger, which stores
+	// only names). recordedFailures carries the loaded ledger to that computation.
 	var rerunPreserved []failedEntry
+	var recordedFailures []failedEntry
 	if *rerunFailed {
 		state, lerr := loadRerunState()
 		if lerr != nil {
 			fmt.Fprintf(stderr, label+": cannot read %s: %v\n", rerunStatePath(), lerr)
 			return ExitConfig
+		}
+		// Absolutize the recorded spec paths and the run targets so a spec matches
+		// regardless of how its path is spelled between the recording run and the
+		// rerun (relative vs absolute). Without this, a rerun addressed by an
+		// equivalent-but-different spelling finds "nothing" and silently greenlights
+		// while the failures are still real.
+		for i := range state.Failed {
+			state.Failed[i].SpecPath = absClean(state.Failed[i].SpecPath)
+		}
+		for i := range paths {
+			paths[i] = absClean(paths[i])
 		}
 		sel := state.selectSet()
 		if len(sel) == 0 {
@@ -133,15 +160,7 @@ func runCmd(label string, args []string, stdout, stderr io.Writer) int {
 			fmt.Fprintln(stderr, label+": no previously failed scenarios under the given targets")
 			return ExitOK
 		}
-		inScope := make(map[string]bool, len(paths))
-		for _, p := range paths {
-			inScope[p] = true
-		}
-		for _, e := range state.Failed {
-			if !inScope[e.SpecPath] {
-				rerunPreserved = append(rerunPreserved, e)
-			}
-		}
+		recordedFailures = state.Failed
 		eng.Select = sel
 	}
 
@@ -207,13 +226,36 @@ func runCmd(label string, args []string, stdout, stderr io.Writer) int {
 	for _, r := range results {
 		ranScenarios += len(r.Scenarios)
 	}
+	// Carry back recorded failures this rerun did not execute (spec outside the
+	// targets, or excluded by an active --filter/--tag/--skip-tag). They were not
+	// re-verified and are still failing, so they stay in the ledger; only scenarios
+	// that actually ran are re-decided below (recorded again if still failing,
+	// dropped if fixed).
+	if *rerunFailed {
+		executed := make(map[string]bool)
+		for _, r := range results {
+			for _, sc := range r.Scenarios {
+				executed[engine.ScenarioID(r.SpecPath, sc.Name)] = true
+			}
+		}
+		for _, e := range recordedFailures {
+			if !executed[engine.ScenarioID(e.SpecPath, e.Scenario)] {
+				rerunPreserved = append(rerunPreserved, e)
+			}
+		}
+	}
 	// A --rerun-failed run that matched NOTHING verified nothing, yet the recorded
 	// failures are still real: greenlighting it and clearing the state would
 	// silently forget still-failing work. Warn loudly, keep the state, and do not
 	// exit green. Require at least one suite to have LOADED, so this stays about a
 	// scenario-name mismatch — when every spec fails to parse, the load errors
 	// (already printed) are the real story, not a "renamed or removed" scenario.
-	rerunMatchedNothing := *rerunFailed && len(results) > 0 && ranScenarios == 0 && ctx.Err() == nil
+	// An active --filter/--tag/--skip-tag is excluded here: when the user's own
+	// selection is why nothing ran, blaming a rename/removal is wrong (and
+	// contradicts the selection warning below). The excluded failures are still
+	// preserved into the ledger via rerunPreserved above, so no work is lost.
+	selectionActive := len(filter) > 0 || len(tag) > 0 || len(skipTag) > 0
+	rerunMatchedNothing := *rerunFailed && !selectionActive && len(results) > 0 && ranScenarios == 0 && ctx.Err() == nil
 	if rerunMatchedNothing {
 		fmt.Fprintln(stderr, label+": warning: no recorded failing scenarios matched the current specs (renamed or removed?); the recorded failures were kept, not cleared")
 		exit = worseExit(exit, ExitConfig)

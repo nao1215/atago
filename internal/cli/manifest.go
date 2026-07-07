@@ -19,14 +19,21 @@ func manifestCmd(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("atago manifest", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	out := fs.String("out", "", "write the JSON manifest to this file instead of stdout")
-	fs.Usage = func() {
-		fmt.Fprint(stderr, "Usage: atago manifest [--out file.json] <path | dir>...\n  (directories are searched recursively)\n")
+	printUsage := func(w io.Writer) {
+		fmt.Fprint(w, "Usage: atago manifest [--out file.json] <path | dir>...\n  (directories are searched recursively)\n")
+		fs.SetOutput(w)
 		fs.PrintDefaults()
 	}
+	// Suppress the flag package's automatic usage print; usage is routed
+	// explicitly below — to stdout for an explicit --help (so it can be piped),
+	// to stderr for a genuine parse error.
+	fs.Usage = func() {}
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
+			printUsage(stdout)
 			return ExitOK
 		}
+		printUsage(stderr)
 		return ExitConfig
 	}
 

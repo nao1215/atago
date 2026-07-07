@@ -137,6 +137,33 @@ scenarios:
 	}
 }
 
+// TestEngine_UnresolvedVarInCwdErrors: a ${name} nothing defines in a run step's
+// cwd is an explained error naming the reference, not the misleading
+// "executable not found" the child raises when it cannot start in a literal
+// "${name}" directory. Go sets cmd.Dir verbatim, so no shell ever expands it.
+func TestEngine_UnresolvedVarInCwdErrors(t *testing.T) {
+	t.Parallel()
+	res := runSpec(t, `
+version: "1"
+suite:
+  name: v
+scenarios:
+  - name: typo in cwd
+    steps:
+      - run: {command: "pwd", cwd: "${no_such_dir}"}
+`)
+	if res.Status != StatusError {
+		t.Fatalf("status = %s, want error", res.Status)
+	}
+	msg := res.Scenarios[0].Steps[0].ErrMsg
+	if !strings.Contains(msg, "${no_such_dir}") || !strings.Contains(msg, "cwd") {
+		t.Errorf("error should name the cwd reference, got %q", msg)
+	}
+	if strings.Contains(msg, "fork/exec") {
+		t.Errorf("error should not be the misleading exec failure, got %q", msg)
+	}
+}
+
 // TestEngine_SkipByCommand exercises the probe-command skip predicate.
 func TestEngine_SkipByCommand(t *testing.T) {
 	t.Parallel()

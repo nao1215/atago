@@ -1438,8 +1438,8 @@ func TestRunCmd_SaveStateWriteErrorWarns(t *testing.T) {
 // --- help flags on FlagSet-based subcommands --------------------------------
 
 // TestSubcommands_HelpFlagExitsOK proves `-h` on the flag-parsing subcommands
-// prints usage to stderr and exits 0 (the flag.ErrHelp path), never treating
-// the flag as a spec path.
+// prints usage and exits 0 (the flag.ErrHelp path), never treating the flag as a
+// spec path. Stream routing per command is asserted in TestSubcommands_HelpToStdout.
 func TestSubcommands_HelpFlagExitsOK(t *testing.T) {
 	t.Parallel()
 	for _, cmd := range []string{"run", "doc", "manifest", "list"} {

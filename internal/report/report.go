@@ -8,14 +8,16 @@ import (
 	"github.com/nao1215/atago/internal/engine"
 )
 
-// sanitizeControlBytes replaces control characters a machine-readable report
-// cannot carry verbatim with the Unicode replacement rune, matching what the
-// XML encoder already does for junit. A TAP 13 diagnostic is a YAML block and a
-// GitHub Actions annotation is a single line; both reject raw C0/C1 control
-// bytes, so a captured ANSI escape, bell, or DEL byte in a command's output
-// would otherwise make the surrounding document malformed. Tab and newline are
-// structural and kept; invalid UTF-8 is folded to the replacement rune too,
-// since a YAML stream must be valid UTF-8.
+// sanitizeControlBytes replaces control characters a tap/gha report cannot
+// carry verbatim with the Unicode replacement rune. It is stricter than junit:
+// junit feeds raw strings to encoding/xml, which only needs well-formed XML 1.0
+// and so passes DEL (0x7f) and the C1 controls (0x80-0x9f) through unchanged,
+// whereas this helper additionally folds DEL and C1. A TAP 13 diagnostic is a
+// YAML block and a GitHub Actions annotation is a single line; both reject raw
+// C0/C1 control bytes, so a captured ANSI escape, bell, or DEL byte in a
+// command's output would otherwise make the surrounding document malformed. Tab
+// and newline are structural and kept; invalid UTF-8 is folded to the
+// replacement rune too, since a YAML stream must be valid UTF-8.
 func sanitizeControlBytes(s string) string {
 	s = strings.ToValidUTF8(s, "�")
 	return strings.Map(func(r rune) rune {

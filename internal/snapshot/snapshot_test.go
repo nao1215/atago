@@ -10,6 +10,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/nao1215/atago/internal/security"
 )
 
 // TestNormalize_Idempotent proves normalizing already-normalized output is a
@@ -30,6 +32,11 @@ func TestNormalize_Idempotent(t *testing.T) {
 		"127.0.0.1:54321", "localhost:8080", "[::1]:22", "0.0.0.0:1",
 		"/tmp/atago-xyz", "plain text ", "\r\n", "\n", "$", "{", "}", "abc",
 		"127.0.0.1:", ":", "-", "T", "Z",
+		// A bare ESC and an incomplete CSI: removing a complete OSC that sits
+		// between them can splice the leftover ESC onto the following bytes and
+		// form a fresh CSI escape, which a single-pass CSI-then-OSC strip would
+		// leave behind. Fold to a fixed point so idempotence still holds.
+		"\x1b", "\x1b[0",
 	}
 	opt := Options{Workdir: "/tmp/atago-xyz"}
 	for iter := range 10000 {
@@ -41,6 +48,50 @@ func TestNormalize_Idempotent(t *testing.T) {
 		if twice := Normalize(once, opt); !bytes.Equal(once, twice) {
 			t.Fatalf("iter %d: Normalize not idempotent\n in:    %q\n once:  %q\n twice: %q", iter, in, once, twice)
 		}
+	}
+}
+
+// TestNormalize_IdempotentAcrossOSCSplice pins the specific splice that the
+// random fuzz above targets: a stray ESC directly before a complete OSC
+// sequence whose removal joins the ESC to the bytes that followed the OSC,
+// forming a valid CSI escape. Stripping CSI before OSC in a single pass leaves
+// that fresh escape in the output, so a second Normalize changes it again and a
+// raw ESC leaks into the golden — exactly what the CSI normalizer exists to
+// prevent. The fixed-point strip must remove it in one Normalize call.
+func TestNormalize_IdempotentAcrossOSCSplice(t *testing.T) {
+	t.Parallel()
+	cases := []string{
+		"a\x1b\x1b]8;;http://x\x1b\\[31mb",
+		"\x1b\x1b]0;title\x07[m",
+		"link \x1b\x1b]8;;u\x1b\\[31mred\x1b[0m\n",
+	}
+	for _, in := range cases {
+		once := Normalize([]byte(in), Options{})
+		twice := Normalize(once, Options{})
+		if !bytes.Equal(once, twice) {
+			t.Errorf("Normalize not idempotent\n in:    %q\n once:  %q\n twice: %q", in, once, twice)
+		}
+		if bytes.ContainsRune(once, '\x1b') {
+			t.Errorf("Normalize(%q) = %q still contains a raw ESC byte", in, once)
+		}
+	}
+}
+
+// TestNormalize_SecretMaskedAfterCRLFFold proves a declared secret cannot leak
+// into a golden when the captured output uses CRLF line endings. Masking runs on
+// the raw bytes, but the CRLF fold that follows can reconstruct a multi-line
+// secret whose stored value uses LF; without a second masking pass the raw
+// credential lands in the committed golden.
+func TestNormalize_SecretMaskedAfterCRLFFold(t *testing.T) {
+	t.Parallel()
+	m := security.NewMasker([]string{"lineA\nlineB"})
+	opt := Options{Secrets: m.MaskBytes}
+	got := string(Normalize([]byte("lineA\r\nlineB\r\n"), opt))
+	if strings.Contains(got, "lineA\nlineB") {
+		t.Errorf("secret leaked into normalized output: %q", got)
+	}
+	if got != "***\n" {
+		t.Errorf("Normalize masked CRLF output = %q, want %q", got, "***\n")
 	}
 }
 

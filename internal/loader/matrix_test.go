@@ -92,6 +92,11 @@ func TestLoadBytes_MatrixErrors(t *testing.T) {
 			src:     "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: \"m ${workdir}\"\n    matrix:\n      - { workdir: /tmp/x }\n    steps:\n      - run: {command: echo}",
 			wantMsg: "shadows a built-in variable",
 		},
+		{
+			name:    "template omits a distinguishing variable",
+			src:     "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: \"check ${who}\"\n    matrix:\n      - { who: alice, lang: en }\n      - { who: alice, lang: fr }\n    steps:\n      - run: {command: echo}",
+			wantMsg: "omits row variable \"lang\"",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
