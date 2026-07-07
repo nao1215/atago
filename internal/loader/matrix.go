@@ -37,8 +37,97 @@ func validateMatrix(s *spec.Spec) []string {
 				}
 			}
 		}
+		if msg := matrixNameCollapse(sc.Name, sc.Matrix); msg != "" {
+			errs = append(errs, fmt.Sprintf("%s: %s", where, msg))
+		}
 	}
 	return errs
+}
+
+// matrixNameCollapse reports whether a matrix name template that references at
+// least one row variable renders two rows to the same instance name because it
+// omits a variable those rows differ on. It returns a message naming the omitted
+// variable(s), or "" when no such collapse exists.
+//
+// Why: without this the rows are genuinely distinct yet expand to a colliding
+// name, and the downstream duplicate-name check reports only "duplicate scenario
+// name" with no clue that the fix is to reference the missing variable. Rows that
+// are byte-for-byte identical, or a template that references no variable (which
+// auto-disambiguates via a deterministic suffix), are left for that check.
+func matrixNameCollapse(template string, rows []map[string]string) string {
+	byName := map[string][]map[string]string{}
+	for _, row := range rows {
+		referenced := false
+		for k := range row {
+			if strings.Contains(template, "${"+k+"}") {
+				referenced = true
+				break
+			}
+		}
+		if !referenced {
+			// The no-reference path appends a deterministic per-row suffix, so
+			// distinct rows never collapse here; skip it.
+			continue
+		}
+		name := matrixInstanceName(template, row)
+		byName[name] = append(byName[name], row)
+	}
+	for name, group := range byName {
+		if len(group) < 2 {
+			continue
+		}
+		omitted := omittedDistinguishingKeys(template, group)
+		if len(omitted) == 0 {
+			// Rows are identical in every unreferenced key too, i.e. a genuine
+			// duplicate; let the downstream duplicate-name check report it.
+			continue
+		}
+		quoted := make([]string, len(omitted))
+		refs := make([]string, len(omitted))
+		for i, k := range omitted {
+			quoted[i] = fmt.Sprintf("%q", k)
+			refs[i] = "${" + k + "}"
+		}
+		noun := "variable"
+		if len(omitted) > 1 {
+			noun = "variables"
+		}
+		return fmt.Sprintf(
+			"matrix name template %q omits row %s %s, so rows collapse to the same name %q; reference %s in the name to keep them distinct",
+			template, noun, strings.Join(quoted, ", "), name, strings.Join(refs, ", "),
+		)
+	}
+	return ""
+}
+
+// omittedDistinguishingKeys returns the sorted set of keys that the colliding
+// rows differ on but the name template does not reference — the variables the
+// author must add to the name to tell the rows apart.
+func omittedDistinguishingKeys(template string, group []map[string]string) []string {
+	keys := map[string]bool{}
+	for k := range group[0] {
+		keys[k] = true
+	}
+	for _, row := range group[1:] {
+		for k := range row {
+			keys[k] = true
+		}
+	}
+	var omitted []string
+	for k := range keys {
+		if strings.Contains(template, "${"+k+"}") {
+			continue
+		}
+		first := group[0][k]
+		for _, row := range group[1:] {
+			if row[k] != first {
+				omitted = append(omitted, k)
+				break
+			}
+		}
+	}
+	sort.Strings(omitted)
+	return omitted
 }
 
 // expandMatrix replaces every matrix scenario with one concrete scenario per row,
