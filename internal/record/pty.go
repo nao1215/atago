@@ -78,7 +78,6 @@ func GeneratePTY(rec PTYRecording, opts Options) ([]byte, error) {
 	fmt.Fprintf(&b, "suite:\n  name: %s\n\n", yamlScalar(opts.SuiteName))
 	b.WriteString("scenarios:\n")
 	fmt.Fprintf(&b, "  - name: %s # TODO: describe the behavior\n", yamlScalar(rec.Command))
-	b.WriteString("    skip:\n      os: windows # pty steps are POSIX-only\n")
 	b.WriteString("    steps:\n")
 	b.WriteString("      - pty:\n")
 	if rec.Shell {

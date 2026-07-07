@@ -7,7 +7,8 @@
 #
 # It is deliberately NOT gated off Windows: once atago's pty runner speaks
 # ConPTY, this is the real-world proof that an interactive, ANSI-coloring nao1215
-# CLI renders correctly through it. Two authoring rules keep the sessions robust:
+# CLI renders correctly through it. Three authoring rules keep the sessions
+# robust — including when many run concurrently and starve each other of CPU:
 #
 #   * Enter is `{key: enter}` (a raw CR, 0x0d); a bare "\n" is not the Return key
 #     a raw-mode line editor waits for.
@@ -15,6 +16,11 @@
 #     executed result (e.g. a value or "TABLE NAME") before expecting the prompt
 #     again — the prompt string is echoed on every keystroke while typing, so
 #     matching it too early would fire mid-input and desync the session.
+#   * Quit with EOF (`send: ""`, a single ^D), NOT by typing ".exit". A one-byte
+#     terminal EOF cannot race the completer or the prompt's read-readiness the
+#     way a multi-character command submitted with Enter can — the latter flaked
+#     under concurrent load when the returning prompt was matched a beat before
+#     the editor was ready to receive ".exit".
 version: "1"
 
 suite:
@@ -40,8 +46,7 @@ scenarios:
             - send: { key: enter } # submit the query (CR, not LF)
             - expect: "Harrison Ford" # result token: only present post-execution
             - expect: 'sqly:' # the prompt returned, editor idle again
-            - send: ".exit"
-            - send: { key: enter }
+            - send: "" # EOF (^D) quits cleanly
       - assert:
           exit_code: 0
           stdout:
@@ -70,9 +75,8 @@ scenarios:
             - send: { key: enter }
             - expect: "TABLE NAME" # the boxed .tables header, post-execution
             - expect: "actor" # the imported CSV became the "actor" table
-            - expect: 'sqly:'
-            - send: ".exit"
-            - send: { key: enter }
+            - expect: 'sqly:' # the prompt returned, editor idle again
+            - send: "" # EOF (^D) quits cleanly
       - assert:
           exit_code: 0
           stdout:
@@ -98,9 +102,8 @@ scenarios:
             - send: "SELECT 'ROWS=' || COUNT(*) AS r FROM actor;"
             - send: { key: enter }
             - expect: "ROWS=2"
-            - expect: 'sqly:'
-            - send: ".exit"
-            - send: { key: enter }
+            - expect: 'sqly:' # the prompt returned, editor idle again
+            - send: "" # EOF (^D) quits cleanly
       - assert:
           exit_code: 0
           stdout:
@@ -122,7 +125,6 @@ scenarios:
             - send: ".mode csv"
             - send: { key: enter }
             - expect: '\(csv\)\$' # the switch is live: the prompt now says csv
-            - send: ".exit"
-            - send: { key: enter }
+            - send: "" # EOF (^D) quits cleanly
       - assert:
           exit_code: 0

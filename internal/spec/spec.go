@@ -227,8 +227,8 @@ type Step struct {
 	Service *Service `yaml:"service,omitempty"`
 	// PTY runs one command inside a real pseudo-terminal and drives it with a
 	// declarative expect/send session (#8) — for CLIs that branch on TTY-ness
-	// or present an interactive prompt. POSIX-only for now; the loader accepts
-	// the step everywhere and the engine reports a clear error on Windows.
+	// or present an interactive prompt. Runs on POSIX (a real pty) and on Windows
+	// (a ConPTY, Windows 10 1809+); the loader accepts the step everywhere.
 	PTY *PTY `yaml:"pty,omitempty"`
 	// Signal sends a named POSIX signal to a managed service (#23) — the
 	// race-free, handle-based alternative to `kill`/`killall` shell hacks for

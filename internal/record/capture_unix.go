@@ -30,8 +30,8 @@ const captureDrainGrace = 500 * time.Millisecond
 
 // CapturePTY runs command inside a pseudo-terminal wired to in/out (the
 // developer's terminal), puts in into raw mode, forwards keystrokes and output
-// until the program exits, and returns the recorded session (#69). It is
-// POSIX-only; the Windows build returns a clear error.
+// until the program exits, and returns the recorded session (#69). This is the
+// POSIX build; capture_windows.go implements the same contract over a ConPTY.
 func CapturePTY(command string, shell bool, in, out *os.File) (PTYRecording, error) {
 	name, args, err := runnercmd.CommandLine(command, shell)
 	if err != nil {

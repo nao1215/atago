@@ -57,4 +57,7 @@ jobs:
           command -v "${{ matrix.tool.name }}" && "${{ matrix.tool.name }}" --version || true
 
       - name: Run the ${{ matrix.tool.name }} dogfood specs
-        run: ./dist/atago run "${{ matrix.tool.dir }}"
+        # --retry-failed absorbs the inherently racy interactive-pty specs (e.g.
+        # sqly's readline REPL over a pty); a recovered scenario is reported as
+        # flaky, a real regression still fails after the retries.
+        run: ./dist/atago run --retry-failed 3 "${{ matrix.tool.dir }}"

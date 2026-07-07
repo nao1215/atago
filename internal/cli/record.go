@@ -30,7 +30,7 @@ func recordCmd(args []string, stdout, stderr io.Writer) int {
 	force := fs.Bool("force", false, "overwrite --out if it already exists")
 	shell := fs.Bool("shell", false, "record the command line verbatim with shell: true")
 	snap := fs.Bool("snapshot", false, "assert stdout against a snapshot golden (requires --out; the golden is written next to it)")
-	ptyMode := fs.Bool("pty", false, "record an interactive pty session and generate an expect/send spec (POSIX-only)")
+	ptyMode := fs.Bool("pty", false, "record an interactive pty session and generate an expect/send spec")
 	fs.Usage = func() {
 		fmt.Fprint(stderr, `Usage: atago record [--out FILE] [--force] [--shell] [--snapshot] -- <command> [args...]
        atago record --pty [--out FILE] [--force] [--shell] -- <command> [args...]
@@ -41,7 +41,9 @@ and created files.
 
 With --pty, runs the command in a real pseudo-terminal wired to your
 terminal, lets you drive one interactive session by hand, and generates a
-spec whose pty: step replays it as expect/send pairs (POSIX-only). HTTP
+spec whose pty: step replays it as expect/send pairs. On Windows it drives a
+ConPTY; a ConPTY exposes no echo state, so typed passwords are not auto-masked
+there — convert a secret send to a ${env:...} placeholder by hand. HTTP
 recording is a non-goal for now — write those steps by hand.
 `)
 		fs.PrintDefaults()
@@ -157,7 +159,7 @@ recording is a non-goal for now — write those steps by hand.
 // recordPTY implements `atago record --pty` (#69): run the command in a real
 // pseudo-terminal wired to the developer's own terminal, let them drive one
 // interactive session by hand, and generate a spec whose pty: step replays it
-// as expect/send pairs. POSIX-only; Windows returns a clear error.
+// as expect/send pairs. Runs on POSIX (a real pty) and Windows (a ConPTY).
 func recordPTY(cmdArgs []string, shell bool, out string, force bool, stdout, stderr io.Writer) int {
 	// Refuse an existing --out up front, before driving the session: otherwise
 	// a user hand-drives the whole interactive session only to be told the file

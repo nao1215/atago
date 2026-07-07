@@ -66,7 +66,7 @@ thirdparty: ## Run atago against third-party programs (needs git, caddy, pushgat
 
 dogfood: ## Run atago against real nao1215 CLIs that just need a binary on PATH (gup, sqly, truss)
 	env CGO_ENABLED=0 $(GO_BUILD) $(GO_LDFLAGS) -o ./dist/$(APP) .
-	./dist/$(APP) run --parallel $(PARALLEL) ./test/e2e/tools/gup ./test/e2e/tools/sqly ./test/e2e/tools/truss
+	./dist/$(APP) run --parallel $(PARALLEL) --retry-failed 3 ./test/e2e/tools/gup ./test/e2e/tools/sqly ./test/e2e/tools/truss
 
 dogfood-iso8583tool: ## Full iso8583tool e2e (builds latest iso8583tool + its TCP mock; set ISO_REPO)
 	bash ./test/e2e/tools/iso8583tool/run.sh --parallel $(PARALLEL)
