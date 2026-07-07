@@ -138,3 +138,58 @@ scenarios:
           exit_code: 2
           stderr:
             contains: defaults.run.command is not supported
+
+  - name: defaults.run.env merges per key and a step env wins the collisions
+    steps:
+      - fixture:
+          file: env.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: envmerge
+            defaults:
+              run:
+                shell: true
+                env: {BASE: from-default, SHARED: default-value}
+            scenarios:
+              - name: step env overrides one key and inherits the other
+                steps:
+                  - run:
+                      command: "echo [$BASE][$SHARED]"
+                      env: {SHARED: step-value}
+                  - assert:
+                      stdout:
+                        contains: "[from-default][step-value]"
+      - run:
+          command: ${atago} run env.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: PASSED
+
+  - name: a step opts out of defaults.run.shell with an explicit shell false
+    steps:
+      - fixture:
+          file: optout.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: optout
+            defaults:
+              run:
+                shell: true
+            scenarios:
+              - name: this step runs without a shell
+                steps:
+                  - run:
+                      shell: false
+                      command: "echo literal-$HOME"
+                  - assert:
+                      stdout:
+                        contains: "literal-$HOME"
+      - run:
+          command: ${atago} run optout.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: PASSED

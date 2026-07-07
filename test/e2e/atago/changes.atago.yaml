@@ -248,3 +248,37 @@ scenarios:
           exit_code: 1
           stdout:
             contains: "unexpected created file"
+
+  - name: a doublestar glob matches a nested redirect target (portable)
+    steps:
+      # stdout_to writes into a directory atago creates; observed paths are
+      # normalized to forward slashes, so `out/**` matches on Windows too — the
+      # redirect and the glob need no POSIX shell.
+      - run:
+          shell: true
+          command: echo produced
+          stdout_to: out/deep/result.txt
+      - assert:
+          exit_code: 0
+          changes:
+            created:
+              - "out/**"
+            modified: []
+            deleted: []
+
+  - name: a doublestar prefix covers both redirect streams (portable)
+    steps:
+      # stdout_to and stderr_to both land under logs/; a single logs/** entry
+      # covers the pair (an empty stderr still creates a 0-byte file).
+      - run:
+          shell: true
+          command: echo out
+          stdout_to: logs/out.txt
+          stderr_to: logs/err.txt
+      - assert:
+          exit_code: 0
+          changes:
+            created:
+              - "logs/**"
+            modified: []
+            deleted: []

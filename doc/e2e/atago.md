@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-73 suites · 362 scenarios
+73 suites · 366 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -28,7 +28,7 @@
   - [manifest surfaces the browser-runner configuration](#scenario-manifest-surfaces-the-browser-runner-configuration)
   - [an upload action without a file fails validation (exit 2)](#scenario-an-upload-action-without-a-file-fails-validation-exit-2)
   - [a download action without a click selector fails validation (exit 2)](#scenario-a-download-action-without-a-click-selector-fails-validation-exit-2)
-- [atago self-hosting / changes (workdir delta assertions)](#atago-self-hosting--changes-workdir-delta-assertions) — 10 scenarios
+- [atago self-hosting / changes (workdir delta assertions)](#atago-self-hosting--changes-workdir-delta-assertions) — 12 scenarios
   - [a generator touches exactly the files it should (POSIX)](#scenario-a-generator-touches-exactly-the-files-it-should-posix)
   - [an unexpected creation breaks the exact contract (POSIX)](#scenario-an-unexpected-creation-breaks-the-exact-contract-posix)
   - [stdout_to counts as created, and modified nothing holds (portable)](#scenario-stdout_to-counts-as-created-and-modified-nothing-holds-portable)
@@ -39,6 +39,8 @@
   - [a pty step feeds the delta scan just like a run step (POSIX)](#scenario-a-pty-step-feeds-the-delta-scan-just-like-a-run-step-posix)
   - [a doublestar glob pins an arbitrary-depth generated tree exactly (POSIX)](#scenario-a-doublestar-glob-pins-an-arbitrary-depth-generated-tree-exactly-posix)
   - [a stray file outside the doublestar prefix breaks the exact contract (POSIX)](#scenario-a-stray-file-outside-the-doublestar-prefix-breaks-the-exact-contract-posix)
+  - [a doublestar glob matches a nested redirect target (portable)](#scenario-a-doublestar-glob-matches-a-nested-redirect-target-portable)
+  - [a doublestar prefix covers both redirect streams (portable)](#scenario-a-doublestar-prefix-covers-both-redirect-streams-portable)
 - [atago self-hosting / CLI scenario selection](#atago-self-hosting--cli-scenario-selection) — 7 scenarios
   - [filter selects by a name substring](#scenario-filter-selects-by-a-name-substring)
   - [filter is OR across a comma-separated list](#scenario-filter-is-or-across-a-comma-separated-list)
@@ -56,11 +58,13 @@
 - [atago self-hosting / db runner](#atago-self-hosting--db-runner) — 2 scenarios
   - [query workflow (create, insert, select, row assert, value binding) passes](#scenario-query-workflow-create-insert-select-row-assert-value-binding-passes)
   - [a query against an undeclared runner fails validation (exit 2)](#scenario-a-query-against-an-undeclared-runner-fails-validation-exit-2)
-- [atago self-hosting / top-level defaults](#atago-self-hosting--top-level-defaults) — 4 scenarios
+- [atago self-hosting / top-level defaults](#atago-self-hosting--top-level-defaults) — 6 scenarios
   - [defaults.run.shell applies to every run step without repeating it](#scenario-defaultsrunshell-applies-to-every-run-step-without-repeating-it)
   - [defaults.scenario.env is merged and an explicit scenario env wins](#scenario-defaultsscenarioenv-is-merged-and-an-explicit-scenario-env-wins)
   - [defaults.run.sandbox_home governs a run step and a pty step alike (POSIX)](#scenario-defaultsrunsandbox_home-governs-a-run-step-and-a-pty-step-alike-posix)
   - [an unsupported defaults field is a load-time error (exit 2)](#scenario-an-unsupported-defaults-field-is-a-load-time-error-exit-2)
+  - [defaults.run.env merges per key and a step env wins the collisions](#scenario-defaultsrunenv-merges-per-key-and-a-step-env-wins-the-collisions)
+  - [a step opts out of defaults.run.shell with an explicit shell false](#scenario-a-step-opts-out-of-defaultsrunshell-with-an-explicit-shell-false)
 - [atago self-hosting / dir assertion](#atago-self-hosting--dir-assertion) — 2 scenarios
   - [directory/tree assertions cover a multi-file generator](#scenario-directorytree-assertions-cover-a-multi-file-generator)
   - [a missing directory can be asserted absent](#scenario-a-missing-directory-can-be-asserted-absent)
@@ -1025,6 +1029,27 @@ ${atago} run check.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `unexpected created file`
+### Scenario: a doublestar glob matches a nested redirect target (portable)
+#### When
+```shell
+echo produced
+```
+#### Then
+- exit code is `0`
+- the step changed exactly created `out/**`, modified nothing, deleted nothing
+#### Generated artifacts
+- `out/deep/result.txt`
+### Scenario: a doublestar prefix covers both redirect streams (portable)
+#### When
+```shell
+echo out
+```
+#### Then
+- exit code is `0`
+- the step changed exactly created `logs/**`, modified nothing, deleted nothing
+#### Generated artifacts
+- `logs/out.txt`
+- `logs/err.txt`
 ## atago self-hosting / CLI scenario selection
 Source: `test/e2e/atago/cli_selection.atago.yaml`
 ### Scenario: filter selects by a name substring
@@ -1443,6 +1468,65 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `defaults.run.command is not supported`
+### Scenario: defaults.run.env merges per key and a step env wins the collisions
+#### Given
+- Fixture file `env.atago.yaml` is created.
+#### Inputs
+_Fixture `env.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: envmerge
+defaults:
+  run:
+    shell: true
+    env: {BASE: from-default, SHARED: default-value}
+scenarios:
+  - name: step env overrides one key and inherits the other
+    steps:
+      - run:
+          command: "echo [$BASE][$SHARED]"
+          env: {SHARED: step-value}
+      - assert:
+          stdout:
+            contains: "[from-default][step-value]"
+```
+#### When
+```shell
+${atago} run env.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout contains `PASSED`
+### Scenario: a step opts out of defaults.run.shell with an explicit shell false
+#### Given
+- Fixture file `optout.atago.yaml` is created.
+#### Inputs
+_Fixture `optout.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: optout
+defaults:
+  run:
+    shell: true
+scenarios:
+  - name: this step runs without a shell
+    steps:
+      - run:
+          shell: false
+          command: "echo literal-$HOME"
+      - assert:
+          stdout:
+            contains: "literal-$HOME"
+```
+#### When
+```shell
+${atago} run optout.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout contains `PASSED`
 ## atago self-hosting / dir assertion
 Source: `test/e2e/atago/dir.atago.yaml`
 ### Scenario: directory/tree assertions cover a multi-file generator
