@@ -88,6 +88,13 @@ func startConPTY(commandLine, workDir string, env []string, rows, cols int) (*co
 
 	si := new(windows.StartupInfoEx)
 	si.Cb = uint32(unsafe.Sizeof(*si))
+	// STARTF_USESTDHANDLES with the std handles left nil is what stops the child
+	// from inheriting the PARENT's console: without it a console app attaches to
+	// atago's own console and writes there instead of through the pseudo-console,
+	// so nothing reaches the transcript pipe. The pseudo-console attribute below
+	// then supplies the child's actual console I/O. This mirrors the established
+	// ConPTY wrappers (aymanbagabas/go-pty, UserExistsError/conpty).
+	si.Flags |= windows.STARTF_USESTDHANDLES
 	si.ProcThreadAttributeList = attrList.List()
 
 	argv, err := windows.UTF16PtrFromString(commandLine)
