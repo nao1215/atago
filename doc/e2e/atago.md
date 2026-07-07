@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-65 suites · 299 scenarios
+66 suites · 313 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -184,6 +184,21 @@
 - [atago self-hosting / list](#atago-self-hosting--list) — 2 scenarios
   - [list surfaces suites, scenarios, tags, and gates](#scenario-list-surfaces-suites-scenarios-tags-and-gates)
   - [list --json is a stable machine contract](#scenario-list---json-is-a-stable-machine-contract)
+- [atago self-hosting / loader rejects malformed specs](#atago-self-hosting--loader-rejects-malformed-specs) — 14 scenarios
+  - [an empty scenario list is rejected](#scenario-an-empty-scenario-list-is-rejected)
+  - [a wrong version string is rejected](#scenario-a-wrong-version-string-is-rejected)
+  - [an unknown top-level field is rejected with its position](#scenario-an-unknown-top-level-field-is-rejected-with-its-position)
+  - [a step that sets two actions is rejected](#scenario-a-step-that-sets-two-actions-is-rejected)
+  - [a stream assertion with no matcher is rejected](#scenario-a-stream-assertion-with-no-matcher-is-rejected)
+  - [combining equals with another matcher is rejected](#scenario-combining-equals-with-another-matcher-is-rejected)
+  - [a line index below one is rejected](#scenario-a-line-index-below-one-is-rejected)
+  - [combining a line selector with json is rejected](#scenario-combining-a-line-selector-with-json-is-rejected)
+  - [a duplicate scenario name is rejected](#scenario-a-duplicate-scenario-name-is-rejected)
+  - [an empty run command is rejected](#scenario-an-empty-run-command-is-rejected)
+  - [an unparseable timeout is rejected with an example](#scenario-an-unparseable-timeout-is-rejected-with-an-example)
+  - [a fixture with two content sources is rejected](#scenario-a-fixture-with-two-content-sources-is-rejected)
+  - [an absolute changes glob is rejected as not workdir-relative](#scenario-an-absolute-changes-glob-is-rejected-as-not-workdir-relative)
+  - [the inline stdin form is a scalar, not a mapping key](#scenario-the-inline-stdin-form-is-a-scalar-not-a-mapping-key)
 - [atago self-hosting / manifest](#atago-self-hosting--manifest) — 2 scenarios
   - [manifest emits a stable JSON summary without running the spec](#scenario-manifest-emits-a-stable-json-summary-without-running-the-spec)
   - [manifest does not execute the spec's commands](#scenario-manifest-does-not-execute-the-specs-commands)
@@ -3042,6 +3057,272 @@ ${atago} list --json sample.atago.yaml
 - exit code is `0`
 - stdout at `$.schema_version` equals `1`
 - stdout at `$.scenarios[0].scenario` equals `only scenario`
+## atago self-hosting / loader rejects malformed specs
+Source: `test/e2e/atago/loader_errors.atago.yaml`
+### Scenario: an empty scenario list is rejected
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios: []
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `must contain at least one scenario`
+### Scenario: a wrong version string is rejected
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "9"
+suite: {name: x}
+scenarios: [{name: a, steps: [{run: {command: echo}}]}]
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `version must be "1"`
+### Scenario: an unknown top-level field is rejected with its position
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenariosss: []
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `unknown field "scenariosss"`
+### Scenario: a step that sets two actions is rejected
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    steps:
+      - run: {command: echo}
+        fixture: {file: f, content: c}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `must set exactly one action`
+### Scenario: a stream assertion with no matcher is rejected
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    steps:
+      - run: {command: echo}
+      - assert: {stdout: {}}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `must set at least one matcher`
+### Scenario: combining equals with another matcher is rejected
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    steps:
+      - run: {command: echo}
+      - assert: {stdout: {equals: hi, contains: h}}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `cannot be combined with another matcher`
+### Scenario: a line index below one is rejected
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    steps:
+      - run: {command: echo}
+      - assert: {stdout: {line: 0, equals: x}}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `line must be >= 1`
+### Scenario: combining a line selector with json is rejected
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    steps:
+      - run: {command: echo}
+      - assert: {stdout: {line: 1, json: [{path: "$.k", equals: 1}]}}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `cannot be combined with json/yaml/snapshot`
+### Scenario: a duplicate scenario name is rejected
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios:
+  - {name: dup, steps: [{run: {command: echo}}]}
+  - {name: dup, steps: [{run: {command: echo}}]}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `duplicate scenario name "dup"`
+### Scenario: an empty run command is rejected
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios: [{name: a, steps: [{run: {command: ""}}]}]
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `run.command is required`
+### Scenario: an unparseable timeout is rejected with an example
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios: [{name: a, steps: [{run: {command: echo, timeout: "soon"}}]}]
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `is not a valid duration`
+### Scenario: a fixture with two content sources is rejected
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios: [{name: a, steps: [{fixture: {file: f, content: c, base64: "QQ=="}}]}]
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `set only one of content, base64, from, or symlink`
+### Scenario: an absolute changes glob is rejected as not workdir-relative
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    steps:
+      - run: {command: echo}
+      - assert: {changes: {created: ["/etc/passwd"]}}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `must be workdir-relative, not absolute`
+### Scenario: the inline stdin form is a scalar, not a mapping key
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios: [{name: a, steps: [{run: {command: cat, stdin: {inline: hi}}}]}]
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `unknown key "inline"`
 ## atago self-hosting / manifest
 Source: `test/e2e/atago/manifest.atago.yaml`
 ### Scenario: manifest emits a stable JSON summary without running the spec

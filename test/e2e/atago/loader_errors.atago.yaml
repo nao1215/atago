@@ -1,0 +1,219 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / loader rejects malformed specs
+
+# A spec author's first feedback loop is the loader: a malformed spec must fail
+# fast, before anything runs, with a positioned message that names the offending
+# field — not a stack trace or a mid-run surprise. Each scenario feeds atago a
+# deliberately broken inner spec and asserts the exit code is 2 (a load error)
+# and the message identifies the problem. The inner specs never execute a step,
+# so these are OS-independent and run in the Windows portable subset.
+scenarios:
+  - name: an empty scenario list is rejected
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios: []
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "must contain at least one scenario"}
+
+  - name: a wrong version string is rejected
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "9"
+            suite: {name: x}
+            scenarios: [{name: a, steps: [{run: {command: echo}}]}]
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: 'version must be "1"'}
+
+  - name: an unknown top-level field is rejected with its position
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenariosss: []
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: 'unknown field "scenariosss"'}
+
+  - name: a step that sets two actions is rejected
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                steps:
+                  - run: {command: echo}
+                    fixture: {file: f, content: c}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "must set exactly one action"}
+
+  - name: a stream assertion with no matcher is rejected
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                steps:
+                  - run: {command: echo}
+                  - assert: {stdout: {}}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "must set at least one matcher"}
+
+  - name: combining equals with another matcher is rejected
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                steps:
+                  - run: {command: echo}
+                  - assert: {stdout: {equals: hi, contains: h}}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "cannot be combined with another matcher"}
+
+  - name: a line index below one is rejected
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                steps:
+                  - run: {command: echo}
+                  - assert: {stdout: {line: 0, equals: x}}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "line must be >= 1"}
+
+  - name: combining a line selector with json is rejected
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                steps:
+                  - run: {command: echo}
+                  - assert: {stdout: {line: 1, json: [{path: "$.k", equals: 1}]}}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "cannot be combined with json/yaml/snapshot"}
+
+  - name: a duplicate scenario name is rejected
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - {name: dup, steps: [{run: {command: echo}}]}
+              - {name: dup, steps: [{run: {command: echo}}]}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: 'duplicate scenario name "dup"'}
+
+  - name: an empty run command is rejected
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios: [{name: a, steps: [{run: {command: ""}}]}]
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "run.command is required"}
+
+  - name: an unparseable timeout is rejected with an example
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios: [{name: a, steps: [{run: {command: echo, timeout: "soon"}}]}]
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "is not a valid duration"}
+
+  - name: a fixture with two content sources is rejected
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios: [{name: a, steps: [{fixture: {file: f, content: c, base64: "QQ=="}}]}]
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "set only one of content, base64, from, or symlink"}
+
+  - name: an absolute changes glob is rejected as not workdir-relative
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                steps:
+                  - run: {command: echo}
+                  - assert: {changes: {created: ["/etc/passwd"]}}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "must be workdir-relative, not absolute"}
+
+  - name: the inline stdin form is a scalar, not a mapping key
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios: [{name: a, steps: [{run: {command: cat, stdin: {inline: hi}}}]}]
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: 'unknown key "inline"'}
