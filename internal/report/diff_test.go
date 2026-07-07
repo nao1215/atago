@@ -77,21 +77,32 @@ func TestUnifiedDiff_HunkPlacement(t *testing.T) {
 }
 
 // TestUnifiedDiff_CRLFAndTrailingNewline proves CRLF inputs fold (an OS
-// artifact must not diff every line) while a trailing-newline difference is
-// rendered explicitly.
+// artifact must not diff every line) while both a trailing-newline difference
+// and a line-ending-only difference are rendered explicitly. A byte-exact
+// failure caused only by CRLF-vs-LF must never render a blank diff: the folded
+// lines are equal, so there are no content hunks, but the assertion still
+// failed and the reason must be surfaced.
 func TestUnifiedDiff_CRLFAndTrailingNewline(t *testing.T) {
 	t.Parallel()
-	if got := unifiedDiff("a\r\nb\r\n", "a\nb\n", "expected", "actual"); !strings.Contains(got, noNewlineMarker) && got != "" {
-		// CRLF folding makes the contents equal; only the byte-level
-		// difference remains, which the caller treats as equal lines. The
-		// diff is header-only in that case — assert no +/- content lines.
-		for _, l := range strings.Split(got, "\n") {
-			if strings.HasPrefix(l, "-") && !strings.HasPrefix(l, "---") {
-				t.Errorf("CRLF-only difference produced content hunks:\n%s", got)
-			}
+	// CRLF is the only difference: the folded lines are identical, so no
+	// content hunk is produced — but the diff must not be blank and must point
+	// at the line-ending difference.
+	got := unifiedDiff("alpha\nbeta\n", "alpha\r\nbeta\r\n", "expected", "actual")
+	if strings.TrimSpace(got) == "" {
+		t.Fatalf("CRLF-only difference rendered a blank diff")
+	}
+	if !strings.Contains(got, "CRLF") && !strings.Contains(strings.ToLower(got), "line ending") {
+		t.Errorf("CRLF-only difference should point at the line-ending difference:\n%s", got)
+	}
+	// Folding still holds: the content lines must not each diff as changed.
+	for _, l := range strings.Split(got, "\n") {
+		if (strings.HasPrefix(l, "-") && !strings.HasPrefix(l, "---")) ||
+			(strings.HasPrefix(l, "+") && !strings.HasPrefix(l, "+++")) {
+			t.Errorf("CRLF-only difference produced content hunks:\n%s", got)
 		}
 	}
-	got := unifiedDiff("a\nb\n", "a\nb", "expected", "actual")
+
+	got = unifiedDiff("a\nb\n", "a\nb", "expected", "actual")
 	if !strings.Contains(got, noNewlineMarker+" (actual)") {
 		t.Errorf("trailing-newline difference not annotated:\n%s", got)
 	}
