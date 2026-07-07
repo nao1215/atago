@@ -1,6 +1,8 @@
 package assert
 
 import (
+	"bytes"
+	"compress/zlib"
 	"os"
 	"path/filepath"
 	"testing"
@@ -50,6 +52,34 @@ endobj
 4 0 obj
 << /Type /Page /Parent 2 0 R >>
 endobj
+%%EOF
+`
+
+// hexStringPDF is a 1-page PDF whose /Title and content-stream text-showing
+// operator use PDF hex-string literals (<...>) instead of (...): a form written
+// by LibreOffice/Word/wkhtmltopdf for Unicode. /Title <5265706F7274> is
+// "Report" and <48656C6C6F> Tj is "Hello".
+const hexStringPDF = `%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 40 >>
+stream
+BT /F1 24 Tf 72 700 Td <48656C6C6F> Tj ET
+endstream
+endobj
+6 0 obj
+<< /Title <5265706F7274> /Author (Ada Lovelace) >>
+endobj
+trailer
+<< /Root 1 0 R /Info 6 0 R >>
 %%EOF
 `
 
@@ -116,6 +146,30 @@ func TestCheckPDF_MetadataAndText(t *testing.T) {
 	}
 }
 
+// TestParsePDF_HexStrings pins decoding of PDF hex-string literals (ISO 32000
+// §7.3.4.3) in both the metadata and the text-operator path. A PDF that encodes
+// its /Title and shown text as <...> hex must still satisfy metadata and text
+// assertions; otherwise a valid PDF reports a misleading "field not present".
+func TestParsePDF_HexStrings(t *testing.T) {
+	doc := parsePDF([]byte(hexStringPDF))
+	if doc.metadata["title"] != "Report" {
+		t.Errorf("title = %q, want %q", doc.metadata["title"], "Report")
+	}
+	if !contains(doc.text, "Hello") {
+		t.Errorf("text = %q, want it to contain %q", doc.text, "Hello")
+	}
+}
+
+func TestCheckPDF_HexStrings(t *testing.T) {
+	wd := writePDF(t, hexStringPDF)
+	if cr := checkPDFOK(t, wd, &spec.PDFAssert{Path: "doc.pdf", Metadata: map[string]string{"title": "Report"}}); !cr.OK {
+		t.Errorf("hex-string metadata title should match: %+v", cr)
+	}
+	if cr := checkPDFOK(t, wd, &spec.PDFAssert{Path: "doc.pdf", Text: &spec.StreamAssert{Contains: spec.StringList{"Hello"}}}); !cr.OK {
+		t.Errorf("hex-string text should contain Hello: %+v", cr)
+	}
+}
+
 func TestCheckPDF_NotAPDF(t *testing.T) {
 	wd := t.TempDir()
 	if err := os.WriteFile(filepath.Join(wd, "doc.pdf"), []byte("not a pdf"), 0o600); err != nil {
@@ -130,6 +184,46 @@ func TestCheckPDF_PathConfinement(t *testing.T) {
 	wd := writePDF(t, minimalPDF)
 	if cr := checkPDFOK(t, wd, &spec.PDFAssert{Path: "../escape.pdf", Pages: ptrInt(1)}); cr.OK {
 		t.Error("a path escaping the workdir must be rejected")
+	}
+}
+
+// TestInflate_DecompressionBombCapped proves the FlateDecode inflate path
+// refuses a decompression bomb: a tiny zlib stream that would inflate past the
+// cap returns an error instead of allocating unbounded memory (atago runs
+// untrusted CLI output through pdf assertions). A normal small stream still
+// inflates correctly.
+func TestInflate_DecompressionBombCapped(t *testing.T) {
+	t.Parallel()
+
+	// A highly compressible zero buffer that inflates well beyond the cap.
+	var buf bytes.Buffer
+	zw := zlib.NewWriter(&buf)
+	zeros := make([]byte, maxPDFStreamBytes+(1<<20)) // cap + 1 MiB
+	if _, err := zw.Write(zeros); err != nil {
+		t.Fatal(err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := inflate(buf.Bytes()); err == nil {
+		t.Errorf("inflate should reject a stream that inflates past the %d-byte cap", maxPDFStreamBytes)
+	}
+
+	// A normal small stream still round-trips.
+	var small bytes.Buffer
+	sw := zlib.NewWriter(&small)
+	if _, err := sw.Write([]byte("hello pdf stream")); err != nil {
+		t.Fatal(err)
+	}
+	if err := sw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	got, err := inflate(small.Bytes())
+	if err != nil {
+		t.Fatalf("inflate of a small stream should succeed: %v", err)
+	}
+	if string(got) != "hello pdf stream" {
+		t.Errorf("inflate = %q, want %q", got, "hello pdf stream")
 	}
 }
 

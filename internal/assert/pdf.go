@@ -134,11 +134,14 @@ type pdfDoc struct {
 var (
 	// A page object is `/Type /Page` not followed by another letter (so it does
 	// not match `/Type /Pages`). Whitespace between token parts is flexible.
-	rePageObj  = regexp.MustCompile(`/Type\s*/Page(?:[^s]|$)`)
-	reCount    = regexp.MustCompile(`/Count\s+(\d+)`)
-	reStream   = regexp.MustCompile(`(?s)stream\r?\n(.*?)\r?\nendstream`)
-	reMetaItem = regexp.MustCompile(`/(Title|Author|Subject|Keywords|Creator|Producer)\s*\(`)
-	reTextOp   = regexp.MustCompile(`\((?:[^()\\]|\\.)*\)`)
+	rePageObj = regexp.MustCompile(`/Type\s*/Page(?:[^s]|$)`)
+	reCount   = regexp.MustCompile(`/Count\s+(\d+)`)
+	reStream  = regexp.MustCompile(`(?s)stream\r?\n(.*?)\r?\nendstream`)
+	// A metadata value is either a "(…)" literal string or a "<…>" hex string.
+	reMetaItem = regexp.MustCompile(`/(Title|Author|Subject|Keywords|Creator|Producer)\s*[(<]`)
+	// A text operand is a "(…)" literal string or a "<…>" hex string (ISO 32000
+	// §7.3.4.3). The hex alternative excludes a leading "<<" dictionary opener.
+	reTextOp = regexp.MustCompile(`\((?:[^()\\]|\\.)*\)|<[0-9A-Fa-f\s]*>`)
 )
 
 // parsePDF extracts a black-box view of a PDF. It is lenient by design: it reads
@@ -176,25 +179,40 @@ func parsePDF(data []byte) pdfDoc {
 	// Info metadata: read the parenthesized value after each known field name.
 	for _, loc := range reMetaItem.FindAllSubmatchIndex(data, -1) {
 		field := strings.ToLower(string(data[loc[2]:loc[3]]))
-		// loc[1] is just past the opening "(" of the value.
-		if val, ok := readPDFString(data, loc[1]-1); ok {
+		// loc[1] is just past the opening delimiter ("(" or "<") of the value.
+		if val, ok := readPDFStringOrHex(data, loc[1]-1); ok {
 			doc.metadata[field] = val
 		}
 	}
 	return doc
 }
 
+// maxPDFStreamBytes caps how many bytes a single FlateDecode stream may inflate
+// to. atago runs the (untrusted) output of the CLI under test through pdf
+// assertions, and a FlateDecode "zip bomb" — a few hundred KB of zeros — inflates
+// to hundreds of megabytes, which would OOM-kill atago. The cap keeps a
+// malicious or degenerate stream from exhausting memory; genuine generated PDFs
+// have content streams far below this ceiling.
+const maxPDFStreamBytes = 64 << 20 // 64 MiB
+
 // inflate decompresses a zlib/FlateDecode stream. A non-Flate (raw) stream
-// returns an error so the caller keeps the raw bytes.
+// returns an error so the caller keeps the raw bytes. Decompression is bounded
+// by maxPDFStreamBytes: a stream that would inflate past the cap returns an
+// error rather than allocating unbounded memory.
 func inflate(b []byte) ([]byte, error) {
 	zr, err := zlib.NewReader(bytes.NewReader(bytes.TrimLeft(b, "\r\n")))
 	if err != nil {
 		return nil, err
 	}
 	defer zr.Close()
-	out, err := io.ReadAll(zr)
+	// Read one byte past the cap so we can tell "exactly at the cap" from
+	// "over the cap".
+	out, err := io.ReadAll(io.LimitReader(zr, maxPDFStreamBytes+1))
 	if err != nil {
 		return nil, err
+	}
+	if len(out) > maxPDFStreamBytes {
+		return nil, fmt.Errorf("decompressed PDF stream exceeds the %d-byte cap", maxPDFStreamBytes)
 	}
 	return out, nil
 }
@@ -259,10 +277,91 @@ func readPDFString(data []byte, open int) (string, bool) {
 	return b.String(), true
 }
 
-// decodePDFString decodes a full "(…)" literal (including the delimiters).
+// decodePDFString decodes a full string operand (including the delimiters):
+// either a "(…)" literal or a "<…>" hex string.
 func decodePDFString(lit []byte) string {
+	if len(lit) > 0 && lit[0] == '<' {
+		return decodePDFHexString(lit)
+	}
 	s, _ := readPDFString(lit, 0)
 	return s
+}
+
+// readPDFStringOrHex reads a PDF string value starting at the opening delimiter
+// at index open: a "(…)" literal or a "<…>" hex string.
+func readPDFStringOrHex(data []byte, open int) (string, bool) {
+	if open < 0 || open >= len(data) {
+		return "", false
+	}
+	if data[open] == '<' {
+		return readPDFHexString(data, open)
+	}
+	return readPDFString(data, open)
+}
+
+// readPDFHexString reads a PDF hex string (ISO 32000 §7.3.4.3) that starts at
+// the "<" at index open and ends at the matching ">". A leading "<<" is a
+// dictionary opener, not a hex string.
+func readPDFHexString(data []byte, open int) (string, bool) {
+	if open < 0 || open >= len(data) || data[open] != '<' {
+		return "", false
+	}
+	if open+1 < len(data) && data[open+1] == '<' {
+		return "", false
+	}
+	for i := open + 1; i < len(data); i++ {
+		c := data[i]
+		if c == '>' {
+			return decodePDFHexString(data[open : i+1]), true
+		}
+		if !isHexDigit(c) && !isPDFSpace(c) {
+			return "", false
+		}
+	}
+	return "", false
+}
+
+// decodePDFHexString decodes a "<…>" hex string. Per spec, whitespace inside is
+// ignored and an odd number of hex digits is padded with a trailing 0.
+func decodePDFHexString(lit []byte) string {
+	digits := make([]byte, 0, len(lit))
+	for _, c := range lit {
+		if isHexDigit(c) {
+			digits = append(digits, c)
+		}
+	}
+	if len(digits)%2 == 1 {
+		digits = append(digits, '0')
+	}
+	var b strings.Builder
+	for i := 0; i+1 < len(digits); i += 2 {
+		b.WriteByte(hexNibble(digits[i])<<4 | hexNibble(digits[i+1]))
+	}
+	return b.String()
+}
+
+func isHexDigit(c byte) bool {
+	return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')
+}
+
+func isPDFSpace(c byte) bool {
+	switch c {
+	case ' ', '\t', '\r', '\n', '\f', 0:
+		return true
+	default:
+		return false
+	}
+}
+
+func hexNibble(c byte) byte {
+	switch {
+	case c >= '0' && c <= '9':
+		return c - '0'
+	case c >= 'a' && c <= 'f':
+		return c - 'a' + 10
+	default:
+		return c - 'A' + 10
+	}
 }
 
 func unescapePDFByte(c byte) byte {

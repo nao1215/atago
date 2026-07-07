@@ -1,6 +1,7 @@
 package assert
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/nao1215/atago/internal/fsdelta"
@@ -131,6 +132,15 @@ func TestCheckChanges(t *testing.T) {
 			delta:  fsdelta.Delta{Created: []string{"a1.txt"}},
 			wantOK: true,
 		},
+		{
+			// A leading "./" on an entry is stripped before matching: observed
+			// paths are workdir-relative without "./", so "./out.txt" must match
+			// "out.txt".
+			name:   "leading ./ on entry is normalized before matching",
+			assert: &spec.ChangesAssert{Created: list("./out.txt")},
+			delta:  fsdelta.Delta{Created: []string{"out.txt"}},
+			wantOK: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -140,6 +150,24 @@ func TestCheckChanges(t *testing.T) {
 				t.Errorf("checkChanges OK = %v, want %v (hint: %s)", got.OK, tt.wantOK, got.Hint)
 			}
 		})
+	}
+}
+
+// TestCheckChanges_GlobMetaHint proves that an entry containing an unescaped
+// glob metacharacter that matches nothing gets a clarifying note appended to the
+// Hint, rather than a byte-identical, self-contradictory Expected/Actual block.
+func TestCheckChanges_GlobMetaHint(t *testing.T) {
+	t.Parallel()
+	got := checkChanges(
+		&spec.ChangesAssert{Created: list("weird[1].txt")},
+		changesResult(fsdelta.Delta{Created: []string{"weird[1].txt"}}),
+	)
+	if got.OK {
+		t.Fatal("an unescaped [ never matches the literal filename, so it should fail")
+	}
+	wantNote := `note: "[" is a glob metacharacter — write "weird\[1\].txt" to match a literal filename`
+	if !strings.Contains(got.Hint, wantNote) {
+		t.Errorf("Hint should carry the glob-metacharacter note.\n got: %s\nwant substring: %s", got.Hint, wantNote)
 	}
 }
 

@@ -91,7 +91,9 @@ func checkDirChildren(d *spec.DirAssert, dirPath string) *CheckResult {
 		if err != nil {
 			return &CheckResult{Desc: fmt.Sprintf("assert dir %q contains %q", d.Path, child), Hint: err.Error()}
 		}
-		if _, err := os.Stat(childPath); err != nil {
+		// Lstat, not Stat: membership is about the directory entry, not whether a
+		// symlink target resolves. A dangling symlink is still a present entry.
+		if _, err := os.Lstat(childPath); err != nil {
 			return &CheckResult{
 				Desc:     fmt.Sprintf("assert dir %q contains %q", d.Path, child),
 				Expected: fmt.Sprintf("child %q present", child),
@@ -105,7 +107,9 @@ func checkDirChildren(d *spec.DirAssert, dirPath string) *CheckResult {
 		if err != nil {
 			return &CheckResult{Desc: fmt.Sprintf("assert dir %q does not contain %q", d.Path, child), Hint: err.Error()}
 		}
-		if _, err := os.Stat(childPath); err == nil {
+		// Lstat, not Stat: a dangling symlink the step left behind is a present
+		// entry, so not_contains must fail on it rather than follow the dead link.
+		if _, err := os.Lstat(childPath); err == nil {
 			return &CheckResult{
 				Desc:     fmt.Sprintf("assert dir %q does not contain %q", d.Path, child),
 				Expected: fmt.Sprintf("child %q absent", child),

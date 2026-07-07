@@ -52,7 +52,13 @@ func checkCategory(name string, entries *spec.StringList, observed []string, pro
 	if entries == nil {
 		return
 	}
-	pats := []string(*entries)
+	// Normalize a single leading "./": observed paths are workdir-relative
+	// without it, so "./out.txt" must match the observed "out.txt". Safe for
+	// globs like "site/**".
+	pats := make([]string, len(*entries))
+	for i, p := range *entries {
+		pats[i] = strings.TrimPrefix(p, "./")
+	}
 	for _, obs := range observed {
 		if !matchesAny(pats, obs) {
 			*problems = append(*problems, fmt.Sprintf("unexpected %s file %q (no entry matches it)", name, obs))
@@ -60,9 +66,66 @@ func checkCategory(name string, entries *spec.StringList, observed []string, pro
 	}
 	for _, pat := range pats {
 		if !patternMatchesAny(pat, observed) {
-			*problems = append(*problems, fmt.Sprintf("%s entry %q matched no file the step %s", name, pat, name))
+			msg := fmt.Sprintf("%s entry %q matched no file the step %s", name, pat, name)
+			if note := globMetaNote(pat); note != "" {
+				msg += "; " + note
+			}
+			*problems = append(*problems, msg)
 		}
 	}
+}
+
+// globMetaNote explains a common footgun: a changes entry is a doublestar glob,
+// so an unescaped `[ ] * ?` is a metacharacter, not a literal filename byte. When
+// such an entry matches nothing the failure is otherwise baffling (the Expected
+// and Actual read identically), so we point at the first metacharacter and show
+// the escaped spelling that would match a literal filename. It returns "" when
+// the entry has no unescaped metacharacter.
+func globMetaNote(pat string) string {
+	meta := firstUnescapedGlobMeta(pat)
+	if meta == 0 {
+		return ""
+	}
+	return fmt.Sprintf(`note: %q is a glob metacharacter — write "%s" to match a literal filename`, string(meta), escapeGlobMeta(pat))
+}
+
+// firstUnescapedGlobMeta returns the first unescaped glob metacharacter in pat,
+// or 0 when there is none. A backslash escapes the following byte.
+func firstUnescapedGlobMeta(pat string) byte {
+	for i := 0; i < len(pat); i++ {
+		if pat[i] == '\\' {
+			i++ // skip the escaped byte
+			continue
+		}
+		switch pat[i] {
+		case '[', ']', '*', '?':
+			return pat[i]
+		}
+	}
+	return 0
+}
+
+// escapeGlobMeta backslash-escapes every glob metacharacter in pat so it would
+// match a literal filename, leaving already-escaped bytes untouched.
+func escapeGlobMeta(pat string) string {
+	var b strings.Builder
+	for i := 0; i < len(pat); i++ {
+		c := pat[i]
+		if c == '\\' {
+			b.WriteByte(c)
+			if i+1 < len(pat) {
+				i++
+				b.WriteByte(pat[i])
+			}
+			continue
+		}
+		switch c {
+		case '[', ']', '*', '?':
+			b.WriteByte('\\')
+		}
+		b.WriteByte(c)
+	}
+	return b.String()
 }
 
 // matchesAny reports whether p matches at least one pattern (exact path, a
