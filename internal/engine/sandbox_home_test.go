@@ -83,7 +83,7 @@ scenarios:
 // TestEngine_SandboxHome_ClearEnvComposition for the pty path.
 func TestEngine_SandboxHome_DefaultsRunGovernsPTY(t *testing.T) {
 	if runtime.GOOS == "windows" {
-		t.Skip("HOME/XDG family and pty steps are POSIX-only")
+		t.Skip("the HOME/XDG sandbox-home family is POSIX-only")
 	}
 	t.Setenv("HOME", "/definitely/not/the/sandbox")
 	res := runSpec(t, `

@@ -1,28 +1,33 @@
 //go:build windows
 
-package ptyrun
+// Package conpty is a self-contained Windows pseudo-console (ConPTY) wrapper,
+// shared by the pty runner (internal/runner/ptyrun) and interactive recording
+// (internal/record). It calls the ConPTY and process-creation APIs directly
+// through golang.org/x/sys/windows (already a dependency), so atago carries no
+// third-party ConPTY library: the surface is small and the Win32 calls are
+// stable since Windows 10 (1809). It follows Microsoft's documented
+// pseudo-console recipe — CreatePseudoConsole over a pipe pair, a
+// PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE attribute list, then CreateProcess with
+// EXTENDED_STARTUPINFO_PRESENT.
+package conpty
 
 import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
+	"syscall"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
+
+	runnercmd "github.com/nao1215/atago/internal/runner/cmd"
 )
 
-// conPTY is a self-contained Windows pseudo-console (ConPTY). It wires a child
-// process's console I/O to a pipe pair through a PseudoConsole and exposes
-// Read/Write/Resize/wait/Close. It calls the ConPTY and process-creation APIs
-// directly through golang.org/x/sys/windows (already a dependency), so atago
-// carries no third-party ConPTY library: the surface is small and the Win32
-// calls are stable since Windows 10 (1809).
-//
-// It follows Microsoft's documented pseudo-console recipe: CreatePseudoConsole
-// over a pipe pair, a PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE attribute list, then
-// CreateProcess with EXTENDED_STARTUPINFO_PRESENT.
-type conPTY struct {
+// PseudoConsole wires a child process's console I/O to a pipe pair through a
+// Windows pseudo console and exposes Read/Write/Resize/Wait/Close.
+type PseudoConsole struct {
 	hpc       windows.Handle // the pseudo console (HPCON)
 	inWrite   windows.Handle // parent → child (sends)
 	outRead   windows.Handle // child → parent (transcript)
@@ -32,18 +37,41 @@ type conPTY struct {
 	closeOnce sync.Once
 }
 
-// isConPTYAvailable reports whether the host exposes the ConPTY API (Windows 10
+// IsAvailable reports whether the host exposes the ConPTY API (Windows 10
 // version 1809 and later), so an older host gets a clear error instead of a
-// missing-proc failure deep in start.
-func isConPTYAvailable() bool {
+// missing-proc failure deep in Start.
+func IsAvailable() bool {
 	return windows.NewLazySystemDLL("kernel32.dll").NewProc("CreatePseudoConsole").Find() == nil
 }
 
-// startConPTY launches commandLine inside a fresh pseudo console sized rows×cols,
-// in workDir, with env (nil inherits the parent's environment; a non-nil slice,
-// even empty, starts the child from exactly that set). The returned conPTY must
-// be Closed.
-func startConPTY(commandLine, workDir string, env []string, rows, cols int) (*conPTY, error) {
+// CommandLine builds the single command-line string ConPTY's CreateProcess
+// receives. A shell command reuses cmd.exe's documented `/S /C "<command>"`
+// contract (strip the outer quotes, run the rest verbatim) so it matches the cmd
+// runner's ConfigureShell. A shell-free command is tokenized with the same
+// splitter the cmd runner uses, then re-escaped with syscall.EscapeArg so the C
+// runtime re-parses it back to the identical argv — keeping pty/record and run
+// steps in agreement about how a command line splits on Windows.
+func CommandLine(command string, shell bool) (string, error) {
+	if shell {
+		return `cmd /S /C "` + command + `"`, nil
+	}
+	name, args, err := runnercmd.CommandLine(command, false)
+	if err != nil {
+		return "", err
+	}
+	parts := make([]string, 0, len(args)+1)
+	parts = append(parts, syscall.EscapeArg(name))
+	for _, a := range args {
+		parts = append(parts, syscall.EscapeArg(a))
+	}
+	return strings.Join(parts, " "), nil
+}
+
+// Start launches commandLine inside a fresh pseudo console sized rows×cols, in
+// workDir, with env (nil inherits the parent's environment; a non-nil slice,
+// even empty, starts the child from exactly that set). The returned
+// PseudoConsole must be Closed.
+func Start(commandLine, workDir string, env []string, rows, cols int) (*PseudoConsole, error) {
 	// Two anonymous pipes: one carries parent→child input, the other
 	// child→parent output. CreatePseudoConsole takes the child's ends (inRead,
 	// outWrite); the parent keeps inWrite and outRead.
@@ -134,7 +162,7 @@ func startConPTY(commandLine, workDir string, env []string, rows, cols int) (*co
 	// The primary thread handle is unused; keep the process handle for wait/kill.
 	closeHandles(pi.Thread)
 
-	return &conPTY{
+	return &PseudoConsole{
 		hpc:      hpc,
 		inWrite:  inWrite,
 		outRead:  outRead,
@@ -147,7 +175,7 @@ func startConPTY(commandLine, workDir string, env []string, rows, cols int) (*co
 // Read drains the child's output (the transcript source). A broken/closed pipe
 // once the child exits is the ConPTY analog of POSIX EIO: it surfaces as an
 // error so the reader loop ends cleanly (after appending any final bytes).
-func (c *conPTY) Read(p []byte) (int, error) {
+func (c *PseudoConsole) Read(p []byte) (int, error) {
 	var done uint32
 	if err := windows.ReadFile(c.outRead, p, &done, nil); err != nil {
 		return int(done), os.ErrClosed
@@ -156,7 +184,7 @@ func (c *conPTY) Read(p []byte) (int, error) {
 }
 
 // Write delivers a send to the child.
-func (c *conPTY) Write(p []byte) (int, error) {
+func (c *PseudoConsole) Write(p []byte) (int, error) {
 	var done uint32
 	if err := windows.WriteFile(c.inWrite, p, &done, nil); err != nil {
 		return int(done), err
@@ -165,7 +193,7 @@ func (c *conPTY) Write(p []byte) (int, error) {
 }
 
 // Resize changes the pseudo console's dimensions.
-func (c *conPTY) Resize(rows, cols int) error {
+func (c *PseudoConsole) Resize(rows, cols int) error {
 	return windows.ResizePseudoConsole(c.hpc, windows.Coord{X: termDim(cols), Y: termDim(rows)})
 }
 
@@ -184,9 +212,9 @@ func termDim(n int) int16 {
 	}
 }
 
-// wait blocks until the child exits (or ctx is done) and returns its exit code;
+// Wait blocks until the child exits (or ctx is done) and returns its exit code;
 // a wait that cannot read the code, or a ctx that fires first, returns -1.
-func (c *conPTY) wait(ctx context.Context) int {
+func (c *PseudoConsole) Wait(ctx context.Context) int {
 	done := make(chan int, 1)
 	go func() {
 		if _, err := windows.WaitForSingleObject(c.process, windows.INFINITE); err != nil {
@@ -208,13 +236,13 @@ func (c *conPTY) wait(ctx context.Context) int {
 	}
 }
 
-// pidValue exposes the child's process id for a tree kill.
-func (c *conPTY) pidValue() int { return int(c.pid) }
+// Pid exposes the child's process id for a tree kill.
+func (c *PseudoConsole) Pid() int { return int(c.pid) }
 
 // Close tears down the pseudo console and every handle exactly once. Closing the
 // pseudo console signals the child that its console went away; a caller that
 // must not let the child linger kills the tree first.
-func (c *conPTY) Close() error {
+func (c *PseudoConsole) Close() error {
 	c.closeOnce.Do(func() {
 		windows.ClosePseudoConsole(c.hpc)
 		closeHandles(c.inWrite, c.outRead, c.process)
@@ -236,8 +264,8 @@ func closeHandles(handles ...windows.Handle) {
 
 // utf16EnvBlock encodes env ("KEY=VALUE" entries) as the NUL-separated,
 // double-NUL-terminated UTF-16 block CreateProcess wants with
-// CREATE_UNICODE_ENVIRONMENT. An empty (non-nil) slice yields just the
-// terminating NUL — an empty environment.
+// CREATE_UNICODE_ENVIRONMENT. An empty (non-nil) slice yields just the double
+// NUL — an empty environment CreateProcessW still accepts.
 func utf16EnvBlock(env []string) *uint16 {
 	var buf []uint16
 	for _, e := range env {

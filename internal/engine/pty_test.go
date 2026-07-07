@@ -15,7 +15,11 @@ import (
 func skipOnWindows(t *testing.T) {
 	t.Helper()
 	if runtime.GOOS == "windows" {
-		t.Skip("pty steps are POSIX-only for now (ConPTY later)")
+		// pty steps run on Windows (ConPTY); these specs skip only because their
+		// inner commands (`[ -t 0 ]`, a `cat` REPL, a SIGINT trap) are POSIX. The
+		// Windows ConPTY path is covered by internal/runner/ptyrun and the
+		// portable pty E2E.
+		t.Skip("these pty specs use POSIX-only inner commands (the pty mechanism itself runs on Windows)")
 	}
 }
 

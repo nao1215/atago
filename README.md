@@ -89,7 +89,7 @@ $ atago run mytool.atago.yaml
 PASSED  1 scenario: 1 passed, 0 failed, 0 errored, 0 skipped (12ms)
 ```
 
-Interactive tools record too: `atago record --pty -- <command>` runs it in a real terminal, lets you drive one session by hand, and writes a `pty:` step that replays your keystrokes as expect/send pairs (POSIX-only; password prompts become `${env:...}` placeholders, never literals):
+Interactive tools record too: `atago record --pty -- <command>` runs it in a real terminal, lets you drive one session by hand, and writes a `pty:` step that replays your keystrokes as expect/send pairs. It works on Linux, macOS, and Windows (a ConPTY); on POSIX a password prompt becomes an `${env:...}` placeholder automatically, while on Windows — where a ConPTY exposes no echo state — you convert a secret send to `${env:...}` by hand:
 
 ```shell
 $ atago record --pty --out wizard.atago.yaml -- mytool init
@@ -189,7 +189,7 @@ scenarios:
           exit_code: 0
 ```
 
-Named keys (`send: {key: enter}`) and asserts on the RENDERED terminal screen cover full TUIs — see [pty](examples/pty.atago.yaml), [pty_screen](examples/pty_screen.atago.yaml), and the cross-platform [pty_portable](examples/pty_portable.atago.yaml). `pty` steps run on Linux, macOS, and Windows (where they drive a ConPTY pseudo-console); only `record --pty` and `signal:` stay POSIX-only. The `pty`/`pty_screen` examples skip on Windows because their inner commands (`[ -t 0 ]`, `cat -v`, a SIGINT trap) are POSIX-specific, not because the `pty` mechanism is.
+Named keys (`send: {key: enter}`) and asserts on the RENDERED terminal screen cover full TUIs — see [pty](examples/pty.atago.yaml), [pty_screen](examples/pty_screen.atago.yaml), and the cross-platform [pty_portable](examples/pty_portable.atago.yaml). `pty` steps and `atago record --pty` run on Linux, macOS, and Windows (where they drive a ConPTY pseudo-console); only `signal:` stays POSIX-only. The `pty`/`pty_screen` examples skip on Windows because their inner commands (`[ -t 0 ]`, `cat -v`, a SIGINT trap) are POSIX-specific, not because the `pty` mechanism is.
 
 ### When your CLI talks to a server
 
