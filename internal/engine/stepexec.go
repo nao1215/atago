@@ -15,6 +15,25 @@ import (
 	"github.com/nao1215/atago/internal/store"
 )
 
+// unresolvedRunRefMsg explains a run field that references a ${name} no variable
+// defines. field names the spec field ("run.command"/"run.cwd"). shellExpandable
+// says whether enabling shell could expand it: true for the command argv, false
+// for cwd, which Go passes to cmd.Dir verbatim so no shell ever touches it.
+func unresolvedRunRefMsg(field, name string, shellExpandable bool) string {
+	if envName, isEnv := strings.CutPrefix(name, "env:"); isEnv {
+		return fmt.Sprintf(
+			"%s references ${env:%s}, but the environment variable %s is not set", field, envName, envName)
+	}
+	if shellExpandable {
+		return fmt.Sprintf(
+			"%s references ${%s}, but no variable with that name is defined (builtins, matrix vars, store, ready.store, env:) and shell is not enabled, so nothing would expand it; define the variable, set shell: true for shell expansion, or write $${%s} for the literal text",
+			field, name, name)
+	}
+	return fmt.Sprintf(
+		"%s references ${%s}, but no variable with that name is defined (builtins, matrix vars, store, ready.store, env:); nothing expands a working directory, so define the variable or write $${%s} for the literal text",
+		field, name, name)
+}
+
 // execStep runs one step and returns its result, its status contribution
 // (passed/failed/error), and whether it breached the security policy. It is
 // shared by the Steps loop and the Teardown loop; only the caller decides
@@ -39,16 +58,19 @@ func (x *scenarioRun) execStep(ctx context.Context, i int, step *spec.Step) (Ste
 		// cmd runner runs the command as local argv too, so it is guarded like
 		// the default runner; only an ssh runner (remote, where a remote shell
 		// may expand it) is exempt.
-		if !step.Run.ShellEnabled() && !isSSHRunner(step.Run.Runner, x.rc.runners) {
-			if names := x.st.Unresolved(step.Run.Command); len(names) > 0 {
-				if envName, isEnv := strings.CutPrefix(names[0], "env:"); isEnv {
-					sr.ErrMsg = fmt.Sprintf(
-						"run.command references ${env:%[1]s}, but the environment variable %[1]s is not set", envName)
-				} else {
-					sr.ErrMsg = fmt.Sprintf(
-						"run.command references ${%[1]s}, but no variable with that name is defined (builtins, matrix vars, store, ready.store, env:) and shell is not enabled, so nothing would expand it; define the variable, set shell: true for shell expansion, or write $${%[1]s} for the literal text",
-						names[0])
+		if !isSSHRunner(step.Run.Runner, x.rc.runners) {
+			if !step.Run.ShellEnabled() {
+				if names := x.st.Unresolved(step.Run.Command); len(names) > 0 {
+					sr.ErrMsg = unresolvedRunRefMsg("run.command", names[0], true)
+					return sr, StatusError, false
 				}
+			}
+			// cwd is passed to cmd.Dir verbatim; no shell ever expands it, so an
+			// unresolved ${name} is always a typo that would make the child fail to
+			// start in a literal "${name}" directory and surface as a misleading
+			// "executable not found". Guard it regardless of shell.
+			if names := x.st.Unresolved(step.Run.Cwd); len(names) > 0 {
+				sr.ErrMsg = unresolvedRunRefMsg("run.cwd", names[0], false)
 				return sr, StatusError, false
 			}
 		}

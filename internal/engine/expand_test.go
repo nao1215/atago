@@ -174,6 +174,28 @@ func TestExpandService_ReadyLog(t *testing.T) {
 	}
 }
 
+// TestExpandRun_StdoutStderrTo is a regression: the stdout_to/stderr_to redirect
+// targets are workdir-relative paths and must be ${name}-expanded like the
+// assert paths that read them. Leaving them literal wrote the output to a file
+// named "out-${who}.txt" while the assertion looked for the expanded name, so
+// every matrix/store-keyed redirect failed with a spurious "no such file".
+func TestExpandRun_StdoutStderrTo(t *testing.T) {
+	t.Parallel()
+	st := store.New()
+	st.Set("who", "alice")
+	r := &spec.Run{Command: "printf hi", StdoutTo: "out-${who}.txt", StderrTo: "err-${who}.log"}
+	out := expandRun(st, r)
+	if out.StdoutTo != "out-alice.txt" {
+		t.Errorf("stdout_to = %q, want out-alice.txt", out.StdoutTo)
+	}
+	if out.StderrTo != "err-alice.log" {
+		t.Errorf("stderr_to = %q, want err-alice.log", out.StderrTo)
+	}
+	if r.StdoutTo != "out-${who}.txt" {
+		t.Errorf("input mutated: %q", r.StdoutTo)
+	}
+}
+
 func TestMergeScenarioEnv(t *testing.T) {
 	t.Parallel()
 	st := store.New()
