@@ -98,7 +98,7 @@ func windowsCommandLine(command string, shell bool) (string, error) {
 }
 
 // killTree force-terminates the child and every descendant. Windows has no
-// process groups, so taskkill /T walks the process tree — the closest analogue
+// process groups, so taskkill /T walks the process tree — the closest analog
 // to the POSIX runner's kill of the whole Setsid group, so a timed-out or
 // aborted pty session never leaks a running child.
 func killTree(pid int) {

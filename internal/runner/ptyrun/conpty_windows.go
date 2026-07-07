@@ -145,7 +145,7 @@ func startConPTY(commandLine, workDir string, env []string, rows, cols int) (*co
 }
 
 // Read drains the child's output (the transcript source). A broken/closed pipe
-// once the child exits is the ConPTY analogue of POSIX EIO: it surfaces as an
+// once the child exits is the ConPTY analog of POSIX EIO: it surfaces as an
 // error so the reader loop ends cleanly (after appending any final bytes).
 func (c *conPTY) Read(p []byte) (int, error) {
 	var done uint32
@@ -248,5 +248,10 @@ func utf16EnvBlock(env []string) *uint16 {
 		buf = append(buf, enc...) // UTF16FromString already appends the entry's NUL
 	}
 	buf = append(buf, 0) // final NUL closes the block
+	if len(buf) == 1 {
+		// An empty environment still needs the double-NUL terminator, or
+		// CreateProcessW rejects the block with ERROR_INVALID_PARAMETER.
+		buf = append(buf, 0)
+	}
 	return &buf[0]
 }
