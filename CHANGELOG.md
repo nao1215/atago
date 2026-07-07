@@ -7,6 +7,16 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-07-07
+
+A robustness patch: seven fixes, each landed test-first. Two panics on malformed
+input — in the YAML loader and the JSON parser — were surfaced by fuzzing and now
+yield clean errors. The rest close cross-platform gaps that only bit
+on Windows: CRLF folding across every stream text matcher, newline tokenization
+for block-scalar commands, nested redirect directories, and POSIX signal exit
+codes, plus a command-name fix in a snapshot-update error. The self-hosted E2E
+suite grew alongside them.
+
 ### Fixed
 
 - A `json` assertion or a `store` capture no longer crashes on malformed JSON
