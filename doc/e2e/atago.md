@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-66 suites · 313 scenarios
+67 suites · 320 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -370,6 +370,14 @@
   - [an explicit TERM overrides the default](#scenario-an-explicit-term-overrides-the-default)
   - [an expect does not re-match a consumed pattern](#scenario-an-expect-does-not-re-match-a-consumed-pattern)
   - [less -X renders a real pager onto the screen](#scenario-less--x-renders-a-real-pager-onto-the-screen)
+- [atago self-hosting / variable resolution semantics](#atago-self-hosting--variable-resolution-semantics) — 7 scenarios
+  - [a doubled dollar keeps the braces literal](#scenario-a-doubled-dollar-keeps-the-braces-literal)
+  - [the workdir builtin expands to the scenario directory](#scenario-the-workdir-builtin-expands-to-the-scenario-directory)
+  - [the atago builtin resolves to the binary under test](#scenario-the-atago-builtin-resolves-to-the-binary-under-test)
+  - [an env reference expands from the host environment](#scenario-an-env-reference-expands-from-the-host-environment)
+  - [shell true defers an unknown reference to the shell](#scenario-shell-true-defers-an-unknown-reference-to-the-shell)
+  - [an unresolved variable is a hard error, not a silent empty](#scenario-an-unresolved-variable-is-a-hard-error-not-a-silent-empty)
+  - [an unset env reference names the missing variable](#scenario-an-unset-env-reference-names-the-missing-variable)
 - [atago self-hosting / verbose](#atago-self-hosting--verbose) — 4 scenarios
   - [verbose shows a passing scenario's command, output, and verdicts](#scenario-verbose-shows-a-passing-scenarios-command-output-and-verdicts)
   - [without --verbose the trace is absent](#scenario-without---verbose-the-trace-is-absent)
@@ -6222,6 +6230,85 @@ Gamma line
 #### Then
 - rendered screen contains `Alpha line`
 - rendered screen contains `Gamma line`
+## atago self-hosting / variable resolution semantics
+Source: `test/e2e/atago/var_resolution.atago.yaml`
+### Scenario: a doubled dollar keeps the braces literal
+#### When
+```shell
+echo pre-$${keep}-post
+```
+#### Then
+- stdout contains `${keep}`
+### Scenario: the workdir builtin expands to the scenario directory
+#### When
+```shell
+echo at=${workdir}
+```
+#### Then
+- stdout does not contain `$${workdir}`
+### Scenario: the atago builtin resolves to the binary under test
+#### When
+```shell
+${atago} --version
+```
+#### Then
+- exit code is `0`
+- stdout contains `atago`
+### Scenario: an env reference expands from the host environment
+#### When
+```shell
+echo path=${env:PATH}
+```
+#### Then
+- stdout matches `/path=.+/`
+### Scenario: shell true defers an unknown reference to the shell
+#### When
+```shell
+echo [${undefined_in_atago}]
+```
+#### Then
+- exit code is `0`
+- stdout equals an exact value
+### Scenario: an unresolved variable is a hard error, not a silent empty
+#### Given
+- Fixture file `typo.atago.yaml` is created.
+#### Inputs
+_Fixture `typo.atago.yaml`:_
+```text
+version: "1"
+suite: {name: typo}
+scenarios:
+  - name: a misspelled variable stops the run
+    steps:
+      - run: {command: "echo ${reuslt}"}
+```
+#### When
+```shell
+${atago} run typo.atago.yaml
+```
+#### Then
+- exit code is `4`
+- stdout contains `references ${reuslt}`, `no variable with that name is defined`
+### Scenario: an unset env reference names the missing variable
+#### Given
+- Fixture file `unsetenv.atago.yaml` is created.
+#### Inputs
+_Fixture `unsetenv.atago.yaml`:_
+```text
+version: "1"
+suite: {name: unsetenv}
+scenarios:
+  - name: an unset env var stops the run
+    steps:
+      - run: {command: "echo ${env:ATAGO_SURELY_UNSET_VAR}"}
+```
+#### When
+```shell
+${atago} run unsetenv.atago.yaml
+```
+#### Then
+- exit code is `4`
+- stdout contains `environment variable ATAGO_SURELY_UNSET_VAR is not set`
 ## atago self-hosting / verbose
 Source: `test/e2e/atago/verbose.atago.yaml`
 ### Scenario: verbose shows a passing scenario's command, output, and verdicts
