@@ -390,14 +390,21 @@ func initCmd(args []string, stdout, stderr io.Writer) int {
 	force := fs.Bool("force", false, "overwrite the file if it already exists")
 	template := fs.String("template", "cli", "starter template: "+strings.Join(initTemplateNames(), "|"))
 	list := fs.Bool("list-templates", false, "list the available templates and exit")
-	fs.Usage = func() {
-		fmt.Fprintf(stderr, "Usage: atago init [--force] [--template %s] [path]\n", strings.Join(initTemplateNames(), "|"))
+	printUsage := func(w io.Writer) {
+		fmt.Fprintf(w, "Usage: atago init [--force] [--template %s] [path]\n", strings.Join(initTemplateNames(), "|"))
+		fs.SetOutput(w)
 		fs.PrintDefaults()
 	}
+	// Suppress the flag package's automatic usage print; usage is routed
+	// explicitly below — to stdout for an explicit --help (so it can be piped),
+	// to stderr for a genuine parse error.
+	fs.Usage = func() {}
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
+			printUsage(stdout)
 			return ExitOK
 		}
+		printUsage(stderr)
 		return ExitConfig
 	}
 

@@ -160,7 +160,8 @@ func TestExplainCmd_NoArgsDefaultsToDot(t *testing.T) {
 }
 
 // Issue #18: explain must print usage on --help/-h (exit 0) instead of treating
-// the flag as a file path.
+// the flag as a file path. Explicitly-requested help goes to stdout so
+// `atago explain --help | grep` works.
 func TestExplainHelp(t *testing.T) {
 	for _, flag := range []string{"--help", "-h"} {
 		var out, errb bytes.Buffer
@@ -168,8 +169,32 @@ func TestExplainHelp(t *testing.T) {
 		if got != ExitOK {
 			t.Errorf("explain %s exit = %d, want %d (stderr=%s)", flag, got, ExitOK, errb.String())
 		}
-		if !strings.Contains(errb.String(), "Usage: atago explain") {
-			t.Errorf("explain %s missing usage, stderr=%q", flag, errb.String())
+		if !strings.Contains(out.String(), "Usage: atago explain") {
+			t.Errorf("explain %s missing usage on stdout, stdout=%q stderr=%q", flag, out.String(), errb.String())
+		}
+	}
+}
+
+// TestSubcommands_HelpToStdout proves an explicit --help/-h on the read
+// subcommands writes usage to STDOUT (so it can be piped) and exits 0, matching
+// completion/snapshot/top-level help. A genuine parse error still uses stderr.
+func TestSubcommands_HelpToStdout(t *testing.T) {
+	cmds := map[string]string{
+		"explain":  "Usage: atago explain",
+		"doc":      "Usage: atago doc",
+		"list":     "Usage: atago list",
+		"manifest": "Usage: atago manifest",
+		"init":     "Usage: atago init",
+	}
+	for cmd, want := range cmds {
+		for _, flag := range []string{"--help", "-h"} {
+			var out, errb bytes.Buffer
+			if got := Main([]string{cmd, flag}, &out, &errb); got != ExitOK {
+				t.Errorf("%s %s exit = %d, want %d (stderr=%s)", cmd, flag, got, ExitOK, errb.String())
+			}
+			if !strings.Contains(out.String(), want) {
+				t.Errorf("%s %s: stdout = %q, want usage line %q on stdout", cmd, flag, out.String(), want)
+			}
 		}
 	}
 }

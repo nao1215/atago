@@ -26,14 +26,21 @@ func listCmd(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("atago list", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	asJSON := fs.Bool("json", false, "emit a stable JSON document instead of a table")
-	fs.Usage = func() {
-		fmt.Fprint(stderr, "Usage: atago list [--json] <path | dir>...\n  (directories are searched recursively; default \".\")\n")
+	printUsage := func(w io.Writer) {
+		fmt.Fprint(w, "Usage: atago list [--json] <path | dir>...\n  (directories are searched recursively; default \".\")\n")
+		fs.SetOutput(w)
 		fs.PrintDefaults()
 	}
+	// Suppress the flag package's automatic usage print; usage is routed
+	// explicitly below — to stdout for an explicit --help (so it can be piped),
+	// to stderr for a genuine parse error.
+	fs.Usage = func() {}
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
+			printUsage(stdout)
 			return ExitOK
 		}
+		printUsage(stderr)
 		return ExitConfig
 	}
 
