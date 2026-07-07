@@ -7,6 +7,21 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-07-07
+
+A hardening release. A bug-hunting sweep across the surfaces that set atago
+apart — assertions, snapshot normalization, report formats, the run engine,
+record, and the loader — fixes verified correctness, security, and UX defects,
+each landed with a regression test at the layer of the defect and the most
+user-visible ones with a self-hosted e2e scenario. A broken symlink is no
+longer a false pass for a negative directory assertion, `stdout_to`/`stderr_to`
+expand variables, snapshot normalization no longer leaks a raw escape or a
+CRLF-folded secret into a golden, `atago record` round-trips non-UTF-8 output,
+`--rerun-failed` no longer forgets the failures a filter excluded, and a `pdf`
+assertion bounds decompression so a zip bomb in the tested CLI's output cannot
+exhaust memory. `atago record --pty` also gains a `--timeout` so it never waits
+forever.
+
 ### Added
 
 - `atago record --pty` takes a `--timeout` flag (default 30s) that bounds how
