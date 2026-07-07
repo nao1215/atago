@@ -5,8 +5,10 @@
 package record
 
 import (
+	"encoding/base64"
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/goccy/go-yaml"
 	"github.com/nao1215/atago/internal/buildinfo"
@@ -166,8 +168,13 @@ func firstLine(stream []byte) string {
 // `contains: ` / `command: ` (producing an invalid document that aborts
 // `atago record`). For a value carrying any control byte, emit an explicit
 // single-line double-quoted scalar that escapes it, so the value round-trips
-// exactly.
+// exactly. A value carrying invalid UTF-8 (binary output, or Latin-1 /
+// Shift-JIS text) cannot survive any string scalar at all — see yamlBinary —
+// so it takes the !!binary path first.
 func yamlScalar(s string) string {
+	if !utf8.ValidString(s) {
+		return yamlBinary(s)
+	}
 	if hasControlByte(s) {
 		return yamlDoubleQuoted(s)
 	}
@@ -176,6 +183,21 @@ func yamlScalar(s string) string {
 		return fmt.Sprintf("%q", s)
 	}
 	return strings.TrimRight(string(out), "\n")
+}
+
+// yamlBinary renders s as a YAML `!!binary` (base64) scalar so a value carrying
+// invalid UTF-8 bytes round-trips byte-for-byte through the loader. No string
+// scalar can do this: a raw invalid byte in a plain, single-, or double-quoted
+// scalar is lossily replaced with U+FFFD (ef bf bd) on reparse, and a `\xNN`
+// double-quoted escape decodes to the Unicode code point U+00NN — re-encoded as
+// two UTF-8 bytes for NN >= 0x80 — not the raw byte. `!!binary` is YAML's
+// canonical arbitrary-byte representation, and go-yaml decodes its base64
+// straight back into the destination string field as the exact original bytes,
+// so the recorded contains anchor still matches the real (raw-byte) stdout on
+// replay. The base64 alphabet ([A-Za-z0-9+/=]) contains nothing that breaks the
+// inline flow or starts a trailing ` # comment`, so it needs no quoting.
+func yamlBinary(s string) string {
+	return "!!binary " + base64.StdEncoding.EncodeToString([]byte(s))
 }
 
 // hasControlByte reports whether s contains a C0 control character (tab,

@@ -210,6 +210,35 @@ func TestGenerate_ControlBytesRoundTrip(t *testing.T) {
 	}, Options{SuiteName: "demo"}); err != nil {
 		t.Errorf("Generate(multi-line command) failed: %v", err)
 	}
+
+	// Invalid-UTF-8 first line (binary output, or Latin-1 / Shift-JIS text): the
+	// generated contains anchor must reload byte-for-byte identical to the raw
+	// output, or the anchor can never match the real (raw-byte) stdout on replay
+	// and the recorded spec is RED by construction. A raw byte in a plain scalar,
+	// or a \xNN double-quoted escape, is lossily transformed on reparse; only a
+	// !!binary anchor round-trips the exact bytes.
+	rawLine := "caf\xe9 ready"
+	out2, err := Generate(Observation{
+		Command:  "printf-tool",
+		ExitCode: 0,
+		Stdout:   []byte(rawLine + "\n"),
+	}, Options{SuiteName: "demo"})
+	if err != nil {
+		t.Fatalf("Generate(invalid-utf8): %v", err)
+	}
+	s2, err := loader.LoadBytes("g.atago.yaml", out2)
+	if err != nil {
+		t.Fatalf("reload(invalid-utf8): %v\n%s", err, out2)
+	}
+	var got []string
+	for _, st := range s2.Scenarios[0].Steps {
+		if st.Assert != nil && st.Assert.Stdout != nil && st.Assert.Stdout.Contains != nil {
+			got = st.Assert.Stdout.Contains
+		}
+	}
+	if len(got) != 1 || got[0] != rawLine {
+		t.Errorf("invalid-utf8 contains round-trip = %x, want [%x]", got, rawLine)
+	}
 }
 
 // TestGenerate_RecordRunRoundTrip is the metamorphic law for record (#30): a
@@ -351,6 +380,9 @@ func TestYAMLScalar_ExoticControlBytesRoundTrip(t *testing.T) {
 		"mixed\ttab\nnewline\rcr end", // the common control trio
 		"plain punctuation: # * ? &",  // no control bytes → yaml.Marshal path
 		"日本語と\x1bエスケープ",               // multibyte + control byte together
+		"caf\xe9 ready",               // invalid UTF-8 (Latin-1 é): a lone 0x80–0xFF byte
+		"\xff\xfe\x00",                // pure binary: a byte sequence that is not text at all
+		"a\xe9b\x1bc",                 // invalid UTF-8 mixed with a C0 control byte
 	}
 	for _, s := range cases {
 		scalar := yamlScalar(s)
