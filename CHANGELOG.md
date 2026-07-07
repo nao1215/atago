@@ -9,10 +9,12 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- A task-oriented cookbook, [doc/cookbook.md](doc/cookbook.md): copyable specs
-  for common jobs — converting images, generating PDFs and files, driving
-  interactive prompts and TUIs, mocking an HTTP API, starting a server, golden
-  files, polling, matrices, captured variables, and hermetic environments.
+- A task-oriented cookbook, [doc/cookbook.md](doc/cookbook.md): 23 copyable
+  specs for common jobs — converting images, generating PDFs and files,
+  driving interactive prompts and TUIs, JSON/YAML output, database side
+  effects, mocking an HTTP API, starting a server, graceful shutdown, output
+  trees, golden files, polling, timing bounds, teardown, suite setup, gating,
+  matrices, captured variables, and hermetic environments.
   A drift test loads and schema-validates every snippet, and keeps the new
   index in lockstep with examples/ and the cookbook headings. The index,
   [doc/examples.md](doc/examples.md), pairs the cookbook's by-task table with
@@ -27,6 +29,9 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 - The package descriptions GoReleaser ships (Homebrew cask, deb/rpm/apk) were
   shortened to match the repository description.
+- The "Why atago?" table names [venom](https://github.com/ovh/venom) for
+  multi-protocol platform integration suites, and the README drops bold
+  emphasis.
 
 ## [0.8.0] - 2026-07-07
 

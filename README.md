@@ -30,11 +30,12 @@ Pick the tool that owns your layer:
 | You are testing | Use |
 |-----------------|-----|
 | An HTTP/gRPC API server — scenario-based API testing | [runn](https://github.com/k1LoW/runn) |
+| A whole platform — integration suites across HTTP, gRPC, Kafka, databases, and more | [venom](https://github.com/ovh/venom) |
 | Shell functions and scripts — BDD-style unit tests | [ShellSpec](https://shellspec.info/) |
 | Bash scripts — TAP-style tests | [Bats](https://github.com/bats-core/bats-core) |
-| A CLI product — exit codes, output, generated files, snapshots, interactive prompts and TUIs | **atago** |
+| A CLI product — exit codes, output, generated files, snapshots, interactive prompts and TUIs | atago |
 
-If the server is the system under test, use runn. atago points the other way: the CLI is the product, and HTTP, database, SSH, gRPC, browser, and mock servers appear only as peers your CLI talks to.
+If the server or the platform is the system under test, use runn or venom. atago points the other way: the CLI is the product, and HTTP, database, SSH, gRPC, browser, and mock servers appear only as peers your CLI talks to.
 
 ## Install
 
@@ -215,13 +216,13 @@ ssh       run a command on a remote host over SSH (edit host/user first)
 
 ## Examples
 
-Every feature has a commented, runnable spec under [examples/](examples/). The examples are loaded, validated, and (where they need no external server) executed in CI on Linux, macOS, and Windows, so they cannot drift from the implementation. [doc/examples.md](doc/examples.md) indexes them two ways: by task (test a CLI that converts images, drive an interactive prompt, mock an HTTP API) and by feature.
+Every feature has a commented, runnable spec under [examples/](examples/), tested in CI on Linux, macOS, and Windows. [doc/examples.md](doc/examples.md) indexes them two ways: by task (test a CLI that converts images, drive an interactive prompt, mock an HTTP API) and by feature.
 
 Selection flags compose with any spec: `--filter NAME` (repeatable, and comma-separated for OR — `--filter a,b` or `--filter a --filter b` runs scenarios whose name contains `a` or `b`), `--tag T`, `--skip-tag T`, `--parallel N`, `--fail-fast`, and `--rerun-failed`. While authoring, `--verbose` traces every command, capture, and assertion verdict — for passing scenarios too.
 
 ## Use it in CI
 
-Real E2E suites flake (timing, ports, external tools). `--retry-failed N` re-runs failed scenarios in a fresh workdir and reports recovered ones as **flaky** — green for the exit code, but loud in every report format; silent retries are explicitly a non-goal. `--repeat N` does the opposite job: run each scenario N times to detect flakiness before it reaches CI.
+Real E2E suites flake (timing, ports, external tools). `--retry-failed N` re-runs failed scenarios in a fresh workdir and reports recovered ones as flaky — green for the exit code, but loud in every report format; silent retries are explicitly a non-goal. `--repeat N` does the opposite job: run each scenario N times to detect flakiness before it reaches CI.
 
 ```shell
 atago run --ci --retry-failed 2 ./specs          # keep CI green, report instability loudly

@@ -1,11 +1,5 @@
 # Examples
 
-Two indexes into the same material: the [cookbook](cookbook.md) answers "how do
-I test X" with a copyable spec, and the feature table links one commented,
-runnable spec per feature. The specs under [examples/](../examples/) are
-loaded, validated, and (where they need no external server) executed in CI on
-Linux, macOS, and Windows, so they cannot drift from the implementation.
-
 ## By task
 
 | You want to | Uses |
@@ -16,12 +10,20 @@ Linux, macOS, and Windows, so they cannot drift from the implementation.
 | [Pin exactly which files a command touches](cookbook.md#pin-exactly-which-files-a-command-touches) | `changes:` workdir delta |
 | [Test error handling: exit codes and stderr](cookbook.md#test-error-handling-exit-codes-and-stderr) | `exit_code` (`not`/`in`), `stderr`, `exists: false` |
 | [Feed stdin to a filter CLI](cookbook.md#feed-stdin-to-a-filter-cli) | `stdin:` inline / file / base64 |
+| [Assert on JSON or YAML output](cookbook.md#assert-on-json-or-yaml-output) | `json:`/`yaml:` JSONPath matchers, numeric bounds |
+| [Check what a CLI wrote to a database](cookbook.md#check-what-a-cli-wrote-to-a-database) | db runner, `query:` steps, `rows:` asserts |
 | [Test an interactive prompt](cookbook.md#test-an-interactive-prompt) | `pty:` expect/send sessions, named keys |
 | [Test a full-screen TUI](cookbook.md#test-a-full-screen-tui) | `screen:` rendered-frame asserts and snapshots |
 | [Test an API-client CLI without the network](cookbook.md#test-an-api-client-cli-without-the-network) | `mock_servers:` + `mock:` request asserts |
 | [Test a CLI that starts a server](cookbook.md#test-a-cli-that-starts-a-server) | `services:` with readiness probes |
+| [Test graceful shutdown](cookbook.md#test-graceful-shutdown) | `signal:` steps with `wait:` |
+| [Pin a generator's whole output tree](cookbook.md#pin-a-generators-whole-output-tree) | recursive `dir:` asserts, tree snapshots |
 | [Pin output with a golden file](cookbook.md#pin-output-with-a-golden-file) | `snapshot:` + `scrub:` |
 | [Poll an async result](cookbook.md#poll-an-async-result) | `retry:` until-assertions |
+| [Bound how long a command may take](cookbook.md#bound-how-long-a-command-may-take) | `duration:` wall-clock bounds |
+| [Clean up external state even when a step fails](cookbook.md#clean-up-external-state-even-when-a-step-fails) | `teardown:` steps sharing the store |
+| [Run expensive setup once for the whole suite](cookbook.md#run-expensive-setup-once-for-the-whole-suite) | `suite.setup`, `${suitedir}` |
+| [Run a scenario only where it can pass](cookbook.md#run-a-scenario-only-where-it-can-pass) | `tags`, `skip:`/`only:` gates |
 | [Run the same scenario over many inputs](cookbook.md#run-the-same-scenario-over-many-inputs) | `matrix:` expansion |
 | [Capture a value in one step and reuse it](cookbook.md#capture-a-value-in-one-step-and-reuse-it) | `store:` + `${name}` |
 | [Isolate the test from the host environment](cookbook.md#isolate-the-test-from-the-host-environment) | `clear_env`, `pass_env`, `sandbox_home` |

@@ -194,6 +194,81 @@ scenarios:
 
 Full spec: [stdin](../examples/stdin.atago.yaml)
 
+## Assert on JSON or YAML output
+
+```yaml
+version: "1"
+suite:
+  name: structured output
+
+scenarios:
+  - name: the status command reports healthy
+    steps:
+      - run:
+          command: mytool status --json
+      # Select values with JSONPath. A list of checks under one json: all must
+      # hold; gt/gte/lt/lte bound numeric values that vary run to run.
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              - { path: "$.status", equals: ok }
+              - { path: "$.jobs", length: 3 }
+              - { path: "$.uptime_seconds", gt: 0 }
+
+  - name: yaml output uses the same path syntax
+    steps:
+      - run:
+          command: mytool config dump
+      - assert:
+          stdout:
+            yaml:
+              path: "$.theme"
+              equals: dark
+```
+
+Full spec: [json_and_yaml](../examples/json_and_yaml.atago.yaml)
+
+## Check what a CLI wrote to a database
+
+```yaml
+version: "1"
+suite:
+  name: database side effects
+
+# A db runner with a workdir-scoped SQLite file: every scenario gets its own
+# isolated database. Pure-Go drivers for SQLite, PostgreSQL, and MySQL are
+# bundled.
+runners:
+  store:
+    type: db
+    dsn: sqlite:${workdir}/app.db   # or postgres://... / mysql://...
+
+scenarios:
+  - name: import lands the rows
+    steps:
+      - fixture:
+          file: users.csv
+          content: |
+            id,name
+            1,alice
+      - run:
+          command: mytool import --db app.db users.csv
+      - assert:
+          exit_code: 0
+      # query runs SQL; rows asserts on the result set as a JSON array.
+      - query:
+          runner: store
+          sql: "SELECT name FROM users ORDER BY id"
+      - assert:
+          rows:
+            json:
+              - { path: "$", length: 1 }
+              - { path: "$[0].name", equals: alice }
+```
+
+Full spec: [db](../examples/db.atago.yaml)
+
 ## Test an interactive prompt
 
 ```yaml
@@ -316,6 +391,78 @@ scenarios:
 
 Full spec: [services](../examples/services.atago.yaml)
 
+## Test graceful shutdown
+
+```yaml
+version: "1"
+suite:
+  name: graceful shutdown
+
+scenarios:
+  - name: the server cleans up on SIGTERM
+    skip:
+      os: windows        # signal steps are POSIX-only
+    services:
+      - name: server
+        command: mytool serve
+        ready:
+          log: "listening on"
+    steps:
+      # signal targets a service atago started — race-free under --parallel,
+      # unlike kill/killall by process name. wait fails loudly if the process
+      # never exits.
+      - signal:
+          service: server
+          signal: TERM
+          wait:
+            timeout: 5s
+      # The evidence of a clean shutdown: whatever your server leaves behind.
+      - assert:
+          file:
+            path: server.log
+            contains: "graceful shutdown complete"
+```
+
+Full spec: [signal](../examples/signal.atago.yaml)
+
+## Pin a generator's whole output tree
+
+```yaml
+version: "1"
+suite:
+  name: output tree
+
+scenarios:
+  - name: scaffold emits exactly the committed tree
+    steps:
+      - run:
+          command: mytool new site
+      - assert:
+          exit_code: 0
+          # One golden manifest line per entry (dirs, files with a sha256,
+          # symlinks) replaces a ladder of per-path asserts. Refresh with:
+          #   atago snapshot update spec.atago.yaml
+          dir:
+            path: site
+            snapshot: snapshots/site_tree.txt
+            ignore: ["*.log"]   # exclude noise from the walk and the manifest
+
+  - name: recursive matchers when the exact tree is an implementation detail
+    steps:
+      - run:
+          command: mytool new site
+      - assert:
+          dir:
+            path: site
+            recursive: true
+            contains: [content/posts/hello.md]
+            glob: "*.md"        # a "/"-less glob matches basenames at any depth
+            min_count: 2        # bound the file total without pinning it
+            max_count: 10
+```
+
+Full spec: [dir_tree](../examples/dir_tree.atago.yaml)
+
 ## Pin output with a golden file
 
 ```yaml
@@ -368,6 +515,126 @@ scenarios:
 ```
 
 Full spec: [retry](../examples/retry.atago.yaml)
+
+## Bound how long a command may take
+
+```yaml
+version: "1"
+suite:
+  name: timing
+
+scenarios:
+  - name: status answers fast, backoff actually waits
+    steps:
+      - run:
+          command: mytool status
+      # duration bounds the immediately preceding step. Assert orders of
+      # magnitude, not milliseconds — tight bounds flake on loaded CI runners.
+      - assert:
+          exit_code: 0
+          duration:
+            lt: 10s
+      - run:
+          command: mytool retry --backoff 200ms
+      - assert:
+          duration:
+            gte: 200ms     # the backoff really waited
+            lt: 60s
+```
+
+Full spec: [duration](../examples/duration.atago.yaml)
+
+## Clean up external state even when a step fails
+
+```yaml
+version: "1"
+suite:
+  name: cleanup
+
+scenarios:
+  - name: the created resource never leaks
+    steps:
+      - run:
+          command: mytool create
+      # Capture the id the create printed; teardown shares the same store.
+      - store:
+          name: rid
+          from:
+            stdout:
+              matches: "resource-[0-9]+"
+      - assert:
+          stdout:
+            contains: created
+    # teardown always runs — pass, fail, error, or interrupt. A teardown
+    # failure is reported but never changes the scenario's verdict.
+    teardown:
+      - run:
+          command: mytool delete ${rid}
+```
+
+Full spec: [teardown](../examples/teardown.atago.yaml)
+
+## Run expensive setup once for the whole suite
+
+```yaml
+version: "1"
+suite:
+  name: shared setup
+  # setup runs once, in order, before any scenario; ${suitedir} outlives every
+  # scenario workdir. A suite-level teardown: would run once after the last
+  # scenario, and a suite-level service: step starts a peer shared by all.
+  setup:
+    - run:
+        shell: true
+        command: go build -o ${suitedir}/mytool ./cmd/mytool
+
+scenarios:
+  - name: every scenario runs the binary built once
+    steps:
+      - run:
+          command: ${suitedir}/mytool --version
+      - assert:
+          exit_code: 0
+```
+
+Full spec: [suite_setup](../examples/suite_setup.atago.yaml)
+
+## Run a scenario only where it can pass
+
+```yaml
+version: "1"
+suite:
+  name: gating
+
+scenarios:
+  - name: skipped on windows
+    skip:
+      os: windows
+    steps:
+      - run:
+          command: mytool daemon --check
+      - assert:
+          exit_code: 0
+
+  - name: needs docker on the host
+    only:
+      command: "docker info"    # runs only when the probe exits 0
+    steps:
+      - run:
+          command: mytool up
+      - assert:
+          exit_code: 0
+
+  - name: tagged for --tag smoke / --skip-tag slow selection
+    tags: [smoke]
+    steps:
+      - run:
+          command: mytool --version
+      - assert:
+          exit_code: 0
+```
+
+Full spec: [select_skip_only](../examples/select_skip_only.atago.yaml)
 
 ## Run the same scenario over many inputs
 
