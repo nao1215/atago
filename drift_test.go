@@ -457,6 +457,67 @@ func TestExamples_EveryFileCategorized(t *testing.T) {
 	}
 }
 
+// TestCookbook_SnippetsValid loads and validates every fenced YAML block in
+// doc/cookbook.md through the real loader, so a recipe cannot drift from the
+// schema it demonstrates. The recipes run placeholder commands (`mytool`), so
+// they validate but do not execute.
+func TestCookbook_SnippetsValid(t *testing.T) {
+	t.Parallel()
+	doc := readDoc(t, "doc/cookbook.md")
+	blocks := regexp.MustCompile("(?s)```yaml\n(.*?)```").FindAllStringSubmatch(doc, -1)
+	if len(blocks) == 0 {
+		t.Fatal("doc/cookbook.md contains no ```yaml blocks")
+	}
+	dir := t.TempDir()
+	for i, m := range blocks {
+		path := filepath.Join(dir, fmt.Sprintf("snippet_%02d.atago.yaml", i))
+		if err := os.WriteFile(path, []byte(m[1]), 0o600); err != nil {
+			t.Fatalf("write snippet %d: %v", i, err)
+		}
+		if _, err := loader.Load(path); err != nil {
+			t.Errorf("doc/cookbook.md snippet %d does not load/validate: %v", i, err)
+		}
+	}
+}
+
+// githubAnchor mirrors how GitHub derives an anchor id from a heading:
+// lowercase, punctuation dropped, spaces to hyphens.
+func githubAnchor(heading string) string {
+	var b strings.Builder
+	for _, r := range strings.ToLower(heading) {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9', r == '-':
+			b.WriteRune(r)
+		case r == ' ':
+			b.WriteRune('-')
+		}
+	}
+	return b.String()
+}
+
+// TestExamplesIndex_InLockstep keeps doc/examples.md honest: its by-feature
+// table must link every spec under examples/ (the table moved out of the
+// README, where nothing guarded it), and every cookbook.md#anchor in its
+// by-task table must resolve to a real doc/cookbook.md heading.
+func TestExamplesIndex_InLockstep(t *testing.T) {
+	t.Parallel()
+	index := readDoc(t, "doc/examples.md")
+	for path := range exampleSpecs {
+		if !strings.Contains(index, "(../"+path+")") {
+			t.Errorf("doc/examples.md by-feature table does not link %s", path)
+		}
+	}
+	anchors := map[string]bool{}
+	for _, m := range regexp.MustCompile(`(?m)^## (.+)$`).FindAllStringSubmatch(readDoc(t, "doc/cookbook.md"), -1) {
+		anchors[githubAnchor(m[1])] = true
+	}
+	for _, m := range regexp.MustCompile(`\(cookbook\.md#([a-z0-9-]+)\)`).FindAllStringSubmatch(index, -1) {
+		if !anchors[m[1]] {
+			t.Errorf("doc/examples.md links cookbook.md#%s, which matches no doc/cookbook.md heading", m[1])
+		}
+	}
+}
+
 // TestExamples_Valid loads and validates every example, hermetic or not.
 func TestExamples_Valid(t *testing.T) {
 	t.Parallel()

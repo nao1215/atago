@@ -7,6 +7,27 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- A task-oriented cookbook, [doc/cookbook.md](doc/cookbook.md): copyable specs
+  for common jobs — converting images, generating PDFs and files, driving
+  interactive prompts and TUIs, mocking an HTTP API, starting a server, golden
+  files, polling, matrices, captured variables, and hermetic environments.
+  A drift test loads and schema-validates every snippet, and keeps the new
+  index in lockstep with examples/ and the cookbook headings. The index,
+  [doc/examples.md](doc/examples.md), pairs the cookbook's by-task table with
+  the per-feature examples table, which moved there from the README; the
+  "Real CLIs tested with atago" tables moved to
+  [doc/real-world.md](doc/real-world.md) the same way, with the README keeping
+  a summary of the shapes of CLIs covered.
+- The README documents installing from the AUR
+  ([atago-bin](https://aur.archlinux.org/packages/atago-bin)) on Arch Linux.
+
+### Changed
+
+- The package descriptions GoReleaser ships (Homebrew cask, deb/rpm/apk) were
+  shortened to match the repository description.
+
 ## [0.8.0] - 2026-07-07
 
 A hardening release. A bug-hunting sweep across the surfaces that set atago
