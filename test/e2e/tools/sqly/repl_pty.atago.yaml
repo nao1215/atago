@@ -1,0 +1,128 @@
+# Drive sqly's INTERACTIVE shell (its readline REPL, built on nao1215/prompt)
+# over a real pseudo-terminal — the path every other sqly spec here skips by
+# using the non-interactive `--sql` flag. sqly only starts the prompt when stdin
+# is a TTY (config.IsInputFromTTY), so a pty is the only way to exercise the line
+# editor, the colored `sqly:...(mode)$ ` prompt, dot-commands, and the
+# box-drawn result tables a real user sees.
+#
+# It is deliberately NOT gated off Windows: once atago's pty runner speaks
+# ConPTY, this is the real-world proof that an interactive, ANSI-coloring nao1215
+# CLI renders correctly through it. Two authoring rules keep the sessions robust:
+#
+#   * Enter is `{key: enter}` (a raw CR, 0x0d); a bare "\n" is not the Return key
+#     a raw-mode line editor waits for.
+#   * After sending a query + Enter, wait for a token that appears ONLY in the
+#     executed result (e.g. a value or "TABLE NAME") before expecting the prompt
+#     again — the prompt string is echoed on every keystroke while typing, so
+#     matching it too early would fire mid-input and desync the session.
+version: "1"
+
+suite:
+  name: sqly interactive shell (pty)
+
+scenarios:
+  - name: run a query and read its rendered result table over a pty
+    steps:
+      - fixture:
+          file: actor.csv
+          content: |
+            actor,gross
+            Harrison Ford,4871
+            Samuel L. Jackson,4772
+      - pty:
+          command: sqly actor.csv
+          rows: 24
+          cols: 80
+          timeout: 30s
+          session:
+            - expect: 'sqly:' # the interactive prompt appeared
+            - send: "SELECT actor FROM actor WHERE actor LIKE 'Harrison%';"
+            - send: { key: enter } # submit the query (CR, not LF)
+            - expect: "Harrison Ford" # result token: only present post-execution
+            - expect: 'sqly:' # the prompt returned, editor idle again
+            - send: ".exit"
+            - send: { key: enter }
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "Harrison Ford"
+              - "+--" # the box-drawn result table sqly renders to the terminal
+      - assert:
+          # The rendered screen (vt10x) still shows the result frame after quit.
+          screen:
+            contains: "Harrison Ford"
+
+  - name: the .tables dot-command renders the imported table over a pty
+    steps:
+      - fixture:
+          file: actor.csv
+          content: |
+            actor,gross
+            Harrison Ford,4871
+            Samuel L. Jackson,4772
+      - pty:
+          command: sqly actor.csv
+          timeout: 30s
+          session:
+            - expect: 'sqly:'
+            - send: ".tables"
+            - send: { key: enter }
+            - expect: "TABLE NAME" # the boxed .tables header, post-execution
+            - expect: "actor" # the imported CSV became the "actor" table
+            - expect: 'sqly:'
+            - send: ".exit"
+            - send: { key: enter }
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "TABLE NAME"
+              - "actor"
+
+  - name: a computed aggregate round-trips through the pty shell
+    steps:
+      - fixture:
+          file: actor.csv
+          content: |
+            actor,gross
+            Harrison Ford,4871
+            Samuel L. Jackson,4772
+      - pty:
+          command: sqly actor.csv
+          timeout: 30s
+          session:
+            - expect: 'sqly:'
+            # A distinctive, self-labeling result so the wait cannot match stray
+            # output — the count of the two imported rows.
+            - send: "SELECT 'ROWS=' || COUNT(*) AS r FROM actor;"
+            - send: { key: enter }
+            - expect: "ROWS=2"
+            - expect: 'sqly:'
+            - send: ".exit"
+            - send: { key: enter }
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "ROWS=2"
+
+  - name: the prompt reflects a live .mode switch over a pty
+    steps:
+      - fixture:
+          file: actor.csv
+          content: |
+            actor,gross
+            Harrison Ford,4871
+            Samuel L. Jackson,4772
+      - pty:
+          command: sqly actor.csv
+          timeout: 30s
+          session:
+            - expect: '\(table\)\$' # the prompt advertises the default table mode
+            - send: ".mode csv"
+            - send: { key: enter }
+            - expect: '\(csv\)\$' # the switch is live: the prompt now says csv
+            - send: ".exit"
+            - send: { key: enter }
+      - assert:
+          exit_code: 0

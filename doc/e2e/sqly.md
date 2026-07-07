@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-46 suites · 393 scenarios
+47 suites · 397 scenarios
 ## Contents
 - [sqly ACH/Fedwire native write-back](#sqly-achfedwire-native-write-back) — 4 scenarios
   - [round-trips an ACH file through --save --force after an UPDATE](#scenario-round-trips-an-ach-file-through---save---force-after-an-update)
@@ -226,6 +226,11 @@
   - [loads ACH records into multiple tables](#scenario-loads-ach-records-into-multiple-tables)
   - [queries the ACH entries table](#scenario-queries-the-ach-entries-table)
   - [loads a Fedwire file into a single message table](#scenario-loads-a-fedwire-file-into-a-single-message-table)
+- [sqly interactive shell (pty)](#sqly-interactive-shell-pty) — 4 scenarios
+  - [run a query and read its rendered result table over a pty](#scenario-run-a-query-and-read-its-rendered-result-table-over-a-pty)
+  - [the .tables dot-command renders the imported table over a pty](#scenario-the-tables-dot-command-renders-the-imported-table-over-a-pty)
+  - [a computed aggregate round-trips through the pty shell](#scenario-a-computed-aggregate-round-trips-through-the-pty-shell)
+  - [the prompt reflects a live .mode switch over a pty](#scenario-the-prompt-reflects-a-live-mode-switch-over-a-pty)
 - [sqly sandbox_home + changes (history DB isolation)](#sqly-sandbox_home--changes-history-db-isolation) — 2 scenarios
   - [sqly --sql writes exactly its history DB, only inside the sandbox home](#scenario-sqly---sql-writes-exactly-its-history-db-only-inside-the-sandbox-home)
   - [a second sqly batch run leaves its sandbox home byte-identical](#scenario-a-second-sqly-batch-run-leaves-its-sandbox-home-byte-identical)
@@ -4245,6 +4250,76 @@ sqly customer-transfer.fed
 #### Then
 - exit code is `0`
 - stdout contains `customer_transfer_message`
+## sqly interactive shell (pty)
+Source: `test/e2e/tools/sqly/repl_pty.atago.yaml`
+### Scenario: run a query and read its rendered result table over a pty
+#### Given
+- Fixture file `actor.csv` is created.
+#### Inputs
+_Fixture `actor.csv`:_
+```text
+actor,gross
+Harrison Ford,4871
+Samuel L. Jackson,4772
+```
+#### When
+```shell
+# interactive (pty): sqly actor.csv
+```
+#### Then
+- exit code is `0`
+- stdout contains `Harrison Ford`, `+--`
+- rendered screen contains `Harrison Ford`
+### Scenario: the .tables dot-command renders the imported table over a pty
+#### Given
+- Fixture file `actor.csv` is created.
+#### Inputs
+_Fixture `actor.csv`:_
+```text
+actor,gross
+Harrison Ford,4871
+Samuel L. Jackson,4772
+```
+#### When
+```shell
+# interactive (pty): sqly actor.csv
+```
+#### Then
+- exit code is `0`
+- stdout contains `TABLE NAME`, `actor`
+### Scenario: a computed aggregate round-trips through the pty shell
+#### Given
+- Fixture file `actor.csv` is created.
+#### Inputs
+_Fixture `actor.csv`:_
+```text
+actor,gross
+Harrison Ford,4871
+Samuel L. Jackson,4772
+```
+#### When
+```shell
+# interactive (pty): sqly actor.csv
+```
+#### Then
+- exit code is `0`
+- stdout contains `ROWS=2`
+### Scenario: the prompt reflects a live .mode switch over a pty
+#### Given
+- Fixture file `actor.csv` is created.
+#### Inputs
+_Fixture `actor.csv`:_
+```text
+actor,gross
+Harrison Ford,4871
+Samuel L. Jackson,4772
+```
+#### When
+```shell
+# interactive (pty): sqly actor.csv
+```
+#### Then
+- exit code is `0`
 ## sqly sandbox_home + changes (history DB isolation)
 Source: `test/e2e/tools/sqly/sandbox_home.atago.yaml`
 ### Scenario: sqly --sql writes exactly its history DB, only inside the sandbox home

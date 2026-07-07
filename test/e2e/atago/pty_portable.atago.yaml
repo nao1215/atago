@@ -1,0 +1,152 @@
+# Portable pty coverage (#8; Windows follow-up to #78).
+#
+# Unlike pty.atago.yaml — whose scenarios drive POSIX-only inner commands
+# (`[ -t 0 ]`, `cat -v`, a SIGINT trap, bash `printf '\r'`) and therefore skip
+# on Windows — every scenario here uses only shell builtins portable to both
+# /bin/sh and cmd.exe, or drives the cross-platform atago binary itself. So this
+# suite runs on Windows (ConPTY) as well as POSIX, thickly exercising the pty
+# contract: output capture, exit-code propagation, ordered expects, regex
+# matching, the rendered screen, shell and no-shell commands, and the
+# never-matching-expect failure. It is listed in
+# scripts/windows_portable_specs.sh and executed by the Windows CI leg.
+version: "1"
+
+suite:
+  name: atago self-hosting / pty (portable)
+
+scenarios:
+  - name: a pty step starts a command, captures its output, and reports exit 0
+    steps:
+      # No send: the command self-terminates. This exercises the whole runner —
+      # start the process in a pseudo-terminal, drain the transcript, match an
+      # expect against it, and reap the real exit code — on both POSIX and Windows.
+      - pty:
+          shell: true # echo is a shell builtin on both /bin/sh and cmd.exe
+          command: echo hello from a pty
+          session:
+            - expect: "hello from a pty"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "hello from a pty"
+
+  - name: a pty step surfaces a command's non-zero exit code
+    steps:
+      # `&&` and `exit N` behave the same in /bin/sh and cmd.exe, so a failing
+      # command's code propagates through the pty identically on both.
+      - pty:
+          shell: true
+          command: echo bye && exit 3
+          session:
+            - expect: "bye"
+      - assert:
+          exit_code: 3
+
+  - name: sequential expects match successive output in declaration order
+    steps:
+      # matchOffset advances past each match, so a recurring token waits for its
+      # NEXT occurrence instead of re-matching stale output.
+      - pty:
+          shell: true
+          command: echo first && echo second && echo third
+          session:
+            - expect: "first"
+            - expect: "second"
+            - expect: "third"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "first"
+              - "third"
+
+  - name: an expect pattern is a regular expression, not a literal
+    steps:
+      - pty:
+          shell: true
+          command: echo item-42-done
+          session:
+            - expect: 'item-[0-9]+-done'
+      - assert:
+          exit_code: 0
+
+  - name: a screen assert reads the rendered frame sized by rows and cols
+    steps:
+      - pty:
+          shell: true
+          command: echo rendered line
+          rows: 10
+          cols: 40
+      - assert:
+          exit_code: 0
+          # The rendered screen (vt10x emulation) is derived from the same bytes
+          # on every platform, so a screen assert is portable too.
+          screen:
+            contains: "rendered line"
+
+  - name: a pty step drives the atago binary directly with no shell
+    steps:
+      - pty:
+          command: ${atago} version
+          session:
+            - expect: atago
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: atago
+
+  - name: a pty drives atago running an inner spec to a green result
+    steps:
+      - fixture:
+          file: inner.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: echo
+                steps:
+                  - run:
+                      shell: true
+                      command: echo inner-ok
+                  - assert:
+                      exit_code: 0
+                      stdout:
+                        contains: inner-ok
+      - pty:
+          command: ${atago} run inner.atago.yaml
+          session:
+            - expect: "PASSED"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "1 passed"
+
+  - name: a never-matching expect fails and names the pattern in the transcript
+    steps:
+      # The inner pty command exits at once but its output never matches; the
+      # expect keeps polling until the 2s session budget elapses, then fails the
+      # step (reported like an assertion). Portable: `echo` is the only command.
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: waits for output that never comes
+                steps:
+                  - pty:
+                      shell: true
+                      command: echo present
+                      timeout: 2s
+                      session:
+                        - expect: "absent-forever"
+      - run:
+          command: ${atago} run bad.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - "pty expect /absent-forever/"
+              - "never appeared in the terminal transcript"

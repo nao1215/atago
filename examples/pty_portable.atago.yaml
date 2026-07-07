@@ -1,0 +1,39 @@
+# A `pty` step works on every platform atago supports — Linux, macOS, and
+# Windows, where it drives a ConPTY pseudo-console instead of a POSIX pty. This
+# example stays portable by running a shell builtin (echo) that self-terminates,
+# so it needs no POSIX-only program and is exercised in CI on all three OSes.
+#
+# The sibling pty.atago.yaml / pty_screen.atago.yaml examples show richer
+# sessions (named keys, TTY detection, screen snapshots) but use POSIX-only
+# inner commands, so their scenarios skip on Windows. Only `record --pty` and
+# `signal:` remain POSIX-only features.
+version: "1"
+
+suite:
+  name: pty (portable across OSes)
+
+scenarios:
+  - name: a pty runs a command, matches its output, and reports exit 0
+    steps:
+      - pty:
+          shell: true # echo is a shell builtin on both /bin/sh and cmd.exe
+          command: echo hello from a pty
+          session:
+            - expect: "hello from a pty"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "hello from a pty"
+
+  - name: a screen assert reads the rendered frame on every platform
+    steps:
+      - pty:
+          shell: true
+          command: echo rendered line
+          rows: 10
+          cols: 40
+      - assert:
+          # The rendered screen (vt10x emulation) is derived from the same bytes
+          # on every platform, so a screen assert is portable too.
+          screen:
+            contains: "rendered line"
