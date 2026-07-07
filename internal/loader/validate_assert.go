@@ -301,8 +301,19 @@ func validateRegexp(add func(string, ...any), where, key, pattern string) {
 		add("%s.%s must not be an empty regexp, which matches everything (matches) or nothing (not_matches); remove it or give a real pattern", where, key)
 		return
 	}
-	if _, err := regexp.Compile(pattern); err != nil {
+	re, err := regexp.Compile(pattern)
+	if err != nil {
 		add("%s.%s %q is not a valid regexp: %v", where, key, pattern, err)
+		return
+	}
+	// A not_matches pattern that matches the empty string (e.g. "z*", "a?",
+	// "(foo)?", "x{0,3}") matches at position 0 of every input, so not_matches
+	// can never pass — the same trap as the empty pattern above. Caught at load
+	// time rather than failing at runtime with a confusing "unexpectedly matched"
+	// hint. An empty-matching pattern under matches is legitimate (it matches
+	// everything, which the author may intend), so this applies to not_matches only.
+	if key == "not_matches" && re.MatchString("") {
+		add("%s.%s %q matches the empty string, so not_matches can never pass; anchor it or require at least one character (e.g. \"z+\")", where, key, pattern)
 	}
 }
 
