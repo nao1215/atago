@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-67 suites · 320 scenarios
+68 suites · 329 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -164,6 +164,16 @@
   - [a json list fails the inner spec when one listed path mismatches](#scenario-a-json-list-fails-the-inner-spec-when-one-listed-path-mismatches)
   - [a stdout json list against a JSON-producing command](#scenario-a-stdout-json-list-against-a-json-producing-command)
   - [a yaml list asserts several paths on one document](#scenario-a-yaml-list-asserts-several-paths-on-one-document)
+- [atago self-hosting / json matcher boundary values](#atago-self-hosting--json-matcher-boundary-values) — 9 scenarios
+  - [an array element is addressable by index](#scenario-an-array-element-is-addressable-by-index)
+  - [a top-level array reports its length](#scenario-a-top-level-array-reports-its-length)
+  - [an empty array has length zero](#scenario-an-empty-array-has-length-zero)
+  - [the numeric comparators bound a value](#scenario-the-numeric-comparators-bound-a-value)
+  - [a boolean value compares equal](#scenario-a-boolean-value-compares-equal)
+  - [a floating-point value compares equal](#scenario-a-floating-point-value-compares-equal)
+  - [a string carrying a quote compares equal](#scenario-a-string-carrying-a-quote-compares-equal)
+  - [a deeply nested path resolves](#scenario-a-deeply-nested-path-resolves)
+  - [a path that selects nothing fails with a clear message](#scenario-a-path-that-selects-nothing-fails-with-a-clear-message)
 - [atago self-hosting / line selector](#atago-self-hosting--line-selector) — 3 scenarios
   - [line selector narrows stdout to a single 1-based line](#scenario-line-selector-narrows-stdout-to-a-single-1-based-line)
   - [a trailing newline does not add a phantom final line](#scenario-a-trailing-newline-does-not-add-a-phantom-final-line)
@@ -2851,6 +2861,85 @@ printf 'name: ada\nid: 42\n'
 ```
 #### Then
 - stdout YAML at `$.name` equals `ada`; YAML at `$.id` equals `42`
+## atago self-hosting / json matcher boundary values
+Source: `test/e2e/atago/json_matcher_edges.atago.yaml`
+### Scenario: an array element is addressable by index
+#### When
+```shell
+printf '{"items":[10,20,30]}'
+```
+#### Then
+- stdout at `$.items[0]` equals `10`; at `$.items[2]` equals `30`
+### Scenario: a top-level array reports its length
+#### When
+```shell
+printf '[1,2,3,4,5]'
+```
+#### Then
+- stdout at `$` has length 5
+### Scenario: an empty array has length zero
+#### When
+```shell
+printf '{"rows":[]}'
+```
+#### Then
+- stdout at `$.rows` has length 0
+### Scenario: the numeric comparators bound a value
+#### When
+```shell
+printf '{"n":50}'
+```
+#### Then
+- stdout at `$.n` is `> 49`; at `$.n` is `>= 50`; at `$.n` is `<= 50`; at `$.n` is `< 51`
+### Scenario: a boolean value compares equal
+#### When
+```shell
+printf '{"ok":true,"off":false}'
+```
+#### Then
+- stdout at `$.ok` equals `true`; at `$.off` equals `false`
+### Scenario: a floating-point value compares equal
+#### When
+```shell
+printf '{"pi":3.14}'
+```
+#### Then
+- stdout at `$.pi` equals `3.14`
+### Scenario: a string carrying a quote compares equal
+#### When
+```shell
+printf '{"s":"a\"b"}'
+```
+#### Then
+- stdout at `$.s` equals `a"b`
+### Scenario: a deeply nested path resolves
+#### When
+```shell
+printf '{"x":{"y":{"z":{"w":42}}}}'
+```
+#### Then
+- stdout at `$.x.y.z.w` equals `42`
+### Scenario: a path that selects nothing fails with a clear message
+#### Given
+- Fixture file `nopath.atago.yaml` is created.
+#### Inputs
+_Fixture `nopath.atago.yaml`:_
+```text
+version: "1"
+suite: {name: nopath}
+scenarios:
+  - name: an absent key is a clean failure
+    steps:
+      - run: {shell: true, command: 'printf ''{"a":1}'''}
+      - assert: {stdout: {json: [{path: "$.missing", equals: 1}]}}
+```
+#### When
+```shell
+${atago} run nopath.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `selected no value`
 ## atago self-hosting / line selector
 Source: `test/e2e/atago/line.atago.yaml`
 ### Scenario: line selector narrows stdout to a single 1-based line
