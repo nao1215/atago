@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"regexp"
@@ -101,9 +102,23 @@ func extractStream(s *spec.StreamAssert, data []byte) (string, error) {
 	}
 }
 
+// parseJSON decodes JSON, converting a panic from the third-party parser into an
+// error. ojg's oj.Parse can panic ("assignment to entry in nil map") on some
+// malformed input; a store captures from the untrusted output of the program
+// under test, so report invalid JSON rather than crash — the same defense the
+// assert matcher applies.
+func parseJSON(data []byte) (v any, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			v, err = nil, errors.New("the parser could not decode it")
+		}
+	}()
+	return oj.Parse(data)
+}
+
 // jsonValue selects exactly one value at path and returns it as a string.
 func jsonValue(data []byte, path string) (string, error) {
-	v, err := oj.Parse(data)
+	v, err := parseJSON(data)
 	if err != nil {
 		return "", fmt.Errorf("invalid JSON: %w", err)
 	}

@@ -42,6 +42,20 @@ func TestJSONValue(t *testing.T) {
 	}
 }
 
+// TestJSONValue_MalformedDoesNotPanic pins the no-panic contract for a store
+// capture over the untrusted output of the program under test: some malformed
+// JSON makes the third-party ojg parser panic; jsonValue must report invalid
+// JSON instead of crashing the run.
+func TestJSONValue_MalformedDoesNotPanic(t *testing.T) {
+	t.Parallel()
+	for _, data := range []string{`{"":f,"":0 0`, `{"a":`, `[1,2,`, `{`} {
+		_, err := jsonValue([]byte(data), "$.x")
+		if err == nil {
+			t.Errorf("jsonValue(%q) err = nil, want an invalid-JSON error", data)
+		}
+	}
+}
+
 func TestRegexValue(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

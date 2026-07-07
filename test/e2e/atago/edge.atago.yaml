@@ -103,3 +103,26 @@ scenarios:
           stderr:
             contains: "atago snapshot update: cannot access"
             not_contains: "atago run:"
+
+  # Malformed JSON from the program under test must be reported as invalid JSON,
+  # not crash atago: the third-party parser can panic on some inputs, and the
+  # loader/matcher recover from it. The fixture holds the exact broken bytes so
+  # this runs on every OS (no shell heredoc needed).
+  - name: a json assertion on malformed input fails cleanly, without a crash
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: badjson}
+            scenarios:
+              - name: json on broken bytes
+                steps:
+                  - fixture: {file: broken.json, content: '{"":f,"":0 0'}
+                  - assert: {file: {path: broken.json, json: {path: "$.x", equals: 1}}}
+      - run:
+          command: ${atago} run bad.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: "not valid JSON"

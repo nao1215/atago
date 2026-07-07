@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-72 suites · 357 scenarios
+72 suites · 358 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -74,11 +74,12 @@
   - [an impossible bound fails and shows the measured duration](#scenario-an-impossible-bound-fails-and-shows-the-measured-duration)
   - [a deliberate wait satisfies a lower bound](#scenario-a-deliberate-wait-satisfies-a-lower-bound)
   - [a duration assert with no preceding step is a load-time error](#scenario-a-duration-assert-with-no-preceding-step-is-a-load-time-error)
-- [atago self-hosting / edge cases](#atago-self-hosting--edge-cases) — 4 scenarios
+- [atago self-hosting / edge cases](#atago-self-hosting--edge-cases) — 5 scenarios
   - [JSON assertion on empty stdout reports an empty stream](#scenario-json-assertion-on-empty-stdout-reports-an-empty-stream)
   - [an unsupported matcher is a parse error](#scenario-an-unsupported-matcher-is-a-parse-error)
   - [a mixed valid+invalid run reads FAILED and counts the dropped spec](#scenario-a-mixed-validinvalid-run-reads-failed-and-counts-the-dropped-spec)
   - [a snapshot update error names the snapshot command, not run](#scenario-a-snapshot-update-error-names-the-snapshot-command-not-run)
+  - [a json assertion on malformed input fails cleanly, without a crash](#scenario-a-json-assertion-on-malformed-input-fails-cleanly-without-a-crash)
 - [atago self-hosting / workdir + scenario env + not_contains](#atago-self-hosting--workdir--scenario-env--not_contains) — 6 scenarios
   - [run.stdout_to redirects stdout to a workdir file without a shell](#scenario-runstdout_to-redirects-stdout-to-a-workdir-file-without-a-shell)
   - [scenario env is shared by every run step and overridable per step](#scenario-scenario-env-is-shared-by-every-run-step-and-overridable-per-step)
@@ -1771,6 +1772,27 @@ ${atago} snapshot update no-such-spec.atago.yaml
 #### Then
 - exit code is `3`
 - stderr contains `atago snapshot update: cannot access`
+### Scenario: a json assertion on malformed input fails cleanly, without a crash
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: badjson}
+scenarios:
+  - name: json on broken bytes
+    steps:
+      - fixture: {file: broken.json, content: '{"":f,"":0 0'}
+      - assert: {file: {path: broken.json, json: {path: "$.x", equals: 1}}}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `not valid JSON`
 ## atago self-hosting / workdir + scenario env + not_contains
 Source: `test/e2e/atago/env_workdir.atago.yaml`
 ### Scenario: run.stdout_to redirects stdout to a workdir file without a shell
