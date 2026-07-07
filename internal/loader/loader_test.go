@@ -742,6 +742,32 @@ func TestLoadBytes_Errors(t *testing.T) {
 	}
 }
 
+// TestLoadBytes_MalformedYAMLDoesNotPanic pins the loader's no-panic contract on
+// untrusted input: some malformed YAML makes the underlying goccy/go-yaml decoder
+// nil-panic (found by FuzzLoadBytes). LoadBytes must recover and return a clean
+// parse error instead of crashing the process.
+func TestLoadBytes_MalformedYAMLDoesNotPanic(t *testing.T) {
+	t.Parallel()
+	// Reduced from the fuzz crasher testdata/fuzz/FuzzLoadBytes/230de42ba4751bda.
+	inputs := []string{
+		"A: 0\nrunners:\n 0: {0000000000000\"}\nscenarios:\n  ! 00",
+		"scenarios:\n  ! 0",
+	}
+	for _, src := range inputs {
+		s, err := LoadBytes("t.atago.yaml", []byte(src))
+		if err == nil {
+			t.Errorf("LoadBytes(%q) = nil error, want a parse error for malformed YAML", src)
+		}
+		if s != nil {
+			t.Errorf("LoadBytes(%q) returned a non-nil spec with a parse error", src)
+		}
+		var lerr *Error
+		if errors.As(err, &lerr) && lerr.Kind != KindParse {
+			t.Errorf("LoadBytes(%q) kind = %v, want KindParse", src, lerr.Kind)
+		}
+	}
+}
+
 // specSteps assembles a minimal one-scenario spec whose steps are the given
 // flow-style step entries (each is the text after "- " in a steps list). It
 // keeps the many one-off validation cases readable without hand-indenting YAML.
