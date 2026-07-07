@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-71 suites · 351 scenarios
+72 suites · 357 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -368,6 +368,13 @@
 - [atago self-hosting / store](#atago-self-hosting--store) — 2 scenarios
   - [a stored JSON value is reusable in later commands](#scenario-a-stored-json-value-is-reusable-in-later-commands)
   - [storing from a missing JSON path is an execution error](#scenario-storing-from-a-missing-json-path-is-an-execution-error)
+- [atago self-hosting / store capture boundary values](#atago-self-hosting--store-capture-boundary-values) — 6 scenarios
+  - [a regex with a capture group stores the group](#scenario-a-regex-with-a-capture-group-stores-the-group)
+  - [a regex without a group stores the whole match](#scenario-a-regex-without-a-group-stores-the-whole-match)
+  - [a JSON path captures a scalar from stdout](#scenario-a-json-path-captures-a-scalar-from-stdout)
+  - [a JSON path captures a value from a generated file](#scenario-a-json-path-captures-a-value-from-a-generated-file)
+  - [a regex that matches nothing is an execution error](#scenario-a-regex-that-matches-nothing-is-an-execution-error)
+  - [a stored value does not leak into the next scenario](#scenario-a-stored-value-does-not-leak-into-the-next-scenario)
 - [atago self-hosting / store whole-content trim and text selectors (#158)](#atago-self-hosting--store-whole-content-trim-and-text-selectors-158) — 2 scenarios
   - [trim captures an opaque token and round-trips it as an argument](#scenario-trim-captures-an-opaque-token-and-round-trips-it-as-an-argument)
   - [text captures a whole multi-line file verbatim](#scenario-text-captures-a-whole-multi-line-file-verbatim)
@@ -6422,6 +6429,99 @@ ${atago} run bad-store.atago.yaml
 #### Then
 - exit code is `4`
 - stdout contains `ERROR`
+## atago self-hosting / store capture boundary values
+Source: `test/e2e/atago/store_edges.atago.yaml`
+### Scenario: a regex with a capture group stores the group
+#### When
+```shell
+echo release v1.2.3-rc1
+# capture ${ver} from stdout
+echo shipping ${ver}
+```
+#### Then
+- after `echo shipping ${ver}`:
+  - stdout equals an exact value
+### Scenario: a regex without a group stores the whole match
+#### When
+```shell
+echo digest sha=abc123def456
+# capture ${sha} from stdout
+echo checksum ${sha}
+```
+#### Then
+- after `echo checksum ${sha}`:
+  - stdout equals an exact value
+### Scenario: a JSON path captures a scalar from stdout
+#### When
+```shell
+printf '{"port":8080}'
+# capture ${port} from stdout
+echo bound ${port}
+```
+#### Then
+- after `echo bound ${port}`:
+  - stdout equals an exact value
+### Scenario: a JSON path captures a value from a generated file
+#### Given
+- Fixture file `meta.json` is created.
+#### Inputs
+_Fixture `meta.json`:_
+```text
+{"build":{"id":"b-42"}}
+```
+#### When
+```shell
+# capture ${build} from file meta.json
+echo build ${build}
+```
+#### Then
+- stdout equals an exact value
+### Scenario: a regex that matches nothing is an execution error
+#### Given
+- Fixture file `nomatch.atago.yaml` is created.
+#### Inputs
+_Fixture `nomatch.atago.yaml`:_
+```text
+version: "1"
+suite: {name: nomatch}
+scenarios:
+  - name: capture fails
+    steps:
+      - run: {shell: true, command: "echo hello"}
+      - store: {name: x, from: {stdout: {matches: "ABSENT([0-9]+)"}}}
+```
+#### When
+```shell
+${atago} run nomatch.atago.yaml
+```
+#### Then
+- exit code is `4`
+- stdout contains `did not match`
+### Scenario: a stored value does not leak into the next scenario
+#### Given
+- Fixture file `scope.atago.yaml` is created.
+#### Inputs
+_Fixture `scope.atago.yaml`:_
+```text
+version: "1"
+suite: {name: scope}
+scenarios:
+  - name: captures a value
+    steps:
+      - run: {shell: true, command: "echo secret-value"}
+      - store: {name: captured, from: {stdout: {trim: true}}}
+      - assert: {stdout: {contains: secret-value}}
+  - name: cannot reference the earlier value
+    steps:
+      - run: {command: "echo ${captured}"}
+```
+#### When
+```shell
+${atago} run scope.atago.yaml
+```
+#### Then
+- exit code is `4`
+- stdout contains `references ${captured}`, `no variable with that name is defined`
 ## atago self-hosting / store whole-content trim and text selectors (#158)
 Source: `test/e2e/atago/store_whole.atago.yaml`
 ### Scenario: trim captures an opaque token and round-trips it as an argument
