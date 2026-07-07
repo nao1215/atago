@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-70 suites · 342 scenarios
+71 suites · 351 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -345,6 +345,16 @@
   - [a snapshot assertion passes against a committed snapshot](#scenario-a-snapshot-assertion-passes-against-a-committed-snapshot)
   - [snapshot update creates the snapshot file](#scenario-snapshot-update-creates-the-snapshot-file)
   - [a snapshot mismatch writes the normalized actual as an artifact](#scenario-a-snapshot-mismatch-writes-the-normalized-actual-as-an-artifact)
+- [atago self-hosting / snapshot normalization and round-trip](#atago-self-hosting--snapshot-normalization-and-round-trip) — 9 scenarios
+  - [record then run round-trips green](#scenario-record-then-run-round-trips-green-1)
+  - [a UUID is masked in the golden](#scenario-a-uuid-is-masked-in-the-golden)
+  - [an ISO timestamp is masked in the golden](#scenario-an-iso-timestamp-is-masked-in-the-golden)
+  - [a loopback host and port are masked in the golden](#scenario-a-loopback-host-and-port-are-masked-in-the-golden)
+  - [the home directory is masked to a tilde in the golden](#scenario-the-home-directory-is-masked-to-a-tilde-in-the-golden)
+  - [a golden verifies against a different volatile value](#scenario-a-golden-verifies-against-a-different-volatile-value)
+  - [updating a snapshot is deterministic](#scenario-updating-a-snapshot-is-deterministic)
+  - [a real content change still fails the snapshot](#scenario-a-real-content-change-still-fails-the-snapshot)
+  - [a missing golden names the update flag](#scenario-a-missing-golden-names-the-update-flag)
 - [atago self-hosting / ssh runner](#atago-self-hosting--ssh-runner) — 3 scenarios
   - [an ssh runner without host/user fails validation (exit 2)](#scenario-an-ssh-runner-without-hostuser-fails-validation-exit-2)
   - [a run step naming an undeclared runner fails validation (exit 2)](#scenario-a-run-step-naming-an-undeclared-runner-fails-validation-exit-2)
@@ -5932,6 +5942,228 @@ cat arts/*/*/step-*-snapshot.actual.txt
 - after `cat arts/*/*/step-*-snapshot.actual.txt`:
   - exit code is `0`
   - stdout contains `changed`
+## atago self-hosting / snapshot normalization and round-trip
+Source: `test/e2e/atago/snapshot_normalization.atago.yaml`
+### Scenario: record then run round-trips green
+#### Given
+- Fixture file `rt.atago.yaml` is created.
+#### Inputs
+_Fixture `rt.atago.yaml`:_
+```text
+version: "1"
+suite: {name: rt}
+scenarios:
+  - name: stable line
+    steps:
+      - run: {shell: true, command: "printf 'stable output line\\n'"}
+      - assert: {stdout: {snapshot: g.txt}}
+```
+#### When
+```shell
+${atago} snapshot update rt.atago.yaml
+${atago} run rt.atago.yaml
+```
+#### Then
+- after `${atago} snapshot update rt.atago.yaml`:
+  - exit code is `0`
+- after `${atago} run rt.atago.yaml`:
+  - exit code is `0`
+### Scenario: a UUID is masked in the golden
+#### Given
+- Fixture file `uuid.atago.yaml` is created.
+#### Inputs
+_Fixture `uuid.atago.yaml`:_
+```text
+version: "1"
+suite: {name: uuid}
+scenarios:
+  - name: emits a uuid
+    steps:
+      - run: {shell: true, command: "printf 'id=550e8400-e29b-41d4-a716-446655440000\\n'"}
+      - assert: {stdout: {snapshot: g.txt}}
+```
+#### When
+```shell
+${atago} snapshot update uuid.atago.yaml
+```
+#### Then
+- file `g.txt` contains `id=<uuid>`
+- file `g.txt` is checked
+### Scenario: an ISO timestamp is masked in the golden
+#### Given
+- Fixture file `ts.atago.yaml` is created.
+#### Inputs
+_Fixture `ts.atago.yaml`:_
+```text
+version: "1"
+suite: {name: ts}
+scenarios:
+  - name: emits a timestamp
+    steps:
+      - run: {shell: true, command: "printf 'at 2024-01-15T10:30:00Z done\\n'"}
+      - assert: {stdout: {snapshot: g.txt}}
+```
+#### When
+```shell
+${atago} snapshot update ts.atago.yaml
+```
+#### Then
+- file `g.txt` contains `at <timestamp> done`
+### Scenario: a loopback host and port are masked in the golden
+#### Given
+- Fixture file `port.atago.yaml` is created.
+#### Inputs
+_Fixture `port.atago.yaml`:_
+```text
+version: "1"
+suite: {name: port}
+scenarios:
+  - name: emits a listen address
+    steps:
+      - run: {shell: true, command: "printf 'listening on 127.0.0.1:54321\\n'"}
+      - assert: {stdout: {snapshot: g.txt}}
+```
+#### When
+```shell
+${atago} snapshot update port.atago.yaml
+```
+#### Then
+- file `g.txt` contains `127.0.0.1:<port>`
+- file `g.txt` is checked
+### Scenario: the home directory is masked to a tilde in the golden
+#### Given
+- Fixture file `home.atago.yaml` is created.
+#### Inputs
+_Fixture `home.atago.yaml`:_
+```text
+version: "1"
+suite: {name: home}
+scenarios:
+  - name: emits the home path
+    steps:
+      - run: {shell: true, command: "printf 'home=%s/x\\n' \"$HOME\""}
+      - assert: {stdout: {snapshot: g.txt}}
+```
+#### When
+```shell
+${atago} snapshot update home.atago.yaml
+```
+#### Then
+- file `g.txt` contains `home=~/x`
+### Scenario: a golden verifies against a different volatile value
+#### Given
+- Fixture file `rec.atago.yaml` is created.
+- Fixture file `ver.atago.yaml` is created.
+#### Inputs
+_Fixture `rec.atago.yaml`:_
+```text
+version: "1"
+suite: {name: rec}
+scenarios:
+  - name: uuid A
+    steps:
+      - run: {shell: true, command: "printf 'token=aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee\\n'"}
+      - assert: {stdout: {snapshot: shared.txt}}
+```
+_Fixture `ver.atago.yaml`:_
+```text
+version: "1"
+suite: {name: rec}
+scenarios:
+  - name: uuid A
+    steps:
+      - run: {shell: true, command: "printf 'token=11111111-2222-3333-4444-555555555555\\n'"}
+      - assert: {stdout: {snapshot: shared.txt}}
+```
+#### When
+```shell
+${atago} snapshot update rec.atago.yaml
+${atago} run ver.atago.yaml
+```
+#### Then
+- after `${atago} snapshot update rec.atago.yaml`:
+  - exit code is `0`
+- after `${atago} run ver.atago.yaml`:
+  - exit code is `0`
+### Scenario: updating a snapshot is deterministic
+#### Given
+- Fixture file `d1.atago.yaml` is created.
+- Fixture file `d2.atago.yaml` is created.
+#### Inputs
+_Fixture `d1.atago.yaml`:_
+```text
+version: "1"
+suite: {name: d}
+scenarios:
+  - name: same command
+    steps:
+      - run: {shell: true, command: "printf 'line one\\nline two\\n'"}
+      - assert: {stdout: {snapshot: a.txt}}
+```
+_Fixture `d2.atago.yaml`:_
+```text
+version: "1"
+suite: {name: d}
+scenarios:
+  - name: same command
+    steps:
+      - run: {shell: true, command: "printf 'line one\\nline two\\n'"}
+      - assert: {stdout: {snapshot: b.txt}}
+```
+#### When
+```shell
+${atago} snapshot update d1.atago.yaml
+${atago} snapshot update d2.atago.yaml
+```
+#### Then
+- after `${atago} snapshot update d2.atago.yaml`:
+  - file `a.txt` is byte-identical to `b.txt`
+### Scenario: a real content change still fails the snapshot
+#### Given
+- Fixture file `change.atago.yaml` is created.
+- Fixture file `g.txt` is created.
+#### Inputs
+_Fixture `change.atago.yaml`:_
+```text
+version: "1"
+suite: {name: change}
+scenarios:
+  - name: drifts from the golden
+    steps:
+      - run: {shell: true, command: "printf 'the committed line\\n'"}
+      - assert: {stdout: {snapshot: g.txt}}
+```
+_Fixture `g.txt`:_
+```text
+a different committed line
+```
+#### When
+```shell
+${atago} run change.atago.yaml
+```
+#### Then
+- exit code is `1`
+### Scenario: a missing golden names the update flag
+#### Given
+- Fixture file `miss.atago.yaml` is created.
+#### Inputs
+_Fixture `miss.atago.yaml`:_
+```text
+version: "1"
+suite: {name: miss}
+scenarios:
+  - name: no golden yet
+    steps:
+      - run: {shell: true, command: "printf 'hi\\n'"}
+      - assert: {stdout: {snapshot: never.txt}}
+```
+#### When
+```shell
+${atago} run miss.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `--update-snapshots`
 ## atago self-hosting / ssh runner
 Source: `test/e2e/atago/ssh.atago.yaml`
 ### Scenario: an ssh runner without host/user fails validation (exit 2)

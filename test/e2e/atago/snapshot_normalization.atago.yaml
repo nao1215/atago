@@ -1,0 +1,193 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / snapshot normalization and round-trip
+
+# The snapshot matcher's value is a stable golden: volatile details are masked
+# so the same spec passes on any machine and run. These drive atago's own
+# snapshot machinery to pin what is normalized — UUIDs, ISO timestamps, a
+# loopback host:port, and the home directory — and the metamorphic invariants: a
+# golden recorded once verifies against different volatile values, updating is
+# deterministic, a real (non-volatile) change still fails, and a missing golden
+# names the update flag. Volatile values are printed with printf, so the suite
+# runs on make e2e; the normalizer is unit-tested for Windows in internal/snapshot.
+scenarios:
+  - name: record then run round-trips green
+    steps:
+      - fixture:
+          file: rt.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: rt}
+            scenarios:
+              - name: stable line
+                steps:
+                  - run: {shell: true, command: "printf 'stable output line\\n'"}
+                  - assert: {stdout: {snapshot: g.txt}}
+      - run: {command: "${atago} snapshot update rt.atago.yaml"}
+      - assert: {exit_code: 0}
+      - run: {command: "${atago} run rt.atago.yaml"}
+      - assert: {exit_code: 0}
+
+  - name: a UUID is masked in the golden
+    steps:
+      - fixture:
+          file: uuid.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: uuid}
+            scenarios:
+              - name: emits a uuid
+                steps:
+                  - run: {shell: true, command: "printf 'id=550e8400-e29b-41d4-a716-446655440000\\n'"}
+                  - assert: {stdout: {snapshot: g.txt}}
+      - run: {command: "${atago} snapshot update uuid.atago.yaml"}
+      - assert:
+          file: {path: g.txt, contains: "id=<uuid>"}
+      - assert:
+          file: {path: g.txt, not_contains: "550e8400"}
+
+  - name: an ISO timestamp is masked in the golden
+    steps:
+      - fixture:
+          file: ts.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: ts}
+            scenarios:
+              - name: emits a timestamp
+                steps:
+                  - run: {shell: true, command: "printf 'at 2024-01-15T10:30:00Z done\\n'"}
+                  - assert: {stdout: {snapshot: g.txt}}
+      - run: {command: "${atago} snapshot update ts.atago.yaml"}
+      - assert:
+          file: {path: g.txt, contains: "at <timestamp> done"}
+
+  - name: a loopback host and port are masked in the golden
+    steps:
+      - fixture:
+          file: port.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: port}
+            scenarios:
+              - name: emits a listen address
+                steps:
+                  - run: {shell: true, command: "printf 'listening on 127.0.0.1:54321\\n'"}
+                  - assert: {stdout: {snapshot: g.txt}}
+      - run: {command: "${atago} snapshot update port.atago.yaml"}
+      - assert:
+          file: {path: g.txt, contains: "127.0.0.1:<port>"}
+      - assert:
+          file: {path: g.txt, not_contains: "54321"}
+
+  - name: the home directory is masked to a tilde in the golden
+    steps:
+      - fixture:
+          file: home.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: home}
+            scenarios:
+              - name: emits the home path
+                steps:
+                  - run: {shell: true, command: "printf 'home=%s/x\\n' \"$HOME\""}
+                  - assert: {stdout: {snapshot: g.txt}}
+      - run: {command: "${atago} snapshot update home.atago.yaml"}
+      - assert:
+          file: {path: g.txt, contains: "home=~/x"}
+
+  - name: a golden verifies against a different volatile value
+    steps:
+      # Record with one UUID, then verify a spec that emits a DIFFERENT UUID
+      # against the same golden: both normalize to <uuid>, so the run is green.
+      # This is the invariant that makes snapshots portable.
+      - fixture:
+          file: rec.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: rec}
+            scenarios:
+              - name: uuid A
+                steps:
+                  - run: {shell: true, command: "printf 'token=aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee\\n'"}
+                  - assert: {stdout: {snapshot: shared.txt}}
+      - fixture:
+          file: ver.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: rec}
+            scenarios:
+              - name: uuid A
+                steps:
+                  - run: {shell: true, command: "printf 'token=11111111-2222-3333-4444-555555555555\\n'"}
+                  - assert: {stdout: {snapshot: shared.txt}}
+      - run: {command: "${atago} snapshot update rec.atago.yaml"}
+      - assert: {exit_code: 0}
+      - run: {command: "${atago} run ver.atago.yaml"}
+      - assert: {exit_code: 0}
+
+  - name: updating a snapshot is deterministic
+    steps:
+      # The same command recorded to two goldens produces byte-identical files.
+      - fixture:
+          file: d1.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: d}
+            scenarios:
+              - name: same command
+                steps:
+                  - run: {shell: true, command: "printf 'line one\\nline two\\n'"}
+                  - assert: {stdout: {snapshot: a.txt}}
+      - fixture:
+          file: d2.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: d}
+            scenarios:
+              - name: same command
+                steps:
+                  - run: {shell: true, command: "printf 'line one\\nline two\\n'"}
+                  - assert: {stdout: {snapshot: b.txt}}
+      - run: {command: "${atago} snapshot update d1.atago.yaml"}
+      - run: {command: "${atago} snapshot update d2.atago.yaml"}
+      - assert:
+          file: {path: a.txt, equals_file: b.txt}
+
+  - name: a real content change still fails the snapshot
+    steps:
+      - fixture:
+          file: change.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: change}
+            scenarios:
+              - name: drifts from the golden
+                steps:
+                  - run: {shell: true, command: "printf 'the committed line\\n'"}
+                  - assert: {stdout: {snapshot: g.txt}}
+      - fixture:
+          file: g.txt
+          content: "a different committed line\n"
+      - run: {command: "${atago} run change.atago.yaml"}
+      - assert:
+          exit_code: 1
+
+  - name: a missing golden names the update flag
+    steps:
+      - fixture:
+          file: miss.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: miss}
+            scenarios:
+              - name: no golden yet
+                steps:
+                  - run: {shell: true, command: "printf 'hi\\n'"}
+                  - assert: {stdout: {snapshot: never.txt}}
+      - run: {command: "${atago} run miss.atago.yaml"}
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: "--update-snapshots"
