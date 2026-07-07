@@ -1,0 +1,110 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / json matcher boundary values
+
+# Boundary coverage for the json/yaml path matcher: array indexing, a top-level
+# array length, the numeric comparators, each scalar type (bool, float, a string
+# carrying a quote), a deeply nested path, and the clean failure when a path
+# selects nothing. printf emits the exact document so these are deterministic;
+# the matcher is OS-independent, so the suite runs on make e2e.
+scenarios:
+  - name: an array element is addressable by index
+    steps:
+      - run: {shell: true, command: 'printf ''{"items":[10,20,30]}'''}
+      - assert:
+          stdout:
+            json:
+              - path: "$.items[0]"
+                equals: 10
+              - path: "$.items[2]"
+                equals: 30
+
+  - name: a top-level array reports its length
+    steps:
+      - run: {shell: true, command: 'printf ''[1,2,3,4,5]'''}
+      - assert:
+          stdout:
+            json:
+              - path: "$"
+                length: 5
+
+  - name: an empty array has length zero
+    steps:
+      - run: {shell: true, command: 'printf ''{"rows":[]}'''}
+      - assert:
+          stdout:
+            json:
+              - path: "$.rows"
+                length: 0
+
+  - name: the numeric comparators bound a value
+    steps:
+      - run: {shell: true, command: 'printf ''{"n":50}'''}
+      - assert:
+          stdout:
+            json:
+              - path: "$.n"
+                gt: 49
+              - path: "$.n"
+                gte: 50
+              - path: "$.n"
+                lte: 50
+              - path: "$.n"
+                lt: 51
+
+  - name: a boolean value compares equal
+    steps:
+      - run: {shell: true, command: 'printf ''{"ok":true,"off":false}'''}
+      - assert:
+          stdout:
+            json:
+              - path: "$.ok"
+                equals: true
+              - path: "$.off"
+                equals: false
+
+  - name: a floating-point value compares equal
+    steps:
+      - run: {shell: true, command: 'printf ''{"pi":3.14}'''}
+      - assert:
+          stdout:
+            json:
+              - path: "$.pi"
+                equals: 3.14
+
+  - name: a string carrying a quote compares equal
+    steps:
+      - run: {shell: true, command: 'printf ''{"s":"a\"b"}'''}
+      - assert:
+          stdout:
+            json:
+              - path: "$.s"
+                equals: 'a"b'
+
+  - name: a deeply nested path resolves
+    steps:
+      - run: {shell: true, command: 'printf ''{"x":{"y":{"z":{"w":42}}}}'''}
+      - assert:
+          stdout:
+            json:
+              - path: "$.x.y.z.w"
+                equals: 42
+
+  - name: a path that selects nothing fails with a clear message
+    steps:
+      - fixture:
+          file: nopath.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: nopath}
+            scenarios:
+              - name: an absent key is a clean failure
+                steps:
+                  - run: {shell: true, command: 'printf ''{"a":1}'''}
+                  - assert: {stdout: {json: [{path: "$.missing", equals: 1}]}}
+      - run: {command: "${atago} run nopath.atago.yaml"}
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: "selected no value"
