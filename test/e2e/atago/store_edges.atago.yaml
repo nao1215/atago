@@ -1,0 +1,92 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / store capture boundary values
+
+# store captures a value from a step and later steps reference it as ${name}.
+# These pin the capture contract: a regex with a group captures the group, one
+# without captures the whole match, a JSON path and a file JSON path both work,
+# a regex that matches nothing is an execution error, and a stored value is
+# scenario-scoped — it does not leak into the next scenario. echo/printf are
+# POSIX builtins, so the suite runs on make e2e; store resolution is
+# OS-independent.
+scenarios:
+  - name: a regex with a capture group stores the group
+    steps:
+      - run: {shell: true, command: "echo release v1.2.3-rc1"}
+      - store: {name: ver, from: {stdout: {matches: "v([0-9.]+)-"}}}
+      - run: {shell: true, command: "echo shipping ${ver}"}
+      - assert:
+          stdout:
+            equals: "shipping 1.2.3"
+
+  - name: a regex without a group stores the whole match
+    steps:
+      - run: {shell: true, command: "echo digest sha=abc123def456"}
+      - store: {name: sha, from: {stdout: {matches: "[a-f0-9]{6,}"}}}
+      - run: {shell: true, command: "echo checksum ${sha}"}
+      - assert:
+          stdout:
+            equals: "checksum abc123def456"
+
+  - name: a JSON path captures a scalar from stdout
+    steps:
+      - run: {shell: true, command: "printf '{\"port\":8080}'"}
+      - store: {name: port, from: {stdout: {json: {path: "$.port"}}}}
+      - run: {shell: true, command: "echo bound ${port}"}
+      - assert:
+          stdout:
+            equals: "bound 8080"
+
+  - name: a JSON path captures a value from a generated file
+    steps:
+      - fixture:
+          file: meta.json
+          content: '{"build":{"id":"b-42"}}'
+      - store: {name: build, from: {file: {path: meta.json, json: {path: "$.build.id"}}}}
+      - run: {shell: true, command: "echo build ${build}"}
+      - assert:
+          stdout:
+            equals: "build b-42"
+
+  - name: a regex that matches nothing is an execution error
+    steps:
+      - fixture:
+          file: nomatch.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: nomatch}
+            scenarios:
+              - name: capture fails
+                steps:
+                  - run: {shell: true, command: "echo hello"}
+                  - store: {name: x, from: {stdout: {matches: "ABSENT([0-9]+)"}}}
+      - run: {command: "${atago} run nomatch.atago.yaml"}
+      - assert:
+          exit_code: 4
+          stdout:
+            contains: "did not match"
+
+  - name: a stored value does not leak into the next scenario
+    steps:
+      - fixture:
+          file: scope.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: scope}
+            scenarios:
+              - name: captures a value
+                steps:
+                  - run: {shell: true, command: "echo secret-value"}
+                  - store: {name: captured, from: {stdout: {trim: true}}}
+                  - assert: {stdout: {contains: secret-value}}
+              - name: cannot reference the earlier value
+                steps:
+                  - run: {command: "echo ${captured}"}
+      - run: {command: "${atago} run scope.atago.yaml"}
+      - assert:
+          exit_code: 4
+          stdout:
+            contains:
+              - "references ${captured}"
+              - "no variable with that name is defined"
