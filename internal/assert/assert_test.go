@@ -680,6 +680,24 @@ func TestCheck_JSON_EmptyStdout(t *testing.T) {
 	}
 }
 
+// TestCheck_JSON_MalformedDoesNotPanic pins the no-panic contract on the
+// untrusted output of the program under test: some malformed JSON makes the
+// third-party ojg parser panic ("assignment to entry in nil map", found by
+// FuzzValuesEqual). A json assertion must report invalid JSON, not crash.
+func TestCheck_JSON_MalformedDoesNotPanic(t *testing.T) {
+	t.Parallel()
+	for _, data := range []string{`{"":f,"":0 0`, `{"a":`, `[1,2,`, `{`} {
+		res := &runner.Result{Stdout: []byte(data)}
+		got := Check(&spec.Assert{Stdout: &spec.StreamAssert{JSON: spec.JSONChecks{{Path: "$.x", Equals: 1}}}}, res, Env{})
+		if got.OK {
+			t.Errorf("malformed JSON %q unexpectedly passed the assertion", data)
+		}
+		if !strings.Contains(got.Hint, "not valid JSON") {
+			t.Errorf("hint = %q, want it to name invalid JSON", got.Hint)
+		}
+	}
+}
+
 // Issue #32: json length and stream empty matchers were only tested on their
 // passing direction. Cover the failure and value-type branches.
 func TestCheck_JSON_Length(t *testing.T) {

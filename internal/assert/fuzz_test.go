@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/nao1215/atago/internal/spec"
-	"github.com/ohler55/ojg/oj"
 )
 
 // FuzzCheckJSON feeds arbitrary document bytes and an arbitrary JSONPath to the
@@ -35,14 +34,16 @@ func FuzzCheckJSON(f *testing.F) {
 
 // FuzzValuesEqual asserts that structural comparison of decoded JSON values is
 // reflexive and total: a parsed value always equals itself, and comparing any
-// two parsed values never panics (issue #46, #40).
+// two parsed values never panics (issue #46, #40). It parses through the same
+// panic-recovering parseJSON the matcher uses, so an ojg parser panic on
+// malformed input is a skipped case here, not a fuzz failure.
 func FuzzValuesEqual(f *testing.F) {
 	for _, s := range []string{`1`, `"s"`, `[1,2]`, `{"a":1,"b":[2,3]}`, `null`, `true`, `1.5`} {
 		f.Add([]byte(s), []byte(`{"a":1}`))
 	}
 	f.Fuzz(func(t *testing.T, a, b []byte) {
-		va, errA := oj.Parse(a)
-		vb, errB := oj.Parse(b)
+		va, errA := parseJSON(a)
+		vb, errB := parseJSON(b)
 		if errA != nil || errB != nil {
 			return
 		}

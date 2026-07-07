@@ -2,6 +2,7 @@ package assert
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"math/big"
@@ -68,7 +69,7 @@ func parseDoc(desc, name string, data []byte, isYAML bool) (any, *CheckResult) {
 	if isYAML {
 		err = yaml.Unmarshal(data, &parsed)
 	} else {
-		parsed, err = oj.Parse(data)
+		parsed, err = parseJSON(data)
 	}
 	if err != nil {
 		return nil, &CheckResult{
@@ -79,6 +80,20 @@ func parseDoc(desc, name string, data []byte, isYAML bool) (any, *CheckResult) {
 		}
 	}
 	return parsed, nil
+}
+
+// parseJSON decodes JSON, converting a panic from the third-party parser into an
+// error. ojg's oj.Parse can panic ("assignment to entry in nil map") on some
+// malformed input; the payload is the untrusted output of the program under
+// test, so atago must report invalid JSON rather than crash. Found by
+// FuzzValuesEqual.
+func parseJSON(data []byte) (v any, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			v, err = nil, errors.New("the parser could not decode it")
+		}
+	}()
+	return oj.Parse(data)
 }
 
 // checkJSON parses data as JSON, selects nodes with a JSONPath, and applies the

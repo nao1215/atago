@@ -9,6 +9,13 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- A `json` assertion or a `store` capture no longer crashes on malformed JSON
+  from the program under test. The third-party JSON parser (ojg) panics with
+  "assignment to entry in nil map" on some inputs, and the panic propagated out
+  and aborted atago. Both the matcher and the store capture now recover from a
+  parser panic and report invalid JSON, so a broken payload is a normal
+  assertion failure or capture error, not a crash. Found by FuzzValuesEqual.
+
 - Loading a spec no longer crashes on malformed YAML. Some inputs (a bare `!`
   tag over a broken mapping) made the underlying goccy/go-yaml decoder panic
   with a nil pointer dereference, which propagated out of the loader and aborted
