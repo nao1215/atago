@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-74 suites · 374 scenarios
+74 suites · 375 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -288,7 +288,7 @@
   - [a pty step drives the atago binary directly with no shell](#scenario-a-pty-step-drives-the-atago-binary-directly-with-no-shell)
   - [a pty drives atago running an inner spec to a green result](#scenario-a-pty-drives-atago-running-an-inner-spec-to-a-green-result)
   - [a never-matching expect fails and names the pattern in the transcript](#scenario-a-never-matching-expect-fails-and-names-the-pattern-in-the-transcript)
-- [atago self-hosting / record (spec skeleton from an observed run)](#atago-self-hosting--record-spec-skeleton-from-an-observed-run) — 13 scenarios
+- [atago self-hosting / record (spec skeleton from an observed run)](#atago-self-hosting--record-spec-skeleton-from-an-observed-run) — 14 scenarios
   - [record then run round-trips green](#scenario-record-then-run-round-trips-green)
   - [refusing to overwrite without --force](#scenario-refusing-to-overwrite-without---force)
   - [record --pty refuses an existing --out before driving the session](#scenario-record---pty-refuses-an-existing---out-before-driving-the-session)
@@ -302,6 +302,7 @@
   - [a prompt with regex metacharacters is escaped in the generated expect](#scenario-a-prompt-with-regex-metacharacters-is-escaped-in-the-generated-expect)
   - [recorded text containing dollar-brace round-trips as literal text](#scenario-recorded-text-containing-dollar-brace-round-trips-as-literal-text)
   - [a recorded secret placeholder replays green with the env set and is guarded when unset](#scenario-a-recorded-secret-placeholder-replays-green-with-the-env-set-and-is-guarded-when-unset)
+  - [record --pty of a never-exiting program times out instead of hanging](#scenario-record---pty-of-a-never-exiting-program-times-out-instead-of-hanging)
 - [atago self-hosting / report formats agree on outcomes](#atago-self-hosting--report-formats-agree-on-outcomes) — 7 scenarios
   - [json report carries per-scenario verdicts and a failures array](#scenario-json-report-carries-per-scenario-verdicts-and-a-failures-array)
   - [junit report tallies tests, failures, skipped, and errors](#scenario-junit-report-tallies-tests-failures-skipped-and-errors)
@@ -4999,6 +5000,17 @@ ${atago} run sec.atago.yaml
 - after `${atago} run sec.atago.yaml`:
   - exit code is `4`
   - stdout contains `ATAGO_SECRET_1 is not set`
+### Scenario: record --pty of a never-exiting program times out instead of hanging
+_skipped on windows_
+#### When
+```shell
+${atago} record --pty --timeout 2s --out wedged.atago.yaml -- tail -f /dev/null
+```
+#### Then
+- exit code is `4`
+- stderr contains `did not exit within 2s`
+- stderr contains `use --timeout to adjust`
+- file `wedged.atago.yaml` contains `- pty:`
 ## atago self-hosting / report formats agree on outcomes
 Source: `test/e2e/atago/report_formats.atago.yaml`
 ### Scenario: json report carries per-scenario verdicts and a failures array

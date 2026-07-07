@@ -32,15 +32,21 @@ const captureDrainGrace = 500 * time.Millisecond
 // developer's terminal), puts in into raw mode, forwards keystrokes and output
 // until the program exits, and returns the recorded session (#69). This is the
 // POSIX build; capture_windows.go implements the same contract over a ConPTY.
-func CapturePTY(command string, shell bool, in, out *os.File) (PTYRecording, error) {
+//
+// timeout bounds the wait for the child to exit: a program that never exits (a
+// server, or a prompt whose quit keystroke was lost) would otherwise hang the
+// recorder forever. When it elapses the whole child process tree is killed and
+// the transcript captured so far is returned with ErrCaptureTimeout (#194). A
+// non-positive timeout falls back to DefaultCaptureTimeout.
+func CapturePTY(command string, shell bool, in, out *os.File, timeout time.Duration) (PTYRecording, error) {
 	name, args, err := runnercmd.CommandLine(command, shell)
 	if err != nil {
 		return PTYRecording{}, err
 	}
 
-	// The session runs until the child exits under the developer's own hand, so
-	// there is no timeout to bound — Background gives the interactive session no
-	// deadline while still satisfying the context-aware exec contract.
+	// Background: the child is bounded by the timeout below (a killed process
+	// group), not by context cancellation, so a plain Background satisfies the
+	// context-aware exec contract without a redundant second deadline.
 	cmd := exec.CommandContext(context.Background(), name, args...) //nolint:gosec // recording the user's declared command is the purpose
 	cmd.Env = os.Environ()
 	// A fresh session so the child owns the pty and a stray descendant does not
@@ -106,7 +112,24 @@ func CapturePTY(command string, shell bool, in, out *os.File) (PTYRecording, err
 		}
 	}()
 
-	waitErr := cmd.Wait()
+	// Reap the child from one goroutine so the wait can be raced against the
+	// timeout. The buffered channel lets the timeout path deliver the code even
+	// after it kills the tree — the reaper never blocks on a drained receiver.
+	waitCh := make(chan int, 1)
+	go func() { waitCh <- exitCode(cmd.Wait()) }()
+
+	timedOut := false
+	var code int
+	select {
+	case code = <-waitCh:
+	case <-time.After(resolveCaptureTimeout(timeout)):
+		timedOut = true
+		// Kill the whole process group (Setsid) so a never-exiting child and any
+		// descendant are torn down, not just the direct child, then reap it.
+		_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+		code = <-waitCh
+	}
+
 	// Drain the pty's final bytes before closing the master, then stop the
 	// output reader. A bounded grace keeps a lingering descendant from hanging us.
 	select {
@@ -117,8 +140,11 @@ func CapturePTY(command string, shell bool, in, out *os.File) (PTYRecording, err
 	<-outDone
 
 	mu.Lock()
-	rec.ExitCode = exitCode(waitErr)
+	rec.ExitCode = code
 	mu.Unlock()
+	if timedOut {
+		return rec, ErrCaptureTimeout
+	}
 	return rec, nil
 }
 

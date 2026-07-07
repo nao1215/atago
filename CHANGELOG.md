@@ -7,6 +7,18 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- `atago record --pty` takes a `--timeout` flag (default 30s) that bounds how
+  long it waits for the recorded program to exit. Previously the recorder waited
+  forever: a server-like process, or an interactive program whose quit keystroke
+  was lost to a read-readiness race, would wedge `record --pty` with no output
+  and no way out but Ctrl-C. When the timeout elapses atago now kills the child
+  process tree (a process-group kill on POSIX, a `taskkill /T` tree kill on
+  Windows), still writes whatever transcript was captured, and exits non-zero
+  with a clear `did not exit within …` message — mirroring the `pty:` spec
+  step's own `timeout:` bound. ([#194](https://github.com/nao1215/atago/issues/194))
+
 ## [0.7.0] - 2026-07-07
 
 Windows completes its interactive-terminal story. `pty:` steps and

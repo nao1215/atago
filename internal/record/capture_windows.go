@@ -17,6 +17,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
+	"strconv"
 	"sync"
 	"time"
 
@@ -34,7 +36,13 @@ const captureDrainGrace = 500 * time.Millisecond
 // console), puts in into raw mode, forwards keystrokes and output until the
 // program exits, and returns the recorded session (#69). Needs Windows 10 (1809)
 // or later for the ConPTY API.
-func CapturePTY(command string, shell bool, in, out *os.File) (PTYRecording, error) {
+//
+// timeout bounds the wait for the child to exit: a program that never exits (a
+// server, or a prompt whose quit keystroke was lost) would otherwise hang the
+// recorder forever. When it elapses the whole child process tree is killed and
+// the transcript captured so far is returned with ErrCaptureTimeout (#194). A
+// non-positive timeout falls back to DefaultCaptureTimeout.
+func CapturePTY(command string, shell bool, in, out *os.File, timeout time.Duration) (PTYRecording, error) {
 	if !conpty.IsAvailable() {
 		return PTYRecording{}, fmt.Errorf("record --pty needs ConPTY, which requires Windows 10 version 1809 or later")
 	}
@@ -106,7 +114,19 @@ func CapturePTY(command string, shell bool, in, out *os.File) (PTYRecording, err
 		}
 	}()
 
-	code := cpty.Wait(context.Background())
+	// Bound the wait: cpty.Wait returns early when ctx fires, letting a
+	// never-exiting child be torn down instead of hanging the recorder.
+	ctx, cancel := context.WithTimeout(context.Background(), resolveCaptureTimeout(timeout))
+	defer cancel()
+	code := cpty.Wait(ctx)
+	timedOut := false
+	if ctx.Err() != nil {
+		// The wait unblocked because the deadline fired, not because the child
+		// exited. Kill the whole tree (Windows has no process groups, so taskkill
+		// /T walks descendants) so nothing is left running, then record a timeout.
+		timedOut = true
+		killTree(cpty.Pid())
+	}
 	// Drain the pseudo console's final bytes before closing it, then stop the
 	// output reader. A bounded grace keeps a lingering descendant from hanging us.
 	select {
@@ -119,7 +139,19 @@ func CapturePTY(command string, shell bool, in, out *os.File) (PTYRecording, err
 	mu.Lock()
 	rec.ExitCode = code
 	mu.Unlock()
+	if timedOut {
+		return rec, ErrCaptureTimeout
+	}
 	return rec, nil
+}
+
+// killTree force-terminates the child and every descendant. Windows has no
+// process groups, so taskkill /T walks the process tree — the closest analog to
+// the POSIX capture's kill of the whole Setsid group, so a timed-out session
+// never leaks a running child (#194).
+func killTree(pid int) {
+	// A fire-and-forget teardown; Background is the honest context here.
+	_ = exec.CommandContext(context.Background(), "taskkill", "/T", "/F", "/PID", strconv.Itoa(pid)).Run() //nolint:gosec // fixed argv, pid from our own child
 }
 
 // enableVTOutput turns on ENABLE_VIRTUAL_TERMINAL_PROCESSING for the developer's

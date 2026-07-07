@@ -89,7 +89,7 @@ $ atago run mytool.atago.yaml
 PASSED  1 scenario: 1 passed, 0 failed, 0 errored, 0 skipped (12ms)
 ```
 
-Interactive tools record too: `atago record --pty -- <command>` runs it in a real terminal, lets you drive one session by hand, and writes a `pty:` step that replays your keystrokes as expect/send pairs. It works on Linux, macOS, and Windows (a ConPTY); on POSIX a password prompt becomes an `${env:...}` placeholder automatically, while on Windows — where a ConPTY exposes no echo state — you convert a secret send to `${env:...}` by hand:
+Interactive tools record too: `atago record --pty -- <command>` runs it in a real terminal, lets you drive one session by hand, and writes a `pty:` step that replays your keystrokes as expect/send pairs. It works on Linux, macOS, and Windows (a ConPTY); on POSIX a password prompt becomes an `${env:...}` placeholder automatically, while on Windows — where a ConPTY exposes no echo state — you convert a secret send to `${env:...}` by hand. A `--pty` session is bounded by `--timeout` (default 30s): if the program never exits, atago kills it, writes whatever was captured, and fails instead of hanging forever:
 
 ```shell
 $ atago record --pty --out wizard.atago.yaml -- mytool init
