@@ -5,15 +5,103 @@ package ptyrun
 import (
 	"context"
 	"errors"
+	"fmt"
+	"os/exec"
+	"strconv"
+	"strings"
+	"syscall"
 
 	"github.com/nao1215/atago/internal/runner"
+	runnercmd "github.com/nao1215/atago/internal/runner/cmd"
 	"github.com/nao1215/atago/internal/spec"
 )
 
-// Run reports that pty steps are POSIX-only for now. The loader accepts the
-// step on every platform so specs stay portable to author; at execution time
-// Windows gets one clear error (an execution error, exit 4) instead of a
-// confusing terminal failure. ConPTY support can lift this later.
-func Run(_ context.Context, _ *spec.PTY, _ string, _ []string) (*runner.Result, *ExpectFailure, error) {
-	return nil, nil, errors.New("pty steps are not supported on Windows yet (POSIX-only; gate the scenario with `skip: {os: windows}`)")
+// Run executes p.Command inside a Windows pseudo-console (ConPTY) and drives the
+// expect/send session against it via the shared driveSession core, so pty specs
+// that were POSIX-only now run on Windows too (follow-up to #78). The loader
+// still accepts pty steps on every platform; here they execute instead of
+// returning the old "unsupported" error. ConPTY needs Windows 10 (1809) or
+// later — an older host gets one clear execution error (exit 4).
+func Run(ctx context.Context, p *spec.PTY, workdir string, env []string) (*runner.Result, *ExpectFailure, error) {
+	if !isConPTYAvailable() {
+		return nil, nil, errors.New("pty steps need ConPTY, which requires Windows 10 version 1809 or later (gate the scenario with `skip: {os: windows}` for older hosts)")
+	}
+
+	cmdLine, err := windowsCommandLine(p.Command, p.Shell != nil && *p.Shell)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	dir := workdir
+	if p.Cwd != "" {
+		dir = resolveCwd(workdir, p.Cwd)
+	}
+
+	rows, cols := defaultRows, defaultCols
+	if p.Rows > 0 {
+		rows = p.Rows
+	}
+	if p.Cols > 0 {
+		cols = p.Cols
+	}
+
+	// env is whatever the engine resolved (clear_env/pass_env already applied):
+	// nil inherits the parent's environment; a non-nil slice starts the child
+	// from exactly that set.
+	cpty, err := startConPTY(cmdLine, dir, env, rows, cols)
+	if err != nil {
+		return nil, nil, fmt.Errorf("pty: start %q: %w", p.Command, err)
+	}
+
+	pid := cpty.pidValue()
+
+	// Reap in one place, mirroring the POSIX runner. cpty.wait blocks on the
+	// process handle and returns its exit code; a parent-context cancel that
+	// unblocks it early, or an unreadable code, maps to -1. On a normal run the
+	// parent context stays alive, so wait blocks until the child exits; on
+	// abort/timeout driveSession kills the tree, which lets wait return. The
+	// buffered channel lets a kill path drain the code later.
+	exitCh := make(chan int, 1)
+	go func() { exitCh <- cpty.wait(ctx) }()
+
+	proc := ptyProcess{
+		rw:        cpty,
+		exit:      exitCh,
+		kill:      func() { killTree(pid) },
+		closeTerm: func() { _ = cpty.Close() },
+		dir:       dir,
+	}
+	return driveSession(ctx, p, proc)
+}
+
+// windowsCommandLine builds the single command-line string ConPTY's CreateProcess
+// receives. A shell step reuses cmd.exe's documented `/S /C "<command>"` contract
+// (strip the outer quotes, run the rest verbatim) so it matches the cmd runner's
+// ConfigureShell. A shell-free step is tokenized with the same splitter the cmd
+// runner uses, then re-escaped with syscall.EscapeArg so the C runtime re-parses
+// it back to the identical argv — keeping pty and run steps in agreement about
+// how a command line splits on Windows.
+func windowsCommandLine(command string, shell bool) (string, error) {
+	if shell {
+		return `cmd /S /C "` + command + `"`, nil
+	}
+	name, args, err := runnercmd.CommandLine(command, false)
+	if err != nil {
+		return "", err
+	}
+	parts := make([]string, 0, len(args)+1)
+	parts = append(parts, syscall.EscapeArg(name))
+	for _, a := range args {
+		parts = append(parts, syscall.EscapeArg(a))
+	}
+	return strings.Join(parts, " "), nil
+}
+
+// killTree force-terminates the child and every descendant. Windows has no
+// process groups, so taskkill /T walks the process tree — the closest analogue
+// to the POSIX runner's kill of the whole Setsid group, so a timed-out or
+// aborted pty session never leaks a running child.
+func killTree(pid int) {
+	// A fire-and-forget teardown; Background is the honest context here.
+	_ = exec.CommandContext(context.Background(), "taskkill", "/T", "/F", "/PID", strconv.Itoa(pid)).Run() //nolint:gosec // fixed argv, pid from our own child
 }

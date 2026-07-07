@@ -102,3 +102,18 @@ jobs:
         run: |
           mapfile -t targets < <(bash scripts/windows_portable_specs.sh)
           go run . run "${targets[@]}"
+
+      # Real-world proof that the ConPTY pty runner drives an INTERACTIVE CLI on
+      # Windows, not just self-terminating output: sqly's shell is a readline
+      # REPL (built on nao1215/prompt) that only starts when stdin is a TTY. A
+      # pinned sqly runs one pty spec that sends a query and `.exit` and asserts
+      # the result — exercising the ConPTY send path end to end.
+      - name: Install pinned sqly for the interactive pty check
+        shell: bash
+        run: |
+          go install github.com/nao1215/sqly@v0.26.0
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Drive sqly's interactive shell over a Windows pty
+        shell: bash
+        run: go run . run ./test/e2e/tools/sqly/repl_pty.atago.yaml

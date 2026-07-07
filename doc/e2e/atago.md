@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-73 suites · 366 scenarios
+74 suites · 374 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -279,6 +279,15 @@
   - [a screen snapshot round-trips through update and compare](#scenario-a-screen-snapshot-round-trips-through-update-and-compare)
   - [a screen assert without a pty step is a load-time error](#scenario-a-screen-assert-without-a-pty-step-is-a-load-time-error)
   - [a send referencing an undefined variable is an execution error, not typed literally](#scenario-a-send-referencing-an-undefined-variable-is-an-execution-error-not-typed-literally)
+- [atago self-hosting / pty (portable)](#atago-self-hosting--pty-portable) — 8 scenarios
+  - [a pty step starts a command, captures its output, and reports exit 0](#scenario-a-pty-step-starts-a-command-captures-its-output-and-reports-exit-0)
+  - [a pty step surfaces a command's non-zero exit code](#scenario-a-pty-step-surfaces-a-commands-non-zero-exit-code)
+  - [sequential expects match successive output in declaration order](#scenario-sequential-expects-match-successive-output-in-declaration-order)
+  - [an expect pattern is a regular expression, not a literal](#scenario-an-expect-pattern-is-a-regular-expression-not-a-literal)
+  - [a screen assert reads the rendered frame sized by rows and cols](#scenario-a-screen-assert-reads-the-rendered-frame-sized-by-rows-and-cols)
+  - [a pty step drives the atago binary directly with no shell](#scenario-a-pty-step-drives-the-atago-binary-directly-with-no-shell)
+  - [a pty drives atago running an inner spec to a green result](#scenario-a-pty-drives-atago-running-an-inner-spec-to-a-green-result)
+  - [a never-matching expect fails and names the pattern in the transcript](#scenario-a-never-matching-expect-fails-and-names-the-pattern-in-the-transcript)
 - [atago self-hosting / record (spec skeleton from an observed run)](#atago-self-hosting--record-spec-skeleton-from-an-observed-run) — 13 scenarios
   - [record then run round-trips green](#scenario-record-then-run-round-trips-green)
   - [refusing to overwrite without --force](#scenario-refusing-to-overwrite-without---force)
@@ -4700,6 +4709,107 @@ ${atago} run typo.atago.yaml
 #### Then
 - exit code is `4`
 - stdout contains `no variable with that name is defined`, `$${no_such_var}`
+## atago self-hosting / pty (portable)
+Source: `test/e2e/atago/pty_portable.atago.yaml`
+### Scenario: a pty step starts a command, captures its output, and reports exit 0
+#### When
+```shell
+# interactive (pty): echo hello from a pty
+```
+#### Then
+- exit code is `0`
+- stdout contains `hello from a pty`
+### Scenario: a pty step surfaces a command's non-zero exit code
+#### When
+```shell
+# interactive (pty): echo bye && exit 3
+```
+#### Then
+- exit code is `3`
+### Scenario: sequential expects match successive output in declaration order
+#### When
+```shell
+# interactive (pty): echo first && echo second && echo third
+```
+#### Then
+- exit code is `0`
+- stdout contains `first`, `third`
+### Scenario: an expect pattern is a regular expression, not a literal
+#### When
+```shell
+# interactive (pty): echo item-42-done
+```
+#### Then
+- exit code is `0`
+### Scenario: a screen assert reads the rendered frame sized by rows and cols
+#### When
+```shell
+# interactive (pty): echo rendered line
+```
+#### Then
+- exit code is `0`
+- rendered screen contains `rendered line`
+### Scenario: a pty step drives the atago binary directly with no shell
+#### When
+```shell
+# interactive (pty): ${atago} version
+```
+#### Then
+- exit code is `0`
+- stdout contains `atago`
+### Scenario: a pty drives atago running an inner spec to a green result
+#### Given
+- Fixture file `inner.atago.yaml` is created.
+#### Inputs
+_Fixture `inner.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: echo
+    steps:
+      - run:
+          shell: true
+          command: echo inner-ok
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: inner-ok
+```
+#### When
+```shell
+# interactive (pty): ${atago} run inner.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout contains `1 passed`
+### Scenario: a never-matching expect fails and names the pattern in the transcript
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: waits for output that never comes
+    steps:
+      - pty:
+          shell: true
+          command: echo present
+          timeout: 2s
+          session:
+            - expect: "absent-forever"
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `pty expect /absent-forever/`, `never appeared in the terminal transcript`
 ## atago self-hosting / record (spec skeleton from an observed run)
 Source: `test/e2e/atago/record.atago.yaml`
 ### Scenario: record then run round-trips green
