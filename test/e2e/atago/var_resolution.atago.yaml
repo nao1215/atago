@@ -1,0 +1,87 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / variable resolution semantics
+
+# atago interpolates ${...} before a command runs. This pins the resolution
+# contract: builtins (${workdir}, ${atago}) and ${env:NAME} expand; a `$${...}`
+# escape stays literal; an unresolved reference is a hard error (not a silent
+# empty) when shell: false so a typo cannot pass unnoticed; and with shell: true
+# an unknown ${...} is deferred to the shell instead. echo is a POSIX builtin, so
+# this suite runs on make e2e; the resolver itself is OS-independent (unit tests
+# in internal/store cover Windows).
+scenarios:
+  - name: a doubled dollar keeps the braces literal
+    steps:
+      - run: {command: "echo pre-$${keep}-post"}
+      - assert:
+          stdout:
+            contains: "${keep}"
+
+  - name: the workdir builtin expands to the scenario directory
+    steps:
+      - run: {command: "echo at=${workdir}"}
+      - assert:
+          stdout:
+            # The assertion value is expanded too, so the escaped literal proves
+            # the command output no longer contains an unexpanded ${workdir}.
+            not_contains: "$${workdir}"
+
+  - name: the atago builtin resolves to the binary under test
+    steps:
+      - run: {command: "${atago} --version"}
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "atago"
+
+  - name: an env reference expands from the host environment
+    steps:
+      - run: {command: "echo path=${env:PATH}"}
+      - assert:
+          stdout:
+            matches: "path=.+"
+
+  - name: shell true defers an unknown reference to the shell
+    steps:
+      - run: {shell: true, command: "echo [${undefined_in_atago}]"}
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "[]"
+
+  - name: an unresolved variable is a hard error, not a silent empty
+    steps:
+      - fixture:
+          file: typo.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: typo}
+            scenarios:
+              - name: a misspelled variable stops the run
+                steps:
+                  - run: {command: "echo ${reuslt}"}
+      - run: {command: "${atago} run typo.atago.yaml"}
+      - assert:
+          exit_code: 4
+          stdout:
+            contains:
+              - "references ${reuslt}"
+              - "no variable with that name is defined"
+
+  - name: an unset env reference names the missing variable
+    steps:
+      - fixture:
+          file: unsetenv.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: unsetenv}
+            scenarios:
+              - name: an unset env var stops the run
+                steps:
+                  - run: {command: "echo ${env:ATAGO_SURELY_UNSET_VAR}"}
+      - run: {command: "${atago} run unsetenv.atago.yaml"}
+      - assert:
+          exit_code: 4
+          stdout:
+            contains: "environment variable ATAGO_SURELY_UNSET_VAR is not set"
