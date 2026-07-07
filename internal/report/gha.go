@@ -36,10 +36,19 @@ func writeGHA(w io.Writer, results []*engine.SuiteResult) error {
 		// an error annotation, so the Actions UI is never silent for a non-zero
 		// exit that produced no scenario rows.
 		if suiteErroredWithoutScenarios(res) {
-			for _, p := range suiteFailurePoints(res) {
+			pts := suiteFailurePoints(res)
+			for _, p := range pts {
 				fmt.Fprintf(&b, "::error title=%s::%s\n",
 					ghaEscapeProp(res.Suite+" / "+p.name), ghaEscapeData(p.message))
 			}
+			// res.Counts() and len(res.Scenarios) are both zero here (no scenario
+			// rows), so the synthesized points are the suite's only failure rows.
+			// Count them as errored — matching the testcases junit emits and the
+			// not-ok points tap emits for the same run — so the ::notice:: summary
+			// agrees with the ::error:: annotations just written above instead of
+			// reading an all-zero, all-green line.
+			agg.Errored += len(pts)
+			total += len(pts)
 		}
 		c := res.Counts()
 		agg.Passed += c.Passed
