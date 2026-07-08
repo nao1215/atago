@@ -31,6 +31,11 @@ type Service struct {
 	// Ready declares how to wait until the service is accepting work before the
 	// steps run. When omitted, the steps start as soon as the process is spawned.
 	Ready *Ready `yaml:"ready,omitempty"`
+	// MaxLogBytes caps how much combined stdout/stderr atago retains for this
+	// service (readiness excerpts and preserved log artifacts only ever need
+	// the tail). Zero/omitted applies the 8 MiB default; the oldest bytes are
+	// dropped first and the retained log says so.
+	MaxLogBytes int `yaml:"max_log_bytes,omitempty"`
 }
 
 // MockServer is a declarative stub HTTP server (#24). It listens on

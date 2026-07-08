@@ -425,6 +425,10 @@ scenarios:
             contains: ok
 ```
 
+A verbose server cannot grow atago's memory for the suite's lifetime: only
+the newest `max_log_bytes` of a service's output are retained (default 8 MiB
+— readiness excerpts and preserved log artifacts only ever need the tail).
+
 Full spec: [services](../examples/services.atago.yaml)
 
 ## Test graceful shutdown

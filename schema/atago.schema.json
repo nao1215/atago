@@ -640,6 +640,11 @@
             }
           },
           "description": "How to wait until the service accepts work before steps run. When omitted, steps start as soon as the process is spawned."
+        },
+        "max_log_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum bytes of combined stdout/stderr atago retains for this service. The oldest bytes are dropped first and the retained log starts with a truncation notice, so readiness excerpts and preserved log artifacts (which only ever need the tail) stay bounded. Omit for the 8 MiB default."
         }
       }
     },
