@@ -52,6 +52,12 @@ and this project follows [Semantic Versioning](https://semver.org/).
   make schema-validating editors reject valid specs) — or a schema change
   without regenerating `spec_keys.json` — can no longer ship silently.
 
+- Failing scenarios now preserve each mock server's recorded requests as a
+  durable artifact next to the service logs (`--artifacts-dir`), so the
+  sharpest evidence a mock scenario has — the typo'd client path that 404'd —
+  survives the CI job. Green runs and mocks that recorded nothing write no
+  file, exactly like service logs.
+
 ### Changed
 
 - README now links the hosted cookbook from its Examples section and points to
@@ -63,6 +69,32 @@ and this project follows [Semantic Versioning](https://semver.org/).
   `/real-world/` now state explicitly that the atago project wrote and runs
   these suites on its own initiative — they are not the upstream projects'
   official test suites, and those projects are not affiliated with atago.
+- Under `--ci`, a `--filter`/`--tag`/`--skip-tag` selection that matches no
+  scenario now fails the run (exit 3, `ExitConfig`) instead of exiting 0 with
+  `PASSED 0 scenarios`, so a typo'd selector can no longer silently disable an
+  entire suite in a pipeline. Without `--ci` the same case stays a warning that
+  exits 0, leaving interactive workflows untouched.
+
+### Fixed
+
+- A step-level `timeout:` on an ssh run step was parsed, validated — and
+  silently ignored: the loader whitelists it "because it is honored remotely",
+  but the engine only ever applied the runner-level timeout captured at dial.
+  The step timeout now bounds the remote command (taking precedence over the
+  runner-level value), and an ssh timeout of either level is an observable
+  `TimedOut` result naming its source — matching how the cmd runner reports
+  local timeouts — instead of a hard scenario error.
+- An unset `${env:NAME}` in a `shell: true` run command now fails with the
+  same explained error as the shell-less path ("the environment variable NAME
+  is not set") instead of reaching the shell, where POSIX sh dies with a
+  cryptic "Bad substitution" and cmd.exe forwards the literal text. A bare
+  unresolved `${name}` is still left for the shell, which CAN expand it.
+
+- The "no scenarios matched" warning is now selector-aware. `--tag`/`--skip-tag`
+  say tags match exactly and point at `atago list`, while `--filter` keeps the
+  case-sensitive-substring note. Previously every empty selection was blamed on a
+  "case-sensitive substring", which is wrong for tags (they match by equality via
+  `==`) and sent users fixing the wrong thing.
 
 ### Fixed
 

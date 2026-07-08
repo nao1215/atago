@@ -183,6 +183,11 @@ func TestRunCmd_SelectionMatchesNothingWarns(t *testing.T) {
 	if !strings.Contains(errb.String(), `no scenarios matched --filter "no-such-name"`) {
 		t.Errorf("stderr = %q, want a no-match warning", errb.String())
 	}
+	// --filter matches by substring, so keep that note (only --tag/--skip-tag
+	// match exactly).
+	if !strings.Contains(errb.String(), "case-sensitive substring") {
+		t.Errorf("stderr = %q, want the --filter case-sensitive-substring note", errb.String())
+	}
 	// A matching selection stays quiet.
 	errb.Reset()
 	out.Reset()
@@ -1477,7 +1482,10 @@ func TestSubcommands_DefaultTargetIsDot(t *testing.T) {
 
 // TestRunCmd_TagSelectionNoMatchWarns proves a --tag/--skip-tag that selects
 // nothing still exits 0 but warns loudly, mentioning the exact selector — a
-// typo in CI must not greenlight in silence.
+// typo in CI must not greenlight in silence. The note must be selector-aware:
+// tags match EXACTLY (engine.hasAnyTag uses ==), so the warning must say so and
+// point at `atago list`, never repeat the --filter "case-sensitive substring"
+// note (which would send users fixing the wrong thing).
 func TestRunCmd_TagSelectionNoMatchWarns(t *testing.T) {
 	dir := t.TempDir()
 	p := writeSpec(t, dir, "ok.atago.yaml", passingSpec)
@@ -1486,8 +1494,18 @@ func TestRunCmd_TagSelectionNoMatchWarns(t *testing.T) {
 		if got := Main([]string{"run", "--tag", "no-such-tag", p}, &out, &errb); got != ExitOK {
 			t.Fatalf("exit = %d, want %d (stderr=%s)", got, ExitOK, errb.String())
 		}
-		if !strings.Contains(errb.String(), `--tag "no-such-tag"`) {
-			t.Errorf("stderr = %q, want a --tag no-match warning", errb.String())
+		s := errb.String()
+		if !strings.Contains(s, `--tag "no-such-tag"`) {
+			t.Errorf("stderr = %q, want a --tag no-match warning", s)
+		}
+		if !strings.Contains(s, "match tags exactly") {
+			t.Errorf("stderr = %q, want it to say tags match exactly", s)
+		}
+		if !strings.Contains(s, "atago list") {
+			t.Errorf("stderr = %q, want it to suggest `atago list`", s)
+		}
+		if strings.Contains(s, "case-sensitive substring") {
+			t.Errorf("stderr = %q, must not use the --filter substring note for a tag", s)
 		}
 	})
 	t.Run("skip-tag", func(t *testing.T) {
@@ -1510,8 +1528,90 @@ scenarios:
 		if got := Main([]string{"run", "--skip-tag", "slow", tp}, &out, &errb); got != ExitOK {
 			t.Fatalf("exit = %d, want %d (stderr=%s)", got, ExitOK, errb.String())
 		}
-		if !strings.Contains(errb.String(), `--skip-tag "slow"`) {
-			t.Errorf("stderr = %q, want a --skip-tag no-match warning", errb.String())
+		s := errb.String()
+		if !strings.Contains(s, `--skip-tag "slow"`) {
+			t.Errorf("stderr = %q, want a --skip-tag no-match warning", s)
+		}
+		if !strings.Contains(s, "match tags exactly") {
+			t.Errorf("stderr = %q, want it to say tags match exactly", s)
+		}
+		if !strings.Contains(s, "atago list") {
+			t.Errorf("stderr = %q, want it to suggest `atago list`", s)
+		}
+		if strings.Contains(s, "case-sensitive substring") {
+			t.Errorf("stderr = %q, must not use the --filter substring note for a skip-tag", s)
+		}
+	})
+}
+
+// TestRunCmd_CIEmptySelectionFails proves that under --ci an empty selection is
+// a hard configuration error (exit 3), not a silent green PASSED-0: a typo'd
+// --tag/--filter/--skip-tag in a pipeline would otherwise disable the whole
+// suite forever. Without --ci the run keeps warning and exiting 0 so interactive
+// workflows are untouched. A selector that DOES match keeps exiting 0 even under
+// --ci — only the empty case fails.
+func TestRunCmd_CIEmptySelectionFails(t *testing.T) {
+	dir := t.TempDir()
+	p := writeSpec(t, dir, "ok.atago.yaml", passingSpec)
+
+	t.Run("tag empty under --ci fails", func(t *testing.T) {
+		var out, errb bytes.Buffer
+		if got := Main([]string{"run", "--ci", "--tag", "no-such-tag", p}, &out, &errb); got != ExitConfig {
+			t.Fatalf("exit = %d, want %d (ExitConfig) (stderr=%s)", got, ExitConfig, errb.String())
+		}
+		s := errb.String()
+		if !strings.Contains(s, "no scenarios matched") || !strings.Contains(s, `--tag "no-such-tag"`) {
+			t.Errorf("stderr = %q, want the CI empty-selection error naming --tag", s)
+		}
+		if !strings.Contains(s, "match tags exactly") {
+			t.Errorf("stderr = %q, want the exact-tag note", s)
+		}
+		if !strings.Contains(s, "atago list") {
+			t.Errorf("stderr = %q, want a hint on how to list scenarios", s)
+		}
+	})
+
+	t.Run("filter empty under --ci fails", func(t *testing.T) {
+		var out, errb bytes.Buffer
+		if got := Main([]string{"run", "--ci", "--filter", "no-such-name", p}, &out, &errb); got != ExitConfig {
+			t.Fatalf("exit = %d, want %d (ExitConfig) (stderr=%s)", got, ExitConfig, errb.String())
+		}
+		s := errb.String()
+		if !strings.Contains(s, "no scenarios matched") || !strings.Contains(s, `--filter "no-such-name"`) {
+			t.Errorf("stderr = %q, want the CI empty-selection error naming --filter", s)
+		}
+		if !strings.Contains(s, "case-sensitive substring") {
+			t.Errorf("stderr = %q, want the --filter substring note", s)
+		}
+	})
+
+	t.Run("no --ci keeps warning and exits 0", func(t *testing.T) {
+		var out, errb bytes.Buffer
+		if got := Main([]string{"run", "--tag", "no-such-tag", p}, &out, &errb); got != ExitOK {
+			t.Fatalf("exit = %d, want %d (stderr=%s)", got, ExitOK, errb.String())
+		}
+		if !strings.Contains(errb.String(), "warning: no scenarios matched") {
+			t.Errorf("stderr = %q, want a warning (not an error) without --ci", errb.String())
+		}
+	})
+
+	t.Run("--ci with a matching selector still passes", func(t *testing.T) {
+		var out, errb bytes.Buffer
+		if got := Main([]string{"run", "--ci", "--filter", "exit 0", p}, &out, &errb); got != ExitOK {
+			t.Fatalf("exit = %d, want %d (a matching selection must not fail) (stderr=%s)", got, ExitOK, errb.String())
+		}
+		if strings.Contains(errb.String(), "no scenarios matched") {
+			t.Errorf("stderr = %q, want no empty-selection message for a matching filter", errb.String())
+		}
+	})
+
+	t.Run("--ci with no selector runs normally", func(t *testing.T) {
+		var out, errb bytes.Buffer
+		if got := Main([]string{"run", "--ci", p}, &out, &errb); got != ExitOK {
+			t.Fatalf("exit = %d, want %d (stderr=%s)", got, ExitOK, errb.String())
+		}
+		if strings.Contains(errb.String(), "no scenarios matched") {
+			t.Errorf("stderr = %q, want no empty-selection message with no selector", errb.String())
 		}
 	})
 }

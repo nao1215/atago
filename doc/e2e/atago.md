@@ -1,6 +1,10 @@
 # atago Behavior Specs
 ## Summary
+<<<<<<< HEAD
 74 suites · 384 scenarios
+=======
+74 suites · 385 scenarios
+>>>>>>> origin/main
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -41,14 +45,16 @@
   - [a stray file outside the doublestar prefix breaks the exact contract (POSIX)](#scenario-a-stray-file-outside-the-doublestar-prefix-breaks-the-exact-contract-posix)
   - [a doublestar glob matches a nested redirect target (portable)](#scenario-a-doublestar-glob-matches-a-nested-redirect-target-portable)
   - [a doublestar prefix covers both redirect streams (portable)](#scenario-a-doublestar-prefix-covers-both-redirect-streams-portable)
-- [atago self-hosting / CLI scenario selection](#atago-self-hosting--cli-scenario-selection) — 7 scenarios
+- [atago self-hosting / CLI scenario selection](#atago-self-hosting--cli-scenario-selection) — 9 scenarios
   - [filter selects by a name substring](#scenario-filter-selects-by-a-name-substring)
   - [filter is OR across a comma-separated list](#scenario-filter-is-or-across-a-comma-separated-list)
   - [tag selects scenarios carrying the tag](#scenario-tag-selects-scenarios-carrying-the-tag)
   - [a repeated tag flag is OR](#scenario-a-repeated-tag-flag-is-or)
   - [skip-tag removes scenarios carrying the tag](#scenario-skip-tag-removes-scenarios-carrying-the-tag)
   - [tag and skip-tag compose as selected minus skipped](#scenario-tag-and-skip-tag-compose-as-selected-minus-skipped)
-  - [a filter that matches nothing selects an empty set and still exits zero](#scenario-a-filter-that-matches-nothing-selects-an-empty-set-and-still-exits-zero)
+  - [an empty filter selection fails under --ci with a substring hint](#scenario-an-empty-filter-selection-fails-under---ci-with-a-substring-hint)
+  - [an empty tag selection fails under --ci and names the exact-tag rule](#scenario-an-empty-tag-selection-fails-under---ci-and-names-the-exact-tag-rule)
+  - [without --ci an empty selection only warns and still exits zero](#scenario-without---ci-an-empty-selection-only-warns-and-still-exits-zero)
 - [atago self-hosting / completion](#atago-self-hosting--completion) — 5 scenarios
   - [bash completion emits a recognizable script](#scenario-bash-completion-emits-a-recognizable-script)
   - [zsh completion emits a compdef script](#scenario-zsh-completion-emits-a-compdef-script)
@@ -1232,7 +1238,7 @@ ${atago} run --ci --report json --tag fast --skip-tag slow inner.atago.yaml
 - exit code is `0`
 - stdout at `$.suites[0].scenarios` has length 1
 - stdout contains `"alpha"`
-### Scenario: a filter that matches nothing selects an empty set and still exits zero
+### Scenario: an empty filter selection fails under --ci with a substring hint
 #### Given
 - Fixture file `inner.atago.yaml` is created.
 #### Inputs
@@ -1256,8 +1262,62 @@ scenarios:
 ${atago} run --ci --report json --filter no_such_name inner.atago.yaml
 ```
 #### Then
+- exit code is `3`
+- stdout at `$.suites[0].scenarios` has length 0
+- stderr contains `no scenarios matched`, `--filter "no_such_name"`, `case-sensitive substring`
+### Scenario: an empty tag selection fails under --ci and names the exact-tag rule
+#### Given
+- Fixture file `inner.atago.yaml` is created.
+#### Inputs
+_Fixture `inner.atago.yaml`:_
+```text
+version: "1"
+suite: {name: inner}
+scenarios:
+  - name: alpha
+    tags: [fast]
+    steps: [{run: {shell: true, command: "exit 0"}}, {assert: {exit_code: 0}}]
+  - name: beta
+    tags: [slow]
+    steps: [{run: {shell: true, command: "exit 0"}}, {assert: {exit_code: 0}}]
+  - name: gamma
+    tags: [fast, slow]
+    steps: [{run: {shell: true, command: "exit 0"}}, {assert: {exit_code: 0}}]
+```
+#### When
+```shell
+${atago} run --ci --report json --tag no_such_tag inner.atago.yaml
+```
+#### Then
+- exit code is `3`
+- stderr contains `no scenarios matched`, `--tag "no_such_tag"`, `match tags exactly`, `atago list`
+### Scenario: without --ci an empty selection only warns and still exits zero
+#### Given
+- Fixture file `inner.atago.yaml` is created.
+#### Inputs
+_Fixture `inner.atago.yaml`:_
+```text
+version: "1"
+suite: {name: inner}
+scenarios:
+  - name: alpha
+    tags: [fast]
+    steps: [{run: {shell: true, command: "exit 0"}}, {assert: {exit_code: 0}}]
+  - name: beta
+    tags: [slow]
+    steps: [{run: {shell: true, command: "exit 0"}}, {assert: {exit_code: 0}}]
+  - name: gamma
+    tags: [fast, slow]
+    steps: [{run: {shell: true, command: "exit 0"}}, {assert: {exit_code: 0}}]
+```
+#### When
+```shell
+${atago} run --report json --filter no_such_name inner.atago.yaml
+```
+#### Then
 - exit code is `0`
 - stdout at `$.suites[0].scenarios` has length 0
+- stderr contains `warning: no scenarios matched`
 ## atago self-hosting / completion
 Source: `test/e2e/atago/completion.atago.yaml`
 ### Scenario: bash completion emits a recognizable script

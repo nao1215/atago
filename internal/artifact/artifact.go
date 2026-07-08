@@ -104,3 +104,10 @@ func FailurePath(specPath, scenario string, scenarioIdx, stepIdx int, kind, role
 func ServiceLogPath(specPath, scenario string, scenarioIdx int, serviceName string) string {
 	return path.Join(SuiteToken(specPath), ScenarioToken(scenario, scenarioIdx), "service-"+Slug(serviceName)+".log")
 }
+
+// MockLogPath composes the relative path for a mock server's preserved request
+// log: <suite-token>/<scenario-token>/mock-<name>.log. The mock- prefix keeps
+// it distinct from a service log even when a mock and a service share a name.
+func MockLogPath(specPath, scenario string, scenarioIdx int, mockName string) string {
+	return path.Join(SuiteToken(specPath), ScenarioToken(scenario, scenarioIdx), "mock-"+Slug(mockName)+".log")
+}
