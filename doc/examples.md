@@ -66,7 +66,7 @@
 | [Abort a destructive command at its confirmation prompt](cookbook.md#abort-a-destructive-command-at-its-confirmation-prompt) | `pty:` "no" branch + empty `changes:` |
 | [Prove color output turns off](cookbook.md#prove-color-output-turns-off) | `not_matches:` on ANSI escapes, `NO_COLOR` |
 | [Assert a generated script is executable](cookbook.md#assert-a-generated-script-is-executable) | `file:` `executable:` + `contains:` |
-| [Hunt down a flaky scenario](cookbook.md#hunt-down-a-flaky-scenario) | `--repeat`, `--retry-failed` (flaky is reported), `atago rerun` |
+| [Hunt down a flaky scenario](cookbook.md#hunt-down-a-flaky-scenario) | `--repeat`, `--retry-failed` (flaky is reported), `--rerun-failed` |
 | [Troubleshooting](cookbook.md#troubleshooting) | the failures every new spec hits once, and the fix for each |
 
 ## By feature

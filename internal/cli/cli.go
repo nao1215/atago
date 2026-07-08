@@ -20,6 +20,47 @@ const (
 	ExitSecurity = 6 // security policy violation
 )
 
+// subcommand pairs a subcommand name with its handler. The dispatch table
+// (see dispatchTable) is the single source of truth for which subcommands
+// exist: Main dispatches through it and Subcommands reports its names, so the
+// user-facing command inventory and its documentation cannot silently drift.
+type subcommand struct {
+	name string
+	run  func(rest []string, stdout, stderr io.Writer) int
+}
+
+// dispatchTable lists every atago subcommand in the order shown in usage. Both
+// Main and Subcommands read from it; do not add a command to one without the
+// other.
+func dispatchTable() []subcommand {
+	return []subcommand{
+		{"run", func(rest []string, stdout, stderr io.Writer) int { return runCmd("atago run", rest, stdout, stderr) }},
+		{"init", initCmd},
+		{"record", recordCmd},
+		{"explain", explainCmd},
+		{"doc", docCmd},
+		{"manifest", manifestCmd},
+		{"list", listCmd},
+		{"completion", completionCmd},
+		{"snapshot", snapshotCmd},
+		{"version", versionCmd},
+		{"help", helpCmd},
+	}
+}
+
+// Subcommands returns the atago subcommand names in dispatch order. It is
+// derived from the same table Main dispatches through, so documentation-drift
+// tests can check a doc's advertised subcommand list against the real inventory
+// without maintaining a second hand-written list.
+func Subcommands() []string {
+	table := dispatchTable()
+	names := make([]string, len(table))
+	for i, sc := range table {
+		names[i] = sc.name
+	}
+	return names
+}
+
 // Main is the CLI entry point. It returns the process exit code.
 func Main(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
@@ -28,36 +69,33 @@ func Main(args []string, stdout, stderr io.Writer) int {
 	}
 
 	cmd, rest := args[0], args[1:]
+	// Flag-style aliases for the meta subcommands.
 	switch cmd {
-	case "run":
-		return runCmd("atago run", rest, stdout, stderr)
-	case "init":
-		return initCmd(rest, stdout, stderr)
-	case "record":
-		return recordCmd(rest, stdout, stderr)
-	case "explain":
-		return explainCmd(rest, stdout, stderr)
-	case "doc":
-		return docCmd(rest, stdout, stderr)
-	case "manifest":
-		return manifestCmd(rest, stdout, stderr)
-	case "list":
-		return listCmd(rest, stdout, stderr)
-	case "completion":
-		return completionCmd(rest, stdout, stderr)
-	case "snapshot":
-		return snapshotCmd(rest, stdout, stderr)
-	case "version", "-version", "--version":
-		fmt.Fprintf(stdout, "atago %s\n", buildinfo.Get())
-		return ExitOK
-	case "help", "-h", "--help":
-		usage(stdout)
-		return ExitOK
-	default:
-		fmt.Fprintf(stderr, "atago: unknown command %q\n\n", cmd)
-		usage(stderr)
-		return ExitConfig
+	case "-version", "--version":
+		cmd = "version"
+	case "-h", "--help":
+		cmd = "help"
 	}
+	for _, sc := range dispatchTable() {
+		if sc.name == cmd {
+			return sc.run(rest, stdout, stderr)
+		}
+	}
+	fmt.Fprintf(stderr, "atago: unknown command %q\n\n", cmd)
+	usage(stderr)
+	return ExitConfig
+}
+
+// versionCmd prints the atago version.
+func versionCmd(_ []string, stdout, _ io.Writer) int {
+	fmt.Fprintf(stdout, "atago %s\n", buildinfo.Get())
+	return ExitOK
+}
+
+// helpCmd prints top-level usage to stdout so it can be piped.
+func helpCmd(_ []string, stdout, _ io.Writer) int {
+	usage(stdout)
+	return ExitOK
 }
 
 func usage(w io.Writer) {

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/nao1215/atago/internal/cli"
 	"github.com/nao1215/atago/internal/docgen"
 	"github.com/nao1215/atago/internal/engine"
 	"github.com/nao1215/atago/internal/loader"
@@ -53,6 +54,36 @@ func TestDocs_FixtureSourceKeyNamed(t *testing.T) {
 	readme := readDoc(t, "README.md")
 	if !strings.Contains(readme, "`content:`") {
 		t.Errorf("README does not name the literal fixture source key `content:`; a reader could guess `text:` from prose and hit an unknown-field error")
+	}
+}
+
+// referenceSubcommandRowRe extracts the subcommand name (the first word after
+// `atago `) from each Subcommands-table row in website/content/reference.md,
+// e.g. "run" from "| `atago run` | run specs and report results |" and
+// "snapshot" from "| `atago snapshot update` | ... |".
+var referenceSubcommandRowRe = regexp.MustCompile("(?m)^\\| `atago ([a-z][a-z-]*)")
+
+// TestDocs_ReferenceSubcommandsAreReal guards the website Reference page's
+// Subcommands table against advertising a command that does not exist. The table
+// once listed `atago rerun` — a subcommand that never existed: the real feature
+// is the `--rerun-failed` flag on `atago run`, and `atago rerun` exits 3
+// (unknown command). This checks every `atago <name>` table row against the real
+// dispatch inventory that internal/cli exports, so a fictional or renamed
+// subcommand fails the build instead of quietly misleading readers.
+func TestDocs_ReferenceSubcommandsAreReal(t *testing.T) {
+	ref := readDoc(t, "website/content/reference.md")
+	real := map[string]bool{}
+	for _, name := range cli.Subcommands() {
+		real[name] = true
+	}
+	rows := referenceSubcommandRowRe.FindAllStringSubmatch(ref, -1)
+	if len(rows) == 0 {
+		t.Fatal("no `| `atago <name>`` Subcommands rows found in website/content/reference.md")
+	}
+	for _, m := range rows {
+		if !real[m[1]] {
+			t.Errorf("website/content/reference.md Subcommands table lists `atago %s`, which is not a real subcommand (real inventory: %v)", m[1], cli.Subcommands())
+		}
 	}
 }
 

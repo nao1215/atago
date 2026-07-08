@@ -10,20 +10,19 @@ description: atago subcommands, scenario selection flags, snapshot updating and 
 |---------|------|
 | `atago run` | run specs and report results |
 | `atago record` | run a command once and write a spec from what it observed (`--pty` for interactive sessions) |
-| `atago init` | scaffold a spec (`--template` for http, db, grpc, ssh, browser, mock, services) |
+| `atago init` | scaffold a spec (`--template` for browser, cli, db, grpc, http, mock, services, ssh; `cli` is the default) |
 | `atago snapshot update` | record or refresh golden files |
 | `atago explain` | describe what a spec does without running it |
 | `atago doc` | generate Markdown from specs, with fixtures and golden files inlined |
 | `atago manifest` | emit a stable JSON summary of specs for tooling |
 | `atago list` | show scenarios, tags, and artifacts |
-| `atago rerun` | re-run the scenarios that failed last time |
 | `atago completion` | print a shell completion script |
 
 `explain`, `doc`, `manifest`, and `list` all load and validate the spec first — exit code 2 on a schema error — so any of them doubles as a lint step in CI.
 
 ## Selecting scenarios
 
-Selection flags compose with any spec: `--filter NAME` (repeatable, and comma-separated for OR — `--filter a,b` or `--filter a --filter b` runs scenarios whose name contains `a` or `b`), `--tag T`, `--skip-tag T`, `--parallel N`, `--fail-fast`, and `--rerun-failed`. While authoring, `--verbose` traces every command, capture, and assertion verdict — for passing scenarios too.
+Selection flags compose with any spec: `--filter NAME` (repeatable, and comma-separated for OR — `--filter a,b` or `--filter a --filter b` runs scenarios whose name contains `a` or `b`), `--tag T`, `--skip-tag T`, `--parallel N`, `--fail-fast`, and `--rerun-failed`. `atago run --rerun-failed` re-runs only the scenarios the previous run recorded as failed in `.atago/last-failed.json`, so the fix-and-recheck loop replays just the failures instead of the whole suite. While authoring, `--verbose` traces every command, capture, and assertion verdict — for passing scenarios too.
 
 ## Snapshot testing
 

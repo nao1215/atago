@@ -56,7 +56,7 @@ release-smoke: ## Build release artifacts locally and smoke-test them (requires 
 		SMOKE_SKIP_SBOM=1 ./scripts/smoke_artifacts.sh dist; \
 	fi
 
-e2e: ## Build the binary and run the hermetic self-hosted E2E specs (atago tested by atago)
+e2e: ## Build the binary and run the hermetic self-hosted E2E specs plus the git third-party suite (atago tested by atago)
 	env CGO_ENABLED=0 $(GO_BUILD) $(GO_LDFLAGS) -o ./dist/$(APP) .
 	./dist/$(APP) run --parallel $(PARALLEL) ./test/e2e/atago ./test/e2e/thirdparty/git
 

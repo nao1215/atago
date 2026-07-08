@@ -199,6 +199,37 @@ func TestSubcommands_HelpToStdout(t *testing.T) {
 	}
 }
 
+// TestSubcommands_MatchDispatch asserts Subcommands reports exactly the commands
+// Main dispatches: every reported name must run (not fall through to the
+// unknown-command path), and every command exercised elsewhere in this package
+// must be reported. This is what lets documentation-drift guards trust
+// cli.Subcommands as the real inventory.
+func TestSubcommands_MatchDispatch(t *testing.T) {
+	names := Subcommands()
+	if len(names) == 0 {
+		t.Fatal("Subcommands() returned no names")
+	}
+	seen := map[string]bool{}
+	for _, name := range names {
+		if seen[name] {
+			t.Errorf("Subcommands() reports %q twice", name)
+		}
+		seen[name] = true
+		// A real subcommand does not hit the unknown-command branch, which
+		// writes an "unknown command" line to stderr and exits ExitConfig.
+		var out, errb bytes.Buffer
+		Main([]string{name, "--help"}, &out, &errb)
+		if strings.Contains(errb.String(), "unknown command") {
+			t.Errorf("Subcommands() reports %q but Main treats it as unknown", name)
+		}
+	}
+	for _, want := range []string{"run", "init", "record", "explain", "doc", "manifest", "list", "completion", "snapshot", "version", "help"} {
+		if !seen[want] {
+			t.Errorf("Subcommands() is missing the real subcommand %q", want)
+		}
+	}
+}
+
 func TestExplainCmd_ParseError(t *testing.T) {
 	dir := t.TempDir()
 	p := writeSpec(t, dir, "bad.atago.yaml", "version: \"9\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}")
