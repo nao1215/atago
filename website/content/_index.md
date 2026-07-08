@@ -40,6 +40,10 @@ The first spec comes from a real run: `atago record -- <command>` executes the t
 
 A `pty:` step runs the command in a real pseudo-terminal — on Windows too (ConPTY) — and drives it with declarative expect/send pairs and named keys, no `expect(1)` scripting. `screen:` asserts the RENDERED frame a user actually sees, after cursor movement and clears are applied, and screen snapshots pin full TUI layouts. TTY-detection branches, wizards, REPLs, htop-style dashboards: all of it is spec-able.
 
+## The name
+
+atago is named after Atago (愛宕), the Japanese deity of fire prevention. The software industry has its own word for a project on fire — 炎上, "going up in flames" — and the name carries a wish: that atago grows into the thing that stops those fires before they spread. It also helps that atago is written in Go, so the name ends in *go*.
+
 ## Where to go
 
 - [Install](/install/) — `go install`, Homebrew, AUR, prebuilt binaries, a GitHub Action.

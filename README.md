@@ -61,27 +61,6 @@ The [release page](https://github.com/nao1215/atago/releases) contains prebuilt 
 
 Runs on Linux, macOS, and Windows (CI tests all three).
 
-## Verifying release integrity
-
-Every release ships supply-chain metadata so you can verify what you download:
-
-- Signed checksums: `checksums.txt` is signed with [cosign](https://github.com/sigstore/cosign) (keyless), producing `checksums.txt.sigstore.json`.
-- SBOM: an SPDX Software Bill of Materials is attached to each release archive.
-- Build provenance: SLSA build provenance is attested via GitHub OIDC.
-
-```shell
-cosign verify-blob \
-  --bundle checksums.txt.sigstore.json \
-  --certificate-identity-regexp 'https://github.com/nao1215/atago/\.github/workflows/release\.yml@refs/tags/.*' \
-  --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
-  checksums.txt
-sha256sum --check --ignore-missing checksums.txt
-```
-
-```shell
-gh attestation verify atago_<version>_<os>_<arch>.tar.gz --repo nao1215/atago  # .zip on Windows
-```
-
 ## Getting started
 
 ### Start from a real run
@@ -311,7 +290,7 @@ version: "1"
 
 ## Real CLIs tested with atago
 
-These suites run real programs of every shape: the author's Go tools (atago tests itself) and unmodified third-party binaries — git and jq, interactive TUIs (fzf, htop), the python3 REPL, servers driven as scenario services (redis, gitea, grafana, prometheus), cloud and IaC CLIs tested offline (aws-cli, terraform, ecspresso), crypto tools (openssl, age, sops), and document/media pipelines (pandoc, ffmpeg). Most were migrated from ShellSpec. [doc/real-world.md](doc/real-world.md) lists all 40+ with specs and generated behavior docs.
+These suites run real programs of every shape: the author's Go tools (atago tests itself) and unmodified third-party binaries — git and jq, interactive TUIs (fzf, htop), the python3 REPL, servers driven as scenario services (redis, gitea, grafana, prometheus), cloud and IaC CLIs tested offline (aws-cli, terraform, ecspresso), crypto tools (openssl, age, sops), and document/media pipelines (pandoc, ffmpeg). Most were migrated from ShellSpec. [Real CLIs tested with atago](https://nao1215.github.io/atago/real-world/) lists all 40+ with specs and generated behavior docs.
 
 ## The name
 

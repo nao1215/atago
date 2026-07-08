@@ -1880,3 +1880,305 @@ clean exit, so capture while the UI is up (`--once` style flags help) rather
 than after quitting.
 
 Full spec: [pty_screen](../examples/pty_screen.atago.yaml)
+
+## Prove a dry run changes nothing
+
+`--dry-run` has exactly one contract: describe what would happen, touch
+nothing. Per-file asserts cannot state the second half ("...and nothing
+else"), but an all-empty `changes:` delta can — the step created, modified,
+and deleted no files at all:
+
+```yaml
+version: "1"
+suite:
+  name: dry run
+
+scenarios:
+  - name: --dry-run reports the plan but touches nothing
+    steps:
+      - fixture:
+          file: notes/draft.txt
+          content: "keep me\n"
+      - run:
+          command: mytool clean --dry-run .
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "would delete notes/draft.txt"
+          # The dry-run contract, stated exhaustively: no file anywhere in the
+          # workdir was created, modified, or deleted.
+          changes:
+            created: []
+            modified: []
+            deleted: []
+```
+
+Full spec: [changes](../examples/changes.atago.yaml)
+
+## Test config precedence
+
+Every layered-config CLI documents "flag beats environment beats file", and
+each layer is usually tested alone — which is exactly how precedence bugs
+hide. Pin each rung against the one below it:
+
+```yaml
+version: "1"
+suite:
+  name: config precedence
+
+scenarios:
+  - name: the config file sets the default
+    steps:
+      - fixture:
+          file: config.toml
+          content: |
+            region = "eu-west-1"
+      - run:
+          command: mytool region --config config.toml
+          # A stray MYTOOL_REGION on the host must not leak into this rung.
+          clear_env: true
+          pass_env: [PATH]
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: eu-west-1
+
+  - name: an environment variable overrides the file
+    steps:
+      - fixture:
+          file: config.toml
+          content: |
+            region = "eu-west-1"
+      - run:
+          command: mytool region --config config.toml
+          clear_env: true
+          pass_env: [PATH]
+          env:
+            MYTOOL_REGION: us-east-2
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: us-east-2
+
+  - name: a flag overrides both
+    steps:
+      - fixture:
+          file: config.toml
+          content: |
+            region = "eu-west-1"
+      - run:
+          command: mytool region --config config.toml --region ap-northeast-1
+          clear_env: true
+          pass_env: [PATH]
+          env:
+            MYTOOL_REGION: us-east-2
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: ap-northeast-1
+```
+
+Full spec: [hermetic_env](../examples/hermetic_env.atago.yaml)
+
+## Abort a destructive command at its confirmation prompt
+
+The "yes" branch of a destructive command gets all the attention; the safety
+branch — answer no, nothing happens — is the one users bet their data on.
+Drive the prompt in a real terminal and pin the delta to empty:
+
+```yaml
+version: "1"
+suite:
+  name: confirmation prompt
+
+scenarios:
+  - name: answering no leaves every file in place
+    steps:
+      - fixture:
+          file: data.db
+          content: "precious\n"
+      - pty:
+          command: mytool purge
+          timeout: 10s
+          session:
+            # [y/N] is a regex character class — escape it.
+            - expect: 'delete 1 file\? \[y/N\]'
+            - send: "n\n"
+      - assert:
+          # Exit-code conventions for an aborted command vary; the files ARE
+          # the contract, so assert those exhaustively instead.
+          changes:
+            created: []
+            modified: []
+            deleted: []
+      - assert:
+          file:
+            path: data.db
+            contains: precious
+```
+
+Full spec: [pty](../examples/pty.atago.yaml)
+
+## Prove color output turns off
+
+Raw ANSI escapes leaking into piped output is a classic CLI bug. Under a
+`run:` step stdout already IS a pipe, so a well-behaved tool should emit no
+color even before you reach for [`NO_COLOR`](https://no-color.org/):
+
+```yaml
+version: "1"
+suite:
+  name: color contract
+
+scenarios:
+  - name: a pipe gets no color by default
+    steps:
+      - run:
+          command: mytool status
+      - assert:
+          exit_code: 0
+          stdout:
+            not_matches: '\x1b\['    # no CSI escape sequence anywhere
+
+  - name: NO_COLOR is honored even where color would be forced
+    steps:
+      - run:
+          command: mytool status --color always
+          env:
+            NO_COLOR: "1"
+      - assert:
+          exit_code: 0
+          stdout:
+            not_matches: '\x1b\['
+```
+
+To test the opposite branch — color IS emitted on a terminal — run the same
+command under `pty:` and assert `matches: '\x1b\['`.
+
+Full spec: [run_and_assert](../examples/run_and_assert.atago.yaml)
+
+## Assert a generated script is executable
+
+A scaffolder that writes hook or build scripts makes two promises: the content
+and the mode bit. A `file:` assert checks one property at a time, so stack two:
+
+```yaml
+version: "1"
+suite:
+  name: executable bit
+
+scenarios:
+  - name: scaffold writes a runnable build script
+    skip:
+      os: windows        # no executable bit to assert there
+    steps:
+      - run:
+          command: mytool scaffold --with-scripts
+      - assert:
+          exit_code: 0
+          file:
+            path: bin/build.sh
+            executable: true
+      - assert:
+          file:
+            path: bin/build.sh
+            contains: "#!/bin/sh"
+```
+
+Full spec: [files_and_fixtures](../examples/files_and_fixtures.atago.yaml)
+
+## Hunt down a flaky scenario
+
+Flakiness survives by hiding behind retries. atago's flake tooling points the
+other way — it surfaces instability instead of absorbing it:
+
+```shell
+atago run --repeat 20 flaky.atago.yaml   # run each scenario 20 times; ONE bad iteration fails the run
+atago run --retry-failed 2 ./specs      # retry failures, but a pass-after-fail is REPORTED as flaky, never hidden
+atago rerun ./specs                     # while bisecting: re-run only what failed last time
+```
+
+The usual culprits, and the recipe that fixes each: sleeping instead of
+polling ([Poll an async result](#poll-an-async-result)), volatile output
+reaching a snapshot ([Pin output with a golden
+file](#pin-output-with-a-golden-file)), host environment leaking in ([Isolate
+the test from the host environment](#isolate-the-test-from-the-host-environment)),
+and unpinned terminal geometry in TUI tests — set `rows:`/`cols:` on the
+`pty:` step so the frame cannot wrap differently between machines.
+
+## Troubleshooting
+
+The failures every new spec hits once, and the fast way out of each.
+
+### "executable file not found", but the command works in your shell
+
+`command:` runs the program directly (argv) — no shell parses the line. Shell
+builtins (`echo`, `cd`, `type`, and `dir` on Windows), pipes, redirects, and
+globs exist only under `shell: true`. If the binary genuinely exists on PATH,
+check whether the scenario cleared its environment: `clear_env: true` drops
+`PATH` too, so re-admit it with `pass_env: [PATH]`.
+
+### atago expands a `${...}` you meant literally
+
+`${name}` is atago's own expansion syntax — stores, matrix parameters,
+`${env:NAME}`, `${workdir}`. To pass a literal `${...}` through to the command
+(a shell variable, a template placeholder), escape it as `$${...}`.
+
+### The command cannot find its input files
+
+Every scenario runs in a fresh, isolated working directory — atago does not
+run your command where you launched atago. Ship each input with a `fixture:`
+step and reference it relatively (or as `${workdir}/...`); do not point at
+files in your repository checkout. See
+[Ship binary test data with fixtures](#ship-binary-test-data-with-fixtures).
+
+### A snapshot passes locally and fails in CI
+
+The built-in normalizers already cover ANSI colors, temp paths, UUIDs,
+timestamps, ports, and CRLF. Anything else that varies per run — build hashes,
+auto-increment IDs, durations — needs a spec-wide `scrub:` rule
+([Pin output with a golden file](#pin-output-with-a-golden-file)). When output
+changed on purpose, `atago snapshot update` re-records and `git diff
+snapshots/` is the review.
+
+### A pty session hangs until its timeout
+
+Three usual causes. A `send:` without a trailing `"\n"` types the text but
+never presses enter. An `expect:` is a Go regex, so a prompt like `[y/N]` is a
+character class until you escape it: `\[y/N\]`. And each `expect` scans only
+the transcript AFTER the previous match — expecting text that appeared earlier
+in the session waits forever for a second occurrence. The session dies at
+`timeout` (default 30s) with the transcript in the failure, so read what the
+terminal actually showed.
+
+### A `screen:` assert sees a blank screen
+
+Most full-screen TUIs use the alternate screen buffer and restore the primary
+screen when they exit cleanly — so after a clean quit there is nothing left to
+assert. Capture the frame while the UI is still displayed: assert before
+sending the quit key, or use a `--once`-style flag that leaves output on the
+primary screen.
+
+### The run exits 2 or 3 before any scenario runs
+
+atago's exit codes separate "your CLI failed the test" from "the test could
+not run": `1` means scenarios failed, `2` means a spec did not load (YAML
+syntax or schema violation — the message points at the offending key), `3`
+means atago itself was misused (unknown flag, or no spec files matched the
+path). On `2`, `atago explain spec.atago.yaml` validates and describes the
+spec without running anything.
+
+### It passes on your machine and fails on a teammate's
+
+Something from the host environment is leaking in — a config file in `$HOME`,
+a locale, an exported variable. Make the scenario hermetic: `clear_env: true`
+with a `pass_env:` allowlist, and `sandbox_home: true` to isolate `$HOME` and
+the per-OS config/cache directories. See
+[Isolate the test from the host environment](#isolate-the-test-from-the-host-environment).
+
+### When all else fails, watch what atago actually did
+
+`atago run --verbose` traces every command, captured stream, and per-assertion
+verdict — for passing scenarios too, which is what you want while authoring.
+`atago explain spec.atago.yaml` describes a spec without running it, and
+`atago list` shows which scenarios and tags a path contains.

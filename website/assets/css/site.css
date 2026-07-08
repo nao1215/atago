@@ -59,6 +59,27 @@ header nav .brand {
   margin-right: 0.5rem;
 }
 
+header nav .sponsor {
+  color: #bf3989;
+}
+
+@media (prefers-color-scheme: dark) {
+  header nav .sponsor {
+    color: #f778ba;
+  }
+}
+
+/* --- home page logo --- */
+
+.logo {
+  text-align: center;
+}
+
+.logo img {
+  max-width: min(400px, 100%);
+  border-radius: 8px;
+}
+
 main {
   max-width: 56rem;
   margin: 0 auto;
