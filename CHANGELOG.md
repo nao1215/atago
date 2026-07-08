@@ -7,6 +7,8 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-07-09
+
 ### Added
 
 - Console failure blocks now say WHERE and WHY without a `--verbose` detour:
