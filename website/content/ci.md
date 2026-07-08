@@ -26,7 +26,7 @@ jobs:
 ```
 
 - `--report json|junit|gha|tap` picks the report format; the JSON shape is stable and versioned ([sample JSON](/samples/report.json), [JUnit](/samples/report.junit.xml), [TAP](/samples/report.tap)).
-- `--ci` enables deterministic, color-free output.
+- `--ci` enables deterministic, color-free output. It also turns an empty selection into a hard error: a `--filter`/`--tag`/`--skip-tag` that matches no scenario fails the run (exit 3) instead of passing an empty suite, so a typo cannot silently disable your specs. Without `--ci` the same case is a warning that still exits 0.
 - `--artifacts-dir DIR` persists the exact payloads a failed assertion compared, so a failure stays reviewable after the job ends.
 - Environment variable names listed under `secrets:` are masked as `***` in all reports and snapshots.
 

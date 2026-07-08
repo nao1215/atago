@@ -63,6 +63,19 @@ and this project follows [Semantic Versioning](https://semver.org/).
   `/real-world/` now state explicitly that the atago project wrote and runs
   these suites on its own initiative — they are not the upstream projects'
   official test suites, and those projects are not affiliated with atago.
+- Under `--ci`, a `--filter`/`--tag`/`--skip-tag` selection that matches no
+  scenario now fails the run (exit 3, `ExitConfig`) instead of exiting 0 with
+  `PASSED 0 scenarios`, so a typo'd selector can no longer silently disable an
+  entire suite in a pipeline. Without `--ci` the same case stays a warning that
+  exits 0, leaving interactive workflows untouched.
+
+### Fixed
+
+- The "no scenarios matched" warning is now selector-aware. `--tag`/`--skip-tag`
+  say tags match exactly and point at `atago list`, while `--filter` keeps the
+  case-sensitive-substring note. Previously every empty selection was blamed on a
+  "case-sensitive substring", which is wrong for tags (they match by equality via
+  `==`) and sent users fixing the wrong thing.
 
 ### Fixed
 
