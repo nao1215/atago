@@ -358,32 +358,8 @@ func (e *Engine) runStep(ctx context.Context, run *spec.Run, st *store.Store, wo
 		r, err := exec(ctx)
 		return r, nil, err
 	}
-
-	interval, _ := time.ParseDuration(run.Retry.Interval) // validated at load time
-	until := expandAssert(st, run.Retry.Until)
 	env := assert.Env{Workdir: workdir, SpecDir: specDir, UpdateSnapshots: e.UpdateSnapshots, Secrets: rc.masker.MaskBytes, Scrub: rc.scrubber.Apply}
-
-	var last *runner.Result
-	var checks []*assert.CheckResult
-	for attempt := 1; attempt <= run.Retry.Times; attempt++ {
-		r, err := exec(ctx)
-		if err != nil {
-			return nil, nil, err
-		}
-		last = r
-		checks = assert.CheckAll(until, r, env)
-		if assert.AllOK(checks) {
-			break
-		}
-		if attempt < run.Retry.Times && interval > 0 {
-			select {
-			case <-ctx.Done():
-				return last, checks, nil
-			case <-time.After(interval):
-			}
-		}
-	}
-	return last, checks, nil
+	return pollUntil(ctx, run.Retry, st, env, exec)
 }
 
 // measurableForChanges reports whether a step kind produces a workdir delta a

@@ -86,6 +86,11 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- `retry.interval` now rejects negative durations at load time like every
+  other duration field (a negative interval silently behaved as "no wait").
+  All duration validation shares one helper, so bounds and wording can no
+  longer drift between fields.
+
 - A step-level `timeout:` on an ssh run step was parsed, validated — and
   silently ignored: the loader whitelists it "because it is honored remotely",
   but the engine only ever applied the runner-level timeout captured at dial.

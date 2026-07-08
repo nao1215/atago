@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	runnercmd "github.com/nao1215/atago/internal/runner/cmd"
 	"github.com/nao1215/atago/internal/spec"
 )
 
@@ -54,8 +55,8 @@ func TestResolveCwd(t *testing.T) {
 		{"/abs", "/abs"},
 	}
 	for _, c := range cases {
-		if got := resolveCwd(wd, c.cwd); got != c.want {
-			t.Errorf("resolveCwd(%q, %q) = %q, want %q", wd, c.cwd, got, c.want)
+		if got := runnercmd.ResolveDir(wd, c.cwd); got != c.want {
+			t.Errorf("ResolveDir(%q, %q) = %q, want %q", wd, c.cwd, got, c.want)
 		}
 	}
 }

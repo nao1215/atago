@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/nao1215/atago/internal/assert"
 	"github.com/nao1215/atago/internal/fixture"
@@ -232,7 +231,3 @@ func (e *Engine) runSuiteTeardown(ctx context.Context, s *spec.Spec, rt *suiteRu
 	out, _ := e.runSuiteSteps(tctx, s.Suite.Teardown, rt, rc, false)
 	return out
 }
-
-// suiteTimeNow is a seam kept trivial on purpose; suite phases reuse the
-// scenario duration accounting via time.Since at the call sites.
-var _ = time.Now

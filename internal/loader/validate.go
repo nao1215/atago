@@ -197,13 +197,7 @@ func validateDefaults(add func(string, ...any), d *spec.Defaults) {
 		if !r.Stdin.IsZero() {
 			add("defaults.run.stdin is not supported (stdin is per-step input data, like command)")
 		}
-		if r.Timeout != "" {
-			if d, err := time.ParseDuration(r.Timeout); err != nil {
-				add("defaults.run.timeout %q is not a valid duration (e.g. \"30s\")", r.Timeout)
-			} else if d < 0 {
-				add("defaults.run.timeout must not be negative (got %q); a wall-clock bound is never below zero", r.Timeout)
-			}
-		}
+		nonNegativeDuration(add, "defaults.run.timeout", r.Timeout, "30s")
 		validateHermeticEnv(add, "defaults.run", r.ClearEnv, r.PassEnv)
 	}
 	if sv := d.Service; sv != nil {
@@ -407,5 +401,42 @@ func measurableStep(k spec.StepKind) bool {
 		return true
 	default:
 		return false
+	}
+}
+
+// nonNegativeDuration validates a wall-clock duration field that may be zero
+// (zero usually means "disabled" or "no wait") in one place, so the accepted
+// bounds and the failure wording cannot drift between the many duration keys —
+// they already had: retry.interval accepted negatives that every timeout field
+// rejected. key is the fully-qualified field ("scenario X.steps[0].run.timeout"),
+// example the hint value shown for an unparsable string.
+func nonNegativeDuration(add func(string, ...any), key, val, example string) {
+	if val == "" {
+		return
+	}
+	d, err := time.ParseDuration(val)
+	if err != nil {
+		add("%s %q is not a valid duration (e.g. %q)", key, val, example)
+		return
+	}
+	if d < 0 {
+		add("%s must not be negative (got %q); a wall-clock bound is never below zero", key, val)
+	}
+}
+
+// positiveDuration validates a duration knob whose zero value is meaningless
+// because omitting the key already selects a documented default; def names
+// that default in the failure message.
+func positiveDuration(add func(string, ...any), key, val, example, def string) {
+	if val == "" {
+		return
+	}
+	d, err := time.ParseDuration(val)
+	if err != nil {
+		add("%s %q is not a valid duration (e.g. %q)", key, val, example)
+		return
+	}
+	if d <= 0 {
+		add("%s must be positive (got %q); omit it for the %s default", key, val, def)
 	}
 }

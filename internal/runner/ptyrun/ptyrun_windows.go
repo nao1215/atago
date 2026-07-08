@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	runnercmd "github.com/nao1215/atago/internal/runner/cmd"
 	"os/exec"
 	"strconv"
 
@@ -32,7 +33,7 @@ func Run(ctx context.Context, p *spec.PTY, workdir string, env []string) (*runne
 
 	dir := workdir
 	if p.Cwd != "" {
-		dir = resolveCwd(workdir, p.Cwd)
+		dir = runnercmd.ResolveDir(workdir, p.Cwd)
 	}
 
 	rows, cols := defaultRows, defaultCols

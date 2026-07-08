@@ -25,33 +25,17 @@ func (e *Engine) runHTTPStep(ctx context.Context, h *spec.HTTP, st *store.Store,
 		r, secViolation, err := e.runHTTP(ctx, h, st, rc, workdir)
 		return r, nil, secViolation, err
 	}
-
-	interval, _ := time.ParseDuration(h.Retry.Interval) // validated at load time
-	until := expandAssert(st, h.Retry.Until)
+	// The policy-violation flag only matters alongside an error, so the shared
+	// poll loop carries it inside the closure.
+	secViolation := false
 	env := assert.Env{Workdir: workdir, SpecDir: specDir, UpdateSnapshots: e.UpdateSnapshots, Secrets: rc.masker.MaskBytes, Scrub: rc.scrubber.Apply}
-
-	var last *runner.Result
-	var checks []*assert.CheckResult
-	for attempt := 1; attempt <= h.Retry.Times; attempt++ {
-		r, secViolation, err := e.runHTTP(ctx, h, st, rc, workdir)
-		if err != nil {
-			// Transport and policy errors abort the poll like a run step's exec
-			// error: retry exists for "the server answered, but not what we want
-			// yet", not for a broken target.
-			return nil, nil, secViolation, err
-		}
-		last = r
-		checks = assert.CheckAll(until, r, env)
-		if assert.AllOK(checks) {
-			break
-		}
-		if attempt < h.Retry.Times && interval > 0 {
-			select {
-			case <-ctx.Done():
-				return last, checks, false, nil
-			case <-time.After(interval):
-			}
-		}
+	last, checks, err := pollUntil(ctx, h.Retry, st, env, func(ctx context.Context) (*runner.Result, error) {
+		r, sv, rerr := e.runHTTP(ctx, h, st, rc, workdir)
+		secViolation = sv
+		return r, rerr
+	})
+	if err != nil {
+		return nil, nil, secViolation, err
 	}
 	return last, checks, false, nil
 }

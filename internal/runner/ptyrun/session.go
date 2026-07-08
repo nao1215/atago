@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"path/filepath"
 	"sync"
 	"time"
 
@@ -233,17 +232,4 @@ func driveSession(ctx context.Context, p *spec.PTY, proc ptyProcess) (*runner.Re
 		}
 		return abort(nil)
 	}
-}
-
-// resolveCwd resolves a step cwd against the scenario workdir like the cmd
-// runner does: an absolute path is used verbatim, a relative path nests inside
-// the workdir, and an empty cwd stays at the workdir.
-func resolveCwd(workdir, cwd string) string {
-	if cwd == "" {
-		return workdir
-	}
-	if filepath.IsAbs(cwd) {
-		return cwd
-	}
-	return filepath.Join(workdir, cwd)
 }
