@@ -7,6 +7,21 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-07-08
+
+A second hardening release. Parallel bug hunters and Go-native fuzzing swept the
+surfaces that set atago apart — secret masking, snapshot normalization, the
+changes-assert glob layer, generated docs, the loader, record, and the
+`--rerun-failed` ledger — and every fix landed with a regression test, three of
+them first found by new fuzz targets. Declared secrets no longer leak through a
+pty step, suite env, or a multi-line value's CRLF variant; a mode-000 file is no
+longer dropped from a `changes:` delta; `atago record` round-trips quoted
+metacharacters and control-byte commands; and the last-failed ledger no longer
+forgets a failure a green run of an unrelated spec did not execute. `atago doc`
+also keeps non-ASCII anchors, names env and command gates, and ends with a
+newline. A task-oriented cookbook and per-feature/real-world doc indexes round
+out the docs.
+
 ### Added
 
 - A task-oriented cookbook, [doc/cookbook.md](doc/cookbook.md): 23 copyable
