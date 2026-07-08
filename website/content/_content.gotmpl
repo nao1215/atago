@@ -24,10 +24,16 @@
   {{ $md = replaceRE `\]\(real-world\.md(#[^)]*)?\)` "](/real-world/$1)" $md }}
   {{ $md = replaceRE `\]\(e2e/([A-Za-z0-9._-]+)\.md(#[^)]*)?\)` "](/real-world/$1/$2)" $md }}
   {{ $md = replaceRE `\]\(\.\./` (printf "](%s" $gh) $md }}
+  {{/* links to the pre-merge section anchors keep working on the merged page */}}
+  {{ $md = replace $md "#by-task)" "#find-a-recipe-by-task)" }}
+  {{ $md = replace $md "#by-feature)" "#every-feature-has-a-runnable-spec)" }}
+  {{ $merged := printf "%s\n%s" $md $cookbook }}
   {{ $parts := split $md "## By feature" }}
-  {{ $byTask := replace (index $parts 0) "## By task" "## Find a recipe by task" }}
-  {{ $byFeature := printf "## Every feature has a runnable spec%s" (index $parts 1) }}
-  {{ $merged := printf "%s\n%s\n%s" $byTask $cookbook $byFeature }}
+  {{ if eq (len $parts) 2 }}
+    {{ $byTask := replace (index $parts 0) "## By task" "## Find a recipe by task" }}
+    {{ $byFeature := printf "## Every feature has a runnable spec%s" (index $parts 1) }}
+    {{ $merged = printf "%s\n%s\n%s" $byTask $cookbook $byFeature }}
+  {{ end }}
   {{ $.AddPage (dict
       "path" "cookbook"
       "title" "Cookbook"

@@ -1477,7 +1477,7 @@
         "body_to": {
           "type": "string",
           "minLength": 1,
-          "description": "Write the response body to this workdir-relative file, so file/image/pdf assertions can inspect a download (the http analogue of run's stdout_to)."
+          "description": "Write the response body to this workdir-relative file, so file/image/pdf assertions can inspect a download (the http analog of run's stdout_to)."
         },
         "follow_redirects": {
           "type": "boolean",
