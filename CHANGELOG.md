@@ -43,6 +43,15 @@ and this project follows [Semantic Versioning](https://semver.org/).
   described), so YAML-language-server hovers and the generated key reference
   document each key, not just the well-known ones.
 
+- Two spec-key inventory drift guards (`TestSpecSchema_StructParity`,
+  `TestSpecSchema_SpecKeysComplete`): the key set a spec may contain is written
+  down in the internal Go structs, the published JSON Schema, and the website's
+  `spec_keys.json` "Since" table, with no mechanical link between them. The
+  guards walk all three inventories into the same shape and fail the build on
+  any mismatch, so a new struct field without its schema property (which would
+  make schema-validating editors reject valid specs) — or a schema change
+  without regenerating `spec_keys.json` — can no longer ship silently.
+
 ### Changed
 
 - README now links the hosted cookbook from its Examples section and points to
