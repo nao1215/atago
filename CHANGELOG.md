@@ -55,6 +55,19 @@ and this project follows [Semantic Versioning](https://semver.org/).
   these suites on its own initiative — they are not the upstream projects'
   official test suites, and those projects are not affiliated with atago.
 
+### Fixed
+
+- A `screen:` assertion no longer crashes or hangs atago on adversarial
+  terminal output. The vt10x emulator panicked on a negative CSI parameter
+  (`CSI -10 P` reached slice arithmetic in delete/insert-chars) and spun for
+  minutes on an oversized repeat count (`CSI 80111111110 Z` steps one tab stop
+  at a time); both shapes — plus variants that hide behind bytes vt10x's
+  decoder silently skips — are now defused before the transcript reaches the
+  emulator, with a recover backstop so an unknown parser bug fails only the
+  assertion, not the process. Found by the new `FuzzRenderScreen` fuzz target,
+  which asserts the rendered screen's row/column budgets and UTF-8 validity
+  across pathological ANSI input.
+
 ## [0.9.0] - 2026-07-08
 
 A second hardening release. Parallel bug hunters and Go-native fuzzing swept the
