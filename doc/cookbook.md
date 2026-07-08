@@ -1111,7 +1111,7 @@ scenarios:
           status: 200
           header:
             name: Content-Type
-            contains: text/html
+            contains: application/json
           body:
             json:
               path: "$.title"
