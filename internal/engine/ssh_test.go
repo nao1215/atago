@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	sshd "github.com/gliderlabs/ssh"
 
@@ -37,6 +38,14 @@ func sshTestServer(t *testing.T) string {
 		case "fail":
 			_, _ = io.WriteString(s.Stderr(), "boom\n")
 			_ = s.Exit(2)
+		case "sleep":
+			d, _ := time.ParseDuration(cmd[1])
+			select {
+			case <-time.After(d):
+				_ = s.Exit(0)
+			case <-s.Context().Done():
+				return
+			}
 		default:
 			_, _ = io.WriteString(s.Stderr(), "unknown command\n")
 			_ = s.Exit(127)
@@ -100,6 +109,94 @@ scenarios:
 	res := runSpec(t, src)
 	if res.Status != StatusPassed {
 		t.Fatalf("status = %s, want passed: %+v", res.Status, res.Scenarios[0].Steps)
+	}
+}
+
+// TestEngine_SSHStepTimeoutHonored closes the silent no-op the loader comment
+// promised away: validateSSHRunFields whitelists `timeout` on an ssh run step
+// "because it is honored remotely", but the engine only ever applied the
+// RUNNER-level timeout captured at dial — a step-level `timeout:` was parsed,
+// validated, and ignored. It must bound the remote command, and — mirroring the
+// cmd runner (#17) — a fired timeout is an OBSERVABLE TimedOut result naming
+// its source, not a hard scenario error.
+func TestEngine_SSHStepTimeoutHonored(t *testing.T) {
+	t.Parallel()
+	addr := sshTestServer(t)
+	src := fmt.Sprintf(`
+version: "1"
+suite:
+  name: ssh
+runners:
+  box:
+    type: ssh
+    host: %s
+    user: tester
+    password: secret
+    insecure_host_key: true
+scenarios:
+  - name: a step timeout bounds the remote command
+    steps:
+      - run:
+          runner: box
+          command: sleep 10s
+          timeout: 300ms
+      - assert:
+          exit_code: {not: 0}
+`, addr)
+	res := runSpec(t, src)
+	if res.Status != StatusPassed {
+		t.Fatalf("status = %s, want passed (a timeout is an observable result the assert inspects): %+v", res.Status, res.Scenarios[0].Steps)
+	}
+	run := res.Scenarios[0].Steps[0].Run
+	if run == nil || !run.TimedOut {
+		t.Fatalf("step result = %+v, want TimedOut", run)
+	}
+	if run.TimeoutSource != "run.timeout" {
+		t.Errorf("TimeoutSource = %q, want %q so the failure hint names the knob", run.TimeoutSource, "run.timeout")
+	}
+	if run.Duration >= 5*time.Second {
+		t.Errorf("Duration = %s, want the 300ms step timeout to have cut the 10s sleep", run.Duration)
+	}
+}
+
+// TestEngine_SSHRunnerTimeoutIsObservable pins the parity half: a RUNNER-level
+// ssh timeout that fires mid-command also produces a TimedOut result (source
+// "runner.timeout"), matching how the cmd runner reports local timeouts,
+// instead of the previous hard "ssh command timed out" scenario error.
+func TestEngine_SSHRunnerTimeoutIsObservable(t *testing.T) {
+	t.Parallel()
+	addr := sshTestServer(t)
+	src := fmt.Sprintf(`
+version: "1"
+suite:
+  name: ssh
+runners:
+  box:
+    type: ssh
+    host: %s
+    user: tester
+    password: secret
+    insecure_host_key: true
+    timeout: 300ms
+scenarios:
+  - name: the runner timeout bounds every remote command
+    steps:
+      - run:
+          runner: box
+          command: sleep 10s
+      - assert:
+          exit_code: {not: 0}
+`, addr)
+	res := runSpec(t, src)
+	if res.Status != StatusPassed {
+		t.Fatalf("status = %s, want passed: %+v", res.Status, res.Scenarios[0].Steps)
+	}
+	run := res.Scenarios[0].Steps[0].Run
+	if run == nil || !run.TimedOut {
+		t.Fatalf("step result = %+v, want TimedOut", run)
+	}
+	if run.TimeoutSource != "runner.timeout" {
+		t.Errorf("TimeoutSource = %q, want %q", run.TimeoutSource, "runner.timeout")
 	}
 }
 

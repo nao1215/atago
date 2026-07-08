@@ -87,6 +87,18 @@ func (r *Runner) Run(ctx context.Context, command string) (*runner.Result, error
 	}
 	defer func() { _ = sess.Close() }()
 
+	// A caller-supplied deadline (the engine applies the step's own
+	// run.timeout that way) takes precedence; without one, the runner-level
+	// timeout captured at dial bounds the command. Track which level armed the
+	// deadline so a fired timeout can name its knob, mirroring the cmd runner.
+	timeoutSource := ""
+	if _, hasDeadline := ctx.Deadline(); !hasDeadline && r.timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, r.timeout)
+		defer cancel()
+		timeoutSource = "runner.timeout"
+	}
+
 	var stdout, stderr strings.Builder
 	sess.Stdout = &stdout
 	sess.Stderr = &stderr
@@ -96,23 +108,33 @@ func (r *Runner) Run(ctx context.Context, command string) (*runner.Result, error
 	go func() { done <- sess.Run(command) }()
 
 	var runErr error
-	if r.timeout > 0 {
+	select {
+	case <-ctx.Done():
+		_ = sess.Signal(ssh.SIGKILL)
+		_ = sess.Close()
+		// Wait (bounded) for the session goroutine so the output builders are
+		// quiescent before they are read — a remote that ignores the kill must
+		// not turn into a data race or a hang here.
 		select {
-		case <-ctx.Done():
-			_ = sess.Signal(ssh.SIGKILL)
-			return nil, ctx.Err()
-		case <-time.After(r.timeout):
-			_ = sess.Signal(ssh.SIGKILL)
-			return nil, fmt.Errorf("ssh command timed out after %s", r.timeout)
-		case runErr = <-done:
+		case <-done:
+		case <-time.After(2 * time.Second):
 		}
-	} else {
-		select {
-		case <-ctx.Done():
-			_ = sess.Signal(ssh.SIGKILL)
-			return nil, ctx.Err()
-		case runErr = <-done:
+		// A fired deadline is an OBSERVABLE outcome assertions can inspect —
+		// TimedOut with the captured output so far — matching the cmd runner
+		// (#17). Only a cancellation (Ctrl-C / suite teardown) is an error.
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return &runner.Result{
+				Command:       command,
+				Stdout:        []byte(stdout.String()),
+				Stderr:        []byte(stderr.String()),
+				Duration:      time.Since(start),
+				ExitCode:      -1,
+				TimedOut:      true,
+				TimeoutSource: timeoutSource,
+			}, nil
 		}
+		return nil, ctx.Err()
+	case runErr = <-done:
 	}
 	elapsed := time.Since(start)
 

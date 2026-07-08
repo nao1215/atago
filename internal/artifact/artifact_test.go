@@ -60,6 +60,20 @@ func TestFailurePathStableAndUnique(t *testing.T) {
 	}
 }
 
+// TestMockLogPath_DistinctFromServiceLog proves a mock server's request log
+// never collides with a service log even when both share a declared name.
+func TestMockLogPath_DistinctFromServiceLog(t *testing.T) {
+	t.Parallel()
+	m := MockLogPath("test/e2e/atago/mock.atago.yaml", "client posts", 0, "api")
+	if !strings.HasSuffix(m, "mock-api.log") {
+		t.Errorf("MockLogPath = %q", m)
+	}
+	s := ServiceLogPath("test/e2e/atago/mock.atago.yaml", "client posts", 0, "api")
+	if m == s {
+		t.Errorf("mock and service logs for the same name collided: %q", m)
+	}
+}
+
 func TestServiceLogPathStableAndUnique(t *testing.T) {
 	t.Parallel()
 	p := ServiceLogPath("test/e2e/atago/services.atago.yaml", "peer talks", 0, "api server")

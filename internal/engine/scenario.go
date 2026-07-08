@@ -110,6 +110,7 @@ func (e *Engine) runScenario(ctx context.Context, scenarioIdx int, sc *spec.Scen
 	// gated), keeping logs opt-in rather than mandatory noise.
 	if x.out.Status == StatusFailed || x.out.Status == StatusError {
 		x.e.writeServiceLogs(&x.out, x.masker, x.services, x.rc.specPath, x.sc.Name, x.idx)
+		x.e.writeMockLogs(&x.out, x.masker, x.mocks, x.rc.specPath, x.sc.Name, x.idx)
 	}
 
 	x.out.Duration = time.Since(x.start)

@@ -64,6 +64,19 @@ func (x *scenarioRun) execStep(ctx context.Context, i int, step *spec.Step) (Ste
 					sr.ErrMsg = unresolvedRunRefMsg("run.command", names[0], true)
 					return sr, StatusError, false
 				}
+			} else {
+				// A shell can expand a bare ${name}, so those pass through — but
+				// ${env:NAME} is atago-only syntax NO shell understands: POSIX sh
+				// dies with a cryptic "Bad substitution" and cmd.exe forwards the
+				// literal text. An unset ${env:NAME} under shell: true is the same
+				// authoring error as without a shell; fail it with the same
+				// explained message instead of handing it to the shell.
+				for _, name := range x.st.Unresolved(step.Run.Command) {
+					if strings.HasPrefix(name, "env:") {
+						sr.ErrMsg = unresolvedRunRefMsg("run.command", name, true)
+						return sr, StatusError, false
+					}
+				}
 			}
 			// cwd is passed to cmd.Dir verbatim; no shell ever expands it, so an
 			// unresolved ${name} is always a typo that would make the child fail to
@@ -309,9 +322,12 @@ func (e *Engine) runStep(ctx context.Context, run *spec.Run, st *store.Store, wo
 	if !remote {
 		// Resolve the effective timeout across all five levels (#17) and
 		// remember which level supplied it so a timeout kill can name the knob
-		// in its hint. Remote (ssh) runs are bounded by the ssh runner's own
-		// connection timeout instead.
+		// in its hint. Remote (ssh) runs apply only the step's own explicit
+		// timeout below — the other levels shape local execution, and the ssh
+		// runner's dial-time timeout already bounds every remote command.
 		run.Timeout, run.TimeoutSource = resolveTimeout(run.Timeout, runnerTimeout, rc.defaultsRunTimeout, rc.suiteTimeout)
+	} else if run.Timeout != "" {
+		run.TimeoutSource = "run.timeout"
 	}
 	exec := func(ctx context.Context) (*runner.Result, error) {
 		if remote {
@@ -319,7 +335,21 @@ func (e *Engine) runStep(ctx context.Context, run *spec.Run, st *store.Store, wo
 			if err != nil {
 				return nil, err
 			}
-			return conn.Run(ctx, run.Command)
+			// The loader whitelists `timeout` on ssh run steps because it is
+			// honored remotely — so honor it: the step's own timeout arrives at
+			// the runner as a context deadline and takes precedence over the
+			// runner-level timeout applied inside conn.Run.
+			if run.Timeout != "" {
+				d, _ := time.ParseDuration(run.Timeout) // validated at load time
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(ctx, d)
+				defer cancel()
+			}
+			r, err := conn.Run(ctx, run.Command)
+			if r != nil && r.TimedOut && r.TimeoutSource == "" {
+				r.TimeoutSource = run.TimeoutSource
+			}
+			return r, err
 		}
 		return e.cmd.Run(ctx, run, workdir)
 	}

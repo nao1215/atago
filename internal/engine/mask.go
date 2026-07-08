@@ -7,6 +7,7 @@ import (
 	"github.com/nao1215/atago/internal/artifact"
 	"github.com/nao1215/atago/internal/assert"
 	"github.com/nao1215/atago/internal/runner"
+	mockrunner "github.com/nao1215/atago/internal/runner/mock"
 	servicerunner "github.com/nao1215/atago/internal/runner/service"
 	"github.com/nao1215/atago/internal/scrub"
 	"github.com/nao1215/atago/internal/security"
@@ -144,6 +145,37 @@ func (e *Engine) writeServiceLogs(out *ScenarioResult, m *security.Masker, procs
 			continue
 		}
 		out.ServiceLogs = append(out.ServiceLogs, ServiceLog{Name: proc.Name(), Path: p})
+	}
+}
+
+// writeMockLogs preserves each mock server's recorded requests as a durable
+// artifact when a scenario fails, honoring RequestLog's contract ("the durable
+// artifact written next to service logs when a scenario fails"). The request
+// log is often the sharpest failure evidence a mock scenario has — a typo'd
+// client path shows up as a recorded 404. Failure-gated and artifacts-dir-gated
+// like service logs; a mock that recorded no request writes nothing.
+func (e *Engine) writeMockLogs(out *ScenarioResult, m *security.Masker, mocks []*mockrunner.Server, specPath, scenario string, scenarioIdx int) {
+	if e.Artifacts == nil {
+		return
+	}
+	for _, srv := range mocks {
+		if srv == nil {
+			continue
+		}
+		name := srv.Name() + " (mock requests)"
+		if serviceLogged(out, name) {
+			continue
+		}
+		log := srv.RequestLog()
+		if log == "" {
+			continue // no recorded request -> no artifact
+		}
+		rel := artifact.MockLogPath(specPath, scenario, scenarioIdx, srv.Name())
+		p, err := e.Artifacts.Write(rel, m.MaskBytes([]byte(log)))
+		if err != nil {
+			continue
+		}
+		out.ServiceLogs = append(out.ServiceLogs, ServiceLog{Name: name, Path: p})
 	}
 }
 
