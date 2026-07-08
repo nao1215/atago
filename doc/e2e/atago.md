@@ -634,7 +634,7 @@ echo w > ${base}2.txt
 - after `echo w > ${base}2.txt`:
   - the step changed exactly created `${base}2.txt`, modified nothing, deleted nothing
 ### Scenario: screen matcher expands a stored variable
-_skipped on windows_
+_skipped on Windows_
 #### When
 ```shell
 echo needle
@@ -873,7 +873,7 @@ ${atago} run baddownload.atago.yaml
 ## atago self-hosting / changes (workdir delta assertions)
 Source: `test/e2e/atago/changes.atago.yaml`
 ### Scenario: a generator touches exactly the files it should (POSIX)
-_skipped on windows_
+_skipped on Windows_
 #### Given
 - Fixture file `config.yaml` is created.
 - Fixture file `stale.html` is created.
@@ -894,7 +894,7 @@ printf 'theme: dark\n' > config.yaml && rm stale.html && mkdir -p site/assets &&
 - exit code is `0`
 - the step changed exactly created `site/index.html`, `site/assets/*.css`, modified `config.yaml`, deleted `stale.html`
 ### Scenario: an unexpected creation breaks the exact contract (POSIX)
-_skipped on windows_
+_skipped on Windows_
 #### Given
 - Fixture file `check.atago.yaml` is created.
 #### Inputs
@@ -939,7 +939,7 @@ echo produced
 #### Generated artifacts
 - `result.txt`
 ### Scenario: the delta over a retried step is cumulative across all attempts (POSIX)
-_skipped on windows_
+_skipped on Windows_
 #### When
 ```shell
 touch a; [ -f b ] && touch c; touch b; [ -f c ]
@@ -948,7 +948,7 @@ touch a; [ -f b ] && touch c; touch b; [ -f c ]
 - exit code is `0`
 - the step changed exactly created `a`, `b`, `c`, modified nothing, deleted nothing
 ### Scenario: deleting and recreating a byte-identical file appears in no list (POSIX)
-_skipped on windows_
+_skipped on Windows_
 #### Given
 - Fixture file `f.txt` is created.
 #### Inputs
@@ -964,7 +964,7 @@ rm f.txt && printf hello > f.txt
 - exit code is `0`
 - the step changed exactly created nothing, modified nothing, deleted nothing
 ### Scenario: deleting and recreating with different content is modified only (POSIX)
-_skipped on windows_
+_skipped on Windows_
 #### Given
 - Fixture file `f.txt` is created.
 #### Inputs
@@ -980,7 +980,7 @@ rm f.txt && printf world > f.txt
 - exit code is `0`
 - the step changed exactly created nothing, modified `f.txt`, deleted nothing
 ### Scenario: stdout_to overwrites a fixture (modified) while stderr_to creates an empty file (POSIX)
-_skipped on windows_
+_skipped on Windows_
 #### Given
 - Fixture file `existing.txt` is created.
 #### Inputs
@@ -999,7 +999,7 @@ printf newcontent
 - `existing.txt`
 - `err.txt`
 ### Scenario: a pty step feeds the delta scan just like a run step (POSIX)
-_skipped on windows_
+_skipped on Windows_
 #### When
 ```shell
 # interactive (pty): sh -c "touch from-pty; echo done"
@@ -1007,7 +1007,7 @@ _skipped on windows_
 #### Then
 - the step changed exactly created `from-pty`
 ### Scenario: a doublestar glob pins an arbitrary-depth generated tree exactly (POSIX)
-_skipped on windows_
+_skipped on Windows_
 #### When
 ```shell
 mkdir -p out/a/b && printf '1' > out/top.txt && printf '2' > out/a/mid.txt && printf '3' > out/a/b/leaf.txt
@@ -1016,7 +1016,7 @@ mkdir -p out/a/b && printf '1' > out/top.txt && printf '2' > out/a/mid.txt && pr
 - exit code is `0`
 - the step changed exactly created `out/**`, modified nothing, deleted nothing
 ### Scenario: a stray file outside the doublestar prefix breaks the exact contract (POSIX)
-_skipped on windows_
+_skipped on Windows_
 #### Given
 - Fixture file `check.atago.yaml` is created.
 #### Inputs
@@ -1422,7 +1422,7 @@ ${atago} run env.atago.yaml
 - exit code is `0`
 - stdout contains `1 passed`
 ### Scenario: defaults.run.sandbox_home governs a run step and a pty step alike (POSIX)
-_skipped on windows_
+_skipped on Windows_
 #### Given
 - Fixture file `sandbox.atago.yaml` is created.
 #### Inputs
@@ -1544,7 +1544,7 @@ ${atago} run optout.atago.yaml
 ## atago self-hosting / dir assertion
 Source: `test/e2e/atago/dir.atago.yaml`
 ### Scenario: directory/tree assertions cover a multi-file generator
-_skipped on windows_
+_skipped on Windows_
 #### When
 ```shell
 mkdir -p site/assets && printf '<html>' > site/index.html && printf '<html>' > site/about.html && printf 'body{}' > site/assets/app.css
@@ -1556,7 +1556,7 @@ mkdir -p site/assets && printf '<html>' > site/index.html && printf '<html>' > s
 #### Then
 - dir `never-created` does not exist
 ### Scenario: a dangling symlink is a present directory entry (membership uses Lstat)
-_skipped on windows_
+_skipped on Windows_
 #### When
 ```shell
 mkdir -p linkdir && ln -s /nonexistent-target-xyz linkdir/planted
@@ -1852,7 +1852,7 @@ ${atago} run slow.atago.yaml
 - exit code is `1`
 - stdout contains `assert duration < 1ns`, `orders of magnitude`
 ### Scenario: a deliberate wait satisfies a lower bound
-_skipped on windows_
+_skipped on Windows_
 #### When
 ```shell
 sleep 0.2
@@ -2256,7 +2256,7 @@ ${atago} run inner.atago.yaml
 - exit code is `1`
 - stdout contains `exit code in [0, 1, 2]`
 ### Scenario: SIGKILL is reported as 137
-_skipped on windows_
+_skipped on Windows_
 #### When
 ```shell
 kill -KILL $$
@@ -2264,7 +2264,7 @@ kill -KILL $$
 #### Then
 - exit code is `137`
 ### Scenario: SIGTERM is reported as 143
-_skipped on windows_
+_skipped on Windows_
 #### When
 ```shell
 kill -TERM $$
@@ -2272,7 +2272,7 @@ kill -TERM $$
 #### Then
 - exit code is `143`
 ### Scenario: SIGINT is reported as 130
-_skipped on windows_
+_skipped on Windows_
 #### When
 ```shell
 kill -INT $$
@@ -2280,7 +2280,7 @@ kill -INT $$
 #### Then
 - exit code is `130`
 ### Scenario: a signal exit composes with the in matcher alongside normal codes
-_skipped on windows_
+_skipped on Windows_
 #### When
 ```shell
 kill -TERM $$
@@ -2288,7 +2288,7 @@ kill -TERM $$
 #### Then
 - exit code is one of `0`, `143`
 ### Scenario: a missing command is 127 under the shell
-_skipped on windows_
+_skipped on Windows_
 #### When
 ```shell
 no_such_command_zzz
@@ -2296,7 +2296,7 @@ no_such_command_zzz
 #### Then
 - exit code is `127`
 ### Scenario: POSIX exit codes wrap modulo 256
-_skipped on windows_
+_skipped on Windows_
 #### When
 ```shell
 exit 257
@@ -2504,11 +2504,13 @@ date -u -r stamped.txt +%Y
 #### Then
 - stdout contains `2021`
 ### Scenario: only.env skips when the variable is unset
+_only when env ATAGO_DEFINITELY_UNSET is set_
 #### When
 ```shell
 false
 ```
 ### Scenario: skip.env runs when the variable is unset
+_skipped when env ATAGO_DEFINITELY_UNSET is set_
 #### When
 ```shell
 true
@@ -2518,7 +2520,7 @@ true
 ## atago self-hosting / flaky tooling (--repeat, --retry-failed)
 Source: `test/e2e/atago/flaky.atago.yaml`
 ### Scenario: retry-failed recovers a flaky scenario and reports it loudly
-_skipped on windows_
+_skipped on Windows_
 #### Given
 - Fixture file `flaky.atago.yaml` is created.
 #### Inputs
@@ -2554,7 +2556,7 @@ ${atago} run --retry-failed 1 --report json flaky.atago.yaml
   - exit code is `0`
   - stdout contains `"status": "flaky"`, `"attempts": 2`
 ### Scenario: repeat surfaces flakiness that a single run would miss
-_skipped on windows_
+_skipped on Windows_
 #### Given
 - Fixture file `green.atago.yaml` is created.
 - Fixture file `flaky.atago.yaml` is created.
@@ -2689,7 +2691,7 @@ ${atago} run norunner.atago.yaml
 ## atago self-hosting / hermetic environment (clear_env + pass_env)
 Source: `test/e2e/atago/hermetic_env.atago.yaml`
 ### Scenario: clear_env drops inherited host variables
-_skipped on windows_
+_skipped on Windows_
 #### Given
 - The command runs with a cleared environment.
 #### When
@@ -2706,7 +2708,7 @@ env
   - stdout contains `ATAGO_HERMETIC_CANARY=leaked-from-scenario`
   - stdout does not contain `PATH=/`
 ### Scenario: pass_env re-admits an allowlist of host variables
-_skipped on windows_
+_skipped on Windows_
 #### Given
 - The command runs with a cleared environment (passing through: PATH).
 #### When
@@ -2718,7 +2720,7 @@ env
 - stdout contains `PATH=`
 - stdout does not contain `HOME=`
 ### Scenario: explicit env wins over a passed-through host variable
-_skipped on windows_
+_skipped on Windows_
 #### Given
 - Environment variables are set: HOME.
 - The command runs with a cleared environment (passing through: HOME).
@@ -2753,7 +2755,7 @@ ${atago} run bad.atago.yaml
 - exit code is `2`
 - stderr contains `pass_env requires clear_env: true`, `steps[0].run`
 ### Scenario: unset host variables in pass_env are skipped, not an error
-_skipped on windows_
+_skipped on Windows_
 #### Given
 - The command runs with a cleared environment (passing through: PATH, ATAGO_SURELY_UNSET_VAR_2026).
 #### When
@@ -3146,7 +3148,7 @@ ${atago} run db.atago.yaml
 - after `${atago} run db.atago.yaml`:
   - exit code is `0`
 ### Scenario: the services template runs green and exercises readiness + retry
-_skipped on windows_
+_skipped on Windows_
 #### When
 ```shell
 ${atago} init --template services services.atago.yaml
@@ -3305,7 +3307,7 @@ ${atago} run bad.atago.yaml
 - exit code is `1`
 - stdout contains `did not equal`
 ### Scenario: a stdout json list against a JSON-producing command
-_skipped on windows_
+_skipped on Windows_
 #### When
 ```shell
 echo '{"count": 3, "name": "ok"}'
@@ -3313,7 +3315,7 @@ echo '{"count": 3, "name": "ok"}'
 #### Then
 - stdout at `$.count` is `>= 2`; at `$.name` equals `ok`
 ### Scenario: a yaml list asserts several paths on one document
-_skipped on windows_
+_skipped on Windows_
 #### When
 ```shell
 printf 'name: ada\nid: 42\n'
@@ -4562,7 +4564,7 @@ ${atago} version
 ## atago self-hosting / pty
 Source: `test/e2e/atago/pty.atago.yaml`
 ### Scenario: a pty step sees a terminal where a run step sees a pipe
-_skipped on windows_
+_skipped on Windows_
 #### Given
 - Fixture file `tty.atago.yaml` is created.
 #### Inputs
@@ -4590,7 +4592,7 @@ ${atago} run tty.atago.yaml
 - exit code is `0`
 - stdout contains `1 passed`
 ### Scenario: a never-matching expect fails with the pattern in the block
-_skipped on windows_
+_skipped on Windows_
 #### Given
 - Fixture file `bad.atago.yaml` is created.
 #### Inputs
@@ -4616,7 +4618,7 @@ ${atago} run bad.atago.yaml
 - exit code is `1`
 - stdout contains `pty expect /prompt-that-never-comes/`, `never appeared in the terminal transcript`
 ### Scenario: named keys transmit their documented bytes and ctrl-c aborts
-_skipped on windows_
+_skipped on Windows_
 #### When
 ```shell
 # interactive (pty): cat -v
@@ -4651,7 +4653,7 @@ ${atago} run badkey.atago.yaml
 - exit code is `2`
 - stderr contains `not a supported key (supported: enter, tab`
 ### Scenario: screen asserts see the final frame where the transcript sees history
-_skipped on windows_
+_skipped on Windows_
 #### When
 ```shell
 # interactive (pty): printf 'loading...'; printf 'done.      
@@ -4662,7 +4664,7 @@ _skipped on windows_
 - rendered screen does not contain `loading`
 - stdout contains `loading`
 ### Scenario: a screen snapshot round-trips through update and compare
-_skipped on windows_
+_skipped on Windows_
 #### Given
 - Fixture file `inner.atago.yaml` is created.
 #### Inputs
@@ -4718,7 +4720,7 @@ ${atago} run bad.atago.yaml
 - exit code is `2`
 - stderr contains `requires a preceding pty step`
 ### Scenario: a send referencing an undefined variable is an execution error, not typed literally
-_skipped on windows_
+_skipped on Windows_
 #### Given
 - Fixture file `typo.atago.yaml` is created.
 #### Inputs
@@ -4898,7 +4900,7 @@ ${atago} record --pty --out taken.atago.yaml -- echo hi
 - stderr contains `use --force to overwrite`
 - file `taken.atago.yaml` contains `precious`
 ### Scenario: created files become exists asserts (shell mode)
-_skipped on windows_
+_skipped on Windows_
 #### When
 ```shell
 ${atago} record --shell --out gen.atago.yaml -- 'echo made > out.txt; echo done'
@@ -4912,7 +4914,7 @@ ${atago} run gen.atago.yaml
 - after `${atago} run gen.atago.yaml`:
   - exit code is `0`
 ### Scenario: snapshot mode writes a golden the run then matches
-_skipped on windows_
+_skipped on Windows_
 #### When
 ```shell
 ${atago} record --snapshot --out snapdemo.atago.yaml -- echo stable output
@@ -4935,7 +4937,7 @@ ${atago} record
 - exit code is `3`
 - stderr contains `no command given`
 ### Scenario: argv boundaries survive spaced arguments
-_skipped on windows_
+_skipped on Windows_
 #### When
 ```shell
 ${atago} record --out spaced.atago.yaml -- printf %s 'hello world'
@@ -4949,7 +4951,7 @@ ${atago} run spaced.atago.yaml
   - exit code is `0`
   - stdout contains `1 passed`
 ### Scenario: a shell metacharacter argument stays one token
-_skipped on windows_
+_skipped on Windows_
 #### When
 ```shell
 ${atago} record --out meta.atago.yaml -- printf %s "foo|bar"
@@ -4963,7 +4965,7 @@ ${atago} run meta.atago.yaml
   - exit code is `0`
   - stdout contains `1 passed`
 ### Scenario: record --pty records a live session and the generated spec replays green
-_skipped on windows_
+_skipped on Windows_
 #### When
 ```shell
 # interactive (pty): ${atago} record --pty --out generated.atago.yaml -- sh -c 'printf PROMPT; read n; echo hi-$n'
@@ -4975,7 +4977,7 @@ ${atago} run generated.atago.yaml
 - exit code is `0`
 - stdout contains `1 passed`
 ### Scenario: record --pty of a no-input command yields a session-less spec that replays green
-_skipped on windows_
+_skipped on Windows_
 #### When
 ```shell
 # interactive (pty): ${atago} record --pty --out echo.atago.yaml -- echo done
@@ -4988,7 +4990,7 @@ ${atago} run echo.atago.yaml
 - exit code is `0`
 - stdout contains `1 passed`
 ### Scenario: a prompt with regex metacharacters is escaped in the generated expect
-_skipped on windows_
+_skipped on Windows_
 #### When
 ```shell
 # interactive (pty): ${atago} record --pty --out meta.atago.yaml -- sh -c 'printf "Continue? (y/n): "; read a; echo got-$a'
@@ -5000,7 +5002,7 @@ ${atago} run meta.atago.yaml
 - exit code is `0`
 - stdout contains `1 passed`
 ### Scenario: recorded text containing dollar-brace round-trips as literal text
-_skipped on windows_
+_skipped on Windows_
 #### When
 ```shell
 ${atago} record --out dollar.atago.yaml -- printf %s 'literal $${HOME} here'
@@ -5014,7 +5016,7 @@ ${atago} run dollar.atago.yaml
   - exit code is `0`
   - stdout contains `1 passed`
 ### Scenario: a recorded secret placeholder replays green with the env set and is guarded when unset
-_skipped on windows_
+_skipped on Windows_
 #### Given
 - Environment variables are set: ATAGO_SECRET_1.
 #### When
@@ -5034,7 +5036,7 @@ ${atago} run sec.atago.yaml
   - exit code is `4`
   - stdout contains `ATAGO_SECRET_1 is not set`
 ### Scenario: record --pty of a never-exiting program times out instead of hanging
-_skipped on windows_
+_skipped on Windows_
 #### When
 ```shell
 ${atago} record --pty --timeout 2s --out wedged.atago.yaml -- tail -f /dev/null
@@ -5702,7 +5704,7 @@ ${atago} run --report json ok.atago.yaml
 ## atago self-hosting / sandbox_home (isolated per-OS home)
 Source: `test/e2e/atago/sandbox_home.atago.yaml`
 ### Scenario: Unix XDG family — write config, read it back, inspect it under the workdir
-_skipped on windows_
+_skipped on Windows_
 #### Given
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
@@ -5719,7 +5721,7 @@ cat "$XDG_CONFIG_HOME/mytool/config"
   - stdout equals an exact value
   - file `.atago-home/.config/mytool/config` contains `editor=vim`
 ### Scenario: Windows APPDATA family — write config, read it back, inspect it under the workdir
-_only on windows_
+_only on Windows_
 #### Given
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
@@ -5736,7 +5738,7 @@ type "%APPDATA%\mytool\config.txt"
   - stdout contains `editor=vim`
   - file `.atago-home/AppData/Roaming/mytool/config.txt` contains `editor=vim`
 ### Scenario: cwd anchors the run, but sandbox_home stays at the workdir ROOT (Unix)
-_skipped on windows_
+_skipped on Windows_
 #### Given
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### When
@@ -6084,7 +6086,7 @@ printf '%s\n' ok
 ## atago self-hosting / signal step (graceful shutdown)
 Source: `test/e2e/atago/signal.atago.yaml`
 ### Scenario: SIGTERM reaches the trap handler and wait observes the exit
-_skipped on windows_
+_skipped on Windows_
 #### Given
 - Background service `server` is started: `trap 'echo graceful shutdown complete > server.log; exit 0' TERM; echo booted; while true; do sleep 0.1; done`.
 #### When
@@ -6094,7 +6096,7 @@ _skipped on windows_
 #### Then
 - file `server.log` contains `graceful shutdown complete`
 ### Scenario: SIGHUP triggers a reload without stopping the service
-_skipped on windows_
+_skipped on Windows_
 #### Given
 - Background service `reloader` is started: `trap 'echo reloaded >> reload.log' HUP; echo booted; while true; do sleep 0.1; done`.
 #### When
@@ -6107,7 +6109,7 @@ for i in 1 2 3 4 5 6 7 8 9 10; do [ -f reload.log ] && break; sleep 0.1; done; c
   - exit code is `0`
   - stdout contains `reloaded`
 ### Scenario: a wait timeout on a TERM-ignoring service fails with the documented message
-_skipped on windows_
+_skipped on Windows_
 #### Given
 - Fixture file `stubborn.atago.yaml` is created.
 #### Inputs
@@ -6646,7 +6648,7 @@ ${atago} run sshfield.atago.yaml
 ## atago self-hosting / stdin sources (file + base64)
 Source: `test/e2e/atago/stdin_sources.atago.yaml`
 ### Scenario: base64 stdin delivers the exact byte count
-_skipped on windows_
+_skipped on Windows_
 #### Inputs
 _stdin for `wc`:_
 ```text
@@ -6660,7 +6662,7 @@ wc -c
 - exit code is `0`
 - stdout matches `/^\s*4\s*$/`
 ### Scenario: stdin file is expanded and read from the workdir
-_skipped on windows_
+_skipped on Windows_
 #### Given
 - Fixture file `payload.txt` is created.
 #### Inputs
@@ -6680,7 +6682,7 @@ cat
 - exit code is `0`
 - stdout equals an exact value
 ### Scenario: a stdin file outside the workdir is rejected at runtime
-_skipped on windows_
+_skipped on Windows_
 #### Given
 - Fixture file `escape.atago.yaml` is created.
 #### Inputs
@@ -7202,7 +7204,7 @@ ${atago} run td.atago.yaml
 ## atago self-hosting / step timeouts (suite default + escape hatch)
 Source: `test/e2e/atago/timeouts.atago.yaml`
 ### Scenario: suite.timeout kills a hanging step and the hint names it
-_skipped on windows_
+_skipped on Windows_
 #### Given
 - Fixture file `hang.atago.yaml` is created.
 #### Inputs
@@ -7229,7 +7231,7 @@ ${atago} run hang.atago.yaml
 - exit code is `1`
 - stdout contains `timed out`, `suite.timeout`
 ### Scenario: a step timeout beats the suite timeout and the hint says run.timeout
-_skipped on windows_
+_skipped on Windows_
 #### Given
 - Fixture file `step_wins.atago.yaml` is created.
 #### Inputs
@@ -7257,7 +7259,7 @@ ${atago} run step_wins.atago.yaml
 - exit code is `1`
 - stdout contains `timed out`, `run.timeout`
 ### Scenario: timeout zero disables a short suite bound
-_skipped on windows_
+_skipped on Windows_
 #### Given
 - Fixture file `optout.atago.yaml` is created.
 #### Inputs
@@ -7309,7 +7311,7 @@ ${atago} run bad.atago.yaml
 ## atago self-hosting / tui
 Source: `test/e2e/atago/tui.atago.yaml`
 ### Scenario: a pty step exports a usable TERM by default
-_skipped on windows_
+_skipped on Windows_
 #### When
 ```shell
 # interactive (pty): echo "TERM=[$TERM]"
@@ -7318,7 +7320,7 @@ _skipped on windows_
 - exit code is `0`
 - stdout contains `TERM=[xterm-256color]`
 ### Scenario: an explicit TERM overrides the default
-_skipped on windows_
+_skipped on Windows_
 #### When
 ```shell
 # interactive (pty): echo "TERM=[$TERM]"
@@ -7327,7 +7329,7 @@ _skipped on windows_
 - exit code is `0`
 - stdout contains `TERM=[vt100]`
 ### Scenario: an expect does not re-match a consumed pattern
-_skipped on windows_
+_skipped on Windows_
 #### Given
 - Fixture file `inner.atago.yaml` is created.
 #### Inputs
@@ -7355,7 +7357,7 @@ ${atago} run inner.atago.yaml
 - exit code is `1`
 - stdout contains `1 failed`
 ### Scenario: less -X renders a real pager onto the screen
-_skipped on windows_
+_only when `command -v less` succeeds · skipped on Windows_
 #### Given
 - Fixture file `page.txt` is created.
 #### Inputs

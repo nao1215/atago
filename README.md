@@ -124,7 +124,7 @@ scenarios:
             empty: true
 ```
 
-`atago run` accepts spec files and directories (searched recursively for `*.atago.yaml`). Each scenario runs in its own temporary directory, and progress streams as a dot per scenario (`.` pass, `F` fail, `E` error, `s` skip):
+`atago run` accepts spec files and directories (searched recursively for `*.atago.yaml`; the `*.atago.yml` spelling is accepted too). Each scenario runs in its own temporary directory, and progress streams as a dot per scenario (`.` pass, `F` fail, `E` error, `s` skip):
 
 ```shell
 $ atago run ./specs

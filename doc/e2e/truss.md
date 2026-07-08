@@ -16,7 +16,7 @@
 ## truss convert (filesystem footprint)
 Source: `test/e2e/tools/truss/changes.atago.yaml`
 ### Scenario: convert PNG->JPEG creates only the output file
-_skipped on windows_
+_only when `truss --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `in.png` is created.
 #### When
@@ -30,7 +30,7 @@ truss convert in.png -o out.jpg
 #### Generated artifacts
 - `out.jpg`
 ### Scenario: convert to a glob-matched output honors path.Match
-_skipped on windows_
+_only when `truss --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `in.png` is created.
 #### When
@@ -43,6 +43,7 @@ truss convert in.png -o thumb.webp --format webp
 ## truss image conversion
 Source: `test/e2e/tools/truss/convert.atago.yaml`
 ### Scenario: inspect reports PNG format and dimensions as JSON
+_only when `truss --version` succeeds_
 #### Given
 - Fixture file `in.png` is created.
 #### When
@@ -55,6 +56,7 @@ truss inspect in.png
 - stdout at `$.width` equals `16`
 - stdout at `$.height` equals `16`
 ### Scenario: convert PNG to JPEG yields a same-size opaque JPEG
+_only when `truss --version` succeeds_
 #### Given
 - Fixture file `in.png` is created.
 #### When
@@ -67,6 +69,7 @@ truss convert in.png -o out.jpg
 #### Generated artifacts
 - `out.jpg`
 ### Scenario: resize with fit=fill produces the requested dimensions
+_only when `truss --version` succeeds_
 #### Given
 - Fixture file `in.png` is created.
 #### When
@@ -79,6 +82,7 @@ truss convert in.png -o thumb.png --width 8 --height 8 --fit fill
 #### Generated artifacts
 - `thumb.png`
 ### Scenario: convert to WebP yields a WebP of the same dimensions
+_only when `truss --version` succeeds_
 #### Given
 - Fixture file `in.png` is created.
 #### When
@@ -91,6 +95,7 @@ truss convert in.png -o out.webp --format webp
 #### Generated artifacts
 - `out.webp`
 ### Scenario: a high-quality JPEG stays visually close to the source
+_only when `truss --version` succeeds_
 #### Given
 - Fixture file `in.png` is created.
 #### When
@@ -106,6 +111,7 @@ _expected image `testdata/sample.png`:_
 #### Generated artifacts
 - `out.jpg`
 ### Scenario: a lossless PNG re-encode is pixel-identical to the source
+_only when `truss --version` succeeds_
 #### Given
 - Fixture file `in.png` is created.
 #### When
@@ -121,6 +127,7 @@ _expected image `testdata/sample.png`:_
 #### Generated artifacts
 - `copy.png`
 ### Scenario: a missing input file exits with the I/O error code
+_only when `truss --version` succeeds_
 #### When
 ```shell
 truss convert does-not-exist.png -o out.jpg

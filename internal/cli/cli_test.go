@@ -1359,7 +1359,7 @@ func TestManifestCmd_NoFilesDefaultDot(t *testing.T) {
 		if got := Main([]string{"manifest"}, &out, &errb); got != ExitConfig {
 			t.Fatalf("exit = %d, want %d", got, ExitConfig)
 		}
-		if !strings.Contains(errb.String(), "no *.atago.yaml files found") {
+		if !strings.Contains(errb.String(), "no *.atago.yaml (or *.atago.yml) files found") {
 			t.Errorf("stderr = %q, want no-files message", errb.String())
 		}
 	})

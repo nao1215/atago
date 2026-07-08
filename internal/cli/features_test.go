@@ -710,6 +710,77 @@ func TestRerunFailed_AbsolutePathMatchesRelativeLedger(t *testing.T) {
 	})
 }
 
+// TestRerunFailed_LedgerStaysRelativeAfterRerun proves a --rerun-failed does not
+// rewrite the ledger's spec paths to absolute. Persisting the absolute form (used
+// only in memory to match across spellings) made the next rerun after the project
+// moved find nothing and silently greenlight still-failing work.
+func TestRerunFailed_LedgerStaysRelativeAfterRerun(t *testing.T) {
+	dir := t.TempDir()
+	writeSpec(t, dir, "s.atago.yaml", twoScenarioSpec)
+
+	withWorkdir(t, dir, func() {
+		var out, errb bytes.Buffer
+		if got := Main([]string{"run", "s.atago.yaml"}, &out, &errb); got != ExitFailures {
+			t.Fatalf("first run exit = %d, want %d (stderr=%s)", got, ExitFailures, errb.String())
+		}
+		// Rerun once (still failing): the ledger must keep the relative spelling.
+		out.Reset()
+		errb.Reset()
+		if got := Main([]string{"run", "--rerun-failed", "s.atago.yaml"}, &out, &errb); got != ExitFailures {
+			t.Fatalf("rerun exit = %d, want %d (stderr=%s)", got, ExitFailures, errb.String())
+		}
+		st, err := loadRerunState()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(st.Failed) == 0 {
+			t.Fatal("ledger empty after a still-failing rerun")
+		}
+		for _, e := range st.Failed {
+			if filepath.IsAbs(e.SpecPath) {
+				t.Errorf("ledger stored an absolute spec_path %q; it must stay portable", e.SpecPath)
+			}
+		}
+	})
+}
+
+// TestLoadRerunState_UnknownSchemaVersion proves a state file written by a future
+// atago (a schema_version this build does not understand) is rejected rather than
+// read under v1 assumptions, which could silently drop recorded failures.
+func TestLoadRerunState_UnknownSchemaVersion(t *testing.T) {
+	dir := t.TempDir()
+	withWorkdir(t, dir, func() {
+		if err := os.MkdirAll(rerunStateDir, 0o750); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(rerunStatePath(), []byte(`{"schema_version":"999","failed":[]}`), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := loadRerunState(); err == nil {
+			t.Error("loadRerunState accepted an unknown schema_version; want an error")
+		}
+	})
+}
+
+// TestRunCmd_ArtifactsDirNotADirectory proves --artifacts-dir pointing at an
+// existing regular file is a clean config error, not a run that silently writes
+// no artifacts and leaves the user believing there were no failures to review.
+func TestRunCmd_ArtifactsDirNotADirectory(t *testing.T) {
+	dir := t.TempDir()
+	spec := writeSpec(t, dir, "fail.atago.yaml", singleFailSpec("f", false))
+	afile := filepath.Join(dir, "not-a-dir")
+	if err := os.WriteFile(afile, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+	if got := Main([]string{"run", "--artifacts-dir", afile, spec}, &out, &errb); got != ExitConfig {
+		t.Fatalf("exit = %d, want %d (stderr=%s)", got, ExitConfig, errb.String())
+	}
+	if !strings.Contains(errb.String(), "not usable") {
+		t.Errorf("stderr should explain the unusable artifacts dir, got: %s", errb.String())
+	}
+}
+
 // TestRunCmd_NegativeParallelRejected proves a negative --parallel is a config
 // error, matching --repeat/--retry-failed, rather than being silently coerced to
 // sequential and exiting 0.

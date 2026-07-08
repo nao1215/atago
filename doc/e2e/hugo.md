@@ -13,6 +13,7 @@
 ## hugo (scaffold + build CLI, tree-snapshot testbed)
 Source: `test/e2e/thirdparty/hugo/hugo.atago.yaml`
 ### Scenario: new site scaffolds the documented directory tree
+_only when `hugo version` succeeds_
 #### When
 ```shell
 hugo new site mysite
@@ -23,6 +24,7 @@ hugo new site mysite
 - dir `mysite` contains `archetypes`, contains `content`, contains `layouts`, contains `static`, contains `themes`
 - file `mysite/hugo.toml` contains `baseURL`
 ### Scenario: new content plus a minimal layout builds the public tree
+_only when `hugo version` succeeds_
 #### Given
 - Fixture file `mysite/layouts/home.html` is created.
 - Fixture file `mysite/layouts/single.html` is created.
@@ -57,6 +59,7 @@ hugo --minify --buildDrafts
   - file `mysite/public/posts/hello/index.html` contains `<h1>Hello</h1>`
   - dir `mysite/public` contains `index.html`, contains `sitemap.xml`, contains `posts/hello/index.html`
 ### Scenario: building outside a site directory fails with a config hint
+_only when `hugo version` succeeds_
 #### When
 ```shell
 hugo

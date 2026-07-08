@@ -16,6 +16,7 @@
 ## aqua (declarative CLI version manager)
 Source: `test/e2e/thirdparty/aqua/aqua.atago.yaml`
 ### Scenario: version prints without error
+_only when `aqua version` succeeds_
 #### When
 ```shell
 aqua version
@@ -24,6 +25,7 @@ aqua version
 - exit code is `0`
 - stdout matches `/\S/`
 ### Scenario: init writes an aqua.yaml with the standard registry
+_only when `aqua version` succeeds_
 #### Given
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### When
@@ -35,6 +37,7 @@ aqua init
 - the step changed exactly created `aqua.yaml`, modified nothing, deleted nothing
 - file `aqua.yaml` contains `registries:`, `type: standard`, `packages:`
 ### Scenario: init is idempotent on an existing config
+_only when `aqua version` succeeds_
 #### Given
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### When
@@ -50,6 +53,7 @@ aqua init
   - stderr contains `configuration file already exists`
   - the step changed exactly created nothing, modified nothing, deleted nothing
 ### Scenario: policy init writes an aqua-policy.yaml
+_only when `aqua version` succeeds_
 #### Given
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### When
@@ -61,6 +65,7 @@ aqua policy init
 - the step changed exactly created `aqua-policy.yaml`, modified nothing, deleted nothing
 - file `aqua-policy.yaml` contains `registries:`
 ### Scenario: root-dir prints the aqua root path
+_only when `aqua version` succeeds_
 #### When
 ```shell
 aqua root-dir
@@ -69,6 +74,7 @@ aqua root-dir
 - exit code is `0`
 - stdout contains `aquaproj-aqua`
 ### Scenario: completion generates a bash script
+_only when `aqua version` succeeds_
 #### When
 ```shell
 aqua completion bash
@@ -77,6 +83,7 @@ aqua completion bash
 - exit code is `0`
 - stdout contains `completion script`
 ### Scenario: which reports an unknown command as not found
+_only when `aqua version` succeeds_
 #### Given
 - Fixture file `aqua.yaml` is created.
 #### Inputs
@@ -95,6 +102,7 @@ aqua which definitely-not-a-real-tool-xyz
 - exit code is `1`
 - stderr contains `command is not found`
 ### Scenario: an unknown subcommand is a usage error
+_only when `aqua version` succeeds_
 #### When
 ```shell
 aqua bogus-subcommand-xyz
@@ -105,6 +113,7 @@ aqua bogus-subcommand-xyz
 ## aqua + install (declarative install of a real tool)
 Source: `test/e2e/thirdparty/aqua/install.atago.yaml`
 ### Scenario: install downloads the tool and makes it runnable
+_only when `aqua version` succeeds_
 #### Given
 - Background service `fileserver` is started: `python3 -m http.server 18595 --bind 127.0.0.1 --directory dist`.
 - Fixture file `dist/mytool` is created.

@@ -135,14 +135,33 @@ func validateSSHRunFields(add func(string, ...any), where string, r *spec.Run, r
 // command, or "" if none. It backs the `shell: false` guard: with shell off the
 // command is tokenized into argv, so operators like `>` or `|` would be passed
 // as literal arguments instead of doing what the author expects. Single- and
-// double-quoted regions are skipped so a quoted `">"` argument is not flagged.
+// double-quoted regions are skipped so a quoted `">"` argument is not flagged,
+// and a backslash escapes the next byte (outside single quotes) so an escaped
+// `\>` — or the `\'` that a posix-quoted literal apostrophe produces — is not
+// read as an operator and does not desync the quote tracking. This mirrors the
+// tokenizer the no-shell path actually uses, so a command `atago record` emits
+// for a literal argument containing `<` round-trips instead of being rejected.
 func shellMetachar(cmd string) string {
 	var quote rune // 0, '\'' or '"' when inside a quoted region
 	runes := []rune(cmd)
-	for i := range len(runes) {
+	for i := 0; i < len(runes); i++ {
 		c := runes[i]
-		if quote != 0 {
-			if c == quote {
+		if quote == '\'' {
+			// Single quotes are literal: only a closing quote ends the region,
+			// and a backslash carries no special meaning inside it.
+			if c == '\'' {
+				quote = 0
+			}
+			continue
+		}
+		if c == '\\' {
+			// Outside single quotes a backslash escapes the next byte, so it is
+			// a literal argument character, never a shell operator. Skip both.
+			i++
+			continue
+		}
+		if quote == '"' {
+			if c == '"' {
 				quote = 0
 			}
 			continue

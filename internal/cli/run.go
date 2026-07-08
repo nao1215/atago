@@ -77,7 +77,7 @@ func runCmd(label string, args []string, stdout, stderr io.Writer) int {
 		return ExitConfig
 	}
 	if len(paths) == 0 {
-		fmt.Fprintln(stderr, label+": no *.atago.yaml files found")
+		fmt.Fprintln(stderr, label+": no *.atago.yaml (or *.atago.yml) files found")
 		return ExitConfig
 	}
 
@@ -112,6 +112,14 @@ func runCmd(label string, args []string, stdout, stderr io.Writer) int {
 	eng.Tags = tag
 	eng.SkipTags = skipTag
 	if strings.TrimSpace(*artifactsDir) != "" {
+		// Fail fast if the artifacts dir cannot be used. An existing regular file at
+		// the path, or a directory that cannot be created, would otherwise make
+		// every artifact write fail silently, leaving the user to believe a run
+		// produced no reviewable failures when in fact none could be written.
+		if err := ensureArtifactsDir(*artifactsDir); err != nil {
+			fmt.Fprintf(stderr, label+": --artifacts-dir %q is not usable: %v\n", *artifactsDir, err)
+			return ExitConfig
+		}
 		eng.Artifacts = artifact.NewDir(*artifactsDir)
 	}
 
@@ -273,7 +281,12 @@ func runCmd(label string, args []string, stdout, stderr io.Writer) int {
 	// best-effort — a read-only checkout must not fail the run — so a write error
 	// is a warning, not a fatal exit.
 	if len(results) > 0 && !rerunMatchedNothing {
-		if err := saveRerunState(append(collectFailures(results), rerunPreserved...)); err != nil {
+		// Store portable (cwd-relative) spec paths so the ledger survives a project
+		// move. A --rerun-failed absolutizes paths in memory to match across
+		// spellings; persisting that absolute form would break the next rerun after
+		// the directory moves.
+		entries := portableEntries(append(collectFailures(results), rerunPreserved...))
+		if err := saveRerunState(entries); err != nil {
 			fmt.Fprintf(stderr, label+": could not update %s: %v\n", rerunStatePath(), err)
 		}
 	}
@@ -474,6 +487,24 @@ func (c *csvFlag) String() string { return strings.Join(*c, ",") }
 func (c *csvFlag) Set(v string) error {
 	*c = append(*c, splitCSV(v)...)
 	return nil
+}
+
+// ensureArtifactsDir verifies --artifacts-dir names a usable directory, creating
+// it when absent. It returns an error when the path exists as a non-directory or
+// cannot be created, so run can report the problem up front instead of letting
+// every later artifact write fail silently.
+func ensureArtifactsDir(dir string) error {
+	info, err := os.Stat(dir)
+	if err == nil {
+		if !info.IsDir() {
+			return fmt.Errorf("exists but is not a directory")
+		}
+		return nil
+	}
+	if !os.IsNotExist(err) {
+		return err
+	}
+	return os.MkdirAll(dir, 0o750)
 }
 
 // splitCSV splits a comma-separated flag value into trimmed, non-empty tokens.

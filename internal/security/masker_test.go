@@ -182,3 +182,177 @@ scenarios:
 		t.Errorf("token from service env not masked: %q", got)
 	}
 }
+
+// TestMasker_LineEndingVariantsNoLeak proves a multi-line secret is masked
+// whichever line ending the output uses: a value declared with LF must not leak
+// when the program under test emits its CRLF variant (a PEM key printed on
+// Windows), and the reverse.
+func TestMasker_LineEndingVariantsNoLeak(t *testing.T) {
+	t.Parallel()
+	m := NewMasker([]string{"line1\nline2\nline3"})
+	if got := m.Mask("out: line1\r\nline2\r\nline3 end"); strings.Contains(got, "line1") {
+		t.Errorf("CRLF variant of an LF secret leaked: %q", got)
+	}
+	m2 := NewMasker([]string{"a1b2\r\nc3d4"})
+	if got := m2.Mask("out: a1b2\nc3d4 end"); strings.Contains(got, "a1b2") {
+		t.Errorf("LF variant of a CRLF secret leaked: %q", got)
+	}
+}
+
+// TestNewMaskerForSpec_FromEnvSources verifies that a declared secret injected
+// through any env-bearing location — a pty step, suite.env, suite.setup /
+// suite.teardown steps, scenario teardown steps, and defaults.scenario.env — is
+// masked, not just run-step and scenario/service env.
+func TestNewMaskerForSpec_FromEnvSources(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name   string
+		secret string
+		src    string
+	}{
+		{
+			name:   "pty step env",
+			secret: "pty-secret-value",
+			src: `
+version: "1"
+suite:
+  name: s
+secrets:
+  - TOKEN
+scenarios:
+  - name: pty carries the secret
+    steps:
+      - pty:
+          command: cat
+          env:
+            TOKEN: pty-secret-value
+          session:
+            - send: ""
+`,
+		},
+		{
+			name:   "suite env",
+			secret: "suite-secret-value",
+			src: `
+version: "1"
+suite:
+  name: s
+  env:
+    TOKEN: suite-secret-value
+secrets:
+  - TOKEN
+scenarios:
+  - name: uses suite env
+    steps:
+      - run:
+          command: echo hi
+      - assert:
+          exit_code: 0
+`,
+		},
+		{
+			name:   "suite setup step env",
+			secret: "setup-secret-value",
+			src: `
+version: "1"
+suite:
+  name: s
+  setup:
+    - run:
+        command: echo hi
+        env:
+          TOKEN: setup-secret-value
+secrets:
+  - TOKEN
+scenarios:
+  - name: needs setup
+    steps:
+      - run:
+          command: echo hi
+      - assert:
+          exit_code: 0
+`,
+		},
+		{
+			name:   "suite teardown step env",
+			secret: "suiteteardown-secret-value",
+			src: `
+version: "1"
+suite:
+  name: s
+  teardown:
+    - run:
+        command: echo hi
+        env:
+          TOKEN: suiteteardown-secret-value
+secrets:
+  - TOKEN
+scenarios:
+  - name: has suite teardown
+    steps:
+      - run:
+          command: echo hi
+      - assert:
+          exit_code: 0
+`,
+		},
+		{
+			name:   "scenario teardown step env",
+			secret: "teardown-secret-value",
+			src: `
+version: "1"
+suite:
+  name: s
+secrets:
+  - TOKEN
+scenarios:
+  - name: has teardown
+    steps:
+      - run:
+          command: echo hi
+      - assert:
+          exit_code: 0
+    teardown:
+      - run:
+          command: echo bye
+          env:
+            TOKEN: teardown-secret-value
+`,
+		},
+		{
+			name:   "defaults scenario env",
+			secret: "defaults-secret-value",
+			src: `
+version: "1"
+suite:
+  name: s
+secrets:
+  - TOKEN
+defaults:
+  scenario:
+    env:
+      TOKEN: defaults-secret-value
+scenarios:
+  - name: inherits default env
+    steps:
+      - run:
+          command: echo hi
+      - assert:
+          exit_code: 0
+`,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			spc, err := loader.LoadBytes("t.atago.yaml", []byte(tc.src))
+			if err != nil {
+				t.Fatalf("load: %v", err)
+			}
+			m := NewMaskerForSpec(spc)
+			if got := m.Mask("leaked " + tc.secret + " here"); strings.Contains(got, tc.secret) {
+				t.Errorf("secret from %s not masked: %q", tc.name, got)
+			}
+		})
+	}
+}

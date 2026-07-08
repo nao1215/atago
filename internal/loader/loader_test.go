@@ -397,6 +397,24 @@ func TestLoadBytes_Errors(t *testing.T) {
 			wantMsg:  "duplicate scenario name",
 		},
 		{
+			name:     "scenario name with a newline",
+			src:      "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: \"line\\nbreak\"\n    steps:\n      - run: {command: echo}",
+			wantKind: KindValidation,
+			wantMsg:  `must not contain the control character "\n"`,
+		},
+		{
+			name:     "scenario name with a tab",
+			src:      "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: \"tab\\there\"\n    steps:\n      - run: {command: echo}",
+			wantKind: KindValidation,
+			wantMsg:  `must not contain the control character "\t"`,
+		},
+		{
+			name:     "suite name with a newline",
+			src:      "version: \"1\"\nsuite:\n  name: \"bad\\nname\"\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}",
+			wantKind: KindValidation,
+			wantMsg:  `suite.name must not contain the control character "\n"`,
+		},
+		{
 			name:     "step with two actions",
 			src:      "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n        assert: {exit_code: 0}",
 			wantKind: KindValidation,

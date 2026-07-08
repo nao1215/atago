@@ -33,6 +33,43 @@ and this project follows [Semantic Versioning](https://semver.org/).
   multi-protocol platform integration suites, and the README drops bold
   emphasis.
 
+### Fixed
+
+- Secret masking now collects declared `secrets:` values from every
+  env-bearing location — suite.env, defaults.scenario.env, pty steps, suite
+  setup/teardown, and scenario teardown — not just run-step, scenario, and
+  service env, so a secret injected through any of them no longer leaks into
+  reports or `--verbose`.
+- A multi-line secret is masked in both line-ending forms, so a value declared
+  with LF (a PEM private key) is still masked when the program prints its CRLF
+  variant, and the reverse.
+- Snapshot normalization no longer writes a secret to a golden when an ANSI
+  escape split it in the raw output (the escape strip reassembled it), and is
+  idempotent for a run of carriage returns before a newline; a user `scrub`
+  rule anchored to line boundaries now also fires on CRLF output.
+- A `changes:` entry hints the doublestar `{ }` brace alternation as a glob
+  metacharacter, and the suggested escaped spelling is correct for a filename
+  that already contains a backslash.
+- A workdir file that exists but cannot be read (mode 000) is tracked in the
+  `changes:` delta instead of vanishing, so `created: []` no longer passes for
+  a step that planted an unreadable file.
+- `atago doc` keeps non-ASCII scenario names in their table-of-contents
+  anchors (a Japanese name no longer collapses to an empty, colliding
+  `#scenario-`), renders env and command skip/only gates rather than only the
+  OS, and ends the document with a trailing newline.
+- The loader rejects a suite or scenario name containing a newline or tab,
+  which corrupted the `atago list` table and split generated doc headings.
+- `atago init` rejects more than one path argument instead of silently
+  creating the first and ignoring the rest.
+- `atago record` generates a valid spec for a command whose quoted argument
+  contains a shell metacharacter, for a multi-line or tab-carrying command, and
+  for output whose first line begins with `?`.
+- `--rerun-failed` stores portable, cwd-relative spec paths in the last-failed
+  ledger, so moving the project no longer makes the next rerun silently pass;
+  an unknown ledger `schema_version` is rejected rather than misread.
+- `--artifacts-dir` pointing at an existing file (or an un-creatable path) is a
+  clear config error instead of a run that silently writes no artifacts.
+
 ## [0.8.0] - 2026-07-07
 
 A hardening release. A bug-hunting sweep across the surfaces that set atago

@@ -90,7 +90,11 @@ func globMetaNote(pat string) string {
 }
 
 // firstUnescapedGlobMeta returns the first unescaped glob metacharacter in pat,
-// or 0 when there is none. A backslash escapes the following byte.
+// or 0 when there is none. A backslash escapes the following byte, so an entry
+// the author already escaped correctly (e.g. `a\{1\}.txt`) reports none and gets
+// no note. The set matches doublestar's metacharacters: the `{ }` brace
+// alternation must be here too, or a literal file named `{1}.txt` can never be
+// matched by its own name and the failure stays baffling with no note.
 func firstUnescapedGlobMeta(pat string) byte {
 	for i := 0; i < len(pat); i++ {
 		if pat[i] == '\\' {
@@ -98,32 +102,27 @@ func firstUnescapedGlobMeta(pat string) byte {
 			continue
 		}
 		switch pat[i] {
-		case '[', ']', '*', '?':
+		case '[', ']', '*', '?', '{', '}':
 			return pat[i]
 		}
 	}
 	return 0
 }
 
-// escapeGlobMeta backslash-escapes every glob metacharacter in pat so it would
-// match a literal filename, leaving already-escaped bytes untouched.
+// escapeGlobMeta returns a doublestar pattern that matches pat as a literal
+// filename by backslash-escaping every byte doublestar treats specially —
+// including the backslash itself. Escaping the backslash matters: without it a
+// pat that already contains one (e.g. `\0*`) would produce `\0\*`, which matches
+// the 2-byte name `0*`, not the literal `\0*` the author typed. A suggestion
+// that fails to match the very name it was derived from is worse than none.
 func escapeGlobMeta(pat string) string {
 	var b strings.Builder
 	for i := 0; i < len(pat); i++ {
-		c := pat[i]
-		if c == '\\' {
-			b.WriteByte(c)
-			if i+1 < len(pat) {
-				i++
-				b.WriteByte(pat[i])
-			}
-			continue
-		}
-		switch c {
-		case '[', ']', '*', '?':
+		switch pat[i] {
+		case '\\', '[', ']', '*', '?', '{', '}':
 			b.WriteByte('\\')
 		}
-		b.WriteByte(c)
+		b.WriteByte(pat[i])
 	}
 	return b.String()
 }

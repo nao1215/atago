@@ -154,7 +154,7 @@ func TestExplainCmd_NoArgsDefaultsToDot(t *testing.T) {
 	if got != ExitConfig {
 		t.Fatalf("exit = %d, want %d", got, ExitConfig)
 	}
-	if !strings.Contains(errb.String(), "no *.atago.yaml files found") {
+	if !strings.Contains(errb.String(), "no *.atago.yaml (or *.atago.yml) files found") {
 		t.Errorf("explain with no args should default to \".\", got stderr: %q", errb.String())
 	}
 }

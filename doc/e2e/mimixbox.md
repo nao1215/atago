@@ -6855,6 +6855,7 @@ printf 'ok'
 - exit code is `0`
 - stdout equals an exact value
 ### Scenario: leaves a pre-existing /tmp/mimixbox file untouched (harness-specific)
+_only when env ATAGO_RUN_HARNESS_SPECIFIC is set_
 #### When
 ```shell
 [ ! -d /tmp/mimixbox ] && printf 'not-a-dir'
@@ -7130,7 +7131,7 @@ _expected stderr:_
 cp: --recursive is not specified: omitting directory: ${workdir}/cp
 ```
 ### Scenario: can not copy a directory to root without authority
-_skipped on linux_
+_skipped on Linux_
 #### When
 ```shell
 cp -r ${workdir}/cp /

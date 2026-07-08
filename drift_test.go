@@ -248,6 +248,26 @@ func TestDocs_E2EDocSetMatchesCommitted(t *testing.T) {
 	}
 }
 
+// TestDocs_RealWorldIndexCoversEverySuite asserts the authoritative index
+// doc/real-world.md links the generated doc of every suite that has one. The
+// hand-maintained list in doc/e2e/README.md rotted precisely because nothing
+// guarded it (19 of 35 third-party suites went unlisted); real-world.md now
+// carries the complete table, so guard it against the same rot.
+func TestDocs_RealWorldIndexCoversEverySuite(t *testing.T) {
+	data, err := os.ReadFile("doc/real-world.md")
+	if err != nil {
+		t.Fatalf("read doc/real-world.md: %v", err)
+	}
+	index := string(data)
+	for doc := range e2eDocSuites(t) {
+		// The index links docs relative to doc/, so doc/e2e/git.md is "e2e/git.md".
+		link := strings.TrimPrefix(doc, "doc/")
+		if !strings.Contains(index, link) {
+			t.Errorf("doc/real-world.md does not link %s; every suite with a generated doc must be indexed", link)
+		}
+	}
+}
+
 // TestDocs_MakefileGeneratesEverySuite asserts the `make docs` recipe emits a
 // doc for exactly the derived suite set, so adding a suite directory forces a
 // matching `atago doc --out` line and nothing generates an orphan doc. This is

@@ -13,6 +13,7 @@
 ## sops + age (secrets encryption)
 Source: `test/e2e/thirdparty/sops/sops.atago.yaml`
 ### Scenario: version prints a semantic version offline
+_only when `sops --version --disable-version-check` succeeds_
 #### When
 ```shell
 sops --version --disable-version-check
@@ -21,6 +22,7 @@ sops --version --disable-version-check
 - exit code is `0`
 - stdout matches `/sops [0-9]+\.[0-9]+\.[0-9]+/`
 ### Scenario: encryption hides values, keeps keys, and records metadata
+_only when `command -v sops && command -v age-keygen` succeeds_
 #### Given
 - Fixture file `secrets.yaml` is created.
 #### Inputs
@@ -46,6 +48,7 @@ sops encrypt --age ${recipient} secrets.yaml
   - stdout contains `password:`, `host:`, `ENC[AES256_GCM`, `sops:`, `mac:`
   - stdout does not contain `hunter2`, `db.internal`
 ### Scenario: encrypt then decrypt recovers the original values
+_only when `command -v sops && command -v age-keygen` succeeds_
 #### Given
 - Fixture file `secrets.yaml` is created.
 - Environment variables are set: SOPS_AGE_KEY_FILE.
@@ -72,6 +75,7 @@ sops decrypt secrets.enc.yaml
   - exit code is `0`
   - stdout contains `password: hunter2`, `host: db.internal`, `region: us-west-1`
 ### Scenario: extract returns a single decrypted value exactly
+_only when `command -v sops && command -v age-keygen` succeeds_
 #### Given
 - Fixture file `secrets.yaml` is created.
 - Environment variables are set: SOPS_AGE_KEY_FILE.
@@ -98,6 +102,7 @@ sops decrypt --extract '["region"]' secrets.enc.yaml
   - exit code is `0`
   - stdout equals an exact value
 ### Scenario: decrypting with the wrong key fails
+_only when `command -v sops && command -v age-keygen` succeeds_
 #### Given
 - Fixture file `secrets.yaml` is created.
 - Environment variables are set: SOPS_AGE_KEY_FILE.
@@ -124,6 +129,7 @@ sops decrypt secrets.enc.yaml
   - exit code is `128`
   - stderr contains `Failed to get the data key`
 ### Scenario: a tampered ciphertext fails the MAC
+_only when `command -v sops && command -v age-keygen` succeeds_
 #### Given
 - Fixture file `secrets.yaml` is created.
 - Environment variables are set: SOPS_AGE_KEY_FILE.
@@ -150,6 +156,7 @@ sops decrypt tampered.yaml
   - exit code is `25`
   - stderr contains `message authentication failed`
 ### Scenario: an encrypted-regex scopes which keys are encrypted
+_only when `command -v sops && command -v age-keygen` succeeds_
 #### Given
 - Fixture file `secrets.yaml` is created.
 #### Inputs

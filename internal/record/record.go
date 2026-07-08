@@ -65,7 +65,7 @@ func Generate(obs Observation, opts Options) ([]byte, error) {
 	b.WriteString("# tighten the matchers to pin the behavior you actually care about.\n")
 	fmt.Fprintf(&b, "suite:\n  name: %s\n\n", yamlScalar(opts.SuiteName))
 	b.WriteString("scenarios:\n")
-	fmt.Fprintf(&b, "  - name: %s # TODO: describe the behavior\n", yamlScalar(obs.Command))
+	fmt.Fprintf(&b, "  - name: %s # TODO: describe the behavior\n", yamlScalar(scenarioLabel(obs.Command)))
 	b.WriteString("    steps:\n")
 	b.WriteString("      - run:\n")
 	if obs.Shell {
@@ -113,6 +113,37 @@ func Generate(obs Observation, opts Options) ([]byte, error) {
 		return nil, fmt.Errorf("generated spec does not validate (this is an atago bug, please report it): %w", err)
 	}
 	return out, nil
+}
+
+// scenarioLabel turns an observed command into a single-line scenario name. The
+// loader rejects a control character in a name (it corrupts the list table and
+// doc headings), so a recorded multi-line shell command or a command carrying a
+// tab would otherwise generate a spec that cannot load — the round-trip law (#30)
+// broken by construction. Replace every control byte with a space and collapse
+// the result; the exact command is preserved verbatim in run.command below.
+func scenarioLabel(command string) string {
+	var b strings.Builder
+	prevSpace := false
+	for _, r := range command {
+		if r == '\t' || r == '\n' || r == '\r' || r < 0x20 || r == 0x7f {
+			r = ' '
+		}
+		if r == ' ' {
+			if prevSpace {
+				continue
+			}
+			prevSpace = true
+		} else {
+			prevSpace = false
+		}
+		b.WriteRune(r)
+	}
+	label := strings.TrimSpace(b.String())
+	if label == "" {
+		// An all-control-byte command still needs a name the loader accepts.
+		return "recorded command"
+	}
+	return label
 }
 
 // escapeVarRefs escapes the variable references in observed text so the
@@ -182,7 +213,31 @@ func yamlScalar(s string) string {
 	if err != nil {
 		return fmt.Sprintf("%q", s)
 	}
-	return strings.TrimRight(string(out), "\n")
+	scalar := strings.TrimRight(string(out), "\n")
+	// yaml.Marshal leaves a value that begins with the explicit-key indicator
+	// "?" unquoted (e.g. a recorded stdout line of just "?"), which reparses as a
+	// mapping-key start rather than a scalar and makes the generated spec invalid.
+	// Force double-quoting when the marshaled scalar came back bare but the value
+	// starts with a YAML indicator that cannot open a plain scalar.
+	if len(scalar) > 0 && scalar[0] != '"' && scalar[0] != '\'' && startsWithYAMLIndicator(s) {
+		return yamlDoubleQuoted(s)
+	}
+	return scalar
+}
+
+// startsWithYAMLIndicator reports whether s begins with a character that cannot
+// open a plain (unquoted) YAML scalar. Most are already quoted by yaml.Marshal,
+// but "?" is not, so this backstops the scalar emitter against an unquoted
+// indicator slipping into the generated spec.
+func startsWithYAMLIndicator(s string) bool {
+	if s == "" {
+		return false
+	}
+	switch s[0] {
+	case '?', ':', '-', ',', '[', ']', '{', '}', '#', '&', '*', '!', '|', '>', '\'', '"', '%', '@', '`', ' ', '\t':
+		return true
+	}
+	return false
 }
 
 // yamlBinary renders s as a YAML `!!binary` (base64) scalar so a value carrying

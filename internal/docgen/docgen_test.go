@@ -193,6 +193,89 @@ scenarios:
 	}
 }
 
+// TestGenerate_NonASCIIAnchorsResolve proves a non-ASCII scenario name yields a
+// non-empty, unique GitHub-style anchor. Dropping non-ASCII letters collapsed
+// every Japanese name to an empty "#scenario-" slug, so the TOC links all
+// pointed at nothing and collided with one another.
+func TestGenerate_NonASCIIAnchorsResolve(t *testing.T) {
+	t.Parallel()
+	src := `
+version: "1"
+suite:
+  name: jp
+scenarios:
+  - name: "日本語シナリオ甲"
+    steps:
+      - run: {shell: true, command: echo a}
+      - assert: {exit_code: 0}
+  - name: "日本語シナリオ乙"
+    steps:
+      - run: {shell: true, command: echo b}
+      - assert: {exit_code: 0}
+`
+	s := mustLoadSpec(t, "jp.atago.yaml", src)
+	var b bytes.Buffer
+	if err := Generate(&b, []Source{{Path: "jp.atago.yaml", Spec: s}}); err != nil {
+		t.Fatal(err)
+	}
+	out := b.String()
+	for _, want := range []string{
+		"(#scenario-日本語シナリオ甲)",
+		"(#scenario-日本語シナリオ乙)",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("TOC missing resolvable anchor %q\n--- got ---\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "(#scenario-)") {
+		t.Errorf("a non-ASCII name produced an empty anchor:\n%s", out)
+	}
+}
+
+// TestGenerate_RendersEnvAndCommandGates proves the doc names env and command
+// skip/only gates, not just the OS. A doc that showed only the OS made an
+// env-gated scenario read as unconditional.
+func TestGenerate_RendersEnvAndCommandGates(t *testing.T) {
+	t.Parallel()
+	src := `
+version: "1"
+suite:
+  name: gates
+scenarios:
+  - name: skipped on CI
+    skip: {env: CI}
+    steps:
+      - run: {shell: true, command: echo a}
+      - assert: {exit_code: 0}
+  - name: only when tool present
+    only: {command: "which jq"}
+    steps:
+      - run: {shell: true, command: echo b}
+      - assert: {exit_code: 0}
+  - name: skipped on windows
+    skip: {os: windows}
+    steps:
+      - run: {shell: true, command: echo c}
+      - assert: {exit_code: 0}
+`
+	s := mustLoadSpec(t, "gates.atago.yaml", src)
+	var b bytes.Buffer
+	if err := Generate(&b, []Source{{Path: "gates.atago.yaml", Spec: s}}); err != nil {
+		t.Fatal(err)
+	}
+	out := b.String()
+	for _, want := range []string{
+		"skipped when env CI is set",
+		"only when `which jq` succeeds",
+		// The spec OS value is lowercase; the prose renders the proper-noun form.
+		"skipped on Windows",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("doc missing gate prose %q\n--- got ---\n%s", want, out)
+		}
+	}
+}
+
 // TestGenerate_SignalGroupsThenBullets proves a signal step is an action for
 // Then-grouping (#23): a run + signal scenario (each with asserts) renders two
 // "after ...:" groups instead of one flattened list — the writeThen counter

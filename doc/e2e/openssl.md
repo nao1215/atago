@@ -16,6 +16,7 @@
 ## openssl + changes (key and cert generation footprints)
 Source: `test/e2e/thirdparty/openssl/changes.atago.yaml`
 ### Scenario: genrsa writes exactly the key file
+_only when `openssl version` succeeds_
 #### When
 ```shell
 openssl genrsa -out key.pem 2048
@@ -24,6 +25,7 @@ openssl genrsa -out key.pem 2048
 - exit code is `0`
 - the step changed exactly created `key.pem`, modified nothing, deleted nothing
 ### Scenario: a self-signed cert is the only new file the req step creates
+_only when `openssl version` succeeds_
 #### When
 ```shell
 openssl genrsa -out key.pem 2048

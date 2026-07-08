@@ -15,6 +15,7 @@
 ## actionlint (GitHub Actions workflow linter)
 Source: `test/e2e/thirdparty/actionlint/actionlint.atago.yaml`
 ### Scenario: version prints a semantic version
+_only when `actionlint -version` succeeds_
 #### When
 ```shell
 actionlint -version
@@ -23,6 +24,7 @@ actionlint -version
 - exit code is `0`
 - stdout matches `/^v[0-9]+\.[0-9]+\.[0-9]+/`
 ### Scenario: a valid workflow passes silently
+_only when `actionlint -version` succeeds_
 #### Given
 - Fixture file `good.yml` is created.
 #### Inputs
@@ -45,6 +47,7 @@ actionlint -shellcheck= good.yml
 - stdout is empty
 - stderr is empty
 ### Scenario: an undefined needs dependency is reported on stdout
+_only when `actionlint -version` succeeds_
 #### Given
 - Fixture file `badneeds.yml` is created.
 #### Inputs
@@ -68,6 +71,7 @@ actionlint -shellcheck= badneeds.yml
 - stdout contains `needs job "nonexistent" which does not exist`, `[job-needs]`
 - stderr is empty
 ### Scenario: an unknown runner label is reported
+_only when `actionlint -version` succeeds_
 #### Given
 - Fixture file `badlabel.yml` is created.
 #### Inputs
@@ -89,6 +93,7 @@ actionlint -shellcheck= badlabel.yml
 - exit code is `1`
 - stdout contains `label "ubuntu-nonsense-9999" is unknown`, `[runner-label]`
 ### Scenario: an invalid expression is reported
+_only when `actionlint -version` succeeds_
 #### Given
 - Fixture file `badexpr.yml` is created.
 #### Inputs
@@ -110,6 +115,7 @@ actionlint -shellcheck= badexpr.yml
 - exit code is `1`
 - stdout contains `[expression]`
 ### Scenario: multiple problems in one file are all reported
+_only when `actionlint -version` succeeds_
 #### Given
 - Fixture file `two.yml` is created.
 #### Inputs
@@ -132,6 +138,7 @@ actionlint -shellcheck= two.yml
 - exit code is `1`
 - stdout contains `[job-needs]`, `[runner-label]`
 ### Scenario: the JSON format is a structured oracle over the findings
+_only when `actionlint -version` succeeds_
 #### Given
 - Fixture file `two.yml` is created.
 #### Inputs
@@ -156,6 +163,7 @@ actionlint -shellcheck= -format '{{json .}}' two.yml
 - stdout at `$[0].kind` equals `job-needs`
 - stdout at `$[1].kind` equals `runner-label`
 ### Scenario: -ignore removes a matching finding
+_only when `actionlint -version` succeeds_
 #### Given
 - Fixture file `two.yml` is created.
 #### Inputs
@@ -179,6 +187,7 @@ actionlint -shellcheck= -ignore 'label .* is unknown' two.yml
 - stdout contains `[job-needs]`
 - stdout does not contain `[runner-label]`
 ### Scenario: stdin mode lints piped content under the given filename
+_only when `actionlint -version` succeeds_
 #### Given
 - Fixture file `piped.yml` is created.
 #### Inputs

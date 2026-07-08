@@ -55,3 +55,26 @@ scenarios:
               - config.yaml
             deleted:
               - stale.html
+
+  # A changes entry is a glob, so a filename that literally contains a glob
+  # metacharacter ([ ] * ? { }) must be backslash-escaped, or it is read as a
+  # pattern and matches nothing — the entry and the observed path look identical
+  # and the failure is baffling. atago points at the metacharacter and prints the
+  # escaped spelling when this happens; this scenario shows the correct escaping.
+  - name: filenames containing glob metacharacters are escaped
+    skip:
+      os: windows
+    steps:
+      - run:
+          shell: true
+          command: >-
+            printf 'q1\n' > 'report[2026].csv' &&
+            printf 'a,b\n' > 'data{v2}.csv'
+      - assert:
+          exit_code: 0
+          changes:
+            created:
+              # Escape the literal [ ] and { } so each entry matches its real name
+              # instead of being parsed as a character class or brace alternation.
+              - report\[2026\].csv
+              - data\{v2\}.csv

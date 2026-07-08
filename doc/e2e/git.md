@@ -16,7 +16,7 @@
 ## git + changes (a staged blob touches exactly index + one object)
 Source: `test/e2e/thirdparty/git/changes.atago.yaml`
 ### Scenario: staging one file creates the index and a single loose object (POSIX)
-_skipped on windows_
+_skipped on Windows_
 #### Given
 - Fixture file `repo/f.txt` is created.
 #### Inputs
@@ -36,7 +36,7 @@ git -C repo add f.txt
   - exit code is `0`
   - the step changed exactly created `repo/.git/index`, `repo/.git/objects/*/*`, modified nothing, deleted nothing
 ### Scenario: git init's whole .git tree is pinned by one recursive glob (POSIX)
-_skipped on windows_
+_skipped on Windows_
 #### When
 ```shell
 git init -q repo
@@ -126,7 +126,7 @@ git -C repo checkout v9.9.9
 ## git + sandbox_home (global config in an isolated HOME)
 Source: `test/e2e/thirdparty/git/sandbox_home.atago.yaml`
 ### Scenario: global user.name is written under the sandbox home and read back (POSIX)
-_skipped on windows_
+_skipped on Windows_
 #### Given
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).

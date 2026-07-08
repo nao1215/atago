@@ -171,6 +171,25 @@ func TestCheckChanges_GlobMetaHint(t *testing.T) {
 	}
 }
 
+// TestCheckChanges_GlobBraceHint proves the doublestar `{a,b}` brace
+// alternation is treated as a metacharacter too: a literal file named
+// "a{1}.txt" never matches its own name, so the failure must carry the note
+// suggesting the escaped spelling rather than a baffling identical block.
+func TestCheckChanges_GlobBraceHint(t *testing.T) {
+	t.Parallel()
+	got := checkChanges(
+		&spec.ChangesAssert{Created: list("a{1}.txt")},
+		changesResult(fsdelta.Delta{Created: []string{"a{1}.txt"}}),
+	)
+	if got.OK {
+		t.Fatal("an unescaped { never matches the literal filename, so it should fail")
+	}
+	wantNote := `note: "{" is a glob metacharacter — write "a\{1\}.txt" to match a literal filename`
+	if !strings.Contains(got.Hint, wantNote) {
+		t.Errorf("Hint should carry the brace-metacharacter note.\n got: %s\nwant substring: %s", got.Hint, wantNote)
+	}
+}
+
 // TestCheckChanges_NoDelta proves a missing delta (no preceding run/pty step)
 // is reported rather than silently passing.
 func TestCheckChanges_NoDelta(t *testing.T) {

@@ -20,6 +20,16 @@ import (
 // "file" the assertion reasons about.
 type Snapshot map[string]string
 
+// unreadableSentinel marks a regular file that exists but could not be read
+// (e.g. mode 000). It is not a valid 64-char hex SHA-256, so it never collides
+// with a real content hash. Recording it keeps the file visible to created/
+// deleted so a step that plants an unreadable file cannot slip past
+// `created: []`. Two snapshots that both find the file unreadable share the
+// sentinel and report no modification; a file readable in one snapshot and
+// unreadable in the other reports as modified, because content equality cannot
+// be established across that readability boundary.
+const unreadableSentinel = "unreadable"
+
 // Scan walks root and hashes every regular file, keyed by its forward-slash
 // path relative to root. It is best-effort about individual files: one that
 // cannot be opened or read is skipped rather than failing the whole scan, so a
@@ -46,7 +56,14 @@ func Scan(root string) (Snapshot, error) {
 		}
 		sum, herr := hashFile(path)
 		if herr != nil {
-			return nil //nolint:nilerr // skip an unreadable file rather than aborting
+			if os.IsNotExist(herr) {
+				// Raced away between walk and open; genuinely absent, so skip it.
+				return nil
+			}
+			// Exists but unreadable (e.g. mode 000): record a sentinel rather than
+			// dropping it, so a created/deleted unreadable file is still reported.
+			snap[filepath.ToSlash(rel)] = unreadableSentinel
+			return nil
 		}
 		snap[filepath.ToSlash(rel)] = sum
 		return nil

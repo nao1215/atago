@@ -422,6 +422,10 @@ func initCmd(args []string, stdout, stderr io.Writer) int {
 		return ExitConfig
 	}
 
+	if fs.NArg() > 1 {
+		fmt.Fprintf(stderr, "atago init: too many paths — init writes one spec file, got %d (%s)\n", fs.NArg(), strings.Join(fs.Args(), ", "))
+		return ExitConfig
+	}
 	path := defaultInitFilename(*template)
 	if fs.NArg() > 0 {
 		path = fs.Arg(0)
