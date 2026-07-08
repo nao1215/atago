@@ -53,14 +53,30 @@ type Masker struct {
 }
 
 // NewMasker builds a Masker from literal secret values. Empty or very short
-// values are ignored.
+// values are ignored. For a multi-line secret, both line-ending forms are masked:
+// a value stored with LF also masks its CRLF variant (and vice versa), so a
+// multi-line credential — a PEM private key is the common case — cannot leak into
+// a report or --verbose dump just because the program under test emitted it with
+// the other line ending than the one the secret was declared with.
 func NewMasker(values []string) *Masker {
 	seen := map[string]bool{}
 	var v []string
-	for _, x := range values {
+	add := func(x string) {
 		if len(x) >= minSecretLen && !seen[x] {
 			seen[x] = true
 			v = append(v, x)
+		}
+	}
+	for _, x := range values {
+		add(x)
+		// Mask the alternate line-ending form too. Normalize to LF first so a
+		// value with mixed or CRLF endings still yields a stable LF and CRLF pair.
+		lf := strings.ReplaceAll(strings.ReplaceAll(x, "\r\n", "\n"), "\r", "\n")
+		if lf != x {
+			add(lf)
+		}
+		if crlf := strings.ReplaceAll(lf, "\n", "\r\n"); crlf != x {
+			add(crlf)
 		}
 	}
 	// Order the values longest-first for deterministic, stable output. Mask now

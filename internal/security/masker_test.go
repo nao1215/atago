@@ -183,6 +183,22 @@ scenarios:
 	}
 }
 
+// TestMasker_LineEndingVariantsNoLeak proves a multi-line secret is masked
+// whichever line ending the output uses: a value declared with LF must not leak
+// when the program under test emits its CRLF variant (a PEM key printed on
+// Windows), and the reverse.
+func TestMasker_LineEndingVariantsNoLeak(t *testing.T) {
+	t.Parallel()
+	m := NewMasker([]string{"line1\nline2\nline3"})
+	if got := m.Mask("out: line1\r\nline2\r\nline3 end"); strings.Contains(got, "line1") {
+		t.Errorf("CRLF variant of an LF secret leaked: %q", got)
+	}
+	m2 := NewMasker([]string{"a1b2\r\nc3d4"})
+	if got := m2.Mask("out: a1b2\nc3d4 end"); strings.Contains(got, "a1b2") {
+		t.Errorf("LF variant of a CRLF secret leaked: %q", got)
+	}
+}
+
 // TestNewMaskerForSpec_FromEnvSources verifies that a declared secret injected
 // through any env-bearing location — a pty step, suite.env, suite.setup /
 // suite.teardown steps, scenario teardown steps, and defaults.scenario.env — is
