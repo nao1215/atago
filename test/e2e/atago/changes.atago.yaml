@@ -89,7 +89,7 @@ scenarios:
             modified: []
             deleted: []
 
-  - name: the delta over a retried step is cumulative across all attempts (POSIX)
+  - name: the delta over a retried step reflects only the converged attempt (POSIX)
     skip:
       os: windows
     steps:
