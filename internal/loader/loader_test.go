@@ -1211,3 +1211,107 @@ func TestBugHunt_FileAndJSONExtras(t *testing.T) {
 		})
 	}
 }
+
+// TestLoadBytes_UnionErrorsCarryPosition guards the location quality of the
+// hand-decoded union nodes (exit_code, stdin, pty send, json checks). Their
+// custom unmarshalers used to return bare fmt.Errorf messages, so in a 300-line
+// spec with a dozen exit_code asserts the error named neither scenario, step,
+// nor line — a hunt, while a typo'd KEY got a [line:col], source excerpt, and
+// caret. Every union-shape error must now carry the same [line:col] annotation
+// pointing at the offending value, plus the source excerpt.
+func TestLoadBytes_UnionErrorsCarryPosition(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name    string
+		src     string
+		wantMsg string // the human explanation, unchanged
+		wantPos string // the exact [line:col] of the offending value
+		excerpt string // a fragment of the offending source line
+	}{
+		{
+			name: "exit_code wrong type",
+			src: `version: "1"
+suite:
+  name: x
+scenarios:
+  - name: a
+    steps:
+      - run: {command: echo}
+      - assert:
+          exit_code: zero
+`,
+			wantMsg: "exit_code must be an integer",
+			wantPos: "[9:22]",
+			excerpt: "exit_code: zero",
+		},
+		{
+			name: "stdin wrong shape",
+			src: `version: "1"
+suite:
+  name: x
+scenarios:
+  - name: a
+    steps:
+      - run:
+          command: cat
+          stdin: [1, 2]
+`,
+			wantMsg: "stdin must be a string, {file: path}, or {base64: data}",
+			wantPos: "[9:18]",
+			excerpt: "stdin: [1, 2]",
+		},
+		{
+			name: "pty send unknown key",
+			src: `version: "1"
+suite:
+  name: x
+scenarios:
+  - name: a
+    steps:
+      - pty:
+          command: cat
+          session:
+            - send: {keyy: enter}
+`,
+			wantMsg: `send: unknown key "keyy"`,
+			wantPos: "[10:21]",
+			excerpt: "keyy: enter",
+		},
+		{
+			name: "json empty check list",
+			src: `version: "1"
+suite:
+  name: x
+scenarios:
+  - name: a
+    steps:
+      - run: {command: echo}
+      - assert:
+          stdout:
+            json: []
+`,
+			wantMsg: "a json/yaml matcher list must have at least one check",
+			wantPos: "[10:19]",
+			excerpt: "json: []",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			_, err := LoadBytes("t.atago.yaml", []byte(tc.src))
+			if err == nil {
+				t.Fatal("LoadBytes accepted the malformed union value")
+			}
+			msg := err.Error()
+			if !strings.Contains(msg, tc.wantMsg) {
+				t.Errorf("error = %q, want the explanation %q", msg, tc.wantMsg)
+			}
+			if !strings.Contains(msg, tc.wantPos) {
+				t.Errorf("error = %q, want the position %q pointing at the offending value", msg, tc.wantPos)
+			}
+			if !strings.Contains(msg, tc.excerpt) {
+				t.Errorf("error = %q, want a source excerpt containing %q", msg, tc.excerpt)
+			}
+		})
+	}
+}

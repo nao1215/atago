@@ -86,6 +86,13 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Union-shape spec errors (`exit_code`, `stdin`, pty `send`, `json`/`yaml`
+  check lists) now carry the same `[line:col]` annotation, source excerpt, and
+  caret a typo'd key gets, pointing at the offending value. Previously they
+  were bare messages — in a 300-line spec with a dozen `exit_code` asserts,
+  "exit_code must be an integer … got \"zero\"" named neither scenario, step,
+  nor line.
+
 - A step-level `timeout:` on an ssh run step was parsed, validated — and
   silently ignored: the loader whitelists it "because it is honored remotely",
   but the engine only ever applied the runner-level timeout captured at dial.

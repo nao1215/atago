@@ -233,18 +233,3 @@ func TestExitCode_UnmarshalYAML(t *testing.T) {
 		}
 	})
 }
-
-func TestTrimYAMLScalar(t *testing.T) {
-	t.Parallel()
-	cases := map[string]string{
-		"  7\n":    "7",
-		"\t\r\n9 ": "9",
-		"plain":    "plain",
-		"   ":      "",
-	}
-	for in, want := range cases {
-		if got := trimYAMLScalar(in); got != want {
-			t.Errorf("trimYAMLScalar(%q) = %q, want %q", in, got, want)
-		}
-	}
-}

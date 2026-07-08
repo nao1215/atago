@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-74 suites · 386 scenarios
+74 suites · 387 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -216,7 +216,7 @@
 - [atago self-hosting / list](#atago-self-hosting--list) — 2 scenarios
   - [list surfaces suites, scenarios, tags, and gates](#scenario-list-surfaces-suites-scenarios-tags-and-gates)
   - [list --json is a stable machine contract](#scenario-list---json-is-a-stable-machine-contract)
-- [atago self-hosting / loader rejects malformed specs](#atago-self-hosting--loader-rejects-malformed-specs) — 14 scenarios
+- [atago self-hosting / loader rejects malformed specs](#atago-self-hosting--loader-rejects-malformed-specs) — 15 scenarios
   - [an empty scenario list is rejected](#scenario-an-empty-scenario-list-is-rejected)
   - [a wrong version string is rejected](#scenario-a-wrong-version-string-is-rejected)
   - [an unknown top-level field is rejected with its position](#scenario-an-unknown-top-level-field-is-rejected-with-its-position)
@@ -231,6 +231,7 @@
   - [a fixture with two content sources is rejected](#scenario-a-fixture-with-two-content-sources-is-rejected)
   - [an absolute changes glob is rejected as not workdir-relative](#scenario-an-absolute-changes-glob-is-rejected-as-not-workdir-relative)
   - [the inline stdin form is a scalar, not a mapping key](#scenario-the-inline-stdin-form-is-a-scalar-not-a-mapping-key)
+  - [a wrong-typed exit_code is rejected with its position and excerpt](#scenario-a-wrong-typed-exit_code-is-rejected-with-its-position-and-excerpt)
 - [atago self-hosting / manifest](#atago-self-hosting--manifest) — 2 scenarios
   - [manifest emits a stable JSON summary without running the spec](#scenario-manifest-emits-a-stable-json-summary-without-running-the-spec)
   - [manifest does not execute the spec's commands](#scenario-manifest-does-not-execute-the-specs-commands)
@@ -3949,6 +3950,28 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `unknown key "inline"`
+### Scenario: a wrong-typed exit_code is rejected with its position and excerpt
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    steps:
+      - run: {command: echo}
+      - assert:
+          exit_code: zero
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `[8:22]`, `exit_code must be an integer`, `exit_code: zero`
 ## atago self-hosting / manifest
 Source: `test/e2e/atago/manifest.atago.yaml`
 ### Scenario: manifest emits a stable JSON summary without running the spec

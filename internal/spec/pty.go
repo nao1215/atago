@@ -3,6 +3,9 @@ package spec
 import (
 	"fmt"
 	"strings"
+
+	"github.com/goccy/go-yaml"
+	"github.com/goccy/go-yaml/ast"
 )
 
 // ClearEnvEnabled reports whether the pty step opts into a cleared environment (#16).
@@ -71,29 +74,33 @@ func SendText(s string) *PTYSend { return &PTYSend{Text: &s} }
 
 // UnmarshalYAML decodes send as a scalar string or a {key: name} mapping,
 // rejecting unknown mapping keys (a custom unmarshaler bypasses the loader's
-// strict decode).
-func (p *PTYSend) UnmarshalYAML(unmarshal func(any) error) error {
+// strict decode). It decodes from the AST node so every shape error carries
+// the offending value's [line:col] for the loader's excerpt formatter.
+func (p *PTYSend) UnmarshalYAML(node ast.Node) error {
+	fail := func(format string, args ...any) error {
+		return &yaml.SyntaxError{Message: fmt.Sprintf(format, args...), Token: node.GetToken()}
+	}
 	var one string
-	if err := unmarshal(&one); err == nil {
+	if err := yaml.NodeToValue(node, &one); err == nil {
 		p.Text = &one
 		return nil
 	}
 	var raw map[string]any
-	if err := unmarshal(&raw); err != nil {
-		return fmt.Errorf("send must be a string or {key: <name>} (e.g. {key: enter})")
+	if err := yaml.NodeToValue(node, &raw); err != nil {
+		return fail("send must be a string or {key: <name>} (e.g. {key: enter})")
 	}
 	for k, v := range raw {
 		if k != "key" {
-			return fmt.Errorf("send: unknown key %q (accepted: key)", k)
+			return fail("send: unknown key %q (accepted: key)", k)
 		}
 		str, ok := v.(string)
 		if !ok {
-			return fmt.Errorf("send.key must be a string")
+			return fail("send.key must be a string")
 		}
 		p.Key = strings.ToLower(strings.TrimSpace(str))
 	}
 	if p.Key == "" {
-		return fmt.Errorf("send: {key: <name>} requires a key name (e.g. enter, tab, ctrl-c)")
+		return fail("send: {key: <name>} requires a key name (e.g. enter, tab, ctrl-c)")
 	}
 	return nil
 }

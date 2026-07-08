@@ -1,11 +1,12 @@
 package spec
 
 import (
+	"errors"
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/goccy/go-yaml"
+	"github.com/goccy/go-yaml/ast"
 )
 
 // Assert checks externally observable behavior. Exactly one target family is set.
@@ -231,23 +232,15 @@ type ExitCode struct {
 }
 
 // UnmarshalYAML decodes exit_code as a scalar int, a {not: int} map, or an
-// {in: [int, ...]} map. Anything else gets a purpose-built error: the generic
-// decoder message ("string was used where mapping is expected", positioned at
-// the sub-node) reads like an internal failure, and a spec author needs to
-// know the accepted shapes.
-func (e *ExitCode) UnmarshalYAML(b []byte) error {
-	if n, err := strconv.Atoi(trimYAMLScalar(string(b))); err == nil {
-		e.Equals = &n
-		return nil
-	}
-	// A YAML-quoted integer (exit_code: "0" / '2') is still an integer to the
-	// author, but the raw-bytes Atoi above sees the surrounding quotes and fails.
-	// A plain int decode unquotes it, so a quoted scalar is accepted instead of
-	// falling through to the misleading "must be an integer … got \"0\"" error.
-	// Mapping/sequence forms ({not:…}, {in:[…]}) fail this decode and fall
-	// through to the shape-specific handling below.
+// {in: [int, ...]} map. It takes the AST node (not raw bytes) so a wrong shape
+// gets a purpose-built error POSITIONED at the offending value — the loader's
+// formatter then renders the same [line:col] + source excerpt a typo'd key
+// gets, instead of a message the author must hunt for across the spec. A
+// quoted integer (exit_code: "0") is still an integer to the author; the plain
+// int decode unquotes it.
+func (e *ExitCode) UnmarshalYAML(node ast.Node) error {
 	var n int
-	if err := yaml.Unmarshal(b, &n); err == nil {
+	if err := yaml.NodeToValue(node, &n); err == nil {
 		e.Equals = &n
 		return nil
 	}
@@ -258,9 +251,18 @@ func (e *ExitCode) UnmarshalYAML(b []byte) error {
 	// Decode strictly so an unknown key (a typo like {not: 0, bogus: 5}) is
 	// rejected here too. A custom unmarshaler bypasses the loader's document-wide
 	// yaml.Strict(), so without this the mapping form silently drops misspelled
-	// fields — the same reason PTYSend and Stdin reject unknown keys.
-	if err := yaml.UnmarshalWithOptions(b, &m, yaml.Strict()); err != nil {
-		return fmt.Errorf("exit_code must be an integer (exit_code: 0), a negation (exit_code: {not: 0}), or a set (exit_code: {in: [0, 2]}), got %q", strings.TrimSpace(string(b)))
+	// fields — the same reason PTYSend and Stdin reject unknown keys. A strict
+	// unknown-field error already carries its own position and did-you-mean, so
+	// it passes through untouched.
+	if err := yaml.NodeToValue(node, &m, yaml.Strict()); err != nil {
+		var unknown *yaml.UnknownFieldError
+		if errors.As(err, &unknown) {
+			return err
+		}
+		return &yaml.SyntaxError{
+			Message: fmt.Sprintf("exit_code must be an integer (exit_code: 0), a negation (exit_code: {not: 0}), or a set (exit_code: {in: [0, 2]}), got %q", strings.TrimSpace(node.String())),
+			Token:   node.GetToken(),
+		}
 	}
 	e.Not = m.Not
 	e.In = m.In
@@ -397,27 +399,27 @@ type JSONAssert struct {
 type JSONChecks []JSONAssert
 
 // UnmarshalYAML accepts a single mapping or a sequence of mappings, rejecting an
-// empty sequence. It probes the node's shape, then decodes strictly so an
-// unknown key inside a check (a typo like `equalss:`) is still rejected — a
-// custom unmarshaler otherwise bypasses the loader's document-wide yaml.Strict().
-func (c *JSONChecks) UnmarshalYAML(b []byte) error {
-	var probe any
-	if err := yaml.Unmarshal(b, &probe); err != nil {
-		return err
-	}
-	if _, isSeq := probe.([]any); isSeq {
+// empty sequence. It decodes from the AST node (not re-tokenized bytes) so
+// every error — a strict unknown-key rejection inside a check, or the
+// empty-list message — carries the ORIGINAL document's [line:col] instead of a
+// position relative to a detached snippet.
+func (c *JSONChecks) UnmarshalYAML(node ast.Node) error {
+	if _, isSeq := node.(*ast.SequenceNode); isSeq {
 		var many []JSONAssert
-		if err := yaml.UnmarshalWithOptions(b, &many, yaml.Strict()); err != nil {
+		if err := yaml.NodeToValue(node, &many, yaml.Strict()); err != nil {
 			return err
 		}
 		if len(many) == 0 {
-			return fmt.Errorf("a json/yaml matcher list must have at least one check")
+			return &yaml.SyntaxError{
+				Message: "a json/yaml matcher list must have at least one check",
+				Token:   node.GetToken(),
+			}
 		}
 		*c = JSONChecks(many)
 		return nil
 	}
 	var one JSONAssert
-	if err := yaml.UnmarshalWithOptions(b, &one, yaml.Strict()); err != nil {
+	if err := yaml.NodeToValue(node, &one, yaml.Strict()); err != nil {
 		return err
 	}
 	*c = JSONChecks{one}
@@ -462,17 +464,4 @@ type StoreFrom struct {
 	Rows    *StreamAssert `yaml:"rows,omitempty"`
 	Message *StreamAssert `yaml:"message,omitempty"`
 	Value   *StreamAssert `yaml:"value,omitempty"`
-}
-
-// trimYAMLScalar strips surrounding whitespace/newlines from a raw scalar node.
-func trimYAMLScalar(s string) string {
-	start := 0
-	end := len(s)
-	for start < end && (s[start] == ' ' || s[start] == '\n' || s[start] == '\t' || s[start] == '\r') {
-		start++
-	}
-	for end > start && (s[end-1] == ' ' || s[end-1] == '\n' || s[end-1] == '\t' || s[end-1] == '\r') {
-		end--
-	}
-	return s[start:end]
 }

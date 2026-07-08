@@ -217,3 +217,28 @@ scenarios:
       - assert:
           exit_code: 2
           stderr: {contains: 'unknown key "inline"'}
+
+  - name: a wrong-typed exit_code is rejected with its position and excerpt
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                steps:
+                  - run: {command: echo}
+                  - assert:
+                      exit_code: zero
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          # The union-shape error is positioned like a typo'd key: [line:col]
+          # pointing at the offending value, plus the source excerpt — not a
+          # bare message the author must hunt for across the spec.
+          stderr:
+            contains:
+              - "[8:22]"
+              - "exit_code must be an integer"
+              - "exit_code: zero"
