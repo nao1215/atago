@@ -35,6 +35,13 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- The last-failed ledger now preserves a recorded failure the run did not
+  execute, so a green run of an unrelated spec (or one whose `--filter`/`--tag`
+  excludes the failing scenario) no longer clears it and lets the next
+  `--rerun-failed` exit 0 while the failure is still real. A fully-green run of
+  the same specs still clears the ledger; only scenarios that actually ran are
+  re-decided. This is the rule the narrowed `--rerun-failed` path already used,
+  now applied to every run.
 - Secret masking now collects declared `secrets:` values from every
   env-bearing location — suite.env, defaults.scenario.env, pty steps, suite
   setup/teardown, and scenario teardown — not just run-step, scenario, and

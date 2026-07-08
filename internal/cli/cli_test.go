@@ -1421,7 +1421,8 @@ func TestRunCmd_SaveStateWriteErrorWarns(t *testing.T) {
 	dir := t.TempDir()
 	writeSpec(t, dir, "fail.atago.yaml", failingSpec)
 	withWorkdir(t, dir, func() {
-		// Block .atago dir creation with a file of the same name.
+		// Block the .atago state dir with a file of the same name, so the ledger can
+		// be neither read nor written.
 		if err := os.WriteFile(rerunStateDir, []byte("x"), 0o600); err != nil {
 			t.Fatal(err)
 		}
@@ -1429,8 +1430,11 @@ func TestRunCmd_SaveStateWriteErrorWarns(t *testing.T) {
 		if got := Main([]string{"run", "fail.atago.yaml"}, &out, &errb); got != ExitFailures {
 			t.Fatalf("exit = %d, want %d (the run's own verdict, stderr=%s)", got, ExitFailures, errb.String())
 		}
-		if !strings.Contains(errb.String(), "could not update") {
-			t.Errorf("stderr = %q, want a best-effort save warning", errb.String())
+		// A ledger persistence problem is a best-effort warning naming the state
+		// file, never a fatal error — whether it surfaces as a read or a write
+		// failure. The run's own verdict stands above.
+		if !strings.Contains(errb.String(), rerunStatePath()) {
+			t.Errorf("stderr = %q, want a best-effort ledger warning naming %s", errb.String(), rerunStatePath())
 		}
 	})
 }
