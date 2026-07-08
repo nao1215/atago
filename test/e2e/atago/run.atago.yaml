@@ -59,7 +59,12 @@ scenarios:
               # points at the YAML to edit without grepping for the scenario.
               - (failing.atago.yaml)
 
+  # The inner command needs "emit a stream, then exit non-zero" in one shell
+  # line, and the separator differs per shell (';' in sh, '&' in cmd.exe), so
+  # the scenario comes in an OS-gated pair.
   - name: an exit_code failure surfaces the command's stderr
+    skip:
+      os: windows
     steps:
       - fixture:
           file: stderr_cause.atago.yaml
@@ -86,7 +91,36 @@ scenarios:
               - "Stderr:"
               - "conversion aborted: bad header"
 
+  - name: an exit_code failure surfaces the command's stderr (windows)
+    only:
+      os: windows
+    steps:
+      - fixture:
+          file: stderr_cause.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: sample
+            scenarios:
+              - name: converter fails loudly
+                steps:
+                  - run:
+                      shell: true
+                      command: "echo conversion aborted: bad header 1>&2 & exit 3"
+                  - assert:
+                      exit_code: 0
+      - run:
+          command: ${atago} run stderr_cause.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - "Stderr:"
+              - "conversion aborted: bad header"
+
   - name: an exit_code failure falls back to stdout when stderr is silent
+    skip:
+      os: windows
     steps:
       - fixture:
           file: stdout_cause.atago.yaml
@@ -100,6 +134,33 @@ scenarios:
                   - run:
                       shell: true
                       command: "echo wrote 0 of 3 files; exit 3"
+                  - assert:
+                      exit_code: 0
+      - run:
+          command: ${atago} run stdout_cause.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - "Stdout:"
+              - "wrote 0 of 3 files"
+
+  - name: an exit_code failure falls back to stdout when stderr is silent (windows)
+    only:
+      os: windows
+    steps:
+      - fixture:
+          file: stdout_cause.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: sample
+            scenarios:
+              - name: converter fails on stdout
+                steps:
+                  - run:
+                      shell: true
+                      command: "echo wrote 0 of 3 files & exit 3"
                   - assert:
                       exit_code: 0
       - run:
