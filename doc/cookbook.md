@@ -2095,7 +2095,7 @@ other way — it surfaces instability instead of absorbing it:
 ```shell
 atago run --repeat 20 flaky.atago.yaml   # run each scenario 20 times; ONE bad iteration fails the run
 atago run --retry-failed 2 ./specs      # retry failures, but a pass-after-fail is REPORTED as flaky, never hidden
-atago rerun ./specs                     # while bisecting: re-run only what failed last time
+atago run --rerun-failed ./specs        # while bisecting: re-run only what failed last time (from .atago/last-failed.json)
 ```
 
 The usual culprits, and the recipe that fixes each: sleeping instead of

@@ -42,7 +42,7 @@ A `pty:` step runs the command in a real pseudo-terminal — on Windows too (Con
 
 ## The name
 
-atago is named after Atago (愛宕), the Japanese deity of fire prevention. The software industry has its own word for a project on fire — 炎上, "going up in flames" — and the name carries a wish: that atago grows into the thing that stops those fires before they spread. It also helps that atago is written in Go, so the name ends in *go*.
+atago (愛宕) is named for Mount Atago in Kyoto, whose shrine enshrines a deity of fire prevention. The software industry has its own word for a project on fire — 炎上, "going up in flames" — and the name carries a wish: that atago grows into the thing that stops those fires before they spread. It also helps that atago is written in Go, so the name ends in *go*.
 
 ## Where to go
 

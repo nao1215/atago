@@ -41,5 +41,5 @@ anonymous.
 
 ## Verifying releases
 Release artifacts are signed with cosign and ship with an SBOM and build
-provenance. See [Verifying release integrity](./README.md#verifying-release-integrity)
+provenance. See [Verifying release integrity](https://nao1215.github.io/atago/install/#verifying-release-integrity)
 for how to check what you download.
