@@ -79,6 +79,20 @@ func (a *anchorer) anchor(text string) string {
 	return fmt.Sprintf("%s-%d", slug, n)
 }
 
+// Anchors assigns GitHub-compatible heading anchors to headings in document
+// order, applying the same slugging and duplicate-suffix rules the generated
+// docs use. Exported so drift guards over hand-written docs (doc/cookbook.md)
+// resolve anchors exactly the way this package does, instead of keeping a
+// second slugger that could drift.
+func Anchors(headings []string) []string {
+	a := newAnchorer()
+	out := make([]string, len(headings))
+	for i, h := range headings {
+		out[i] = a.anchor(h)
+	}
+	return out
+}
+
 func slugify(text string) string {
 	var b strings.Builder
 	for _, r := range strings.ToLower(text) {

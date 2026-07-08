@@ -457,6 +457,62 @@ func TestExamples_EveryFileCategorized(t *testing.T) {
 	}
 }
 
+// TestCookbook_SnippetsValid loads and validates every fenced YAML block in
+// doc/cookbook.md through the real loader, so a recipe cannot drift from the
+// schema it demonstrates. The recipes run placeholder commands (`mytool`), so
+// they validate but do not execute.
+func TestCookbook_SnippetsValid(t *testing.T) {
+	t.Parallel()
+	doc := readDoc(t, "doc/cookbook.md")
+	blocks := regexp.MustCompile("(?s)```yaml\n(.*?)```").FindAllStringSubmatch(doc, -1)
+	if len(blocks) == 0 {
+		t.Fatal("doc/cookbook.md contains no ```yaml blocks")
+	}
+	dir := t.TempDir()
+	for i, m := range blocks {
+		path := filepath.Join(dir, fmt.Sprintf("snippet_%02d.atago.yaml", i))
+		if err := os.WriteFile(path, []byte(m[1]), 0o600); err != nil {
+			t.Fatalf("write snippet %d: %v", i, err)
+		}
+		if _, err := loader.Load(path); err != nil {
+			t.Errorf("doc/cookbook.md snippet %d does not load/validate: %v", i, err)
+		}
+	}
+}
+
+// TestExamplesIndex_InLockstep keeps doc/examples.md honest in both
+// directions: its by-feature table must link every spec under examples/ (the
+// table moved out of the README, where nothing guarded it), every
+// cookbook.md#anchor in its by-task table must resolve to a real
+// doc/cookbook.md heading, and every cookbook heading must be indexed. The
+// anchors come from docgen's slugger — the one authority on how a heading
+// becomes an anchor — so the guard cannot drift from the generated docs.
+func TestExamplesIndex_InLockstep(t *testing.T) {
+	t.Parallel()
+	index := readDoc(t, "doc/examples.md")
+	for path := range exampleSpecs {
+		if !strings.Contains(index, "(../"+path+")") {
+			t.Errorf("doc/examples.md by-feature table does not link %s", path)
+		}
+	}
+	var headings []string
+	for _, m := range regexp.MustCompile(`(?m)^## (.+)$`).FindAllStringSubmatch(readDoc(t, "doc/cookbook.md"), -1) {
+		headings = append(headings, m[1])
+	}
+	anchors := map[string]bool{}
+	for i, anchor := range docgen.Anchors(headings) {
+		anchors[anchor] = true
+		if !strings.Contains(index, "(cookbook.md#"+anchor+")") {
+			t.Errorf("doc/cookbook.md heading %q is not indexed in doc/examples.md (expected a cookbook.md#%s link)", headings[i], anchor)
+		}
+	}
+	for _, m := range regexp.MustCompile(`\(cookbook\.md#([^)]+)\)`).FindAllStringSubmatch(index, -1) {
+		if !anchors[m[1]] {
+			t.Errorf("doc/examples.md links cookbook.md#%s, which matches no doc/cookbook.md heading", m[1])
+		}
+	}
+}
+
 // TestExamples_Valid loads and validates every example, hermetic or not.
 func TestExamples_Valid(t *testing.T) {
 	t.Parallel()

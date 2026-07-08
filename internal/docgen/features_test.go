@@ -86,6 +86,31 @@ scenarios:
 	}
 }
 
+// TestAnchors_MatchesGitHubRules pins the exported slugger drift guards rely
+// on: punctuation drops, spaces hyphenate, underscores survive, and a repeated
+// heading gets GitHub's incrementing suffix.
+func TestAnchors_MatchesGitHubRules(t *testing.T) {
+	got := Anchors([]string{
+		"Test error handling: exit codes and stderr",
+		"Pin a generator's whole output tree",
+		"snake_case heading",
+		"Repeat",
+		"Repeat",
+	})
+	want := []string{
+		"test-error-handling-exit-codes-and-stderr",
+		"pin-a-generators-whole-output-tree",
+		"snake_case-heading",
+		"repeat",
+		"repeat-1",
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("Anchors[%d] = %q, want %q", i, got[i], want[i])
+		}
+	}
+}
+
 // --- #67 previews ----------------------------------------------------------
 
 func TestGenerate_InputPreviews(t *testing.T) {

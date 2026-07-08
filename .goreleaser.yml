@@ -27,7 +27,7 @@ archives:
 # Linux system packages for apt/dnf/apk users (the same set gup and sqly ship).
 nfpms:
   - maintainer: Naohiro CHIKAMATSU <n.chika156@gmail.com>
-    description: "Tests real CLI behavior from plain YAML: commands, files, snapshots, and interactive terminals"
+    description: "Tests CLI behavior from plain YAML: exit codes, output, files, snapshots, and interactive terminals (PTY/TUI)"
     homepage: https://github.com/nao1215/atago
     license: MIT License
     formats:
@@ -49,7 +49,7 @@ homebrew_casks:
       token: "{{ .Env.TAP_GITHUB_TOKEN }}"
     directory: Casks
     homepage: "https://github.com/nao1215/atago"
-    description: "Tests real CLI behavior from plain YAML: commands, files, snapshots, and interactive terminals"
+    description: "Tests CLI behavior from plain YAML: exit codes, output, files, snapshots, and interactive terminals (PTY/TUI)"
     # The binary is not signed/notarized, so strip the quarantine attribute on
     # install — otherwise Gatekeeper blocks the cask-installed binary with
     # "cannot verify the developer" (the pattern GoReleaser documents for
