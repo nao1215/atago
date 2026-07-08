@@ -1,0 +1,4 @@
+go test fuzz v1
+[]byte("\x1b\xf3[-1P")
+int(54)
+int(51)
