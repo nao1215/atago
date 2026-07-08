@@ -155,6 +155,25 @@ func TestNormalize_Scrub(t *testing.T) {
 	}
 }
 
+// TestNormalize_ScrubAppliesAfterCRLFFold proves a line-anchored scrub rule
+// fires on CRLF output. Before the fix the scrub ran only on the raw bytes,
+// where a (?m)^id=\d+$ rule sees "id=42\r" and never matches, so the volatile id
+// reached the golden and every later run failed. The rule must also match once
+// CRLF is folded to LF.
+func TestNormalize_ScrubAppliesAfterCRLFFold(t *testing.T) {
+	t.Parallel()
+	reID := regexp.MustCompile(`(?m)^id=\d+$`)
+	opt := Options{Scrub: func(b []byte) []byte { return reID.ReplaceAllLiteral(b, []byte("id=<ID>")) }}
+	got := string(Normalize([]byte("id=42\r\n"), opt))
+	if got != "id=<ID>\n" {
+		t.Errorf("Normalize(CRLF) = %q, want %q", got, "id=<ID>\n")
+	}
+	// Idempotent: the folded, scrubbed golden re-normalizes to itself.
+	if again := string(Normalize([]byte(got), opt)); again != got {
+		t.Errorf("Normalize not idempotent: %q -> %q", got, again)
+	}
+}
+
 func TestCompareAndUpdate(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()

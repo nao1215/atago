@@ -72,8 +72,12 @@ func NewMasker(values []string) *Masker {
 }
 
 // NewMaskerForSpec collects secret values for a spec from the process
-// environment and from per-step env overrides of the names listed under
-// `secrets:`.
+// environment and from EVERY env-bearing location that can inject one of the
+// names listed under `secrets:`: suite.env, defaults.scenario.env, scenario and
+// service env, and the env of every run/pty step in suite.setup, suite.teardown,
+// a scenario's steps, and a scenario's teardown. A secret that reaches any of
+// these places can surface in a report or log, so all of them must feed the
+// masker — collecting only run-step and scenario/service env leaks the rest.
 func NewMaskerForSpec(s *spec.Spec) *Masker {
 	if len(s.Secrets) == 0 {
 		return NewMasker(nil)
@@ -91,6 +95,29 @@ func NewMaskerForSpec(s *spec.Spec) *Masker {
 			}
 		}
 	}
+	collectSteps := func(steps []spec.Step) {
+		for i := range steps {
+			st := &steps[i]
+			if st.Run != nil {
+				collect(st.Run.Env)
+			}
+			if st.PTY != nil {
+				collect(st.PTY.Env)
+			}
+			if st.Service != nil {
+				collect(st.Service.Env)
+			}
+		}
+	}
+	// Suite-wide env is exported to every scenario, setup, and teardown step.
+	collect(s.Suite.Env)
+	// defaults.scenario.env is merged into each scenario by the loader, but
+	// collect it directly so masking does not depend on that merge order.
+	if s.Defaults != nil && s.Defaults.Scenario != nil {
+		collect(s.Defaults.Scenario.Env)
+	}
+	collectSteps(s.Suite.Setup)
+	collectSteps(s.Suite.Teardown)
 	for i := range s.Scenarios {
 		sc := &s.Scenarios[i]
 		// Scenario-level env is a first-class secret source (#38).
@@ -99,13 +126,8 @@ func NewMaskerForSpec(s *spec.Spec) *Masker {
 		for k := range sc.Services {
 			collect(sc.Services[k].Env)
 		}
-		for j := range sc.Steps {
-			st := &sc.Steps[j]
-			if st.Run == nil {
-				continue
-			}
-			collect(st.Run.Env)
-		}
+		collectSteps(sc.Steps)
+		collectSteps(sc.Teardown)
 	}
 	return NewMasker(vals)
 }

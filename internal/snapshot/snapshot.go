@@ -60,8 +60,13 @@ var (
 )
 
 // Normalize masks volatile details so snapshots are deterministic. Declared
-// secrets are masked first so a real credential never reaches the golden file.
+// secrets are masked first, and again at the very end, so a real credential
+// never reaches the golden file even when a normalization step reassembles it.
 func Normalize(data []byte, opt Options) []byte {
+	// First pass, on the raw bytes: mask secrets, then apply the user scrub. This
+	// keeps the built-in normalizers below operating on already-scrubbed text
+	// (a scrub rule may target a pattern the built-ins would otherwise mangle) and
+	// lets a scrub rule that matches raw CR bytes still fire.
 	if opt.Secrets != nil {
 		data = opt.Secrets(data)
 	}
@@ -72,14 +77,10 @@ func Normalize(data []byte, opt Options) []byte {
 	// Line endings are an OS artifact, not observable behavior: fold CRLF so a
 	// snapshot recorded on POSIX matches cmd.exe output on Windows (and the
 	// committed golden never carries CRs). Matches the equals matcher's rule.
-	s = strings.ReplaceAll(s, "\r\n", "\n")
-	// Folding CRLF can rejoin a multi-line secret whose stored value uses LF: the
-	// first masking pass saw the \r\n form and could not match it, so the raw
-	// credential would otherwise reappear here. Mask once more on the folded text
-	// before any of it can reach the golden.
-	if opt.Secrets != nil {
-		s = string(opt.Secrets([]byte(s)))
-	}
+	// Fold to a fixed point (`\r\r\n` -> `\r\n` -> `\n`): a single ReplaceAll is
+	// not idempotent for a run of CRs before the LF, which would make the whole
+	// function non-idempotent and fail a snapshot on its very next comparison.
+	s = foldCRLF(s)
 	// Strip CSI and OSC escapes to a fixed point. Removing a complete OSC
 	// sequence can splice a stray leading ESC onto the bytes that followed it and
 	// form a fresh CSI escape, which a single CSI-then-OSC pass leaves behind —
@@ -110,7 +111,30 @@ func Normalize(data []byte, opt Options) []byte {
 	if home, err := os.UserHomeDir(); err == nil && home != "" && home != "/" {
 		s = maskPathPrefix(s, home, "~")
 	}
+	// Final sanitize pass. Folding CRLF and stripping CSI/OSC escapes can rejoin
+	// text that the first pass could not match: a multi-line secret whose stored
+	// value uses LF but whose output used CRLF, a secret split by an ANSI escape
+	// ("tok\x1b[0men" for secret "token"), or a line-anchored scrub rule that only
+	// matches once the CR is gone. Re-apply the scrub and then the secret masker
+	// here — masking last — so nothing volatile or secret survives to the golden.
+	if opt.Scrub != nil {
+		s = string(opt.Scrub([]byte(s)))
+	}
+	if opt.Secrets != nil {
+		s = string(opt.Secrets([]byte(s)))
+	}
 	return []byte(s)
+}
+
+// foldCRLF collapses CRLF line endings to LF to a fixed point: a run of CRs
+// before an LF ("\r\r\n") folds to a single "\n" rather than leaving a trailing
+// "\r\n" that a second call would fold again. Idempotence matters because a
+// snapshot written by Update is compared by the very next Compare.
+func foldCRLF(s string) string {
+	for strings.Contains(s, "\r\n") {
+		s = strings.ReplaceAll(s, "\r\n", "\n")
+	}
+	return s
 }
 
 // maskPathPrefix replaces every occurrence of prefix in s with replacement, but

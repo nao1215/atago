@@ -182,3 +182,162 @@ scenarios:
 		t.Errorf("token from service env not masked: %q", got)
 	}
 }
+
+// TestNewMaskerForSpec_FromEnvSources verifies that a declared secret injected
+// through any env-bearing location — a pty step, suite.env, suite.setup /
+// suite.teardown steps, scenario teardown steps, and defaults.scenario.env — is
+// masked, not just run-step and scenario/service env.
+func TestNewMaskerForSpec_FromEnvSources(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name   string
+		secret string
+		src    string
+	}{
+		{
+			name:   "pty step env",
+			secret: "pty-secret-value",
+			src: `
+version: "1"
+suite:
+  name: s
+secrets:
+  - TOKEN
+scenarios:
+  - name: pty carries the secret
+    steps:
+      - pty:
+          command: cat
+          env:
+            TOKEN: pty-secret-value
+          session:
+            - send: ""
+`,
+		},
+		{
+			name:   "suite env",
+			secret: "suite-secret-value",
+			src: `
+version: "1"
+suite:
+  name: s
+  env:
+    TOKEN: suite-secret-value
+secrets:
+  - TOKEN
+scenarios:
+  - name: uses suite env
+    steps:
+      - run:
+          command: echo hi
+      - assert:
+          exit_code: 0
+`,
+		},
+		{
+			name:   "suite setup step env",
+			secret: "setup-secret-value",
+			src: `
+version: "1"
+suite:
+  name: s
+  setup:
+    - run:
+        command: echo hi
+        env:
+          TOKEN: setup-secret-value
+secrets:
+  - TOKEN
+scenarios:
+  - name: needs setup
+    steps:
+      - run:
+          command: echo hi
+      - assert:
+          exit_code: 0
+`,
+		},
+		{
+			name:   "suite teardown step env",
+			secret: "suiteteardown-secret-value",
+			src: `
+version: "1"
+suite:
+  name: s
+  teardown:
+    - run:
+        command: echo hi
+        env:
+          TOKEN: suiteteardown-secret-value
+secrets:
+  - TOKEN
+scenarios:
+  - name: has suite teardown
+    steps:
+      - run:
+          command: echo hi
+      - assert:
+          exit_code: 0
+`,
+		},
+		{
+			name:   "scenario teardown step env",
+			secret: "teardown-secret-value",
+			src: `
+version: "1"
+suite:
+  name: s
+secrets:
+  - TOKEN
+scenarios:
+  - name: has teardown
+    steps:
+      - run:
+          command: echo hi
+      - assert:
+          exit_code: 0
+    teardown:
+      - run:
+          command: echo bye
+          env:
+            TOKEN: teardown-secret-value
+`,
+		},
+		{
+			name:   "defaults scenario env",
+			secret: "defaults-secret-value",
+			src: `
+version: "1"
+suite:
+  name: s
+secrets:
+  - TOKEN
+defaults:
+  scenario:
+    env:
+      TOKEN: defaults-secret-value
+scenarios:
+  - name: inherits default env
+    steps:
+      - run:
+          command: echo hi
+      - assert:
+          exit_code: 0
+`,
+		},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			spc, err := loader.LoadBytes("t.atago.yaml", []byte(tc.src))
+			if err != nil {
+				t.Fatalf("load: %v", err)
+			}
+			m := NewMaskerForSpec(spc)
+			if got := m.Mask("leaked " + tc.secret + " here"); strings.Contains(got, tc.secret) {
+				t.Errorf("secret from %s not masked: %q", tc.name, got)
+			}
+		})
+	}
+}
