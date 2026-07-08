@@ -129,18 +129,6 @@ func runCmd(label string, args []string, stdout, stderr io.Writer) int {
 	// identity selector so only the recorded scenarios execute. With nothing
 	// recorded there is nothing to rerun, which is reported and treated as success.
 	//
-	// rerunPreserved holds recorded failures this rerun did NOT execute, which must
-	// be carried back into the saved ledger below. A rerun skips a recorded failure
-	// two ways: its spec is outside this run's targets (a narrowed
-	// `--rerun-failed a.atago.yaml` when b.atago.yaml also had recorded failures),
-	// or an active --filter/--tag/--skip-tag excludes it. Either way the scenario
-	// was not re-verified and is still failing, so overwriting the ledger with only
-	// what ran would forget still-failing work and could greenlight the loop. It is
-	// computed after the run from what actually executed, which covers both cases
-	// uniformly (tag exclusion cannot be predicted from the ledger, which stores
-	// only names). recordedFailures carries the loaded ledger to that computation.
-	var rerunPreserved []failedEntry
-	var recordedFailures []failedEntry
 	if *rerunFailed {
 		state, lerr := loadRerunState()
 		if lerr != nil {
@@ -168,7 +156,6 @@ func runCmd(label string, args []string, stdout, stderr io.Writer) int {
 			fmt.Fprintln(stderr, label+": no previously failed scenarios under the given targets")
 			return ExitOK
 		}
-		recordedFailures = state.Failed
 		eng.Select = sel
 	}
 
@@ -234,24 +221,6 @@ func runCmd(label string, args []string, stdout, stderr io.Writer) int {
 	for _, r := range results {
 		ranScenarios += len(r.Scenarios)
 	}
-	// Carry back recorded failures this rerun did not execute (spec outside the
-	// targets, or excluded by an active --filter/--tag/--skip-tag). They were not
-	// re-verified and are still failing, so they stay in the ledger; only scenarios
-	// that actually ran are re-decided below (recorded again if still failing,
-	// dropped if fixed).
-	if *rerunFailed {
-		executed := make(map[string]bool)
-		for _, r := range results {
-			for _, sc := range r.Scenarios {
-				executed[engine.ScenarioID(r.SpecPath, sc.Name)] = true
-			}
-		}
-		for _, e := range recordedFailures {
-			if !executed[engine.ScenarioID(e.SpecPath, e.Scenario)] {
-				rerunPreserved = append(rerunPreserved, e)
-			}
-		}
-	}
 	// A --rerun-failed run that matched NOTHING verified nothing, yet the recorded
 	// failures are still real: greenlighting it and clearing the state would
 	// silently forget still-failing work. Warn loudly, keep the state, and do not
@@ -269,25 +238,48 @@ func runCmd(label string, args []string, stdout, stderr io.Writer) int {
 		exit = worseExit(exit, ExitConfig)
 	}
 
-	// Record this run's failing scenarios for a later `--rerun-failed` (#64). The
-	// state reflects exactly the scenarios that ran: failures are recorded and a
-	// fully-green run clears the file. It is only rewritten when at least one suite
-	// loaded, so a run where every spec failed to parse leaves prior state intact;
-	// and a --rerun-failed that matched no scenario must NOT clear the file, or the
-	// still-failing work it could not map would be forgotten. A narrowed
-	// --rerun-failed carries back the recorded failures for specs outside its
-	// target (rerunPreserved), which it did not re-verify, so a partial rerun
-	// cannot silently drop still-failing work elsewhere in the ledger. Writing is
-	// best-effort — a read-only checkout must not fail the run — so a write error
-	// is a warning, not a fatal exit.
+	// Update the last-failed ledger for a later `--rerun-failed` (#64). The ledger
+	// reflects what this run decided about the scenarios it EXECUTED — a failure is
+	// recorded, a pass is cleared — while PRESERVING every recorded failure the run
+	// did not execute. A run that touches only a subset of scenarios (a narrowed
+	// --rerun-failed, a --filter/--tag/--skip-tag selection, or simply running a
+	// different or smaller set of specs) must not drop still-failing work elsewhere:
+	// overwriting the ledger with only what ran would forget it and could greenlight
+	// a later --rerun-failed while real failures remain. So a fully-green run of the
+	// SAME specs clears the file, but a green run of an unrelated spec keeps the
+	// other spec's recorded failures. The ledger is left untouched when no suite
+	// loaded (prior state stays intact) and when a --rerun-failed matched nothing
+	// (its unmapped failures must survive). Writing is best-effort — a read-only
+	// checkout must not fail the run — so a write error is a warning, not a fatal
+	// exit.
 	if len(results) > 0 && !rerunMatchedNothing {
-		// Store portable (cwd-relative) spec paths so the ledger survives a project
-		// move. A --rerun-failed absolutizes paths in memory to match across
-		// spellings; persisting that absolute form would break the next rerun after
-		// the directory moves.
-		entries := portableEntries(append(collectFailures(results), rerunPreserved...))
-		if err := saveRerunState(entries); err != nil {
-			fmt.Fprintf(stderr, label+": could not update %s: %v\n", rerunStatePath(), err)
+		prior, perr := loadRerunState()
+		if perr != nil {
+			// A corrupt or future-version ledger: do not overwrite it and destroy
+			// recorded failures we cannot read. (--rerun-failed already exited above on
+			// this same error, so this only guards a plain run.)
+			fmt.Fprintf(stderr, label+": cannot read %s; leaving it untouched: %v\n", rerunStatePath(), perr)
+		} else {
+			executed := make(map[string]bool, ranScenarios)
+			for _, r := range results {
+				for _, sc := range r.Scenarios {
+					executed[canonicalScenarioID(r.SpecPath, sc.Name)] = true
+				}
+			}
+			var preserved []failedEntry
+			for _, e := range prior.Failed {
+				if !executed[canonicalScenarioID(e.SpecPath, e.Scenario)] {
+					preserved = append(preserved, e)
+				}
+			}
+			// Store portable (cwd-relative) spec paths so the ledger survives a project
+			// move. A --rerun-failed absolutizes paths in memory to match across
+			// spellings; persisting that absolute form would break the next rerun after
+			// the directory moves.
+			entries := dedupeEntries(portableEntries(append(collectFailures(results), preserved...)))
+			if err := saveRerunState(entries); err != nil {
+				fmt.Fprintf(stderr, label+": could not update %s: %v\n", rerunStatePath(), err)
+			}
 		}
 	}
 

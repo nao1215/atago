@@ -201,6 +201,32 @@ func intersectPaths(paths, keep []string) []string {
 	return out
 }
 
+// canonicalScenarioID is engine.ScenarioID with the spec path canonicalized, so
+// a recorded failure matches an executed scenario whether their paths are spelled
+// relative or absolute (or reach the same file through a symlinked temp dir).
+// Comparing raw ScenarioID strings would miss equivalent-but-differently-spelled
+// paths and let a preserved failure be dropped or double-counted.
+func canonicalScenarioID(specPath, scenario string) string {
+	return engine.ScenarioID(absClean(specPath), scenario)
+}
+
+// dedupeEntries removes duplicate (spec_path, scenario) entries, keeping
+// first-seen order, so a failure preserved from the prior ledger and the same
+// failure freshly recorded this run never both land in the file.
+func dedupeEntries(in []failedEntry) []failedEntry {
+	seen := make(map[string]bool, len(in))
+	var out []failedEntry
+	for _, e := range in {
+		k := e.SpecPath + "\x00" + e.Scenario
+		if seen[k] {
+			continue
+		}
+		seen[k] = true
+		out = append(out, e)
+	}
+	return out
+}
+
 // collectFailures extracts the failing scenario identities from a set of suite
 // results and their spec paths, in a deterministic order.
 func collectFailures(results []*engine.SuiteResult) []failedEntry {

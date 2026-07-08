@@ -472,17 +472,60 @@ func TestRerunFailed_NothingRecorded(t *testing.T) {
 func TestRerunFailed_GreenRunClearsState(t *testing.T) {
 	dir := t.TempDir()
 	withWorkdir(t, dir, func() {
-		// Seed a state file, then a fully-green run should remove it.
-		if err := saveRerunState([]failedEntry{{SpecPath: "x.atago.yaml", Scenario: "old"}}); err != nil {
-			t.Fatal(err)
-		}
-		writeSpec(t, dir, "ok.atago.yaml", passingSpec)
+		// A spec that fails, records its failure, then is fixed and re-run green:
+		// re-running THE SAME spec re-decides its scenario and clears the ledger.
+		writeSpec(t, dir, "s.atago.yaml", singleFailSpec("s", false))
 		var out, errb bytes.Buffer
-		if got := Main([]string{"run", "ok.atago.yaml"}, &out, &errb); got != ExitOK {
-			t.Fatalf("exit = %d (stderr=%s)", got, errb.String())
+		if got := Main([]string{"run", "s.atago.yaml"}, &out, &errb); got != ExitFailures {
+			t.Fatalf("failing run exit = %d, want %d (stderr=%s)", got, ExitFailures, errb.String())
+		}
+		writeSpec(t, dir, "s.atago.yaml", singleFailSpec("s", true))
+		out.Reset()
+		errb.Reset()
+		if got := Main([]string{"run", "s.atago.yaml"}, &out, &errb); got != ExitOK {
+			t.Fatalf("fixed run exit = %d (stderr=%s)", got, errb.String())
 		}
 		if _, err := os.Stat(rerunStatePath()); !os.IsNotExist(err) {
-			t.Errorf("green run did not clear rerun state file (err=%v)", err)
+			t.Errorf("re-running the fixed spec did not clear the rerun state file (err=%v)", err)
+		}
+	})
+}
+
+// TestRun_UnrelatedGreenRunPreservesRecordedFailures is a regression: a green run
+// that does not execute a recorded failure — running an unrelated spec, or a
+// --filter that excludes the failing scenario — must not clear that failure from
+// the ledger. Overwriting the ledger with only what ran forgot still-failing work
+// and let the next --rerun-failed exit 0 while the failure was still real. The
+// preserve rule the narrowed-rerun path always used now applies to every run.
+func TestRun_UnrelatedGreenRunPreservesRecordedFailures(t *testing.T) {
+	dir := t.TempDir()
+	writeSpec(t, dir, "fail.atago.yaml", singleFailSpec("f", false))
+	writeSpec(t, dir, "ok.atago.yaml", passingSpec)
+
+	withWorkdir(t, dir, func() {
+		var out, errb bytes.Buffer
+		// Record f_fail.
+		if got := Main([]string{"run", "fail.atago.yaml"}, &out, &errb); got != ExitFailures {
+			t.Fatalf("first run exit = %d, want %d (stderr=%s)", got, ExitFailures, errb.String())
+		}
+		// Run an unrelated green spec: it must not touch fail.atago.yaml's record.
+		out.Reset()
+		errb.Reset()
+		if got := Main([]string{"run", "ok.atago.yaml"}, &out, &errb); got != ExitOK {
+			t.Fatalf("unrelated green run exit = %d (stderr=%s)", got, errb.String())
+		}
+		st, err := loadRerunState()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(st.Failed) != 1 || st.Failed[0].Scenario != "f_fail" {
+			t.Fatalf("ledger = %+v, want f_fail preserved after an unrelated green run", st.Failed)
+		}
+		// The still-real failure is therefore still caught by --rerun-failed.
+		out.Reset()
+		errb.Reset()
+		if got := Main([]string{"run", "--rerun-failed", "."}, &out, &errb); got != ExitFailures {
+			t.Fatalf("--rerun-failed exit = %d, want %d (the preserved failure must still be caught); stderr=%s", got, ExitFailures, errb.String())
 		}
 	})
 }
@@ -706,6 +749,50 @@ func TestRerunFailed_AbsolutePathMatchesRelativeLedger(t *testing.T) {
 		abs := filepath.Join(dir, "s.atago.yaml")
 		if got := Main([]string{"run", "--rerun-failed", abs}, &out, &errb); got != ExitFailures {
 			t.Fatalf("absolute-path rerun exit = %d, want %d (recorded failure was not selected); stderr=%s", got, ExitFailures, errb.String())
+		}
+	})
+}
+
+// TestRun_FilteredGreenRunPreservesExcludedFailure proves a plain run whose
+// --filter excludes a recorded failing scenario does not clear that failure, the
+// same way a narrowed --rerun-failed preserves it. Only scenarios that actually
+// ran are re-decided.
+func TestRun_FilteredGreenRunPreservesExcludedFailure(t *testing.T) {
+	dir := t.TempDir()
+	writeSpec(t, dir, "m.atago.yaml", twoFailingSpec)
+
+	withWorkdir(t, dir, func() {
+		var out, errb bytes.Buffer
+		// Record alpha_fail and beta_fail.
+		if got := Main([]string{"run", "m.atago.yaml"}, &out, &errb); got != ExitFailures {
+			t.Fatalf("first run exit = %d, want %d (stderr=%s)", got, ExitFailures, errb.String())
+		}
+		// Fix alpha, then run with a --filter that only touches alpha: beta_fail was
+		// not re-run and is still broken, so it must survive.
+		writeSpec(t, dir, "m.atago.yaml", `version: "1"
+suite:
+  name: multi
+scenarios:
+  - name: alpha_fail
+    steps:
+      - run: {shell: true, command: "exit 0"}
+      - assert: {exit_code: 0}
+  - name: beta_fail
+    steps:
+      - run: {shell: true, command: "exit 1"}
+      - assert: {exit_code: 0}
+`)
+		out.Reset()
+		errb.Reset()
+		if got := Main([]string{"run", "--filter", "alpha_fail", "m.atago.yaml"}, &out, &errb); got != ExitOK {
+			t.Fatalf("filtered run exit = %d (stderr=%s)", got, errb.String())
+		}
+		st, err := loadRerunState()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(st.Failed) != 1 || st.Failed[0].Scenario != "beta_fail" {
+			t.Errorf("ledger = %+v, want only beta_fail (alpha re-verified green, beta preserved)", st.Failed)
 		}
 	})
 }
