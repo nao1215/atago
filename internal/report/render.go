@@ -73,7 +73,7 @@ func Render(w io.Writer, f Format, results []*engine.SuiteResult, opts ...Option
 		hardFail := false
 		for _, res := range results {
 			for i := range res.Scenarios {
-				writeDetail(&b, color, res.Suite, &res.Scenarios[i])
+				writeDetail(&b, color, res.Suite, res.SpecPath, &res.Scenarios[i])
 			}
 			writeSuiteDetail(&b, color, res)
 			writeRepeatRates(&b, color, res)

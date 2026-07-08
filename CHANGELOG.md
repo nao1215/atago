@@ -9,6 +9,12 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Console failure blocks now say WHERE and WHY without a `--verbose` detour:
+  every `FAILED:` / `ERROR:` / `TEARDOWN FAILED:` header names the spec file
+  that produced it (`FAILED: suite / scenario  (specs/convert.atago.yaml)`),
+  and an `exit_code` failure appends the failing command's captured stderr
+  tail (or its stdout tail when stderr is silent) — the actual error a command
+  printed on its way out, previously visible only under `--verbose`.
 - A hosted documentation website, https://nao1215.github.io/atago/, built
   with Hugo from the committed docs (no content is duplicated: `doc/cookbook.md`,
   `doc/examples.md`, `doc/real-world.md`, and the generated behavior docs under

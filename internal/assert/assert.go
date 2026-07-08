@@ -27,7 +27,13 @@ func intList(ns []int) string {
 
 // CheckResult is the structured outcome of one assertion.
 type CheckResult struct {
-	OK       bool
+	OK bool
+	// Target is the assertion target family that produced this result (the
+	// spec.AssertTarget string, e.g. "exit_code", "stdout", "file"). Reports
+	// branch on it structurally — e.g. the console failure block appends the
+	// captured stderr tail only for exit_code failures — instead of sniffing
+	// the human-facing Desc.
+	Target   string
 	Desc     string // human label, e.g. `assert stdout contains "Alice"`
 	Expected string
 	Actual   string
@@ -115,7 +121,9 @@ func CheckAll(a *spec.Assert, res *runner.Result, env Env) []*CheckResult {
 	}
 	out := make([]*CheckResult, 0, len(targets))
 	for _, t := range targets {
-		out = append(out, checkTarget(a, t, res, env))
+		r := checkTarget(a, t, res, env)
+		r.Target = string(t)
+		out = append(out, r)
 	}
 	return out
 }
