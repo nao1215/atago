@@ -146,7 +146,7 @@ site: ## Regenerate the browsable docs site under site/ (drift-guarded by TestSi
 	env UPDATE_SITE=1 $(GO) test -run TestSite_InSync .
 
 website: ## Build the hosted documentation website into website/public (requires hugo on PATH)
-	cd website && hugo --gc --minify
+	cd website && hugo --gc --minify --cleanDestinationDir
 
 website-serve: ## Serve the website locally with live reload (requires hugo on PATH)
 	cd website && hugo server

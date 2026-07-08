@@ -24,18 +24,30 @@ and this project follows [Semantic Versioning](https://semver.org/).
   fixture sources (`from:`/`base64:`/`mode:`/`mtime:`/`symlink:`), binary
   safety, boundary inputs, db/ssh/grpc/browser peers, matrix release
   comparison, tags, defaults, and suite layout guidance.
-- A "Write specs with an LLM" website page with a constrained, copy-paste
-  prompt for generating honest atago specs, plus an auto-generated
-  [/llms.txt](https://nao1215.github.io/atago/llms.txt) index for LLM agents.
 - Website polish: per-page "On this page" TOC, hover heading anchors, a copy
   button on code blocks, active-nav state, card-grid landing links, and zebra
   tables — plus landing sections spotlighting record, snapshot, and PTY/TUI
   strengths.
+- A generated "Spec file keys" reference on the website's Reference page:
+  every key a spec accepts, rendered from `schema/atago.schema.json` with its
+  nesting, type, description, and the atago release that introduced it
+  (`website/data/spec_keys.json`, regenerated from release tags by
+  `website/tools/gen-spec-keys.py`).
+- Descriptions for every property in `schema/atago.schema.json` (58 → all 329
+  described), so YAML-language-server hovers and the generated key reference
+  document each key, not just the well-known ones.
 
 ### Changed
 
-- README now links the hosted cookbook and examples index from its Examples
-  section, and points to the documentation site under the tagline.
+- README now links the hosted cookbook from its Examples section and points to
+  the documentation site under the tagline.
+- The website's Cookbook and Examples pages are merged into one `/cookbook/`
+  page: the by-task index, the recipes, then the runnable per-feature example
+  index (the committed `doc/cookbook.md` and `doc/examples.md` stay separate).
+- [doc/real-world.md](doc/real-world.md) and every third-party page under
+  `/real-world/` now state explicitly that the atago project wrote and runs
+  these suites on its own initiative — they are not the upstream projects'
+  official test suites, and those projects are not affiliated with atago.
 
 ## [0.9.0] - 2026-07-08
 

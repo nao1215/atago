@@ -44,11 +44,9 @@ A `pty:` step runs the command in a real pseudo-terminal — on Windows too (Con
 
 - [Install](/install/) — `go install`, Homebrew, AUR, prebuilt binaries, a GitHub Action.
 - [Getting started](/getting-started/) — record a real run, read the spec it wrote, keep it as a test.
-- [Cookbook](/cookbook/) — 50+ copyable recipes, from image conversion to API-failure simulation to TUI frames.
-- [Examples](/examples/) — every feature has a commented, runnable spec, tested in CI on Linux, macOS, and Windows.
+- [Cookbook](/cookbook/) — 50+ copyable recipes indexed by task, plus the runnable, CI-tested example for every feature.
 - [Use it in CI](/ci/) — report formats, retries, flake detection, artifacts, secret masking.
-- [Reference](/reference/) — subcommands, selection flags, exit codes, editor schema.
-- [Write specs with an LLM](/llm/) — a ready-made prompt that keeps generated specs honest.
-- [Real CLIs tested with atago](/real-world/) — 40+ programs from jq to terraform to htop, each with executable specs and generated behavior docs.
+- [Reference](/reference/) — subcommands, exit codes, and every spec key with the release that introduced it.
+- [Real CLIs tested with atago](/real-world/) — 40+ programs from jq to terraform to htop that atago tests on its own initiative, each with executable specs and generated behavior docs.
 
 Everything on this site comes from files committed in the [repository](https://github.com/nao1215/atago). The behavior docs are regenerated from executable specs, and drift tests fail the build when docs and specs disagree — if an example is on this site, it runs.

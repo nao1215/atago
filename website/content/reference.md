@@ -42,6 +42,22 @@ scrub:
 
 See the [scrub example](https://github.com/nao1215/atago/blob/main/examples/scrub.atago.yaml).
 
+## Spec file keys
+
+Every key a spec file accepts, generated from the committed
+[JSON Schema](https://github.com/nao1215/atago/blob/main/schema/atago.schema.json)
+— the same document that powers editor completion, so this reference cannot
+drift from what the loader accepts. Indentation shows nesting; a type that
+links (like [step](#spec-step)) is documented in its own section rather than
+repeated inline.
+
+All keys belong to spec format version `1` — the only format version so far;
+`version: "1"` is the first line of every spec. **Since** is the atago release
+that introduced the key (`unreleased` = merged to main, not yet in a tagged
+release).
+
+{{< spec-reference >}}
+
 ## Editor support (JSON Schema)
 
 A JSON Schema lives at [schema/atago.schema.json](https://github.com/nao1215/atago/blob/main/schema/atago.schema.json). With the YAML language server you get completion and validation as you type — step types, every matcher, and the `${workdir}` / `${env:NAME}` / `${name}` / `$${...}` expansion rules. `atago init` and `atago record` already emit this header as the first line of every generated spec, so scaffolded specs get completion out of the box. To add it to an existing spec, use the absolute URL (it resolves in any project, unlike a repo-relative path):

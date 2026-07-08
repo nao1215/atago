@@ -1,0 +1,26 @@
+{{- /* Recursive table rows for one object schema node.
+     Args: root (whole schema), node (object schema), base (since-map lookup
+     prefix), depth (display indent), since (map key path -> version). $ref'd
+     definitions are NOT expanded — the type column links to their section. */ -}}
+{{- $root := .root -}}
+{{- $since := .since -}}
+{{- $base := .base -}}
+{{- $depth := .depth -}}
+{{- $node := .node -}}
+{{- with $node.properties -}}
+  {{- range $key, $prop := . -}}
+    {{- partial "spec-row.html" (dict "root" $root "key" $key "prop" $prop "base" $base "depth" $depth "since" $since "required" $node.required) -}}
+  {{- end -}}
+{{- end -}}
+{{- range $variant := (default (slice) $node.oneOf) -}}
+  {{- with $variant.properties -}}
+    {{- $label := "" -}}
+    {{- with (index . "type") }}{{ with .const }}{{ $label = . }}{{ end }}{{ end -}}
+    {{- if $label -}}
+      <tr class="variant"><td colspan="4">type: <code>{{ $label }}</code></td></tr>
+    {{- end -}}
+    {{- range $key, $prop := . -}}
+      {{- partial "spec-row.html" (dict "root" $root "key" $key "prop" $prop "base" $base "depth" $depth "since" $since "required" $variant.required) -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}

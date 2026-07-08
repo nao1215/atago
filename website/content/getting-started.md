@@ -138,4 +138,4 @@ ssh       run a command on a remote host over SSH (edit host/user first)
 
 ## Next
 
-The [cookbook](/cookbook/) has a copyable spec for most jobs, the [examples](/examples/) index covers every feature, and [Use it in CI](/ci/) wires a suite into GitHub Actions.
+The [cookbook](/cookbook/) has a copyable spec for most jobs and indexes the runnable example for every feature, and [Use it in CI](/ci/) wires a suite into GitHub Actions.

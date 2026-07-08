@@ -1,0 +1,65 @@
+{{- /* Renders the spec-key reference from schema/atago.schema.json (mounted
+     read-only) and data/spec_keys.json (key path -> first atago release).
+     One section per top-level area and per $defs definition; a $ref is linked,
+     not inline-expanded, so shared shapes appear exactly once. */ -}}
+{{- $schema := resources.Get "schema/atago.schema.json" | transform.Unmarshal -}}
+{{- $since := hugo.Data.spec_keys.keys -}}
+{{- $defs := index $schema "$defs" -}}
+
+{{- $sections := slice
+  (dict "id" "top-level" "title" "Top level" "node" $schema "base" ""
+        "desc" "The keys of a spec file document.")
+  (dict "id" "scenario" "title" "scenarios[*]" "def" "scenario")
+  (dict "id" "step" "title" "steps[*]" "def" "step")
+  (dict "id" "fixture" "title" "fixture" "def" "fixture")
+  (dict "id" "run" "title" "run" "def" "run")
+  (dict "id" "pty" "title" "pty" "def" "pty")
+  (dict "id" "http" "title" "http" "def" "http")
+  (dict "id" "query" "title" "query" "def" "query")
+  (dict "id" "grpc" "title" "grpc" "def" "grpc")
+  (dict "id" "cdp" "title" "cdp" "def" "cdp")
+  (dict "id" "store" "title" "store" "def" "store")
+  (dict "id" "signal" "title" "signal" "def" "signal")
+  (dict "id" "service" "title" "service" "def" "service")
+  (dict "id" "mockServer" "title" "mock_server" "def" "mockServer")
+  (dict "id" "mockRoute" "title" "mock_server routes[*]" "def" "mockRoute")
+  (dict "id" "assert" "title" "assert" "def" "assert")
+  (dict "id" "stream" "title" "stream matchers (stdout / stderr / body / rows / message / value / screen)" "def" "stream")
+  (dict "id" "exitCode" "title" "exit_code" "def" "exitCode")
+  (dict "id" "file" "title" "file" "def" "file")
+  (dict "id" "dir" "title" "dir" "def" "dir")
+  (dict "id" "changesAssert" "title" "changes" "def" "changesAssert")
+  (dict "id" "durationAssert" "title" "duration" "def" "durationAssert")
+  (dict "id" "image" "title" "image" "def" "image")
+  (dict "id" "pdf" "title" "pdf" "def" "pdf")
+  (dict "id" "mockAssert" "title" "mock" "def" "mockAssert")
+  (dict "id" "headerMatch" "title" "header matcher" "def" "headerMatch")
+  (dict "id" "jsonAssert" "title" "json / yaml checks" "def" "jsonAssert")
+  (dict "id" "retry" "title" "retry" "def" "retry")
+  (dict "id" "condition" "title" "skip / only conditions" "def" "condition")
+  (dict "id" "runner" "title" "runners.<name>" "def" "runner")
+  (dict "id" "defaults" "title" "defaults" "def" "defaults")
+-}}
+
+<div class="spec-reference">
+{{- range $s := $sections -}}
+  {{- $node := $s.node -}}
+  {{- $base := $s.base -}}
+  {{- $desc := $s.desc -}}
+  {{- with $s.def -}}
+    {{- $node = index $defs . -}}
+    {{- $base = . -}}
+    {{- if not $desc }}{{ $desc = $node.description }}{{ end -}}
+  {{- end -}}
+  {{- if $node -}}
+<h3 id="spec-{{ $s.id }}"><code>{{ $s.title }}</code> <a class="hlink" href="#spec-{{ $s.id }}" aria-label="Link to this section">#</a></h3>
+{{- with $desc }}<p>{{ . | markdownify }}</p>{{ end }}
+<table>
+<thead><tr><th>Key</th><th>Type</th><th>Description</th><th>Since</th></tr></thead>
+<tbody>
+{{- partial "spec-rows.html" (dict "root" $schema "node" $node "base" $base "depth" 0 "since" $since) -}}
+</tbody>
+</table>
+  {{- end -}}
+{{- end -}}
+</div>

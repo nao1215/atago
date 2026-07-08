@@ -1,0 +1,82 @@
+{{- /* One key row (and its inline children).
+     Args: root, key, prop, base, depth, since, required (list). */ -}}
+{{- $root := .root -}}
+{{- $key := .key -}}
+{{- $prop := .prop -}}
+{{- $base := .base -}}
+{{- $depth := .depth -}}
+{{- $since := .since -}}
+{{- $lookup := $key -}}
+{{- if $base }}{{ $lookup = printf "%s.%s" $base $key }}{{ end -}}
+{{- /* a JSON Schema can be the boolean `true` (any value allowed) */ -}}
+{{- if not (reflect.IsMap $prop) }}{{ $prop = dict }}{{ end -}}
+
+{{- /* type cell + which node (if any) to expand inline */ -}}
+{{- $type := "" -}}
+{{- $expand := dict -}}
+{{- $expandBase := $lookup -}}
+{{- if $prop.enum -}}
+  {{- $vals := slice -}}
+  {{- range $prop.enum }}{{ $vals = $vals | append (printf "%v" .) }}{{ end -}}
+  {{- $type = delimit $vals " | " -}}
+{{- else if (index $prop "$ref") -}}
+  {{- $def := path.Base (index $prop "$ref") -}}
+  {{- $type = printf `<a href="#spec-%s">%s</a>` $def $def -}}
+{{- else if eq $prop.type "array" -}}
+  {{- $items := default (dict) $prop.items -}}
+  {{- if (index $items "$ref") -}}
+    {{- $def := path.Base (index $items "$ref") -}}
+    {{- $type = printf `array of <a href="#spec-%s">%s</a>` $def $def -}}
+  {{- else if $items.properties -}}
+    {{- $type = "array of objects" -}}
+    {{- $expand = $items -}}
+    {{- $expandBase = printf "%s[]" $lookup -}}
+  {{- else -}}
+    {{- $type = printf "array of %s" (default "any" $items.type) -}}
+  {{- end -}}
+{{- else if $prop.properties -}}
+  {{- $type = "object" -}}
+  {{- $expand = $prop -}}
+{{- else if $prop.additionalProperties -}}
+  {{- $ap := $prop.additionalProperties -}}
+  {{- if reflect.IsMap $ap -}}
+    {{- if (index $ap "$ref") -}}
+      {{- $def := path.Base (index $ap "$ref") -}}
+      {{- $type = printf `map of <a href="#spec-%s">%s</a>` $def $def -}}
+    {{- else -}}
+      {{- $type = printf "map of %s" (default "any" $ap.type) -}}
+    {{- end -}}
+  {{- else -}}
+    {{- $type = "map" -}}
+  {{- end -}}
+{{- else if $prop.oneOf -}}
+  {{- $vals := slice -}}
+  {{- range $prop.oneOf -}}
+    {{- if .properties }}{{ $vals = $vals | append "object" }}{{ else }}{{ $vals = $vals | append (default "any" .type) }}{{ end -}}
+  {{- end -}}
+  {{- $type = delimit ($vals | uniq) " | " -}}
+{{- else -}}
+  {{- $type = default "any" $prop.type -}}
+  {{- if reflect.IsSlice $type }}{{ $type = delimit $type " | " }}{{ end -}}
+{{- end -}}
+
+{{- $ver := index (default (dict) $since) $lookup | default "unreleased" -}}
+{{- $req := in (default (slice) .required) $key -}}
+<tr>
+<td class="spec-key" style="padding-left:{{ printf "%.1f" (add 0.7 (mul $depth 1.4)) }}rem"><code>{{ $key }}</code></td>
+<td class="spec-type">{{ $type | safeHTML }}</td>
+<td>{{ if $req }}<strong>Required.</strong> {{ end }}{{ default "" $prop.description | markdownify }}</td>
+<td class="spec-since"><code>{{ $ver }}</code></td>
+</tr>
+{{- /* expand inline (non-$ref) object children */ -}}
+{{- if $expand.properties -}}
+  {{- partial "spec-rows.html" (dict "root" $root "node" $expand "base" $expandBase "depth" (add $depth 1) "since" $since) -}}
+{{- end -}}
+{{- /* inline oneOf with object variants and no top-level properties (stdin, exit_code) */ -}}
+{{- if and $prop.oneOf (not $prop.properties) (not (index $prop "$ref")) -}}
+  {{- range $variant := $prop.oneOf -}}
+    {{- if $variant.properties -}}
+      {{- partial "spec-rows.html" (dict "root" $root "node" $variant "base" $lookup "depth" (add $depth 1) "since" $since) -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
