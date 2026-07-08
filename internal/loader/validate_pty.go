@@ -3,7 +3,6 @@ package loader
 import (
 	"fmt"
 	"regexp"
-	"time"
 
 	"github.com/nao1215/atago/internal/spec"
 )
@@ -15,15 +14,7 @@ func validatePTY(add func(string, ...any), where string, p *spec.PTY) {
 	if p.Command == "" {
 		add("%s.pty.command is required", where)
 	}
-	if p.Timeout != "" {
-		d, err := time.ParseDuration(p.Timeout)
-		switch {
-		case err != nil:
-			add("%s.pty.timeout %q is not a valid duration (e.g. \"30s\")", where, p.Timeout)
-		case d <= 0:
-			add("%s.pty.timeout must be positive (got %q); omit it for the 30s default", where, p.Timeout)
-		}
-	}
+	positiveDuration(add, where+".pty.timeout", p.Timeout, "30s", "30s")
 	validateHermeticEnv(add, where+".pty", p.ClearEnv, p.PassEnv)
 	// A pty size is a uint16 on the wire; reject values the terminal cannot
 	// represent instead of silently truncating.

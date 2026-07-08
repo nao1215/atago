@@ -36,7 +36,7 @@ func Run(ctx context.Context, p *spec.PTY, workdir string, env []string) (*runne
 	}
 	cmd.Dir = workdir
 	if p.Cwd != "" {
-		cmd.Dir = resolveCwd(workdir, p.Cwd)
+		cmd.Dir = runnercmd.ResolveDir(workdir, p.Cwd)
 	}
 	cmd.Env = env
 	// A fresh process group so cleanup kills the whole tree, mirroring the cmd

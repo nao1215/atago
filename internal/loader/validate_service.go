@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/nao1215/atago/internal/spec"
 )
@@ -50,17 +49,8 @@ func validateReady(add func(string, ...any), where string, r *spec.Ready) {
 	if r.Store != "" && r.File == "" {
 		add("%s.ready.store requires file (the file whose content is captured)", where)
 	}
-	for _, d := range []struct {
-		key, val string
-	}{{"timeout", r.Timeout}, {"delay", r.Delay}} {
-		if d.val != "" {
-			if dur, err := time.ParseDuration(d.val); err != nil {
-				add("%s.ready.%s %q is not a valid duration", where, d.key, d.val)
-			} else if dur < 0 {
-				add("%s.ready.%s must not be negative (got %q); a wall-clock bound is never below zero", where, d.key, d.val)
-			}
-		}
-	}
+	nonNegativeDuration(add, where+".ready.timeout", r.Timeout, "5s")
+	nonNegativeDuration(add, where+".ready.delay", r.Delay, "500ms")
 	if r.Log != "" {
 		if _, err := regexp.Compile(r.Log); err != nil {
 			add("%s.ready.log %q is not a valid regexp: %v", where, r.Log, err)
@@ -118,12 +108,6 @@ func validateMockRoutes(add func(string, ...any), where string, routes []spec.Mo
 		if rt.Status != 0 && (rt.Status < 100 || rt.Status > 599) {
 			add("%s.status %d is not a valid HTTP status", rw, rt.Status)
 		}
-		if rt.Delay != "" {
-			if d, err := time.ParseDuration(rt.Delay); err != nil {
-				add("%s.delay %q is not a valid duration (e.g. \"500ms\")", rw, rt.Delay)
-			} else if d < 0 {
-				add("%s.delay must not be negative (got %q); a wall-clock bound is never below zero", rw, rt.Delay)
-			}
-		}
+		nonNegativeDuration(add, rw+".delay", rt.Delay, "500ms")
 	}
 }

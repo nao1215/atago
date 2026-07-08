@@ -4,7 +4,6 @@ import (
 	"maps"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/nao1215/atago/internal/spec"
 )
@@ -29,13 +28,7 @@ func validateSignal(add func(string, ...any), where string, sg *spec.Signal, ser
 	case !spec.ValidSignalName(sg.Signal):
 		add("%s.signal.signal %q is not an accepted signal (TERM, INT, HUP, USR1, USR2, or KILL, with an optional SIG prefix)", where, sg.Signal)
 	}
-	if sg.Wait != nil && sg.Wait.Timeout != "" {
-		d, err := time.ParseDuration(sg.Wait.Timeout)
-		switch {
-		case err != nil:
-			add("%s.signal.wait.timeout %q is not a valid duration (e.g. \"5s\")", where, sg.Wait.Timeout)
-		case d <= 0:
-			add("%s.signal.wait.timeout must be positive (got %q); omit it for the 5s default", where, sg.Wait.Timeout)
-		}
+	if sg.Wait != nil {
+		positiveDuration(add, where+".signal.wait.timeout", sg.Wait.Timeout, "5s", "5s")
 	}
 }

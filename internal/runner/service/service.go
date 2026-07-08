@@ -248,14 +248,18 @@ func (p *Proc) waitReady(ctx context.Context, r *spec.Ready, workdir string) (st
 		}
 		// Rescan only when new bytes arrived: the probe polls every 20ms, and
 		// copying + re-matching the whole capture on every idle tick is
-		// O(output²) across a readiness window for a chatty service.
-		lastLen := -1
+		// O(output²) across a readiness window for a chatty service. The
+		// freshness signal must be the MONOTONIC written-byte total, not the
+		// retained length — once a capped buffer reaches max_log_bytes its
+		// length never changes again, and a length-based check would stop
+		// rescanning exactly while the ready line is still streaming in.
+		var lastTotal int64 = -1
 		return "", p.poll(ctx, timeout, func() bool {
-			n := p.out.Len()
-			if n == lastLen {
+			n := p.out.TotalWritten()
+			if n == lastTotal {
 				return false
 			}
-			lastLen = n
+			lastTotal = n
 			return re.MatchString(p.out.String())
 		})
 	default:
@@ -331,12 +335,14 @@ type syncBuffer struct {
 	buf     bytes.Buffer
 	cap     int
 	dropped int64
+	total   int64
 }
 
 func (b *syncBuffer) Write(p []byte) (int, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	n, err := b.buf.Write(p)
+	b.total += int64(n)
 	if b.cap > 0 && b.buf.Len() > b.cap {
 		over := b.buf.Len() - b.cap
 		b.buf.Next(over) // discard the oldest bytes
@@ -354,10 +360,11 @@ func (b *syncBuffer) String() string {
 	return b.buf.String()
 }
 
-// Len reports the retained byte count (without any truncation notice), letting
-// the log probe skip rescans when nothing new arrived.
-func (b *syncBuffer) Len() int {
+// TotalWritten reports the monotonic count of bytes ever written, letting the
+// log probe skip rescans when nothing new arrived. The retained length is
+// useless for that: it stops changing the moment the buffer reaches its cap.
+func (b *syncBuffer) TotalWritten() int64 {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	return b.buf.Len()
+	return b.total
 }
