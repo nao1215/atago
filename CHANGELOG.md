@@ -86,6 +86,12 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Union-shape spec errors (`exit_code`, `stdin`, pty `send`, `json`/`yaml`
+  check lists) now carry the same `[line:col]` annotation, source excerpt, and
+  caret a typo'd key gets, pointing at the offending value. Previously they
+  were bare messages — in a 300-line spec with a dozen `exit_code` asserts,
+  "exit_code must be an integer … got \"zero\"" named neither scenario, step,
+  nor line.
 - `retry.interval` now rejects negative durations at load time like every
   other duration field (a negative interval silently behaved as "no wait").
   All duration validation shares one helper, so bounds and wording can no

@@ -1,6 +1,11 @@
 package spec
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/goccy/go-yaml"
+	"github.com/goccy/go-yaml/ast"
+)
 
 // Stdin is a run step's standard-input source (#18). It accepts either the
 // historical scalar string (inline text) or a mapping with exactly one of
@@ -31,25 +36,29 @@ func (s Stdin) IsZero() bool {
 func (s Stdin) IsMapping() bool { return s.mapped }
 
 // UnmarshalYAML decodes stdin as a scalar string or a {file}/{base64} mapping.
-// It uses the interface-based decoder so escapes like "\x1b" in the inline
-// form are resolved by goccy's parser, matching the historical behavior.
-// Unknown mapping keys are rejected here (a custom unmarshaler bypasses the
-// loader's strict-decode), with the accepted shapes spelled out.
-func (s *Stdin) UnmarshalYAML(unmarshal func(any) error) error {
+// It decodes from the AST node so escapes like "\x1b" in the inline form stay
+// resolved by goccy's parser AND every shape error carries the offending
+// value's [line:col] for the loader's excerpt-and-caret formatter. Unknown
+// mapping keys are rejected here (a custom unmarshaler bypasses the loader's
+// strict-decode), with the accepted shapes spelled out.
+func (s *Stdin) UnmarshalYAML(node ast.Node) error {
+	fail := func(format string, args ...any) error {
+		return &yaml.SyntaxError{Message: fmt.Sprintf(format, args...), Token: node.GetToken()}
+	}
 	var one string
-	if err := unmarshal(&one); err == nil {
+	if err := yaml.NodeToValue(node, &one); err == nil {
 		s.Inline = one
 		return nil
 	}
 	var raw map[string]any
-	if err := unmarshal(&raw); err != nil {
-		return fmt.Errorf("stdin must be a string, {file: path}, or {base64: data}")
+	if err := yaml.NodeToValue(node, &raw); err != nil {
+		return fail("stdin must be a string, {file: path}, or {base64: data}")
 	}
 	s.mapped = true
 	for k, v := range raw {
 		str, ok := v.(string)
 		if !ok {
-			return fmt.Errorf("stdin.%s must be a string", k)
+			return fail("stdin.%s must be a string", k)
 		}
 		switch k {
 		case "file":
@@ -57,7 +66,7 @@ func (s *Stdin) UnmarshalYAML(unmarshal func(any) error) error {
 		case "base64":
 			s.Base64 = str
 		default:
-			return fmt.Errorf("stdin: unknown key %q (accepted: file, base64)", k)
+			return fail("stdin: unknown key %q (accepted: file, base64)", k)
 		}
 	}
 	return nil
