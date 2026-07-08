@@ -586,3 +586,77 @@ func TestStart_ContextCancellation(t *testing.T) {
 		t.Fatal("Stop() did not return after context cancellation")
 	}
 }
+
+// TestSyncBuffer_CapRetainsTail guards the max_log_bytes retention contract: a
+// chatty service must not grow atago's memory without bound (suite-level
+// services live for the whole run, and --parallel multiplies scenario
+// services), so the capture keeps only the newest bytes up to the cap and says
+// so. Every consumer — the readiness-failure excerpt, the preserved log
+// artifact (#51) — only ever needs the tail.
+func TestSyncBuffer_CapRetainsTail(t *testing.T) {
+	t.Parallel()
+	b := &syncBuffer{cap: 16}
+	for i := 0; i < 10; i++ {
+		if _, err := b.Write([]byte("0123456789")); err != nil {
+			t.Fatal(err)
+		}
+	}
+	out := b.String()
+	if !strings.Contains(out, "earlier output truncated") {
+		t.Errorf("Output = %q, want a truncation notice so a capped log never reads as complete", out)
+	}
+	if !strings.HasSuffix(out, "0123456789") {
+		t.Errorf("Output = %q, want the NEWEST bytes retained", out)
+	}
+	if tail := strings.SplitN(out, "\n", 2); len(tail) == 2 && len(tail[1]) > 16 {
+		t.Errorf("retained tail is %d bytes, want at most the 16-byte cap", len(tail[1]))
+	}
+
+	// Under the cap: no trimming, no notice.
+	small := &syncBuffer{cap: 64}
+	if _, err := small.Write([]byte("hello")); err != nil {
+		t.Fatal(err)
+	}
+	if got := small.String(); got != "hello" {
+		t.Errorf("Output = %q, want untouched content under the cap", got)
+	}
+}
+
+// TestStart_MaxLogBytesCapsOutput proves the spec key reaches the capture: a
+// service that writes more than its declared max_log_bytes retains only the
+// tail, and its readiness (a log probe on RECENT output) still works.
+func TestStart_MaxLogBytesCapsOutput(t *testing.T) {
+	t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skip("uses a POSIX shell one-liner")
+	}
+	svc := &spec.Service{
+		Name:        "chatty",
+		Command:     `sh -c 'i=0; while [ $i -lt 200 ]; do echo "noise line $i"; i=$((i+1)); done; echo READY-NOW; sleep 5'`,
+		Shell:       spec.Bool(true),
+		MaxLogBytes: 256,
+		Ready:       &spec.Ready{Log: "READY-NOW", Timeout: "5s"},
+	}
+	p, _, err := Start(context.Background(), svc, t.TempDir())
+	if err != nil {
+		t.Fatalf("Start: %v (output=%q)", err, outputOf(p))
+	}
+	defer p.Stop()
+	out := p.Output()
+	if !strings.Contains(out, "READY-NOW") {
+		t.Errorf("Output = %q, want the recent READY line retained", out)
+	}
+	if strings.Contains(out, "noise line 0\n") {
+		t.Errorf("Output = %q, want the oldest lines trimmed by the 256-byte cap", out)
+	}
+	if !strings.Contains(out, "earlier output truncated") {
+		t.Errorf("Output = %q, want the truncation notice", out)
+	}
+}
+
+func outputOf(p *Proc) string {
+	if p == nil {
+		return ""
+	}
+	return p.Output()
+}

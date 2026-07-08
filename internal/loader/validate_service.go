@@ -27,6 +27,9 @@ func validateServices(add func(string, ...any), where string, services []spec.Se
 			add("%s.command is required", sw)
 		}
 		validateHermeticEnv(add, sw, svc.ClearEnv, svc.PassEnv)
+		if svc.MaxLogBytes < 0 {
+			add("%s.max_log_bytes must be positive (got %d); omit it for the 8 MiB default", sw, svc.MaxLogBytes)
+		}
 		validateReady(add, sw, svc.Ready)
 	}
 }

@@ -254,6 +254,7 @@
   "service.command": "v0.1.0",
   "service.cwd": "v0.1.0",
   "service.env": "v0.1.0",
+  "service.max_log_bytes": "unreleased",
   "service.name": "v0.1.0",
   "service.pass_env": "v0.3.0",
   "service.ready": "v0.1.0",

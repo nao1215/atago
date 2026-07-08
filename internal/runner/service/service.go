@@ -33,6 +33,13 @@ const defaultReadyTimeout = 5 * time.Second
 // pollInterval is how often a file/port/log probe re-checks.
 const pollInterval = 20 * time.Millisecond
 
+// defaultMaxLogBytes caps a service's retained stdout/stderr when the spec
+// does not set services[].max_log_bytes: suite-level services live for the
+// whole run and --parallel multiplies scenario services, so an unbounded
+// capture lets one chatty server grow atago's memory without limit. 8 MiB of
+// tail is far more than any readiness excerpt or preserved log artifact needs.
+const defaultMaxLogBytes = 8 << 20
+
 // Proc is a running background service. Stop terminates it and its children.
 type Proc struct {
 	name string
@@ -59,7 +66,11 @@ func Start(ctx context.Context, svc *spec.Service, workdir string) (*Proc, strin
 		return nil, "", fmt.Errorf("service %q: %w", svc.Name, err)
 	}
 
-	out := &syncBuffer{}
+	maxLog := svc.MaxLogBytes
+	if maxLog <= 0 {
+		maxLog = defaultMaxLogBytes
+	}
+	out := &syncBuffer{cap: maxLog}
 	pc := newProcessCmd(ctx, name, args)
 	if svc.ShellEnabled() {
 		// On Windows this hands cmd.exe the raw command line; Go's default argv
@@ -235,7 +246,18 @@ func (p *Proc) waitReady(ctx context.Context, r *spec.Ready, workdir string) (st
 		if err != nil {
 			return "", fmt.Errorf("invalid ready.log regexp %q: %w", r.Log, err)
 		}
-		return "", p.poll(ctx, timeout, func() bool { return re.MatchString(p.out.String()) })
+		// Rescan only when new bytes arrived: the probe polls every 20ms, and
+		// copying + re-matching the whole capture on every idle tick is
+		// O(output²) across a readiness window for a chatty service.
+		lastLen := -1
+		return "", p.poll(ctx, timeout, func() bool {
+			n := p.out.Len()
+			if n == lastLen {
+				return false
+			}
+			lastLen = n
+			return re.MatchString(p.out.String())
+		})
 	default:
 		return "", nil
 	}
@@ -299,20 +321,43 @@ func (p *Proc) poll(ctx context.Context, timeout time.Duration, check func() boo
 }
 
 // syncBuffer is a bytes.Buffer safe for concurrent writes (the process's output
-// goroutine) and reads (the log readiness probe).
+// goroutine) and reads (the log readiness probe). cap bounds retention: once
+// the buffer exceeds it, the OLDEST bytes are dropped (every consumer — the
+// readiness excerpt, the preserved log artifact — wants the tail) and String
+// prepends an honest truncation notice so a capped log never reads as
+// complete. A zero cap means unbounded (only tests construct that).
 type syncBuffer struct {
-	mu  sync.Mutex
-	buf bytes.Buffer
+	mu      sync.Mutex
+	buf     bytes.Buffer
+	cap     int
+	dropped int64
 }
 
 func (b *syncBuffer) Write(p []byte) (int, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	return b.buf.Write(p)
+	n, err := b.buf.Write(p)
+	if b.cap > 0 && b.buf.Len() > b.cap {
+		over := b.buf.Len() - b.cap
+		b.buf.Next(over) // discard the oldest bytes
+		b.dropped += int64(over)
+	}
+	return n, err
 }
 
 func (b *syncBuffer) String() string {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	if b.dropped > 0 {
+		return fmt.Sprintf("[atago] earlier output truncated (%d bytes dropped, max_log_bytes %d)\n%s", b.dropped, b.cap, b.buf.String())
+	}
 	return b.buf.String()
+}
+
+// Len reports the retained byte count (without any truncation notice), letting
+// the log probe skip rescans when nothing new arrived.
+func (b *syncBuffer) Len() int {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Len()
 }

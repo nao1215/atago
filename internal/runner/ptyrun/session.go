@@ -88,6 +88,26 @@ func driveSession(ctx context.Context, p *spec.PTY, proc ptyProcess) (*runner.Re
 		defer mu.Unlock()
 		return append([]byte(nil), transcript...)
 	}
+	// tailFrom copies only transcript[from:] under the lock and reports the
+	// transcript's current length; curLen reports the length alone. Together
+	// they let a pending expect skip the poll entirely when nothing new
+	// arrived and copy only the bytes it can still match — a TUI redrawing at
+	// full speed otherwise costs an O(transcript) allocation every 10ms per
+	// expect, pure garbage churn on bytes before matchOffset that no later
+	// expect may ever see again.
+	tailFrom := func(from int) ([]byte, int) {
+		mu.Lock()
+		defer mu.Unlock()
+		if from > len(transcript) {
+			from = len(transcript)
+		}
+		return append([]byte(nil), transcript[from:]...), len(transcript)
+	}
+	curLen := func() int {
+		mu.Lock()
+		defer mu.Unlock()
+		return len(transcript)
+	}
 
 	finish := func(timedOut bool, code int, ef *ExpectFailure) (*runner.Result, *ExpectFailure, error) {
 		// Drain before closing: a fast-exiting child's final output may still sit
@@ -156,17 +176,23 @@ func driveSession(ctx context.Context, p *spec.PTY, proc ptyProcess) (*runner.Re
 	for i, a := range p.Session {
 		if expects[i] != nil {
 			matched := false
+			scannedTo := -1 // transcript length at the last scan; -1 forces one
 			for {
-				if loc := expects[i].FindIndex(snapshot()[matchOffset:]); loc != nil {
-					matchOffset += loc[1]
-					matched = true
-					break
+				if n := curLen(); n != scannedTo {
+					tail, m := tailFrom(matchOffset)
+					scannedTo = m
+					if loc := expects[i].FindIndex(tail); loc != nil {
+						matchOffset += loc[1]
+						matched = true
+						break
+					}
 				}
 				select {
 				case <-ctx.Done():
 					// One last check: bytes may have landed in the final poll
 					// window before the deadline fired.
-					if loc := expects[i].FindIndex(snapshot()[matchOffset:]); loc != nil {
+					tail, _ := tailFrom(matchOffset)
+					if loc := expects[i].FindIndex(tail); loc != nil {
 						matchOffset += loc[1]
 						matched = true
 					}
