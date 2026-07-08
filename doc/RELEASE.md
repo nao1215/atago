@@ -46,7 +46,7 @@ The release workflow then:
 - Check the [Releases page](https://github.com/nao1215/atago/releases) for the
   generated notes and artifacts.
 - Verify a downloaded artifact as described in
-  [Verifying release integrity](../README.md#verifying-release-integrity).
+  [Verifying release integrity](https://nao1215.github.io/atago/install/#verifying-release-integrity).
 
 ## If a release fails
 - Re-run the failed job from the Actions tab once the cause is fixed.
