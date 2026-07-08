@@ -9,6 +9,12 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Console failure blocks now say WHERE and WHY without a `--verbose` detour:
+  every `FAILED:` / `ERROR:` / `TEARDOWN FAILED:` header names the spec file
+  that produced it (`FAILED: suite / scenario  (specs/convert.atago.yaml)`),
+  and an `exit_code` failure appends the failing command's captured stderr
+  tail (or its stdout tail when stderr is silent) — the actual error a command
+  printed on its way out, previously visible only under `--verbose`.
 - A hosted documentation website, https://nao1215.github.io/atago/, built
   with Hugo from the committed docs (no content is duplicated: `doc/cookbook.md`,
   `doc/examples.md`, `doc/real-world.md`, and the generated behavior docs under
@@ -61,6 +67,19 @@ and this project follows [Semantic Versioning](https://semver.org/).
   case-sensitive-substring note. Previously every empty selection was blamed on a
   "case-sensitive substring", which is wrong for tags (they match by equality via
   `==`) and sent users fixing the wrong thing.
+
+### Fixed
+
+- A `screen:` assertion no longer crashes or hangs atago on adversarial
+  terminal output. The vt10x emulator panicked on a negative CSI parameter
+  (`CSI -10 P` reached slice arithmetic in delete/insert-chars) and spun for
+  minutes on an oversized repeat count (`CSI 80111111110 Z` steps one tab stop
+  at a time); both shapes — plus variants that hide behind bytes vt10x's
+  decoder silently skips — are now defused before the transcript reaches the
+  emulator, with a recover backstop so an unknown parser bug fails only the
+  assertion, not the process. Found by the new `FuzzRenderScreen` fuzz target,
+  which asserts the rendered screen's row/column budgets and UTF-8 validity
+  across pathological ANSI input.
 
 ## [0.9.0] - 2026-07-08
 

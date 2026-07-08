@@ -1,0 +1,4 @@
+go test fuzz v1
+[]byte("\x1b[80111111110Z")
+int(62)
+int(-22)
