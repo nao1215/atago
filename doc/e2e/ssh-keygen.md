@@ -69,7 +69,7 @@ chmod 600 corrupt && ssh-keygen -y -f corrupt
 - exit code is one of `255`, `1`
 - stderr contains `error in libcrypto`
 ### Scenario: interactive passphrase generation prompts twice
-_only when `command -v ssh-keygen` succeeds · skipped on windows_
+_only when `command -v ssh-keygen` succeeds · skipped on Windows_
 #### When
 ```shell
 # interactive (pty): ssh-keygen -t ed25519 -f protected -C test@atago
@@ -86,7 +86,7 @@ ssh-keygen -y -P "$PASSPHRASE" -f protected
 - `protected`
 - `protected.pub`
 ### Scenario: the wrong passphrase is rejected
-_only when `command -v ssh-keygen` succeeds · skipped on windows_
+_only when `command -v ssh-keygen` succeeds · skipped on Windows_
 #### When
 ```shell
 # interactive (pty): ssh-keygen -t ed25519 -f protected -C test@atago

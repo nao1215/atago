@@ -64,7 +64,7 @@ printf 'apple\n' | fzf
 - exit code is `2`
 - stderr contains `ioctl`
 ### Scenario: interactive selection picks the queried line
-_only when `fzf --version` succeeds · skipped on windows_
+_only when `fzf --version` succeeds · skipped on Windows_
 #### When
 ```shell
 # interactive (pty): printf 'apple\nbanana\ncherry\n' | fzf > pick.txt
@@ -74,7 +74,7 @@ _only when `fzf --version` succeeds · skipped on windows_
 - file `pick.txt` contains `cherry`
 - file `pick.txt` is checked
 ### Scenario: multi-select accepts several lines at once
-_only when `fzf --version` succeeds · skipped on windows_
+_only when `fzf --version` succeeds · skipped on Windows_
 #### When
 ```shell
 # interactive (pty): printf 'apple\nbanana\ncherry\n' | fzf -m --bind ctrl-a:select-all > pick.txt
@@ -83,7 +83,7 @@ _only when `fzf --version` succeeds · skipped on windows_
 - exit code is `0`
 - file `pick.txt` contains `apple`, `banana`, `cherry`
 ### Scenario: aborting the finder exits 130
-_only when `fzf --version` succeeds · skipped on windows_
+_only when `fzf --version` succeeds · skipped on Windows_
 #### When
 ```shell
 # interactive (pty): printf 'apple\nbanana\ncherry\n' | fzf
@@ -91,7 +91,7 @@ _only when `fzf --version` succeeds · skipped on windows_
 #### Then
 - exit code is `130`
 ### Scenario: the finder screen narrows to the typed query
-_only when `fzf --version` succeeds · skipped on windows_
+_only when `fzf --version` succeeds · skipped on Windows_
 #### When
 ```shell
 # interactive (pty): printf 'apple\nbanana\ncherry\n' | fzf

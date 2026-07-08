@@ -100,7 +100,7 @@ age -d -i other.txt secret.age
   - exit code is `1`
   - stderr contains `no identity matched`
 ### Scenario: passphrase mode encrypts and decrypts interactively
-_only when `age --version` succeeds · skipped on windows_
+_only when `age --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `msg.txt` is created.
 #### Inputs

@@ -39,7 +39,7 @@ gup list --json
 ## gup read-only subcommands (no HOME writes)
 Source: `test/e2e/tools/gup/sandbox_home.atago.yaml`
 ### Scenario: gup version writes nothing to the workdir or its sandbox home
-_only when `gup version` succeeds · skipped on windows_
+_only when `gup version` succeeds · skipped on Windows_
 #### Given
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### When
@@ -51,7 +51,7 @@ gup version
 - stdout contains `gup version`
 - the step changed exactly created nothing, modified nothing, deleted nothing
 ### Scenario: gup list is a pure read of GOBIN and writes nothing
-_only when `gup list` succeeds · skipped on windows_
+_only when `gup list` succeeds · skipped on Windows_
 #### Given
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### When

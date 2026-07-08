@@ -1182,7 +1182,7 @@ sqly --cache snap.cache --sql "SELECT COUNT(*) AS n FROM data" indir
 ## sqly changes delta cross-checks (exhaustive-set semantics)
 Source: `test/e2e/tools/sqly/changes_crosscheck.atago.yaml`
 ### Scenario: omitting sqly's history DB from an exhaustive list is rejected
-_only when `sqly --version` succeeds · skipped on windows_
+_only when `sqly --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `inner.atago.yaml` is created.
 #### Inputs
@@ -1215,7 +1215,7 @@ ${atago} run inner.atago.yaml
 - stdout contains `unexpected created file`
 - stdout contains `.atago-home/.config/sqly/history.db`
 ### Scenario: the exhaustive list including the history DB passes
-_only when `sqly --version` succeeds · skipped on windows_
+_only when `sqly --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `user.csv` is created.
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
@@ -3519,7 +3519,7 @@ sqly --inspect "..%2fuser.csv"
 - stdout contains `user_name`
 - stderr does not contain `dangerous path pattern`
 ### Scenario: rejects a symlink alias that resolves to a blocked system path
-_skipped on windows_
+_skipped on Windows_
 #### When
 ```shell
 ln -s /etc/hosts hosts_alias.csv
@@ -3530,7 +3530,7 @@ sqly --inspect hosts_alias.csv
   - exit code is `1`
   - stderr contains `system directory not allowed`
 ### Scenario: imports a symlink alias that resolves to an ordinary user file
-_skipped on windows_
+_skipped on Windows_
 #### Given
 - Fixture file `real.csv` is created.
 - Fixture file `user_alias.csv` is created.
@@ -4325,7 +4325,7 @@ Samuel L. Jackson,4772
 ## sqly sandbox_home + changes (history DB isolation)
 Source: `test/e2e/tools/sqly/sandbox_home.atago.yaml`
 ### Scenario: sqly --sql writes exactly its history DB, only inside the sandbox home
-_only when `sqly --version` succeeds · skipped on windows_
+_only when `sqly --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `user.csv` is created.
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
@@ -4347,7 +4347,7 @@ sqly --sql "SELECT identifier FROM user WHERE user_name = 'booker12'" user.csv
 #### Generated artifacts
 - `.atago-home/.config/sqly/history.db`
 ### Scenario: a second sqly batch run leaves its sandbox home byte-identical
-_only when `sqly --version` succeeds · skipped on windows_
+_only when `sqly --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `user.csv` is created.
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
@@ -6415,7 +6415,7 @@ sqly --sql "SELECT COUNT(*) AS c FROM empty" empty.jsonl.gz
 - exit code is `0`
 - stdout contains `0`
 ### Scenario: imports /dev/stdin as CSV
-_skipped on windows_
+_skipped on Windows_
 #### Inputs
 _stdin for `sqly`:_
 ```text
@@ -6432,7 +6432,7 @@ sqly --csv --sql "SELECT COUNT(*) AS c FROM stdin" /dev/stdin
 - exit code is `0`
 - stdout equals an exact value
 ### Scenario: imports /proc/self/fd/0 as CSV
-_only on linux_
+_only on Linux_
 #### Inputs
 _stdin for `sqly`:_
 ```text

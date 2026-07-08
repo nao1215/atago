@@ -190,6 +190,22 @@ func scenarioMeta(sc *spec.Scenario) string {
 	return "_" + strings.Join(parts, " · ") + "_"
 }
 
+// osDisplayName renders a spec OS value (linux/darwin/windows, always lowercase
+// in the spec) as its proper-noun display form for prose. "darwin" reads as
+// macOS, the name users know it by.
+func osDisplayName(os string) string {
+	switch os {
+	case "linux":
+		return "Linux"
+	case "darwin":
+		return "macOS"
+	case "windows":
+		return "Windows"
+	default:
+		return os
+	}
+}
+
 // conditionPhrases renders every gate a run/skip condition carries — OS, env,
 // and command — not just the OS. `atago list` shows env and command gates, so a
 // generated doc that named only the OS made an env- or command-gated scenario
@@ -201,7 +217,7 @@ func conditionPhrases(kind string, c *spec.Condition) []string {
 	verb := map[string]string{"only": "only", "skip": "skipped"}[kind]
 	var out []string
 	if c.OS != "" {
-		out = append(out, verb+" on "+c.OS)
+		out = append(out, verb+" on "+osDisplayName(c.OS))
 	}
 	if c.Env != "" {
 		out = append(out, verb+" when env "+c.Env+" is set")

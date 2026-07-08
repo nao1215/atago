@@ -7131,7 +7131,7 @@ _expected stderr:_
 cp: --recursive is not specified: omitting directory: ${workdir}/cp
 ```
 ### Scenario: can not copy a directory to root without authority
-_skipped on linux_
+_skipped on Linux_
 #### When
 ```shell
 cp -r ${workdir}/cp /

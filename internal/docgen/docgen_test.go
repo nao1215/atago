@@ -252,6 +252,11 @@ scenarios:
     steps:
       - run: {shell: true, command: echo b}
       - assert: {exit_code: 0}
+  - name: skipped on windows
+    skip: {os: windows}
+    steps:
+      - run: {shell: true, command: echo c}
+      - assert: {exit_code: 0}
 `
 	s := mustLoadSpec(t, "gates.atago.yaml", src)
 	var b bytes.Buffer
@@ -262,6 +267,8 @@ scenarios:
 	for _, want := range []string{
 		"skipped when env CI is set",
 		"only when `which jq` succeeds",
+		// The spec OS value is lowercase; the prose renders the proper-noun form.
+		"skipped on Windows",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("doc missing gate prose %q\n--- got ---\n%s", want, out)

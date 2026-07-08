@@ -89,7 +89,7 @@ python3 no_such_script.py
 - exit code is `2`
 - stderr contains `can't open file`
 ### Scenario: stdout is a pipe under run but a tty under pty
-_only when `python3 --version` succeeds · skipped on windows_
+_only when `python3 --version` succeeds · skipped on Windows_
 #### When
 ```shell
 python3 -c "import sys; print(sys.stdout.isatty())"
@@ -101,7 +101,7 @@ python3 -c "import sys; print(sys.stdout.isatty())"
 - exit code is `0`
 - stdout contains `True`
 ### Scenario: an interactive session drives the REPL across exchanges
-_only when `python3 --version` succeeds · skipped on windows_
+_only when `python3 --version` succeeds · skipped on Windows_
 #### When
 ```shell
 # interactive (pty): python3 -q
@@ -110,7 +110,7 @@ _only when `python3 --version` succeeds · skipped on windows_
 - exit code is `0`
 - stdout contains `2`, `120`
 ### Scenario: EOF (ctrl-d) ends the session cleanly
-_only when `python3 --version` succeeds · skipped on windows_
+_only when `python3 --version` succeeds · skipped on Windows_
 #### When
 ```shell
 # interactive (pty): python3 -q
@@ -118,7 +118,7 @@ _only when `python3 --version` succeeds · skipped on windows_
 #### Then
 - exit code is `0`
 ### Scenario: a traceback is reported and the REPL recovers
-_only when `python3 --version` succeeds · skipped on windows_
+_only when `python3 --version` succeeds · skipped on Windows_
 #### When
 ```shell
 # interactive (pty): python3 -q

@@ -28,7 +28,7 @@ htop --nonexistent-flag
 - exit code is not `0`
 - stderr contains `unrecognized option`
 ### Scenario: the finder loads its function-key bar and quits on q
-_only when `htop --version` succeeds · skipped on windows_
+_only when `htop --version` succeeds · skipped on Windows_
 #### When
 ```shell
 # interactive (pty): htop
@@ -36,7 +36,7 @@ _only when `htop --version` succeeds · skipped on windows_
 #### Then
 - exit code is `0`
 ### Scenario: the rendered screen shows the live meters and column header
-_only when `htop --version` succeeds · skipped on windows_
+_only when `htop --version` succeeds · skipped on Windows_
 #### When
 ```shell
 # interactive (pty): htop

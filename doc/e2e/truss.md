@@ -16,7 +16,7 @@
 ## truss convert (filesystem footprint)
 Source: `test/e2e/tools/truss/changes.atago.yaml`
 ### Scenario: convert PNG->JPEG creates only the output file
-_only when `truss --version` succeeds · skipped on windows_
+_only when `truss --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `in.png` is created.
 #### When
@@ -30,7 +30,7 @@ truss convert in.png -o out.jpg
 #### Generated artifacts
 - `out.jpg`
 ### Scenario: convert to a glob-matched output honors path.Match
-_only when `truss --version` succeeds · skipped on windows_
+_only when `truss --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `in.png` is created.
 #### When
