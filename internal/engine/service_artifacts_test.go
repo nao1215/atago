@@ -1,10 +1,15 @@
 package engine
 
 import (
+	"context"
+	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/nao1215/atago/internal/loader"
 )
 
 // serviceLog returns the recorded service-log artifact for name, or fails.
@@ -307,6 +312,65 @@ scenarios:
 		for _, sl := range res.Scenarios[i].ServiceLogs {
 			if strings.Contains(sl.Name, "mock requests") {
 				t.Errorf("scenario %d unexpectedly recorded a mock request log: %+v", i, sl)
+			}
+		}
+	}
+}
+
+// TestEngine_ParallelMatchesSerial_WithServices extends the metamorphic
+// parallel/serial parity check to scenarios that each own a background
+// service. Concurrent workers spawning and killing whole process groups is
+// exactly the interaction the porting campaign flagged as a trap — a group-id
+// mixup under concurrency would kill a SIBLING scenario's service and flip its
+// verdict — yet no test combined --parallel with services at any level. Each
+// scenario's step consumes its own service's ready.store value, so cross-talk
+// (killed peer, swapped store) surfaces as a changed status or value, and -race
+// in CI guards the shared scheduler state.
+func TestEngine_ParallelMatchesSerial_WithServices(t *testing.T) {
+	t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skip("services below use POSIX shell one-liners")
+	}
+	var b strings.Builder
+	b.WriteString("version: \"1\"\nsuite:\n  name: par-services\nscenarios:\n")
+	for i := 0; i < 6; i++ {
+		fmt.Fprintf(&b, `  - name: scenario %d
+    services:
+      - name: peer%d
+        shell: true
+        command: 'echo token-%d > addr.txt; sleep 30'
+        ready: {file: addr.txt, store: tok, timeout: 5s}
+    steps:
+      - run: {shell: true, command: "echo got ${tok}"}
+      - assert:
+          exit_code: 0
+          stdout: {contains: "got token-%d"}
+`, i, i, i, i)
+	}
+	s, err := loader.LoadBytes("par-svc.atago.yaml", []byte(b.String()))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	runAt := func(workers int) []ScenarioResult {
+		e := New()
+		e.Parallel = workers
+		return e.Run(context.Background(), s, "par-svc.atago.yaml").Scenarios
+	}
+	serial := runAt(1)
+	for i := range serial {
+		if serial[i].Status != StatusPassed {
+			t.Fatalf("serial scenario %q = %s, want passed: %+v", serial[i].Name, serial[i].Status, serial[i].Steps)
+		}
+	}
+	for _, workers := range []int{3, 6} {
+		got := runAt(workers)
+		if len(got) != len(serial) {
+			t.Fatalf("parallel=%d: %d scenarios, serial had %d", workers, len(got), len(serial))
+		}
+		for i := range serial {
+			if got[i].Name != serial[i].Name || got[i].Status != serial[i].Status {
+				t.Fatalf("parallel=%d: scenario %d = %s/%s, serial = %s/%s (a sibling's service may have been killed)",
+					workers, i, got[i].Name, got[i].Status, serial[i].Name, serial[i].Status)
 			}
 		}
 	}

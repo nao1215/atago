@@ -995,3 +995,57 @@ func TestFailFast_StopsSubsequentSpecFiles(t *testing.T) {
 		}
 	})
 }
+
+// TestRunCmd_CorruptLedgerLeftUntouchedByPlainRun guards the save-side half of
+// the rerun-ledger contract (the read side under --rerun-failed exits 3 and is
+// tested elsewhere): a plain `run` that cannot READ .atago/last-failed.json —
+// corrupt bytes, or a future schema version a newer atago wrote — must warn and
+// leave the file byte-identical. Overwriting it with only this run's outcome
+// would destroy recorded failures we cannot see, and a later --rerun-failed
+// would silently greenlight while real failures remain. A fully green run of
+// unrelated specs must ALSO leave the unreadable ledger in place rather than
+// clearing it.
+func TestRunCmd_CorruptLedgerLeftUntouchedByPlainRun(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	garbage := []byte(`{"schema_version": 999, "failed": "not-a-list"`)
+	if err := os.MkdirAll(".atago", 0o750); err != nil {
+		t.Fatal(err)
+	}
+	ledger := filepath.Join(".atago", "last-failed.json")
+	if err := os.WriteFile(ledger, garbage, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	// A failing run: warns, exits 1, ledger byte-identical.
+	fp := writeSpec(t, dir, "fail.atago.yaml", failingSpec)
+	var out, errb bytes.Buffer
+	if got := Main([]string{"run", fp}, &out, &errb); got != ExitFailures {
+		t.Fatalf("exit = %d, want %d (stderr=%s)", got, ExitFailures, errb.String())
+	}
+	if !strings.Contains(errb.String(), "leaving it untouched") {
+		t.Errorf("stderr = %q, want the leaving-it-untouched warning", errb.String())
+	}
+	data, err := os.ReadFile(ledger)
+	if err != nil {
+		t.Fatalf("ledger vanished after a failing run: %v", err)
+	}
+	if !bytes.Equal(data, garbage) {
+		t.Errorf("ledger = %q, want the unreadable bytes preserved verbatim", data)
+	}
+
+	// A green run of an unrelated spec: still byte-identical (not cleared).
+	pp := writeSpec(t, dir, "ok.atago.yaml", passingSpec)
+	out.Reset()
+	errb.Reset()
+	if got := Main([]string{"run", pp}, &out, &errb); got != ExitOK {
+		t.Fatalf("exit = %d, want %d (stderr=%s)", got, ExitOK, errb.String())
+	}
+	data, err = os.ReadFile(ledger)
+	if err != nil {
+		t.Fatalf("ledger vanished after a green run: %v", err)
+	}
+	if !bytes.Equal(data, garbage) {
+		t.Errorf("ledger = %q, want the unreadable bytes preserved verbatim after a green run", data)
+	}
+}
