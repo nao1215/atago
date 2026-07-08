@@ -13,6 +13,29 @@ import (
 
 var validOS = map[string]bool{"linux": true, "darwin": true, "windows": true}
 
+// firstControlChar returns a readable label for the first control character in
+// name (a newline, tab, or other C0/DEL byte), or "" when there is none. A name
+// carrying one silently corrupts the aligned `atago list` table and the
+// generated Markdown headings/anchors, so the loader rejects it up front like it
+// rejects an empty or duplicate name.
+func firstControlChar(name string) string {
+	for _, r := range name {
+		if r == '\t' || r == '\n' || r == '\r' || (r < 0x20) || r == 0x7f {
+			switch r {
+			case '\t':
+				return `"\t"`
+			case '\n':
+				return `"\n"`
+			case '\r':
+				return `"\r"`
+			default:
+				return fmt.Sprintf("U+%04X", r)
+			}
+		}
+	}
+	return ""
+}
+
 // validate runs schema and semantic checks and
 // returns all problems found so the user can fix them in one pass.
 func validate(s *spec.Spec) []string {
@@ -26,6 +49,8 @@ func validate(s *spec.Spec) []string {
 	}
 	if s.Suite.Name == "" {
 		add("suite.name is required")
+	} else if c := firstControlChar(s.Suite.Name); c != "" {
+		add("suite.name must not contain the control character %s (it breaks list output and generated docs)", c)
 	}
 	validateSuiteTimeout(add, &s.Suite)
 	validateScrub(add, s.Scrub)
@@ -57,6 +82,9 @@ func validate(s *spec.Spec) []string {
 		if sc.Name == "" {
 			add("%s.name is required", where)
 		} else {
+			if c := firstControlChar(sc.Name); c != "" {
+				add("%s.name must not contain the control character %s (it breaks list output and generated docs)", where, c)
+			}
 			if seen[sc.Name] {
 				add("duplicate scenario name %q", sc.Name)
 			}

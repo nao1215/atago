@@ -32,6 +32,30 @@ func TestInit_CreatesValidSpec(t *testing.T) {
 	}
 }
 
+// TestInit_RejectsExtraPaths proves init refuses more than one path argument
+// rather than silently writing only the first and dropping the rest, which would
+// make a user believe both files were scaffolded.
+func TestInit_RejectsExtraPaths(t *testing.T) {
+	dir := t.TempDir()
+	first := filepath.Join(dir, "first.atago.yaml")
+	second := filepath.Join(dir, "second.atago.yaml")
+
+	var out, errb bytes.Buffer
+	if got := Main([]string{"init", first, second}, &out, &errb); got != ExitConfig {
+		t.Fatalf("init with two paths exit = %d, want %d", got, ExitConfig)
+	}
+	if !bytes.Contains(errb.Bytes(), []byte("too many paths")) {
+		t.Errorf("stderr should explain the extra-path error, got: %s", errb.String())
+	}
+	// Neither file is created when the invocation is rejected.
+	if _, err := os.Stat(first); err == nil {
+		t.Error("first path should not be written when init is rejected")
+	}
+	if _, err := os.Stat(second); err == nil {
+		t.Error("second path should not be written when init is rejected")
+	}
+}
+
 func TestInit_RefusesOverwriteWithoutForce(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "example.atago.yaml")

@@ -6855,6 +6855,7 @@ printf 'ok'
 - exit code is `0`
 - stdout equals an exact value
 ### Scenario: leaves a pre-existing /tmp/mimixbox file untouched (harness-specific)
+_only when env ATAGO_RUN_HARNESS_SPECIFIC is set_
 #### When
 ```shell
 [ ! -d /tmp/mimixbox ] && printf 'not-a-dir'

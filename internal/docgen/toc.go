@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"unicode"
 )
 
 // summary aggregates document-wide counts for the top-of-file summary block
@@ -103,7 +104,13 @@ func slugify(text string) string {
 			b.WriteRune('-')
 		case r == '_':
 			b.WriteRune('_')
-			// GitHub keeps underscores; other punctuation is dropped.
+			// GitHub keeps underscores; ASCII punctuation is dropped.
+		case r > 0x7f && (unicode.IsLetter(r) || unicode.IsNumber(r)):
+			// GitHub's slugger keeps non-ASCII letters and digits (日本語, é, ß),
+			// lowercased. Dropping them collapsed every non-ASCII heading to an
+			// empty anchor, so a Japanese scenario name produced "#scenario-" for
+			// each scenario — colliding links that resolve to nothing.
+			b.WriteRune(r)
 		}
 	}
 	return b.String()

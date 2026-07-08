@@ -14,6 +14,7 @@
 ## ffmpeg + changes (single-artifact encode)
 Source: `test/e2e/thirdparty/ffmpeg/changes.atago.yaml`
 ### Scenario: lavfi source encodes exactly one output file
+_only when `ffmpeg -version` succeeds_
 #### When
 ```shell
 ffmpeg -v error -f lavfi -i testsrc=duration=0.1:size=64x64 -y out.mp4
@@ -24,6 +25,7 @@ ffmpeg -v error -f lavfi -i testsrc=duration=0.1:size=64x64 -y out.mp4
 ## ffmpeg / ffprobe (media pipeline)
 Source: `test/e2e/thirdparty/ffmpeg/ffmpeg.atago.yaml`
 ### Scenario: lavfi synthesizes a video file
+_only when `ffmpeg -version` succeeds_
 #### When
 ```shell
 ffmpeg -v error -f lavfi -i testsrc=duration=1:size=320x240:rate=10 out.mp4
@@ -34,6 +36,7 @@ ffmpeg -v error -f lavfi -i testsrc=duration=1:size=320x240:rate=10 out.mp4
 #### Generated artifacts
 - `out.mp4`
 ### Scenario: ffprobe exposes the stream JSON contract
+_only when `ffmpeg -version` succeeds_
 #### When
 ```shell
 ffmpeg -v error -f lavfi -i testsrc=duration=1:size=320x240:rate=10 out.mp4
@@ -49,6 +52,7 @@ ffprobe -v error -print_format json -show_streams out.mp4
   - stdout at `$.streams[0].codec_type` equals `video`
   - stdout at `$.streams` has length 1
 ### Scenario: extracted frames are the right image and deterministic
+_only when `ffmpeg -version` succeeds_
 #### When
 ```shell
 ffmpeg -v error -f lavfi -i testsrc=duration=1:size=320x240:rate=10 out.mp4
@@ -69,6 +73,7 @@ ffmpeg -v error -i out.mp4 -frames:v 1 frame2.png
 - `frame.png`
 - `frame2.png`
 ### Scenario: transcode to webm and re-probe the codec
+_only when `ffmpeg -version` succeeds_
 #### When
 ```shell
 ffmpeg -v error -f lavfi -i testsrc=duration=1:size=320x240:rate=10 out.mp4
@@ -87,6 +92,7 @@ ffprobe -v error -print_format json -show_streams out.webm
 #### Generated artifacts
 - `out.webm`
 ### Scenario: a missing input file fails with a not-found error
+_only when `ffmpeg -version` succeeds_
 #### When
 ```shell
 ffmpeg -v error -i no_such_input.mp4 out.mp4
@@ -95,6 +101,7 @@ ffmpeg -v error -i no_such_input.mp4 out.mp4
 - exit code is one of `1`, `254`
 - stderr contains `No such file or directory`
 ### Scenario: ffprobe on non-media data reports invalid input
+_only when `ffmpeg -version` succeeds_
 #### Given
 - Fixture file `corrupt.mp4` is created.
 #### When

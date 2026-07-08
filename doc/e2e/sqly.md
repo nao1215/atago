@@ -1182,7 +1182,7 @@ sqly --cache snap.cache --sql "SELECT COUNT(*) AS n FROM data" indir
 ## sqly changes delta cross-checks (exhaustive-set semantics)
 Source: `test/e2e/tools/sqly/changes_crosscheck.atago.yaml`
 ### Scenario: omitting sqly's history DB from an exhaustive list is rejected
-_skipped on windows_
+_only when `sqly --version` succeeds · skipped on windows_
 #### Given
 - Fixture file `inner.atago.yaml` is created.
 #### Inputs
@@ -1215,7 +1215,7 @@ ${atago} run inner.atago.yaml
 - stdout contains `unexpected created file`
 - stdout contains `.atago-home/.config/sqly/history.db`
 ### Scenario: the exhaustive list including the history DB passes
-_skipped on windows_
+_only when `sqly --version` succeeds · skipped on windows_
 #### Given
 - Fixture file `user.csv` is created.
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
@@ -2471,6 +2471,7 @@ sqly user.csv
 ## sqly hermetic environment
 Source: `test/e2e/tools/sqly/hermetic.atago.yaml`
 ### Scenario: runs with HOME inside the sandbox
+_only when env SQLY_E2E_SANDBOX is set_
 #### When
 ```shell
 case "$HOME" in "$SQLY_E2E_SANDBOX"*) exit 0 ;; *) exit 1 ;; esac
@@ -2478,6 +2479,7 @@ case "$HOME" in "$SQLY_E2E_SANDBOX"*) exit 0 ;; *) exit 1 ;; esac
 #### Then
 - exit code is `0`
 ### Scenario: routes the history DB into the sandbox
+_only when env SQLY_E2E_SANDBOX is set_
 #### When
 ```shell
 case "$SQLY_HISTORY_DB_PATH" in "$SQLY_E2E_SANDBOX"*) exit 0 ;; *) exit 1 ;; esac
@@ -4323,7 +4325,7 @@ Samuel L. Jackson,4772
 ## sqly sandbox_home + changes (history DB isolation)
 Source: `test/e2e/tools/sqly/sandbox_home.atago.yaml`
 ### Scenario: sqly --sql writes exactly its history DB, only inside the sandbox home
-_skipped on windows_
+_only when `sqly --version` succeeds · skipped on windows_
 #### Given
 - Fixture file `user.csv` is created.
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
@@ -4345,7 +4347,7 @@ sqly --sql "SELECT identifier FROM user WHERE user_name = 'booker12'" user.csv
 #### Generated artifacts
 - `.atago-home/.config/sqly/history.db`
 ### Scenario: a second sqly batch run leaves its sandbox home byte-identical
-_skipped on windows_
+_only when `sqly --version` succeeds · skipped on windows_
 #### Given
 - Fixture file `user.csv` is created.
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).

@@ -12,6 +12,7 @@
 ## ssh-keygen (OpenSSH key generation)
 Source: `test/e2e/thirdparty/ssh-keygen/ssh-keygen.atago.yaml`
 ### Scenario: non-interactive generation writes the key pair
+_only when `command -v ssh-keygen` succeeds_
 #### When
 ```shell
 ssh-keygen -t ed25519 -N '' -f key -C test@atago
@@ -26,6 +27,7 @@ ssh-keygen -t ed25519 -N '' -f key -C test@atago
 - `key`
 - `key.pub`
 ### Scenario: the fingerprint contract is exact
+_only when `command -v ssh-keygen` succeeds_
 #### When
 ```shell
 ssh-keygen -t ed25519 -N '' -f key -C test@atago
@@ -38,6 +40,7 @@ ssh-keygen -lf key.pub
   - exit code is `0`
   - stdout matches `/(?m)^256 SHA256:[A-Za-z0-9+/]+ test@atago \(ED25519\)$/`
 ### Scenario: -y regenerates the public key from the private key
+_only when `command -v ssh-keygen` succeeds_
 #### When
 ```shell
 ssh-keygen -t ed25519 -N '' -f key -C test@atago
@@ -50,6 +53,7 @@ ssh-keygen -y -f key
   - exit code is `0`
   - stdout contains `ssh-ed25519`
 ### Scenario: -y on a corrupted key file fails
+_only when `command -v ssh-keygen` succeeds_
 #### Given
 - Fixture file `corrupt` is created.
 #### Inputs
@@ -65,7 +69,7 @@ chmod 600 corrupt && ssh-keygen -y -f corrupt
 - exit code is one of `255`, `1`
 - stderr contains `error in libcrypto`
 ### Scenario: interactive passphrase generation prompts twice
-_skipped on windows_
+_only when `command -v ssh-keygen` succeeds · skipped on windows_
 #### When
 ```shell
 # interactive (pty): ssh-keygen -t ed25519 -f protected -C test@atago
@@ -82,7 +86,7 @@ ssh-keygen -y -P "$PASSPHRASE" -f protected
 - `protected`
 - `protected.pub`
 ### Scenario: the wrong passphrase is rejected
-_skipped on windows_
+_only when `command -v ssh-keygen` succeeds · skipped on windows_
 #### When
 ```shell
 # interactive (pty): ssh-keygen -t ed25519 -f protected -C test@atago

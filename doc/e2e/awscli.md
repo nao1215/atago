@@ -10,6 +10,7 @@
 ## aws-cli against MinIO (offline cloud-CLI story)
 Source: `test/e2e/thirdparty/awscli/awscli.atago.yaml`
 ### Scenario: bucket and object lifecycle round-trips byte-identically
+_only when `aws --version` succeeds_
 #### Given
 - Background service `minio` is started: `minio server data --address 127.0.0.1:18530`.
 - Fixture file `payload.txt` is created.
@@ -45,6 +46,7 @@ aws --endpoint-url http://127.0.0.1:18530 s3 ls s3://mybucket/
   - exit code is `0`
   - stdout does not contain `key.txt`
 ### Scenario: head-object and list-objects expose a JSON contract
+_only when `aws --version` succeeds_
 #### Given
 - Background service `minio` is started: `minio server data --address 127.0.0.1:18531`.
 - Fixture file `obj.txt` is created.
@@ -73,6 +75,7 @@ aws --endpoint-url http://127.0.0.1:18531 s3 ls s3://jsonbucket/
   - exit code is `0`
   - stdout contains `obj.txt`
 ### Scenario: a presigned URL is fetchable without credentials
+_only when `aws --version` succeeds_
 #### Given
 - Background service `minio` is started: `minio server data --address 127.0.0.1:18532`.
 - Fixture file `signed.txt` is created.
@@ -98,6 +101,7 @@ curl -s "${url}"
   - exit code is `0`
   - stdout equals an exact value
 ### Scenario: head-object on a missing key fails with Not Found
+_only when `aws --version` succeeds_
 #### Given
 - Background service `minio` is started: `minio server data --address 127.0.0.1:18533`.
 #### When

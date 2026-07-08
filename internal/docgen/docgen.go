@@ -51,6 +51,11 @@ func GenerateTo(w io.Writer, sources []Source, outputDir string) error {
 		return err
 	}
 	normalized := bytes.ReplaceAll(buf.Bytes(), []byte("\r\n"), []byte("\n"))
+	// End the document with exactly one newline. A generated Markdown file is a
+	// POSIX text file, and manifest/list --json already terminate their output the
+	// same way; without it a shell prompt joins onto the last line and git reports
+	// "no newline at end of file" for every generated doc.
+	normalized = append(bytes.TrimRight(normalized, "\n"), '\n')
 	_, err := w.Write(normalized)
 	return err
 }
@@ -177,16 +182,34 @@ func scenarioMeta(sc *spec.Scenario) string {
 	if len(sc.Tags) > 0 {
 		parts = append(parts, "tags: "+strings.Join(sc.Tags, ", "))
 	}
-	if sc.Only != nil && sc.Only.OS != "" {
-		parts = append(parts, "only on "+sc.Only.OS)
-	}
-	if sc.Skip != nil && sc.Skip.OS != "" {
-		parts = append(parts, "skipped on "+sc.Skip.OS)
-	}
+	parts = append(parts, conditionPhrases("only", sc.Only)...)
+	parts = append(parts, conditionPhrases("skip", sc.Skip)...)
 	if len(parts) == 0 {
 		return ""
 	}
 	return "_" + strings.Join(parts, " · ") + "_"
+}
+
+// conditionPhrases renders every gate a run/skip condition carries — OS, env,
+// and command — not just the OS. `atago list` shows env and command gates, so a
+// generated doc that named only the OS made an env- or command-gated scenario
+// read as unconditional (the reader could not tell it was gated at all).
+func conditionPhrases(kind string, c *spec.Condition) []string {
+	if c == nil {
+		return nil
+	}
+	verb := map[string]string{"only": "only", "skip": "skipped"}[kind]
+	var out []string
+	if c.OS != "" {
+		out = append(out, verb+" on "+c.OS)
+	}
+	if c.Env != "" {
+		out = append(out, verb+" when env "+c.Env+" is set")
+	}
+	if c.Command != "" {
+		out = append(out, verb+" when `"+c.Command+"` succeeds")
+	}
+	return out
 }
 
 func givenBullets(sc *spec.Scenario, expand func(string) string) []string {

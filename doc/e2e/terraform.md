@@ -12,6 +12,7 @@
 ## terraform (offline via the builtin terraform_data resource)
 Source: `test/e2e/thirdparty/terraform/terraform.atago.yaml`
 ### Scenario: init downloads nothing and validate reports valid
+_only when `terraform version` succeeds_
 #### Given
 - Fixture file `main.tf` is created.
 #### Inputs
@@ -37,6 +38,7 @@ terraform validate -json
   - exit code is `0`
   - stdout at `$.valid` equals `true`
 ### Scenario: plan -detailed-exitcode reports the change contract
+_only when `terraform version` succeeds_
 #### Given
 - Fixture file `main.tf` is created.
 #### Inputs
@@ -66,6 +68,7 @@ terraform plan -detailed-exitcode
 - after `terraform plan -detailed-exitcode`:
   - exit code is `0`
 ### Scenario: apply exposes state JSON and a captured output
+_only when `terraform version` succeeds_
 #### Given
 - Fixture file `main.tf` is created.
 #### Inputs
@@ -99,6 +102,7 @@ echo captured: ${message}
   - exit code is `0`
   - stdout contains `captured: hello from atago`
 ### Scenario: destroy empties the state
+_only when `terraform version` succeeds_
 #### Given
 - Fixture file `main.tf` is created.
 #### Inputs
@@ -126,6 +130,7 @@ terraform show -json
   - exit code is `0`
   - stdout does not contain `terraform_data.greeting`
 ### Scenario: fmt -check exits 3 on a misformatted file
+_only when `terraform version` succeeds_
 #### Given
 - Fixture file `messy.tf` is created.
 #### Inputs
@@ -142,6 +147,7 @@ terraform fmt -check messy.tf
 #### Then
 - exit code is one of `3`
 ### Scenario: a broken configuration is rejected
+_only when `terraform version` succeeds_
 #### Given
 - Fixture file `main.tf` is created.
 #### Inputs

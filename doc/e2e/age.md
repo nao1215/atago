@@ -13,6 +13,7 @@
 ## age (modern file encryption)
 Source: `test/e2e/thirdparty/age/age.atago.yaml`
 ### Scenario: keygen writes a key and reports the public half
+_only when `age --version` succeeds_
 #### When
 ```shell
 age-keygen -o key.txt
@@ -27,6 +28,7 @@ age-keygen -y key.txt
   - exit code is `0`
   - stdout matches `/(?m)^age1[a-z0-9]+$/`
 ### Scenario: encrypt then decrypt round-trips binary bytes exactly
+_only when `age --version` succeeds_
 #### Given
 - Fixture file `data.bin` is created.
 #### When
@@ -48,6 +50,7 @@ cmp data.bin out.bin
 - after `cmp data.bin out.bin`:
   - exit code is `0`
 ### Scenario: armored output is PEM-wrapped
+_only when `age --version` succeeds_
 #### Given
 - Fixture file `msg.txt` is created.
 #### Inputs
@@ -69,6 +72,7 @@ age -a -r ${pubkey} -o armored.age msg.txt
   - exit code is `0`
   - file `armored.age` contains `-----BEGIN AGE ENCRYPTED FILE-----`
 ### Scenario: decrypting with the wrong identity fails
+_only when `age --version` succeeds_
 #### Given
 - Fixture file `msg.txt` is created.
 #### Inputs
@@ -96,7 +100,7 @@ age -d -i other.txt secret.age
   - exit code is `1`
   - stderr contains `no identity matched`
 ### Scenario: passphrase mode encrypts and decrypts interactively
-_skipped on windows_
+_only when `age --version` succeeds · skipped on windows_
 #### Given
 - Fixture file `msg.txt` is created.
 #### Inputs
@@ -119,6 +123,7 @@ passphrase protected
 ## age + changes (single-artifact generator)
 Source: `test/e2e/thirdparty/age/changes.atago.yaml`
 ### Scenario: age-keygen writes exactly the key file (HOME untouched)
+_only when `age --version` succeeds_
 #### Given
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### When

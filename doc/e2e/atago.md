@@ -2504,11 +2504,13 @@ date -u -r stamped.txt +%Y
 #### Then
 - stdout contains `2021`
 ### Scenario: only.env skips when the variable is unset
+_only when env ATAGO_DEFINITELY_UNSET is set_
 #### When
 ```shell
 false
 ```
 ### Scenario: skip.env runs when the variable is unset
+_skipped when env ATAGO_DEFINITELY_UNSET is set_
 #### When
 ```shell
 true
@@ -7355,7 +7357,7 @@ ${atago} run inner.atago.yaml
 - exit code is `1`
 - stdout contains `1 failed`
 ### Scenario: less -X renders a real pager onto the screen
-_skipped on windows_
+_only when `command -v less` succeeds · skipped on windows_
 #### Given
 - Fixture file `page.txt` is created.
 #### Inputs

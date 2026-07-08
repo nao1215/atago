@@ -10,6 +10,7 @@
 ## htop (third-party CLI, full-screen TUI testbed)
 Source: `test/e2e/thirdparty/htop/htop.atago.yaml`
 ### Scenario: version prints a semantic version
+_only when `htop --version` succeeds_
 #### When
 ```shell
 htop --version
@@ -18,6 +19,7 @@ htop --version
 - exit code is `0`
 - stdout matches `/^htop [0-9]+\.[0-9]+/`
 ### Scenario: an unrecognized option is rejected without opening the TUI
+_only when `htop --version` succeeds_
 #### When
 ```shell
 htop --nonexistent-flag
@@ -26,7 +28,7 @@ htop --nonexistent-flag
 - exit code is not `0`
 - stderr contains `unrecognized option`
 ### Scenario: the finder loads its function-key bar and quits on q
-_skipped on windows_
+_only when `htop --version` succeeds · skipped on windows_
 #### When
 ```shell
 # interactive (pty): htop
@@ -34,7 +36,7 @@ _skipped on windows_
 #### Then
 - exit code is `0`
 ### Scenario: the rendered screen shows the live meters and column header
-_skipped on windows_
+_only when `htop --version` succeeds · skipped on windows_
 #### When
 ```shell
 # interactive (pty): htop

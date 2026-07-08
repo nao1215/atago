@@ -15,6 +15,7 @@
 ## ecspresso + deploy (real ECS deploy against a mock)
 Source: `test/e2e/thirdparty/ecspresso/deploy.atago.yaml`
 ### Scenario: deploy registers the task definition, creates the service, and rolls it
+_only when `command -v ecspresso && command -v moto_server && command -v aws` succeeds_
 #### Given
 - Background service `moto` is started: `moto_server -H 127.0.0.1 -p 15111`.
 - Fixture file `ecspresso.yml` is created.
@@ -81,6 +82,7 @@ aws --endpoint-url http://127.0.0.1:15111 ecs list-task-definitions --query "len
 ## ecspresso (Amazon ECS deploy tool)
 Source: `test/e2e/thirdparty/ecspresso/ecspresso.atago.yaml`
 ### Scenario: version prints without error
+_only when `ecspresso version` succeeds_
 #### When
 ```shell
 ecspresso version
@@ -88,6 +90,7 @@ ecspresso version
 #### Then
 - exit code is `0`
 ### Scenario: render substitutes an env template function
+_only when `ecspresso version` succeeds_
 #### Given
 - Fixture file `ecspresso.yml` is created.
 - Fixture file `taskdef.json` is created.
@@ -122,6 +125,7 @@ ecspresso render --config ecspresso.yml taskdef
 - exit code is `0`
 - stdout at `$.containerDefinitions[0].image` equals `nginx:1.2.3`
 ### Scenario: render falls back to the template default when the env is unset
+_only when `ecspresso version` succeeds_
 #### Given
 - Fixture file `ecspresso.yml` is created.
 - Fixture file `taskdef.json` is created.
@@ -155,6 +159,7 @@ ecspresso render --config ecspresso.yml taskdef
 - exit code is `0`
 - stdout at `$.containerDefinitions[0].image` equals `nginx:latest`
 ### Scenario: render evaluates a jsonnet task definition with an external variable
+_only when `ecspresso version` succeeds_
 #### Given
 - Fixture file `ecspresso.yml` is created.
 - Fixture file `task.jsonnet` is created.
@@ -188,6 +193,7 @@ ecspresso render --config ecspresso.yml --ext-str tag=9.9.9 taskdef
 - exit code is `0`
 - stdout at `$.containerDefinitions[0].image` equals `nginx:9.9.9`
 ### Scenario: render config resolves the defaults
+_only when `ecspresso version` succeeds_
 #### Given
 - Fixture file `ecspresso.yml` is created.
 - Fixture file `taskdef.json` is created.
@@ -211,6 +217,7 @@ ecspresso render --config ecspresso.yml config
 - exit code is `0`
 - stdout contains `cluster: demo`, `timeout:`
 ### Scenario: an undefined must_env fails the render
+_only when `ecspresso version` succeeds_
 #### Given
 - Fixture file `ecspresso.yml` is created.
 - Fixture file `taskdef.json` is created.
@@ -244,6 +251,7 @@ ecspresso render --config ecspresso.yml taskdef
 - exit code is `2`
 - stderr contains `REQUIRED_TAG is not defined`
 ### Scenario: a missing config file fails cleanly
+_only when `ecspresso version` succeeds_
 #### When
 ```shell
 ecspresso render --config nonexistent.yml taskdef

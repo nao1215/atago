@@ -15,6 +15,7 @@
 ## python3 + changes (bytecode cache footprint)
 Source: `test/e2e/thirdparty/python/changes.atago.yaml`
 ### Scenario: importing a local module writes exactly one .pyc
+_only when `python3 --version` succeeds_
 #### Given
 - Fixture file `mymod.py` is created.
 - Fixture file `main.py` is created.
@@ -38,6 +39,7 @@ python3 main.py
 - stdout equals an exact value
 - the step changed exactly created `__pycache__/*.pyc`, modified nothing, deleted nothing
 ### Scenario: PYTHONDONTWRITEBYTECODE suppresses the cache entirely
+_only when `python3 --version` succeeds_
 #### Given
 - Fixture file `mymod.py` is created.
 - Fixture file `main.py` is created.
@@ -64,6 +66,7 @@ python3 main.py
 ## python3 REPL (interactive pty testbed)
 Source: `test/e2e/thirdparty/python/python.atago.yaml`
 ### Scenario: version and -c contracts (non-interactive)
+_only when `python3 --version` succeeds_
 #### When
 ```shell
 python3 --version
@@ -77,6 +80,7 @@ python3 -c "print('hello from python')"
   - exit code is `0`
   - stdout equals an exact value
 ### Scenario: a missing script exits 2 with a can't-open-file error
+_only when `python3 --version` succeeds_
 #### When
 ```shell
 python3 no_such_script.py
@@ -85,7 +89,7 @@ python3 no_such_script.py
 - exit code is `2`
 - stderr contains `can't open file`
 ### Scenario: stdout is a pipe under run but a tty under pty
-_skipped on windows_
+_only when `python3 --version` succeeds · skipped on windows_
 #### When
 ```shell
 python3 -c "import sys; print(sys.stdout.isatty())"
@@ -97,7 +101,7 @@ python3 -c "import sys; print(sys.stdout.isatty())"
 - exit code is `0`
 - stdout contains `True`
 ### Scenario: an interactive session drives the REPL across exchanges
-_skipped on windows_
+_only when `python3 --version` succeeds · skipped on windows_
 #### When
 ```shell
 # interactive (pty): python3 -q
@@ -106,7 +110,7 @@ _skipped on windows_
 - exit code is `0`
 - stdout contains `2`, `120`
 ### Scenario: EOF (ctrl-d) ends the session cleanly
-_skipped on windows_
+_only when `python3 --version` succeeds · skipped on windows_
 #### When
 ```shell
 # interactive (pty): python3 -q
@@ -114,7 +118,7 @@ _skipped on windows_
 #### Then
 - exit code is `0`
 ### Scenario: a traceback is reported and the REPL recovers
-_skipped on windows_
+_only when `python3 --version` succeeds · skipped on windows_
 #### When
 ```shell
 # interactive (pty): python3 -q

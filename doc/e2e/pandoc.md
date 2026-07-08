@@ -15,6 +15,7 @@
 ## pandoc + changes (a conversion writes exactly its output)
 Source: `test/e2e/thirdparty/pandoc/changes.atago.yaml`
 ### Scenario: markdown-to-html creates exactly the output file
+_only when `pandoc --version` succeeds_
 #### Given
 - Fixture file `in.md` is created.
 #### Inputs
@@ -35,6 +36,7 @@ pandoc in.md -o out.html
 ## pandoc (document conversion filter)
 Source: `test/e2e/thirdparty/pandoc/pandoc.atago.yaml`
 ### Scenario: markdown converts to HTML and a binary docx
+_only when `pandoc --version` succeeds_
 #### Given
 - Fixture file `doc.md` is created.
 #### Inputs
@@ -65,6 +67,7 @@ unzip -p doc.docx word/document.xml
 #### Generated artifacts
 - `doc.docx`
 ### Scenario: pandoc is a stdin-to-stdout filter
+_only when `pandoc --version` succeeds_
 #### Given
 - Fixture file `snippet.md` is created.
 #### Inputs
@@ -84,6 +87,7 @@ pandoc -f markdown -t html
 - exit code is `0`
 - stdout contains `<strong>strong</strong>`, `<em>italic</em>`
 ### Scenario: the JSON AST is a queryable contract
+_only when `pandoc --version` succeeds_
 #### Given
 - Fixture file `doc.md` is created.
 #### Inputs
@@ -102,6 +106,7 @@ pandoc -t json doc.md
 - stdout at `$.blocks[0].t` equals `Header`
 - stdout at `$['pandoc-api-version']` has length 3
 ### Scenario: standalone HTML carries the metadata title
+_only when `pandoc --version` succeeds_
 #### Given
 - Fixture file `doc.md` is created.
 #### Inputs
@@ -117,6 +122,7 @@ pandoc --metadata title=Atago -s doc.md -o standalone.html
 - exit code is `0`
 - file `standalone.html` contains `<title>Atago</title>`
 ### Scenario: an unknown output format is rejected
+_only when `pandoc --version` succeeds_
 #### Given
 - Fixture file `doc.md` is created.
 #### Inputs
@@ -132,6 +138,7 @@ pandoc -t nosuchformat doc.md
 - exit code is one of `21`, `22`, `23`
 - stderr contains `Unknown output format`
 ### Scenario: markdown survives a round-trip through HTML
+_only when `pandoc --version` succeeds_
 #### Given
 - Fixture file `doc.md` is created.
 #### Inputs
@@ -151,6 +158,7 @@ pandoc -f html -t markdown rt.html -o rt.md
   - exit code is `0`
   - file `rt.md` contains `*emphasis*`, `**bold text**`
 ### Scenario: a missing input file fails cleanly
+_only when `pandoc --version` succeeds_
 #### When
 ```shell
 pandoc no-such-file.md
