@@ -2,9 +2,11 @@ package cli
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/nao1215/atago/internal/engine"
 )
@@ -52,6 +54,15 @@ func loadRerunState() (rerunState, error) {
 	}
 	if err := json.Unmarshal(data, &st); err != nil {
 		return st, err
+	}
+	// Reject an unknown schema version rather than interpreting a future format
+	// under v1 assumptions: a later version may move or rename fields, and reading
+	// it as v1 would silently drop or misread the recorded failures — turning a
+	// still-red project green. An empty version predates the field and is treated
+	// as v1 for backward compatibility.
+	if st.SchemaVersion != "" && st.SchemaVersion != RerunStateSchemaVersion {
+		return st, fmt.Errorf("%s has unsupported schema_version %q (this atago understands %q); delete it to reset the rerun state",
+			rerunStatePath(), st.SchemaVersion, RerunStateSchemaVersion)
 	}
 	return st, nil
 }
@@ -133,6 +144,42 @@ func absClean(p string) string {
 		return resolved
 	}
 	return abs
+}
+
+// portableSpecPath returns a spelling of p to store in the ledger that survives
+// the project being moved or checked out at a different absolute path (a CI
+// cache restored under a different directory). It prefers a forward-slashed,
+// cwd-relative form; a --rerun-failed absolutizes its spec paths in memory to
+// match across spellings, and persisting that absolute form made the next rerun
+// after a move find nothing and silently greenlight still-failing work. A path
+// outside cwd (or one that cannot be relativized) keeps its canonical absolute
+// form, which is the best portable spelling available for it.
+func portableSpecPath(p string) string {
+	abs := absClean(p)
+	cwd, err := os.Getwd()
+	if err != nil {
+		return abs
+	}
+	rel, rerr := filepath.Rel(absClean(cwd), abs)
+	if rerr != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return abs
+	}
+	return filepath.ToSlash(rel)
+}
+
+// portableEntry rewrites an entry's spec path to its portable spelling.
+func portableEntry(e failedEntry) failedEntry {
+	e.SpecPath = portableSpecPath(e.SpecPath)
+	return e
+}
+
+// portableEntries maps portableEntry over a slice.
+func portableEntries(in []failedEntry) []failedEntry {
+	out := make([]failedEntry, 0, len(in))
+	for _, e := range in {
+		out = append(out, portableEntry(e))
+	}
+	return out
 }
 
 // intersectPaths returns the members of paths that also appear in keep,
