@@ -954,7 +954,7 @@ touch a; [ -f b ] && touch c; touch b; [ -f c ]
 ```
 #### Then
 - exit code is `0`
-- the step changed exactly created `a`, `b`, `c`, modified nothing, deleted nothing
+- the step changed exactly created `c`, modified nothing, deleted nothing
 ### Scenario: deleting and recreating a byte-identical file appears in no list (POSIX)
 _skipped on Windows_
 #### Given

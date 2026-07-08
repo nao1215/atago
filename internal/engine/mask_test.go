@@ -62,6 +62,62 @@ scenarios:
 	}
 }
 
+// TestEngine_UpdateSnapshotsSharedGoldenParallel is the regression for #250:
+// several matrix rows that assert against the SAME snapshot path, updated under
+// the default parallelism, must update the shared golden deterministically when
+// every row produces byte-identical output. Before the atomic-write fix the
+// concurrent snapshot.Update calls raced in WriteFileNoFollow's non-atomic
+// remove/create window and the update failed ~80% of the time with a confusing
+// filesystem-race error.
+func TestEngine_UpdateSnapshotsSharedGoldenParallel(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	specPath := filepath.Join(dir, "s.atago.yaml")
+	src := `
+version: "1"
+suite:
+  name: snap-race
+scenarios:
+  - name: row ${v}
+    matrix:
+      - { v: "a" }
+      - { v: "b" }
+      - { v: "c" }
+      - { v: "d" }
+      - { v: "e" }
+      - { v: "f" }
+      - { v: "g" }
+      - { v: "h" }
+    steps:
+      - run: { shell: true, command: echo same }
+      - assert:
+          stdout:
+            snapshot: snaps/race.txt
+`
+	if err := os.WriteFile(specPath, []byte(src), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s, err := loader.LoadBytes(specPath, []byte(src))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+
+	eng := New()
+	eng.UpdateSnapshots = true
+	eng.Parallel = 8
+	res := eng.Run(context.Background(), s, specPath)
+	if res.Status != StatusPassed {
+		t.Fatalf("status = %s, want passed (identical-content rows must update a shared golden without racing): %+v", res.Status, res.Scenarios)
+	}
+	golden, err := os.ReadFile(filepath.Join(dir, "snaps", "race.txt"))
+	if err != nil {
+		t.Fatalf("read golden: %v", err)
+	}
+	if strings.TrimSpace(string(golden)) != "same" {
+		t.Errorf("golden = %q, want %q", golden, "same")
+	}
+}
+
 // Regression for issue #12: a failed service-readiness probe embeds the service's
 // raw output in its error; a secret in that output must be masked before it
 // reaches the report.

@@ -19,13 +19,20 @@ import (
 // fails the step if they never all passed. Keeping one loop means a future
 // change to retry semantics (jitter, max-elapsed, ctx-err reporting) cannot
 // silently apply to one step kind and not the other.
-func pollUntil(ctx context.Context, retry *spec.Retry, st *store.Store, env assert.Env, exec func(context.Context) (*runner.Result, error)) (*runner.Result, []*assert.CheckResult, error) {
+func pollUntil(ctx context.Context, retry *spec.Retry, st *store.Store, env assert.Env, exec func(context.Context) (*runner.Result, error), beforeAttempt func()) (*runner.Result, []*assert.CheckResult, error) {
 	interval, _ := time.ParseDuration(retry.Interval) // validated at load time
 	until := expandAssert(st, retry.Until)
 
 	var last *runner.Result
 	var checks []*assert.CheckResult
 	for attempt := 1; attempt <= retry.Times; attempt++ {
+		// beforeAttempt re-captures the caller's `changes:` baseline just before
+		// each attempt, so a following changes assert measures only the final
+		// (converged) attempt's workdir delta rather than the sum of every
+		// attempt's per-run side effects (#251).
+		if beforeAttempt != nil {
+			beforeAttempt()
+		}
 		r, err := exec(ctx)
 		if err != nil {
 			return nil, nil, err

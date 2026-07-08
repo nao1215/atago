@@ -33,7 +33,7 @@ func (e *Engine) runHTTPStep(ctx context.Context, h *spec.HTTP, st *store.Store,
 		r, sv, rerr := e.runHTTP(ctx, h, st, rc, workdir)
 		secViolation = sv
 		return r, rerr
-	})
+	}, nil) // http steps never carry a changes assert, so no per-attempt rebaselining
 	if err != nil {
 		return nil, nil, secViolation, err
 	}

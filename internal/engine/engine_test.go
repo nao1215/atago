@@ -484,6 +484,101 @@ scenarios:
 	}
 }
 
+// TestEngine_StoredRefLeaksIntoArgvErrors is a regression for #249: a stored
+// value that itself contains a ${...} reference, substituted into a no-shell
+// run.command, would survive verbatim into argv because expansion is
+// single-pass. The pre-expansion guard cannot see it (it runs on the raw
+// command, where the outer ${p} IS defined), so the post-expansion guard must
+// catch the leaked reference and error instead of running a garbled command.
+func TestEngine_StoredRefLeaksIntoArgvErrors(t *testing.T) {
+	t.Parallel()
+	res := runSpec(t, `
+version: "1"
+suite:
+  name: store-leak
+scenarios:
+  - name: stored ref leaks into argv
+    steps:
+      - run:
+          shell: true
+          command: "printf '%s' '${undefined_var}/x'"
+      - store:
+          name: p
+          from:
+            stdout:
+              trim: true
+      - run:
+          command: "`+catCmd()+` ${p}"
+      - assert:
+          exit_code: 0
+`)
+	if res.Status != StatusError {
+		t.Fatalf("status = %s, want error (leaked ${undefined_var} must not reach argv): %+v", res.Status, res.Scenarios)
+	}
+	msg := res.Scenarios[0].Steps[2].ErrMsg
+	if !strings.Contains(msg, "undefined_var") {
+		t.Errorf("error = %q, want it to name the leaked ${undefined_var}", msg)
+	}
+}
+
+// TestEngine_MatrixRefLeaksIntoArgvErrors is the matrix-row twin of #249: a
+// matrix value carrying a ${...} reference is seeded raw, so substituting it
+// into a no-shell command leaks the inner reference (even one naming a builtin
+// like ${workdir}, which single-pass expansion never re-expands) into argv.
+func TestEngine_MatrixRefLeaksIntoArgvErrors(t *testing.T) {
+	t.Parallel()
+	res := runSpec(t, `
+version: "1"
+suite:
+  name: matrix-leak
+scenarios:
+  - name: matrix ref leaks
+    matrix:
+      - { path: "${workdir}/data" }
+    steps:
+      - run:
+          command: "`+catCmd()+` ${path}"
+      - assert:
+          exit_code: 0
+`)
+	if res.Status != StatusError {
+		t.Fatalf("status = %s, want error (leaked ${workdir} must not reach argv): %+v", res.Status, res.Scenarios)
+	}
+	msg := res.Scenarios[0].Steps[0].ErrMsg
+	if !strings.Contains(msg, "workdir") {
+		t.Errorf("error = %q, want it to name the leaked ${workdir}", msg)
+	}
+}
+
+// TestEngine_EscapedRefInArgvIsLiteral guards the #249 fix against a false
+// positive: an author who writes $${name} in a no-shell command (or stores a
+// value that deliberately escapes one) wants the literal text ${name} in argv,
+// not an error. The leak guard must only fire for a reference introduced by a
+// substituted value, never for a deliberate escape.
+func TestEngine_EscapedRefInArgvIsLiteral(t *testing.T) {
+	t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skip("no-shell run needs a real printf binary; cmd.exe printf is not an exe")
+	}
+	res := runSpec(t, `
+version: "1"
+suite:
+  name: escape-literal
+scenarios:
+  - name: escaped ref stays literal in argv
+    steps:
+      - run:
+          command: "printf %s $${literal_ref}"
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "${literal_ref}"
+`)
+	if res.Status != StatusPassed {
+		t.Fatalf("status = %s, want passed (an escaped $${name} is a deliberate literal): %+v", res.Status, res.Scenarios)
+	}
+}
+
 // parityScenarios builds a spec with n scenarios cycling passed/failed/skipped so
 // the parallel scheduler has real mixed outcomes to interleave.
 func parityScenarios(n int) string {

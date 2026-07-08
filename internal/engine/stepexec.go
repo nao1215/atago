@@ -34,11 +34,28 @@ func unresolvedRunRefMsg(field, name string, shellExpandable bool) string {
 		field, name, name)
 }
 
+// leakedRunRefMsg explains a run field whose value, after substitution, still
+// contains a ${name} reference that leaked in from a store/matrix value.
+// Expansion is single-pass, so a reference carried by a substituted value is
+// never re-expanded and would reach argv (or cwd) verbatim. field names the
+// spec field ("run.command"/"run.cwd") and name the leaked reference.
+func leakedRunRefMsg(field, name string) string {
+	return fmt.Sprintf(
+		"%s expands to text that still contains ${%s}: a store or matrix value used here itself contains a ${%s} reference, and variable expansion is single-pass, so that inner reference is left verbatim and would leak into the command rather than being expanded. Reference ${%s} directly in the field instead of storing a value that contains it",
+		field, name, name, name)
+}
+
 // execStep runs one step and returns its result, its status contribution
 // (passed/failed/error), and whether it breached the security policy. It is
 // shared by the Steps loop and the Teardown loop; only the caller decides
 // whether the contribution affects the scenario's verdict.
-func (x *scenarioRun) execStep(ctx context.Context, i int, step *spec.Step) (StepResult, Status, bool) {
+//
+// beforeAttempt, when non-nil, is invoked immediately before each execution
+// attempt of a retried run step. runSteps uses it to re-capture the `changes:`
+// baseline before every attempt, so the recorded delta reflects only the final
+// (converged) attempt rather than the cumulative delta of all attempts (#251).
+// It is nil for the teardown path and for every non-run step kind.
+func (x *scenarioRun) execStep(ctx context.Context, i int, step *spec.Step, beforeAttempt func()) (StepResult, Status, bool) {
 	sr := StepResult{Index: i, Kind: step.Kind()}
 	status := StatusPassed
 	secViolation := false
@@ -86,9 +103,25 @@ func (x *scenarioRun) execStep(ctx context.Context, i int, step *spec.Step) (Ste
 				sr.ErrMsg = unresolvedRunRefMsg("run.cwd", names[0], false)
 				return sr, StatusError, false
 			}
+			// The guards above run on the raw fields, where the outer ${p}/${path}
+			// IS defined. But a store/matrix value can itself contain a ${...}
+			// reference, and expansion is single-pass — so substituting such a value
+			// leaves an unexpanded reference that leaks verbatim into a no-shell argv
+			// (or into cwd, which no shell ever expands). Catch that leaked reference
+			// here instead of running a garbled command (#249).
+			if !step.Run.ShellEnabled() {
+				if _, leaked := x.st.ExpandDetectingLeaks(step.Run.Command); len(leaked) > 0 {
+					sr.ErrMsg = leakedRunRefMsg("run.command", leaked[0])
+					return sr, StatusError, false
+				}
+			}
+			if _, leaked := x.st.ExpandDetectingLeaks(step.Run.Cwd); len(leaked) > 0 {
+				sr.ErrMsg = leakedRunRefMsg("run.cwd", leaked[0])
+				return sr, StatusError, false
+			}
 		}
 		run := mergeScenarioEnv(x.scEnv, expandRun(x.st, step.Run), x.st)
-		r, untilChecks, err := x.e.runStep(ctx, run, x.st, x.workdir, x.specDir, x.rc, x.sshConns)
+		r, untilChecks, err := x.e.runStep(ctx, run, x.st, x.workdir, x.specDir, x.rc, x.sshConns, beforeAttempt)
 		if err != nil {
 			sr.ErrMsg = err.Error()
 			return sr, StatusError, isPolicyViolation(err)
@@ -225,11 +258,18 @@ func (x *scenarioRun) runSteps(ctx context.Context, leadingFixtures int) {
 		// (stdout_to/stderr_to) land after the baseline and count as created.
 		var preScan fsdelta.Snapshot
 		scanChanges := measurableForChanges(step.Kind()) && changesFollows(x.sc.Steps, i)
+		// rescan re-captures the baseline. For a retried run step it is invoked
+		// before every attempt (via execStep → runStep → pollUntil), so the delta
+		// below reflects only the final, converged attempt rather than the sum of
+		// every attempt's writes (#251). The pre-loop scan here still covers pty
+		// steps and the no-retry path.
+		var rescan func()
 		if scanChanges {
-			preScan, _ = fsdelta.Scan(x.workdir)
+			rescan = func() { preScan, _ = fsdelta.Scan(x.workdir) }
+			rescan()
 		}
 
-		sr, status, secViolation := x.execStep(ctx, i, step)
+		sr, status, secViolation := x.execStep(ctx, i, step, rescan)
 		if scanChanges && x.current != nil {
 			post, _ := fsdelta.Scan(x.workdir)
 			delta := fsdelta.Diff(preScan, post)
@@ -271,7 +311,15 @@ func (x *scenarioRun) runTeardown(ctx context.Context) {
 			defer cancel()
 		}
 		for i := range x.sc.Teardown {
-			sr, _, _ := x.execStep(tctx, i, &x.sc.Teardown[i])
+			sr, _, secViolation := x.execStep(tctx, i, &x.sc.Teardown[i], nil) // teardown never carries a changes assert
+			// A teardown failure never changes the scenario verdict — the behavior
+			// under test was decided by the steps above. But a security-policy
+			// breach (e.g. a denied network host contacted during cleanup) is not a
+			// verdict question: it must still set SecurityViolation so the run does
+			// not report green after a declared egress rule was violated (#248).
+			if secViolation {
+				x.out.SecurityViolation = true
+			}
 			sr.ErrMsg = x.masker.Mask(sr.ErrMsg)
 			x.out.Teardown = append(x.out.Teardown, sr)
 		}
@@ -291,7 +339,7 @@ func isSSHRunner(name string, runners map[string]spec.Runner) bool {
 // configured), and an execution error. With retry, the command is re-run until
 // until passes or the attempt budget is spent; the last attempt's result is what
 // later steps observe.
-func (e *Engine) runStep(ctx context.Context, run *spec.Run, st *store.Store, workdir, specDir string, rc runConfig, sshConns map[string]*sshrunner.Runner) (*runner.Result, []*assert.CheckResult, error) {
+func (e *Engine) runStep(ctx context.Context, run *spec.Run, st *store.Store, workdir, specDir string, rc runConfig, sshConns map[string]*sshrunner.Runner, beforeAttempt func()) (*runner.Result, []*assert.CheckResult, error) {
 	// A run step naming an ssh runner executes remotely; otherwise it
 	// runs locally via the cmd runner. The runner is resolved once (not per
 	// retry attempt) so the timeout precedence below sees the pristine authored
@@ -355,11 +403,16 @@ func (e *Engine) runStep(ctx context.Context, run *spec.Run, st *store.Store, wo
 	}
 
 	if run.Retry == nil {
+		// No retry: the caller's single pre-step `changes:` baseline already
+		// covers this one execution, so no per-attempt rebaselining is needed.
+		if beforeAttempt != nil {
+			beforeAttempt()
+		}
 		r, err := exec(ctx)
 		return r, nil, err
 	}
 	env := assert.Env{Workdir: workdir, SpecDir: specDir, UpdateSnapshots: e.UpdateSnapshots, Secrets: rc.masker.MaskBytes, Scrub: rc.scrubber.Apply}
-	return pollUntil(ctx, run.Retry, st, env, exec)
+	return pollUntil(ctx, run.Retry, st, env, exec, beforeAttempt)
 }
 
 // measurableForChanges reports whether a step kind produces a workdir delta a

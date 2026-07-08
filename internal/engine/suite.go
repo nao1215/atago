@@ -116,7 +116,7 @@ func (e *Engine) runSuiteSteps(ctx context.Context, steps []spec.Step, rt *suite
 			}
 		case spec.StepRun:
 			run := mergeScenarioEnv(rt.env, expandRun(rt.st, step.Run), rt.st)
-			r, untilChecks, err := e.runStep(ctx, run, rt.st, rt.dir, rc.specDir, rc, rt.sshConns)
+			r, untilChecks, err := e.runStep(ctx, run, rt.st, rt.dir, rc.specDir, rc, rt.sshConns, nil) // suite setup/teardown steps carry no changes assert
 			if err != nil {
 				sr.ErrMsg = err.Error()
 				failed = true

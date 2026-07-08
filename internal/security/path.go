@@ -65,29 +65,43 @@ func ReadFileNoFollow(path string) ([]byte, error) {
 // dest. Lexical containment proves dest is inside its root, but the untrusted
 // program under test may have created a link there pointing outside the root;
 // following it on write would escape containment and clobber a host file (TOCTOU,
-// issue #16). An existing symlink is rejected outright; an existing regular file
-// is removed and re-created with O_EXCL so a link planted in the race is never
-// written through (O_EXCL fails atomically on any existing path). This is
-// portable — unlike O_NOFOLLOW, which is not available on all platforms.
+// issue #16). An existing symlink is rejected outright.
+//
+// The payload is written to a fresh temp file (created O_EXCL, so a planted link
+// is never written through) in dest's own directory and then atomically renamed
+// over dest. os.Rename replaces the destination name without following a link
+// that may sit there, and the rename is a single filesystem operation — so
+// concurrent writers targeting one path (e.g. several parallel scenarios sharing
+// one golden under --update-snapshots) can never observe a torn file or race in
+// a Lstat→Remove→create window; identical-content writers all succeed and the
+// last rename wins (#250). This is portable — unlike O_NOFOLLOW, which is not
+// available on all platforms.
 func WriteFileNoFollow(dest string, data []byte, perm os.FileMode) error {
-	if fi, err := os.Lstat(dest); err == nil {
-		if fi.Mode()&os.ModeSymlink != 0 {
-			return fmt.Errorf("refusing to write through the existing symlink %q (it escapes the scenario root)", dest)
-		}
-		if err := os.Remove(dest); err != nil {
-			return err
-		}
+	if fi, err := os.Lstat(dest); err == nil && fi.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("refusing to write through the existing symlink %q (it escapes the scenario root)", dest)
 	}
-	f, err := os.OpenFile(dest, os.O_WRONLY|os.O_CREATE|os.O_EXCL, perm) //nolint:gosec // dest is containment-checked by the caller; O_EXCL guards against a planted link
+	// Create the temp file in dest's directory so the rename stays on one
+	// filesystem (a cross-device rename is not atomic and errors). CreateTemp's
+	// name is unique per call, so concurrent writers never collide on the temp.
+	tmp, err := os.CreateTemp(filepath.Dir(dest), "."+filepath.Base(dest)+".tmp-*")
 	if err != nil {
 		return err
 	}
-	_, werr := f.Write(data)
-	cerr := f.Close()
-	if werr != nil {
-		return werr
+	tmpName := tmp.Name()
+	// Best-effort cleanup: harmless if the rename already consumed the temp.
+	defer func() { _ = os.Remove(tmpName) }()
+	if err := tmp.Chmod(perm); err != nil {
+		_ = tmp.Close()
+		return err
 	}
-	return cerr
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmpName, dest)
 }
 
 // WithinRoot reports whether resolved lies inside root (root itself counts).

@@ -93,11 +93,13 @@ scenarios:
     skip:
       os: windows
     steps:
-      # Pinned semantic: with retry, atago pre-scans ONCE before attempt 1 and
-      # post-scans ONCE after the LAST attempt — so the changes delta is the
-      # cumulative footprint of every attempt, not just the winning one. This
-      # command fails on attempt 1 (c does not exist yet) and passes on attempt
-      # 2, and a, b, c are all created along the way.
+      # Pinned semantic (#251): with retry, atago re-scans the workdir baseline
+      # before EVERY attempt, so the changes delta reflects only the final,
+      # converged attempt — the state the until gate accepted — not the
+      # cumulative footprint of every attempt. This command fails on attempt 1
+      # (c does not exist yet) and passes on attempt 2. On attempt 2, a and b
+      # already exist from attempt 1 (so they are baseline, not changes), and the
+      # only new file the winning attempt creates is c.
       - run:
           shell: true
           command: 'touch a; [ -f b ] && touch c; touch b; [ -f c ]'
@@ -110,8 +112,6 @@ scenarios:
           exit_code: 0
           changes:
             created:
-              - a
-              - b
               - c
             modified: []
             deleted: []

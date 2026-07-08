@@ -82,6 +82,48 @@ func (s *Store) Expand(in string) string {
 	})
 }
 
+// ExpandDetectingLeaks expands in like Expand, and additionally reports the
+// names of any ${...} references that a *substituted value* carries into the
+// output. Expansion is deliberately single-pass (see Expand): a reference that
+// a store/matrix value contains is never re-examined, so it survives verbatim
+// into the result — and, for a no-shell run.command, into argv, where nothing
+// will ever expand it. Reporting these lets the run guard refuse the garbled
+// command instead of leaking the literal text (#249).
+//
+// Only references introduced by a substituted value are reported. A reference
+// the author wrote directly in in is not (an unresolved one is already the
+// pre-expansion guard's job, and a resolved one expands normally), and an
+// escaped $${name} — in the input or inside a substituted value — is a
+// deliberate literal, never a leak.
+func (s *Store) ExpandDetectingLeaks(in string) (string, []string) {
+	if s == nil || !varRef.MatchString(in) {
+		return in, nil
+	}
+	var leaked []string
+	out := varRef.ReplaceAllStringFunc(in, func(m string) string {
+		sub := varRef.FindStringSubmatch(m)
+		escaped, name := sub[1], sub[2]
+		if escaped != "" {
+			return "${" + name + "}"
+		}
+		v, ok := s.resolve(name)
+		if !ok {
+			return m // authored unresolved reference: pre-expansion guard's domain
+		}
+		// The substituted value is inserted verbatim (single-pass); any live
+		// reference it carries will never be expanded and would leak into argv.
+		// An escaped $${x} inside the value is a deliberate literal, so skip it.
+		for _, vm := range varRef.FindAllStringSubmatch(v, -1) {
+			if vm[1] != "" {
+				continue
+			}
+			leaked = append(leaked, vm[2])
+		}
+		return v
+	})
+	return out, leaked
+}
+
 // Escape rewrites text so that Expand returns it verbatim: it prefixes an extra
 // `$` onto exactly the references Expand acts on — a live `${name}` becomes the
 // literal `$${name}`, and an already-escaped `$${name}` becomes `$$${name}` —
