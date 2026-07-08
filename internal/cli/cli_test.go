@@ -1535,6 +1535,9 @@ scenarios:
 		if !strings.Contains(s, "match tags exactly") {
 			t.Errorf("stderr = %q, want it to say tags match exactly", s)
 		}
+		if !strings.Contains(s, "atago list") {
+			t.Errorf("stderr = %q, want it to suggest `atago list`", s)
+		}
 		if strings.Contains(s, "case-sensitive substring") {
 			t.Errorf("stderr = %q, must not use the --filter substring note for a skip-tag", s)
 		}
