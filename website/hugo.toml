@@ -16,6 +16,19 @@ description = "atago tests real CLI behavior from plain YAML: exit codes, output
 [markup.highlight]
 noClasses = false
 
+[markup.tableOfContents]
+startLevel = 2
+endLevel = 3
+
+# /llms.txt: a plain-text index of every page, for LLM agents that fetch docs.
+[outputFormats.llms]
+mediaType = "text/plain"
+baseName = "llms"
+isPlainText = true
+
+[outputs]
+home = ["html", "llms"]
+
 [[menus.main]]
 name = "Install"
 pageRef = "/install"
@@ -45,6 +58,11 @@ weight = 50
 name = "Reference"
 pageRef = "/reference"
 weight = 60
+
+[[menus.main]]
+name = "LLM"
+pageRef = "/llm"
+weight = 65
 
 [[menus.main]]
 name = "Real-world CLIs"

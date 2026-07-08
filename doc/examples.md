@@ -4,6 +4,7 @@
 
 | You want to | Uses |
 |-------------|------|
+| [Start from a recorded run](cookbook.md#start-from-a-recorded-run) | `atago record`, then edit the generated spec |
 | [Test a CLI that converts images](cookbook.md#test-a-cli-that-converts-images) | `image:` format/dimension/similarity asserts |
 | [Test a CLI that generates a PDF](cookbook.md#test-a-cli-that-generates-a-pdf) | `pdf:` page/metadata/text asserts |
 | [Test a CLI that generates files](cookbook.md#test-a-cli-that-generates-files) | `file:`/`dir:` asserts, byte-exact `equals_file` |
@@ -27,6 +28,39 @@
 | [Run the same scenario over many inputs](cookbook.md#run-the-same-scenario-over-many-inputs) | `matrix:` expansion |
 | [Capture a value in one step and reuse it](cookbook.md#capture-a-value-in-one-step-and-reuse-it) | `store:` + `${name}` |
 | [Isolate the test from the host environment](cookbook.md#isolate-the-test-from-the-host-environment) | `clear_env`, `pass_env`, `sandbox_home` |
+| [Pin the help and misuse contract](cookbook.md#pin-the-help-and-misuse-contract) | `--help` content, unknown-flag exit code and stderr |
+| [Test a CLI that reads environment variables](cookbook.md#test-a-cli-that-reads-environment-variables) | step `env:`, `clear_env` to prove the default |
+| [Mask secrets in reports and snapshots](cookbook.md#mask-secrets-in-reports-and-snapshots) | `secrets:` masking as `***` |
+| [Test a REPL](cookbook.md#test-a-repl) | `pty:` prompt-gated expect/send, EOF via `ctrl-d` |
+| [Prove a command is idempotent](cookbook.md#prove-a-command-is-idempotent) | second-run `changes:` pinned to empty |
+| [Compare two implementations of the same command](cookbook.md#compare-two-implementations-of-the-same-command) | `store:` + `equals: ${reference}` oracle |
+| [Record an interactive session instead of scripting it](cookbook.md#record-an-interactive-session-instead-of-scripting-it) | `atago record --pty`, secrets become `${env:...}` |
+| [Refresh snapshots when output legitimately changes](cookbook.md#refresh-snapshots-when-output-legitimately-changes) | `atago snapshot update`, `scrub:`, git-reviewable goldens |
+| [Pin the final TUI frame with a screen snapshot](cookbook.md#pin-the-final-tui-frame-with-a-screen-snapshot) | `screen:` line/contains asserts and snapshots, `rows:`/`cols:` |
+| [Pin the version and completion contracts](cookbook.md#pin-the-version-and-completion-contracts) | `matches:` on `--version`, completion output |
+| [Simulate API failures offline](cookbook.md#simulate-api-failures-offline) | `mock_servers:` error routes, `mock:` call counting |
+| [Test a download command offline](cookbook.md#test-a-download-command-offline) | mock route body, `equals_file` byte compare |
+| [Verify server state after the CLI acts](cookbook.md#verify-server-state-after-the-cli-acts) | `services:` + observer `http:` step, `status`/`header`/`body` |
+| [Send output streams to files](cookbook.md#send-output-streams-to-files) | `stdout_to:`/`stderr_to:` + file asserts |
+| [Ship binary test data with fixtures](cookbook.md#ship-binary-test-data-with-fixtures) | fixture `from:`/`base64:`/`mode:` |
+| [Test how the CLI treats symlinks](cookbook.md#test-how-the-cli-treats-symlinks) | fixture `symlink:` |
+| [Test freshness logic with fixture timestamps](cookbook.md#test-freshness-logic-with-fixture-timestamps) | fixture `mtime:` + `changes:` delta |
+| [Prove the tool is binary-safe](cookbook.md#prove-the-tool-is-binary-safe) | `stdin: {base64:}`, `stdout_to:`, `equals_file` |
+| [Test the empty-input boundary](cookbook.md#test-the-empty-input-boundary) | empty fixtures and `stdin: ""` |
+| [Prove multibyte text survives](cookbook.md#prove-multibyte-text-survives) | exact `equals:` on unicode round-trips |
+| [Test TTY detection](cookbook.md#test-tty-detection) | the same command under `pty:` and `run:` |
+| [Inspect an archive the CLI produced](cookbook.md#inspect-an-archive-the-cli-produced) | listing via a real tool + `contains`/`not_contains` |
+| [Test the unreadable-input failure mode](cookbook.md#test-the-unreadable-input-failure-mode) | fixture `mode: "0000"` |
+| [Run the command from a subdirectory](cookbook.md#run-the-command-from-a-subdirectory) | `cwd:` inside the workdir |
+| [Write one spec that runs on all three OSes](cookbook.md#write-one-spec-that-runs-on-all-three-oses) | direct argv commands, `skip: {os:}` gates |
+| [Compare releases of your CLI with a matrix](cookbook.md#compare-releases-of-your-cli-with-a-matrix) | `matrix:` over the command itself |
+| [Tag scenarios and run a slice in CI](cookbook.md#tag-scenarios-and-run-a-slice-in-ci) | `tags:` + `--tag`/`--skip-tag` |
+| [Set defaults once for the whole suite](cookbook.md#set-defaults-once-for-the-whole-suite) | `defaults:` for run steps and scenario env |
+| [Assert a database migration's schema](cookbook.md#assert-a-database-migrations-schema) | db runner, catalog `query:` + `rows:` |
+| [Run the CLI on a remote host over SSH](cookbook.md#run-the-cli-on-a-remote-host-over-ssh) | `ssh` runner as the observation point |
+| [Check a gRPC dependency after the CLI acts](cookbook.md#check-a-grpc-dependency-after-the-cli-acts) | `grpc:` step, `grpc_status`/`message` asserts |
+| [Verify a generated page in a real browser](cookbook.md#verify-a-generated-page-in-a-real-browser) | `cdp:` actions + `value:` assert |
+| [Lay out specs for a growing suite](cookbook.md#lay-out-specs-for-a-growing-suite) | directory layout, tags, `atago doc`/`list` |
 
 ## By feature
 

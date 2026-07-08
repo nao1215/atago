@@ -169,3 +169,108 @@ hr {
   border-top: 1px solid var(--border);
   margin: 2rem 0;
 }
+
+/* --- navigation state --- */
+
+header nav a.active {
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 0.35em;
+}
+
+/* --- heading anchors: visible on hover --- */
+
+.hlink {
+  text-decoration: none;
+  opacity: 0;
+  font-weight: 400;
+  transition: opacity 0.1s;
+}
+
+h1:hover .hlink, h2:hover .hlink, h3:hover .hlink, h4:hover .hlink {
+  opacity: 0.7;
+}
+
+/* --- "On this page" box --- */
+
+details.toc {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.5rem 1rem;
+  margin: 1rem 0;
+  font-size: 0.95rem;
+}
+
+details.toc summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+
+details.toc ul {
+  margin: 0.5rem 0;
+  padding-left: 1.25rem;
+}
+
+details.toc a {
+  text-decoration: none;
+}
+
+details.toc a:hover {
+  text-decoration: underline;
+}
+
+/* --- copy button on code blocks --- */
+
+pre {
+  position: relative;
+}
+
+pre .copy {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--muted);
+  font: 0.75rem ui-monospace, monospace;
+  padding: 0.15rem 0.5rem;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+
+pre:hover .copy {
+  opacity: 1;
+}
+
+pre .copy:hover {
+  color: var(--fg);
+}
+
+/* --- subtle zebra striping for wide tables --- */
+
+tbody tr:nth-child(even) {
+  background: var(--code-bg);
+}
+
+/* --- landing: "Where to go" as a card grid --- */
+
+#where-to-go + ul {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(21rem, 1fr));
+  gap: 0.75rem;
+}
+
+#where-to-go + ul li {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  margin: 0;
+}
+
+#where-to-go + ul li a:first-child {
+  font-weight: 600;
+}

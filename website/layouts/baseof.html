@@ -23,7 +23,7 @@
 <nav>
 <a class="brand" href="{{ site.Home.RelPermalink }}">atago</a>
 {{- range site.Menus.main }}
-<a href="{{ .URL }}">{{ .Name }}</a>
+<a{{ if or ($.IsMenuCurrent "main" .) ($.HasMenuCurrent "main" .) }} class="active"{{ end }} href="{{ .URL }}">{{ .Name }}</a>
 {{- end }}
 <a href="https://github.com/nao1215/atago">GitHub</a>
 </nav>
@@ -34,5 +34,26 @@
 <footer>
 <p>MIT licensed · <a href="https://github.com/nao1215/atago">nao1215/atago</a> · every page on this site is generated from files committed in the repository.</p>
 </footer>
+<script>
+if (navigator.clipboard && window.isSecureContext) {
+  document.querySelectorAll("pre").forEach(function (pre) {
+    var b = document.createElement("button");
+    b.type = "button";
+    b.className = "copy";
+    b.textContent = "copy";
+    b.addEventListener("click", function () {
+      var code = pre.querySelector("code");
+      navigator.clipboard.writeText(code ? code.innerText : pre.innerText).then(function () {
+        b.textContent = "copied";
+      }, function () {
+        b.textContent = "failed";
+      }).then(function () {
+        setTimeout(function () { b.textContent = "copy"; }, 1200);
+      });
+    });
+    pre.appendChild(b);
+  });
+}
+</script>
 </body>
 </html>

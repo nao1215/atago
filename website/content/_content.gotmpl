@@ -16,7 +16,9 @@
   {{ $.AddPage (dict
       "path" "cookbook"
       "title" "Cookbook"
-      "params" (dict "description" "Copyable atago specs for common jobs: converting files, driving prompts and TUIs, mocking HTTP APIs, pinning output trees, and more.")
+      "params" (dict
+        "description" "50+ copyable atago specs for common jobs: converting files, driving prompts and TUIs, simulating API failures, pinning output trees, and more."
+        "toc" true)
       "content" (dict "mediaType" "text/markdown" "value" $md)) }}
 {{ end }}
 
