@@ -660,3 +660,27 @@ func outputOf(p *Proc) string {
 	}
 	return p.Output()
 }
+
+// TestSyncBuffer_TotalWrittenIsMonotonic guards the log-probe freshness signal
+// against the capped-buffer trap that flaked on macOS CI: once the buffer
+// reaches its cap, its retained LENGTH never changes again, so a length-based
+// "did anything new arrive?" check stops rescanning exactly while the ready
+// line is still streaming in. The written-byte total must keep growing.
+func TestSyncBuffer_TotalWrittenIsMonotonic(t *testing.T) {
+	t.Parallel()
+	b := &syncBuffer{cap: 8}
+	var prev int64
+	for i := 0; i < 5; i++ {
+		if _, err := b.Write([]byte("0123456789")); err != nil {
+			t.Fatal(err)
+		}
+		if got := b.TotalWritten(); got <= prev {
+			t.Fatalf("write %d: TotalWritten = %d, want > %d (must grow past the cap)", i, got, prev)
+		} else {
+			prev = got
+		}
+	}
+	if prev != 50 {
+		t.Errorf("TotalWritten = %d, want 50 (every written byte counted)", prev)
+	}
+}
