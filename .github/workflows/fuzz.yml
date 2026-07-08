@@ -1,8 +1,7 @@
 name: Fuzz
 
-# The repository ships fuzz targets (internal/loader, internal/store,
-# internal/assert), but the push/PR test workflows only exercise their seed
-# corpus. This job runs real mutation fuzzing on a schedule so the loader, the
+# The repository ships fuzz targets (loader, store, assert, snapshot, record,
+# ptyrun), but the push/PR test workflows only exercise their seed corpus. This job runs real mutation fuzzing on a schedule so the loader, the
 # ${...} expander, and the JSON matcher keep getting adversarial input over
 # time — atago parses untrusted specs and arbitrary program output, so its input
 # surface is exactly where fuzzing pays off. A newly discovered crasher fails the
@@ -34,6 +33,14 @@ jobs:
             target: FuzzCheckJSON
           - pkg: ./internal/assert
             target: FuzzValuesEqual
+          - pkg: ./internal/assert
+            target: FuzzChangesGlob
+          - pkg: ./internal/snapshot
+            target: FuzzNormalize
+          - pkg: ./internal/record
+            target: FuzzGenerateRoundTrip
+          - pkg: ./internal/runner/ptyrun
+            target: FuzzRenderScreen
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
