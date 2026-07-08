@@ -1,4 +1,5 @@
 ---
+toc: true
 title: Use it in CI
 description: Run atago suites in CI with JUnit/JSON/TAP/GitHub reports, loud retries for flaky scenarios, repeat-based flake detection, kept artifacts, and secret masking.
 ---

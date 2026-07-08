@@ -15,6 +15,27 @@ and this project follows [Semantic Versioning](https://semver.org/).
   `doc/e2e/` are mounted and turned into pages at build time). Deployed to
   GitHub Pages by `.github/workflows/website.yml` on every push to `main` that
   touches the docs; `make website` / `make website-serve` build it locally.
+- 34 new cookbook recipes (23 → 57), all loader-validated by
+  `TestCookbook_SnippetsValid` and indexed in [doc/examples.md](doc/examples.md):
+  record-first workflows (including `record --pty`), snapshot refresh with
+  `scrub:`, TUI screen-frame snapshots, help/version/completion contracts,
+  environment and secrets handling, REPL and TTY-detection sessions,
+  idempotency and differential oracles, offline API-failure simulation,
+  fixture sources (`from:`/`base64:`/`mode:`/`mtime:`/`symlink:`), binary
+  safety, boundary inputs, db/ssh/grpc/browser peers, matrix release
+  comparison, tags, defaults, and suite layout guidance.
+- A "Write specs with an LLM" website page with a constrained, copy-paste
+  prompt for generating honest atago specs, plus an auto-generated
+  [/llms.txt](https://nao1215.github.io/atago/llms.txt) index for LLM agents.
+- Website polish: per-page "On this page" TOC, hover heading anchors, a copy
+  button on code blocks, active-nav state, card-grid landing links, and zebra
+  tables — plus landing sections spotlighting record, snapshot, and PTY/TUI
+  strengths.
+
+### Changed
+
+- README now links the hosted cookbook and examples index from its Examples
+  section, and points to the documentation site under the tagline.
 
 ## [0.9.0] - 2026-07-08
 

@@ -1,4 +1,5 @@
 ---
+toc: true
 title: Getting started
 description: Record a real run of your CLI, read the spec atago wrote, and keep it as a test — then assert on files, snapshots, interactive prompts, and server peers.
 ---

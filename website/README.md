@@ -16,8 +16,10 @@ repository-relative links to site pages or GitHub:
 | `doc/e2e/<tool>.md` | `/real-world/<tool>/` |
 | `doc/img/`, `site/samples/` | served as static files |
 
-Only the landing page and the Install / Getting started / CI / Reference pages
-under `content/` are authored here; their prose is adapted from README.md.
+Only the landing page and the Install / Getting started / CI / Reference /
+LLM pages under `content/` are authored here; their prose is adapted from
+README.md. `/llms.txt` (a plain-text page index for LLM agents) is generated
+by `layouts/home.llms.txt` via the custom `llms` output format.
 
 ```shell
 make website        # build into website/public (requires hugo)

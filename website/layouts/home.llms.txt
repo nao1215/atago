@@ -1,0 +1,21 @@
+# atago
+
+> {{ site.Params.description }}
+
+Docs: {{ site.Home.Permalink }}
+Source: https://github.com/nao1215/atago
+Spec JSON Schema: https://raw.githubusercontent.com/nao1215/atago/main/schema/atago.schema.json
+
+Every page below is generated from files committed in the repository; the
+real-world pages are behavior docs regenerated from executable specs that run
+in CI.
+
+## Docs
+{{ range site.RegularPages.ByTitle }}
+- [{{ .Title }}]({{ .Permalink }}): {{ or .Params.description .Summary | plainify | chomp }}
+{{- end }}
+
+## Sections
+{{ range site.Sections }}
+- [{{ .Title }}]({{ .Permalink }}): {{ or .Params.description "" | plainify | chomp }}
+{{- end }}

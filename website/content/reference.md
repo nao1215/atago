@@ -1,4 +1,5 @@
 ---
+toc: true
 title: Reference
 description: atago subcommands, scenario selection flags, snapshot updating and scrub rules, the JSON Schema for editors, shell completion, and the exit code contract.
 ---
