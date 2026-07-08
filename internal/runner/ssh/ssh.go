@@ -13,6 +13,7 @@ import (
 	"net"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/crypto/ssh"
@@ -99,7 +100,7 @@ func (r *Runner) Run(ctx context.Context, command string) (*runner.Result, error
 		timeoutSource = "runner.timeout"
 	}
 
-	var stdout, stderr strings.Builder
+	var stdout, stderr lockedBuilder
 	sess.Stdout = &stdout
 	sess.Stderr = &stderr
 
@@ -112,9 +113,10 @@ func (r *Runner) Run(ctx context.Context, command string) (*runner.Result, error
 	case <-ctx.Done():
 		_ = sess.Signal(ssh.SIGKILL)
 		_ = sess.Close()
-		// Wait (bounded) for the session goroutine so the output builders are
-		// quiescent before they are read — a remote that ignores the kill must
-		// not turn into a data race or a hang here.
+		// Wait (bounded) for the session goroutine so the captured output is
+		// as complete as possible; the builders are lock-guarded, so even a
+		// remote that ignores the kill and keeps streaming past the grace
+		// window cannot turn the read below into a data race.
 		select {
 		case <-done:
 		case <-time.After(2 * time.Second):
@@ -154,6 +156,26 @@ func (r *Runner) Run(ctx context.Context, command string) (*runner.Result, error
 		return nil, fmt.Errorf("ssh run %q: %w", command, runErr)
 	}
 	return res, nil
+}
+
+// lockedBuilder is a strings.Builder safe for the session goroutine to write
+// while the timeout path reads: a killed remote may ignore the signal and keep
+// streaming past the bounded grace wait, so the read must not race the write.
+type lockedBuilder struct {
+	mu sync.Mutex
+	b  strings.Builder
+}
+
+func (w *lockedBuilder) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.b.Write(p)
+}
+
+func (w *lockedBuilder) String() string {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.b.String()
 }
 
 func authMethods(cfg Config) ([]ssh.AuthMethod, error) {
