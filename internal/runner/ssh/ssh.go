@@ -13,6 +13,7 @@ import (
 	"net"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/crypto/ssh"
@@ -87,7 +88,19 @@ func (r *Runner) Run(ctx context.Context, command string) (*runner.Result, error
 	}
 	defer func() { _ = sess.Close() }()
 
-	var stdout, stderr strings.Builder
+	// A caller-supplied deadline (the engine applies the step's own
+	// run.timeout that way) takes precedence; without one, the runner-level
+	// timeout captured at dial bounds the command. Track which level armed the
+	// deadline so a fired timeout can name its knob, mirroring the cmd runner.
+	timeoutSource := ""
+	if _, hasDeadline := ctx.Deadline(); !hasDeadline && r.timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, r.timeout)
+		defer cancel()
+		timeoutSource = "runner.timeout"
+	}
+
+	var stdout, stderr lockedBuilder
 	sess.Stdout = &stdout
 	sess.Stderr = &stderr
 
@@ -96,23 +109,34 @@ func (r *Runner) Run(ctx context.Context, command string) (*runner.Result, error
 	go func() { done <- sess.Run(command) }()
 
 	var runErr error
-	if r.timeout > 0 {
+	select {
+	case <-ctx.Done():
+		_ = sess.Signal(ssh.SIGKILL)
+		_ = sess.Close()
+		// Wait (bounded) for the session goroutine so the captured output is
+		// as complete as possible; the builders are lock-guarded, so even a
+		// remote that ignores the kill and keeps streaming past the grace
+		// window cannot turn the read below into a data race.
 		select {
-		case <-ctx.Done():
-			_ = sess.Signal(ssh.SIGKILL)
-			return nil, ctx.Err()
-		case <-time.After(r.timeout):
-			_ = sess.Signal(ssh.SIGKILL)
-			return nil, fmt.Errorf("ssh command timed out after %s", r.timeout)
-		case runErr = <-done:
+		case <-done:
+		case <-time.After(2 * time.Second):
 		}
-	} else {
-		select {
-		case <-ctx.Done():
-			_ = sess.Signal(ssh.SIGKILL)
-			return nil, ctx.Err()
-		case runErr = <-done:
+		// A fired deadline is an OBSERVABLE outcome assertions can inspect —
+		// TimedOut with the captured output so far — matching the cmd runner
+		// (#17). Only a cancellation (Ctrl-C / suite teardown) is an error.
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return &runner.Result{
+				Command:       command,
+				Stdout:        []byte(stdout.String()),
+				Stderr:        []byte(stderr.String()),
+				Duration:      time.Since(start),
+				ExitCode:      -1,
+				TimedOut:      true,
+				TimeoutSource: timeoutSource,
+			}, nil
 		}
+		return nil, ctx.Err()
+	case runErr = <-done:
 	}
 	elapsed := time.Since(start)
 
@@ -132,6 +156,26 @@ func (r *Runner) Run(ctx context.Context, command string) (*runner.Result, error
 		return nil, fmt.Errorf("ssh run %q: %w", command, runErr)
 	}
 	return res, nil
+}
+
+// lockedBuilder is a strings.Builder safe for the session goroutine to write
+// while the timeout path reads: a killed remote may ignore the signal and keep
+// streaming past the bounded grace wait, so the read must not race the write.
+type lockedBuilder struct {
+	mu sync.Mutex
+	b  strings.Builder
+}
+
+func (w *lockedBuilder) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.b.Write(p)
+}
+
+func (w *lockedBuilder) String() string {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.b.String()
 }
 
 func authMethods(cfg Config) ([]ssh.AuthMethod, error) {
