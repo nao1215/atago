@@ -4,19 +4,32 @@
   "title": "atago",
   "description": "Schema for atago black-box behavior spec files (*.atago.yaml). See doc/design/schema.md.",
   "type": "object",
-  "required": ["version", "suite", "scenarios"],
+  "required": [
+    "version",
+    "suite",
+    "scenarios"
+  ],
   "additionalProperties": false,
   "properties": {
     "version": {
-      "enum": ["1", 1],
-      "description": "Spec format version. Write \"1\" (quoted); a bare 1 is accepted for convenience \u2014 the loader coerces it to \"1\"."
+      "enum": [
+        "1",
+        1
+      ],
+      "description": "Spec format version. Write \"1\" (quoted); a bare 1 is accepted for convenience — the loader coerces it to \"1\"."
     },
     "suite": {
       "type": "object",
-      "required": ["name"],
+      "required": [
+        "name"
+      ],
       "additionalProperties": false,
       "properties": {
-        "name": { "type": "string", "minLength": 1 },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The suite name shown in reports and generated docs."
+        },
         "timeout": {
           "type": "string",
           "description": "Suite-level default step timeout (#17): every run/http/query/grpc step without a more specific timeout (step > runner > defaults.run > suite) is bounded by this Go duration. \"0\" disables. When no level configures one, a built-in 60s default applies."
@@ -24,25 +37,35 @@
         "env": {
           "description": "Environment exported to every scenario, setup, and teardown step (a scenario's own env wins per key).",
           "type": "object",
-          "additionalProperties": { "type": "string" }
+          "additionalProperties": {
+            "type": "string"
+          }
         },
         "setup": {
           "description": "Steps run ONCE before any scenario, in order, inside the ${suitedir} scratch dir. Allowed kinds: fixture, run, store, assert, and service (a suite-wide background process started at that point in the sequence). A failing setup step errors every scenario.",
           "type": "array",
           "minItems": 1,
-          "items": { "$ref": "#/$defs/step" }
+          "items": {
+            "$ref": "#/$defs/step"
+          }
         },
         "teardown": {
           "description": "Steps that always run after the last scenario, while suite services are still up (services stop last, LIFO). Failures are reported but never change the suite verdict.",
           "type": "array",
           "minItems": 1,
-          "items": { "$ref": "#/$defs/step" }
+          "items": {
+            "$ref": "#/$defs/step"
+          }
         }
-      }
+      },
+      "description": "Groups the file's scenarios under a name, with optional suite-wide env, default step timeout, and one-time setup/teardown steps."
     },
     "runners": {
       "type": "object",
-      "additionalProperties": { "$ref": "#/$defs/runner" }
+      "additionalProperties": {
+        "$ref": "#/$defs/runner"
+      },
+      "description": "Named runner configurations. `cmd` is the implicit default for run steps; `http` supplies a base_url for http steps; `db` a dsn for query steps; `ssh`, `grpc`, and `browser` configure their step types."
     },
     "permissions": {
       "type": "object",
@@ -52,38 +75,75 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "allow": { "type": "array", "items": { "type": "string" } }
-          }
+            "allow": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Hosts that scenarios may contact; egress to any other host is a policy violation (exit 6)."
+            }
+          },
+          "description": "Network egress policy for the spec."
         }
-      }
+      },
+      "description": "The spec's security policy."
     },
-    "secrets": { "type": "array", "items": { "type": "string" } },
+    "secrets": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Environment variable names whose VALUES are masked as `***` in output, reports, and snapshots."
+    },
     "scrub": {
       "type": "array",
       "description": "Declarative output-normalization rules (#137): each replaces every regex match in captured output with a literal placeholder before a snapshot is compared or written. Where `secrets` masks known values, `scrub` normalizes volatile patterns the built-in normalizers do not cover (auto-increment IDs, request identifiers, custom timestamps). Rules apply in order, after secret masking and before the built-in ANSI/UUID/timestamp/port/path normalization.",
       "items": {
         "type": "object",
-        "required": ["pattern"],
+        "required": [
+          "pattern"
+        ],
         "additionalProperties": false,
         "properties": {
-          "pattern": { "type": "string", "minLength": 1, "description": "A Go (RE2) regular expression; every match is replaced. Required." },
-          "placeholder": { "type": "string", "description": "Literal replacement text (no $1 expansion), e.g. \"<ID>\". Defaults to empty, which deletes matches." }
+          "pattern": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Go (RE2) regular expression; every match is replaced. Required."
+          },
+          "placeholder": {
+            "type": "string",
+            "description": "Literal replacement text (no $1 expansion), e.g. \"`<ID>`\". Defaults to empty, which deletes matches."
+          }
         }
       }
     },
-    "defaults": { "$ref": "#/$defs/defaults" },
+    "defaults": {
+      "$ref": "#/$defs/defaults",
+      "description": "Spec-wide default fragments merged into every matching element at load time — authoring sugar to cut repetition. An explicitly authored value always wins; maps merge per key; a defaulted boolean cannot be turned off per element."
+    },
     "scenarios": {
       "type": "array",
       "minItems": 1,
-      "items": { "$ref": "#/$defs/scenario" }
+      "items": {
+        "$ref": "#/$defs/scenario"
+      },
+      "description": "The named behaviors under test. Each scenario runs in its own isolated temporary workdir."
     }
   },
   "$defs": {
     "stringOrList": {
       "description": "A contains/not_contains matcher argument: either a single substring, or a non-empty list of substrings that must all be present (contains) or all be absent (not_contains). The whole list counts as one matcher.",
       "oneOf": [
-        { "type": "string" },
-        { "type": "array", "minItems": 1, "items": { "type": "string" } }
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        }
       ]
     },
     "defaults": {
@@ -96,14 +156,45 @@
           "description": "Layered beneath every `run` step. `command` and `retry` are per-step and rejected here. The environment-shaping subset (`env`, `clear_env`, `pass_env`, `sandbox_home`) also layers onto `pty` steps, which share the same environment surface (#77); the run-only fields (`runner`, `shell`, `cwd`, `timeout`, `stdin`, redirects) stay per-step and never reach pty steps.",
           "additionalProperties": false,
           "properties": {
-            "runner": { "type": "string" },
-            "shell": { "type": "boolean" },
-            "cwd": { "type": "string" },
-            "timeout": { "type": "string" },
-            "env": { "type": "object", "additionalProperties": { "type": "string" } },
-            "clear_env": { "type": "boolean", "description": "Start the child from an empty environment instead of inheriting the host environment (#16). On Windows a small system-critical set (SystemRoot, SystemDrive, TEMP, TMP, PATHEXT) is always retained." },
-            "pass_env": { "type": "array", "items": { "type": "string", "minLength": 1 }, "description": "Host variables copied into the cleared environment (#16). Requires clear_env: true; unset host variables are skipped." },
-            "sandbox_home": { "type": "boolean", "description": "Point the child's home and per-OS config/cache/data/state dirs at ${workdir}/.atago-home so a CLI touching ~/.config, ~/.cache, or %APPDATA% runs hermetically (#71). Precedence: step env > sandbox > pass_env > host; composes with clear_env." }
+            "runner": {
+              "type": "string",
+              "description": "Default runner name for every run step."
+            },
+            "shell": {
+              "type": "boolean",
+              "description": "Default `shell` for every run step (an authored `shell: false` on a step cannot override a defaulted `true`)."
+            },
+            "cwd": {
+              "type": "string",
+              "description": "Default working directory for every run step."
+            },
+            "timeout": {
+              "type": "string",
+              "description": "Default timeout for every run step (a step's own timeout wins)."
+            },
+            "env": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Default env map shallow-merged beneath every run step's own `env`."
+            },
+            "clear_env": {
+              "type": "boolean",
+              "description": "Start the child from an empty environment instead of inheriting the host environment (#16). On Windows a small system-critical set (SystemRoot, SystemDrive, TEMP, TMP, PATHEXT) is always retained."
+            },
+            "pass_env": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "description": "Host variables copied into the cleared environment (#16). Requires clear_env: true; unset host variables are skipped."
+            },
+            "sandbox_home": {
+              "type": "boolean",
+              "description": "Point the child's home and per-OS config/cache/data/state dirs at ${workdir}/.atago-home so a CLI touching ~/.config, ~/.cache, or %APPDATA% runs hermetically (#71). Precedence: step env > sandbox > pass_env > host; composes with clear_env."
+            }
           }
         },
         "scenario": {
@@ -111,7 +202,13 @@
           "description": "Scenario-level defaults. Only `env` is supported; it shallow-merges beneath each scenario's own env.",
           "additionalProperties": false,
           "properties": {
-            "env": { "type": "object", "additionalProperties": { "type": "string" } }
+            "env": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Env map shallow-merged beneath every scenario's own `env`."
+            }
           }
         },
         "service": {
@@ -119,22 +216,63 @@
           "description": "Layered beneath every service. `name` and `command` identify a service and are rejected here; a whole `ready` probe is copied in when a service declares none.",
           "additionalProperties": false,
           "properties": {
-            "shell": { "type": "boolean" },
-            "cwd": { "type": "string" },
-            "env": { "type": "object", "additionalProperties": { "type": "string" } },
-            "clear_env": { "type": "boolean", "description": "Start the child from an empty environment instead of inheriting the host environment (#16). On Windows a small system-critical set (SystemRoot, SystemDrive, TEMP, TMP, PATHEXT) is always retained." },
-            "pass_env": { "type": "array", "items": { "type": "string", "minLength": 1 }, "description": "Host variables copied into the cleared environment (#16). Requires clear_env: true; unset host variables are skipped." },
+            "shell": {
+              "type": "boolean",
+              "description": "Default `shell` for every service."
+            },
+            "cwd": {
+              "type": "string",
+              "description": "Default working directory for every service."
+            },
+            "env": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Default env map for every service."
+            },
+            "clear_env": {
+              "type": "boolean",
+              "description": "Start the child from an empty environment instead of inheriting the host environment (#16). On Windows a small system-critical set (SystemRoot, SystemDrive, TEMP, TMP, PATHEXT) is always retained."
+            },
+            "pass_env": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "description": "Host variables copied into the cleared environment (#16). Requires clear_env: true; unset host variables are skipped."
+            },
             "ready": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "file": { "type": "string" },
-                "port": { "type": "string" },
-                "log": { "type": "string" },
-                "delay": { "type": "string" },
-                "timeout": { "type": "string" },
-                "store": { "type": "string" }
-              }
+                "file": {
+                  "type": "string",
+                  "description": "See `service.ready.file`."
+                },
+                "port": {
+                  "type": "string",
+                  "description": "See `service.ready.port`."
+                },
+                "log": {
+                  "type": "string",
+                  "description": "See `service.ready.log`."
+                },
+                "delay": {
+                  "type": "string",
+                  "description": "See `service.ready.delay`."
+                },
+                "timeout": {
+                  "type": "string",
+                  "description": "See `service.ready.timeout`."
+                },
+                "store": {
+                  "type": "string",
+                  "description": "See `service.ready.store`."
+                }
+              },
+              "description": "Default readiness probe for every service (a service's own `ready` wins)."
             }
           }
         }
@@ -142,72 +280,186 @@
     },
     "runner": {
       "type": "object",
-      "required": ["type"],
+      "required": [
+        "type"
+      ],
       "description": "A runner is discriminated by `type`: only the fields for that type are allowed, so cross-type fields are rejected and editors can narrow completion (#44).",
       "oneOf": [
         {
           "additionalProperties": false,
           "properties": {
-            "type": { "const": "cmd" },
-            "cwd": { "type": "string" },
-            "timeout": { "type": "string" }
+            "type": {
+              "const": "cmd",
+              "description": "Selects the `cmd` runner: local command execution (the implicit default for run steps)."
+            },
+            "cwd": {
+              "type": "string",
+              "description": "Working directory for commands run through this runner, relative to the scenario workdir."
+            },
+            "timeout": {
+              "type": "string",
+              "description": "Default timeout for steps using this runner, as a Go duration."
+            }
           }
         },
         {
           "additionalProperties": false,
           "properties": {
-            "type": { "const": "http" },
-            "cwd": { "type": "string" },
-            "timeout": { "type": "string" },
-            "base_url": { "type": "string" }
+            "type": {
+              "const": "http",
+              "description": "Selects the `http` runner: HTTP requests from http steps."
+            },
+            "cwd": {
+              "type": "string",
+              "description": "Unused for http runners; accepted for uniformity."
+            },
+            "timeout": {
+              "type": "string",
+              "description": "Request timeout as a Go duration."
+            },
+            "base_url": {
+              "type": "string",
+              "description": "Base URL every http step's `path` is appended to."
+            }
           }
         },
         {
-          "required": ["dsn"],
+          "required": [
+            "dsn"
+          ],
           "additionalProperties": false,
           "properties": {
-            "type": { "const": "db" },
-            "cwd": { "type": "string" },
-            "timeout": { "type": "string" },
-            "dsn": { "type": "string" },
-            "driver": { "enum": ["sqlite", "sqlite3", "postgres", "postgresql", "mysql"] }
+            "type": {
+              "const": "db",
+              "description": "Selects the `db` runner: SQL from query steps."
+            },
+            "cwd": {
+              "type": "string",
+              "description": "Unused for db runners; accepted for uniformity."
+            },
+            "timeout": {
+              "type": "string",
+              "description": "Statement timeout as a Go duration."
+            },
+            "dsn": {
+              "type": "string",
+              "description": "Data source name, e.g. \"sqlite:${workdir}/app.db\", \"postgres://user:pass@host/db\", or \"mysql://user:pass@host:3306/db\". Pure-Go drivers are bundled."
+            },
+            "driver": {
+              "enum": [
+                "sqlite",
+                "sqlite3",
+                "postgres",
+                "postgresql",
+                "mysql"
+              ],
+              "description": "Names the database/sql driver explicitly (sqlite, postgres, or mysql), overriding scheme inference from the dsn."
+            }
           }
         },
         {
-          "required": ["host", "user"],
+          "required": [
+            "host",
+            "user"
+          ],
           "additionalProperties": false,
           "properties": {
-            "type": { "const": "ssh" },
-            "cwd": { "type": "string" },
-            "timeout": { "type": "string" },
-            "host": { "type": "string" },
-            "user": { "type": "string" },
-            "password": { "type": "string" },
-            "key_file": { "type": "string" },
-            "known_hosts": { "type": "string" },
-            "insecure_host_key": { "type": "boolean" }
+            "type": {
+              "const": "ssh",
+              "description": "Selects the `ssh` runner: running commands on a remote host."
+            },
+            "cwd": {
+              "type": "string",
+              "description": "Remote working directory for commands."
+            },
+            "timeout": {
+              "type": "string",
+              "description": "Command timeout as a Go duration."
+            },
+            "host": {
+              "type": "string",
+              "description": "Remote host, as host or host:port (default port 22)."
+            },
+            "user": {
+              "type": "string",
+              "description": "Login user."
+            },
+            "password": {
+              "type": "string",
+              "description": "Password authentication (prefer key_file, and keep the value in an env var)."
+            },
+            "key_file": {
+              "type": "string",
+              "description": "Path to a private key for key authentication."
+            },
+            "known_hosts": {
+              "type": "string",
+              "description": "known_hosts file verifying the host key (recommended)."
+            },
+            "insecure_host_key": {
+              "type": "boolean",
+              "description": "Must be set to `true` to connect without a known_hosts file, explicitly disabling host-key verification."
+            }
           }
         },
         {
-          "required": ["target"],
+          "required": [
+            "target"
+          ],
           "additionalProperties": false,
           "properties": {
-            "type": { "const": "grpc" },
-            "cwd": { "type": "string" },
-            "timeout": { "type": "string" },
-            "target": { "type": "string" },
-            "tls": { "type": "boolean" }
+            "type": {
+              "const": "grpc",
+              "description": "Selects the `grpc` runner: unary gRPC calls from grpc steps."
+            },
+            "cwd": {
+              "type": "string",
+              "description": "Unused for grpc runners; accepted for uniformity."
+            },
+            "timeout": {
+              "type": "string",
+              "description": "Call timeout as a Go duration."
+            },
+            "target": {
+              "type": "string",
+              "description": "host:port of the gRPC server; the schema is resolved via server reflection."
+            },
+            "tls": {
+              "type": "boolean",
+              "description": "Connect with TLS (default plaintext)."
+            }
           }
         },
         {
           "additionalProperties": false,
           "properties": {
-            "type": { "const": "browser" },
-            "cwd": { "type": "string" },
-            "timeout": { "type": "string" },
-            "headless": { "type": "boolean", "description": "Run Chrome without a visible window (default true); set false to debug headed." },
-            "exec_path": { "type": "string", "description": "Path to a specific Chrome/Chromium binary instead of the one discovered on PATH." },
-            "browser_args": { "type": "array", "items": { "type": "string" }, "description": "Extra Chrome launch flags (bare names, no leading '--'), e.g. 'disable-gpu' or 'window-size=1280,720'." }
+            "type": {
+              "const": "browser",
+              "description": "Selects the `browser` runner: headless Chrome driven by cdp steps."
+            },
+            "cwd": {
+              "type": "string",
+              "description": "Unused for browser runners; accepted for uniformity."
+            },
+            "timeout": {
+              "type": "string",
+              "description": "Session timeout as a Go duration."
+            },
+            "headless": {
+              "type": "boolean",
+              "description": "Run Chrome without a visible window (default true); set false to debug headed."
+            },
+            "exec_path": {
+              "type": "string",
+              "description": "Path to a specific Chrome/Chromium binary instead of the one discovered on PATH."
+            },
+            "browser_args": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Extra Chrome launch flags (bare names, no leading '--'), e.g. 'disable-gpu' or 'window-size=1280,720'."
+            }
           }
         }
       ]
@@ -216,75 +468,178 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "os": { "enum": ["linux", "darwin", "windows"] },
-        "env": { "type": "string" },
-        "command": { "type": "string" }
+        "os": {
+          "enum": [
+            "linux",
+            "darwin",
+            "windows"
+          ],
+          "description": "Matches the host operating system (linux, darwin, windows)."
+        },
+        "env": {
+          "type": "string",
+          "description": "True when the named environment variable is non-empty."
+        },
+        "command": {
+          "type": "string",
+          "description": "True when this probe command (run through the shell) exits 0."
+        }
       }
     },
     "scenario": {
       "type": "object",
-      "required": ["name", "steps"],
+      "required": [
+        "name",
+        "steps"
+      ],
       "additionalProperties": false,
       "properties": {
-        "name": { "type": "string", "minLength": 1 },
-        "tags": { "type": "array", "items": { "type": "string" } },
-        "skip": { "$ref": "#/$defs/condition" },
-        "only": { "$ref": "#/$defs/condition" },
-        "env": { "type": "object", "additionalProperties": { "type": "string" } },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The scenario name shown in reports; with `matrix:`, `${var}` placeholders make each instance's name unique."
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Labels for run-time selection with `--tag` / `--skip-tag`."
+        },
+        "skip": {
+          "$ref": "#/$defs/condition",
+          "description": "Skips the scenario when the condition holds (os match, env var set, or probe command succeeding)."
+        },
+        "only": {
+          "$ref": "#/$defs/condition",
+          "description": "Runs the scenario only when the condition holds."
+        },
+        "env": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Environment variables for every step in the scenario (a step's own `env` wins per key)."
+        },
         "matrix": {
           "type": "array",
           "minItems": 1,
           "items": {
             "type": "object",
             "minProperties": 1,
-            "additionalProperties": { "type": "string" }
-          }
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "description": "Makes the scenario a template: one concrete instance per row, with each row's key/value pairs seeded as `${name}` variables."
         },
         "services": {
           "type": "array",
-          "items": { "$ref": "#/$defs/service" }
+          "items": {
+            "$ref": "#/$defs/service"
+          },
+          "description": "Background processes started before the steps and terminated (with their process group) when the scenario ends — peers the CLI under test talks to."
         },
         "mock_servers": {
-          "description": "Declarative stub HTTP servers (#24): canned routes on an ephemeral loopback port, every request recorded for the mock: assertion target; ${<name>.url} / ${<name>.port} are seeded before steps run.",
+          "description": "Declarative stub HTTP servers (#24): canned routes on an ephemeral loopback port, every request recorded for the mock: assertion target; `${<name>.url}` / `${<name>.port}` are seeded before steps run.",
           "type": "array",
-          "items": { "$ref": "#/$defs/mockServer" }
+          "items": {
+            "$ref": "#/$defs/mockServer"
+          }
         },
         "steps": {
           "type": "array",
           "minItems": 1,
-          "items": { "$ref": "#/$defs/step" }
+          "items": {
+            "$ref": "#/$defs/step"
+          },
+          "description": "The ordered actions: fixtures, commands, requests, assertions, captures."
         },
         "teardown": {
           "description": "Steps that always run after steps — pass, fail, error, or interrupt — sharing the scenario's variable store. For external side effects the isolated workdir cannot undo. A teardown failure is reported but does not change the scenario's verdict.",
           "type": "array",
           "minItems": 1,
-          "items": { "$ref": "#/$defs/step" }
+          "items": {
+            "$ref": "#/$defs/step"
+          }
         }
       }
     },
     "service": {
       "type": "object",
-      "required": ["name", "command"],
+      "required": [
+        "name",
+        "command"
+      ],
       "additionalProperties": false,
       "properties": {
-        "name": { "type": "string", "minLength": 1 },
-        "command": { "type": "string", "minLength": 1 },
-        "shell": { "type": "boolean" },
-        "cwd": { "type": "string" },
-        "env": { "type": "object", "additionalProperties": { "type": "string" } },
-        "clear_env": { "type": "boolean", "description": "Start the child from an empty environment instead of inheriting the host environment (#16). On Windows a small system-critical set (SystemRoot, SystemDrive, TEMP, TMP, PATHEXT) is always retained." },
-        "pass_env": { "type": "array", "items": { "type": "string", "minLength": 1 }, "description": "Host variables copied into the cleared environment (#16). Requires clear_env: true; unset host variables are skipped." },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Identifies the service in diagnostics and `signal:` steps; unique per scenario."
+        },
+        "command": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The program to run. Tokenized and exec'd directly unless `shell: true`."
+        },
+        "shell": {
+          "type": "boolean",
+          "description": "Runs the command through the POSIX shell (pipes, redirects, `${}`)."
+        },
+        "cwd": {
+          "type": "string",
+          "description": "Working directory relative to the scenario workdir."
+        },
+        "env": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Environment variables, layered over the scenario env, with `${name}` expansion."
+        },
+        "clear_env": {
+          "type": "boolean",
+          "description": "Start the child from an empty environment instead of inheriting the host environment (#16). On Windows a small system-critical set (SystemRoot, SystemDrive, TEMP, TMP, PATHEXT) is always retained."
+        },
+        "pass_env": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Host variables copied into the cleared environment (#16). Requires clear_env: true; unset host variables are skipped."
+        },
         "ready": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "file": { "type": "string" },
-            "port": { "type": "string" },
-            "log": { "type": "string" },
-            "delay": { "type": "string" },
-            "timeout": { "type": "string" },
-            "store": { "type": "string" }
-          }
+            "file": {
+              "type": "string",
+              "description": "Ready when this workdir-relative file exists and is non-empty — the canonical pattern for a server publishing its listen address."
+            },
+            "port": {
+              "type": "string",
+              "description": "Ready when this TCP address (host:port) accepts a connection."
+            },
+            "log": {
+              "type": "string",
+              "description": "Ready when the service's combined stdout/stderr matches this regular expression."
+            },
+            "delay": {
+              "type": "string",
+              "description": "Simply waits this Go duration — a last resort when no observable readiness signal exists."
+            },
+            "timeout": {
+              "type": "string",
+              "description": "Bounds the readiness wait as a Go duration (default \"5s\")."
+            },
+            "store": {
+              "type": "string",
+              "description": "Used with `file`: captures the ready file's trimmed content into `${<name>}` so steps can reference a dynamic address or port."
+            }
+          },
+          "description": "How to wait until the service accepts work before steps run. When omitted, steps start as soon as the process is spawned."
         }
       }
     },
@@ -292,46 +647,131 @@
       "type": "object",
       "additionalProperties": false,
       "oneOf": [
-        { "required": ["fixture"] },
-        { "required": ["run"] },
-        { "required": ["http"] },
-        { "required": ["query"] },
-        { "required": ["grpc"] },
-        { "required": ["cdp"] },
-        { "required": ["assert"] },
-        { "required": ["store"] },
-        { "required": ["service"] },
-        { "required": ["pty"] },
-        { "required": ["signal"] },
-        { "required": ["mock_server"] }
+        {
+          "required": [
+            "fixture"
+          ]
+        },
+        {
+          "required": [
+            "run"
+          ]
+        },
+        {
+          "required": [
+            "http"
+          ]
+        },
+        {
+          "required": [
+            "query"
+          ]
+        },
+        {
+          "required": [
+            "grpc"
+          ]
+        },
+        {
+          "required": [
+            "cdp"
+          ]
+        },
+        {
+          "required": [
+            "assert"
+          ]
+        },
+        {
+          "required": [
+            "store"
+          ]
+        },
+        {
+          "required": [
+            "service"
+          ]
+        },
+        {
+          "required": [
+            "pty"
+          ]
+        },
+        {
+          "required": [
+            "signal"
+          ]
+        },
+        {
+          "required": [
+            "mock_server"
+          ]
+        }
       ],
       "properties": {
-        "fixture": { "$ref": "#/$defs/fixture" },
-        "run": { "$ref": "#/$defs/run" },
-        "http": { "$ref": "#/$defs/http" },
-        "query": { "$ref": "#/$defs/query" },
-        "grpc": { "$ref": "#/$defs/grpc" },
-        "cdp": { "$ref": "#/$defs/cdp" },
+        "fixture": {
+          "$ref": "#/$defs/fixture",
+          "description": "Materializes an input file in the scenario workdir before the command runs."
+        },
+        "run": {
+          "$ref": "#/$defs/run",
+          "description": "Executes a command and captures its exit code, stdout, and stderr."
+        },
+        "http": {
+          "$ref": "#/$defs/http",
+          "description": "Issues an HTTP request through an `http` runner — as a peer of the CLI under test."
+        },
+        "query": {
+          "$ref": "#/$defs/query",
+          "description": "Runs a SQL statement through a `db` runner; SELECT rows feed the `rows:` assert."
+        },
+        "grpc": {
+          "$ref": "#/$defs/grpc",
+          "description": "Calls a unary gRPC method through a `grpc` runner via server reflection."
+        },
+        "cdp": {
+          "$ref": "#/$defs/cdp",
+          "description": "Drives a headless Chrome through a `browser` runner with a declarative action list."
+        },
         "service": {
           "$ref": "#/$defs/service",
           "description": "Starts a suite-wide background process at this point in the sequence. Valid only inside suite.setup; the loader rejects it anywhere else."
         },
-        "signal": { "$ref": "#/$defs/signal" },
+        "signal": {
+          "$ref": "#/$defs/signal",
+          "description": "Sends a named POSIX signal to a managed service — the race-free alternative to `kill` hacks for graceful-shutdown tests. POSIX-only."
+        },
         "mock_server": {
           "$ref": "#/$defs/mockServer",
           "description": "Starts a suite-wide stub HTTP server at this point in the sequence (#24). Valid only inside suite.setup."
         },
-        "pty": { "$ref": "#/$defs/pty" },
-        "assert": { "$ref": "#/$defs/assert" },
-        "store": { "$ref": "#/$defs/store" }
+        "pty": {
+          "$ref": "#/$defs/pty",
+          "description": "Runs a command inside a real pseudo-terminal and drives it with a declarative expect/send session — for prompts, REPLs, and TUIs. Works on Linux, macOS, and Windows (ConPTY)."
+        },
+        "assert": {
+          "$ref": "#/$defs/assert",
+          "description": "Checks externally observable behavior of the preceding step. Exactly one target family per assert block."
+        },
+        "store": {
+          "$ref": "#/$defs/store",
+          "description": "Captures a value into the variable store; later steps reference it as `${name}`."
+        }
       }
     },
     "cdp": {
       "type": "object",
-      "required": ["runner", "actions"],
+      "required": [
+        "runner",
+        "actions"
+      ],
       "additionalProperties": false,
       "properties": {
-        "runner": { "type": "string", "minLength": 1 },
+        "runner": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Names the `browser` runner to drive."
+        },
         "actions": {
           "type": "array",
           "minItems": 1,
@@ -339,180 +779,449 @@
             "type": "object",
             "additionalProperties": false,
             "properties": {
-              "navigate": { "type": "string" },
-              "wait_visible": { "type": "string" },
-              "wait_hidden": { "type": "string" },
-              "click": { "type": "string" },
-              "check": { "type": "string" },
-              "uncheck": { "type": "string" },
-              "text": { "type": "string" },
-              "title": { "type": "boolean" },
-              "eval": { "type": "string" },
+              "navigate": {
+                "type": "string",
+                "description": "Loads a URL."
+              },
+              "wait_visible": {
+                "type": "string",
+                "description": "Waits until the CSS selector is visible."
+              },
+              "wait_hidden": {
+                "type": "string",
+                "description": "Waits until the CSS selector is hidden or absent."
+              },
+              "click": {
+                "type": "string",
+                "description": "Clicks the element matched by the selector."
+              },
+              "check": {
+                "type": "string",
+                "description": "Ticks the checkbox matched by the selector."
+              },
+              "uncheck": {
+                "type": "string",
+                "description": "Unticks the checkbox matched by the selector."
+              },
+              "text": {
+                "type": "string",
+                "description": "Captures the text of the element matched by the selector."
+              },
+              "title": {
+                "type": "boolean",
+                "description": "Captures the page title."
+              },
+              "eval": {
+                "type": "string",
+                "description": "Evaluates a JavaScript expression and captures the result as JSON."
+              },
               "send_keys": {
                 "type": "object",
-                "required": ["selector", "value"],
+                "required": [
+                  "selector",
+                  "value"
+                ],
                 "additionalProperties": false,
                 "properties": {
-                  "selector": { "type": "string" },
-                  "value": { "type": "string" }
-                }
+                  "selector": {
+                    "type": "string",
+                    "description": "The element to type into."
+                  },
+                  "value": {
+                    "type": "string",
+                    "description": "The text to type."
+                  }
+                },
+                "description": "Types text into an element."
               },
               "press": {
                 "type": "object",
-                "required": ["selector", "key"],
+                "required": [
+                  "selector",
+                  "key"
+                ],
                 "additionalProperties": false,
                 "properties": {
-                  "selector": { "type": "string" },
-                  "key": { "type": "string" }
-                }
+                  "selector": {
+                    "type": "string",
+                    "description": "The element to receive the key press."
+                  },
+                  "key": {
+                    "type": "string",
+                    "description": "The key to press (e.g. \"Enter\", \"Tab\", or a printable character)."
+                  }
+                },
+                "description": "Presses a single key on an element."
               },
               "select": {
                 "type": "object",
-                "required": ["selector", "value"],
+                "required": [
+                  "selector",
+                  "value"
+                ],
                 "additionalProperties": false,
                 "properties": {
-                  "selector": { "type": "string" },
-                  "value": { "type": "string" }
-                }
+                  "selector": {
+                    "type": "string",
+                    "description": "The `<select>` element."
+                  },
+                  "value": {
+                    "type": "string",
+                    "description": "The option value to choose."
+                  }
+                },
+                "description": "Chooses an `<option>` in a `<select>`."
               },
               "screenshot": {
                 "type": "object",
-                "required": ["path"],
+                "required": [
+                  "path"
+                ],
                 "additionalProperties": false,
                 "properties": {
-                  "path": { "type": "string" },
-                  "selector": { "type": "string" }
-                }
+                  "path": {
+                    "type": "string",
+                    "description": "The workdir-relative PNG path to write."
+                  },
+                  "selector": {
+                    "type": "string",
+                    "description": "Limits the screenshot to this element (default: the whole page)."
+                  }
+                },
+                "description": "Writes a PNG of the page (or one element) into the workdir for file/image assertions."
               },
               "attribute": {
                 "type": "object",
-                "required": ["selector", "name"],
+                "required": [
+                  "selector",
+                  "name"
+                ],
                 "additionalProperties": false,
                 "properties": {
-                  "selector": { "type": "string" },
-                  "name": { "type": "string" }
-                }
+                  "selector": {
+                    "type": "string",
+                    "description": "The element to read."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "The attribute name to capture."
+                  }
+                },
+                "description": "Captures an element attribute value."
               },
               "upload": {
                 "type": "object",
-                "required": ["selector", "file"],
+                "required": [
+                  "selector",
+                  "file"
+                ],
                 "additionalProperties": false,
                 "properties": {
-                  "selector": { "type": "string" },
-                  "file": { "type": "string" }
-                }
+                  "selector": {
+                    "type": "string",
+                    "description": "The `<input type=file>` element."
+                  },
+                  "file": {
+                    "type": "string",
+                    "description": "The workdir-relative file to attach; must exist."
+                  }
+                },
+                "description": "Sets a file on an `<input type=file>` — no scripted file dialogs."
               },
               "download": {
                 "type": "object",
-                "required": ["click"],
+                "required": [
+                  "click"
+                ],
                 "additionalProperties": false,
                 "properties": {
-                  "click": { "type": "string" },
-                  "dir": { "type": "string" }
-                }
+                  "click": {
+                    "type": "string",
+                    "description": "The element to click to start the download."
+                  },
+                  "dir": {
+                    "type": "string",
+                    "description": "Workdir-relative directory to save into (default: the workdir root)."
+                  }
+                },
+                "description": "Clicks to trigger a download and captures the file using the server-suggested filename; the captured value is the final filename."
               }
             }
-          }
+          },
+          "description": "Browser actions run in order against one session; the value captured by the last `text`/`eval`/`attribute`/`title` action feeds the `value:` assert and `store from.value`."
         }
       }
     },
     "query": {
       "type": "object",
-      "required": ["runner", "sql"],
+      "required": [
+        "runner",
+        "sql"
+      ],
       "additionalProperties": false,
       "properties": {
-        "runner": { "type": "string", "minLength": 1 },
-        "sql": { "type": "string", "minLength": 1 }
+        "runner": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Names the `db` runner declaring the dsn."
+        },
+        "sql": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The SQL statement. SELECT rows are captured as JSON for `rows:` asserts and `store from.rows`; other statements record their affected-row count."
+        }
       }
     },
     "grpc": {
       "type": "object",
-      "required": ["runner", "method"],
+      "required": [
+        "runner",
+        "method"
+      ],
       "additionalProperties": false,
       "properties": {
-        "runner": { "type": "string", "minLength": 1 },
-        "method": { "type": "string", "minLength": 1 },
-        "header": { "type": "object", "additionalProperties": { "type": "string" } },
+        "runner": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Names the `grpc` runner declaring the target server."
+        },
+        "method": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The unary method to call as \"package.Service/Method\"; the schema is resolved via server reflection (no compiled stubs)."
+        },
+        "header": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Request metadata headers."
+        },
         "json": true
       }
     },
     "fixture": {
       "type": "object",
-      "required": ["file"],
+      "required": [
+        "file"
+      ],
       "additionalProperties": false,
       "properties": {
-        "file": { "type": "string", "minLength": 1 },
-        "content": { "type": "string" },
-        "base64": { "type": "string" },
-        "from": { "type": "string" },
-        "symlink": { "type": "string" },
-        "mode": { "type": "string", "pattern": "^[0-7]{3,4}$" },
-        "mtime": { "type": "string" }
+        "file": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The workdir-relative path to create."
+        },
+        "content": {
+          "type": "string",
+          "description": "Inline text content for the file. Exactly one source (`content`/`base64`/`from`/`symlink`) is set."
+        },
+        "base64": {
+          "type": "string",
+          "description": "Inline binary content, base64-encoded — carries exact bytes YAML text cannot."
+        },
+        "from": {
+          "type": "string",
+          "description": "Copies an existing file (e.g. committed testdata), resolved relative to the spec file's directory."
+        },
+        "symlink": {
+          "type": "string",
+          "description": "Makes `file` a symbolic link to this target instead of a regular file. The target is written verbatim."
+        },
+        "mode": {
+          "type": "string",
+          "pattern": "^[0-7]{3,4}$",
+          "description": "Octal file mode (e.g. \"0755\") applied after writing."
+        },
+        "mtime": {
+          "type": "string",
+          "description": "RFC3339 modification time applied after writing — pins timestamps for freshness/change-detection tests."
+        }
       }
     },
     "run": {
       "type": "object",
-      "required": ["command"],
+      "required": [
+        "command"
+      ],
       "additionalProperties": false,
       "properties": {
-        "command": { "type": "string", "minLength": 1 },
-        "runner": { "type": "string" },
-        "shell": { "type": "boolean" },
-        "cwd": { "type": "string" },
-        "timeout": { "type": "string" },
-        "env": { "type": "object", "additionalProperties": { "type": "string" } },
-        "clear_env": { "type": "boolean", "description": "Start the child from an empty environment instead of inheriting the host environment (#16). On Windows a small system-critical set (SystemRoot, SystemDrive, TEMP, TMP, PATHEXT) is always retained." },
-        "pass_env": { "type": "array", "items": { "type": "string", "minLength": 1 }, "description": "Host variables copied into the cleared environment (#16). Requires clear_env: true; unset host variables are skipped." },
-        "sandbox_home": { "type": "boolean", "description": "Point the child's home and per-OS config/cache/data/state dirs at ${workdir}/.atago-home so a CLI touching ~/.config, ~/.cache, or %APPDATA% runs hermetically (#71). Precedence: step env > sandbox > pass_env > host; composes with clear_env." },
+        "command": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The program to run. Tokenized and exec'd directly unless `shell: true`."
+        },
+        "runner": {
+          "type": "string",
+          "description": "Names a declared runner to execute through (e.g. an `ssh` runner runs the command remotely). Default: local execution."
+        },
+        "shell": {
+          "type": "boolean",
+          "description": "Runs the command through the shell (/bin/sh on POSIX, cmd.exe on Windows) — for pipes, redirects, and builtins."
+        },
+        "cwd": {
+          "type": "string",
+          "description": "Working directory relative to the scenario workdir (default: the workdir itself)."
+        },
+        "timeout": {
+          "type": "string",
+          "description": "Bounds this command as a Go duration. Precedence: step > runner > defaults.run > suite > built-in 60s."
+        },
+        "env": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Environment variables for the child process, layered over the scenario env; values get `${name}` expansion."
+        },
+        "clear_env": {
+          "type": "boolean",
+          "description": "Start the child from an empty environment instead of inheriting the host environment (#16). On Windows a small system-critical set (SystemRoot, SystemDrive, TEMP, TMP, PATHEXT) is always retained."
+        },
+        "pass_env": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Host variables copied into the cleared environment (#16). Requires clear_env: true; unset host variables are skipped."
+        },
+        "sandbox_home": {
+          "type": "boolean",
+          "description": "Point the child's home and per-OS config/cache/data/state dirs at ${workdir}/.atago-home so a CLI touching ~/.config, ~/.cache, or %APPDATA% runs hermetically (#71). Precedence: step env > sandbox > pass_env > host; composes with clear_env."
+        },
         "stdin": {
           "description": "Standard input for the command (#18): a plain string (inline text), {file: path} (workdir-relative, path-confined), or {base64: data} for binary bytes.",
           "oneOf": [
-            { "type": "string" },
             {
-              "type": "object",
-              "additionalProperties": false,
-              "required": ["file"],
-              "properties": { "file": { "type": "string", "minLength": 1 } }
+              "type": "string"
             },
             {
               "type": "object",
               "additionalProperties": false,
-              "required": ["base64"],
-              "properties": { "base64": { "type": "string" } }
+              "required": [
+                "file"
+              ],
+              "properties": {
+                "file": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Feeds the command's stdin from a workdir-relative file."
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "base64"
+              ],
+              "properties": {
+                "base64": {
+                  "type": "string",
+                  "description": "Feeds the command's stdin with exact binary bytes, base64-encoded."
+                }
+              }
             }
           ]
         },
-        "stdout_to": { "type": "string", "minLength": 1, "description": "Write the command's captured stdout to this workdir-relative file (create/truncate), without needing shell redirection." },
-        "stderr_to": { "type": "string", "minLength": 1, "description": "Write the command's captured stderr to this workdir-relative file (create/truncate), without needing shell redirection." },
-        "retry": { "$ref": "#/$defs/retry" }
+        "stdout_to": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Write the command's captured stdout to this workdir-relative file (create/truncate), without needing shell redirection."
+        },
+        "stderr_to": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Write the command's captured stderr to this workdir-relative file (create/truncate), without needing shell redirection."
+        },
+        "retry": {
+          "$ref": "#/$defs/retry",
+          "description": "Re-runs the command until the `until` assertion passes — declarative polling for async behavior. The last attempt's result is what later steps observe."
+        }
       }
     },
     "retry": {
       "type": "object",
-      "required": ["times", "until"],
+      "required": [
+        "times",
+        "until"
+      ],
       "additionalProperties": false,
       "properties": {
-        "times": { "type": "integer", "minimum": 1 },
-        "interval": { "type": "string" },
-        "until": { "$ref": "#/$defs/assert" }
+        "times": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum number of attempts (>= 1)."
+        },
+        "interval": {
+          "type": "string",
+          "description": "Wait between attempts as a Go duration (e.g. \"200ms\"). Empty means no wait."
+        },
+        "until": {
+          "$ref": "#/$defs/assert",
+          "description": "A single assertion polled after each attempt; the loop stops as soon as it passes. If it never passes, the step fails."
+        }
       }
     },
     "pty": {
       "type": "object",
-      "required": ["command"],
+      "required": [
+        "command"
+      ],
       "additionalProperties": false,
       "description": "Runs one command inside a real pseudo-terminal and drives it with a declarative expect/send session (#8) — for CLIs that branch on TTY-ness or present interactive prompts. POSIX-only at runtime; Windows reports a clear execution error.",
       "properties": {
-        "command": { "type": "string", "minLength": 1 },
-        "shell": { "type": "boolean" },
-        "cwd": { "type": "string" },
-        "rows": { "type": "integer", "minimum": 0 },
-        "cols": { "type": "integer", "minimum": 0 },
-        "timeout": { "type": "string", "description": "Go duration bounding the WHOLE session (default 30s)." },
-        "env": { "type": "object", "additionalProperties": { "type": "string" } },
-        "clear_env": { "type": "boolean", "description": "Start the child from an empty environment instead of inheriting the host environment (#16). On Windows a small system-critical set (SystemRoot, SystemDrive, TEMP, TMP, PATHEXT) is always retained." },
-        "pass_env": { "type": "array", "items": { "type": "string", "minLength": 1 }, "description": "Host variables copied into the cleared environment (#16). Requires clear_env: true; unset host variables are skipped." },
-        "sandbox_home": { "type": "boolean", "description": "Point the pty child's home and per-OS config/cache/data/state dirs at ${workdir}/.atago-home so a CLI touching ~/.config, ~/.cache, or %APPDATA% runs hermetically (#71)." },
+        "command": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The program to run inside a real pseudo-terminal (a ConPTY on Windows). The captured transcript becomes the step's stdout."
+        },
+        "shell": {
+          "type": "boolean",
+          "description": "Runs the command through the shell, like `run.shell`."
+        },
+        "cwd": {
+          "type": "string",
+          "description": "Working directory relative to the scenario workdir."
+        },
+        "rows": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Terminal height in rows (default 24). Also sizes the `screen:` assertion's emulator."
+        },
+        "cols": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Terminal width in columns (default 80)."
+        },
+        "timeout": {
+          "type": "string",
+          "description": "Go duration bounding the WHOLE session (default 30s)."
+        },
+        "env": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Environment variables for the pty child. The child gets TERM=xterm-256color by default; override here if needed."
+        },
+        "clear_env": {
+          "type": "boolean",
+          "description": "Start the child from an empty environment instead of inheriting the host environment (#16). On Windows a small system-critical set (SystemRoot, SystemDrive, TEMP, TMP, PATHEXT) is always retained."
+        },
+        "pass_env": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Host variables copied into the cleared environment (#16). Requires clear_env: true; unset host variables are skipped."
+        },
+        "sandbox_home": {
+          "type": "boolean",
+          "description": "Point the pty child's home and per-OS config/cache/data/state dirs at ${workdir}/.atago-home so a CLI touching ~/.config, ~/.cache, or %APPDATA% runs hermetically (#71)."
+        },
         "session": {
           "type": "array",
           "minItems": 1,
@@ -521,128 +1230,337 @@
             "additionalProperties": false,
             "description": "Exactly one of expect (wait until the transcript matches the regexp) or send (write to the terminal; \"\" sends EOF/^D; {key: enter} presses a named key, #26). ${name}/${env:NAME} references in a send or expect are expanded against the store; a reference nothing resolves fails the step before any terminal I/O (#78) — write $${name} for literal text.",
             "properties": {
-              "expect": { "type": "string" },
+              "expect": {
+                "type": "string",
+                "description": "Waits until the transcript (scanned after the previous match) matches this Go regular expression; a never-matching expect fails when the session timeout elapses."
+              },
               "send": {
                 "oneOf": [
-                  { "type": "string" },
+                  {
+                    "type": "string"
+                  },
                   {
                     "type": "object",
                     "additionalProperties": false,
-                    "required": ["key"],
+                    "required": [
+                      "key"
+                    ],
                     "properties": {
-                      "key": { "type": "string", "minLength": 1, "description": "Named key: enter, tab, esc, space, backspace, delete, arrows, home/end, pageup/pagedown, f1-f12, ctrl-a..ctrl-z." }
+                      "key": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Named key: enter, tab, esc, space, backspace, delete, arrows, home/end, pageup/pagedown, f1-f12, ctrl-a..ctrl-z."
+                      }
                     }
                   }
-                ]
+                ],
+                "description": "Writes to the terminal: a string verbatim (\"\" sends EOF/^D; `${name}` expansion applies) or `{key: <name>}` for a named key — enter, tab, esc, arrows, f1-f12, ctrl-a..ctrl-z."
               }
             }
-          }
+          },
+          "description": "Ordered expect/send script. Each entry waits for the transcript to match (`expect`) or types into the terminal (`send`). Deliberately no branching."
         }
       }
     },
     "mockServer": {
       "type": "object",
-      "required": ["name"],
+      "required": [
+        "name"
+      ],
       "additionalProperties": false,
       "description": "A declarative stub HTTP server (#24): routes match on exact method+path (query string excluded); an unmatched request answers 404 and is still recorded.",
       "properties": {
-        "name": { "type": "string", "minLength": 1 },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Identifies the server: seeds `${<name>.url}` / `${<name>.port}` and is referenced by `mock:` asserts. Unique per scenario."
+        },
         "routes": {
           "type": "array",
-          "items": { "$ref": "#/$defs/mockRoute" }
+          "items": {
+            "$ref": "#/$defs/mockRoute"
+          },
+          "description": "Canned responses, matched top-down on exact method+path (query string excluded; deliberately no patterns). An unmatched request answers 404 and is still recorded."
         }
       }
     },
     "mockRoute": {
       "type": "object",
-      "required": ["method", "path"],
+      "required": [
+        "method",
+        "path"
+      ],
       "additionalProperties": false,
       "description": "One canned response. At most one of json/body/body_file supplies the payload; status defaults to 200.",
       "properties": {
-        "method": { "type": "string", "minLength": 1 },
-        "path": { "type": "string", "pattern": "^/" },
-        "status": { "type": "integer", "minimum": 100, "maximum": 599 },
-        "json": {},
-        "body": { "type": "string" },
-        "body_file": { "type": "string", "minLength": 1, "description": "Spec-relative response body file, confined to the spec directory." },
-        "header": { "type": "object", "additionalProperties": { "type": "string" } },
-        "delay": { "type": "string", "description": "Go duration to sleep before responding - for retry testing." }
+        "method": {
+          "type": "string",
+          "minLength": 1,
+          "description": "HTTP method to match (case-insensitive)."
+        },
+        "path": {
+          "type": "string",
+          "pattern": "^/",
+          "description": "Exact request path to match (query string excluded)."
+        },
+        "status": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 599,
+          "description": "Response status code (default 200)."
+        },
+        "json": {
+          "description": "Inline response document, marshaled with Content-Type: application/json."
+        },
+        "body": {
+          "type": "string",
+          "description": "Inline text response body."
+        },
+        "body_file": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Spec-relative response body file, confined to the spec directory."
+        },
+        "header": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Extra response headers to set."
+        },
+        "delay": {
+          "type": "string",
+          "description": "Go duration to sleep before responding - for retry testing."
+        }
       }
     },
     "mockAssert": {
       "type": "object",
-      "required": ["name"],
+      "required": [
+        "name"
+      ],
       "additionalProperties": false,
       "description": "Checks what the CLI under test sent to a mock server (#24): filter by path/method, pin the exact count (or require at least one match), and match header/body of the LAST matching request.",
       "properties": {
-        "name": { "type": "string", "minLength": 1 },
-        "path": { "type": "string" },
-        "method": { "type": "string" },
-        "count": { "type": "integer", "minimum": 0 },
-        "header": { "$ref": "#/$defs/headerMatch" },
-        "body": { "$ref": "#/$defs/stream" }
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "References a declared mock server by name."
+        },
+        "path": {
+          "type": "string",
+          "description": "Filters recorded requests by exact path."
+        },
+        "method": {
+          "type": "string",
+          "description": "Filters recorded requests by method (case-insensitive)."
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Asserts the exact number of matching requests (without it, at least one must exist)."
+        },
+        "header": {
+          "$ref": "#/$defs/headerMatch",
+          "description": "Matches a header of the LAST matching recorded request."
+        },
+        "body": {
+          "$ref": "#/$defs/stream",
+          "description": "Matches the body of the LAST matching recorded request with the stream matchers."
+        }
       }
     },
     "signal": {
       "type": "object",
-      "required": ["service", "signal"],
+      "required": [
+        "service",
+        "signal"
+      ],
       "additionalProperties": false,
       "description": "Sends a named POSIX signal to a managed service's process group (#23) - the race-free alternative to kill/killall for graceful-shutdown tests. POSIX-only at runtime; Windows reports a clear execution error.",
       "properties": {
-        "service": { "type": "string", "minLength": 1, "description": "A service declared in the scenario's services: list or started by a suite.setup service: step." },
-        "signal": { "type": "string", "minLength": 1, "description": "TERM, INT, HUP, USR1, USR2, or KILL (optional SIG prefix accepted)." },
+        "service": {
+          "type": "string",
+          "minLength": 1,
+          "description": "A service declared in the scenario's services: list or started by a suite.setup service: step."
+        },
+        "signal": {
+          "type": "string",
+          "minLength": 1,
+          "description": "TERM, INT, HUP, USR1, USR2, or KILL (optional SIG prefix accepted)."
+        },
         "wait": {
           "type": "object",
           "additionalProperties": false,
           "description": "Block until the signaled process exits; a still-running process fails the step.",
           "properties": {
-            "timeout": { "type": "string", "description": "Go duration bounding the wait (default 5s)." }
+            "timeout": {
+              "type": "string",
+              "description": "Go duration bounding the wait (default 5s)."
+            }
           }
         }
       }
     },
     "http": {
       "type": "object",
-      "required": ["method"],
+      "required": [
+        "method"
+      ],
       "additionalProperties": false,
       "properties": {
-        "runner": { "type": "string" },
-        "method": { "type": "string" },
-        "path": { "type": "string" },
-        "header": { "type": "object", "additionalProperties": { "type": "string" } },
+        "runner": {
+          "type": "string",
+          "description": "Names the `http` runner declaring the base_url. With exactly one http runner declared it may be omitted."
+        },
+        "method": {
+          "type": "string",
+          "description": "The HTTP method (GET, POST, ...)."
+        },
+        "path": {
+          "type": "string",
+          "description": "Request path appended to the runner's base_url; `${name}` expansion applies."
+        },
+        "header": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Request headers."
+        },
         "json": true,
-        "body": { "type": "string", "description": "Raw string payload sent verbatim (default Content-Type text/plain). The payload fields (json/body/body_file/form+files) are mutually exclusive." },
-        "body_file": { "type": "string", "minLength": 1, "description": "Workdir-relative file streamed as the raw request body (binary-safe) — for upload endpoints that take file content directly." },
-        "form": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Form fields: application/x-www-form-urlencoded alone, multipart/form-data when files is also set." },
+        "body": {
+          "type": "string",
+          "description": "Raw string payload sent verbatim (default Content-Type text/plain). The payload fields (json/body/body_file/form+files) are mutually exclusive."
+        },
+        "body_file": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Workdir-relative file streamed as the raw request body (binary-safe) — for upload endpoints that take file content directly."
+        },
+        "form": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Form fields: application/x-www-form-urlencoded alone, multipart/form-data when files is also set."
+        },
         "files": {
           "type": "array",
           "minItems": 1,
           "description": "Files attached as multipart/form-data parts (the browser-style upload most web apps expect).",
           "items": {
             "type": "object",
-            "required": ["field", "path"],
+            "required": [
+              "field",
+              "path"
+            ],
             "additionalProperties": false,
             "properties": {
-              "field": { "type": "string", "minLength": 1 },
-              "path": { "type": "string", "minLength": 1 },
-              "content_type": { "type": "string" }
+              "field": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The multipart form field name the server reads the file from."
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The workdir-relative file whose content becomes the part body."
+              },
+              "content_type": {
+                "type": "string",
+                "description": "Overrides the part's Content-Type (default: detected from content, falling back to application/octet-stream)."
+              }
             }
           }
         },
-        "body_to": { "type": "string", "minLength": 1, "description": "Write the response body to this workdir-relative file, so file/image/pdf assertions can inspect a download (the http analogue of run's stdout_to)." },
-        "follow_redirects": { "type": "boolean", "description": "Follow 3xx responses (default true). Set false to assert on the redirect itself: its status code and Location header." },
-        "retry": { "$ref": "#/$defs/retry" }
+        "body_to": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Write the response body to this workdir-relative file, so file/image/pdf assertions can inspect a download (the http analogue of run's stdout_to)."
+        },
+        "follow_redirects": {
+          "type": "boolean",
+          "description": "Follow 3xx responses (default true). Set false to assert on the redirect itself: its status code and Location header."
+        },
+        "retry": {
+          "$ref": "#/$defs/retry",
+          "description": "Re-issues the request until the `until` assertion passes — declarative polling for eventually-consistent endpoints."
+        }
       },
       "allOf": [
-        { "not": { "required": ["json", "body"] } },
-        { "not": { "required": ["json", "body_file"] } },
-        { "not": { "required": ["json", "form"] } },
-        { "not": { "required": ["json", "files"] } },
-        { "not": { "required": ["body", "body_file"] } },
-        { "not": { "required": ["body", "form"] } },
-        { "not": { "required": ["body", "files"] } },
-        { "not": { "required": ["body_file", "form"] } },
-        { "not": { "required": ["body_file", "files"] } }
+        {
+          "not": {
+            "required": [
+              "json",
+              "body"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "json",
+              "body_file"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "json",
+              "form"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "json",
+              "files"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "body",
+              "body_file"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "body",
+              "form"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "body",
+              "files"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "body_file",
+              "form"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "body_file",
+              "files"
+            ]
+          }
+        }
       ]
     },
     "assert": {
@@ -650,47 +1568,170 @@
       "additionalProperties": false,
       "description": "An assert sets one or more target families; each is an independent check and all must hold (e.g. exit_code + stdout + file in one block).",
       "anyOf": [
-        { "required": ["exit_code"] },
-        { "required": ["stdout"] },
-        { "required": ["stderr"] },
-        { "required": ["file"] },
-        { "required": ["status"] },
-        { "required": ["header"] },
-        { "required": ["body"] },
-        { "required": ["rows"] },
-        { "required": ["grpc_status"] },
-        { "required": ["message"] },
-        { "required": ["value"] },
-        { "required": ["image"] },
-        { "required": ["dir"] },
-        { "required": ["pdf"] },
-        { "required": ["mock"] },
-        { "required": ["screen"] },
-        { "required": ["duration"] },
-        { "required": ["changes"] }
+        {
+          "required": [
+            "exit_code"
+          ]
+        },
+        {
+          "required": [
+            "stdout"
+          ]
+        },
+        {
+          "required": [
+            "stderr"
+          ]
+        },
+        {
+          "required": [
+            "file"
+          ]
+        },
+        {
+          "required": [
+            "status"
+          ]
+        },
+        {
+          "required": [
+            "header"
+          ]
+        },
+        {
+          "required": [
+            "body"
+          ]
+        },
+        {
+          "required": [
+            "rows"
+          ]
+        },
+        {
+          "required": [
+            "grpc_status"
+          ]
+        },
+        {
+          "required": [
+            "message"
+          ]
+        },
+        {
+          "required": [
+            "value"
+          ]
+        },
+        {
+          "required": [
+            "image"
+          ]
+        },
+        {
+          "required": [
+            "dir"
+          ]
+        },
+        {
+          "required": [
+            "pdf"
+          ]
+        },
+        {
+          "required": [
+            "mock"
+          ]
+        },
+        {
+          "required": [
+            "screen"
+          ]
+        },
+        {
+          "required": [
+            "duration"
+          ]
+        },
+        {
+          "required": [
+            "changes"
+          ]
+        }
       ],
       "properties": {
-        "exit_code": { "$ref": "#/$defs/exitCode" },
-        "stdout": { "$ref": "#/$defs/stream" },
-        "stderr": { "$ref": "#/$defs/stream" },
-        "file": { "$ref": "#/$defs/file" },
-        "status": { "type": "integer" },
-        "header": { "$ref": "#/$defs/headerMatch" },
-        "body": { "$ref": "#/$defs/stream" },
-        "rows": { "$ref": "#/$defs/stream" },
-        "grpc_status": { "type": "integer" },
-        "message": { "$ref": "#/$defs/stream" },
-        "value": { "$ref": "#/$defs/stream" },
-        "image": { "$ref": "#/$defs/image" },
-        "dir": { "$ref": "#/$defs/dir" },
-        "pdf": { "$ref": "#/$defs/pdf" },
-        "mock": { "$ref": "#/$defs/mockAssert" },
+        "exit_code": {
+          "$ref": "#/$defs/exitCode",
+          "description": "Asserts the preceding command's exit status: a bare integer, `{not: N}`, or a documented set `{in: [0, 2]}`."
+        },
+        "stdout": {
+          "$ref": "#/$defs/stream",
+          "description": "Matches the preceding step's captured standard output with exactly one stream matcher."
+        },
+        "stderr": {
+          "$ref": "#/$defs/stream",
+          "description": "Matches the preceding step's captured standard error with exactly one stream matcher."
+        },
+        "file": {
+          "$ref": "#/$defs/file",
+          "description": "Checks a generated file: existence, content substrings, byte-exact equality, JSONPath checks, executability, or a snapshot."
+        },
+        "status": {
+          "type": "integer",
+          "description": "Asserts the HTTP response status code of the preceding http step."
+        },
+        "header": {
+          "$ref": "#/$defs/headerMatch",
+          "description": "Matches one HTTP response header of the preceding http step by name."
+        },
+        "body": {
+          "$ref": "#/$defs/stream",
+          "description": "Matches the HTTP response body of the preceding http step with the stream matchers."
+        },
+        "rows": {
+          "$ref": "#/$defs/stream",
+          "description": "Matches the preceding query step's result rows, captured as a JSON array, with the stream matchers (`json` path/length, `contains`, ...)."
+        },
+        "grpc_status": {
+          "type": "integer",
+          "description": "Asserts the numeric gRPC status code of the preceding grpc step (0 = OK)."
+        },
+        "message": {
+          "$ref": "#/$defs/stream",
+          "description": "Matches the preceding grpc step's response message (as JSON) with the stream matchers."
+        },
+        "value": {
+          "$ref": "#/$defs/stream",
+          "description": "Matches the value captured by the last browser `text`/`eval`/`attribute`/`title` action with the stream matchers."
+        },
+        "image": {
+          "$ref": "#/$defs/image",
+          "description": "Inspects a generated image's decoded properties (format, dimensions, alpha) and optionally compares its pixels against a baseline. Every set field must hold."
+        },
+        "dir": {
+          "$ref": "#/$defs/dir",
+          "description": "Black-box checks over a generated directory: existence, expected/forbidden children, entry counts, glob coverage, or a whole-tree snapshot manifest."
+        },
+        "pdf": {
+          "$ref": "#/$defs/pdf",
+          "description": "Checks a generated PDF: page count, Info-dictionary metadata, and extracted text. Every set field must hold."
+        },
+        "mock": {
+          "$ref": "#/$defs/mockAssert",
+          "description": "Asserts what the CLI under test actually sent to a declared mock server: request count, and header/body matchers on the last matching recorded request."
+        },
         "screen": {
           "$ref": "#/$defs/stream",
           "description": "The rendered terminal screen of the preceding pty step (#27): the transcript replayed through a vt10x emulator, asserted as plain text (line.n = screen row)."
         },
-        "duration": { "$ref": "#/$defs/durationAssert" },
-        "changes": { "$ref": "#/$defs/changesAssert" }
+        "duration": {
+          "$ref": "#/$defs/durationAssert",
+          "description": "Bounds how long the preceding measurable step (run/http/query/grpc/pty) took, with Go-duration `lt`/`lte`/`gt`/`gte` bounds."
+        },
+        "changes": {
+          "$ref": "#/$defs/changesAssert",
+          "description": "Valid after a run/pty step: pins exactly which files that step created, modified, and deleted in the scenario workdir. Each set list is exhaustive in both directions."
+        }
       }
     },
     "changesAssert": {
@@ -699,16 +1740,32 @@
       "description": "Pins the exact workdir delta of the immediately preceding run/pty step (#70): which files it created, modified, and deleted. Each set field is EXHAUSTIVE in both directions (every observed path must match an entry, every entry must match a path), so `modified: []` asserts \"modified nothing\". An omitted field is unconstrained. Entries are workdir-relative doublestar globs, always /-separated: a single `*` stays within one path segment while `**` crosses `/` at any depth (`site/**` covers the whole tree, `dist/**/*.css` composes with a suffix). A backslash escapes a literal metacharacter (`\\[`, `\\?`, `\\*`) — `a\\[1\\].txt` matches the file `a[1].txt`; the escape is portable because entries are always /-separated.",
       "minProperties": 1,
       "properties": {
-        "created": { "$ref": "#/$defs/changesEntries" },
-        "modified": { "$ref": "#/$defs/changesEntries" },
-        "deleted": { "$ref": "#/$defs/changesEntries" }
+        "created": {
+          "$ref": "#/$defs/changesEntries",
+          "description": "Exhaustive list of paths the step created: every observed creation must match an entry and vice versa. `[]` asserts \"created nothing\"."
+        },
+        "modified": {
+          "$ref": "#/$defs/changesEntries",
+          "description": "Exhaustive list of paths the step modified (content-based, not mtime). `[]` asserts \"modified nothing\"."
+        },
+        "deleted": {
+          "$ref": "#/$defs/changesEntries",
+          "description": "Exhaustive list of paths the step deleted. `[]` asserts \"deleted nothing\"."
+        }
       }
     },
     "changesEntries": {
       "description": "A single workdir-relative path/glob, or a list of them (the empty list [] asserts the category changed nothing). Globs are doublestar and /-separated: `*` within a segment, `**` across `/`; a backslash escapes a literal metacharacter.",
       "oneOf": [
-        { "type": "string" },
-        { "type": "array", "items": { "type": "string" } }
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
       ]
     },
     "durationAssert": {
@@ -716,58 +1773,153 @@
       "additionalProperties": false,
       "description": "Bounds the wall-clock time of the immediately preceding run/http/query/grpc/pty step (#31). At least one bound; lt/lte and gt/gte are mutually exclusive. Values are Go duration strings (2s, 100ms).",
       "properties": {
-        "lt": { "type": "string" },
-        "lte": { "type": "string" },
-        "gt": { "type": "string" },
-        "gte": { "type": "string" }
+        "lt": {
+          "type": "string",
+          "description": "Exclusive upper bound as a Go duration (e.g. \"2s\")."
+        },
+        "lte": {
+          "type": "string",
+          "description": "Inclusive upper bound as a Go duration."
+        },
+        "gt": {
+          "type": "string",
+          "description": "Exclusive lower bound as a Go duration."
+        },
+        "gte": {
+          "type": "string",
+          "description": "Inclusive lower bound as a Go duration."
+        }
       }
     },
     "pdf": {
       "type": "object",
-      "required": ["path"],
+      "required": [
+        "path"
+      ],
       "additionalProperties": false,
       "properties": {
-        "path": { "type": "string", "minLength": 1 },
-        "pages": { "type": "integer", "minimum": 0 },
-        "min_pages": { "type": "integer", "minimum": 0 },
-        "max_pages": { "type": "integer", "minimum": 0 },
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The PDF under test, resolved against the scenario workdir when relative."
+        },
+        "pages": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Asserts the exact page count."
+        },
+        "min_pages": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Lower bound on the page count."
+        },
+        "max_pages": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Upper bound on the page count."
+        },
         "metadata": {
           "type": "object",
-          "additionalProperties": { "type": "string" }
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Maps an Info-dictionary field (title, author, subject, keywords, creator, producer; case-insensitive) to a substring its value must contain."
         },
-        "text": { "$ref": "#/$defs/stream" }
+        "text": {
+          "$ref": "#/$defs/stream",
+          "description": "Applies the stream matchers to the text extracted from the PDF's content streams."
+        }
       }
     },
     "dir": {
       "type": "object",
-      "required": ["path"],
+      "required": [
+        "path"
+      ],
       "additionalProperties": false,
       "properties": {
-        "path": { "type": "string", "minLength": 1 },
-        "exists": { "type": "boolean" },
-        "contains": { "type": "array", "items": { "type": "string" } },
-        "not_contains": { "type": "array", "items": { "type": "string" } },
-        "count": { "type": "integer", "minimum": 0 },
-        "min_count": { "type": "integer", "minimum": 0 },
-        "max_count": { "type": "integer", "minimum": 0 },
-        "glob": { "type": "string" },
-        "recursive": { "type": "boolean", "description": "Apply contains/not_contains/count/glob to the whole tree (#25): counts see files only; glob matches relative paths, or basenames for patterns without /." },
-        "snapshot": { "type": "string", "description": "Golden tree manifest (#25): sorted relative paths, one line per entry (dir/file sha256/link). Composes only with ignore; refresh with --update-snapshots." },
-        "ignore": { "type": "array", "items": { "type": "string" }, "description": "Glob patterns excluded from the recursive walk and the snapshot manifest (*.log, .git/**)." }
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The directory under test, resolved against the scenario workdir when relative."
+        },
+        "exists": {
+          "type": "boolean",
+          "description": "Asserts the path exists and is a directory (`false` asserts it is absent)."
+        },
+        "contains": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Child paths (relative to `path`) that must exist; nested paths are allowed and confined to the directory."
+        },
+        "not_contains": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Child paths (relative to `path`) that must NOT exist."
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Asserts the exact number of direct entries (files only under `recursive: true`)."
+        },
+        "min_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Lower bound on the number of entries."
+        },
+        "max_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Upper bound on the number of entries."
+        },
+        "glob": {
+          "type": "string",
+          "description": "Requires at least one entry to match this shell glob (basename match for patterns without `/`)."
+        },
+        "recursive": {
+          "type": "boolean",
+          "description": "Apply contains/not_contains/count/glob to the whole tree (#25): counts see files only; glob matches relative paths, or basenames for patterns without /."
+        },
+        "snapshot": {
+          "type": "string",
+          "description": "Golden tree manifest (#25): sorted relative paths, one line per entry (dir/file sha256/link). Composes only with ignore; refresh with --update-snapshots."
+        },
+        "ignore": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Glob patterns excluded from the recursive walk and the snapshot manifest (*.log, .git/**)."
+        }
       }
     },
     "exitCode": {
       "oneOf": [
-        { "type": "integer" },
         {
-          "type": "object",
-          "required": ["not"],
-          "additionalProperties": false,
-          "properties": { "not": { "type": "integer" } }
+          "type": "integer"
         },
         {
           "type": "object",
-          "required": ["in"],
+          "required": [
+            "not"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "not": {
+              "type": "integer",
+              "description": "Asserts the exit code is anything but this value."
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "in"
+          ],
           "additionalProperties": false,
           "properties": {
             "in": {
@@ -775,7 +1927,9 @@
               "type": "array",
               "minItems": 1,
               "uniqueItems": true,
-              "items": { "type": "integer" }
+              "items": {
+                "type": "integer"
+              }
             }
           }
         }
@@ -785,169 +1939,553 @@
       "type": "object",
       "additionalProperties": false,
       "oneOf": [
-        { "required": ["empty"] },
-        { "required": ["equals"] },
-        { "required": ["not_equals"] },
-        { "required": ["json"] },
-        { "required": ["yaml"] },
-        { "required": ["snapshot"] },
-        { "required": ["trim"] },
+        {
+          "required": [
+            "empty"
+          ]
+        },
+        {
+          "required": [
+            "equals"
+          ]
+        },
+        {
+          "required": [
+            "not_equals"
+          ]
+        },
+        {
+          "required": [
+            "json"
+          ]
+        },
+        {
+          "required": [
+            "yaml"
+          ]
+        },
+        {
+          "required": [
+            "snapshot"
+          ]
+        },
+        {
+          "required": [
+            "trim"
+          ]
+        },
         {
           "comment": "The text matchers contains/not_contains/matches/not_matches may be combined (all must hold); the whole-stream matchers above are each used alone.",
           "anyOf": [
-            { "required": ["contains"] },
-            { "required": ["not_contains"] },
-            { "required": ["matches"] },
-            { "required": ["not_matches"] }
+            {
+              "required": [
+                "contains"
+              ]
+            },
+            {
+              "required": [
+                "not_contains"
+              ]
+            },
+            {
+              "required": [
+                "matches"
+              ]
+            },
+            {
+              "required": [
+                "not_matches"
+              ]
+            }
           ]
         }
       ],
       "properties": {
-        "line": { "type": "integer", "minimum": 1 },
-        "empty": { "type": "boolean" },
-        "contains": { "$ref": "#/$defs/stringOrList" },
-        "not_contains": { "$ref": "#/$defs/stringOrList" },
-        "matches": { "type": "string" },
-        "not_matches": { "type": "string" },
-        "equals": { "type": "string" },
-        "not_equals": { "type": "string" },
-        "json": { "$ref": "#/$defs/jsonChecks" },
-        "yaml": { "$ref": "#/$defs/jsonChecks" },
-        "snapshot": { "type": "string" },
-        "trim": { "type": "boolean", "description": "Store-only (#158): capture the whole stream. trim: true strips surrounding whitespace; trim: false keeps bytes verbatim." }
+        "line": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "1-based line selector: applies the matcher to that single line instead of the whole stream. Not itself a matcher; does not compose with json/snapshot."
+        },
+        "empty": {
+          "type": "boolean",
+          "description": "Asserts the stream is empty (`true`) or non-empty (`false`)."
+        },
+        "contains": {
+          "$ref": "#/$defs/stringOrList",
+          "description": "Requires every listed substring (a scalar counts as a one-element list) to be present."
+        },
+        "not_contains": {
+          "$ref": "#/$defs/stringOrList",
+          "description": "Requires every listed substring to be absent."
+        },
+        "matches": {
+          "type": "string",
+          "description": "Requires the stream to match this Go (RE2) regular expression."
+        },
+        "not_matches": {
+          "type": "string",
+          "description": "Requires the stream NOT to match this Go (RE2) regular expression."
+        },
+        "equals": {
+          "type": "string",
+          "description": "Requires the stream to equal this string exactly (CRLF and one trailing newline are normalized)."
+        },
+        "not_equals": {
+          "type": "string",
+          "description": "Requires the stream NOT to equal this string."
+        },
+        "json": {
+          "$ref": "#/$defs/jsonChecks",
+          "description": "Parses the stream as JSON and applies one JSONPath check, or a list of checks that must all hold."
+        },
+        "yaml": {
+          "$ref": "#/$defs/jsonChecks",
+          "description": "Parses the stream as YAML and applies one JSONPath check, or a list of checks that must all hold."
+        },
+        "snapshot": {
+          "type": "string",
+          "description": "Compares the stream against a committed golden file (spec-relative path). Volatile details (ANSI, temp paths, UUIDs, timestamps, ports, CRLF) are normalized; refresh with `atago snapshot update`."
+        },
+        "trim": {
+          "type": "boolean",
+          "description": "Store-only (#158): capture the whole stream. trim: true strips surrounding whitespace; trim: false keeps bytes verbatim."
+        }
       }
     },
     "file": {
       "type": "object",
-      "required": ["path"],
+      "required": [
+        "path"
+      ],
       "additionalProperties": false,
       "oneOf": [
-        { "required": ["exists"] },
-        { "required": ["contains"] },
-        { "required": ["not_contains"] },
-        { "required": ["executable"] },
-        { "required": ["equals"] },
-        { "required": ["equals_file"] },
-        { "required": ["json"] },
-        { "required": ["snapshot"] },
-        { "required": ["text"] }
+        {
+          "required": [
+            "exists"
+          ]
+        },
+        {
+          "required": [
+            "contains"
+          ]
+        },
+        {
+          "required": [
+            "not_contains"
+          ]
+        },
+        {
+          "required": [
+            "executable"
+          ]
+        },
+        {
+          "required": [
+            "equals"
+          ]
+        },
+        {
+          "required": [
+            "equals_file"
+          ]
+        },
+        {
+          "required": [
+            "json"
+          ]
+        },
+        {
+          "required": [
+            "snapshot"
+          ]
+        },
+        {
+          "required": [
+            "text"
+          ]
+        }
       ],
       "properties": {
-        "path": { "type": "string", "minLength": 1 },
-        "exists": { "type": "boolean" },
-        "contains": { "$ref": "#/$defs/stringOrList" },
-        "not_contains": { "$ref": "#/$defs/stringOrList" },
-        "executable": { "type": "boolean" },
-        "equals": { "type": "string", "description": "Byte-exact content match against an inline literal (no CRLF/newline normalization)." },
-        "equals_file": { "type": "string", "minLength": 1, "description": "Byte-exact content match against another workdir-confined file (round-trip/idempotence; no CRLF/newline normalization)." },
-        "json": { "$ref": "#/$defs/jsonChecks" },
-        "snapshot": { "type": "string" },
-        "text": { "type": "boolean", "description": "Store-only (#158): capture the whole file content verbatim instead of extracting a value via a json path." }
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The file under test, resolved against the scenario workdir when relative (confined to it)."
+        },
+        "exists": {
+          "type": "boolean",
+          "description": "Asserts the file exists (`true`) or is absent (`false`)."
+        },
+        "contains": {
+          "$ref": "#/$defs/stringOrList",
+          "description": "Requires every listed substring to be present in the file content."
+        },
+        "not_contains": {
+          "$ref": "#/$defs/stringOrList",
+          "description": "Requires every listed substring to be absent from the file content."
+        },
+        "executable": {
+          "type": "boolean",
+          "description": "Asserts whether the file has an executable bit set (POSIX)."
+        },
+        "equals": {
+          "type": "string",
+          "description": "Byte-exact content match against an inline literal (no CRLF/newline normalization)."
+        },
+        "equals_file": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Byte-exact content match against another workdir-confined file (round-trip/idempotence; no CRLF/newline normalization)."
+        },
+        "json": {
+          "$ref": "#/$defs/jsonChecks",
+          "description": "Parses the file as JSON and applies one JSONPath check, or a list of checks that must all hold."
+        },
+        "snapshot": {
+          "type": "string",
+          "description": "Compares the file content against a committed golden file, with the standard snapshot normalization."
+        },
+        "text": {
+          "type": "boolean",
+          "description": "Store-only (#158): capture the whole file content verbatim instead of extracting a value via a json path."
+        }
       }
     },
     "image": {
       "type": "object",
-      "required": ["path"],
+      "required": [
+        "path"
+      ],
       "additionalProperties": false,
       "anyOf": [
-        { "required": ["format"] },
-        { "required": ["width"] },
-        { "required": ["height"] },
-        { "required": ["min_width"] },
-        { "required": ["max_width"] },
-        { "required": ["min_height"] },
-        { "required": ["max_height"] },
-        { "required": ["alpha"] },
-        { "required": ["similar_to"] }
+        {
+          "required": [
+            "format"
+          ]
+        },
+        {
+          "required": [
+            "width"
+          ]
+        },
+        {
+          "required": [
+            "height"
+          ]
+        },
+        {
+          "required": [
+            "min_width"
+          ]
+        },
+        {
+          "required": [
+            "max_width"
+          ]
+        },
+        {
+          "required": [
+            "min_height"
+          ]
+        },
+        {
+          "required": [
+            "max_height"
+          ]
+        },
+        {
+          "required": [
+            "alpha"
+          ]
+        },
+        {
+          "required": [
+            "similar_to"
+          ]
+        }
       ],
       "properties": {
-        "path": { "type": "string", "minLength": 1 },
-        "format": { "enum": ["png", "jpeg", "gif", "webp", "bmp", "tiff", "avif", "svg"] },
-        "width": { "type": "integer", "minimum": 0 },
-        "height": { "type": "integer", "minimum": 0 },
-        "min_width": { "type": "integer", "minimum": 0 },
-        "max_width": { "type": "integer", "minimum": 0 },
-        "min_height": { "type": "integer", "minimum": 0 },
-        "max_height": { "type": "integer", "minimum": 0 },
-        "alpha": { "type": "boolean" },
-        "similar_to": { "type": "string", "minLength": 1 },
-        "max_diff": { "type": "number", "minimum": 0, "maximum": 1 }
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The image file under test, resolved against the scenario workdir when relative."
+        },
+        "format": {
+          "enum": [
+            "png",
+            "jpeg",
+            "gif",
+            "webp",
+            "bmp",
+            "tiff",
+            "avif",
+            "svg"
+          ],
+          "description": "Asserts the encoded format, detected from content: png, jpeg, gif, webp, bmp, tiff, avif, or svg."
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Asserts the exact pixel width."
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Asserts the exact pixel height."
+        },
+        "min_width": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Lower bound on the pixel width."
+        },
+        "max_width": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Upper bound on the pixel width."
+        },
+        "min_height": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Lower bound on the pixel height."
+        },
+        "max_height": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Upper bound on the pixel height."
+        },
+        "alpha": {
+          "type": "boolean",
+          "description": "Asserts whether the image actually carries transparency (any non-opaque pixel), scanning decoded pixels."
+        },
+        "similar_to": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Baseline image to compare decoded pixels against. A relative path resolves against the spec file's directory; both images must share dimensions."
+        },
+        "max_diff": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Maximum allowed normalized mean per-pixel difference (0..1) for `similar_to`. Defaults to 0 (exact); lossy formats need a small tolerance like 0.02."
+        }
       }
     },
     "jsonChecks": {
       "description": "A json/yaml matcher (#156): either a single check (mapping) or a non-empty list of checks that must all hold.",
       "oneOf": [
-        { "$ref": "#/$defs/jsonAssert" },
-        { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/jsonAssert" } }
+        {
+          "$ref": "#/$defs/jsonAssert"
+        },
+        {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/jsonAssert"
+          }
+        }
       ]
     },
     "jsonAssert": {
       "type": "object",
-      "required": ["path"],
+      "required": [
+        "path"
+      ],
       "additionalProperties": false,
       "oneOf": [
-        { "required": ["equals"] },
-        { "required": ["matches"] },
-        { "required": ["length"] },
-        { "required": ["gt"] },
-        { "required": ["gte"] },
-        { "required": ["lt"] },
-        { "required": ["lte"] }
+        {
+          "required": [
+            "equals"
+          ]
+        },
+        {
+          "required": [
+            "matches"
+          ]
+        },
+        {
+          "required": [
+            "length"
+          ]
+        },
+        {
+          "required": [
+            "gt"
+          ]
+        },
+        {
+          "required": [
+            "gte"
+          ]
+        },
+        {
+          "required": [
+            "lt"
+          ]
+        },
+        {
+          "required": [
+            "lte"
+          ]
+        }
       ],
       "properties": {
-        "path": { "type": "string", "minLength": 1 },
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "JSONPath selecting the value under test (e.g. \"$.items[0].name\")."
+        },
         "equals": true,
-        "matches": { "type": "string" },
-        "length": { "type": "integer" },
-        "gt": { "type": "number" },
-        "gte": { "type": "number" },
-        "lt": { "type": "number" },
-        "lte": { "type": "number" }
+        "matches": {
+          "type": "string",
+          "description": "Requires the selected value (as a string) to match this Go regular expression."
+        },
+        "length": {
+          "type": "integer",
+          "description": "Asserts the selected array or string has exactly this length."
+        },
+        "gt": {
+          "type": "number",
+          "description": "Requires the selected numeric value to be greater than this bound."
+        },
+        "gte": {
+          "type": "number",
+          "description": "Requires the selected numeric value to be at least this bound."
+        },
+        "lt": {
+          "type": "number",
+          "description": "Requires the selected numeric value to be less than this bound."
+        },
+        "lte": {
+          "type": "number",
+          "description": "Requires the selected numeric value to be at most this bound."
+        }
       }
     },
     "headerMatch": {
       "type": "object",
-      "required": ["name"],
+      "required": [
+        "name"
+      ],
       "additionalProperties": false,
       "oneOf": [
-        { "required": ["contains"] },
-        { "required": ["equals"] },
-        { "required": ["matches"] }
+        {
+          "required": [
+            "contains"
+          ]
+        },
+        {
+          "required": [
+            "equals"
+          ]
+        },
+        {
+          "required": [
+            "matches"
+          ]
+        }
       ],
       "properties": {
-        "name": { "type": "string" },
-        "contains": { "type": "string" },
-        "equals": { "type": "string" },
-        "matches": { "type": "string", "description": "Regexp the header value must match - the natural shape for auth headers (^Bearer )." }
+        "name": {
+          "type": "string",
+          "description": "The header name to check (case-insensitive)."
+        },
+        "contains": {
+          "type": "string",
+          "description": "Requires the header value to contain this substring."
+        },
+        "equals": {
+          "type": "string",
+          "description": "Requires the header value to equal this string exactly."
+        },
+        "matches": {
+          "type": "string",
+          "description": "Regexp the header value must match - the natural shape for auth headers (^Bearer )."
+        }
       }
     },
     "store": {
       "type": "object",
-      "required": ["name", "from"],
+      "required": [
+        "name",
+        "from"
+      ],
       "additionalProperties": false,
       "properties": {
-        "name": { "type": "string", "minLength": 1 },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The variable name; later steps reference the captured value as `${name}`."
+        },
         "from": {
           "type": "object",
           "additionalProperties": false,
           "oneOf": [
-            { "required": ["stdout"] },
-            { "required": ["body"] },
-            { "required": ["file"] },
-            { "required": ["header"] },
-            { "required": ["rows"] },
-            { "required": ["message"] },
-            { "required": ["value"] }
+            {
+              "required": [
+                "stdout"
+              ]
+            },
+            {
+              "required": [
+                "body"
+              ]
+            },
+            {
+              "required": [
+                "file"
+              ]
+            },
+            {
+              "required": [
+                "header"
+              ]
+            },
+            {
+              "required": [
+                "rows"
+              ]
+            },
+            {
+              "required": [
+                "message"
+              ]
+            },
+            {
+              "required": [
+                "value"
+              ]
+            }
           ],
           "properties": {
-            "stdout": { "$ref": "#/$defs/stream" },
-            "body": { "$ref": "#/$defs/stream" },
-            "file": { "$ref": "#/$defs/file" },
-            "header": { "type": "string" },
-            "rows": { "$ref": "#/$defs/stream" },
-            "message": { "$ref": "#/$defs/stream" },
-            "value": { "$ref": "#/$defs/stream" }
-          }
+            "stdout": {
+              "$ref": "#/$defs/stream",
+              "description": "Extracts from the preceding step's stdout via a `json` path or `matches` regex, or captures the whole stream with `trim`."
+            },
+            "body": {
+              "$ref": "#/$defs/stream",
+              "description": "Extracts from the preceding http step's response body via a `json` path or regex."
+            },
+            "file": {
+              "$ref": "#/$defs/file",
+              "description": "Reads a generated file: a `json` path selects a value, or `text: true` captures the whole content."
+            },
+            "header": {
+              "type": "string",
+              "description": "Captures an HTTP response header value by name."
+            },
+            "rows": {
+              "$ref": "#/$defs/stream",
+              "description": "Extracts from the preceding query step's result rows (a JSON array) via a `json` path."
+            },
+            "message": {
+              "$ref": "#/$defs/stream",
+              "description": "Extracts from the preceding grpc step's response message via a `json` path."
+            },
+            "value": {
+              "$ref": "#/$defs/stream",
+              "description": "Extracts from the last browser-captured value via a `json` path or regex."
+            }
+          },
+          "description": "Where the value comes from — exactly one source."
         }
       }
     }
