@@ -23,7 +23,7 @@ description: atago subcommands, scenario selection flags, snapshot updating and 
 
 ## Selecting scenarios
 
-Selection flags compose with any spec: `--filter NAME` (repeatable, and comma-separated for OR — `--filter a,b` or `--filter a --filter b` runs scenarios whose name contains `a` or `b`), `--tag T`, `--skip-tag T`, `--parallel N`, `--fail-fast`, and `--rerun-failed`. While authoring, `--verbose` traces every command, capture, and assertion verdict — for passing scenarios too.
+Selection flags compose with any spec: `--filter NAME` (repeatable, and comma-separated for OR — `--filter a,b` or `--filter a --filter b` runs scenarios whose name contains `a` or `b`), `--tag T` and `--skip-tag T` (tags match exactly, not by substring — `atago list` shows the available tags), `--parallel N`, `--fail-fast`, and `--rerun-failed`. While authoring, `--verbose` traces every command, capture, and assertion verdict — for passing scenarios too. Under `--ci`, a selection that matches no scenario fails the run (exit 3) rather than passing an empty suite.
 
 ## Snapshot testing
 

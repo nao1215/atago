@@ -199,7 +199,7 @@ ssh       run a command on a remote host over SSH (edit host/user first)
 
 Every feature has a commented, runnable spec under [examples/](examples/), tested in CI on Linux, macOS, and Windows. The **[cookbook](https://nao1215.github.io/atago/cookbook/)** collects 50+ copyable recipes for common jobs — converting images, driving prompts and TUIs, simulating API failures offline, proving idempotency — and indexes every spec by task and by feature.
 
-Selection flags compose with any spec: `--filter NAME` (repeatable, and comma-separated for OR — `--filter a,b` or `--filter a --filter b` runs scenarios whose name contains `a` or `b`), `--tag T`, `--skip-tag T`, `--parallel N`, `--fail-fast`, and `--rerun-failed`. While authoring, `--verbose` traces every command, capture, and assertion verdict — for passing scenarios too.
+Selection flags compose with any spec: `--filter NAME` (repeatable, and comma-separated for OR — `--filter a,b` or `--filter a --filter b` runs scenarios whose name contains `a` or `b`), `--tag T` and `--skip-tag T` (tags match exactly, not by substring — `atago list` shows the available tags), `--parallel N`, `--fail-fast`, and `--rerun-failed`. While authoring, `--verbose` traces every command, capture, and assertion verdict — for passing scenarios too.
 
 ## Use it in CI
 
@@ -225,7 +225,7 @@ jobs:
 ```
 
 - `--report json|junit|gha|tap` picks the report format; the JSON shape is stable and versioned.
-- `--ci` enables deterministic, color-free output.
+- `--ci` enables deterministic, color-free output. It also turns an empty selection into a hard error: a `--filter`/`--tag`/`--skip-tag` that matches no scenario fails the run (exit 3) instead of passing an empty suite, so a typo cannot silently disable your specs. Without `--ci` the same case is a warning that still exits 0.
 - `--artifacts-dir DIR` persists the exact payloads a failed assertion compared, so a failure stays reviewable after the job ends.
 - Environment variable names listed under `secrets:` are masked as `***` in all reports and snapshots.
 

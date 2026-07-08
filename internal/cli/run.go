@@ -37,9 +37,9 @@ func runCmd(label string, args []string, stdout, stderr io.Writer) int {
 	var filter csvFlag
 	fs.Var(&filter, "filter", "run only scenarios whose name contains any of these comma-separated substrings (repeatable; OR semantics like --tag)")
 	var tag csvFlag
-	fs.Var(&tag, "tag", "run only scenarios with any of these tags (comma-separated and repeatable; OR semantics)")
+	fs.Var(&tag, "tag", "run only scenarios with any of these tags, matched exactly (comma-separated and repeatable; OR semantics)")
 	var skipTag csvFlag
-	fs.Var(&skipTag, "skip-tag", "skip scenarios with any of these tags (comma-separated and repeatable)")
+	fs.Var(&skipTag, "skip-tag", "skip scenarios with any of these tags, matched exactly (comma-separated and repeatable)")
 	artifactsDir := fs.String("artifacts-dir", "", "write deterministic failure artifacts (actual/expected payloads) under DIR for review tooling")
 	rerunFailed := fs.Bool("rerun-failed", false, "run only the scenarios that failed on the previous run (recorded in .atago/last-failed.json)")
 	repeat := fs.Int("repeat", 0, "run each selected scenario N times to surface flakiness; any failing iteration fails the run")
@@ -294,14 +294,20 @@ func runCmd(label string, args []string, stdout, stderr io.Writer) int {
 		return exit
 	}
 
-	// A selection that matches nothing still exits 0 (nothing ran, nothing
-	// failed), but stay loud about it: a typo'd --filter/--tag in CI would
-	// otherwise greenlight silently.
-	if len(filter) > 0 || len(tag) > 0 || len(skipTag) > 0 {
+	// A selection that matches nothing: interactively this still exits 0 (nothing
+	// ran, nothing failed) but stays loud; under --ci it is a hard config error so
+	// a typo'd --filter/--tag/--skip-tag cannot silently disable the whole suite in
+	// a pipeline forever.
+	if selectionActive {
 		total := 0
 		for _, r := range results {
 			total += len(r.Scenarios)
 		}
+		// total == 0 here can only mean the selectors excluded every scenario, never
+		// that the specs were empty: the loader rejects a spec with no scenarios, and
+		// a selected-but-skipped scenario (os gate, skip step) still appears in
+		// res.Scenarios. So this is precisely the "selectors filtered everything"
+		// case the task must fail on, not "the specs had nothing to run".
 		if total == 0 && ctx.Err() == nil {
 			var sel []string
 			if len(filter) > 0 {
@@ -313,7 +319,22 @@ func runCmd(label string, args []string, stdout, stderr io.Writer) int {
 			if len(skipTag) > 0 {
 				sel = append(sel, fmt.Sprintf("--skip-tag %q", strings.Join(skipTag, ",")))
 			}
-			fmt.Fprintf(stderr, label+": warning: no scenarios matched %s (name matching is a case-sensitive substring)\n", strings.Join(sel, " "))
+			tagActive := len(tag) > 0 || len(skipTag) > 0
+			// The note is selector-aware: --filter matches names by case-sensitive
+			// substring, but --tag/--skip-tag compare tags for EXACT equality
+			// (engine.hasAnyTag uses ==). A single "substring" note for tags would send
+			// users fixing the wrong thing, so name each selector's real rule.
+			note := selectorNoMatchNote(len(filter) > 0, tagActive)
+			if *ci {
+				fmt.Fprintf(stderr, label+": no scenarios matched %s under --ci; refusing to exit 0 (an empty selection would silently disable the suite). %s. Run `atago list` to see available scenarios and tags.\n", strings.Join(sel, " "), note)
+				exit = worseExit(exit, ExitConfig)
+			} else {
+				hint := note
+				if tagActive {
+					hint += "; run `atago list` to see the available tags"
+				}
+				fmt.Fprintf(stderr, label+": warning: no scenarios matched %s (%s)\n", strings.Join(sel, " "), hint)
+			}
 		}
 	}
 
@@ -540,6 +561,21 @@ func exitForSuite(res *engine.SuiteResult) int {
 	default:
 		return ExitInternal
 	}
+}
+
+// selectorNoMatchNote explains, per active selector, why a selection came up
+// empty. --filter matches scenario NAMES by case-sensitive substring, whereas
+// --tag/--skip-tag compare TAGS for exact equality (engine.hasAnyTag uses ==);
+// conflating the two rules would point users at the wrong fix.
+func selectorNoMatchNote(filterActive, tagActive bool) string {
+	var parts []string
+	if filterActive {
+		parts = append(parts, "--filter matches scenario names by case-sensitive substring")
+	}
+	if tagActive {
+		parts = append(parts, "--tag/--skip-tag match tags exactly")
+	}
+	return strings.Join(parts, "; ")
 }
 
 // worseExit returns the more severe of two exit codes, preferring failure codes
