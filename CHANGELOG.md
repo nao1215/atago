@@ -52,6 +52,16 @@ and this project follows [Semantic Versioning](https://semver.org/).
   make schema-validating editors reject valid specs) — or a schema change
   without regenerating `spec_keys.json` — can no longer ship silently.
 
+- New spec key `services[].max_log_bytes`: caps how much combined
+  stdout/stderr atago retains per service (default 8 MiB), dropping the oldest
+  bytes first with an explicit truncation notice. Suite-level services live for
+  the whole run and `--parallel` multiplies scenario services, so an unbounded
+  capture let one chatty server grow memory without limit; every consumer of
+  the capture (readiness excerpts, preserved log artifacts) only ever needs the
+  tail. The `ready.log` probe also stopped rescanning the whole capture on
+  every idle 20ms tick, and a pending pty `expect` no longer copies the entire
+  transcript per poll — both were O(output²) on busy programs.
+
 ### Changed
 
 - README now links the hosted cookbook from its Examples section and points to

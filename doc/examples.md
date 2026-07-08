@@ -94,7 +94,7 @@
 | [duration](../examples/duration.atago.yaml) | bound a step's wall-clock time with `duration: {lt: 2s, gte: 100ms}` (use generous bounds — CI runners are slow) |
 | [dir_tree](../examples/dir_tree.atago.yaml) | recursive dir assertions and directory-tree snapshots: pin a generator's whole output tree with one golden manifest |
 | [changes](../examples/changes.atago.yaml) | `changes:` pins the exact workdir delta of a step — which files it created, modified, and deleted, and nothing else |
-| [services](../examples/services.atago.yaml) | background servers: readiness probes, `ready.store`, teardown |
+| [services](../examples/services.atago.yaml) | background servers: readiness probes, `ready.store`, bounded log retention (`max_log_bytes`), teardown |
 | [signal](../examples/signal.atago.yaml) | `signal:` steps deliver SIGTERM/SIGHUP/... to a managed service's process group for graceful-shutdown and reload testing (POSIX-only) |
 | [defaults](../examples/defaults.atago.yaml) | sharing `shell`/`env`/`service` fragments across scenarios |
 | [suite_setup](../examples/suite_setup.atago.yaml) | once-per-suite bootstrap: ordered setup steps, suite-wide `service:` steps, `${suitedir}`, suite env, always-run suite teardown |

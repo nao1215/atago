@@ -617,6 +617,12 @@ func TestLoadBytes_Errors(t *testing.T) {
 			wantMsg:  "name is required",
 		},
 		{
+			name:     "service max_log_bytes must be positive",
+			src:      "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    services:\n      - {name: s, command: sleep 1, max_log_bytes: -1}\n    steps:\n      - run: {command: echo}",
+			wantKind: KindValidation,
+			wantMsg:  "max_log_bytes must be positive",
+		},
+		{
 			name:     "duplicate service names",
 			src:      "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    services:\n      - {name: s, command: sleep 1}\n      - {name: s, command: sleep 1}\n    steps:\n      - run: {command: echo}",
 			wantKind: KindValidation,

@@ -48,3 +48,32 @@ scenarios:
       - assert:
           stdout:
             contains: pong
+
+  - name: a chatty service keeps only its newest log bytes
+    skip:
+      os: windows   # the stand-in service below uses POSIX shell commands
+    services:
+      - name: chatty
+        shell: true
+        # A service that logs heavily. atago retains at most max_log_bytes of
+        # its combined stdout/stderr (default 8 MiB), dropping the OLDEST
+        # bytes first — readiness excerpts and preserved log artifacts only
+        # ever need the tail, and this keeps a verbose server from growing
+        # memory for the whole suite's lifetime.
+        command: |
+          i=0
+          while [ $i -lt 100 ]; do echo "debug: request $i handled"; i=$((i+1)); done
+          echo "server listening"
+          sleep 30
+        max_log_bytes: 1024
+        ready:
+          log: "server listening"   # matches in the retained tail
+          timeout: 5s
+    steps:
+      - run:
+          shell: true
+          command: echo service is up
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: service is up
