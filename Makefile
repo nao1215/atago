@@ -1,4 +1,4 @@
-.PHONY: build test coverage clean vet fmt lint tools release-smoke e2e thirdparty dogfood dogfood-iso8583tool dogfood-jose dogfood-career dogfood-gup dogfood-mimixbox dogfood-mobilepkg demo docs site help
+.PHONY: build test coverage clean vet fmt lint tools release-smoke e2e thirdparty dogfood dogfood-iso8583tool dogfood-jose dogfood-career dogfood-gup dogfood-mimixbox dogfood-mobilepkg demo docs site website website-serve help
 
 APP         = atago
 VERSION     = $(shell git describe --tags --always --dirty 2>/dev/null)
@@ -144,6 +144,12 @@ docs: ## Regenerate the committed behavior docs under doc/e2e/ from the specs
 
 site: ## Regenerate the browsable docs site under site/ (drift-guarded by TestSite_InSync)
 	env UPDATE_SITE=1 $(GO) test -run TestSite_InSync .
+
+website: ## Build the hosted documentation website into website/public (requires hugo on PATH)
+	cd website && hugo --gc --minify
+
+website-serve: ## Serve the website locally with live reload (requires hugo on PATH)
+	cd website && hugo server
 
 demo: ## Regenerate the README GIFs with vhs (requires vhs on PATH)
 	env CGO_ENABLED=0 $(GO_BUILD) $(GO_LDFLAGS) -o ./dist/$(APP) .

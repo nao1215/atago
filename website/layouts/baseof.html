@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+{{- $title := printf "%s · %s" .Title site.Title }}
+{{- if .IsHome }}{{ $title = printf "%s — %s" site.Title site.Params.tagline }}{{ end }}
+<title>{{ $title }}</title>
+{{- $desc := or .Params.description site.Params.description }}
+<meta name="description" content="{{ $desc }}">
+<link rel="canonical" href="{{ .Permalink }}">
+<meta property="og:title" content="{{ $title }}">
+<meta property="og:description" content="{{ $desc }}">
+<meta property="og:type" content="website">
+<meta property="og:url" content="{{ .Permalink }}">
+<meta property="og:image" content="{{ absURL "img/atago-logo.jpg" }}">
+<link rel="icon" href="{{ relURL "img/atago-logo.jpg" }}">
+{{- $css := slice (resources.Get "css/site.css") (resources.Get "css/chroma.css") | resources.Concat "css/bundle.css" | minify | fingerprint }}
+<link rel="stylesheet" href="{{ $css.RelPermalink }}">
+</head>
+<body>
+<header>
+<nav>
+<a class="brand" href="{{ site.Home.RelPermalink }}">atago</a>
+{{- range site.Menus.main }}
+<a href="{{ .URL }}">{{ .Name }}</a>
+{{- end }}
+<a href="https://github.com/nao1215/atago">GitHub</a>
+</nav>
+</header>
+<main>
+{{ block "main" . }}{{ end }}
+</main>
+<footer>
+<p>MIT licensed · <a href="https://github.com/nao1215/atago">nao1215/atago</a> · every page on this site is generated from files committed in the repository.</p>
+</footer>
+</body>
+</html>
