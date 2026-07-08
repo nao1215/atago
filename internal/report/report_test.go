@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"encoding/xml"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -1088,5 +1089,138 @@ func TestColorize(t *testing.T) {
 	}
 	if got := colorize(true, cRed, "x"); got != cRed+"x"+cReset {
 		t.Errorf("colorized = %q", got)
+	}
+}
+
+// failedExitResults builds one suite whose scenario fails an exit_code assert
+// after a run step that captured output on the given streams. It is the fixture
+// for the failure-context sections (spec path, stderr/stdout tails).
+func failedExitResults(specPath string, stdout, stderr []byte) []*engine.SuiteResult {
+	return []*engine.SuiteResult{{
+		Suite:    "s1",
+		SpecPath: specPath,
+		Status:   engine.StatusFailed,
+		Duration: time.Millisecond,
+		Scenarios: []engine.ScenarioResult{
+			{Name: "f", Status: engine.StatusFailed, Duration: time.Millisecond, Steps: []engine.StepResult{
+				{Index: 0, Kind: "run", Run: &runner.Result{
+					Command: "mytool convert in.txt", ExitCode: 2, Stdout: stdout, Stderr: stderr}},
+				{Index: 1, Kind: "assert", Checks: []*assert.CheckResult{{
+					OK: false, Target: "exit_code", Desc: "assert exit_code is 0",
+					Expected: "exit code 0", Actual: "exit code 2",
+					Hint: "expected exit code 0 but the command exited with 2"}}},
+			}},
+		},
+	}}
+}
+
+// TestConsole_FailureNamesSpecFile: in a directory run the failure block must
+// name the spec file that produced it — with 40+ spec files, "FAILED: suite /
+// scenario" alone forces the user to grep for the scenario name (and duplicate
+// suite names make even that ambiguous). The path is appended to the FAILED /
+// ERROR / TEARDOWN FAILED headers; an empty SpecPath (direct API use) keeps the
+// old header untouched.
+func TestConsole_FailureNamesSpecFile(t *testing.T) {
+	t.Parallel()
+	var b bytes.Buffer
+	if err := Render(&b, FormatConsole, failedExitResults("specs/convert.atago.yaml", nil, []byte("boom\n"))); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(b.String(), "FAILED: s1 / f  (specs/convert.atago.yaml)") {
+		t.Errorf("failure header does not name the spec file:\n%s", b.String())
+	}
+
+	// An errored scenario names the file too.
+	errRes := []*engine.SuiteResult{{
+		Suite: "s1", SpecPath: "specs/convert.atago.yaml", Status: engine.StatusFailed,
+		Scenarios: []engine.ScenarioResult{{Name: "e", Status: engine.StatusError,
+			Steps: []engine.StepResult{{Index: 0, Kind: "run", ErrMsg: "command not found"}}}},
+	}}
+	b.Reset()
+	if err := Render(&b, FormatConsole, errRes); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(b.String(), "ERROR: s1 / e  (specs/convert.atago.yaml)") {
+		t.Errorf("error header does not name the spec file:\n%s", b.String())
+	}
+
+	// No SpecPath -> the header keeps its exact old shape (no stray parens).
+	b.Reset()
+	if err := Render(&b, FormatConsole, failedExitResults("", nil, nil)); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(b.String(), "FAILED: s1 / f\n") || strings.Contains(b.String(), "f  (") {
+		t.Errorf("empty SpecPath must leave the header unchanged:\n%s", b.String())
+	}
+}
+
+// TestConsole_ExitCodeFailureShowsStderr: an exit_code mismatch is the most
+// common first failure a user hits, and the WHY almost always sits on the
+// command's stderr — which the default report never showed, sending users on a
+// --verbose detour. The failure block now prints the captured stderr tail (or
+// the stdout tail when stderr is empty) for exit_code failures only; stream
+// asserts already show the stream they matched against.
+func TestConsole_ExitCodeFailureShowsStderr(t *testing.T) {
+	t.Parallel()
+
+	// stderr present -> Stderr section with the content.
+	var b bytes.Buffer
+	if err := Render(&b, FormatConsole, failedExitResults("", nil, []byte("/bin/sh: 1: Bad substitution\n"))); err != nil {
+		t.Fatal(err)
+	}
+	out := b.String()
+	if !strings.Contains(out, "Stderr:") || !strings.Contains(out, "Bad substitution") {
+		t.Errorf("exit_code failure does not surface stderr:\n%s", out)
+	}
+
+	// stderr empty, stdout present -> Stdout section instead.
+	b.Reset()
+	if err := Render(&b, FormatConsole, failedExitResults("", []byte("wrote 0 files\n"), nil)); err != nil {
+		t.Fatal(err)
+	}
+	out = b.String()
+	if strings.Contains(out, "Stderr:") || !strings.Contains(out, "Stdout:") || !strings.Contains(out, "wrote 0 files") {
+		t.Errorf("exit_code failure with empty stderr does not surface stdout:\n%s", out)
+	}
+
+	// Both empty -> neither section appears.
+	b.Reset()
+	if err := Render(&b, FormatConsole, failedExitResults("", nil, nil)); err != nil {
+		t.Fatal(err)
+	}
+	out = b.String()
+	if strings.Contains(out, "Stderr:") || strings.Contains(out, "Stdout:") {
+		t.Errorf("exit_code failure with no output must not print empty sections:\n%s", out)
+	}
+
+	// A long stderr is tailed, newest lines kept, with an honest header.
+	var long bytes.Buffer
+	for i := 1; i <= 30; i++ {
+		fmt.Fprintf(&long, "line %d\n", i)
+	}
+	b.Reset()
+	if err := Render(&b, FormatConsole, failedExitResults("", nil, long.Bytes())); err != nil {
+		t.Fatal(err)
+	}
+	out = b.String()
+	if !strings.Contains(out, "Stderr (last 10 of 30 lines):") {
+		t.Errorf("long stderr is not labeled as a tail:\n%s", out)
+	}
+	if strings.Contains(out, "line 1\n") || !strings.Contains(out, "line 30") {
+		t.Errorf("stderr tail must keep the newest lines:\n%s", out)
+	}
+
+	// A failing stream assert (not exit_code) does not grow a duplicate
+	// Stderr section — its Actual already shows the stream.
+	streamFail := failedExitResults("", nil, []byte("noise\n"))
+	streamFail[0].Scenarios[0].Steps[1].Checks[0] = &assert.CheckResult{
+		OK: false, Target: "stdout", Desc: `assert stdout contains "x"`,
+		Expected: "x", Actual: "y", Hint: "missing x"}
+	b.Reset()
+	if err := Render(&b, FormatConsole, streamFail); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(b.String(), "Stderr:") {
+		t.Errorf("stream-assert failure must not print the exit_code stderr section:\n%s", b.String())
 	}
 }

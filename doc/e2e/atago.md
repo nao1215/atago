@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-74 suites · 379 scenarios
+74 suites · 383 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -328,9 +328,13 @@
   - [retry polls until the condition becomes true](#scenario-retry-polls-until-the-condition-becomes-true)
   - [retry fails the inner spec when until never holds](#scenario-retry-fails-the-inner-spec-when-until-never-holds)
   - [until with a changes target is a load-time error](#scenario-until-with-a-changes-target-is-a-load-time-error)
-- [atago self-hosting / run](#atago-self-hosting--run) — 4 scenarios
+- [atago self-hosting / run](#atago-self-hosting--run) — 8 scenarios
   - [a passing spec exits zero and reports PASS](#scenario-a-passing-spec-exits-zero-and-reports-pass)
   - [a failing assertion exits one and reports the failure](#scenario-a-failing-assertion-exits-one-and-reports-the-failure)
+  - [an exit_code failure surfaces the command's stderr](#scenario-an-exit_code-failure-surfaces-the-commands-stderr)
+  - [an exit_code failure surfaces the command's stderr (windows)](#scenario-an-exit_code-failure-surfaces-the-commands-stderr-windows)
+  - [an exit_code failure falls back to stdout when stderr is silent](#scenario-an-exit_code-failure-falls-back-to-stdout-when-stderr-is-silent)
+  - [an exit_code failure falls back to stdout when stderr is silent (windows)](#scenario-an-exit_code-failure-falls-back-to-stdout-when-stderr-is-silent-windows)
   - [a parse error exits with code two](#scenario-a-parse-error-exits-with-code-two)
   - [JSON report is valid JSON with a passed status](#scenario-json-report-is-valid-json-with-a-passed-status)
 - [atago self-hosting / sandbox_home (isolated per-OS home)](#atago-self-hosting--sandbox_home-isolated-per-os-home) — 3 scenarios
@@ -5656,7 +5660,111 @@ ${atago} run failing.atago.yaml
 ```
 #### Then
 - exit code is `1`
-- stdout contains `FAILED`, `expected exit code 0`
+- stdout contains `FAILED`, `expected exit code 0`, `(failing.atago.yaml)`
+### Scenario: an exit_code failure surfaces the command's stderr
+_skipped on Windows_
+#### Given
+- Fixture file `stderr_cause.atago.yaml` is created.
+#### Inputs
+_Fixture `stderr_cause.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: converter fails loudly
+    steps:
+      - run:
+          shell: true
+          command: "echo conversion aborted: bad header 1>&2; exit 3"
+      - assert:
+          exit_code: 0
+```
+#### When
+```shell
+${atago} run stderr_cause.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `Stderr:`, `conversion aborted: bad header`
+### Scenario: an exit_code failure surfaces the command's stderr (windows)
+_only on Windows_
+#### Given
+- Fixture file `stderr_cause.atago.yaml` is created.
+#### Inputs
+_Fixture `stderr_cause.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: converter fails loudly
+    steps:
+      - run:
+          shell: true
+          command: "echo conversion aborted: bad header 1>&2 & exit 3"
+      - assert:
+          exit_code: 0
+```
+#### When
+```shell
+${atago} run stderr_cause.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `Stderr:`, `conversion aborted: bad header`
+### Scenario: an exit_code failure falls back to stdout when stderr is silent
+_skipped on Windows_
+#### Given
+- Fixture file `stdout_cause.atago.yaml` is created.
+#### Inputs
+_Fixture `stdout_cause.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: converter fails on stdout
+    steps:
+      - run:
+          shell: true
+          command: "echo wrote 0 of 3 files; exit 3"
+      - assert:
+          exit_code: 0
+```
+#### When
+```shell
+${atago} run stdout_cause.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `Stdout:`, `wrote 0 of 3 files`
+### Scenario: an exit_code failure falls back to stdout when stderr is silent (windows)
+_only on Windows_
+#### Given
+- Fixture file `stdout_cause.atago.yaml` is created.
+#### Inputs
+_Fixture `stdout_cause.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: converter fails on stdout
+    steps:
+      - run:
+          shell: true
+          command: "echo wrote 0 of 3 files & exit 3"
+      - assert:
+          exit_code: 0
+```
+#### When
+```shell
+${atago} run stdout_cause.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `Stdout:`, `wrote 0 of 3 files`
 ### Scenario: a parse error exits with code two
 #### Given
 - Fixture file `broken.atago.yaml` is created.
