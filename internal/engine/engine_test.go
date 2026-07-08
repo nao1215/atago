@@ -229,6 +229,51 @@ scenarios:
 	}
 }
 
+// TestEngine_UnsetEnvRefErrorsUnderShell closes the shell:true gap in the
+// unresolved-reference guard: ${env:NAME} is atago-only syntax that NO shell
+// can expand — POSIX sh dies with a cryptic "Bad substitution", cmd.exe passes
+// the literal through — so an unset ${env:NAME} must error with the same
+// explained message as the shell-less path instead of falling through to the
+// shell. A bare unresolved ${name} stays exempt: a shell CAN expand that, and
+// the second scenario proves it still reaches the shell untouched.
+func TestEngine_UnsetEnvRefErrorsUnderShell(t *testing.T) {
+	t.Parallel()
+	res := runSpec(t, `
+version: "1"
+suite:
+  name: s
+scenarios:
+  - name: unset env ref errors even with a shell
+    steps:
+      - run: {shell: true, command: "echo [${env:ATAGO_TEST_DEFINITELY_UNSET}]"}
+`)
+	if res.Status != StatusError {
+		t.Fatalf("status = %s, want error (no shell can expand ${env:...}): %+v", res.Status, res.Scenarios)
+	}
+	if msg := res.Scenarios[0].Steps[0].ErrMsg; !strings.Contains(msg, "environment variable ATAGO_TEST_DEFINITELY_UNSET is not set") {
+		t.Errorf("ErrMsg = %q, want it to name the unset environment variable", msg)
+	}
+
+	if runtime.GOOS == "windows" {
+		return // the control below uses POSIX parameter expansion
+	}
+	res = runSpec(t, `
+version: "1"
+suite:
+  name: s
+scenarios:
+  - name: a bare unresolved ref is still left for the shell
+    steps:
+      - run: {shell: true, command: "echo ${ATAGO_UNDEFINED_SHELLVAR:-shell-fallback}"}
+      - assert:
+          exit_code: 0
+          stdout: {contains: shell-fallback}
+`)
+	if res.Status != StatusPassed {
+		t.Fatalf("status = %s, want passed (bare ${name} must stay shell-expandable): %+v", res.Status, res.Scenarios)
+	}
+}
+
 // TestEngine_TeardownAlwaysRuns proves the teardown contract: teardown steps
 // run after a pass, after an assertion failure, and after an execution error;
 // they share the scenario store (a store-captured value flows into cleanup);

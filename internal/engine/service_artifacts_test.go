@@ -208,3 +208,106 @@ scenarios:
 		t.Errorf("green run should write no service log, got %+v", logs)
 	}
 }
+
+// TestEngine_MockRequestLogPreservedOnFailure closes the gap RequestLog's doc
+// comment promised away: it billed itself as "the durable artifact written next
+// to service logs when a scenario fails", but nothing ever called it — a failed
+// scenario preserved the service's stdout while discarding the requests the
+// mock observed, which is exactly the evidence (a typo'd path 404ing) the
+// artifact dir exists to keep. On failure each mock server with at least one
+// recorded request now writes its request log next to the service logs.
+func TestEngine_MockRequestLogPreservedOnFailure(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	res := runSpecWithArtifacts(t, "mock.atago.yaml", `
+version: "1"
+suite:
+  name: s
+runners:
+  api:
+    type: http
+    base_url: ${api.url}
+scenarios:
+  - name: the client hits a typo'd path
+    mock_servers:
+      - name: api
+        routes:
+          - method: GET
+            path: /v1/ping
+            status: 200
+            body: pong
+    steps:
+      - http:
+          runner: api
+          method: GET
+          path: /v1/pingg
+      - assert:
+          status: 200
+`, root)
+	if res.Status != StatusFailed {
+		t.Fatalf("status = %s, want failed: %+v", res.Status, res.Scenarios)
+	}
+	sl := serviceLog(t, res, "api (mock requests)")
+	data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(sl.Path)))
+	if err != nil {
+		t.Fatalf("read mock request log: %v", err)
+	}
+	if !strings.Contains(string(data), "GET /v1/pingg -> 404") {
+		t.Errorf("mock request log = %q, want the 404'd typo'd request", data)
+	}
+}
+
+// TestEngine_MockRequestLogSkippedWhenGreenOrSilent pins the two no-artifact
+// cases: a passing scenario writes nothing (failure-gated like service logs),
+// and a failing scenario whose mock recorded no request writes no empty file.
+func TestEngine_MockRequestLogSkippedWhenGreenOrSilent(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	res := runSpecWithArtifacts(t, "mock.atago.yaml", `
+version: "1"
+suite:
+  name: s
+runners:
+  api:
+    type: http
+    base_url: ${api.url}
+scenarios:
+  - name: green round trip
+    mock_servers:
+      - name: api
+        routes:
+          - method: GET
+            path: /v1/ping
+            status: 200
+            body: pong
+    steps:
+      - http:
+          runner: api
+          method: GET
+          path: /v1/ping
+      - assert:
+          status: 200
+  - name: failing but the mock saw nothing
+    mock_servers:
+      - name: quiet
+        routes:
+          - method: GET
+            path: /v1/ping
+            status: 200
+            body: pong
+    steps:
+      - run: {shell: true, command: "exit 7"}
+      - assert:
+          exit_code: 0
+`, root)
+	if res.Scenarios[0].Status != StatusPassed || res.Scenarios[1].Status != StatusFailed {
+		t.Fatalf("statuses = %s/%s, want passed/failed", res.Scenarios[0].Status, res.Scenarios[1].Status)
+	}
+	for i := range res.Scenarios {
+		for _, sl := range res.Scenarios[i].ServiceLogs {
+			if strings.Contains(sl.Name, "mock requests") {
+				t.Errorf("scenario %d unexpectedly recorded a mock request log: %+v", i, sl)
+			}
+		}
+	}
+}

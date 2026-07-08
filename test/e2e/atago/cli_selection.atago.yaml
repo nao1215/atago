@@ -111,13 +111,46 @@ scenarios:
             contains: '"alpha"'
             not_contains: '"gamma"'
 
-  - name: a filter that matches nothing selects an empty set and still exits zero
+  - name: an empty filter selection fails under --ci with a substring hint
     steps:
       - fixture: {file: inner.atago.yaml, content: *inner}
+      # Under --ci an empty selection is a hard config error (exit 3): a typo'd
+      # --filter must not silently disable the whole suite. The json report still
+      # renders (0 selected), but the exit code and stderr flag the mistake.
       - run: {command: "${atago} run --ci --report json --filter no_such_name inner.atago.yaml"}
+      - assert:
+          exit_code: 3
+          stdout:
+            json:
+              - path: "$.suites[0].scenarios"
+                length: 0
+      - assert:
+          stderr:
+            contains: ['no scenarios matched', '--filter "no_such_name"', 'case-sensitive substring']
+
+  - name: an empty tag selection fails under --ci and names the exact-tag rule
+    steps:
+      - fixture: {file: inner.atago.yaml, content: *inner}
+      # Tags match EXACTLY, so the note must say so and point at `atago list`,
+      # never repeat the --filter substring wording.
+      - run: {command: "${atago} run --ci --report json --tag no_such_tag inner.atago.yaml"}
+      - assert:
+          exit_code: 3
+      - assert:
+          stderr:
+            contains: ['no scenarios matched', '--tag "no_such_tag"', 'match tags exactly', 'atago list']
+            not_contains: 'case-sensitive substring'
+
+  - name: without --ci an empty selection only warns and still exits zero
+    steps:
+      - fixture: {file: inner.atago.yaml, content: *inner}
+      - run: {command: "${atago} run --report json --filter no_such_name inner.atago.yaml"}
       - assert:
           exit_code: 0
           stdout:
             json:
               - path: "$.suites[0].scenarios"
                 length: 0
+      - assert:
+          stderr:
+            contains: 'warning: no scenarios matched'
