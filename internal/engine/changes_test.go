@@ -126,26 +126,28 @@ scenarios:
 
 // TestEngine_Changes_RetryReflectsLastAttempt is the regression for #251: a
 // `changes:` assert after a retried run step must pin the delta of the final
-// (converged) attempt, not the cumulative delta of every attempt. Each attempt
-// here creates its own attempt-N file and the until gate accepts once two prior
-// attempts exist; before the fix the delta spanned attempt-0..attempt-2, so an
-// author asking for the converged net effect (attempt-2 only) saw a spurious
-// "unexpected created file attempt-0/attempt-1" failure.
+// (converged) attempt, not the cumulative delta of every attempt. Here attempt
+// 1 creates a and b but exits 1 (c does not exist yet); attempt 2 finds b
+// present, creates c, and passes. Before the fix the baseline was scanned once
+// before attempt 1, so the delta spanned a, b, and c and an author asking for
+// the converged net effect (c only) saw a spurious "unexpected created file
+// a/b" failure. With the fix the baseline is re-taken before attempt 2, so a
+// and b are inputs and only c is reported.
 func TestEngine_Changes_RetryReflectsLastAttempt(t *testing.T) {
 	t.Parallel()
 	if runtime.GOOS == "windows" {
-		t.Skip("uses a POSIX shell counter to make each retry attempt write its own file")
+		t.Skip("uses POSIX shell test/touch to make each retry attempt write its own file")
 	}
 	res := runSpec(t, `
 version: "1"
 suite:
   name: retry-delta
 scenarios:
-  - name: each attempt writes its own file
+  - name: converged attempt delta
     steps:
       - run:
           shell: true
-          command: "n=$(ls attempt-* 2>/dev/null | wc -l); touch attempt-$n; test $n -ge 2"
+          command: 'touch a; [ -f b ] && touch c; touch b; [ -f c ]'
           retry:
             times: 5
             interval: 5ms
@@ -155,7 +157,9 @@ scenarios:
           exit_code: 0
           changes:
             created:
-              - attempt-2
+              - c
+            modified: []
+            deleted: []
 `)
 	if res.Status != StatusPassed {
 		t.Fatalf("status = %s, want passed (changes must reflect the converged last attempt, not the cumulative delta): %+v", res.Status, res.Scenarios[0].Steps)
