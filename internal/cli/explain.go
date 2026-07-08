@@ -43,7 +43,7 @@ func explainCmd(args []string, stdout, stderr io.Writer) int {
 		return ExitConfig
 	}
 	if len(paths) == 0 {
-		fmt.Fprintln(stderr, "atago explain: no *.atago.yaml files found")
+		fmt.Fprintln(stderr, "atago explain: no *.atago.yaml (or *.atago.yml) files found")
 		return ExitConfig
 	}
 

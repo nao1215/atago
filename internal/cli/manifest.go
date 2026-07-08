@@ -47,7 +47,7 @@ func manifestCmd(args []string, stdout, stderr io.Writer) int {
 		return ExitConfig
 	}
 	if len(paths) == 0 {
-		fmt.Fprintln(stderr, "atago manifest: no *.atago.yaml files found")
+		fmt.Fprintln(stderr, "atago manifest: no *.atago.yaml (or *.atago.yml) files found")
 		return ExitConfig
 	}
 

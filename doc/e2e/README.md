@@ -15,69 +15,11 @@ atago doc --out doc/e2e/<tool>.md ./test/e2e/tools/<tool>
 
 - [atago.md](atago.md) — atago tested by itself (`test/e2e/atago`).
 
-## Programs nobody here wrote (`test/e2e/thirdparty`)
+## The full index
 
-- [git.md](git.md) — plain `git`. Runs in CI on Linux/macOS/Windows to show
-  that testing an arbitrary third-party CLI needs no test code, no build step,
-  and no per-OS spec variants.
-- [caddy.md](caddy.md) — the Caddy web server (awesome-selfhosted): CLI
-  behavior plus the real daemon started as a background service — including a
-  config-driven boot from an authored Caddyfile — and queried over HTTP.
-- [pushgateway.md](pushgateway.md) — Prometheus Pushgateway
-  (awesome-selfhosted): pushes raw text-exposition payloads with the http
-  step's `body:` and asserts on the scrape output.
-- [webhook.md](webhook.md) — adnanh/webhook (awesome-selfhosted): a JSON POST
-  triggers a configured command whose output flows back into the response.
-- [gitea.md](gitea.md) — Gitea (awesome-selfhosted): the real server booted
-  from an authored app.ini with SQLite, administered via its CLI, driven over
-  the REST API (repos, file commits, issues), and cloned with real git.
-- [minio.md](minio.md) — MinIO (awesome-selfhosted): the S3-compatible server
-  as a background service, health endpoints, a full object lifecycle through
-  `mc`, versioning, and anonymous bucket policies.
-- [prometheus.md](prometheus.md) — Prometheus (awesome-selfhosted): promtool
-  config validation and rule unit tests, the query API as JSON, and a
-  self-scrape polled with http `retry` until the sample is ingested.
-- [rclone.md](rclone.md) — rclone (awesome-selfhosted): copy/sync semantics,
-  integrity checks and their failure mode, machine-readable listings, the
-  obscure/reveal round-trip, and `rclone serve http` queried over HTTP.
-- [restic.md](restic.md) — restic (awesome-selfhosted): a full backup
-  lifecycle — init, backup, JSON snapshot listing, restore, diff, integrity
-  check, retention, and the wrong-password failure mode.
-- [coredns.md](coredns.md) — CoreDNS (awesome-selfhosted): an authored zone
-  served over real DNS and queried with `dig` — authoritative answers, CNAME
-  chasing, NXDOMAIN/REFUSED rcodes — plus the health plugin over HTTP.
-- [nats.md](nats.md) — NATS (awesome-selfhosted): request/reply through the
-  real broker (a second client process answers), JetStream persistence and
-  purge, the KV store, and the monitoring endpoint as JSON.
-- [mailpit.md](mailpit.md) — Mailpit (awesome-selfhosted): real SMTP delivery
-  with the stock curl client, then REST-API assertions — capture, full-text
-  search, MIME attachments, and mailbox teardown.
-- [ntfy.md](ntfy.md) — ntfy (awesome-selfhosted): pub/sub push notifications
-  over HTTP — header-based publishing, the JSON poll feed, topic isolation,
-  and deny-all access control unlocked through the admin CLI.
-- [transfersh.md](transfersh.md) — transfer.sh (awesome-selfhosted): binary
-  upload as the raw request body (`body_file`), share-URL capture, download
-  back to disk (`body_to`), byte-for-byte verification, multipart uploads.
-- [gotify.md](gotify.md) — Gotify (awesome-selfhosted): app provisioning,
-  token-authenticated pushes, and the app icon round-tripped through a real
-  multipart/form-data upload (`files:`) and an image assertion.
-- [grafana.md](grafana.md) — Grafana (awesome-selfhosted): health/build info,
-  the login redirect asserted with `follow_redirects: false`, and a dashboard
-  + datasource lifecycle over the REST API.
-
-## Real CLIs exercised by atago (dogfood)
-
-atago is dogfooded against real nao1215 CLIs. The specs are ports of each
-project's ShellSpec suite (or, for a tool that had none, its first end-to-end
-suite), rebuilt as declarative atago YAML.
-
-| Tool | Docs | What it is |
-|------|------|------------|
-| [gup](https://github.com/nao1215/gup) | [gup.md](gup.md) | Updates and manages the Go command-line tools in `$GOBIN`. |
-| [sqly](https://github.com/nao1215/sqly) | [sqly.md](sqly.md) | Runs SQL against CSV/TSV/LTSV/JSON/Parquet/Excel/ACH/Fedwire files via an in-memory SQLite. |
-| [truss](https://github.com/nao1215/truss) | [truss.md](truss.md) | Image transformation tool (convert/resize/re-encode) with a shared Rust core. |
-| [iso8583tool](https://github.com/nao1215/iso8583tool) | [iso8583tool.md](iso8583tool.md) | Debugs and inspects ISO 8583 payment messages. |
-| [jose](https://github.com/nao1215/jose) | [jose.md](jose.md) | Signs and encrypts with JSON Object Signing and Encryption (JOSE). |
-| [career](https://github.com/nao1215/career) | [career.md](career.md) | Renders résumé PDFs from a single YAML file. |
-| [mimixbox](https://github.com/nao1215/mimixbox) | [mimixbox.md](mimixbox.md) | Packs many Unix commands into one BusyBox-style multi-call binary. |
-| [mobilepkg](https://github.com/nao1215/mobilepkg) | [mobilepkg.md](mobilepkg.md) | Inspects Android packages (APK/XAPK/APKS/AAB) for metadata and security findings. |
+Every generated doc in this directory — atago's own specs, each dogfooded
+nao1215 CLI under `test/e2e/tools`, and each third-party program under
+`test/e2e/thirdparty` — is listed with a one-line description in the complete,
+drift-guarded index at [../real-world.md](../real-world.md). That table is kept
+in sync by `TestDocs_RealWorldIndexCoversEverySuite`, so it never falls behind
+the suites on disk the way a second hand-maintained list here would.
