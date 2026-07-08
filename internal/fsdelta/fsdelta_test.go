@@ -248,6 +248,46 @@ func TestScan_EmptyFileAndTruncation(t *testing.T) {
 	}
 }
 
+// TestScan_UnreadableFileStillTracked proves a created regular file that cannot
+// be read (mode 000) is not silently dropped: it is recorded so `created: []`
+// cannot pass for a step that planted an unreadable file, and its deletion is
+// reported too. An unreadable file present in both snapshots is unchanged.
+func TestScan_UnreadableFileStillTracked(t *testing.T) {
+	t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix file modes; chmod 000 does not deny reads the same way on Windows")
+	}
+	if os.Geteuid() == 0 {
+		t.Skip("root bypasses mode 000 read permission")
+	}
+	root := t.TempDir()
+	pre, err := Scan(root)
+	if err != nil {
+		t.Fatalf("pre scan: %v", err)
+	}
+	locked := filepath.Join(root, "locked.txt")
+	if err := os.WriteFile(locked, []byte("secret"), 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(locked, 0o600) })
+	post, err := Scan(root)
+	if err != nil {
+		t.Fatalf("post scan: %v", err)
+	}
+	got := Diff(pre, post)
+	if want := []string{"locked.txt"}; !reflect.DeepEqual(got.Created, want) {
+		t.Errorf("created = %v, want %v (an unreadable created file must be reported)", got.Created, want)
+	}
+	// Deletion of an unreadable file is reported as the mirror.
+	if rev := Diff(post, pre); !reflect.DeepEqual(rev.Deleted, []string{"locked.txt"}) {
+		t.Errorf("deleted = %v, want [locked.txt]", rev.Deleted)
+	}
+	// Unreadable in both snapshots: unchanged, reported nowhere.
+	if stable := Diff(post, post); len(stable.Created)+len(stable.Modified)+len(stable.Deleted) != 0 {
+		t.Errorf("unreadable-in-both should be unchanged, got %+v", stable)
+	}
+}
+
 // TestDiff_FileReplacedByDirectoryAndReverse covers a name changing kind: a file
 // replaced by a directory of the same name deletes the file and creates the
 // directory's contents, and the reverse deletes the contents and creates the
