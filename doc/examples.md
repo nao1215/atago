@@ -61,6 +61,13 @@
 | [Check a gRPC dependency after the CLI acts](cookbook.md#check-a-grpc-dependency-after-the-cli-acts) | `grpc:` step, `grpc_status`/`message` asserts |
 | [Verify a generated page in a real browser](cookbook.md#verify-a-generated-page-in-a-real-browser) | `cdp:` actions + `value:` assert |
 | [Lay out specs for a growing suite](cookbook.md#lay-out-specs-for-a-growing-suite) | directory layout, tags, `atago doc`/`list` |
+| [Prove a dry run changes nothing](cookbook.md#prove-a-dry-run-changes-nothing) | all-empty `changes:` delta |
+| [Test config precedence](cookbook.md#test-config-precedence) | flag > env > file, hermetic `clear_env` rungs |
+| [Abort a destructive command at its confirmation prompt](cookbook.md#abort-a-destructive-command-at-its-confirmation-prompt) | `pty:` "no" branch + empty `changes:` |
+| [Prove color output turns off](cookbook.md#prove-color-output-turns-off) | `not_matches:` on ANSI escapes, `NO_COLOR` |
+| [Assert a generated script is executable](cookbook.md#assert-a-generated-script-is-executable) | `file:` `executable:` + `contains:` |
+| [Hunt down a flaky scenario](cookbook.md#hunt-down-a-flaky-scenario) | `--repeat`, `--retry-failed` (flaky is reported), `atago rerun` |
+| [Troubleshooting](cookbook.md#troubleshooting) | the failures every new spec hits once, and the fix for each |
 
 ## By feature
 
