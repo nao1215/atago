@@ -57,12 +57,13 @@ func Scan(root string) (Snapshot, error) {
 		sum, herr := hashFile(path)
 		if herr != nil {
 			if os.IsNotExist(herr) {
-				return nil //nolint:nilerr // raced away between walk and open; genuinely absent
+				// Raced away between walk and open; genuinely absent, so skip it.
+				return nil
 			}
 			// Exists but unreadable (e.g. mode 000): record a sentinel rather than
 			// dropping it, so a created/deleted unreadable file is still reported.
 			snap[filepath.ToSlash(rel)] = unreadableSentinel
-			return nil //nolint:nilerr
+			return nil
 		}
 		snap[filepath.ToSlash(rel)] = sum
 		return nil

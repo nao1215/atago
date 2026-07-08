@@ -28,7 +28,7 @@ func FuzzChangesGlob(f *testing.F) {
 	f.Add("a\\", "a\\")
 	f.Add(`\0*`, "0")
 	f.Fuzz(func(t *testing.T, pat, path string) {
-		_ = matchesAny([]string{pat}, path)       // must not panic
+		_ = matchesAny([]string{pat}, path)        // must not panic
 		_ = patternMatchesAny(pat, []string{path}) // must not panic
 		_ = globMetaNote(pat)                      // must not panic
 

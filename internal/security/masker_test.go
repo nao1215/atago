@@ -343,7 +343,6 @@ scenarios:
 		},
 	}
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			spc, err := loader.LoadBytes("t.atago.yaml", []byte(tc.src))
