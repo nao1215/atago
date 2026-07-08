@@ -480,25 +480,13 @@ func TestCookbook_SnippetsValid(t *testing.T) {
 	}
 }
 
-// githubAnchor mirrors how GitHub derives an anchor id from a heading:
-// lowercase, punctuation dropped, spaces to hyphens.
-func githubAnchor(heading string) string {
-	var b strings.Builder
-	for _, r := range strings.ToLower(heading) {
-		switch {
-		case r >= 'a' && r <= 'z', r >= '0' && r <= '9', r == '-':
-			b.WriteRune(r)
-		case r == ' ':
-			b.WriteRune('-')
-		}
-	}
-	return b.String()
-}
-
-// TestExamplesIndex_InLockstep keeps doc/examples.md honest: its by-feature
-// table must link every spec under examples/ (the table moved out of the
-// README, where nothing guarded it), and every cookbook.md#anchor in its
-// by-task table must resolve to a real doc/cookbook.md heading.
+// TestExamplesIndex_InLockstep keeps doc/examples.md honest in both
+// directions: its by-feature table must link every spec under examples/ (the
+// table moved out of the README, where nothing guarded it), every
+// cookbook.md#anchor in its by-task table must resolve to a real
+// doc/cookbook.md heading, and every cookbook heading must be indexed. The
+// anchors come from docgen's slugger — the one authority on how a heading
+// becomes an anchor — so the guard cannot drift from the generated docs.
 func TestExamplesIndex_InLockstep(t *testing.T) {
 	t.Parallel()
 	index := readDoc(t, "doc/examples.md")
@@ -507,11 +495,18 @@ func TestExamplesIndex_InLockstep(t *testing.T) {
 			t.Errorf("doc/examples.md by-feature table does not link %s", path)
 		}
 	}
-	anchors := map[string]bool{}
+	var headings []string
 	for _, m := range regexp.MustCompile(`(?m)^## (.+)$`).FindAllStringSubmatch(readDoc(t, "doc/cookbook.md"), -1) {
-		anchors[githubAnchor(m[1])] = true
+		headings = append(headings, m[1])
 	}
-	for _, m := range regexp.MustCompile(`\(cookbook\.md#([a-z0-9-]+)\)`).FindAllStringSubmatch(index, -1) {
+	anchors := map[string]bool{}
+	for i, anchor := range docgen.Anchors(headings) {
+		anchors[anchor] = true
+		if !strings.Contains(index, "(cookbook.md#"+anchor+")") {
+			t.Errorf("doc/cookbook.md heading %q is not indexed in doc/examples.md (expected a cookbook.md#%s link)", headings[i], anchor)
+		}
+	}
+	for _, m := range regexp.MustCompile(`\(cookbook\.md#([^)]+)\)`).FindAllStringSubmatch(index, -1) {
 		if !anchors[m[1]] {
 			t.Errorf("doc/examples.md links cookbook.md#%s, which matches no doc/cookbook.md heading", m[1])
 		}
