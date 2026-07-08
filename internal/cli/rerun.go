@@ -3,6 +3,7 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -242,4 +243,82 @@ func collectFailures(results []*engine.SuiteResult) []failedEntry {
 		}
 	}
 	return failed
+}
+
+// applyRerunSelection narrows a --rerun-failed run to the scenarios the ledger
+// recorded as failing: it absolutizes the recorded spec paths AND the run
+// targets so a spec matches regardless of how its path is spelled between the
+// recording run and the rerun (relative vs absolute) — without this, a rerun
+// addressed by an equivalent-but-different spelling finds "nothing" and
+// silently greenlights while the failures are still real. It intersects the
+// recorded spec paths with the collected targets so the usual path semantics
+// still apply, and installs an identity selector so only the recorded
+// scenarios execute. done reports that the run should end immediately with
+// exitNow: an unreadable ledger is a config error, and nothing-to-rerun is
+// reported and treated as success.
+func applyRerunSelection(label string, stderr io.Writer, paths []string, eng *engine.Engine) (narrowed []string, exitNow int, done bool) {
+	state, lerr := loadRerunState()
+	if lerr != nil {
+		fmt.Fprintf(stderr, label+": cannot read %s: %v\n", rerunStatePath(), lerr)
+		return nil, ExitConfig, true
+	}
+	for i := range state.Failed {
+		state.Failed[i].SpecPath = absClean(state.Failed[i].SpecPath)
+	}
+	for i := range paths {
+		paths[i] = absClean(paths[i])
+	}
+	sel := state.selectSet()
+	if len(sel) == 0 {
+		fmt.Fprintln(stderr, label+": no previously failed scenarios recorded; nothing to rerun")
+		return nil, ExitOK, true
+	}
+	paths = intersectPaths(paths, state.specPaths())
+	if len(paths) == 0 {
+		fmt.Fprintln(stderr, label+": no previously failed scenarios under the given targets")
+		return nil, ExitOK, true
+	}
+	eng.Select = sel
+	return paths, 0, false
+}
+
+// updateRerunLedger persists the last-failed ledger after a run. The ledger
+// reflects what this run decided about the scenarios it EXECUTED — a failure is
+// recorded, a pass is cleared — while PRESERVING every recorded failure the run
+// did not execute. A run that touches only a subset of scenarios (a narrowed
+// --rerun-failed, a --filter/--tag/--skip-tag selection, or simply running a
+// different or smaller set of specs) must not drop still-failing work elsewhere:
+// overwriting the ledger with only what ran would forget it and could greenlight
+// a later --rerun-failed while real failures remain. So a fully-green run of the
+// SAME specs clears the file, but a green run of an unrelated spec keeps the
+// other spec's recorded failures. Entries are stored with portable
+// (cwd-relative) spec paths so the ledger survives a project move — a
+// --rerun-failed absolutizes paths in memory to match across spellings, and
+// persisting that absolute form would break the next rerun after the directory
+// moves. Writing is best-effort — a read-only checkout must not fail the run —
+// so a write error is a warning, not a fatal exit; an UNREADABLE ledger is
+// never overwritten, so recorded failures a newer atago wrote survive a plain
+// run by an older one.
+func updateRerunLedger(label string, stderr io.Writer, results []*engine.SuiteResult, ranScenarios int) {
+	prior, perr := loadRerunState()
+	if perr != nil {
+		fmt.Fprintf(stderr, label+": cannot read %s; leaving it untouched: %v\n", rerunStatePath(), perr)
+		return
+	}
+	executed := make(map[string]bool, ranScenarios)
+	for _, r := range results {
+		for _, sc := range r.Scenarios {
+			executed[canonicalScenarioID(r.SpecPath, sc.Name)] = true
+		}
+	}
+	var preserved []failedEntry
+	for _, e := range prior.Failed {
+		if !executed[canonicalScenarioID(e.SpecPath, e.Scenario)] {
+			preserved = append(preserved, e)
+		}
+	}
+	entries := dedupeEntries(portableEntries(append(collectFailures(results), preserved...)))
+	if err := saveRerunState(entries); err != nil {
+		fmt.Fprintf(stderr, label+": could not update %s: %v\n", rerunStatePath(), err)
+	}
 }

@@ -124,39 +124,14 @@ func runCmd(label string, args []string, stdout, stderr io.Writer) int {
 	}
 
 	// --rerun-failed restricts this run to the scenarios recorded as failing on
-	// the previous run (#64). It intersects the recorded spec paths with the
-	// collected targets so the usual path semantics still apply, and installs an
-	// identity selector so only the recorded scenarios execute. With nothing
-	// recorded there is nothing to rerun, which is reported and treated as success.
-	//
+	// the previous run (#64); the selection and canonicalization invariants live
+	// with the ledger primitives in rerun.go.
 	if *rerunFailed {
-		state, lerr := loadRerunState()
-		if lerr != nil {
-			fmt.Fprintf(stderr, label+": cannot read %s: %v\n", rerunStatePath(), lerr)
-			return ExitConfig
+		narrowed, exitNow, done := applyRerunSelection(label, stderr, paths, eng)
+		if done {
+			return exitNow
 		}
-		// Absolutize the recorded spec paths and the run targets so a spec matches
-		// regardless of how its path is spelled between the recording run and the
-		// rerun (relative vs absolute). Without this, a rerun addressed by an
-		// equivalent-but-different spelling finds "nothing" and silently greenlights
-		// while the failures are still real.
-		for i := range state.Failed {
-			state.Failed[i].SpecPath = absClean(state.Failed[i].SpecPath)
-		}
-		for i := range paths {
-			paths[i] = absClean(paths[i])
-		}
-		sel := state.selectSet()
-		if len(sel) == 0 {
-			fmt.Fprintln(stderr, label+": no previously failed scenarios recorded; nothing to rerun")
-			return ExitOK
-		}
-		paths = intersectPaths(paths, state.specPaths())
-		if len(paths) == 0 {
-			fmt.Fprintln(stderr, label+": no previously failed scenarios under the given targets")
-			return ExitOK
-		}
-		eng.Select = sel
+		paths = narrowed
 	}
 
 	// In console mode, stream a live dot per scenario as it finishes, so a run
@@ -238,49 +213,13 @@ func runCmd(label string, args []string, stdout, stderr io.Writer) int {
 		exit = worseExit(exit, ExitConfig)
 	}
 
-	// Update the last-failed ledger for a later `--rerun-failed` (#64). The ledger
-	// reflects what this run decided about the scenarios it EXECUTED — a failure is
-	// recorded, a pass is cleared — while PRESERVING every recorded failure the run
-	// did not execute. A run that touches only a subset of scenarios (a narrowed
-	// --rerun-failed, a --filter/--tag/--skip-tag selection, or simply running a
-	// different or smaller set of specs) must not drop still-failing work elsewhere:
-	// overwriting the ledger with only what ran would forget it and could greenlight
-	// a later --rerun-failed while real failures remain. So a fully-green run of the
-	// SAME specs clears the file, but a green run of an unrelated spec keeps the
-	// other spec's recorded failures. The ledger is left untouched when no suite
-	// loaded (prior state stays intact) and when a --rerun-failed matched nothing
-	// (its unmapped failures must survive). Writing is best-effort — a read-only
-	// checkout must not fail the run — so a write error is a warning, not a fatal
-	// exit.
+	// Update the last-failed ledger for a later `--rerun-failed` (#64); the
+	// preservation invariants live with the ledger primitives in rerun.go. The
+	// ledger is left untouched when no suite loaded (prior state stays intact)
+	// and when a --rerun-failed matched nothing (its unmapped failures must
+	// survive).
 	if len(results) > 0 && !rerunMatchedNothing {
-		prior, perr := loadRerunState()
-		if perr != nil {
-			// A corrupt or future-version ledger: do not overwrite it and destroy
-			// recorded failures we cannot read. (--rerun-failed already exited above on
-			// this same error, so this only guards a plain run.)
-			fmt.Fprintf(stderr, label+": cannot read %s; leaving it untouched: %v\n", rerunStatePath(), perr)
-		} else {
-			executed := make(map[string]bool, ranScenarios)
-			for _, r := range results {
-				for _, sc := range r.Scenarios {
-					executed[canonicalScenarioID(r.SpecPath, sc.Name)] = true
-				}
-			}
-			var preserved []failedEntry
-			for _, e := range prior.Failed {
-				if !executed[canonicalScenarioID(e.SpecPath, e.Scenario)] {
-					preserved = append(preserved, e)
-				}
-			}
-			// Store portable (cwd-relative) spec paths so the ledger survives a project
-			// move. A --rerun-failed absolutizes paths in memory to match across
-			// spellings; persisting that absolute form would break the next rerun after
-			// the directory moves.
-			entries := dedupeEntries(portableEntries(append(collectFailures(results), preserved...)))
-			if err := saveRerunState(entries); err != nil {
-				fmt.Fprintf(stderr, label+": could not update %s: %v\n", rerunStatePath(), err)
-			}
-		}
+		updateRerunLedger(label, stderr, results, ranScenarios)
 	}
 
 	// Every spec failed to load, or an interrupt skipped every suite before it

@@ -2,7 +2,6 @@ package loader
 
 import (
 	"encoding/base64"
-	"time"
 
 	"github.com/nao1215/atago/internal/spec"
 )
@@ -15,13 +14,7 @@ import (
 // only difference was those two additions).
 func validateRunStep(add func(string, ...any), where string, r *spec.Run, runners map[string]spec.Runner, full bool) {
 	validateRunnerRef(add, where, "run", r.Runner, runners)
-	if r.Timeout != "" {
-		if d, err := time.ParseDuration(r.Timeout); err != nil {
-			add("%s.run.timeout %q is not a valid duration (e.g. \"30s\")", where, r.Timeout)
-		} else if d < 0 {
-			add("%s.run.timeout must not be negative (got %q); a wall-clock bound is never below zero", where, r.Timeout)
-		}
-	}
+	nonNegativeDuration(add, where+".run.timeout", r.Timeout, "30s")
 	if r.Command == "" {
 		add("%s.run.command is required", where)
 	} else if full && !r.ShellEnabled() && !runnerIsSSH(r.Runner, runners) {
@@ -208,11 +201,7 @@ func validateRetry(add func(string, ...any), where string, r *spec.Retry) {
 	if r.Times < 1 {
 		add("%s.retry.times must be >= 1 (got %d)", where, r.Times)
 	}
-	if r.Interval != "" {
-		if _, err := time.ParseDuration(r.Interval); err != nil {
-			add("%s.retry.interval %q is not a valid duration", where, r.Interval)
-		}
-	}
+	nonNegativeDuration(add, where+".retry.interval", r.Interval, "500ms")
 	if r.Until == nil {
 		add("%s.retry.until is required", where)
 		return
