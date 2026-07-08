@@ -48,3 +48,8 @@ go.work.sum
 
 # `atago run --rerun-failed` state (records the previous run's failing scenarios)
 .atago/
+
+# Hugo build artifacts for the hosted website (`make website`)
+/website/public/
+/website/resources/
+/website/.hugo_build.lock

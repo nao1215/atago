@@ -1,0 +1,71 @@
+{{/* Build pages from docs committed in this repository (mounted under
+     assets/). The committed files stay the single source of truth; this
+     template only strips the H1 (the layout renders the title) and rewrites
+     repository-relative links to site pages or GitHub. */}}
+
+{{ $gh := "https://github.com/nao1215/atago/blob/main/" }}
+
+{{/* doc/cookbook.md -> /cookbook/ */}}
+{{ with resources.Get "doc/cookbook.md" }}
+  {{ $md := .Content }}
+  {{ $md = replaceRE `\A# Cookbook\n` "" $md }}
+  {{ $md = replaceRE `\]\(examples\.md(#[^)]*)?\)` "](/examples/$1)" $md }}
+  {{ $md = replaceRE `\]\(real-world\.md(#[^)]*)?\)` "](/real-world/$1)" $md }}
+  {{ $md = replaceRE `\]\(e2e/([A-Za-z0-9._-]+)\.md(#[^)]*)?\)` "](/real-world/$1/$2)" $md }}
+  {{ $md = replaceRE `\]\(\.\./` (printf "](%s" $gh) $md }}
+  {{ $.AddPage (dict
+      "path" "cookbook"
+      "title" "Cookbook"
+      "params" (dict "description" "Copyable atago specs for common jobs: converting files, driving prompts and TUIs, mocking HTTP APIs, pinning output trees, and more.")
+      "content" (dict "mediaType" "text/markdown" "value" $md)) }}
+{{ end }}
+
+{{/* doc/examples.md -> /examples/ */}}
+{{ with resources.Get "doc/examples.md" }}
+  {{ $md := .Content }}
+  {{ $md = replaceRE `\A# Examples\n` "" $md }}
+  {{ $md = replaceRE `\]\(cookbook\.md(#[^)]*)?\)` "](/cookbook/$1)" $md }}
+  {{ $md = replaceRE `\]\(real-world\.md(#[^)]*)?\)` "](/real-world/$1)" $md }}
+  {{ $md = replaceRE `\]\(e2e/([A-Za-z0-9._-]+)\.md(#[^)]*)?\)` "](/real-world/$1/$2)" $md }}
+  {{ $md = replaceRE `\]\(\.\./` (printf "](%s" $gh) $md }}
+  {{ $.AddPage (dict
+      "path" "examples"
+      "title" "Examples"
+      "params" (dict "description" "Every atago feature has a commented, runnable spec, tested in CI on Linux, macOS, and Windows — indexed by task and by feature.")
+      "content" (dict "mediaType" "text/markdown" "value" $md)) }}
+{{ end }}
+
+{{/* doc/real-world.md -> /real-world/ (section index) */}}
+{{ with resources.Get "doc/real-world.md" }}
+  {{ $md := .Content }}
+  {{ $md = replaceRE `\A# Real CLIs tested with atago\n` "" $md }}
+  {{ $md = replaceRE `\]\(e2e/([A-Za-z0-9._-]+)\.md(#[^)]*)?\)` "](/real-world/$1/$2)" $md }}
+  {{ $md = replaceRE `\]\(e2e/\)` "](/real-world/)" $md }}
+  {{ $md = replaceRE `\]\(\.\./` (printf "](%s" $gh) $md }}
+  {{ $.AddPage (dict
+      "path" "real-world"
+      "kind" "section"
+      "title" "Real CLIs tested with atago"
+      "params" (dict "description" "40+ real programs run their E2E suites on atago: git, jq, fzf, htop, redis, terraform, ffmpeg, and more — each with executable specs and generated behavior docs.")
+      "content" (dict "mediaType" "text/markdown" "value" $md)) }}
+{{ end }}
+
+{{/* doc/e2e/<tool>.md -> /real-world/<tool>/ */}}
+{{ range resources.Match "e2e/*.md" }}
+  {{ $name := path.BaseName .Name }}
+  {{ if ne $name "README" }}
+    {{ $md := .Content }}
+    {{ $md = replaceRE `\A# atago Behavior Specs\n` "" $md }}
+    {{ $md = replaceRE `\]\(\.\./real-world\.md(#[^)]*)?\)` "](/real-world/$1)" $md }}
+    {{ $md = replaceRE `\]\(([A-Za-z0-9._-]+)\.md(#[^)]*)?\)` "](/real-world/$1/$2)" $md }}
+    {{/* embedded images need the raw file, not the GitHub blob page */}}
+    {{ $md = replaceRE `!\[([^\]]*)\]\(\.\./\.\./` "![$1](https://raw.githubusercontent.com/nao1215/atago/main/" $md }}
+    {{ $md = replaceRE `\]\(\.\./\.\./` (printf "](%s" $gh) $md }}
+    {{ $md = replaceRE `\]\(\.\./` (printf "](%sdoc/" $gh) $md }}
+    {{ $.AddPage (dict
+        "path" (printf "real-world/%s" $name)
+        "title" $name
+        "params" (dict "description" (printf "Behavior docs for %s, generated from the executable atago specs that run in CI." $name))
+        "content" (dict "mediaType" "text/markdown" "value" $md)) }}
+  {{ end }}
+{{ end }}

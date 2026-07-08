@@ -7,6 +7,15 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- A hosted documentation website, https://nao1215.github.io/atago/, built
+  with Hugo from the committed docs (no content is duplicated: `doc/cookbook.md`,
+  `doc/examples.md`, `doc/real-world.md`, and the generated behavior docs under
+  `doc/e2e/` are mounted and turned into pages at build time). Deployed to
+  GitHub Pages by `.github/workflows/website.yml` on every push to `main` that
+  touches the docs; `make website` / `make website-serve` build it locally.
+
 ## [0.9.0] - 2026-07-08
 
 A second hardening release. Parallel bug hunters and Go-native fuzzing swept the

@@ -1,0 +1,91 @@
+# Configuration for the hosted documentation website (GitHub Pages).
+# Content comes from the repository itself: committed docs under doc/ are
+# mounted read-only and turned into pages by content/_content.gotmpl, so the
+# repository files stay the single source of truth.
+baseURL = "https://nao1215.github.io/atago/"
+locale = "en"
+title = "atago"
+disableKinds = ["taxonomy", "term", "rss"]
+enableRobotsTXT = true
+timeZone = "UTC"
+
+[params]
+tagline = "black-box E2E testing for CLIs, from plain YAML"
+description = "atago tests real CLI behavior from plain YAML: exit codes, output, generated files, snapshots, services, and interactive terminals (PTY/TUI)."
+
+[markup.highlight]
+noClasses = false
+
+[[menus.main]]
+name = "Install"
+pageRef = "/install"
+weight = 10
+
+[[menus.main]]
+name = "Getting started"
+pageRef = "/getting-started"
+weight = 20
+
+[[menus.main]]
+name = "Cookbook"
+pageRef = "/cookbook"
+weight = 30
+
+[[menus.main]]
+name = "Examples"
+pageRef = "/examples"
+weight = 40
+
+[[menus.main]]
+name = "CI"
+pageRef = "/ci"
+weight = 50
+
+[[menus.main]]
+name = "Reference"
+pageRef = "/reference"
+weight = 60
+
+[[menus.main]]
+name = "Real-world CLIs"
+pageRef = "/real-world"
+weight = 70
+
+[module]
+[[module.mounts]]
+source = "content"
+target = "content"
+
+[[module.mounts]]
+source = "layouts"
+target = "layouts"
+
+[[module.mounts]]
+source = "assets"
+target = "assets"
+
+# Repository docs, mounted so pages can be generated from the committed files.
+[[module.mounts]]
+source = "../doc/e2e"
+target = "assets/e2e"
+
+[[module.mounts]]
+source = "../doc/cookbook.md"
+target = "assets/doc/cookbook.md"
+
+[[module.mounts]]
+source = "../doc/examples.md"
+target = "assets/doc/examples.md"
+
+[[module.mounts]]
+source = "../doc/real-world.md"
+target = "assets/doc/real-world.md"
+
+# Images and deterministic sample artifacts served as-is.
+[[module.mounts]]
+source = "../doc/img"
+target = "static/img"
+
+[[module.mounts]]
+source = "../site/samples"
+target = "static/samples"
