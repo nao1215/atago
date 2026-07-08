@@ -5,24 +5,18 @@
 
 {{ $gh := "https://github.com/nao1215/atago/blob/main/" }}
 
-{{/* doc/cookbook.md -> /cookbook/ */}}
+{{/* doc/cookbook.md + doc/examples.md -> one /cookbook/ page: the by-task
+     index, the recipes, then the runnable per-feature example index. */}}
+{{ $cookbook := "" }}
 {{ with resources.Get "doc/cookbook.md" }}
   {{ $md := .Content }}
   {{ $md = replaceRE `\A# Cookbook\n` "" $md }}
-  {{ $md = replaceRE `\]\(examples\.md(#[^)]*)?\)` "](/examples/$1)" $md }}
+  {{ $md = replaceRE `\]\(examples\.md(#[^)]*)?\)` "](/cookbook/$1)" $md }}
   {{ $md = replaceRE `\]\(real-world\.md(#[^)]*)?\)` "](/real-world/$1)" $md }}
   {{ $md = replaceRE `\]\(e2e/([A-Za-z0-9._-]+)\.md(#[^)]*)?\)` "](/real-world/$1/$2)" $md }}
   {{ $md = replaceRE `\]\(\.\./` (printf "](%s" $gh) $md }}
-  {{ $.AddPage (dict
-      "path" "cookbook"
-      "title" "Cookbook"
-      "params" (dict
-        "description" "50+ copyable atago specs for common jobs: converting files, driving prompts and TUIs, simulating API failures, pinning output trees, and more."
-        "toc" true)
-      "content" (dict "mediaType" "text/markdown" "value" $md)) }}
+  {{ $cookbook = $md }}
 {{ end }}
-
-{{/* doc/examples.md -> /examples/ */}}
 {{ with resources.Get "doc/examples.md" }}
   {{ $md := .Content }}
   {{ $md = replaceRE `\A# Examples\n` "" $md }}
@@ -30,11 +24,23 @@
   {{ $md = replaceRE `\]\(real-world\.md(#[^)]*)?\)` "](/real-world/$1)" $md }}
   {{ $md = replaceRE `\]\(e2e/([A-Za-z0-9._-]+)\.md(#[^)]*)?\)` "](/real-world/$1/$2)" $md }}
   {{ $md = replaceRE `\]\(\.\./` (printf "](%s" $gh) $md }}
+  {{/* links to the pre-merge section anchors keep working on the merged page */}}
+  {{ $md = replace $md "#by-task)" "#find-a-recipe-by-task)" }}
+  {{ $md = replace $md "#by-feature)" "#every-feature-has-a-runnable-spec)" }}
+  {{ $merged := printf "%s\n%s" $md $cookbook }}
+  {{ $parts := split $md "## By feature" }}
+  {{ if eq (len $parts) 2 }}
+    {{ $byTask := replace (index $parts 0) "## By task" "## Find a recipe by task" }}
+    {{ $byFeature := printf "## Every feature has a runnable spec%s" (index $parts 1) }}
+    {{ $merged = printf "%s\n%s\n%s" $byTask $cookbook $byFeature }}
+  {{ end }}
   {{ $.AddPage (dict
-      "path" "examples"
-      "title" "Examples"
-      "params" (dict "description" "Every atago feature has a commented, runnable spec, tested in CI on Linux, macOS, and Windows — indexed by task and by feature.")
-      "content" (dict "mediaType" "text/markdown" "value" $md)) }}
+      "path" "cookbook"
+      "title" "Cookbook"
+      "params" (dict
+        "description" "50+ copyable atago specs indexed by task, plus the runnable, CI-tested example for every feature."
+        "toc" true)
+      "content" (dict "mediaType" "text/markdown" "value" $merged)) }}
 {{ end }}
 
 {{/* doc/real-world.md -> /real-world/ (section index) */}}
@@ -58,6 +64,10 @@
   {{ if ne $name "README" }}
     {{ $md := .Content }}
     {{ $md = replaceRE `\A# atago Behavior Specs\n` "" $md }}
+    {{/* Third-party programs did not ask for these tests — say so up front. */}}
+    {{ if strings.Contains $md "test/e2e/thirdparty" }}
+      {{ $md = printf "> The atago project wrote these specs on its own initiative and runs them in its own CI, to exercise atago against a real program. They are not %s's official test suite, and the %s project is not affiliated with atago.\n\n%s" $name $name $md }}
+    {{ end }}
     {{ $md = replaceRE `\]\(\.\./real-world\.md(#[^)]*)?\)` "](/real-world/$1)" $md }}
     {{ $md = replaceRE `\]\(([A-Za-z0-9._-]+)\.md(#[^)]*)?\)` "](/real-world/$1/$2)" $md }}
     {{/* embedded images need the raw file, not the GitHub blob page */}}

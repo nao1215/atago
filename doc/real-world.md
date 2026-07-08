@@ -2,6 +2,8 @@
 
 These real programs run their end-to-end suites on atago; most were migrated from ShellSpec. The generated behavior docs live in [doc/e2e/](e2e/).
 
+Every suite here was written by the atago project on its own initiative and runs in atago's own CI — the point is to exercise atago against real programs of every shape. The third-party projects listed below are not affiliated with atago, did not commission these tests, and these specs are not their official test suites.
+
 Programs maintained by the author, starting with atago itself ([test/e2e/tools/](../test/e2e/tools/)):
 
 | Tool | Feature | Specs | Docs |

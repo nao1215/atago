@@ -20,15 +20,6 @@ noClasses = false
 startLevel = 2
 endLevel = 3
 
-# /llms.txt: a plain-text index of every page, for LLM agents that fetch docs.
-[outputFormats.llms]
-mediaType = "text/plain"
-baseName = "llms"
-isPlainText = true
-
-[outputs]
-home = ["html", "llms"]
-
 [[menus.main]]
 name = "Install"
 pageRef = "/install"
@@ -45,11 +36,6 @@ pageRef = "/cookbook"
 weight = 30
 
 [[menus.main]]
-name = "Examples"
-pageRef = "/examples"
-weight = 40
-
-[[menus.main]]
 name = "CI"
 pageRef = "/ci"
 weight = 50
@@ -58,11 +44,6 @@ weight = 50
 name = "Reference"
 pageRef = "/reference"
 weight = 60
-
-[[menus.main]]
-name = "LLM"
-pageRef = "/llm"
-weight = 65
 
 [[menus.main]]
 name = "Real-world CLIs"
@@ -98,6 +79,10 @@ target = "assets/doc/examples.md"
 [[module.mounts]]
 source = "../doc/real-world.md"
 target = "assets/doc/real-world.md"
+
+[[module.mounts]]
+source = "../schema/atago.schema.json"
+target = "assets/schema/atago.schema.json"
 
 # Images and deterministic sample artifacts served as-is.
 [[module.mounts]]
