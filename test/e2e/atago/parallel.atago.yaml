@@ -47,3 +47,52 @@ scenarios:
           exit_code: 1
           stdout:
             contains: "1 skipped"
+
+  - name: scenario-scoped services stay isolated under parallel workers
+    # Each inner scenario owns a service and asserts ITS OWN service's captured
+    # value: a process-group mixup under concurrency (killing a sibling's
+    # service, swapping a store) flips an inner verdict and fails the outer
+    # exit-0 assert. The services are POSIX shell one-liners.
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: par-svc.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: par-svc
+            scenarios:
+              - name: one
+                services:
+                  - name: peer1
+                    shell: true
+                    command: 'echo token-1 > addr.txt; sleep 30'
+                    ready: {file: addr.txt, store: tok, timeout: 5s}
+                steps:
+                  - run: {shell: true, command: "echo got ${tok}"}
+                  - assert: {exit_code: 0, stdout: {contains: got token-1}}
+              - name: two
+                services:
+                  - name: peer2
+                    shell: true
+                    command: 'echo token-2 > addr.txt; sleep 30'
+                    ready: {file: addr.txt, store: tok, timeout: 5s}
+                steps:
+                  - run: {shell: true, command: "echo got ${tok}"}
+                  - assert: {exit_code: 0, stdout: {contains: got token-2}}
+              - name: three
+                services:
+                  - name: peer3
+                    shell: true
+                    command: 'echo token-3 > addr.txt; sleep 30'
+                    ready: {file: addr.txt, store: tok, timeout: 5s}
+                steps:
+                  - run: {shell: true, command: "echo got ${tok}"}
+                  - assert: {exit_code: 0, stdout: {contains: got token-3}}
+      - run:
+          command: ${atago} run --parallel 3 par-svc.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "3 passed"

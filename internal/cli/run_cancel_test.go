@@ -3,11 +3,15 @@
 package cli
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -214,5 +218,124 @@ func writeFile(t *testing.T, path, content string) {
 	t.Helper()
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// TestRunCmd_InterruptRunsTeardownAndReportsPartials pins the full Ctrl-C
+// promise from the README ("in-flight processes, services, and sessions are
+// torn down, partial results are reported, and the run exits 4") — previously
+// only "exits non-zero promptly" was verified, so a regression that skipped
+// teardown on interrupt (leaking servers in every user's aborted CI run) would
+// have passed the suite. The sentinel files land OUTSIDE the scenario workdir
+// (which atago removes) via an env-passed directory.
+func TestRunCmd_InterruptRunsTeardownAndReportsPartials(t *testing.T) {
+	if testing.Short() {
+		t.Skip("builds a binary; skipped in -short")
+	}
+
+	dir := t.TempDir()
+	sentinels := t.TempDir()
+	bin := filepath.Join(dir, "atago")
+	build := exec.CommandContext(context.Background(), "go", "build", "-o", bin, "github.com/nao1215/atago")
+	build.Env = os.Environ()
+	if out, err := build.CombinedOutput(); err != nil {
+		t.Fatalf("building atago: %v\n%s", err, out)
+	}
+
+	specPath := filepath.Join(dir, "slow.atago.yaml")
+	writeFile(t, specPath, `
+version: "1"
+suite:
+  name: cancel
+scenarios:
+  - name: slow with service and teardown
+    services:
+      - name: peer
+        shell: true
+        command: 'echo $$ > "${env:ATAGO_TEST_SENTINELS}/svc.pid"; echo service-armed; sleep 120'
+        ready:
+          log: service-armed
+          timeout: 5s
+    steps:
+      - run: {shell: true, command: "sleep 60"}
+    teardown:
+      - run: {shell: true, command: 'echo cleaned > "${env:ATAGO_TEST_SENTINELS}/teardown.txt"'}
+`)
+
+	cmd := exec.CommandContext(context.Background(), bin, "run", specPath)
+	cmd.Env = append(os.Environ(), "ATAGO_TEST_SENTINELS="+sentinels)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("starting atago: %v", err)
+	}
+
+	// Interrupt only after the service is up (its pid file exists) and the
+	// scenario has had a moment to reach the sleeping step.
+	pidFile := filepath.Join(sentinels, "svc.pid")
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		if fi, err := os.Stat(pidFile); err == nil && fi.Size() > 0 {
+			break
+		}
+		if time.Now().After(deadline) {
+			_ = cmd.Process.Kill()
+			t.Fatalf("service pid file never appeared; stderr=%s", stderr.String())
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	time.Sleep(300 * time.Millisecond)
+	if err := cmd.Process.Signal(os.Interrupt); err != nil {
+		t.Fatalf("sending SIGINT: %v", err)
+	}
+
+	done := make(chan error, 1)
+	go func() { done <- cmd.Wait() }()
+	var waitErr error
+	select {
+	case waitErr = <-done:
+	case <-time.After(15 * time.Second):
+		_ = cmd.Process.Kill()
+		t.Fatal("atago run did not exit within 15s of SIGINT")
+	}
+
+	// Exit code 4 (ExitExec), per the README's stable contract.
+	var exitErr *exec.ExitError
+	if !errors.As(waitErr, &exitErr) || exitErr.ExitCode() != 4 {
+		t.Errorf("exit = %v, want exit code 4 (ExitExec)\nstdout=%s\nstderr=%s", waitErr, stdout.String(), stderr.String())
+	}
+
+	// Teardown ran.
+	if _, err := os.Stat(filepath.Join(sentinels, "teardown.txt")); err != nil {
+		t.Errorf("teardown sentinel missing (%v): teardown did not run on interrupt\nstderr=%s", err, stderr.String())
+	}
+
+	// The service's process is gone (kill(pid, 0) fails once reaped).
+	pidBytes, err := os.ReadFile(pidFile)
+	if err != nil {
+		t.Fatalf("read pid file: %v", err)
+	}
+	pid, err := strconv.Atoi(strings.TrimSpace(string(pidBytes)))
+	if err != nil {
+		t.Fatalf("parse service pid %q: %v", pidBytes, err)
+	}
+	// The process may linger a beat while the group signal lands.
+	gone := false
+	for range 50 {
+		if syscall.Kill(pid, 0) != nil {
+			gone = true
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	if !gone {
+		t.Errorf("service pid %d still alive after atago exited: services were not torn down", pid)
+	}
+
+	// Partial results were reported: the summary tally line still renders.
+	if !strings.Contains(stdout.String(), "scenario") {
+		t.Errorf("stdout = %q, want a partial report with the scenario tally", stdout.String())
 	}
 }

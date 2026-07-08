@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-74 suites · 383 scenarios
+74 suites · 384 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -259,9 +259,10 @@
   - [not_equals is trailing-newline tolerant like equals](#scenario-not_equals-is-trailing-newline-tolerant-like-equals)
   - [not_equals composes with a line selector](#scenario-not_equals-composes-with-a-line-selector)
   - [not_equals fails the inner spec when the text matches exactly](#scenario-not_equals-fails-the-inner-spec-when-the-text-matches-exactly)
-- [atago self-hosting / parallel](#atago-self-hosting--parallel) — 2 scenarios
+- [atago self-hosting / parallel](#atago-self-hosting--parallel) — 3 scenarios
   - [parallel run passes and stays deterministic](#scenario-parallel-run-passes-and-stays-deterministic)
   - [fail-fast stops after the first failure](#scenario-fail-fast-stops-after-the-first-failure)
+  - [scenario-scoped services stay isolated under parallel workers](#scenario-scenario-scoped-services-stay-isolated-under-parallel-workers)
 - [atago self-hosting / forward-slash spec paths resolve on every OS](#atago-self-hosting--forward-slash-spec-paths-resolve-on-every-os) — 7 scenarios
   - [stdout_to creates a nested parent directory](#scenario-stdout_to-creates-a-nested-parent-directory)
   - [stderr_to creates its own nested parent directory](#scenario-stderr_to-creates-its-own-nested-parent-directory)
@@ -4427,6 +4428,42 @@ ${atago} run --parallel 1 --fail-fast ff.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `1 skipped`
+### Scenario: scenario-scoped services stay isolated under parallel workers
+_skipped on Windows_
+#### Given
+- Fixture file `par-svc.atago.yaml` is created.
+#### Inputs
+_Fixture `par-svc.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: par-svc
+scenarios:
+  - name: one
+    services:
+      - name: peer1
+        shell: true
+        command: 'echo token-1 > addr.txt; sleep 30'
+        ready: {file: addr.txt, store: tok, timeout: 5s}
+    steps:
+      - run: {shell: true, command: "echo got ${tok}"}
+      - assert: {exit_code: 0, stdout: {contains: got token-1}}
+  - name: two
+    services:
+      - name: peer2
+        shell: true
+        command: 'echo token-2 > addr.txt; sleep 30'
+        ready: {file: addr.txt, store: tok, timeout: 5s}
+    steps:
+… (truncated, 11 more lines)
+```
+#### When
+```shell
+${atago} run --parallel 3 par-svc.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout contains `3 passed`
 ## atago self-hosting / forward-slash spec paths resolve on every OS
 Source: `test/e2e/atago/paths_portable.atago.yaml`
 ### Scenario: stdout_to creates a nested parent directory
