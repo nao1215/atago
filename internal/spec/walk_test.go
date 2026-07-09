@@ -247,8 +247,22 @@ func TestCollectStepVars_KnownFields(t *testing.T) {
 func TestCollectStepVars_RemainingKinds(t *testing.T) {
 	t.Parallel()
 
-	if got := collectStep(&Step{Service: &Service{Name: "s", Command: "echo ${scmd}", Cwd: "${scwd}"}}); !hasVar(got, "scmd") || !hasVar(got, "scwd") {
-		t.Errorf("service step vars = %v", got)
+	// A service STEP (a suite.setup `service:`) must collect the same fields as a
+	// scenario-level service — command, cwd, env values, AND ready.file/port/log —
+	// because CollectStepVars is what the manifest walks for suite.setup steps. It
+	// used to collect only command/cwd, under-reporting env/ready (#244).
+	svcStep := &Step{Service: &Service{
+		Name:    "s",
+		Command: "echo ${scmd}",
+		Cwd:     "${scwd}",
+		Env:     map[string]string{"DSN": "${senv}"},
+		Ready:   &Ready{File: "${sready_file}", Port: "${sready_port}", Log: "up ${sready_log}"},
+	}}
+	got := collectStep(svcStep)
+	for _, want := range []string{"scmd", "scwd", "senv", "sready_file", "sready_port", "sready_log"} {
+		if !hasVar(got, want) {
+			t.Errorf("service step field %q not collected; got %v", want, got)
+		}
 	}
 	if got := collectStep(&Step{Query: &Query{Runner: "d", SQL: "SELECT ${col}"}}); !hasVar(got, "col") {
 		t.Errorf("query step vars = %v", got)
@@ -275,7 +289,7 @@ func TestCollectStepVars_RemainingKinds(t *testing.T) {
 		{Upload: &CDPUpload{Selector: "${up_sel}", File: "${up_file}"}},
 		{Download: &CDPDownload{Click: "${dl_click}", Dir: "${dl_dir}"}},
 	}}}
-	got := collectStep(cdp)
+	got = collectStep(cdp)
 	for _, want := range []string{
 		"nav", "wv", "wh", "clk", "chk", "unchk", "txt", "evl",
 		"sk_sel", "sk_val", "pr_sel", "pr_key", "se_sel", "se_val",
