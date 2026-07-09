@@ -12,7 +12,7 @@
 ## redis (server + client, signal-step testbed)
 Source: `test/e2e/thirdparty/redis/redis.atago.yaml`
 ### Scenario: server boots (log readiness) and answers PING
-_only when `redis-server --version` succeeds · skipped on Windows_
+_only when `redis-server --version && redis-cli --version` succeeds · skipped on Windows_
 #### Given
 - Background service `redis` is started: `redis-server --port 16379 --save '' --appendonly no`.
 #### When
@@ -23,7 +23,7 @@ redis-cli -p 16379 PING
 - exit code is `0`
 - stdout equals an exact value
 ### Scenario: server boots (port readiness) and round-trips SET/GET/INCR
-_only when `redis-server --version` succeeds · skipped on Windows_
+_only when `redis-server --version && redis-cli --version` succeeds · skipped on Windows_
 #### Given
 - Background service `redis` is started: `redis-server --port 16380 --save '' --appendonly no`.
 #### When
@@ -47,7 +47,7 @@ redis-cli -p 16380 INCR counter
   - exit code is `0`
   - stdout equals an exact value
 ### Scenario: EXPIRE and TTL report lifetime state
-_only when `redis-server --version` succeeds · skipped on Windows_
+_only when `redis-server --version && redis-cli --version` succeeds · skipped on Windows_
 #### Given
 - Background service `redis` is started: `redis-server --port 16381 --save '' --appendonly no`.
 #### When
@@ -83,7 +83,7 @@ redis-cli -p 16999 PING
 - exit code is `1`
 - stderr contains `Connection refused`
 ### Scenario: an unknown command reports ERR without killing the server
-_only when `redis-server --version` succeeds · skipped on Windows_
+_only when `redis-server --version && redis-cli --version` succeeds · skipped on Windows_
 #### Given
 - Background service `redis` is started: `redis-server --port 16382 --save '' --appendonly no`.
 #### When
@@ -98,7 +98,7 @@ redis-cli -p 16382 PING
   - exit code is `0`
   - stdout equals an exact value
 ### Scenario: SHUTDOWN NOSAVE stops the server and PING starts failing
-_only when `redis-server --version` succeeds · skipped on Windows_
+_only when `redis-server --version && redis-cli --version` succeeds · skipped on Windows_
 #### Given
 - Background service `redis` is started: `redis-server --port 16383 --save '' --appendonly no`.
 #### When

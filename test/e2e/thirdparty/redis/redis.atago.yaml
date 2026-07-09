@@ -10,7 +10,12 @@ suite:
 # planned `signal:` step (#23) — until that lands, the shutdown scenario uses
 # SHUTDOWN NOSAVE plus a retry-polled PING as the declarative stand-in.
 # Every scenario probes for redis first so the suite skips cleanly where it
-# is absent; redis-server is POSIX-only, so the suite skips on Windows.
+# is absent; redis-server is POSIX-only, so the suite skips on Windows. Because
+# the two binaries ship in separate packages on some hosts (redis-server vs
+# redis-tools), each scenario that starts a server AND talks to it gates on BOTH
+# `redis-server` and `redis-cli` (a single shell probe joined with `&&`), so a
+# host with only one installed skips instead of failing on the missing binary
+# (#200). The client-only "connection refused" scenario gates on redis-cli alone.
 # Install with: apt-get install redis-server redis-tools / brew install redis
 #
 # Each scenario binds its own port: scenarios run in parallel and must not
@@ -18,7 +23,7 @@ suite:
 scenarios:
   - name: server boots (log readiness) and answers PING
     only:
-      command: redis-server --version
+      command: redis-server --version && redis-cli --version
     skip:
       os: windows
     services:
@@ -37,7 +42,7 @@ scenarios:
 
   - name: server boots (port readiness) and round-trips SET/GET/INCR
     only:
-      command: redis-server --version
+      command: redis-server --version && redis-cli --version
     skip:
       os: windows
     services:
@@ -75,7 +80,7 @@ scenarios:
 
   - name: EXPIRE and TTL report lifetime state
     only:
-      command: redis-server --version
+      command: redis-server --version && redis-cli --version
     skip:
       os: windows
     services:
@@ -133,7 +138,7 @@ scenarios:
 
   - name: an unknown command reports ERR without killing the server
     only:
-      command: redis-server --version
+      command: redis-server --version && redis-cli --version
     skip:
       os: windows
     services:
@@ -159,7 +164,7 @@ scenarios:
 
   - name: SHUTDOWN NOSAVE stops the server and PING starts failing
     only:
-      command: redis-server --version
+      command: redis-server --version && redis-cli --version
     skip:
       os: windows
     services:
