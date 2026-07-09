@@ -47,9 +47,13 @@
 {{- end }}
 <a href="https://github.com/nao1215/atago">GitHub</a>
 <a class="sponsor" href="https://github.com/sponsors/nao1215">&#9825; Sponsor</a>
+<div class="search">
+<input type="search" id="search-box" class="search-box" placeholder="Search…" aria-label="Search the documentation" autocomplete="off" data-pagefind-base="{{ relURL "" }}">
+<div id="search-ui" class="search-ui" hidden></div>
+</div>
 </nav>
 </header>
-<main id="main">
+<main id="main" data-pagefind-body>
 {{ block "main" . }}{{ end }}
 </main>
 <footer>
@@ -140,6 +144,47 @@
     });
   }
   input.addEventListener("input", apply);
+})();
+</script>
+<script>
+// Client-side search, lazy: the Pagefind UI (script, stylesheet, and the WASM
+// index chunks) is self-hosted under /pagefind/ and fetched only when the user
+// first focuses the search box, so it adds nothing to a normal page load. The
+// index is built in CI by the Pagefind pass in .github/workflows/website.yml;
+// on a local `make website` (no Pagefind) the assets are absent and the box
+// simply does nothing.
+(function () {
+  var box = document.getElementById("search-box");
+  var ui = document.getElementById("search-ui");
+  if (!box || !ui) return;
+  var base = box.getAttribute("data-pagefind-base") || "/";
+  var loaded = false;
+  function load() {
+    if (loaded) return;
+    loaded = true;
+    var css = document.createElement("link");
+    css.rel = "stylesheet";
+    css.href = base + "pagefind/pagefind-ui.css";
+    document.head.appendChild(css);
+    var s = document.createElement("script");
+    s.src = base + "pagefind/pagefind-ui.js";
+    s.onload = function () {
+      if (typeof PagefindUI === "undefined") return;
+      /* global PagefindUI */
+      new PagefindUI({ element: "#search-ui", showImages: false, showSubResults: true });
+      ui.hidden = false;
+      var real = ui.querySelector("input");
+      if (real) {
+        real.value = box.value;
+        real.focus();
+        real.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+      box.hidden = true;
+    };
+    s.onerror = function () { loaded = false; }; // let a later focus retry
+    document.body.appendChild(s);
+  }
+  box.addEventListener("focus", load);
 })();
 </script>
 </body>
