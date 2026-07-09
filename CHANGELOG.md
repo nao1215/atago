@@ -7,6 +7,15 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-07-09
+
+A minor release focused on manifest visibility, documentation discoverability,
+and safer shipping paths. `atago manifest` now reports suite lifecycle variable
+usage, the docs site is easier to search and browse, release automation now
+publishes a multi-arch container image, and several correctness fixes harden
+teardown security, unresolved-variable handling, snapshot updates, retry
+`changes:` accounting, and `atago run` finalization.
+
 ### Added
 
 - `atago manifest` now reports the suite lifecycle's variable references in a new
@@ -50,6 +59,9 @@ and this project follows [Semantic Versioning](https://semver.org/).
   a nav search box lazy-loads the search UI and WASM index only when focused, so
   the landing weight is unchanged. Every recipe and spec key becomes directly
   reachable across the cookbook, reference, and real-world pages (#236).
+- Release artifacts now include a multi-arch GHCR image for `linux/amd64` and
+  `linux/arm64`, published under both the release tag and `latest`, so
+  container users no longer depend on a single-architecture image path (#264).
 
 ### Fixed
 
@@ -84,6 +96,10 @@ and this project follows [Semantic Versioning](https://semver.org/).
   of every attempt: the baseline is re-captured before each attempt, so a
   command with a per-attempt side effect reports the net effect the `until` gate
   accepted (#251).
+- `atago run` no longer crashes or misreports when post-run finalization sees an
+  incomplete result shape. The shared finish path now tolerates partial result
+  payloads and still returns the best available status and diagnostics instead
+  of panicking late in CLI teardown (#265).
 
 ## [0.10.0] - 2026-07-09
 
