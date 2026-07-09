@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/nao1215/atago/internal/assertdesc"
 	"github.com/nao1215/atago/internal/spec"
 	"github.com/nao1215/markdown"
 )
@@ -19,6 +20,83 @@ func codeList(subs spec.StringList) string {
 		parts[i] = markdown.Code(s)
 	}
 	return strings.Join(parts, ", ")
+}
+
+var docgenJSONStyle = assertdesc.JSONStyle{
+	Prefix:  func(path string) string { return "at " + markdown.Code(path) },
+	Equals:  func(v any) string { return "equals " + markdown.Code(fmt.Sprint(v)) },
+	Matches: func(s string) string { return "matches " + markdown.Code("/"+s+"/") },
+	Length:  func(n int) string { return fmt.Sprintf("has length %d", n) },
+	Compare: func(op string, v any) string { return "is " + markdown.Code(fmt.Sprintf("%s %v", op, v)) },
+	Default: "is checked",
+}
+
+var docgenYAMLStyle = assertdesc.JSONStyle{
+	Prefix:  func(path string) string { return "YAML at " + markdown.Code(path) },
+	Equals:  docgenJSONStyle.Equals,
+	Matches: docgenJSONStyle.Matches,
+	Length:  docgenJSONStyle.Length,
+	Compare: docgenJSONStyle.Compare,
+	Default: docgenJSONStyle.Default,
+}
+
+var docgenStreamStyle = assertdesc.StreamStyle{
+	List:      codeList,
+	Regex:     func(s string) string { return markdown.Code("/" + s + "/") },
+	Equals:    "equals an exact value",
+	NotEquals: "does not equal an exact value",
+	JSON:      docgenJSONStyle,
+	YAML:      docgenYAMLStyle,
+	Snapshot:  markdown.Code,
+	NoMatcher: "is checked",
+}
+
+var docgenFileStyle = assertdesc.FileStyle{
+	Path:       markdown.Code,
+	List:       codeList,
+	JSON:       docgenJSONStyle,
+	Snapshot:   markdown.Code,
+	Checked:    func(path string) string { return markdown.Code(path) + " is checked" },
+	ExactBytes: "equals exact bytes",
+}
+
+var docgenHeaderStyle = assertdesc.HeaderStyle{
+	Name:  markdown.Code,
+	Value: markdown.Code,
+	Regex: func(s string) string { return markdown.Code("/" + s + "/") },
+	Bare:  func(s string) string { return markdown.Code(s) + " is checked" },
+}
+
+var docgenImageStyle = assertdesc.ImageStyle{
+	Path:      markdown.Code,
+	Format:    markdown.Code,
+	SimilarTo: markdown.Code,
+	Checked:   func(path string) string { return markdown.Code(path) + " is checked" },
+}
+
+var docgenDirStyle = assertdesc.DirStyle{
+	Path:    markdown.Code,
+	Item:    markdown.Code,
+	Token:   markdown.Code,
+	Checked: func(path string) string { return markdown.Code(path) + " is checked" },
+}
+
+var docgenPDFStyle = assertdesc.PDFStyle{
+	Path:    markdown.Code,
+	Value:   markdown.Code,
+	Stream:  describeStream,
+	Checked: func(path string) string { return markdown.Code(path) + " is checked" },
+}
+
+var docgenChangesStyle = assertdesc.ChangesStyle{
+	Entry: markdown.Code,
+	Join:  ", ",
+}
+
+var docgenMockStyle = assertdesc.MockStyle{
+	Name:  markdown.Code,
+	Route: markdown.Code,
+	Count: func(n int) string { return fmt.Sprintf(" exactly %d time(s)", n) },
 }
 
 // describeAsserts renders an assertion as one Markdown "Then" bullet per target.
@@ -55,17 +133,7 @@ func describeTarget(a *spec.Assert, target spec.AssertTarget) string {
 		}
 		return "exit code is checked"
 	case spec.AssertMock:
-		m := a.Mock
-		desc := "mock " + markdown.Code(m.Name) + " received"
-		if m.Method != "" || m.Path != "" {
-			desc += " " + markdown.Code(strings.TrimSpace(strings.ToUpper(m.Method)+" "+m.Path))
-		} else {
-			desc += " a request"
-		}
-		if m.Count != nil {
-			desc += fmt.Sprintf(" exactly %d time(s)", *m.Count)
-		}
-		return desc
+		return describeMockAssert(a.Mock)
 	case spec.AssertScreen:
 		return "rendered screen " + describeStream(a.Screen)
 	case spec.AssertDuration:
@@ -115,258 +183,38 @@ func describeTarget(a *spec.Assert, target spec.AssertTarget) string {
 // describeChanges renders a workdir-delta assertion (#70) as a compact phrase
 // listing each set category. `modified: []` renders as "modified nothing".
 func describeChanges(c *spec.ChangesAssert) string {
-	var parts []string
-	for _, cat := range []struct {
-		name    string
-		entries *spec.StringList
-	}{
-		{"created", c.Created},
-		{"modified", c.Modified},
-		{"deleted", c.Deleted},
-	} {
-		if cat.entries == nil {
-			continue
-		}
-		if len(*cat.entries) == 0 {
-			parts = append(parts, cat.name+" nothing")
-			continue
-		}
-		parts = append(parts, cat.name+" "+codeList(*cat.entries))
-	}
-	if len(parts) == 0 {
-		return "nothing"
-	}
-	return strings.Join(parts, ", ")
+	return assertdesc.DescribeChanges(c, docgenChangesStyle)
 }
 
 func describeHeader(h *spec.HeaderMatch) string {
-	switch {
-	case h.Contains != nil:
-		return markdown.Code(h.Name) + " contains " + markdown.Code(*h.Contains)
-	case h.Equals != nil:
-		return markdown.Code(h.Name) + " equals " + markdown.Code(*h.Equals)
-	// A header `matches` regexp is a real matcher (the natural shape for auth
-	// headers like "^Bearer "); without this case it fell to the generic "is
-	// checked" and the documented constraint vanished from the doc, so a reviewer
-	// could not see it. Kept in step with explain.describeHeader.
-	case h.Matches != nil:
-		return markdown.Code(h.Name) + " matches " + markdown.Code("/"+*h.Matches+"/")
-	default:
-		return markdown.Code(h.Name) + " is checked"
-	}
+	return assertdesc.DescribeHeader(h, docgenHeaderStyle)
 }
 
 func describeImage(im *spec.ImageAssert) string {
-	parts := imageConstraints(im)
-	if len(parts) == 0 {
-		return markdown.Code(im.Path) + " is checked"
-	}
-	return markdown.Code(im.Path) + " " + strings.Join(parts, ", ")
-}
-
-// imageConstraints renders each set image constraint as a short phrase.
-func imageConstraints(im *spec.ImageAssert) []string {
-	var parts []string
-	if im.Format != "" {
-		parts = append(parts, "is "+markdown.Code(im.Format))
-	}
-	if im.Width != nil {
-		parts = append(parts, fmt.Sprintf("width %d", *im.Width))
-	}
-	if im.Height != nil {
-		parts = append(parts, fmt.Sprintf("height %d", *im.Height))
-	}
-	if im.MinWidth != nil {
-		parts = append(parts, fmt.Sprintf("width >= %d", *im.MinWidth))
-	}
-	if im.MaxWidth != nil {
-		parts = append(parts, fmt.Sprintf("width <= %d", *im.MaxWidth))
-	}
-	if im.MinHeight != nil {
-		parts = append(parts, fmt.Sprintf("height >= %d", *im.MinHeight))
-	}
-	if im.MaxHeight != nil {
-		parts = append(parts, fmt.Sprintf("height <= %d", *im.MaxHeight))
-	}
-	if im.Alpha != nil {
-		if *im.Alpha {
-			parts = append(parts, "has alpha")
-		} else {
-			parts = append(parts, "has no alpha")
-		}
-	}
-	if im.SimilarTo != "" {
-		parts = append(parts, "similar to "+markdown.Code(im.SimilarTo))
-	}
-	return parts
+	return assertdesc.DescribeImage(im, docgenImageStyle)
 }
 
 // describeDir renders a directory/tree assertion (#74) as a compact phrase
 // listing each set constraint.
 func describeDir(d *spec.DirAssert) string {
-	parts := dirConstraints(d)
-	if len(parts) == 0 {
-		return markdown.Code(d.Path) + " is checked"
-	}
-	return markdown.Code(d.Path) + " " + strings.Join(parts, ", ")
-}
-
-func dirConstraints(d *spec.DirAssert) []string {
-	var parts []string
-	if d.Exists != nil {
-		if *d.Exists {
-			parts = append(parts, "exists")
-		} else {
-			parts = append(parts, "does not exist")
-		}
-	}
-	for _, c := range d.Contains {
-		parts = append(parts, "contains "+markdown.Code(c))
-	}
-	for _, c := range d.NotContains {
-		parts = append(parts, "does not contain "+markdown.Code(c))
-	}
-	if d.Count != nil {
-		parts = append(parts, fmt.Sprintf("has %d entries", *d.Count))
-	}
-	if d.MinCount != nil {
-		parts = append(parts, fmt.Sprintf("has >= %d entries", *d.MinCount))
-	}
-	if d.MaxCount != nil {
-		parts = append(parts, fmt.Sprintf("has <= %d entries", *d.MaxCount))
-	}
-	if d.Glob != "" {
-		parts = append(parts, "matches glob "+markdown.Code(d.Glob))
-	}
-	if d.Snapshot != "" {
-		parts = append(parts, "tree matches snapshot "+markdown.Code(d.Snapshot))
-	}
-	if d.Recursive {
-		parts = append(parts, "(recursive)")
-	}
-	if len(d.Ignore) > 0 {
-		parts = append(parts, "ignoring "+strings.Join(d.Ignore, ", "))
-	}
-	return parts
+	return assertdesc.DescribeDir(d, docgenDirStyle)
 }
 
 // describePDF renders a PDF assertion (#73) as a compact phrase.
 func describePDF(p *spec.PDFAssert) string {
-	var parts []string
-	if p.Pages != nil {
-		parts = append(parts, fmt.Sprintf("%d pages", *p.Pages))
-	}
-	if p.MinPages != nil {
-		parts = append(parts, fmt.Sprintf(">= %d pages", *p.MinPages))
-	}
-	if p.MaxPages != nil {
-		parts = append(parts, fmt.Sprintf("<= %d pages", *p.MaxPages))
-	}
-	for _, k := range sortedMapKeys(p.Metadata) {
-		parts = append(parts, fmt.Sprintf("%s contains %s", k, markdown.Code(p.Metadata[k])))
-	}
-	if p.Text != nil {
-		parts = append(parts, "text "+describeStream(p.Text))
-	}
-	if len(parts) == 0 {
-		return markdown.Code(p.Path) + " is checked"
-	}
-	return markdown.Code(p.Path) + " " + strings.Join(parts, ", ")
-}
-
-// sortedMapKeys returns a string map's keys in sorted order for deterministic
-// rendering.
-func sortedMapKeys(m map[string]string) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	return keys
+	return assertdesc.DescribePDF(p, docgenPDFStyle)
 }
 
 func describeStream(s *spec.StreamAssert) string {
-	switch {
-	case s.Empty != nil:
-		if *s.Empty {
-			return "is empty"
-		}
-		return "is not empty"
-	case s.Contains != nil:
-		return "contains " + codeList(s.Contains)
-	case s.NotContains != nil:
-		return "does not contain " + codeList(s.NotContains)
-	case s.Matches != nil:
-		return "matches " + markdown.Code("/"+*s.Matches+"/")
-	case s.NotMatches != nil:
-		return "does not match " + markdown.Code("/"+*s.NotMatches+"/")
-	case s.Equals != nil:
-		return "equals an exact value"
-	case s.NotEquals != nil:
-		return "does not equal an exact value"
-	case len(s.JSON) > 0:
-		return jsonChecks("at ", s.JSON)
-	case len(s.YAML) > 0:
-		return jsonChecks("YAML at ", s.YAML)
-	case s.Snapshot != "":
-		return "matches snapshot " + markdown.Code(s.Snapshot)
-	default:
-		return "is checked"
-	}
+	return assertdesc.DescribeStream(s, docgenStreamStyle)
 }
 
 func describeFile(f *spec.FileAssert) string {
-	switch {
-	case f.Exists != nil:
-		if *f.Exists {
-			return markdown.Code(f.Path) + " exists"
-		}
-		return markdown.Code(f.Path) + " does not exist"
-	case f.Contains != nil:
-		return markdown.Code(f.Path) + " contains " + codeList(f.Contains)
-	case f.Equals != nil:
-		return markdown.Code(f.Path) + " equals exact bytes"
-	case f.EqualsFile != nil:
-		return markdown.Code(f.Path) + " is byte-identical to " + markdown.Code(*f.EqualsFile)
-	case len(f.JSON) > 0:
-		return markdown.Code(f.Path) + " " + jsonChecks("at ", f.JSON)
-	case f.Snapshot != "":
-		return markdown.Code(f.Path) + " matches snapshot " + markdown.Code(f.Snapshot)
-	default:
-		return markdown.Code(f.Path) + " is checked"
-	}
+	return assertdesc.DescribeFile(f, docgenFileStyle)
 }
 
-// jsonChecks renders a json/yaml matcher list (#156). A single check reads
-// exactly as it did before the list form ("<prefix>`path` matcher"); several
-// checks are joined with "; " so every asserted path appears in the doc.
-func jsonChecks(prefix string, list spec.JSONChecks) string {
-	parts := make([]string, len(list))
-	for i := range list {
-		parts[i] = prefix + markdown.Code(list[i].Path) + " " + jsonMatcher(&list[i])
-	}
-	return strings.Join(parts, "; ")
-}
-
-func jsonMatcher(j *spec.JSONAssert) string {
-	switch {
-	case j.Equals != nil:
-		return "equals " + markdown.Code(fmt.Sprint(j.Equals))
-	case j.Matches != nil:
-		return "matches " + markdown.Code("/"+*j.Matches+"/")
-	case j.Length != nil:
-		return fmt.Sprintf("has length %d", *j.Length)
-	case j.Gt != nil:
-		return "is " + markdown.Code(fmt.Sprintf("> %v", *j.Gt))
-	case j.Gte != nil:
-		return "is " + markdown.Code(fmt.Sprintf(">= %v", *j.Gte))
-	case j.Lt != nil:
-		return "is " + markdown.Code(fmt.Sprintf("< %v", *j.Lt))
-	case j.Lte != nil:
-		return "is " + markdown.Code(fmt.Sprintf("<= %v", *j.Lte))
-	default:
-		return "is checked"
-	}
+func describeMockAssert(m *spec.MockAssert) string {
+	return assertdesc.DescribeMock(m, docgenMockStyle)
 }
 
 func sortedEnvKeys(env map[string]string) []string {
