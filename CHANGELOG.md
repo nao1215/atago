@@ -32,7 +32,7 @@ and this project follows [Semantic Versioning](https://semver.org/).
   (the collapsible box stays on narrow screens), and the cookbook gains a live
   recipe filter — typing a keyword hides the non-matching recipe sections and
   their sidebar entries — turning the 63-recipe single scroll into a browsable
-  catalogue without splitting the committed file or changing any anchor (#241).
+  catalog without splitting the committed file or changing any anchor (#241).
 
 ### Fixed
 
