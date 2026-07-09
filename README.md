@@ -19,6 +19,30 @@ Documentation: **https://nao1215.github.io/atago/**
 
 ![demo](./doc/img/demo.gif)
 
+## Try it in 30 seconds
+
+No install, no fictional binary — if you have Go, paste this. It records a real
+run of a command you already have, then replays it as a test:
+
+```shell
+go run github.com/nao1215/atago@latest record --out demo.atago.yaml -- git --version
+go run github.com/nao1215/atago@latest run demo.atago.yaml
+```
+
+```text
+.
+
+PASSED  1 scenario: 1 passed, 0 failed, 0 errored, 0 skipped
+```
+
+`record` runs `git --version` once and writes a spec from what it observed — the
+exit code, the version line on stdout, an empty stderr. `run` replays it. Open
+`demo.atago.yaml` and you have a real test you can tighten, not YAML you wrote
+from scratch. (Swap `git --version` for any command you have: `go version`,
+`jq --version`, `ls -la`.)
+
+Then point it at your own tool:
+
 ```shell
 atago record --out mytool.atago.yaml -- mytool convert input.txt  # turn a real run into a spec
 atago run mytool.atago.yaml                                       # replay it as a test

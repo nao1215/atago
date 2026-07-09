@@ -16,6 +16,11 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- The README, landing page, and getting-started guide now open with a
+  "Try it in 30 seconds" block: a copy-pasteable, zero-install
+  `go run github.com/nao1215/atago@latest record … -- git --version` /
+  `run` loop against a command everyone already has, producing a green
+  `PASSED` in under a minute before any install or fictional binary (#230).
 - Website SEO, social, and landing improvements (no tool behavior change): the
   landing page now leads with a visible `<h1>` tagline above a right-sized logo
   (with explicit `width`/`height` on the logo and embedded GIFs to eliminate
