@@ -33,6 +33,11 @@ and this project follows [Semantic Versioning](https://semver.org/).
   recipe filter — typing a keyword hides the non-matching recipe sections and
   their sidebar entries — turning the 63-recipe single scroll into a browsable
   catalog without splitting the committed file or changing any anchor (#241).
+- Website full-text search (no tool behavior change): a self-hosted Pagefind
+  index is built in CI (pinned binary, SHA-256 verified, no external hosts) and
+  a nav search box lazy-loads the search UI and WASM index only when focused, so
+  the landing weight is unchanged. Every recipe and spec key becomes directly
+  reachable across the cookbook, reference, and real-world pages (#236).
 
 ### Fixed
 

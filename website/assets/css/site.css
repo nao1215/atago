@@ -466,3 +466,44 @@ main h3 {
     display: none;
   }
 }
+/* --- client-side search box in the nav (#236) --- */
+.search {
+  position: relative;
+  display: inline-flex;
+}
+
+.search-box {
+  font: inherit;
+  font-size: 0.9rem;
+  padding: 0.2rem 0.55rem;
+  width: 9rem;
+  max-width: 40vw;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+/* Pagefind renders its input and results into this dropdown once loaded; the
+   CSS variables theme it to match the site in both light and dark. */
+.search-ui {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 0.4rem;
+  width: min(92vw, 24rem);
+  max-height: 72vh;
+  overflow-y: auto;
+  padding: 0.6rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+  z-index: 30;
+  --pagefind-ui-primary: var(--link);
+  --pagefind-ui-text: var(--fg);
+  --pagefind-ui-background: var(--bg);
+  --pagefind-ui-border: var(--border);
+  --pagefind-ui-tag: var(--code-bg);
+  --pagefind-ui-font: inherit;
+}
