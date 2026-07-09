@@ -1,7 +1,8 @@
 #!/bin/sh
 # Smoke-test the GoReleaser-built container image before a tagged release can
-# publish it. This proves the image was tagged locally (including latest) and
-# that the host can run `atago version` from it.
+# publish it. Snapshot builds used by release-smoke do not always load a local
+# `latest` tag, so prove at least one local tag runs; when `latest` is present
+# we still prefer it and inspect its multi-arch manifest too.
 set -eu
 
 repo="${1:-ghcr.io/nao1215/atago}"
@@ -16,8 +17,9 @@ command -v docker >/dev/null || fail "docker is not installed"
 images="$(docker image ls --format '{{.Repository}}:{{.Tag}}' "$repo")"
 [ -n "$images" ] || fail "no local docker images found for $repo"
 
-printf '%s\n' "$images" | grep -q "^${repo}:latest\$" || fail "missing latest tag for $repo"
-host_image="$(printf '%s\n' "$images" | grep "^${repo}:" | head -n1)"
+latest_image="$(printf '%s\n' "$images" | grep "^${repo}:latest\$" || true)"
+host_image="$latest_image"
+[ -n "$host_image" ] || host_image="$(printf '%s\n' "$images" | grep "^${repo}:" | head -n1)"
 [ -n "$host_image" ] || fail "no runnable image tag found for $repo"
 
 version_out="$(docker run --rm "$host_image" version)"
