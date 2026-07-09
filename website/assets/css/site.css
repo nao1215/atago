@@ -186,10 +186,19 @@ pre code {
   background: var(--code-bg) !important;
 }
 
+/* A real <table> (not display:block) so browsers keep announcing it as a table
+   to assistive tech; horizontal scrolling for wide tables lives on the
+   .table-wrap container emitted by the table render hook and the spec-reference
+   shortcode instead. */
 table {
-  display: block;
-  overflow-x: auto;
+  display: table;
+  width: 100%;
   border-collapse: collapse;
+  margin: 1rem 0;
+}
+
+.table-wrap {
+  overflow-x: auto;
   margin: 1rem 0;
 }
 
@@ -320,4 +329,56 @@ tbody tr:nth-child(even) {
 
 #where-to-go + ul li a:first-child {
   font-weight: 600;
+}
+
+/* --- performance: skip off-screen layout on the heaviest pages (#237) --- */
+/* content-visibility:auto lets the browser skip layout and paint of off-screen
+   code blocks and tables — the real-world pages reach ~1.7 MB with 1,896 <pre>
+   blocks — while contain-intrinsic-size gives a placeholder box so the scrollbar
+   stays stable and remembered sizes avoid re-layout thrash on scroll. */
+main pre,
+main .table-wrap {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 6rem;
+}
+
+/* --- accessibility: skip-to-content link (#242) --- */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 10;
+  padding: 0.5rem 0.85rem;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 0 0 6px 0;
+}
+
+.skip-link:focus {
+  left: 0;
+}
+
+/* --- accessibility: copy button reachable by keyboard and touch (#242) --- */
+/* Previously only pre:hover revealed it, so keyboard users tabbed onto an
+   invisible control and touch devices (no hover) never saw it at all. */
+pre:focus-within .copy,
+.copy:focus-visible {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  pre .copy {
+    opacity: 1;
+  }
+}
+
+/* --- accessibility: visible focus outlines (#242) --- */
+header nav a:focus-visible,
+.hlink:focus-visible,
+.copy:focus-visible,
+main a:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 2px;
+  border-radius: 2px;
 }

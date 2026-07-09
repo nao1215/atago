@@ -54,12 +54,14 @@
   {{- if $node -}}
 <h3 id="spec-{{ $s.id }}"><code>{{ $s.title }}</code> <a class="hlink" href="#spec-{{ $s.id }}" aria-label="Link to this section">#</a></h3>
 {{- with $desc }}<p>{{ . | markdownify }}</p>{{ end }}
+<div class="table-wrap">
 <table>
 <thead><tr><th>Key</th><th>Type</th><th>Description</th><th>Since</th></tr></thead>
 <tbody>
 {{- partial "spec-rows.html" (dict "root" $schema "node" $node "base" $base "depth" 0 "since" $since) -}}
 </tbody>
 </table>
+</div>
   {{- end -}}
 {{- end -}}
 </div>
