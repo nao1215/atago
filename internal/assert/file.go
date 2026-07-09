@@ -11,10 +11,34 @@ import (
 
 // checkFile evaluates a file assertion. Relative paths resolve
 // against the scenario workdir and may not escape it.
-func checkFile(f *spec.FileAssert, env Env) *CheckResult {
+func checkFile(f *spec.FileAssert, env Env) (out *CheckResult) {
 	path, err := security.ResolveWorkdirPath("assert.file.path", env.Workdir, f.Path)
 	if err != nil {
 		return &CheckResult{Desc: fmt.Sprintf("assert file %q", f.Path), Hint: err.Error()}
+	}
+
+	// Attach the compared file bytes to any failing result that did not shape its
+	// own artifact, so --artifacts-dir can persist it (#48). This mirrors
+	// checkStream's single deferred hook, so a new file matcher inherits the
+	// attachment instead of each branch remembering it by hand (#247). A branch
+	// that reads the file records its bytes via read(); exists/executable never
+	// read and leave fileData nil (they attach nothing); checkSnapshot shapes its
+	// own artifact and is left untouched (it reads via readFile, not read).
+	var fileData []byte
+	defer func() {
+		if out != nil && !out.OK && out.ArtifactKind == "" && fileData != nil {
+			out.ArtifactKind = "file"
+			if out.ArtifactActual == nil {
+				out.ArtifactActual = fileData
+			}
+		}
+	}()
+	read := func(label, p string) ([]byte, *CheckResult) {
+		data, cr := readFile(label, p)
+		if cr == nil {
+			fileData = data
+		}
+		return data, cr
 	}
 
 	switch {
@@ -44,37 +68,33 @@ func checkFile(f *spec.FileAssert, env Env) *CheckResult {
 		}
 
 	case f.Contains != nil:
-		data, cr := readFile(f.Path, path)
+		data, cr := read(f.Path, path)
 		if cr != nil {
 			return cr
 		}
 		desc := fileContainsDesc(f.Path, f.Contains, true)
 		if sub, idx, missing := firstMissing(string(data), f.Contains); missing {
 			return &CheckResult{
-				Desc:           desc,
-				Expected:       fmt.Sprintf("file %q contains %q", f.Path, sub),
-				Actual:         excerpt(string(data)),
-				Hint:           fmt.Sprintf("the substring %q%s was not present in %q", sub, elementLabel(idx, len(f.Contains)), f.Path),
-				ArtifactKind:   "file",
-				ArtifactActual: data,
+				Desc:     desc,
+				Expected: fmt.Sprintf("file %q contains %q", f.Path, sub),
+				Actual:   excerpt(string(data)),
+				Hint:     fmt.Sprintf("the substring %q%s was not present in %q", sub, elementLabel(idx, len(f.Contains)), f.Path),
 			}
 		}
 		return pass(desc)
 
 	case f.NotContains != nil:
-		data, cr := readFile(f.Path, path)
+		data, cr := read(f.Path, path)
 		if cr != nil {
 			return cr
 		}
 		desc := fileContainsDesc(f.Path, f.NotContains, false)
 		if sub, idx, present := firstPresent(string(data), f.NotContains); present {
 			return &CheckResult{
-				Desc:           desc,
-				Expected:       fmt.Sprintf("file %q without %q", f.Path, sub),
-				Actual:         excerpt(string(data)),
-				Hint:           fmt.Sprintf("the substring %q%s was unexpectedly present in %q", sub, elementLabel(idx, len(f.NotContains)), f.Path),
-				ArtifactKind:   "file",
-				ArtifactActual: data,
+				Desc:     desc,
+				Expected: fmt.Sprintf("file %q without %q", f.Path, sub),
+				Actual:   excerpt(string(data)),
+				Hint:     fmt.Sprintf("the substring %q%s was unexpectedly present in %q", sub, elementLabel(idx, len(f.NotContains)), f.Path),
 			}
 		}
 		return pass(desc)
@@ -102,7 +122,7 @@ func checkFile(f *spec.FileAssert, env Env) *CheckResult {
 		}
 
 	case f.Equals != nil:
-		data, cr := readFile(f.Path, path)
+		data, cr := read(f.Path, path)
 		if cr != nil {
 			return cr
 		}
@@ -117,13 +137,11 @@ func checkFile(f *spec.FileAssert, env Env) *CheckResult {
 			Expected:         excerpt(*f.Equals),
 			Actual:           excerpt(string(data)),
 			Hint:             fmt.Sprintf("file %q did not equal the expected bytes exactly (no CRLF/newline normalization)", f.Path),
-			ArtifactKind:     "file",
-			ArtifactActual:   data,
 			ArtifactExpected: []byte(*f.Equals),
 		}
 
 	case f.EqualsFile != nil:
-		data, cr := readFile(f.Path, path)
+		data, cr := read(f.Path, path)
 		if cr != nil {
 			return cr
 		}
@@ -131,6 +149,8 @@ func checkFile(f *spec.FileAssert, env Env) *CheckResult {
 		if err != nil {
 			return &CheckResult{Desc: fmt.Sprintf("assert file %q equals_file %q", f.Path, *f.EqualsFile), Hint: err.Error()}
 		}
+		// The comparison file is read plainly (not via read): the failure artifact
+		// is the file under test, and the other file is carried as ArtifactExpected.
 		other, cr := readFile(*f.EqualsFile, otherPath)
 		if cr != nil {
 			return cr
@@ -144,24 +164,21 @@ func checkFile(f *spec.FileAssert, env Env) *CheckResult {
 			Expected:         fmt.Sprintf("bytes identical to %q", *f.EqualsFile),
 			Actual:           excerpt(string(data)),
 			Hint:             fmt.Sprintf("file %q is not byte-identical to %q (no CRLF/newline normalization)", f.Path, *f.EqualsFile),
-			ArtifactKind:     "file",
-			ArtifactActual:   data,
 			ArtifactExpected: other,
 		}
 
 	case len(f.JSON) > 0:
-		data, cr := readFile(f.Path, path)
+		data, cr := read(f.Path, path)
 		if cr != nil {
 			return cr
 		}
-		res := checkJSONChecks(fmt.Sprintf("assert file %q json", f.Path), f.Path, data, f.JSON, false)
-		if !res.OK && res.ArtifactKind == "" {
-			res.ArtifactKind = "file"
-			res.ArtifactActual = data
-		}
-		return res
+		// A failing json check inherits the "file" artifact from the deferred hook
+		// unless checkJSONChecks shaped its own.
+		return checkJSONChecks(fmt.Sprintf("assert file %q json", f.Path), f.Path, data, f.JSON, false)
 
 	case f.Snapshot != "":
+		// Read plainly so fileData stays nil: checkSnapshot shapes its own
+		// (normalized) artifact, and the deferred hook must not overwrite it.
 		data, cr := readFile(f.Path, path)
 		if cr != nil {
 			return cr
