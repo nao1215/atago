@@ -196,6 +196,31 @@ func TestFinishRun_InterruptedWithoutResultsSkipsReport(t *testing.T) {
 	}
 }
 
+func TestFinishRun_IncompleteResultSlicesReturnInternal(t *testing.T) {
+	var out, errb bytes.Buffer
+	opts := &runOptions{
+		label:  "atago run",
+		format: report.FormatJSON,
+		paths:  []string{"one.atago.yaml", "two.atago.yaml"},
+		stdout: &out,
+		stderr: &errb,
+	}
+
+	if got := finishRun(opts, []*engine.SuiteResult{{
+		Suite:    "one",
+		SpecPath: "one.atago.yaml",
+		Status:   engine.StatusPassed,
+	}}, []error{nil}, nil, 5*time.Millisecond, context.Background()); got != ExitInternal {
+		t.Fatalf("exit = %d, want %d (stderr=%s)", got, ExitInternal, errb.String())
+	}
+	if out.Len() != 0 {
+		t.Fatalf("stdout = %q, want no report for incomplete internal results", out.String())
+	}
+	if !strings.Contains(errb.String(), "internal error: incomplete run results") {
+		t.Fatalf("stderr = %q, want the incomplete-results diagnostic", errb.String())
+	}
+}
+
 func TestFinishRun_ReportWriteFailureReturnsInternal(t *testing.T) {
 	dir := t.TempDir()
 	withWorkdir(t, dir, func() {

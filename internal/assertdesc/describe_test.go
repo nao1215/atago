@@ -26,7 +26,6 @@ func TestDescribeHeader(t *testing.T) {
 		{"bare", &spec.HeaderMatch{Name: "X"}, `bare X`},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			if got := DescribeHeader(tt.h, style); got != tt.want {
