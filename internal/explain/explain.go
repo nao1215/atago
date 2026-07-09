@@ -6,10 +6,10 @@ package explain
 import (
 	"fmt"
 	"io"
-	"sort"
 	"strconv"
 	"strings"
 
+	"github.com/nao1215/atago/internal/assertdesc"
 	"github.com/nao1215/atago/internal/spec"
 )
 
@@ -263,42 +263,12 @@ func describeSignal(sg *spec.Signal) string {
 // describeChangesExplain renders a workdir-delta assertion (#70) as a compact
 // phrase for `atago explain`. `modified: []` renders as "modified nothing".
 func describeChangesExplain(c *spec.ChangesAssert) string {
-	var parts []string
-	for _, cat := range []struct {
-		name    string
-		entries *spec.StringList
-	}{
-		{"created", c.Created},
-		{"modified", c.Modified},
-		{"deleted", c.Deleted},
-	} {
-		if cat.entries == nil {
-			continue
-		}
-		if len(*cat.entries) == 0 {
-			parts = append(parts, cat.name+" nothing")
-			continue
-		}
-		parts = append(parts, cat.name+" "+strings.Join([]string(*cat.entries), ", "))
-	}
-	if len(parts) == 0 {
-		return "nothing"
-	}
-	return strings.Join(parts, "; ")
+	return assertdesc.DescribeChanges(c, explainChangesStyle)
 }
 
 // describeMockAssert renders a one-line summary of a mock assertion (#24).
 func describeMockAssert(m *spec.MockAssert) string {
-	desc := "mock " + m.Name
-	if m.Method != "" || m.Path != "" {
-		desc += " received " + strings.TrimSpace(strings.ToUpper(m.Method)+" "+m.Path)
-	} else {
-		desc += " received a request"
-	}
-	if m.Count != nil {
-		desc += fmt.Sprintf(" x%d", *m.Count)
-	}
-	return desc
+	return assertdesc.DescribeMock(m, explainMockStyle)
 }
 
 func describeFixture(f *spec.Fixture) string {
@@ -419,131 +389,21 @@ func describeTarget(a *spec.Assert, target spec.AssertTarget) string {
 }
 
 func describeHeader(h *spec.HeaderMatch) string {
-	switch {
-	case h.Contains != nil:
-		return fmt.Sprintf("%q contains %q", h.Name, *h.Contains)
-	case h.Equals != nil:
-		return fmt.Sprintf("%q equals %q", h.Name, *h.Equals)
-	// A header `matches` regexp is a real matcher (the natural shape for auth
-	// headers like "^Bearer "); without this case it fell to the name-only
-	// default and the documented constraint vanished from the explain output.
-	// Kept in step with docgen.describeHeader.
-	case h.Matches != nil:
-		return fmt.Sprintf("%q matches /%s/", h.Name, *h.Matches)
-	default:
-		return fmt.Sprintf("%q", h.Name)
-	}
+	return assertdesc.DescribeHeader(h, explainHeaderStyle)
 }
 
 func describeImage(im *spec.ImageAssert) string {
-	var parts []string
-	if im.Format != "" {
-		parts = append(parts, "is "+im.Format)
-	}
-	if im.Width != nil {
-		parts = append(parts, fmt.Sprintf("width %d", *im.Width))
-	}
-	if im.Height != nil {
-		parts = append(parts, fmt.Sprintf("height %d", *im.Height))
-	}
-	if im.MinWidth != nil {
-		parts = append(parts, fmt.Sprintf("width >= %d", *im.MinWidth))
-	}
-	if im.MaxWidth != nil {
-		parts = append(parts, fmt.Sprintf("width <= %d", *im.MaxWidth))
-	}
-	if im.MinHeight != nil {
-		parts = append(parts, fmt.Sprintf("height >= %d", *im.MinHeight))
-	}
-	if im.MaxHeight != nil {
-		parts = append(parts, fmt.Sprintf("height <= %d", *im.MaxHeight))
-	}
-	if im.Alpha != nil {
-		if *im.Alpha {
-			parts = append(parts, "has alpha")
-		} else {
-			parts = append(parts, "has no alpha")
-		}
-	}
-	if im.SimilarTo != "" {
-		parts = append(parts, "similar to "+im.SimilarTo)
-	}
-	if len(parts) == 0 {
-		return fmt.Sprintf("%q is checked", im.Path)
-	}
-	return fmt.Sprintf("%q %s", im.Path, strings.Join(parts, ", "))
+	return assertdesc.DescribeImage(im, explainImageStyle)
 }
 
 // describeDir renders a directory/tree assertion (#74) for explain output.
 func describeDir(d *spec.DirAssert) string {
-	var parts []string
-	if d.Exists != nil {
-		if *d.Exists {
-			parts = append(parts, "exists")
-		} else {
-			parts = append(parts, "does not exist")
-		}
-	}
-	for _, c := range d.Contains {
-		parts = append(parts, "contains "+c)
-	}
-	for _, c := range d.NotContains {
-		parts = append(parts, "does not contain "+c)
-	}
-	if d.Count != nil {
-		parts = append(parts, fmt.Sprintf("has %d entries", *d.Count))
-	}
-	if d.MinCount != nil {
-		parts = append(parts, fmt.Sprintf("has >= %d entries", *d.MinCount))
-	}
-	if d.MaxCount != nil {
-		parts = append(parts, fmt.Sprintf("has <= %d entries", *d.MaxCount))
-	}
-	if d.Glob != "" {
-		parts = append(parts, "matches glob "+d.Glob)
-	}
-	if d.Snapshot != "" {
-		parts = append(parts, "tree matches snapshot "+d.Snapshot)
-	}
-	if d.Recursive {
-		parts = append(parts, "(recursive)")
-	}
-	if len(d.Ignore) > 0 {
-		parts = append(parts, "ignoring "+strings.Join(d.Ignore, ", "))
-	}
-	if len(parts) == 0 {
-		return fmt.Sprintf("%q is checked", d.Path)
-	}
-	return fmt.Sprintf("%q %s", d.Path, strings.Join(parts, ", "))
+	return assertdesc.DescribeDir(d, explainDirStyle)
 }
 
 // describePDF renders a PDF assertion (#73) for explain output.
 func describePDF(p *spec.PDFAssert) string {
-	var parts []string
-	if p.Pages != nil {
-		parts = append(parts, fmt.Sprintf("%d pages", *p.Pages))
-	}
-	if p.MinPages != nil {
-		parts = append(parts, fmt.Sprintf(">= %d pages", *p.MinPages))
-	}
-	if p.MaxPages != nil {
-		parts = append(parts, fmt.Sprintf("<= %d pages", *p.MaxPages))
-	}
-	keys := make([]string, 0, len(p.Metadata))
-	for k := range p.Metadata {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	for _, k := range keys {
-		parts = append(parts, fmt.Sprintf("%s contains %q", k, p.Metadata[k]))
-	}
-	if p.Text != nil {
-		parts = append(parts, "text "+describeStream(p.Text))
-	}
-	if len(parts) == 0 {
-		return fmt.Sprintf("%q is checked", p.Path)
-	}
-	return fmt.Sprintf("%q %s", p.Path, strings.Join(parts, ", "))
+	return assertdesc.DescribePDF(p, explainPDFStyle)
 }
 
 // quoteList renders a contains/not_contains matcher argument. A single element
@@ -557,88 +417,89 @@ func quoteList(subs spec.StringList) string {
 	return strings.Join(parts, ", ")
 }
 
-func describeStream(s *spec.StreamAssert) string {
-	switch {
-	case s.Empty != nil:
-		if *s.Empty {
-			return "is empty"
-		}
-		return "is not empty"
-	case s.Contains != nil:
-		return "contains " + quoteList(s.Contains)
-	case s.NotContains != nil:
-		return "does not contain " + quoteList(s.NotContains)
-	case s.Matches != nil:
-		return fmt.Sprintf("matches /%s/", *s.Matches)
-	case s.NotMatches != nil:
-		return fmt.Sprintf("does not match /%s/", *s.NotMatches)
-	case s.Equals != nil:
-		return "equals exact text"
-	case s.NotEquals != nil:
-		return "does not equal exact text"
-	case len(s.JSON) > 0:
-		return jsonChecks("JSON", s.JSON)
-	case len(s.YAML) > 0:
-		return jsonChecks("YAML", s.YAML)
-	case s.Snapshot != "":
-		return "matches snapshot " + s.Snapshot
-	default:
-		return "(no matcher)"
-	}
+var explainJSONStyle = assertdesc.JSONStyle{
+	Prefix:  func(path string) string { return "JSON " + path },
+	Equals:  func(v any) string { return fmt.Sprintf("== %v", v) },
+	Matches: func(s string) string { return fmt.Sprintf("matches /%s/", s) },
+	Length:  func(n int) string { return fmt.Sprintf("length %d", n) },
+	Compare: func(op string, v any) string { return fmt.Sprintf("%s %v", op, v) },
+	Default: "",
 }
 
-// jsonChecks renders a json/yaml matcher list (#156): a single check reads as it
-// did before the list form ("<kind> <path> <matcher>"), several are joined with
-// "; ".
-func jsonChecks(kind string, list spec.JSONChecks) string {
-	parts := make([]string, len(list))
-	for i := range list {
-		parts[i] = fmt.Sprintf("%s %s %s", kind, list[i].Path, jsonMatcher(&list[i]))
-	}
-	return strings.Join(parts, "; ")
+var explainYAMLStyle = assertdesc.JSONStyle{
+	Prefix:  func(path string) string { return "YAML " + path },
+	Equals:  explainJSONStyle.Equals,
+	Matches: explainJSONStyle.Matches,
+	Length:  explainJSONStyle.Length,
+	Compare: explainJSONStyle.Compare,
+	Default: explainJSONStyle.Default,
+}
+
+var explainStreamStyle = assertdesc.StreamStyle{
+	List:      quoteList,
+	Regex:     func(s string) string { return fmt.Sprintf("/%s/", s) },
+	Equals:    "equals exact text",
+	NotEquals: "does not equal exact text",
+	JSON:      explainJSONStyle,
+	YAML:      explainYAMLStyle,
+	Snapshot:  func(s string) string { return s },
+	NoMatcher: "(no matcher)",
+}
+
+var explainFileStyle = assertdesc.FileStyle{
+	Path:       func(s string) string { return fmt.Sprintf("%q", s) },
+	List:       quoteList,
+	JSON:       explainJSONStyle,
+	Snapshot:   func(s string) string { return s },
+	Checked:    func(path string) string { return path },
+	ExactBytes: "equals exact bytes",
+}
+
+var explainHeaderStyle = assertdesc.HeaderStyle{
+	Name:  func(s string) string { return fmt.Sprintf("%q", s) },
+	Value: func(s string) string { return fmt.Sprintf("%q", s) },
+	Regex: func(s string) string { return fmt.Sprintf("/%s/", s) },
+	Bare:  func(s string) string { return fmt.Sprintf("%q", s) },
+}
+
+var explainImageStyle = assertdesc.ImageStyle{
+	Path:      func(s string) string { return fmt.Sprintf("%q", s) },
+	Format:    func(s string) string { return s },
+	SimilarTo: func(s string) string { return s },
+	Checked:   func(path string) string { return fmt.Sprintf("%q is checked", path) },
+}
+
+var explainDirStyle = assertdesc.DirStyle{
+	Path:    func(s string) string { return fmt.Sprintf("%q", s) },
+	Item:    func(s string) string { return s },
+	Token:   func(s string) string { return s },
+	Checked: func(path string) string { return fmt.Sprintf("%q is checked", path) },
+}
+
+var explainPDFStyle = assertdesc.PDFStyle{
+	Path:    func(s string) string { return fmt.Sprintf("%q", s) },
+	Value:   func(s string) string { return fmt.Sprintf("%q", s) },
+	Stream:  describeStream,
+	Checked: func(path string) string { return fmt.Sprintf("%q is checked", path) },
+}
+
+var explainChangesStyle = assertdesc.ChangesStyle{
+	Entry: func(s string) string { return s },
+	Join:  "; ",
+}
+
+var explainMockStyle = assertdesc.MockStyle{
+	Name:  func(s string) string { return s },
+	Route: func(s string) string { return s },
+	Count: func(n int) string { return fmt.Sprintf(" x%d", n) },
+}
+
+func describeStream(s *spec.StreamAssert) string {
+	return assertdesc.DescribeStream(s, explainStreamStyle)
 }
 
 func describeFile(f *spec.FileAssert) string {
-	switch {
-	case f.Exists != nil:
-		if *f.Exists {
-			return fmt.Sprintf("%q exists", f.Path)
-		}
-		return fmt.Sprintf("%q does not exist", f.Path)
-	case f.Contains != nil:
-		return fmt.Sprintf("%q contains %s", f.Path, quoteList(f.Contains))
-	case f.Equals != nil:
-		return fmt.Sprintf("%q equals exact bytes", f.Path)
-	case f.EqualsFile != nil:
-		return fmt.Sprintf("%q is byte-identical to %q", f.Path, *f.EqualsFile)
-	case len(f.JSON) > 0:
-		return fmt.Sprintf("%q %s", f.Path, jsonChecks("JSON", f.JSON))
-	case f.Snapshot != "":
-		return fmt.Sprintf("%q matches snapshot %s", f.Path, f.Snapshot)
-	default:
-		return f.Path
-	}
-}
-
-func jsonMatcher(j *spec.JSONAssert) string {
-	switch {
-	case j.Equals != nil:
-		return fmt.Sprintf("== %v", j.Equals)
-	case j.Matches != nil:
-		return fmt.Sprintf("matches /%s/", *j.Matches)
-	case j.Length != nil:
-		return fmt.Sprintf("length %d", *j.Length)
-	case j.Gt != nil:
-		return fmt.Sprintf("> %v", *j.Gt)
-	case j.Gte != nil:
-		return fmt.Sprintf(">= %v", *j.Gte)
-	case j.Lt != nil:
-		return fmt.Sprintf("< %v", *j.Lt)
-	case j.Lte != nil:
-		return fmt.Sprintf("<= %v", *j.Lte)
-	default:
-		return ""
-	}
+	return assertdesc.DescribeFile(f, explainFileStyle)
 }
 
 func writeList(b *strings.Builder, title string, items []string) {
