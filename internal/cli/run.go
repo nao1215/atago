@@ -240,23 +240,47 @@ func parseRunFlags(label string, args []string, stdout, stderr io.Writer) (*runO
 }
 
 func finishRun(opts *runOptions, suiteResults []*engine.SuiteResult, loadErrs []error, progress *report.Progress, elapsed time.Duration, ctx context.Context) int {
+	failIncomplete := func() int {
+		if progress != nil {
+			progress.Done()
+		}
+		fmt.Fprintln(opts.stderr, opts.label+": internal error: incomplete run results")
+		return ExitInternal
+	}
+
+	if len(suiteResults) != len(opts.paths) || len(loadErrs) != len(opts.paths) {
+		return failIncomplete()
+	}
+
 	results := make([]*engine.SuiteResult, 0, len(opts.paths))
 	exit := ExitOK
 	loadFailures := 0
-	for i := range opts.paths {
-		if loadErrs[i] != nil {
-			fmt.Fprintf(opts.stderr, "%v\n", loadErrs[i])
-			exit = worseExit(exit, exitForLoadError(loadErrs[i]))
+	remainingResults := suiteResults
+	remainingLoadErrs := loadErrs
+	for range opts.paths {
+		loadErr, nextLoadErrs, ok := shiftSlice(remainingLoadErrs)
+		if !ok {
+			return failIncomplete()
+		}
+		suiteResult, nextResults, ok := shiftSlice(remainingResults)
+		if !ok {
+			return failIncomplete()
+		}
+		remainingLoadErrs = nextLoadErrs
+		remainingResults = nextResults
+		if loadErr != nil {
+			fmt.Fprintf(opts.stderr, "%v\n", loadErr)
+			exit = worseExit(exit, exitForLoadError(loadErr))
 			loadFailures++
 			continue
 		}
 		// A nil result with no load error is a spec fail-fast (or an interrupt)
 		// skipped before running: it contributes no scenarios, so omit it.
-		if suiteResults[i] == nil {
+		if suiteResult == nil {
 			continue
 		}
-		results = append(results, suiteResults[i])
-		exit = worseExit(exit, exitForSuite(suiteResults[i]))
+		results = append(results, suiteResult)
+		exit = worseExit(exit, exitForSuite(suiteResult))
 	}
 	if progress != nil {
 		progress.Done()
@@ -361,6 +385,14 @@ func finishRun(opts *runOptions, suiteResults []*engine.SuiteResult, loadErrs []
 		exit = worseExit(exit, ExitExec)
 	}
 	return exit
+}
+
+func shiftSlice[T any](values []T) (T, []T, bool) {
+	var zero T
+	if len(values) == 0 {
+		return zero, nil, false
+	}
+	return values[0], values[1:], true
 }
 
 // runSpecs loads and executes every spec in paths under ctx, returning each
