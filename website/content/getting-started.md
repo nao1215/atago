@@ -4,6 +4,23 @@ title: Getting started
 description: Record a real run of your CLI, read the spec atago wrote, and keep it as a test — then assert on files, snapshots, interactive prompts, and server peers.
 ---
 
+## Try it in 30 seconds
+
+Before installing anything, prove the loop against a command you already have. If you have Go, paste this — it records a real run and replays it as a test:
+
+```shell
+go run github.com/nao1215/atago@latest record --out demo.atago.yaml -- git --version
+go run github.com/nao1215/atago@latest run demo.atago.yaml
+```
+
+```text
+.
+
+PASSED  1 scenario: 1 passed, 0 failed, 0 errored, 0 skipped
+```
+
+Open `demo.atago.yaml`: `record` captured the exit code, the version line on stdout, and an empty stderr, so you have a real test to tighten rather than YAML written from scratch. Swap `git --version` for any command you have (`go version`, `jq --version`, `ls -la`). Then [install atago](/install/) and point it at your own tool.
+
 ## Start from a real run
 
 You don't write the first spec — your tool does. `atago record -- <command>` runs it once and generates a spec from what it observed (exit code, output, created files):
