@@ -382,3 +382,87 @@ main a:focus-visible {
   outline-offset: 2px;
   border-radius: 2px;
 }
+/* --- cookbook / reference: sticky TOC sidebar on wide viewports (#241) --- */
+/* Anchor jumps land clear of the top edge instead of flush against it. */
+main h2,
+main h3 {
+  scroll-margin-top: 1rem;
+}
+
+/* Narrow (and any non-toc page): keep the collapsible inline TOC, no sidebar. */
+.sidebar {
+  display: none;
+}
+
+.toc-filter {
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 0.75rem;
+  padding: 0.4rem 0.6rem;
+  font: inherit;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+@media (min-width: 1200px) {
+  /* Widen the column band for TOC pages so a sidebar fits beside the 56rem
+     article instead of wasting the margin the narrow cap leaves. */
+  main:has(.page.has-toc) {
+    max-width: 76rem;
+  }
+
+  .page.has-toc {
+    display: grid;
+    grid-template-columns: 15rem minmax(0, 1fr);
+    gap: 2.5rem;
+    align-items: start;
+  }
+
+  .page.has-toc article {
+    max-width: 56rem;
+    min-width: 0;
+  }
+
+  .sidebar {
+    display: block;
+  }
+
+  .sidebar-inner {
+    position: sticky;
+    top: 1rem;
+    max-height: calc(100vh - 2rem);
+    overflow-y: auto;
+    font-size: 0.9rem;
+  }
+
+  .toc-nav ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .toc-nav ul ul {
+    padding-left: 0.9rem;
+  }
+
+  .toc-nav li {
+    margin: 0.15rem 0;
+  }
+
+  .toc-nav a {
+    text-decoration: none;
+    color: var(--muted);
+  }
+
+  .toc-nav a:hover {
+    color: var(--fg);
+    text-decoration: underline;
+  }
+
+  /* The inline collapsible TOC is redundant once the sidebar is shown. */
+  .toc-inline {
+    display: none;
+  }
+}

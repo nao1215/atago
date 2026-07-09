@@ -98,5 +98,49 @@
   }
 })();
 </script>
+<script>
+// Live recipe filter for the cookbook: type "pty" or "snapshot" and only the
+// matching h2 sections (and their TOC entries) stay visible. Sections are
+// contiguous sibling runs between h2 headings, so group the article's children
+// by heading and toggle each group. No-op on pages without a .toc-filter input.
+(function () {
+  var input = document.querySelector(".toc-filter");
+  if (!input) return;
+  var main = document.getElementById("main");
+  var article = main && main.querySelector("article");
+  if (!article) return;
+  var groups = [];
+  var cur = null;
+  Array.prototype.forEach.call(article.children, function (node) {
+    if (node.tagName === "H2") {
+      cur = { heading: node, nodes: [node], text: node.textContent.toLowerCase() };
+      groups.push(cur);
+    } else if (cur) {
+      cur.nodes.push(node);
+      cur.text += " " + node.textContent.toLowerCase();
+    }
+  });
+  var tocLinks = {};
+  document.querySelectorAll(".toc-nav a, .toc-inline a").forEach(function (a) {
+    var href = a.getAttribute("href");
+    if (href && href.charAt(0) === "#") {
+      var id = href.slice(1);
+      (tocLinks[id] = tocLinks[id] || []).push(a);
+    }
+  });
+  function apply() {
+    var q = input.value.trim().toLowerCase();
+    groups.forEach(function (g) {
+      var show = !q || g.text.indexOf(q) !== -1;
+      g.nodes.forEach(function (n) { n.hidden = !show; });
+      (tocLinks[g.heading.id] || []).forEach(function (a) {
+        var li = a.closest("li");
+        if (li) li.hidden = !show;
+      });
+    });
+  }
+  input.addEventListener("input", apply);
+})();
+</script>
 </body>
 </html>

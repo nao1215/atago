@@ -27,6 +27,12 @@ and this project follows [Semantic Versioning](https://semver.org/).
   `<table>` semantics (horizontal scroll moved to a wrapper so screen readers
   keep announcing the Reference tables) round out an accessibility pass (#237,
   #242).
+- Website cookbook and reference navigation (no tool behavior change): on wide
+  viewports the "On this page" list becomes a sticky sidebar next to the content
+  (the collapsible box stays on narrow screens), and the cookbook gains a live
+  recipe filter — typing a keyword hides the non-matching recipe sections and
+  their sidebar entries — turning the 63-recipe single scroll into a browsable
+  catalogue without splitting the committed file or changing any anchor (#241).
 
 ### Fixed
 
