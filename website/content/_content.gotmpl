@@ -84,7 +84,7 @@
     {{ with (findRE `[0-9]+ suites? · [0-9]+ scenarios?` $md 1) }}{{ $coverage = index . 0 }}{{ end }}
     {{ $pageDesc := printf "Behavior docs for %s, generated from the executable atago specs that run in CI." $name }}
     {{ if $coverage }}
-      {{ $pageDesc = printf "Testing %s with atago: %s of executable E2E specs asserting exit codes, output, and file changes — generated from the specs that run in CI." $name $coverage }}
+      {{ $pageDesc = printf "Testing %s with atago: %s — executable E2E specs asserting exit codes, output, and file changes, generated from the specs that run in CI." $name $coverage }}
     {{ end }}
     {{ $.AddPage (dict
         "path" (printf "real-world/%s" $name)

@@ -4,7 +4,7 @@
 {{- $logo := .Resize "800x q90" }}
 <img class="hero-logo" src="{{ $logo.RelPermalink }}" alt="atago" width="{{ $logo.Width }}" height="{{ $logo.Height }}">
 {{- else }}
-<img class="hero-logo" src="{{ relURL "img/atago-logo.jpg" }}" alt="atago" width="400">
+<img class="hero-logo" src="{{ relURL "img/atago-logo.jpg" }}" alt="atago" width="400" height="133">
 {{- end }}
 <h1>{{ site.Params.tagline }}</h1>
 </div>
