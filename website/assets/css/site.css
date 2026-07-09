@@ -80,6 +80,32 @@ header nav .sponsor {
   border-radius: 8px;
 }
 
+/* Landing hero: a smaller logo sitting directly above the tagline h1, so the
+   "what is this" headline is the first text a visitor and a crawler see. */
+.hero {
+  text-align: center;
+  margin: 0.5rem 0 1.5rem;
+}
+
+.hero-logo {
+  max-width: min(360px, 90%);
+  height: auto;
+  border-radius: 8px;
+}
+
+.hero h1 {
+  margin: 0.75rem 0 0;
+  font-size: 1.6rem;
+  line-height: 1.25;
+}
+
+/* Embedded doc images (demo/snapshot GIFs) keep their intrinsic ratio while
+   scaling down, so the reserved width/height box never overflows the column. */
+main img {
+  max-width: 100%;
+  height: auto;
+}
+
 main {
   max-width: 56rem;
   margin: 0 auto;

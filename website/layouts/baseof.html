@@ -4,17 +4,36 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 {{- $title := printf "%s · %s" .Title site.Title }}
+{{- with .Params.seoTitle }}{{ $title = . }}{{ end }}
 {{- if .IsHome }}{{ $title = printf "%s — %s" site.Title site.Params.tagline }}{{ end }}
 <title>{{ $title }}</title>
 {{- $desc := or .Params.description site.Params.description }}
 <meta name="description" content="{{ $desc }}">
 <link rel="canonical" href="{{ .Permalink }}">
+{{- /* A right-ratio (1.91:1) social card and a square favicon, both derived at
+       build time from the committed logo: the logo is fit to 1000px wide and
+       padded onto a 1200x630 brand-dark canvas so X/Slack/Discord render a full
+       card instead of cropping the 3:1 source. Falls back to the raw logo if the
+       processable asset is ever unavailable. */ -}}
+{{- $ogImage := absURL "img/atago-logo.jpg" }}{{ $ogW := "2172" }}{{ $ogH := "724" }}{{ $favicon := relURL "img/atago-logo.jpg" }}{{ $faviconType := "image/jpeg" }}
+{{- with resources.Get "imgsrc/atago-logo.jpg" }}
+  {{- $card := (.Resize "1000x q90").Filter (images.Padding 149 100 148 100 "#0d1117") }}
+  {{- $ogImage = $card.Permalink }}{{ $ogW = string $card.Width }}{{ $ogH = string $card.Height }}
+  {{- $icon := ((.Resize "512x").Filter (images.Padding 170 0 171 0 "#0d1117")).Resize "64x64 png" }}
+  {{- $favicon = $icon.RelPermalink }}{{ $faviconType = "image/png" }}
+{{- end }}
 <meta property="og:title" content="{{ $title }}">
 <meta property="og:description" content="{{ $desc }}">
 <meta property="og:type" content="website">
 <meta property="og:url" content="{{ .Permalink }}">
-<meta property="og:image" content="{{ absURL "img/atago-logo.jpg" }}">
-<link rel="icon" href="{{ relURL "img/atago-logo.jpg" }}">
+<meta property="og:image" content="{{ $ogImage }}">
+<meta property="og:image:width" content="{{ $ogW }}">
+<meta property="og:image:height" content="{{ $ogH }}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{{ $title }}">
+<meta name="twitter:description" content="{{ $desc }}">
+<meta name="twitter:image" content="{{ $ogImage }}">
+<link rel="icon" href="{{ $favicon }}" type="{{ $faviconType }}"{{ if eq $faviconType "image/png" }} sizes="64x64"{{ end }}>
 {{- $css := slice (resources.Get "css/site.css") (resources.Get "css/chroma.css") | resources.Concat "css/bundle.css" | minify | fingerprint }}
 <link rel="stylesheet" href="{{ $css.RelPermalink }}">
 </head>

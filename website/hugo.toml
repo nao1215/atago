@@ -89,6 +89,14 @@ target = "assets/schema/atago.schema.json"
 source = "../doc/img"
 target = "static/img"
 
+# The same images, mounted again as processable assets so the layouts can
+# derive sized variants at build time (a right-ratio social card, a square
+# favicon, and width/height for embedded images to kill layout shift) without
+# committing any extra binary — everything still comes from doc/img.
+[[module.mounts]]
+source = "../doc/img"
+target = "assets/imgsrc"
+
 [[module.mounts]]
 source = "../site/samples"
 target = "static/samples"

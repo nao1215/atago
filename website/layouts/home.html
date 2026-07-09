@@ -1,4 +1,12 @@
 {{ define "main" }}
-<p class="logo"><img src="{{ relURL "img/atago-logo.jpg" }}" alt="atago logo" width="400"></p>
+<div class="hero">
+{{- with resources.Get "imgsrc/atago-logo.jpg" }}
+{{- $logo := .Resize "800x q90" }}
+<img class="hero-logo" src="{{ $logo.RelPermalink }}" alt="atago" width="{{ $logo.Width }}" height="{{ $logo.Height }}">
+{{- else }}
+<img class="hero-logo" src="{{ relURL "img/atago-logo.jpg" }}" alt="atago" width="400">
+{{- end }}
+<h1>{{ site.Params.tagline }}</h1>
+</div>
 {{ .Content }}
 {{ end }}

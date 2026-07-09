@@ -7,6 +7,19 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- Website SEO, social, and landing improvements (no tool behavior change): the
+  landing page now leads with a visible `<h1>` tagline above a right-sized logo
+  (with explicit `width`/`height` on the logo and embedded GIFs to eliminate
+  layout shift); every page ships a 1.91:1 (1200x630) social card and a square
+  favicon, both derived at build time from the committed logo, plus a
+  `twitter:card` and `og:image:width`/`height` tags; the sitemap no longer marks
+  the cookbook and real-world pages as priority 0, `robots.txt` advertises the
+  sitemap, and the 44 generated real-world pages get search-intent titles
+  ("Testing <tool> with atago — executable E2E specs") and coverage-based
+  descriptions (#238, #239, #240).
+
 ### Fixed
 
 - A network-policy (`permissions.network.allow`) violation raised by a
