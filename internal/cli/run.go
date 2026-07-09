@@ -23,10 +23,117 @@ import (
 	"github.com/nao1215/atago/internal/report"
 )
 
+// runOptions is the validated result of parsing `atago run`'s flags: the plain
+// configuration the run pipeline needs, with every ExitConfig-worthy check
+// already done by parseRunFlags. Keeping it a plain struct lets finishRun's
+// exit-code invariants be exercised by a unit test instead of only through full
+// CLI invocations (#246).
+type runOptions struct {
+	label           string
+	format          report.Format
+	paths           []string
+	updateSnapshots bool
+	parallel        int
+	failFast        bool
+	repeat          int
+	retryFailed     int
+	filter          csvFlag
+	tag             csvFlag
+	skipTag         csvFlag
+	artifactsDir    string
+	rerunFailed     bool
+	verbose         bool
+	ci              bool
+	stdout          io.Writer
+	stderr          io.Writer
+}
+
+// selectionActive reports whether the user narrowed the run with a name/tag
+// selector — the shared guard for the rerun-matched-nothing and
+// selection-matched-nothing warnings.
+func (o *runOptions) selectionActive() bool {
+	return len(o.filter) > 0 || len(o.tag) > 0 || len(o.skipTag) > 0
+}
+
 // runCmd implements `atago run`. label is the command name to name in error
 // messages ("atago run", or "atago snapshot update" when snapshotCmd delegates
-// here), so a diagnostic identifies the command the user actually invoked.
+// here), so a diagnostic identifies the command the user actually invoked. It is
+// the ~40-line pipeline between parseRunFlags (flag parse + validation) and
+// finishRun (post-run bookkeeping and the final exit code) (#246).
 func runCmd(label string, args []string, stdout, stderr io.Writer) int {
+	opts, exit, done := parseRunFlags(label, args, stdout, stderr)
+	if done {
+		return exit
+	}
+
+	eng := engine.New()
+	eng.UpdateSnapshots = opts.updateSnapshots
+	eng.Parallel = opts.parallel
+	eng.FailFast = opts.failFast
+	eng.Repeat = opts.repeat
+	eng.RetryFailed = opts.retryFailed
+	eng.FilterNames = opts.filter
+	eng.Tags = opts.tag
+	eng.SkipTags = opts.skipTag
+	if strings.TrimSpace(opts.artifactsDir) != "" {
+		eng.Artifacts = artifact.NewDir(opts.artifactsDir)
+	}
+
+	paths := opts.paths
+	// --rerun-failed restricts this run to the scenarios recorded as failing on
+	// the previous run (#64); the selection and canonicalization invariants live
+	// with the ledger primitives in rerun.go.
+	if opts.rerunFailed {
+		narrowed, exitNow, done := applyRerunSelection(label, stderr, paths, eng)
+		if done {
+			return exitNow
+		}
+		paths = narrowed
+	}
+	opts.paths = paths
+
+	// In console mode, stream a live dot per scenario as it finishes, so a run
+	// visibly zips along. JSON output stays pure (no dots on stdout).
+	// --verbose (#6) replaces the dots with a full per-scenario trace; with a
+	// machine report the trace goes to stderr so stdout stays machine-readable.
+	var progress *report.Progress
+	switch {
+	case opts.verbose && opts.format == report.FormatConsole:
+		eng.OnScenario = report.NewVerbose(stdout).Scenario
+	case opts.verbose:
+		eng.OnScenario = report.NewVerbose(stderr).Scenario
+	case opts.format == report.FormatConsole:
+		progress = report.NewProgress(stdout)
+		eng.OnScenario = progress.Scenario
+	}
+
+	// Cancel the whole run on Ctrl-C / SIGTERM. NotifyContext restores the default
+	// signal disposition on the second signal, so an unresponsive run can still be
+	// force-killed. The context threads into every scenario and runner so an
+	// interrupt stops scheduling new work and unwinds in-flight cleanup promptly.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	// With --parallel > 1, run suites concurrently too, sharing one global
+	// semaphore so the TOTAL number of in-flight scenarios across every suite is
+	// capped at N. This parallelizes both many-small-suites and few-large-suites
+	// runs. Results are reassembled in input order for a deterministic report.
+	if opts.parallel > 1 {
+		eng.Sem = make(chan struct{}, opts.parallel)
+	}
+	start := time.Now()
+	suiteResults, loadErrs := runSpecs(ctx, eng, paths)
+	elapsed := time.Since(start)
+
+	return finishRun(opts, suiteResults, loadErrs, progress, elapsed, ctx)
+}
+
+// parseRunFlags parses and validates `atago run`'s flags into a runOptions. The
+// bool return is true when parsing already decided the outcome (a --help, a bad
+// flag, an unknown --report, no matching spec files, or a failed bounds check),
+// in which case the int is the exit code to return immediately; otherwise it is
+// ExitOK and the caller proceeds with the returned options.
+func parseRunFlags(label string, args []string, stdout, stderr io.Writer) (*runOptions, int, bool) {
 	fs := flag.NewFlagSet(label, flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	reportFmt := fs.String("report", "console", "report format: console|json|junit|gha|tap")
@@ -51,9 +158,9 @@ func runCmd(label string, args []string, stdout, stderr io.Writer) int {
 	}
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
-			return ExitOK
+			return nil, ExitOK, true
 		}
-		return ExitConfig
+		return nil, ExitConfig, true
 	}
 	if *ci {
 		// Force deterministic, color-free output. Secret masking is always on.
@@ -63,7 +170,7 @@ func runCmd(label string, args []string, stdout, stderr io.Writer) int {
 	format := report.Format(*reportFmt)
 	if !format.Valid() {
 		fmt.Fprintf(stderr, label+": unknown --report %q (want console, json, junit, gha, or tap)\n", *reportFmt)
-		return ExitConfig
+		return nil, ExitConfig, true
 	}
 
 	targets := fs.Args()
@@ -74,11 +181,11 @@ func runCmd(label string, args []string, stdout, stderr io.Writer) int {
 	paths, err := collectSpecFiles(targets)
 	if err != nil {
 		fmt.Fprintf(stderr, label+": %v\n", err)
-		return ExitConfig
+		return nil, ExitConfig, true
 	}
 	if len(paths) == 0 {
 		fmt.Fprintln(stderr, label+": no *.atago.yaml (or *.atago.yml) files found")
-		return ExitConfig
+		return nil, ExitConfig, true
 	}
 
 	// --repeat and --retry-failed answer opposite questions (does it flake? /
@@ -87,11 +194,11 @@ func runCmd(label string, args []string, stdout, stderr io.Writer) int {
 	// changes nothing and must not be rejected alongside --retry-failed.
 	if *repeat > 1 && *retryFailed > 0 {
 		fmt.Fprintln(stderr, label+": --repeat and --retry-failed are mutually exclusive (repeat detects flakiness, retry-failed tolerates it)")
-		return ExitConfig
+		return nil, ExitConfig, true
 	}
 	if *repeat < 0 || *retryFailed < 0 {
 		fmt.Fprintln(stderr, label+": --repeat and --retry-failed must be >= 0")
-		return ExitConfig
+		return nil, ExitConfig, true
 	}
 	// A negative --parallel is a typo, not a request: the engine would clamp it to
 	// sequential and exit 0, silently ignoring the mistake. Reject it with the same
@@ -99,18 +206,8 @@ func runCmd(label string, args []string, stdout, stderr io.Writer) int {
 	// is left to mean the default (like repeat/retry allow 0).
 	if *parallel < 0 {
 		fmt.Fprintln(stderr, label+": --parallel must be >= 0")
-		return ExitConfig
+		return nil, ExitConfig, true
 	}
-
-	eng := engine.New()
-	eng.UpdateSnapshots = *updateSnapshots
-	eng.Parallel = *parallel
-	eng.FailFast = *failFast
-	eng.Repeat = *repeat
-	eng.RetryFailed = *retryFailed
-	eng.FilterNames = filter
-	eng.Tags = tag
-	eng.SkipTags = skipTag
 	if strings.TrimSpace(*artifactsDir) != "" {
 		// Fail fast if the artifacts dir cannot be used. An existing regular file at
 		// the path, or a directory that cannot be created, would otherwise make
@@ -118,61 +215,37 @@ func runCmd(label string, args []string, stdout, stderr io.Writer) int {
 		// produced no reviewable failures when in fact none could be written.
 		if err := ensureArtifactsDir(*artifactsDir); err != nil {
 			fmt.Fprintf(stderr, label+": --artifacts-dir %q is not usable: %v\n", *artifactsDir, err)
-			return ExitConfig
+			return nil, ExitConfig, true
 		}
-		eng.Artifacts = artifact.NewDir(*artifactsDir)
 	}
+	return &runOptions{
+		label:           label,
+		format:          format,
+		paths:           paths,
+		updateSnapshots: *updateSnapshots,
+		parallel:        *parallel,
+		failFast:        *failFast,
+		repeat:          *repeat,
+		retryFailed:     *retryFailed,
+		filter:          filter,
+		tag:             tag,
+		skipTag:         skipTag,
+		artifactsDir:    *artifactsDir,
+		rerunFailed:     *rerunFailed,
+		verbose:         *verbose,
+		ci:              *ci,
+		stdout:          stdout,
+		stderr:          stderr,
+	}, ExitOK, false
+}
 
-	// --rerun-failed restricts this run to the scenarios recorded as failing on
-	// the previous run (#64); the selection and canonicalization invariants live
-	// with the ledger primitives in rerun.go.
-	if *rerunFailed {
-		narrowed, exitNow, done := applyRerunSelection(label, stderr, paths, eng)
-		if done {
-			return exitNow
-		}
-		paths = narrowed
-	}
-
-	// In console mode, stream a live dot per scenario as it finishes, so a run
-	// visibly zips along. JSON output stays pure (no dots on stdout).
-	// --verbose (#6) replaces the dots with a full per-scenario trace; with a
-	// machine report the trace goes to stderr so stdout stays machine-readable.
-	var progress *report.Progress
-	switch {
-	case *verbose && format == report.FormatConsole:
-		eng.OnScenario = report.NewVerbose(stdout).Scenario
-	case *verbose:
-		eng.OnScenario = report.NewVerbose(stderr).Scenario
-	case format == report.FormatConsole:
-		progress = report.NewProgress(stdout)
-		eng.OnScenario = progress.Scenario
-	}
-
-	// Cancel the whole run on Ctrl-C / SIGTERM. NotifyContext restores the default
-	// signal disposition on the second signal, so an unresponsive run can still be
-	// force-killed. The context threads into every scenario and runner so an
-	// interrupt stops scheduling new work and unwinds in-flight cleanup promptly.
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-
-	// With --parallel > 1, run suites concurrently too, sharing one global
-	// semaphore so the TOTAL number of in-flight scenarios across every suite is
-	// capped at N. This parallelizes both many-small-suites and few-large-suites
-	// runs. Results are reassembled in input order for a deterministic report.
-	if *parallel > 1 {
-		eng.Sem = make(chan struct{}, *parallel)
-	}
-	start := time.Now()
-	suiteResults, loadErrs := runSpecs(ctx, eng, paths)
-	elapsed := time.Since(start)
-
-	results := make([]*engine.SuiteResult, 0, len(paths))
+func finishRun(opts *runOptions, suiteResults []*engine.SuiteResult, loadErrs []error, progress *report.Progress, elapsed time.Duration, ctx context.Context) int {
+	results := make([]*engine.SuiteResult, 0, len(opts.paths))
 	exit := ExitOK
 	loadFailures := 0
-	for i := range paths {
+	for i := range opts.paths {
 		if loadErrs[i] != nil {
-			fmt.Fprintf(stderr, "%v\n", loadErrs[i])
+			fmt.Fprintf(opts.stderr, "%v\n", loadErrs[i])
 			exit = worseExit(exit, exitForLoadError(loadErrs[i]))
 			loadFailures++
 			continue
@@ -206,10 +279,9 @@ func runCmd(label string, args []string, stdout, stderr io.Writer) int {
 	// selection is why nothing ran, blaming a rename/removal is wrong (and
 	// contradicts the selection warning below). The excluded failures are still
 	// preserved into the ledger via rerunPreserved above, so no work is lost.
-	selectionActive := len(filter) > 0 || len(tag) > 0 || len(skipTag) > 0
-	rerunMatchedNothing := *rerunFailed && !selectionActive && len(results) > 0 && ranScenarios == 0 && ctx.Err() == nil
+	rerunMatchedNothing := opts.rerunFailed && !opts.selectionActive() && len(results) > 0 && ranScenarios == 0 && ctx.Err() == nil
 	if rerunMatchedNothing {
-		fmt.Fprintln(stderr, label+": warning: no recorded failing scenarios matched the current specs (renamed or removed?); the recorded failures were kept, not cleared")
+		fmt.Fprintln(opts.stderr, opts.label+": warning: no recorded failing scenarios matched the current specs (renamed or removed?); the recorded failures were kept, not cleared")
 		exit = worseExit(exit, ExitConfig)
 	}
 
@@ -219,7 +291,7 @@ func runCmd(label string, args []string, stdout, stderr io.Writer) int {
 	// and when a --rerun-failed matched nothing (its unmapped failures must
 	// survive).
 	if len(results) > 0 && !rerunMatchedNothing {
-		updateRerunLedger(label, stderr, results, ranScenarios)
+		updateRerunLedger(opts.label, opts.stderr, results, ranScenarios)
 	}
 
 	// Every spec failed to load, or an interrupt skipped every suite before it
@@ -227,7 +299,7 @@ func runCmd(label string, args []string, stdout, stderr io.Writer) int {
 	// that was interrupted before completing must never exit 0.
 	if len(results) == 0 {
 		if ctx.Err() != nil {
-			fmt.Fprintln(stderr, label+": interrupted")
+			fmt.Fprintln(opts.stderr, opts.label+": interrupted")
 			return worseExit(exit, ExitExec)
 		}
 		return exit
@@ -237,7 +309,7 @@ func runCmd(label string, args []string, stdout, stderr io.Writer) int {
 	// ran, nothing failed) but stays loud; under --ci it is a hard config error so
 	// a typo'd --filter/--tag/--skip-tag cannot silently disable the whole suite in
 	// a pipeline forever.
-	if selectionActive {
+	if opts.selectionActive() {
 		total := 0
 		for _, r := range results {
 			total += len(r.Scenarios)
@@ -249,43 +321,43 @@ func runCmd(label string, args []string, stdout, stderr io.Writer) int {
 		// case the task must fail on, not "the specs had nothing to run".
 		if total == 0 && ctx.Err() == nil {
 			var sel []string
-			if len(filter) > 0 {
-				sel = append(sel, fmt.Sprintf("--filter %q", strings.Join(filter, ",")))
+			if len(opts.filter) > 0 {
+				sel = append(sel, fmt.Sprintf("--filter %q", strings.Join(opts.filter, ",")))
 			}
-			if len(tag) > 0 {
-				sel = append(sel, fmt.Sprintf("--tag %q", strings.Join(tag, ",")))
+			if len(opts.tag) > 0 {
+				sel = append(sel, fmt.Sprintf("--tag %q", strings.Join(opts.tag, ",")))
 			}
-			if len(skipTag) > 0 {
-				sel = append(sel, fmt.Sprintf("--skip-tag %q", strings.Join(skipTag, ",")))
+			if len(opts.skipTag) > 0 {
+				sel = append(sel, fmt.Sprintf("--skip-tag %q", strings.Join(opts.skipTag, ",")))
 			}
-			tagActive := len(tag) > 0 || len(skipTag) > 0
+			tagActive := len(opts.tag) > 0 || len(opts.skipTag) > 0
 			// The note is selector-aware: --filter matches names by case-sensitive
 			// substring, but --tag/--skip-tag compare tags for EXACT equality
 			// (engine.hasAnyTag uses ==). A single "substring" note for tags would send
 			// users fixing the wrong thing, so name each selector's real rule.
-			note := selectorNoMatchNote(len(filter) > 0, tagActive)
-			if *ci {
-				fmt.Fprintf(stderr, label+": no scenarios matched %s under --ci; refusing to exit 0 (an empty selection would silently disable the suite). %s. Run `atago list` to see available scenarios and tags.\n", strings.Join(sel, " "), note)
+			note := selectorNoMatchNote(len(opts.filter) > 0, tagActive)
+			if opts.ci {
+				fmt.Fprintf(opts.stderr, opts.label+": no scenarios matched %s under --ci; refusing to exit 0 (an empty selection would silently disable the suite). %s. Run `atago list` to see available scenarios and tags.\n", strings.Join(sel, " "), note)
 				exit = worseExit(exit, ExitConfig)
 			} else {
 				hint := note
 				if tagActive {
 					hint += "; run `atago list` to see the available tags"
 				}
-				fmt.Fprintf(stderr, label+": warning: no scenarios matched %s (%s)\n", strings.Join(sel, " "), hint)
+				fmt.Fprintf(opts.stderr, opts.label+": warning: no scenarios matched %s (%s)\n", strings.Join(sel, " "), hint)
 			}
 		}
 	}
 
-	if err := report.Render(stdout, format, results, report.WithLoadFailures(loadFailures), report.WithElapsed(elapsed)); err != nil {
-		fmt.Fprintf(stderr, label+": failed to write report: %v\n", err)
+	if err := report.Render(opts.stdout, opts.format, results, report.WithLoadFailures(loadFailures), report.WithElapsed(elapsed)); err != nil {
+		fmt.Fprintf(opts.stderr, opts.label+": failed to write report: %v\n", err)
 		return worseExit(exit, ExitInternal)
 	}
 	// An interrupted run never reports success, even in the rare case where the
 	// signal landed between scenarios and every scheduled one was skipped: the run
 	// did not complete, so the exit code is at least an execution error (4).
 	if ctx.Err() != nil {
-		fmt.Fprintln(stderr, label+": interrupted")
+		fmt.Fprintln(opts.stderr, opts.label+": interrupted")
 		exit = worseExit(exit, ExitExec)
 	}
 	return exit
