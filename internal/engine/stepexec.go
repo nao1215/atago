@@ -45,6 +45,52 @@ func leakedRunRefMsg(field, name string) string {
 		field, name, name, name)
 }
 
+// runRefGuard checks a run step for a ${...} reference that nothing could ever
+// expand and that would therefore leak verbatim into the child's argv. It
+// returns an explained error message, or "" when the step is clean. The rules,
+// all skipped for an ssh runner (a remote shell may expand a bare ${name}):
+//
+//   - no-shell command: an unresolved ${name}/${env:NAME} is a typo — with no
+//     shell nothing expands it, so the literal text would run;
+//   - shell command: a bare ${name} passes (the shell expands it), but an unset
+//     ${env:NAME} is atago-only syntax no shell understands, so it still errors;
+//   - cwd: passed to cmd.Dir verbatim, never shell-expanded, so any unresolved
+//     ${name} is guarded regardless of shell;
+//   - a ${...} dragged in by a substituted store/matrix value survives single-
+//     pass expansion into a no-shell argv (or cwd) and is caught too (#249).
+//
+// It is shared by execStep (scenario steps) and runSuiteSteps (suite setup and
+// teardown) so both enforce the identical guard instead of one loop drifting
+// from the other (#243).
+func runRefGuard(st *store.Store, run *spec.Run, runners map[string]spec.Runner) string {
+	if isSSHRunner(run.Runner, runners) {
+		return ""
+	}
+	if !run.ShellEnabled() {
+		if names := st.Unresolved(run.Command); len(names) > 0 {
+			return unresolvedRunRefMsg("run.command", names[0], true)
+		}
+	} else {
+		for _, name := range st.Unresolved(run.Command) {
+			if strings.HasPrefix(name, "env:") {
+				return unresolvedRunRefMsg("run.command", name, true)
+			}
+		}
+	}
+	if names := st.Unresolved(run.Cwd); len(names) > 0 {
+		return unresolvedRunRefMsg("run.cwd", names[0], false)
+	}
+	if !run.ShellEnabled() {
+		if _, leaked := st.ExpandDetectingLeaks(run.Command); len(leaked) > 0 {
+			return leakedRunRefMsg("run.command", leaked[0])
+		}
+	}
+	if _, leaked := st.ExpandDetectingLeaks(run.Cwd); len(leaked) > 0 {
+		return leakedRunRefMsg("run.cwd", leaked[0])
+	}
+	return ""
+}
+
 // execStep runs one step and returns its result, its status contribution
 // (passed/failed/error), and whether it breached the security policy. It is
 // shared by the Steps loop and the Teardown loop; only the caller decides
@@ -67,58 +113,9 @@ func (x *scenarioRun) execStep(ctx context.Context, i int, step *spec.Step, befo
 			status = StatusError
 		}
 	case spec.StepRun:
-		// A ${name} that no variable defines is left verbatim so a shell can
-		// still expand it — but a local run without `shell: true`
-		// has no shell, so nothing could ever expand it and the literal text
-		// would leak into argv. That is almost always a typo; error with the
-		// reference named instead of running a garbled command (#UX). A named
-		// cmd runner runs the command as local argv too, so it is guarded like
-		// the default runner; only an ssh runner (remote, where a remote shell
-		// may expand it) is exempt.
-		if !isSSHRunner(step.Run.Runner, x.rc.runners) {
-			if !step.Run.ShellEnabled() {
-				if names := x.st.Unresolved(step.Run.Command); len(names) > 0 {
-					sr.ErrMsg = unresolvedRunRefMsg("run.command", names[0], true)
-					return sr, StatusError, false
-				}
-			} else {
-				// A shell can expand a bare ${name}, so those pass through — but
-				// ${env:NAME} is atago-only syntax NO shell understands: POSIX sh
-				// dies with a cryptic "Bad substitution" and cmd.exe forwards the
-				// literal text. An unset ${env:NAME} under shell: true is the same
-				// authoring error as without a shell; fail it with the same
-				// explained message instead of handing it to the shell.
-				for _, name := range x.st.Unresolved(step.Run.Command) {
-					if strings.HasPrefix(name, "env:") {
-						sr.ErrMsg = unresolvedRunRefMsg("run.command", name, true)
-						return sr, StatusError, false
-					}
-				}
-			}
-			// cwd is passed to cmd.Dir verbatim; no shell ever expands it, so an
-			// unresolved ${name} is always a typo that would make the child fail to
-			// start in a literal "${name}" directory and surface as a misleading
-			// "executable not found". Guard it regardless of shell.
-			if names := x.st.Unresolved(step.Run.Cwd); len(names) > 0 {
-				sr.ErrMsg = unresolvedRunRefMsg("run.cwd", names[0], false)
-				return sr, StatusError, false
-			}
-			// The guards above run on the raw fields, where the outer ${p}/${path}
-			// IS defined. But a store/matrix value can itself contain a ${...}
-			// reference, and expansion is single-pass — so substituting such a value
-			// leaves an unexpanded reference that leaks verbatim into a no-shell argv
-			// (or into cwd, which no shell ever expands). Catch that leaked reference
-			// here instead of running a garbled command (#249).
-			if !step.Run.ShellEnabled() {
-				if _, leaked := x.st.ExpandDetectingLeaks(step.Run.Command); len(leaked) > 0 {
-					sr.ErrMsg = leakedRunRefMsg("run.command", leaked[0])
-					return sr, StatusError, false
-				}
-			}
-			if _, leaked := x.st.ExpandDetectingLeaks(step.Run.Cwd); len(leaked) > 0 {
-				sr.ErrMsg = leakedRunRefMsg("run.cwd", leaked[0])
-				return sr, StatusError, false
-			}
+		if msg := runRefGuard(x.st, step.Run, x.rc.runners); msg != "" {
+			sr.ErrMsg = msg
+			return sr, StatusError, false
 		}
 		run := mergeScenarioEnv(x.scEnv, expandRun(x.st, step.Run), x.st)
 		r, untilChecks, err := x.e.runStep(ctx, run, x.st, x.workdir, x.specDir, x.rc, x.sshConns, beforeAttempt)

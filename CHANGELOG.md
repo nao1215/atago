@@ -41,6 +41,14 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- A failing assertion inside `suite.setup`/`suite.teardown` now masks declared
+  secrets in its reported `Expected`/`Actual`/`Hint` fields and writes
+  `--artifacts-dir` sidecars, matching scenario-level asserts. The suite path
+  previously set the check payloads raw, so a secret printed by a setup command
+  and echoed into an assert-failure block leaked into the console/JSON reports
+  (the leak class #12 fixed for scenarios); and a suite run step with an
+  unresolved `${name}` now errors with the same explained diagnostic instead of
+  leaking the literal reference into argv (#243).
 - A network-policy (`permissions.network.allow`) violation raised by a
   `teardown` step now sets `SecurityViolation` and exits 6, instead of being
   silently swallowed so a spec that contacted a denied host during cleanup

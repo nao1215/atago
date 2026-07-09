@@ -92,7 +92,7 @@ func (e *Engine) newSuiteRuntime(s *spec.Spec) (*suiteRuntime, error) {
 // is then errored by the caller. Teardown (stopOnFailure=false) always runs
 // every step: cleanups of independent resources must not shadow each other.
 // The returned bool reports whether every step succeeded.
-func (e *Engine) runSuiteSteps(ctx context.Context, steps []spec.Step, rt *suiteRuntime, rc runConfig, stopOnFailure bool) ([]StepResult, bool) {
+func (e *Engine) runSuiteSteps(ctx context.Context, steps []spec.Step, rt *suiteRuntime, rc runConfig, stopOnFailure bool, label string) ([]StepResult, bool) {
 	var out []StepResult
 	var current *runner.Result
 	ok := true
@@ -115,6 +115,14 @@ func (e *Engine) runSuiteSteps(ctx context.Context, steps []spec.Step, rt *suite
 				failed = true
 			}
 		case spec.StepRun:
+			// Same unresolved/leaked-${name} guard the scenario path enforces, so a
+			// typo in suite.setup errors with the explained diagnostic instead of
+			// leaking the literal reference into argv (#243).
+			if msg := runRefGuard(rt.st, step.Run, rc.runners); msg != "" {
+				sr.ErrMsg = msg
+				failed = true
+				break
+			}
 			run := mergeScenarioEnv(rt.env, expandRun(rt.st, step.Run), rt.st)
 			r, untilChecks, err := e.runStep(ctx, run, rt.st, rt.dir, rc.specDir, rc, rt.sshConns, nil) // suite setup/teardown steps carry no changes assert
 			if err != nil {
@@ -125,6 +133,10 @@ func (e *Engine) runSuiteSteps(ctx context.Context, steps []spec.Step, rt *suite
 			current = r
 			sr.Run = maskResult(rc.masker, r)
 			if len(untilChecks) > 0 {
+				// recordChecks masks secrets in the check payloads and writes any
+				// --artifacts-dir sidecars, exactly as the scenario path does — the
+				// suite path used to set sr.Checks raw and leak both (#243).
+				e.recordChecks(rc.masker, untilChecks, rc.specPath, label, -1, i)
 				sr.Checks = untilChecks
 				if !assert.AllOK(untilChecks) {
 					failed = true
@@ -154,6 +166,7 @@ func (e *Engine) runSuiteSteps(ctx context.Context, steps []spec.Step, rt *suite
 					return nil, false
 				},
 			})
+			e.recordChecks(rc.masker, crs, rc.specPath, label, -1, i)
 			sr.Checks = crs
 			if !assert.AllOK(crs) {
 				failed = true
@@ -228,6 +241,6 @@ func (e *Engine) runSuiteTeardown(ctx context.Context, s *spec.Spec, rt *suiteRu
 		tctx, cancel = context.WithTimeout(context.Background(), teardownInterruptTimeout)
 		defer cancel()
 	}
-	out, _ := e.runSuiteSteps(tctx, s.Suite.Teardown, rt, rc, false)
+	out, _ := e.runSuiteSteps(tctx, s.Suite.Teardown, rt, rc, false, "suite teardown")
 	return out
 }

@@ -157,7 +157,7 @@ func (e *Engine) Run(ctx context.Context, s *spec.Spec, specPath string) *SuiteR
 	if suiteRT != nil {
 		defer suiteRT.stop()
 		var setupOK bool
-		res.Setup, setupOK = e.runSuiteSteps(ctx, s.Suite.Setup, suiteRT, rc, true)
+		res.Setup, setupOK = e.runSuiteSteps(ctx, s.Suite.Setup, suiteRT, rc, true, "suite setup")
 		if !setupOK {
 			// Every selected scenario is errored with the suite-setup phase
 			// named; none of their steps run. Teardown still runs: a partially
