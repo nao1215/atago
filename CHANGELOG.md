@@ -19,6 +19,14 @@ and this project follows [Semantic Versioning](https://semver.org/).
   sitemap, and the 44 generated real-world pages get search-intent titles
   ("Testing <tool> with atago — executable E2E specs") and coverage-based
   descriptions (#238, #239, #240).
+- Website performance and accessibility (no tool behavior change): the heavy
+  real-world pages skip off-screen layout via `content-visibility` on code
+  blocks and tables, and copy buttons are now created lazily as blocks scroll
+  into view (instead of building ~1,900 buttons at load); a skip-to-content link,
+  keyboard/touch-visible copy buttons with `:focus-visible` outlines, and real
+  `<table>` semantics (horizontal scroll moved to a wrapper so screen readers
+  keep announcing the Reference tables) round out an accessibility pass (#237,
+  #242).
 
 ### Fixed
 
