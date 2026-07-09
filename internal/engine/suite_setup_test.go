@@ -318,3 +318,86 @@ scenarios:
 		t.Fatalf("scenario should be errored by the setup failure: %+v", res.Scenarios)
 	}
 }
+
+// TestEngine_SuiteSetupAssertMasksSecrets is a regression for #243: a suite.setup
+// assert failure whose Actual/Hint carry a declared secret must be masked before
+// it reaches the reports, exactly as a scenario-level assert failure already is
+// (#12). The suite path used to set sr.Checks directly, bypassing maskCheck, so a
+// secret printed by a setup command leaked into the console/JSON failure block.
+func TestEngine_SuiteSetupAssertMasksSecrets(t *testing.T) {
+	const secret = "ghp_suite_setup_secret_value"
+	t.Setenv("ATAGO_TEST_SECRET", secret)
+	src := `
+version: "1"
+suite:
+  name: s
+  setup:
+    - run:
+        shell: true
+        command: echo token-` + envRef("ATAGO_TEST_SECRET") + `
+    - assert:
+        stdout: {equals: this-will-not-match}
+secrets:
+  - ATAGO_TEST_SECRET
+scenarios:
+  - name: never runs
+    steps:
+      - run: {shell: true, command: echo unreached}
+`
+	s, err := loader.LoadBytes("t.atago.yaml", []byte(src))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	res := New().Run(context.Background(), s, "t.atago.yaml")
+	if res.Status != StatusError {
+		t.Fatalf("status = %s, want error (setup assert fails)", res.Status)
+	}
+	// The failing setup assert is step index 1; its check's Actual holds the
+	// setup command's stdout, which contains the secret. It must be masked.
+	if len(res.Setup) < 2 {
+		t.Fatalf("recorded %d setup steps, want >= 2", len(res.Setup))
+	}
+	for _, sr := range res.Setup {
+		for _, cr := range sr.Checks {
+			blob := cr.Desc + "\n" + cr.Expected + "\n" + cr.Actual + "\n" + cr.Hint
+			if strings.Contains(blob, secret) {
+				t.Errorf("suite setup check leaked the raw secret:\n%s", blob)
+			}
+		}
+	}
+}
+
+// TestEngine_SuiteSetupUnresolvedVarGuard is a regression for #243: a suite.setup
+// run whose command references an undefined ${name} with no shell must error with
+// the same explained diagnostic the scenario path gives, instead of leaking the
+// literal ${name} into argv. The suite path called runStep directly, skipping the
+// unresolved-reference guard.
+func TestEngine_SuiteSetupUnresolvedVarGuard(t *testing.T) {
+	t.Parallel()
+	src := `
+version: "1"
+suite:
+  name: s
+  setup:
+    - run: {command: "echo ${undefined_setup_var}"}
+scenarios:
+  - name: never runs
+    steps:
+      - run: {shell: true, command: echo unreached}
+`
+	s, err := loader.LoadBytes("t.atago.yaml", []byte(src))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	res := New().Run(context.Background(), s, "t.atago.yaml")
+	if res.Status != StatusError {
+		t.Fatalf("status = %s, want error (unresolved ${name} in setup)", res.Status)
+	}
+	if len(res.Setup) < 1 {
+		t.Fatalf("recorded %d setup steps, want >= 1", len(res.Setup))
+	}
+	msg := res.Setup[0].ErrMsg
+	if !strings.Contains(msg, "undefined_setup_var") || !strings.Contains(msg, "no variable with that name") {
+		t.Errorf("setup err = %q, want the explained unresolved-reference diagnostic", msg)
+	}
+}
