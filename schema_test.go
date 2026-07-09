@@ -492,6 +492,66 @@ func TestManifestExample_Conforms(t *testing.T) {
 	}
 }
 
+// TestManifest_SuiteLifecycleConforms builds a manifest for a spec that exercises
+// the suite lifecycle — env, setup (with a service), teardown, and the derived
+// suite_variables — and validates the output against the manifest schema. The
+// schema previously omitted every suite_* field except suite_timeout, so a
+// suite-bearing manifest would have failed its own published schema (#244).
+func TestManifest_SuiteLifecycleConforms(t *testing.T) {
+	src := `
+version: "1"
+suite:
+  name: life
+  env:
+    SHARED: shared-value
+  setup:
+    - run: {shell: true, command: "echo build ${srcdir}"}
+    - service:
+        name: db
+        command: ./db
+        env:
+          DSN: "${dsn_ref}"
+        ready:
+          file: "${suitedir}/ready"
+  teardown:
+    - run: {shell: true, command: cleanup}
+scenarios:
+  - name: sc
+    steps:
+      - run: {shell: true, command: echo hi}
+`
+	s, err := loader.LoadBytes("life.atago.yaml", []byte(src))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	doc := manifest.Build([]manifest.Input{{Spec: s, Path: "life.atago.yaml"}})
+	blob, err := json.Marshal(doc)
+	if err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	}
+	var v any
+	if err := json.Unmarshal(blob, &v); err != nil {
+		t.Fatalf("unmarshal manifest: %v", err)
+	}
+	schema := compileSchema(t, "schema/manifest.schema.json")
+	if err := schema.Validate(v); err != nil {
+		t.Errorf("suite-lifecycle manifest does not conform to schema:\n%v", err)
+	}
+	// The suite service's env value and ready-probe references must surface.
+	sv := doc.Specs[0].SuiteVariables
+	for _, want := range []string{"srcdir", "dsn_ref", "suitedir"} {
+		found := false
+		for _, got := range sv {
+			if got == want {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("suite_variables = %v, want it to include %q", sv, want)
+		}
+	}
+}
+
 // TestReportExample_Conforms validates the committed report example against the
 // report schema. The report embeds wall-clock duration_ms fields, so the
 // committed example zeroes them and is guarded by schema conformance rather than

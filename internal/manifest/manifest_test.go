@@ -490,7 +490,18 @@ func TestBuildSpec_SuiteLifecycle(t *testing.T) {
 			Name:    "life",
 			Timeout: "30s",
 			Env:     map[string]string{"ZED": "secretz", "ALPHA": "secreta"},
-			Setup:   []spec.Step{{Run: &spec.Run{Command: "build"}}},
+			Setup: []spec.Step{
+				{Run: &spec.Run{Command: "build ${srcdir}"}},
+				// A suite service whose env value and ready probe reference variables:
+				// the manifest must report them (previously CollectStepVars' service
+				// case dropped env/ready, and no suite-variable list was output) (#244).
+				{Service: &spec.Service{
+					Name:    "db",
+					Command: "./db",
+					Env:     map[string]string{"DSN": "${dsn_ref}"},
+					Ready:   &spec.Ready{File: "${suitedir}/ready-${tag}"},
+				}},
+			},
 			Teardown: []spec.Step{
 				{Run: &spec.Run{Command: "cleanup"}},
 			},
@@ -505,8 +516,16 @@ func TestBuildSpec_SuiteLifecycle(t *testing.T) {
 	if strings.Join(sp.SuiteEnv, ",") != "ALPHA,ZED" {
 		t.Errorf("suite env keys = %v, want [ALPHA ZED]", sp.SuiteEnv)
 	}
-	if len(sp.SuiteSetup) != 1 || sp.SuiteSetup[0].Command != "build" {
+	if len(sp.SuiteSetup) != 2 || sp.SuiteSetup[0].Command != "build ${srcdir}" {
 		t.Errorf("suite setup = %+v", sp.SuiteSetup)
+	}
+	// The suite-variable union must include the run command's ref AND the suite
+	// service's env-value and ready-probe refs (the #244 drift).
+	sv := strings.Join(sp.SuiteVariables, ",")
+	for _, want := range []string{"srcdir", "dsn_ref", "suitedir", "tag"} {
+		if !strings.Contains(","+sv+",", ","+want+",") {
+			t.Errorf("suite_variables = %v, want it to include %q", sp.SuiteVariables, want)
+		}
 	}
 	if len(sp.SuiteTeardown) != 1 || sp.SuiteTeardown[0].Command != "cleanup" {
 		t.Errorf("suite teardown = %+v", sp.SuiteTeardown)
