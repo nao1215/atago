@@ -61,6 +61,23 @@ homebrew_casks:
             system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/atago"]
           end
 
+dockers_v2:
+  - images:
+      - "ghcr.io/nao1215/atago"
+    tags:
+      - "{{ .Version }}"
+      - "latest"
+    dockerfile: Dockerfile.goreleaser
+    platforms:
+      - "linux/amd64"
+      - "linux/arm64"
+    labels:
+      org.opencontainers.image.created: "{{ .Date }}"
+      org.opencontainers.image.revision: "{{ .FullCommit }}"
+      org.opencontainers.image.version: "{{ .Version }}"
+      org.opencontainers.image.source: "https://github.com/nao1215/atago"
+      org.opencontainers.image.licenses: "MIT"
+
 snapshot:
   version_template: "{{ incpatch .Version }}-next"
 release:

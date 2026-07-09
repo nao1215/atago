@@ -25,6 +25,28 @@ jobs:
       - run: atago run --ci --report gha ./specs
 ```
 
+On GitLab CI (or any CI that starts from a container image), use the published
+GHCR image:
+
+```yaml
+image: ghcr.io/nao1215/atago:latest
+
+stages: [test]
+
+behavior-specs:
+  stage: test
+  script:
+    - atago run --ci --report junit ./specs > junit.xml
+  artifacts:
+    when: always
+    reports:
+      junit: junit.xml
+```
+
+The image contains `atago` and `ca-certificates`; if your scenarios drive `git`,
+`jq`, a browser, or your own CLI binary, build FROM `ghcr.io/nao1215/atago:latest`
+and layer those tools on top.
+
 - `--report json|junit|gha|tap` picks the report format; the JSON shape is stable and versioned ([sample JSON](/samples/report.json), [JUnit](/samples/report.junit.xml), [TAP](/samples/report.tap)).
 - `--ci` enables deterministic, color-free output. It also turns an empty selection into a hard error: a `--filter`/`--tag`/`--skip-tag` that matches no scenario fails the run (exit 3) instead of passing an empty suite, so a typo cannot silently disable your specs. Without `--ci` the same case is a warning that still exits 0.
 - `--artifacts-dir DIR` persists the exact payloads a failed assertion compared — plus, for a failed scenario, its background services' logs and each mock server's recorded requests — so a failure stays reviewable after the job ends.
