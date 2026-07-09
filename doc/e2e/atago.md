@@ -32,7 +32,7 @@
   - [a generator touches exactly the files it should (POSIX)](#scenario-a-generator-touches-exactly-the-files-it-should-posix)
   - [an unexpected creation breaks the exact contract (POSIX)](#scenario-an-unexpected-creation-breaks-the-exact-contract-posix)
   - [stdout_to counts as created, and modified nothing holds (portable)](#scenario-stdout_to-counts-as-created-and-modified-nothing-holds-portable)
-  - [the delta over a retried step is cumulative across all attempts (POSIX)](#scenario-the-delta-over-a-retried-step-is-cumulative-across-all-attempts-posix)
+  - [the delta over a retried step reflects only the converged attempt (POSIX)](#scenario-the-delta-over-a-retried-step-reflects-only-the-converged-attempt-posix)
   - [deleting and recreating a byte-identical file appears in no list (POSIX)](#scenario-deleting-and-recreating-a-byte-identical-file-appears-in-no-list-posix)
   - [deleting and recreating with different content is modified only (POSIX)](#scenario-deleting-and-recreating-with-different-content-is-modified-only-posix)
   - [stdout_to overwrites a fixture (modified) while stderr_to creates an empty file (POSIX)](#scenario-stdout_to-overwrites-a-fixture-modified-while-stderr_to-creates-an-empty-file-posix)
@@ -946,7 +946,7 @@ echo produced
 - the step changed exactly created `result.txt`, modified nothing, deleted nothing
 #### Generated artifacts
 - `result.txt`
-### Scenario: the delta over a retried step is cumulative across all attempts (POSIX)
+### Scenario: the delta over a retried step reflects only the converged attempt (POSIX)
 _skipped on Windows_
 #### When
 ```shell
@@ -954,7 +954,7 @@ touch a; [ -f b ] && touch c; touch b; [ -f c ]
 ```
 #### Then
 - exit code is `0`
-- the step changed exactly created `a`, `b`, `c`, modified nothing, deleted nothing
+- the step changed exactly created `c`, modified nothing, deleted nothing
 ### Scenario: deleting and recreating a byte-identical file appears in no list (POSIX)
 _skipped on Windows_
 #### Given

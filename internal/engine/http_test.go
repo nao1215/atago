@@ -156,6 +156,56 @@ scenarios:
 	}
 }
 
+// TestEngine_HTTPNetworkPolicyViolationInTeardown proves a network-policy
+// breach raised by a teardown step still sets SecurityViolation (and thus
+// exits 6), even though a teardown failure never changes the scenario verdict
+// (#248). Before the fix runTeardown discarded execStep's secViolation return,
+// so a denied host contacted only during cleanup reported a fully green run.
+func TestEngine_HTTPNetworkPolicyViolationInTeardown(t *testing.T) {
+	t.Parallel()
+	srv := loginServer(t)
+	src := fmt.Sprintf(`
+version: "1"
+suite:
+  name: api
+permissions:
+  network:
+    allow:
+      - api.allowed.example
+runners:
+  api:
+    type: http
+    base_url: %s
+scenarios:
+  - name: denied host only in teardown
+    steps:
+      - run: {shell: true, command: echo ok}
+      - assert: {exit_code: 0}
+    teardown:
+      - http:
+          runner: api
+          method: GET
+          path: /me
+`, srv.URL)
+
+	res := runSpec(t, src)
+	// The body passed; the teardown contract keeps the scenario verdict passed.
+	if res.Status != StatusPassed {
+		t.Errorf("status = %s, want passed (teardown failures do not change the verdict)", res.Status)
+	}
+	// But the egress-policy breach in teardown must still be recorded.
+	if !res.SecurityViolation {
+		t.Error("SecurityViolation = false, want true (denied host contacted in teardown)")
+	}
+	td := res.Scenarios[0].Teardown
+	if len(td) != 1 {
+		t.Fatalf("recorded %d teardown steps, want 1", len(td))
+	}
+	if !strings.Contains(td[0].ErrMsg, "network policy denies") {
+		t.Errorf("teardown err = %q, want network policy denial", td[0].ErrMsg)
+	}
+}
+
 func TestEngine_HTTPUnknownRunner(t *testing.T) {
 	t.Parallel()
 	src := `

@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -158,6 +159,48 @@ func TestWriteFileNoFollow(t *testing.T) {
 	}
 	if got, _ := os.ReadFile(victim); string(got) != "original" {
 		t.Errorf("host file was modified through the symlink: %q", got)
+	}
+}
+
+// TestWriteFileNoFollow_ConcurrentIdenticalContent is the regression for #250:
+// several parallel scenarios that share one golden file call WriteFileNoFollow
+// on the same path with byte-identical content (e.g. matrix rows producing the
+// same output under --update-snapshots). The old non-atomic
+// Lstat→Remove→OpenFile(O_EXCL) sequence raced — one goroutine's Remove hit the
+// file another had already removed (ENOENT), or its O_EXCL open hit a file
+// another had just created — so an update failed nondeterministically even
+// though every writer produced the same bytes. An atomic write must let every
+// concurrent identical write succeed and leave the expected content behind.
+func TestWriteFileNoFollow_ConcurrentIdenticalContent(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	dest := filepath.Join(root, "shared.golden")
+	content := []byte("same output from every row\n")
+
+	const writers = 16
+	var wg sync.WaitGroup
+	errs := make([]error, writers)
+	start := make(chan struct{})
+	for i := range writers {
+		wg.Go(func() {
+			<-start // release all goroutines at once to maximize contention
+			errs[i] = WriteFileNoFollow(dest, content, 0o600)
+		})
+	}
+	close(start)
+	wg.Wait()
+
+	for i, err := range errs {
+		if err != nil {
+			t.Errorf("writer %d: WriteFileNoFollow errored on identical concurrent write: %v", i, err)
+		}
+	}
+	got, err := os.ReadFile(dest)
+	if err != nil {
+		t.Fatalf("read back: %v", err)
+	}
+	if string(got) != string(content) {
+		t.Errorf("final content = %q, want %q", got, content)
 	}
 }
 

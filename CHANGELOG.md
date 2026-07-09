@@ -7,6 +7,28 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- A network-policy (`permissions.network.allow`) violation raised by a
+  `teardown` step now sets `SecurityViolation` and exits 6, instead of being
+  silently swallowed so a spec that contacted a denied host during cleanup
+  reported a fully green run. Teardown failures still never change the pass/fail
+  verdict — only the security signal is now honored regardless of phase (#248).
+- A store- or matrix-provided value that itself contains a `${...}` reference no
+  longer leaks that reference verbatim into a no-shell command's argv (or into
+  `cwd`). Expansion is single-pass, so such a reference was never expanded; the
+  unresolved-reference guard now catches it after substitution and errors with
+  the leaked reference named instead of running a garbled command (#249).
+- `--update-snapshots` no longer races under `--parallel` when several scenarios
+  share one golden file: snapshot writes are now atomic (temp-file + rename), so
+  identical-content scenarios update the shared golden deterministically instead
+  of failing nondeterministically in a non-atomic remove/create window (#250).
+- A `changes:` assert after a retried (`retry.until`) run step now reflects only
+  the final, converged attempt's workdir delta rather than the cumulative delta
+  of every attempt: the baseline is re-captured before each attempt, so a
+  command with a per-attempt side effect reports the net effect the `until` gate
+  accepted (#251).
+
 ## [0.10.0] - 2026-07-09
 
 ### Added

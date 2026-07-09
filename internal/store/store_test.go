@@ -46,6 +46,51 @@ func TestExpand(t *testing.T) {
 	}
 }
 
+// TestExpandDetectingLeaks proves the leak detector (#249) reports exactly the
+// ${...} references a substituted value introduces — never one the author wrote
+// directly, and never an escaped literal. Single-pass expansion never re-visits
+// a substituted value, so any live reference it carries survives verbatim into
+// the output; the no-shell argv guard uses this to refuse a garbled command.
+func TestExpandDetectingLeaks(t *testing.T) {
+	t.Parallel()
+	s := New()
+	s.Set("p", "${undefined_var}/x") // a stored value carrying an unresolved ref
+	s.Set("q", "${workdir}/data")    // a value carrying a builtin-looking ref
+	s.Set("plain", "value")          // a value with no reference
+	s.Set("esc", "$${keep}")         // a value with a deliberately escaped ref
+	s.Set("workdir", "/tmp/wd")      // workdir IS defined, but single-pass never re-expands it
+
+	tests := []struct {
+		name, in, wantOut string
+		wantLeaked        []string
+	}{
+		{"stored unresolved ref leaks", "cat ${p}", "cat ${undefined_var}/x", []string{"undefined_var"}},
+		{"stored builtin ref leaks (never re-expanded)", "cat ${q}", "cat ${workdir}/data", []string{"workdir"}},
+		{"plain value does not leak", "echo ${plain}", "echo value", nil},
+		{"escaped ref in a value is not a leak", "echo ${esc}", "echo $${keep}", nil},
+		{"authored unresolved ref is not a leak", "echo ${direct}", "echo ${direct}", nil},
+		{"authored escape is not a leak", "echo $${lit}", "echo ${lit}", nil},
+		{"no references at all", "echo hi", "echo hi", nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			out, leaked := s.ExpandDetectingLeaks(tt.in)
+			if out != tt.wantOut {
+				t.Errorf("out = %q, want %q", out, tt.wantOut)
+			}
+			if len(leaked) != len(tt.wantLeaked) {
+				t.Fatalf("leaked = %v, want %v", leaked, tt.wantLeaked)
+			}
+			for i := range leaked {
+				if leaked[i] != tt.wantLeaked[i] {
+					t.Errorf("leaked[%d] = %q, want %q", i, leaked[i], tt.wantLeaked[i])
+				}
+			}
+		})
+	}
+}
+
 // TestExpand_EnvRefs proves ${env:NAME} resolves from the host environment:
 // set variables expand (including set-but-empty), unset ones stay verbatim so
 // they surface as failures, $${env:NAME} stays literal, and env names never
