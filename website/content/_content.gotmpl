@@ -74,10 +74,24 @@
     {{ $md = replaceRE `!\[([^\]]*)\]\(\.\./\.\./` "![$1](https://raw.githubusercontent.com/nao1215/atago/main/" $md }}
     {{ $md = replaceRE `\]\(\.\./\.\./` (printf "](%s" $gh) $md }}
     {{ $md = replaceRE `\]\(\.\./` (printf "](%sdoc/" $gh) $md }}
+    {{/* Give each tool page a search-intent <title>/description instead of the
+         bare "<tool> · atago" nobody queries. The visible h1 stays the tool
+         name (page.html renders .Title); seoTitle drives the <title>/og:title,
+         and the description leads with the suite/scenario counts pulled from the
+         doc's own Summary line so 44 pages get 44 distinct snippets. */}}
+    {{ $seoTitle := printf "Testing %s with atago — executable E2E specs" $name }}
+    {{ $coverage := "" }}
+    {{ with (findRE `[0-9]+ suites? · [0-9]+ scenarios?` $md 1) }}{{ $coverage = index . 0 }}{{ end }}
+    {{ $pageDesc := printf "Behavior docs for %s, generated from the executable atago specs that run in CI." $name }}
+    {{ if $coverage }}
+      {{ $pageDesc = printf "Testing %s with atago: %s — executable E2E specs asserting exit codes, output, and file changes, generated from the specs that run in CI." $name $coverage }}
+    {{ end }}
     {{ $.AddPage (dict
         "path" (printf "real-world/%s" $name)
         "title" $name
-        "params" (dict "description" (printf "Behavior docs for %s, generated from the executable atago specs that run in CI." $name))
+        "params" (dict
+          "seoTitle" $seoTitle
+          "description" $pageDesc)
         "content" (dict "mediaType" "text/markdown" "value" $md)) }}
   {{ end }}
 {{ end }}
