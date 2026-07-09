@@ -78,10 +78,15 @@ type Spec struct {
 	// (#7): env exported to every scenario, steps run once before any scenario
 	// (setup may contain service steps starting suite-wide peers), and steps
 	// that always run after the last scenario.
-	SuiteEnv      []string   `json:"suite_env,omitempty"`
-	SuiteSetup    []Step     `json:"suite_setup,omitempty"`
-	SuiteTeardown []Step     `json:"suite_teardown,omitempty"`
-	Scenarios     []Scenario `json:"scenarios"`
+	SuiteEnv      []string `json:"suite_env,omitempty"`
+	SuiteSetup    []Step   `json:"suite_setup,omitempty"`
+	SuiteTeardown []Step   `json:"suite_teardown,omitempty"`
+	// SuiteVariables is the sorted union of ${name} references across the suite
+	// setup/teardown steps (their commands, env, service ready probes, asserts).
+	// It mirrors a scenario's Variables so tooling can see which variables the
+	// suite lifecycle depends on.
+	SuiteVariables []string   `json:"suite_variables,omitempty"`
+	Scenarios      []Scenario `json:"scenarios"`
 }
 
 // Network summarizes the spec's network policy.
@@ -238,6 +243,7 @@ func buildSpec(in Input) Spec {
 	for i := range s.Suite.Teardown {
 		out.SuiteTeardown = append(out.SuiteTeardown, buildStep(i, &s.Suite.Teardown[i], suiteVars))
 	}
+	out.SuiteVariables = spec.SortedKeys(suiteVars)
 	for i := range s.Scenarios {
 		out.Scenarios = append(out.Scenarios, buildScenario(&s.Scenarios[i], in.Source))
 	}

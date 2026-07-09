@@ -45,6 +45,34 @@
           "description": "Suite-level default step timeout (suite.timeout, #17); omitted when the built-in default applies.",
           "type": "string"
         },
+        "suite_env": {
+          "description": "Sorted names of suite-level environment variables exported to every scenario (values never exposed). Omitted when none.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "suite_setup": {
+          "description": "Steps run once before any scenario (#7); may include service steps starting suite-wide peers. Omitted when none.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/step"
+          }
+        },
+        "suite_teardown": {
+          "description": "Steps that always run after the last scenario (#7). Omitted when none.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/step"
+          }
+        },
+        "suite_variables": {
+          "description": "Variable names referenced anywhere in the suite setup/teardown steps, sorted (omitted when none).",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "secrets": {
           "description": "Declared secret names (omitted when none).",
           "type": "array",

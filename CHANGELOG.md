@@ -7,6 +7,13 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- `atago manifest` now reports the suite lifecycle's variable references in a new
+  `suite_variables` field (mirroring a scenario's `variables`), and the manifest
+  schema gains the previously-undocumented `suite_env`, `suite_setup`,
+  `suite_teardown`, and `suite_variables` fields (#244).
+
 ### Changed
 
 - Website SEO, social, and landing improvements (no tool behavior change): the
@@ -41,6 +48,10 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- A suite-level `service:` step's `env` values and `ready` file/port/log probes
+  are now counted as variable references by the shared collector, so a
+  `suite.setup` service like `env: {DSN: ${...}}` / `ready: {file: ${suitedir}/…}`
+  is no longer under-reported by `atago manifest`/`explain` (#244).
 - A failing assertion inside `suite.setup`/`suite.teardown` now masks declared
   secrets in its reported `Expected`/`Actual`/`Hint` fields and writes
   `--artifacts-dir` sidecars, matching scenario-level asserts. The suite path

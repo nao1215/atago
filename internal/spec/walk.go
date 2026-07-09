@@ -75,7 +75,13 @@ func CollectStepVars(set map[string]bool, step *Step) {
 		// counted like file/content/symlink — omitting it under-reported it.
 		CollectVars(set, step.Fixture.File, step.Fixture.Content, step.Fixture.Symlink, step.Fixture.From)
 	case StepService:
-		CollectVars(set, step.Service.Command, step.Service.Cwd)
+		// Delegate to CollectServiceVars — the single source of truth for a
+		// service's variable-bearing fields — instead of re-listing them here.
+		// This case had drifted: it collected only command/cwd, missing the env
+		// values and ready.file/port/log that expandService actually expands, so a
+		// suite.setup `service:` with `env: {DSN: ${...}}` or `ready: {file:
+		// ${suitedir}/ready}` was under-reported by `atago manifest` (#244).
+		CollectServiceVars(set, step.Service)
 	case StepRun:
 		r := step.Run
 		// stdout_to/stderr_to are ${name}-expanded by the engine (expandRun), so a
