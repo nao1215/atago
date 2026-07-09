@@ -30,10 +30,20 @@ jobs:
       - name: Install Syft (SBOM generator)
         uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
 
-      # Signing stays skipped on purpose: keyless cosign needs an OIDC id-token,
-      # which fork PRs cannot mint, and a PR-signed cert identity would differ
-      # from the release.yml identity users verify against. Everything else the
-      # release promises — SBOMs, checksums, runnable archives — builds here.
+      - name: Enable QEMU for arm64 container builds
+        run: docker run --privileged --rm tonistiigi/binfmt --install arm64
+
+      - name: Create buildx builder
+        run: |
+          docker buildx create --name atago-release-smoke --use
+          docker buildx inspect --bootstrap
+
+      # Signing and publishing stay skipped on purpose: keyless cosign needs an
+      # OIDC id-token, which fork PRs cannot mint, and a PR-signed cert identity
+      # would differ from the release.yml identity users verify against. The
+      # local docker image build still runs here via skip_push templates, so the
+      # release promises — runnable archives and a runnable GHCR image — build on
+      # every PR without publishing anything.
       - name: Build artifacts for smoke test
         uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
         with:
@@ -46,3 +56,6 @@ jobs:
       # binary through version -> init -> run.
       - name: Smoke-test artifacts before publishing
         run: ./scripts/smoke_artifacts.sh dist
+
+      - name: Smoke-test Docker image before publishing
+        run: ./scripts/smoke_docker_image.sh
