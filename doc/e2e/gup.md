@@ -53,6 +53,8 @@ gup version
 ### Scenario: gup list is a pure read of GOBIN and writes nothing
 _only when `gup list` succeeds · skipped on Windows_
 #### Given
+- Fixture file `emptybin/.keep` is created.
+- Environment variables are set: GOBIN.
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### When
 ```shell

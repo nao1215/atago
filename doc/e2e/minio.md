@@ -44,37 +44,37 @@ hello object storage
 ```
 #### When
 ```shell
-mc alias set local http://127.0.0.1:18122 atago atago-secret-key
-mc mb local/atago-bucket
-mc cp upload.txt local/atago-bucket/
-mc ls --json local/atago-bucket
-mc cat local/atago-bucket/upload.txt
-mc cp local/atago-bucket/upload.txt downloaded.txt
-mc rm local/atago-bucket/upload.txt
-mc ls local/atago-bucket
+mc alias set lifecycle http://127.0.0.1:18122 atago atago-secret-key
+mc mb lifecycle/atago-bucket
+mc cp upload.txt lifecycle/atago-bucket/
+mc ls --json lifecycle/atago-bucket
+mc cat lifecycle/atago-bucket/upload.txt
+mc cp lifecycle/atago-bucket/upload.txt downloaded.txt
+mc rm lifecycle/atago-bucket/upload.txt
+mc ls lifecycle/atago-bucket
 ```
 #### Then
-- after `mc alias set local http://127.0.0.1:18122 atago atago-secret-key`:
+- after `mc alias set lifecycle http://127.0.0.1:18122 atago atago-secret-key`:
   - exit code is `0`
-- after `mc mb local/atago-bucket`:
+- after `mc mb lifecycle/atago-bucket`:
   - exit code is `0`
   - stdout contains `Bucket created successfully`
-- after `mc cp upload.txt local/atago-bucket/`:
+- after `mc cp upload.txt lifecycle/atago-bucket/`:
   - exit code is `0`
-- after `mc ls --json local/atago-bucket`:
+- after `mc ls --json lifecycle/atago-bucket`:
   - exit code is `0`
   - stdout at `$.key` equals `upload.txt`
   - stdout at `$.size` equals `20`
-- after `mc cat local/atago-bucket/upload.txt`:
+- after `mc cat lifecycle/atago-bucket/upload.txt`:
   - exit code is `0`
   - stdout equals an exact value
-- after `mc cp local/atago-bucket/upload.txt downloaded.txt`:
+- after `mc cp lifecycle/atago-bucket/upload.txt downloaded.txt`:
   - exit code is `0`
   - file `downloaded.txt` contains `hello object storage`
-- after `mc rm local/atago-bucket/upload.txt`:
+- after `mc rm lifecycle/atago-bucket/upload.txt`:
   - exit code is `0`
   - stdout contains `Removed`
-- after `mc ls local/atago-bucket`:
+- after `mc ls lifecycle/atago-bucket`:
   - exit code is `0`
   - stdout is empty
 ### Scenario: bucket versioning can be enabled and reported
@@ -82,16 +82,16 @@ mc ls local/atago-bucket
 - Background service `minio` is started: `minio server data --address 127.0.0.1:18123`.
 #### When
 ```shell
-mc alias set local http://127.0.0.1:18123 atago atago-secret-key
-mc mb local/versioned
-mc version enable local/versioned
-mc version info --json local/versioned
+mc alias set versioned http://127.0.0.1:18123 atago atago-secret-key
+mc mb versioned/versioned
+mc version enable versioned/versioned
+mc version info --json versioned/versioned
 ```
 #### Then
-- after `mc version enable local/versioned`:
+- after `mc version enable versioned/versioned`:
   - exit code is `0`
   - stdout contains `versioning is enabled`
-- after `mc version info --json local/versioned`:
+- after `mc version info --json versioned/versioned`:
   - exit code is `0`
   - stdout at `$.versioning.status` equals `Enabled`
 ### Scenario: an anonymous download policy publishes a bucket read-only
@@ -105,18 +105,18 @@ published via bucket policy
 ```
 #### When
 ```shell
-mc alias set local http://127.0.0.1:18124 atago atago-secret-key
-mc mb local/public-bucket
-mc cp page.txt local/public-bucket/
+mc alias set publichost http://127.0.0.1:18124 atago atago-secret-key
+mc mb publichost/public-bucket
+mc cp page.txt publichost/public-bucket/
 # HTTP GET /public-bucket/page.txt
-mc anonymous set download local/public-bucket
+mc anonymous set download publichost/public-bucket
 # HTTP GET /public-bucket/page.txt
 # HTTP PUT /public-bucket/forbidden.txt
 ```
 #### Then
 - after `HTTP GET /public-bucket/page.txt`:
   - HTTP status is `403`
-- after `mc anonymous set download local/public-bucket`:
+- after `mc anonymous set download publichost/public-bucket`:
   - exit code is `0`
   - stdout contains `is set to `download``
 - after `HTTP GET /public-bucket/page.txt`:
