@@ -1,11 +1,10 @@
 # Dogfood spec: exercises atago's sandbox_home + changes against the real `gup`
 # CLI (github.com/nao1215/gup). Requires `gup` on PATH. Run with: make dogfood
 #
-# gup's network-free subcommands (version/list) are pure reads — they write
-# NOTHING, not even to HOME. The changes assert with all three lists empty is
-# the strongest possible "touches nothing" statement, and sandbox_home
-# guarantees any stray dotfile write would land inside .atago-home where changes
-# would catch it.
+# gup's network-free subcommands (version/list) should not mutate the repo under
+# test. The changes assert with all three lists empty is the strongest possible
+# "touches nothing" statement, and sandbox_home guarantees any stray dotfile
+# write would land inside .atago-home where changes would catch it.
 version: "1"
 
 suite:
@@ -40,10 +39,17 @@ scenarios:
     skip:
       os: windows
     steps:
+      - fixture:
+          file: emptybin/.keep
+          content: ""
       - run:
           sandbox_home: true
           command: gup list
-      # Even under an isolated home, list produces no side effects.
+          env:
+            # Keep GOBIN explicit: when it is unset, current Go releases may
+            # create per-user state under HOME before gup reads the install set.
+            GOBIN: emptybin
+      # With an isolated, empty GOBIN, list produces no side effects.
       - assert:
           exit_code: 0
           changes:
