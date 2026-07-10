@@ -10,6 +10,10 @@ version: "1"
 
 suite:
   name: gup read-only subcommands (no HOME writes)
+  env:
+    # Go 1.26 telemetry writes under HOME on first process startup; disable it
+    # so this spec measures gup's own footprint rather than toolchain noise.
+    GOTELEMETRY: "off"
 
 scenarios:
   - name: gup version writes nothing to the workdir or its sandbox home

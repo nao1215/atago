@@ -74,6 +74,11 @@ scenarios:
           runner: s3_authz
           method: GET
           path: /
+          retry:
+            times: 20
+            interval: 250ms
+            until:
+              status: 403
       - assert:
           status: 403
           body:

@@ -31,7 +31,9 @@ jobs:
         tool:
           - { name: gup, module: "github.com/nao1215/gup@latest", dir: "./test/e2e/tools/gup" }
           - { name: sqly, module: "github.com/nao1215/sqly@latest", dir: "./test/e2e/tools/sqly" }
-          - { name: truss, module: "github.com/nao1215/truss@latest", dir: "./test/e2e/tools/truss" }
+          # truss moved from a Go module to the Rust crate `truss-image`
+          # (installing the `truss` binary).
+          - { name: truss, dir: "./test/e2e/tools/truss" }
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -48,8 +50,16 @@ jobs:
       - name: Install ${{ matrix.tool.name }} onto PATH
         run: |
           set -e
-          go install "${{ matrix.tool.module }}"
-          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+          case "${{ matrix.tool.name }}" in
+            truss)
+              cargo install truss-image --locked
+              echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+              ;;
+            *)
+              go install "${{ matrix.tool.module }}"
+              echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+              ;;
+          esac
 
       - name: Report the dogfood target
         run: |
