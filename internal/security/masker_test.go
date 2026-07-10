@@ -199,6 +199,17 @@ func TestMasker_LineEndingVariantsNoLeak(t *testing.T) {
 	}
 }
 
+// TestMasker_ShortSecretDoesNotQualifyViaCRLFVariant is a regression for the
+// short-secret floor: a 3-byte secret like "0\n\"" must stay ignored even
+// though its CRLF spelling is 4 bytes long.
+func TestMasker_ShortSecretDoesNotQualifyViaCRLFVariant(t *testing.T) {
+	t.Parallel()
+	m := NewMasker([]string{"0\n\""})
+	if !m.Empty() {
+		t.Fatalf("short secret unexpectedly produced a non-empty masker: %+v", m)
+	}
+}
+
 // TestNewMaskerForSpec_FromEnvSources verifies that a declared secret injected
 // through any env-bearing location — a pty step, suite.env, suite.setup /
 // suite.teardown steps, scenario teardown steps, and defaults.scenario.env — is

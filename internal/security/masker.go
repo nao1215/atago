@@ -68,6 +68,9 @@ func NewMasker(values []string) *Masker {
 		}
 	}
 	for _, x := range values {
+		if len(x) < minSecretLen {
+			continue
+		}
 		add(x)
 		// Mask the alternate line-ending form too. Normalize to LF first so a
 		// value with mixed or CRLF endings still yields a stable LF and CRLF pair.
