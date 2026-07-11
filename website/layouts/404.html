@@ -1,10 +1,6 @@
 {{ define "main" }}
 <article>
-<h1>{{ site.Params.ui.notFoundTitle }}</h1>
-{{ if eq site.Language.Lang "ja" }}
-<p>このアドレスにページはありません。<a href="{{ site.Home.RelPermalink }}">トップページ</a>から辿ってください。</p>
-{{ else }}
+<h1>Page not found</h1>
 <p>No page lives at this address. Start from the <a href="{{ site.Home.RelPermalink }}">front page</a>.</p>
-{{ end }}
 </article>
 {{ end }}

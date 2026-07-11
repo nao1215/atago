@@ -3,7 +3,7 @@
      external URLs, fragments, page-relative paths — passes through. */ -}}
 {{- $u := .Destination -}}
 {{- if and (hasPrefix $u "/") (not (hasPrefix $u "//")) -}}
-  {{- $u = relLangURL (strings.TrimPrefix "/" $u) -}}
+  {{- $u = relURL (strings.TrimPrefix "/" $u) -}}
 {{- end -}}
 <a href="{{ $u }}"{{ with .Title }} title="{{ . }}"{{ end }}>{{ .Text }}</a>
 {{- /* chomp trailing newline */ -}}
