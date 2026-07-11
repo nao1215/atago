@@ -6,6 +6,7 @@
 {{- $base := .base -}}
 {{- $depth := .depth -}}
 {{- $since := .since -}}
+{{- $requiredText := default "Required." .requiredText -}}
 {{- $lookup := $key -}}
 {{- if $base }}{{ $lookup = printf "%s.%s" $base $key }}{{ end -}}
 {{- /* a JSON Schema can be the boolean `true` (any value allowed) */ -}}
@@ -65,18 +66,18 @@
 <tr>
 <td class="spec-key" style="padding-left:{{ printf "%.1f" (add 0.7 (mul $depth 1.4)) }}rem"><code>{{ $key }}</code></td>
 <td class="spec-type">{{ $type | safeHTML }}</td>
-<td>{{ if $req }}<strong>Required.</strong> {{ end }}{{ default "" $prop.description | markdownify }}</td>
+<td>{{ if $req }}<strong>{{ $requiredText }}</strong> {{ end }}{{ default "" $prop.description | markdownify }}</td>
 <td class="spec-since"><code>{{ $ver }}</code></td>
 </tr>
 {{- /* expand inline (non-$ref) object children */ -}}
 {{- if $expand.properties -}}
-  {{- partial "spec-rows.html" (dict "root" $root "node" $expand "base" $expandBase "depth" (add $depth 1) "since" $since) -}}
+  {{- partial "spec-rows.html" (dict "root" $root "node" $expand "base" $expandBase "depth" (add $depth 1) "since" $since "requiredText" $requiredText) -}}
 {{- end -}}
 {{- /* inline oneOf with object variants and no top-level properties (stdin, exit_code) */ -}}
 {{- if and $prop.oneOf (not $prop.properties) (not (index $prop "$ref")) -}}
   {{- range $variant := $prop.oneOf -}}
     {{- if $variant.properties -}}
-      {{- partial "spec-rows.html" (dict "root" $root "node" $variant "base" $lookup "depth" (add $depth 1) "since" $since) -}}
+      {{- partial "spec-rows.html" (dict "root" $root "node" $variant "base" $lookup "depth" (add $depth 1) "since" $since "requiredText" $requiredText) -}}
     {{- end -}}
   {{- end -}}
 {{- end -}}

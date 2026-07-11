@@ -14,7 +14,7 @@ require (
 	github.com/jhump/protoreflect/v2 v2.0.0-beta.2
 	github.com/k1LoW/grpcstub v0.26.4
 	github.com/lib/pq v1.12.3
-	github.com/mattn/go-shellwords v1.0.13
+	github.com/mattn/go-shellwords v1.0.14
 	github.com/nao1215/markdown v0.13.0
 	github.com/ohler55/ojg v1.28.2
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2

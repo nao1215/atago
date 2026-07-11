@@ -3,18 +3,74 @@
 # mounted read-only and turned into pages by content/_content.gotmpl, so the
 # repository files stay the single source of truth.
 baseURL = "https://nao1215.github.io/atago/"
-locale = "en"
 title = "atago"
 disableKinds = ["taxonomy", "term", "rss"]
 enableRobotsTXT = true
 timeZone = "UTC"
+defaultContentLanguage = "en"
+defaultContentLanguageInSubdir = false
 
 [params]
 tagline = "black-box E2E testing for CLIs, from plain YAML"
 description = "atago tests real CLI behavior from plain YAML: exit codes, output, generated files, snapshots, services, and interactive terminals (PTY/TUI)."
 
+[params.ui]
+language = "Language"
+skipToContent = "Skip to content"
+github = "GitHub"
+sponsor = "Sponsor"
+searchPlaceholder = "Search..."
+searchAriaLabel = "Search the documentation"
+copy = "copy"
+copied = "copied"
+copyFailed = "failed"
+copyAriaLabel = "Copy code to clipboard"
+onThisPage = "On this page"
+filterPlaceholder = "Filter recipes..."
+filterAriaLabel = "Filter recipes by keyword"
+footerGenerated = "every page on this site is generated from files committed in the repository."
+notFoundTitle = "Page not found"
+headingLinkLabel = "Link to this section"
+
+[languages.en]
+locale = "en-US"
+label = "English"
+weight = 1
+title = "atago"
+
+[languages.ja]
+locale = "ja-JP"
+label = "日本語"
+weight = 2
+title = "atago"
+
+[languages.ja.params]
+tagline = "CLI の実挙動をプレーンな YAML で検証する black-box E2E テスト"
+description = "atago は CLI の実際の挙動をプレーンな YAML から検証します。終了コード、出力、生成ファイル、スナップショット、サービス、対話端末 (PTY/TUI) まで扱えます。"
+
+[languages.ja.params.ui]
+language = "言語"
+skipToContent = "本文へスキップ"
+github = "GitHub"
+sponsor = "スポンサー"
+searchPlaceholder = "検索..."
+searchAriaLabel = "ドキュメントを検索"
+copy = "コピー"
+copied = "コピー済み"
+copyFailed = "失敗"
+copyAriaLabel = "コードをクリップボードへコピー"
+onThisPage = "このページ内"
+filterPlaceholder = "レシピを絞り込む..."
+filterAriaLabel = "キーワードでレシピを絞り込む"
+footerGenerated = "このサイトの全ページは、リポジトリにコミットされたファイルから生成されています。"
+notFoundTitle = "ページが見つかりません"
+headingLinkLabel = "このセクションへのリンク"
+
 [markup.highlight]
 noClasses = false
+
+[markup.goldmark.parser.attribute]
+block = true
 
 [markup.tableOfContents]
 startLevel = 2
@@ -50,6 +106,36 @@ name = "Real-world CLIs"
 pageRef = "/real-world"
 weight = 70
 
+[[languages.ja.menu.main]]
+name = "インストール"
+pageRef = "/install"
+weight = 10
+
+[[languages.ja.menu.main]]
+name = "はじめに"
+pageRef = "/getting-started"
+weight = 20
+
+[[languages.ja.menu.main]]
+name = "クックブック"
+pageRef = "/cookbook"
+weight = 30
+
+[[languages.ja.menu.main]]
+name = "CI"
+pageRef = "/ci"
+weight = 50
+
+[[languages.ja.menu.main]]
+name = "リファレンス"
+pageRef = "/reference"
+weight = 60
+
+[[languages.ja.menu.main]]
+name = "実在 CLI"
+pageRef = "/real-world"
+weight = 70
+
 [module]
 [[module.mounts]]
 source = "content"
@@ -62,6 +148,10 @@ target = "layouts"
 [[module.mounts]]
 source = "assets"
 target = "assets"
+
+[[module.mounts]]
+source = "data"
+target = "data"
 
 # Repository docs, mounted so pages can be generated from the committed files.
 [[module.mounts]]

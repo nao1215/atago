@@ -1,8 +1,17 @@
 <!doctype html>
-<html lang="en">
+<html lang="{{ site.Language.Lang }}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+{{- $pagePath := strings.TrimPrefix site.Home.RelPermalink .RelPermalink -}}
+{{- $enRoot := site.Home.RelPermalink -}}
+{{- $jaRoot := site.Home.RelPermalink -}}
+{{- range hugo.Sites -}}
+  {{- if eq .Language.Lang "en" }}{{ $enRoot = .Home.RelPermalink }}{{ end -}}
+  {{- if eq .Language.Lang "ja" }}{{ $jaRoot = .Home.RelPermalink }}{{ end -}}
+{{- end -}}
+{{- $enPath := printf "%s%s" $enRoot $pagePath -}}
+{{- $jaPath := printf "%s%s" $jaRoot $pagePath -}}
 {{- $title := printf "%s · %s" .Title site.Title }}
 {{- with .Params.seoTitle }}{{ $title = . }}{{ end }}
 {{- if .IsHome }}{{ $title = printf "%s — %s" site.Title site.Params.tagline }}{{ end }}
@@ -10,6 +19,9 @@
 {{- $desc := or .Params.description site.Params.description }}
 <meta name="description" content="{{ $desc }}">
 <link rel="canonical" href="{{ .Permalink }}">
+<link rel="alternate" hreflang="en" href="{{ $enPath | absURL }}">
+<link rel="alternate" hreflang="ja" href="{{ $jaPath | absURL }}">
+<link rel="alternate" hreflang="x-default" href="{{ $enPath | absURL }}">
 {{- /* A right-ratio (1.91:1) social card and a square favicon, both derived at
        build time from the committed logo: the logo is fit to 1000px wide and
        padded onto a 1200x630 brand-dark canvas so X/Slack/Discord render a full
@@ -38,17 +50,21 @@
 <link rel="stylesheet" href="{{ $css.RelPermalink }}">
 </head>
 <body>
-<a class="skip-link" href="#main">Skip to content</a>
+<a class="skip-link" href="#main">{{ site.Params.ui.skipToContent }}</a>
 <header>
 <nav>
 <a class="brand" href="{{ site.Home.RelPermalink }}">atago</a>
 {{- range site.Menus.main }}
 <a{{ if or ($.IsMenuCurrent "main" .) ($.HasMenuCurrent "main" .) }} class="active"{{ end }} href="{{ .URL }}">{{ .Name }}</a>
 {{- end }}
-<a href="https://github.com/nao1215/atago">GitHub</a>
-<a class="sponsor" href="https://github.com/sponsors/nao1215">&#9825; Sponsor</a>
+<a href="https://github.com/nao1215/atago">{{ site.Params.ui.github }}</a>
+<a class="sponsor" href="https://github.com/sponsors/nao1215">&#9825; {{ site.Params.ui.sponsor }}</a>
+<div class="lang-switch" aria-label="{{ site.Params.ui.language }}">
+<a{{ if eq site.Language.Lang "en" }} class="active"{{ end }} href="{{ $enPath }}">EN</a>
+<a{{ if eq site.Language.Lang "ja" }} class="active"{{ end }} href="{{ $jaPath }}">JA</a>
+</div>
 <div class="search">
-<input type="search" id="search-box" class="search-box" placeholder="Search…" aria-label="Search the documentation" autocomplete="off" data-pagefind-base="{{ relURL "" }}">
+<input type="search" id="search-box" class="search-box" placeholder="{{ site.Params.ui.searchPlaceholder }}" aria-label="{{ site.Params.ui.searchAriaLabel }}" autocomplete="off" data-pagefind-base="{{ $enRoot }}">
 <div id="search-ui" class="search-ui" hidden></div>
 </div>
 </nav>
@@ -57,7 +73,7 @@
 {{ block "main" . }}{{ end }}
 </main>
 <footer>
-<p>MIT licensed · <a href="https://github.com/nao1215/atago">nao1215/atago</a> · every page on this site is generated from files committed in the repository.</p>
+<p>MIT licensed · <a href="https://github.com/nao1215/atago">nao1215/atago</a> · {{ site.Params.ui.footerGenerated }}</p>
 </footer>
 <script>
 // Lazy copy buttons: building a button for every <pre> at load is ~1,896
@@ -70,21 +86,22 @@
   if (!(navigator.clipboard && window.isSecureContext)) return;
   var main = document.getElementById("main");
   if (!main) return;
+  var labels = {{ dict "copy" site.Params.ui.copy "copied" site.Params.ui.copied "failed" site.Params.ui.copyFailed "aria" site.Params.ui.copyAriaLabel | jsonify | safeJS }};
   function addButton(pre) {
     if (pre.querySelector(".copy")) return;
     var b = document.createElement("button");
     b.type = "button";
     b.className = "copy";
-    b.textContent = "copy";
-    b.setAttribute("aria-label", "Copy code to clipboard");
+    b.textContent = labels.copy;
+    b.setAttribute("aria-label", labels.aria);
     b.addEventListener("click", function () {
       var code = pre.querySelector("code");
       navigator.clipboard.writeText(code ? code.innerText : pre.innerText).then(function () {
-        b.textContent = "copied";
+        b.textContent = labels.copied;
       }, function () {
-        b.textContent = "failed";
+        b.textContent = labels.failed;
       }).then(function () {
-        setTimeout(function () { b.textContent = "copy"; }, 1200);
+        setTimeout(function () { b.textContent = labels.copy; }, 1200);
       });
     });
     pre.appendChild(b);

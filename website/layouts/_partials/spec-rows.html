@@ -7,9 +7,10 @@
 {{- $base := .base -}}
 {{- $depth := .depth -}}
 {{- $node := .node -}}
+{{- $requiredText := default "Required." .requiredText -}}
 {{- with $node.properties -}}
   {{- range $key, $prop := . -}}
-    {{- partial "spec-row.html" (dict "root" $root "key" $key "prop" $prop "base" $base "depth" $depth "since" $since "required" $node.required) -}}
+    {{- partial "spec-row.html" (dict "root" $root "key" $key "prop" $prop "base" $base "depth" $depth "since" $since "required" $node.required "requiredText" $requiredText) -}}
   {{- end -}}
 {{- end -}}
 {{- range $variant := (default (slice) $node.oneOf) -}}
@@ -20,7 +21,7 @@
       <tr class="variant"><td colspan="4">type: <code>{{ $label }}</code></td></tr>
     {{- end -}}
     {{- range $key, $prop := . -}}
-      {{- partial "spec-row.html" (dict "root" $root "key" $key "prop" $prop "base" $base "depth" $depth "since" $since "required" $variant.required) -}}
+      {{- partial "spec-row.html" (dict "root" $root "key" $key "prop" $prop "base" $base "depth" $depth "since" $since "required" $variant.required "requiredText" $requiredText) -}}
     {{- end -}}
   {{- end -}}
 {{- end -}}
