@@ -69,6 +69,9 @@ headingLinkLabel = "このセクションへのリンク"
 [markup.highlight]
 noClasses = false
 
+[markup.goldmark.parser.attribute]
+block = true
+
 [markup.tableOfContents]
 startLevel = 2
 endLevel = 3

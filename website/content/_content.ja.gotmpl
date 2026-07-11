@@ -8,8 +8,8 @@
 {{ $cookbookTitle := cond $isJA "クックブック" "Cookbook" }}
 {{ $cookbookDesc := cond $isJA "atago の copyable な recipe を 50 件以上まとめ、各機能に対応する CI 検証済みの runnable example へ辿れます。" "50+ copyable atago specs indexed by task, plus the runnable, CI-tested example for every feature." }}
 {{ $cookbookIntro := cond $isJA "> このページのレシピ本文は、リポジトリにコミットされた英語ドキュメントをそのまま掲載しています。ナビゲーションと導線を日本語化しつつ、実行可能 spec の原文を保っています。" "" }}
-{{ $byTaskTitle := cond $isJA "<span id=\"by-task\"></span>\n\n## タスク別に探す" "<span id=\"by-task\"></span>\n\n## Find a recipe by task" }}
-{{ $byFeatureTitle := cond $isJA "<span id=\"by-feature\"></span>\n\n## 機能別の runnable spec" "<span id=\"by-feature\"></span>\n\n## Every feature has a runnable spec" }}
+{{ $byTaskTitle := cond $isJA "## タスク別に探す {#by-task}" "## Find a recipe by task {#by-task}" }}
+{{ $byFeatureTitle := cond $isJA "## 機能別の runnable spec {#by-feature}" "## Every feature has a runnable spec {#by-feature}" }}
 {{ $realWorldTitle := cond $isJA "atago で検証している実在 CLI" "Real CLIs tested with atago" }}
 {{ $realWorldDesc := cond $isJA "git、jq、fzf、htop、redis、terraform、ffmpeg など、40 以上の実在プログラムを atago で E2E 検証しています。各ページは実行可能 spec と生成ドキュメントに紐づきます。" "40+ real programs run their E2E suites on atago: git, jq, fzf, htop, redis, terraform, ffmpeg, and more — each with executable specs and generated behavior docs." }}
 {{ $realWorldIntro := cond $isJA "> この一覧は日本語ナビゲーションで案内しています。個々の behavior docs は、実行可能 spec から生成した原文を掲載しています。" "" }}
