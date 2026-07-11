@@ -101,7 +101,7 @@ PASSED  1 scenario: 1 passed, 0 failed, 0 errored, 0 skipped (12ms)
 対話 tool も record できます。`atago record --pty -- <command>` は本物の terminal で 1 session を操作させ、その keystroke を `pty:` step の expect/send pair として書き出します。Linux、macOS、Windows (ConPTY) で動きます。POSIX では password prompt が自動で `${env:...}` placeholder に変わり、Windows では ConPTY に echo 状態がないため secret send をあとで `${env:...}` に置き換えます。`--pty` session は `--timeout` (既定 30s) で打ち切られます。終了しない program で hang せず、capture 済みの内容を書いて fail させます。
 
 ```shell
-$ atago record --pty --out wizard.atago.yaml -- mytool init
+atago record --pty --out wizard.atago.yaml -- mytool init
 ```
 
 空の雛形から始めたいなら `atago init` でも構いません。どちらにせよ形は同じで、command を宣言し、実行し、結果を assert します。
