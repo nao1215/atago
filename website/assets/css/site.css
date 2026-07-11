@@ -63,34 +63,9 @@ header nav .sponsor {
   color: #bf3989;
 }
 
-header nav .lang-switch {
-  display: inline-flex;
-  gap: 0.25rem;
-  margin-left: auto;
-}
-
-header nav .lang-switch a {
-  padding: 0.1rem 0.45rem;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  font-size: 0.85rem;
-  text-decoration: none;
-}
-
-header nav .lang-switch a.active {
-  font-weight: 600;
-  text-decoration: none;
-}
-
 @media (prefers-color-scheme: dark) {
   header nav .sponsor {
     color: #f778ba;
-  }
-}
-
-@media (max-width: 52rem) {
-  header nav .lang-switch {
-    margin-left: 0;
   }
 }
 

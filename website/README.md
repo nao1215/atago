@@ -4,11 +4,6 @@ The hosted documentation website, https://nao1215.github.io/atago/, built with
 Hugo and deployed by `.github/workflows/website.yml` on every push to `main`
 that touches `website/`, `doc/`, `schema/`, or `site/samples/`.
 
-The site is bilingual: English lives at `/`, Japanese at `/ja/`. The authored
-pages under `content/` have language-specific files (`*.ja.md`), while the
-generated Cookbook / Real-world pages reuse the committed English source docs
-and wrap them in localized titles, navigation, and surrounding copy.
-
 The committed docs stay the single source of truth. Hugo mounts them read-only
 (`hugo.toml`) and `content/_content.gotmpl` turns them into pages, rewriting
 repository-relative links to site pages or GitHub:
@@ -22,8 +17,7 @@ repository-relative links to site pages or GitHub:
 | `doc/img/`, `site/samples/` | served as static files |
 
 Only the landing page and the Install / Getting started / CI / Reference pages
-under `content/` are authored here; their prose is adapted from README.md and
-maintained in both English and Japanese.
+under `content/` are authored here; their prose is adapted from README.md.
 
 The spec-key reference is rendered by the `spec-reference` shortcode
 (`layouts/_shortcodes/` + `layouts/_partials/spec-row*.html`) from the JSON

@@ -13,11 +13,9 @@
   <img src="./doc/img/atago-logo.jpg" alt="atago logo" width="400" />
 </p>
 
-**Language:** English | [日本語](./README.ja.md)
-
 atago tests real CLI behavior from plain YAML: commands, files, snapshots, services, and interactive terminals. It runs your actual binary — in any language — and asserts what a user observes. No test code, no shell DSL.
 
-Documentation: **https://nao1215.github.io/atago/** · [日本語](https://nao1215.github.io/atago/ja/)
+Documentation: **https://nao1215.github.io/atago/**
 
 ![demo](./doc/img/demo.gif)
 
