@@ -5,10 +5,16 @@
 {{- $schema := resources.Get "schema/atago.schema.json" | transform.Unmarshal -}}
 {{- $since := hugo.Data.spec_keys.keys -}}
 {{- $defs := index $schema "$defs" -}}
+{{- $isJA := eq site.Language.Lang "ja" -}}
+{{- $keyHeader := cond $isJA "キー" "Key" -}}
+{{- $typeHeader := cond $isJA "型" "Type" -}}
+{{- $descHeader := cond $isJA "説明" "Description" -}}
+{{- $sinceHeader := cond $isJA "追加" "Since" -}}
+{{- $requiredText := cond $isJA "必須。" "Required." -}}
 
 {{- $sections := slice
-  (dict "id" "top-level" "title" "Top level" "node" $schema "base" ""
-        "desc" "The keys of a spec file document.")
+  (dict "id" "top-level" "title" (cond $isJA "トップレベル" "Top level") "node" $schema "base" ""
+        "desc" (cond $isJA "spec ファイル直下で使えるキーです。" "The keys of a spec file document."))
   (dict "id" "scenario" "title" "scenarios[*]" "def" "scenario")
   (dict "id" "step" "title" "steps[*]" "def" "step")
   (dict "id" "fixture" "title" "fixture" "def" "fixture")
@@ -24,7 +30,7 @@
   (dict "id" "mockServer" "title" "mock_server" "def" "mockServer")
   (dict "id" "mockRoute" "title" "mock_server routes[*]" "def" "mockRoute")
   (dict "id" "assert" "title" "assert" "def" "assert")
-  (dict "id" "stream" "title" "stream matchers (stdout / stderr / body / rows / message / value / screen)" "def" "stream")
+  (dict "id" "stream" "title" (cond $isJA "stream マッチャ (stdout / stderr / body / rows / message / value / screen)" "stream matchers (stdout / stderr / body / rows / message / value / screen)") "def" "stream")
   (dict "id" "exitCode" "title" "exit_code" "def" "exitCode")
   (dict "id" "file" "title" "file" "def" "file")
   (dict "id" "dir" "title" "dir" "def" "dir")
@@ -33,10 +39,10 @@
   (dict "id" "image" "title" "image" "def" "image")
   (dict "id" "pdf" "title" "pdf" "def" "pdf")
   (dict "id" "mockAssert" "title" "mock" "def" "mockAssert")
-  (dict "id" "headerMatch" "title" "header matcher" "def" "headerMatch")
-  (dict "id" "jsonAssert" "title" "json / yaml checks" "def" "jsonAssert")
+  (dict "id" "headerMatch" "title" (cond $isJA "header マッチャ" "header matcher") "def" "headerMatch")
+  (dict "id" "jsonAssert" "title" (cond $isJA "json / yaml チェック" "json / yaml checks") "def" "jsonAssert")
   (dict "id" "retry" "title" "retry" "def" "retry")
-  (dict "id" "condition" "title" "skip / only conditions" "def" "condition")
+  (dict "id" "condition" "title" (cond $isJA "skip / only 条件" "skip / only conditions") "def" "condition")
   (dict "id" "runner" "title" "runners.<name>" "def" "runner")
   (dict "id" "defaults" "title" "defaults" "def" "defaults")
 -}}
@@ -52,13 +58,13 @@
     {{- if not $desc }}{{ $desc = $node.description }}{{ end -}}
   {{- end -}}
   {{- if $node -}}
-<h3 id="spec-{{ $s.id }}"><code>{{ $s.title }}</code> <a class="hlink" href="#spec-{{ $s.id }}" aria-label="Link to this section">#</a></h3>
+<h3 id="spec-{{ $s.id }}"><code>{{ $s.title }}</code> <a class="hlink" href="#spec-{{ $s.id }}" aria-label="{{ site.Params.ui.headingLinkLabel }}">#</a></h3>
 {{- with $desc }}<p>{{ . | markdownify }}</p>{{ end }}
 <div class="table-wrap">
 <table>
-<thead><tr><th>Key</th><th>Type</th><th>Description</th><th>Since</th></tr></thead>
+<thead><tr><th>{{ $keyHeader }}</th><th>{{ $typeHeader }}</th><th>{{ $descHeader }}</th><th>{{ $sinceHeader }}</th></tr></thead>
 <tbody>
-{{- partial "spec-rows.html" (dict "root" $schema "node" $node "base" $base "depth" 0 "since" $since) -}}
+{{- partial "spec-rows.html" (dict "root" $schema "node" $node "base" $base "depth" 0 "since" $since "requiredText" $requiredText) -}}
 </tbody>
 </table>
 </div>
