@@ -8,6 +8,7 @@
 [![reviewdog](https://github.com/nao1215/atago/actions/workflows/reviewdog.yml/badge.svg)](https://github.com/nao1215/atago/actions/workflows/reviewdog.yml)
 [![Go Reference](https://pkg.go.dev/badge/github.com/nao1215/atago.svg)](https://pkg.go.dev/github.com/nao1215/atago)
 ![GitHub](https://img.shields.io/github/license/nao1215/atago)
+[![Total Downloads](https://img.shields.io/github/downloads/nao1215/atago/total?label=downloads)](https://github.com/nao1215/atago/releases)
 
 <p align="center">
   <img src="./doc/img/atago-logo.jpg" alt="atago logo" width="400" />
