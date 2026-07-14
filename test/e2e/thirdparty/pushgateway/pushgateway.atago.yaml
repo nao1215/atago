@@ -6,7 +6,7 @@ suite:
 # Exercises Prometheus Pushgateway (from awesome-selfhosted's monitoring
 # corner) as a third-party target. Its push API takes the raw text exposition
 # format — the workload the http step's `body:` payload exists for. Install:
-#   go install github.com/prometheus/pushgateway@latest
+# see .github/workflows/thirdparty.yml for the pinned CI version.
 #
 # Each scenario binds its own port so the suite runs under the default
 # scenario concurrency.

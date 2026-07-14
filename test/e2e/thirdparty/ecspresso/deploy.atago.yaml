@@ -11,10 +11,8 @@ suite:
 # the ECS state change is observed with `aws ecs describe-services`, not just
 # asserted from ecspresso's logs. `--no-wait` is used because moto never runs
 # tasks, so a wait-for-stable would hang; the registration and service update
-# are synchronous and complete before it returns.
-# Install:
-#   pip install 'moto[server]'
-#   go install github.com/kayac/ecspresso/v2/cmd/ecspresso@latest
+# are synchronous and complete before it returns. Install: see
+# .github/workflows/thirdparty.yml for the pinned CI versions.
 
 permissions:
   network:

@@ -3,9 +3,11 @@ name: Dogfood
 # atago's strongest product proof is its dogfood matrix — running the real
 # hermetic atago binary against real third-party CLIs (#77). The hermetic
 # self-hosted suite runs on every push (e2e.yml); this workflow continuously
-# exercises the go-installable dogfood slices (gup, sqly, truss) so real-world
-# regressions surface on a dedicated, clearly-owned workflow instead of only when
-# a maintainer runs `make dogfood` by hand.
+# exercises the dogfood slices (gup, sqly, truss) so real-world regressions
+# surface on a dedicated, clearly-owned workflow instead of only when a
+# maintainer runs `make dogfood` by hand. Like thirdparty.yml, these external
+# CLIs are pinned so scheduled CI stays deterministic and version bumps are
+# intentional reviewable changes.
 #
 # It is intentionally NOT gated on push: it depends on external tools whose
 # availability atago does not control, so it runs on a schedule and on demand to
@@ -29,8 +31,8 @@ jobs:
       fail-fast: false
       matrix:
         tool:
-          - { name: gup, module: "github.com/nao1215/gup@latest", dir: "./test/e2e/tools/gup" }
-          - { name: sqly, module: "github.com/nao1215/sqly@latest", dir: "./test/e2e/tools/sqly" }
+          - { name: gup, module: "github.com/nao1215/gup@v1.7.1", dir: "./test/e2e/tools/gup" }
+          - { name: sqly, module: "github.com/nao1215/sqly@v0.27.3", dir: "./test/e2e/tools/sqly" }
           # truss moved from a Go module to the Rust crate `truss-image`
           # (installing the `truss` binary).
           - { name: truss, dir: "./test/e2e/tools/truss" }
@@ -52,7 +54,7 @@ jobs:
           set -e
           case "${{ matrix.tool.name }}" in
             truss)
-              cargo install truss-image --locked
+              cargo install truss-image --version 0.11.5 --locked
               echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
               ;;
             *)

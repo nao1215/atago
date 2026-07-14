@@ -6,8 +6,8 @@ suite:
 # Exercises Caddy (https://caddyserver.com/, from awesome-selfhosted) as a
 # third-party target: pure CLI behavior (version/adapt/fmt/validate), and the
 # real server started as a background service with a TCP readiness probe and
-# queried through the http runner. Install with:
-#   go install github.com/caddyserver/caddy/v2/cmd/caddy@latest
+# queried through the http runner. Install: see
+# .github/workflows/thirdparty.yml for the pinned CI version.
 
 permissions:
   network:

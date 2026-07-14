@@ -9,9 +9,8 @@ suite:
 # driven with the official nats CLI through request/reply (a second background
 # service answers), JetStream persistence (stream create → publish → counted
 # state → purge), and the JetStream KV store, while the monitoring endpoint is
-# asserted through the http runner. Install with:
-#   go install github.com/nats-io/nats-server/v2@latest
-#   go install github.com/nats-io/natscli/nats@latest
+# asserted through the http runner. Install: see
+# .github/workflows/thirdparty.yml for the pinned CI versions.
 #
 # Each scenario binds its own port so the suite runs under the default
 # scenario concurrency.

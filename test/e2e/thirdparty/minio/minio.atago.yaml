@@ -8,8 +8,7 @@ suite:
 # background service per scenario, health probed over HTTP, driven end-to-end
 # with the mc client (bucket + object lifecycle, versioning, anonymous
 # policies), and the unauthenticated failure mode asserted as S3 XML. Install:
-#   go install github.com/minio/minio@latest
-#   go install github.com/minio/mc@latest
+# see .github/workflows/thirdparty.yml for the pinned CI versions.
 #
 # Each scenario binds its own port so the suite runs under the default
 # scenario concurrency. Pin MC_CONFIG_DIR under the scenario workdir so mc
@@ -42,7 +41,7 @@ defaults:
 
 # mc seeds a builtin "local" alias for http://localhost:9000. Use distinct
 # alias names here so a resolution fallback cannot silently talk to that default
-# during fresh @latest CI installs.
+# during fresh CI installs.
 
 scenarios:
   - name: the server reports itself alive over the health API

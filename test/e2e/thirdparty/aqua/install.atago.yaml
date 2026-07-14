@@ -11,8 +11,8 @@ suite:
 # `aqua install` downloads it from 127.0.0.1, lands it under AQUA_ROOT_DIR, and
 # `aqua exec` runs it. AQUA_ROOT_DIR and the policy file are pinned inside the
 # workdir. (aqua still fetches its pinned aqua-proxy bootstrap from GitHub on
-# install, the one external dependency of aqua's own design.)
-# Install: go install github.com/aquaproj/aqua/v2/cmd/aqua@latest
+# install, the one external dependency of aqua's own design.) Install: see
+# .github/workflows/thirdparty.yml for the pinned CI version.
 
 permissions:
   network:
