@@ -441,11 +441,16 @@ func sameJSONValue(a, b any) bool {
 	va := reflect.ValueOf(a)
 	vb := reflect.ValueOf(b)
 	switch ta.Kind() {
-	case reflect.Map, reflect.Slice:
+	case reflect.Map:
 		if va.IsNil() || vb.IsNil() {
 			return va.IsNil() == vb.IsNil()
 		}
 		return va.Pointer() == vb.Pointer()
+	case reflect.Slice:
+		if va.IsNil() || vb.IsNil() {
+			return va.IsNil() == vb.IsNil()
+		}
+		return va.Len() == vb.Len() && va.Pointer() == vb.Pointer()
 	default:
 		return false
 	}
