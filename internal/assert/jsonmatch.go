@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math"
 	"math/big"
-	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -358,12 +357,6 @@ func lengthOf(v any) (int, bool) {
 // objects and arrays, recurses so nested structures compare by value rather
 // than by fmt.Sprintf output. Map comparison is key-order independent (#40).
 func valuesEqual(node, want any) bool {
-	// A self-compare of the same decoded tree is already exact equality. Short-
-	// circuiting identical composites avoids a full recursive walk for huge
-	// adversarial JSON values, which can otherwise overrun the fuzz deadline.
-	if sameJSONValue(node, want) {
-		return true
-	}
 	// Numeric normalization (int 2 == 2.0, and a numeric string vs a number) is
 	// intended, but only when at least ONE side is a genuine number: two DIFFERENT
 	// strings that merely parse to the same float ("2" vs "2.0", "1e3" vs "1000")
@@ -425,35 +418,6 @@ func valuesEqual(node, want any) bool {
 		return want == nil
 	}
 	return fmt.Sprintf("%v", node) == fmt.Sprintf("%v", want)
-}
-
-func sameJSONValue(a, b any) bool {
-	if a == nil || b == nil {
-		return a == b
-	}
-	ta := reflect.TypeOf(a)
-	if ta != reflect.TypeOf(b) {
-		return false
-	}
-	if ta.Comparable() {
-		return a == b
-	}
-	va := reflect.ValueOf(a)
-	vb := reflect.ValueOf(b)
-	switch ta.Kind() {
-	case reflect.Map:
-		if va.IsNil() || vb.IsNil() {
-			return va.IsNil() == vb.IsNil()
-		}
-		return va.Pointer() == vb.Pointer()
-	case reflect.Slice:
-		if va.IsNil() || vb.IsNil() {
-			return va.IsNil() == vb.IsNil()
-		}
-		return va.Len() == vb.Len() && va.Pointer() == vb.Pointer()
-	default:
-		return false
-	}
 }
 
 // isNumericKind reports whether v is a genuine number (not an arbitrary numeric
