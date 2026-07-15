@@ -45,8 +45,8 @@ jobs:
   # representative slice of that proof must gate every PR, not only the daily
   # schedules. One flagship self-hosted server (caddy) and one dogfood CLI
   # (sqly) run here at PINNED versions so the required check stays
-  # deterministic; the daily thirdparty.yml / dogfood.yml matrices keep
-  # tracking @latest to catch upstream drift.
+  # deterministic; the daily thirdparty.yml / dogfood.yml matrices keep the
+  # broader external-tool coverage on their own pinned versions.
   e2e-representative:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -67,7 +67,7 @@ jobs:
         run: |
           set -e
           go install github.com/caddyserver/caddy/v2/cmd/caddy@v2.11.4
-          go install github.com/nao1215/sqly@v0.26.0
+          go install github.com/nao1215/sqly@v0.27.3
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
       - name: Run the caddy suite (self-hosted web server, awesome-selfhosted)
@@ -117,7 +117,7 @@ jobs:
       - name: Install pinned sqly for the interactive pty check
         shell: bash
         run: |
-          go install github.com/nao1215/sqly@v0.26.0
+          go install github.com/nao1215/sqly@v0.27.3
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
       # --parallel 1 keeps the concurrent ConPTY sessions from starving each

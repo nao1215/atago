@@ -9,7 +9,7 @@ suite:
 # builds files worth asserting on. The server half lives in
 # hugo_server.atago.yaml. Every scenario probes for hugo first so the suite
 # skips cleanly where it is absent.
-# Install with: go install github.com/gohugoio/hugo@latest / brew install hugo
+# Install: see .github/workflows/thirdparty.yml for the pinned CI version.
 scenarios:
   - name: new site scaffolds the documented directory tree
     only:

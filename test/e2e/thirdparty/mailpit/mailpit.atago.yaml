@@ -7,8 +7,8 @@ suite:
 # email corner) as a third-party target — a protocol pairing nothing else in
 # this directory covers: real messages are delivered over SMTP with the stock
 # curl client (smtp://), then asserted through Mailpit's REST API — capture,
-# full-text search, MIME attachments, and mailbox teardown. Install with:
-#   go install github.com/axllent/mailpit@latest
+# full-text search, MIME attachments, and mailbox teardown. Install: see
+# .github/workflows/thirdparty.yml for the pinned CI version.
 #
 # Each scenario binds its own SMTP+HTTP port pair so the suite runs under the
 # default scenario concurrency.

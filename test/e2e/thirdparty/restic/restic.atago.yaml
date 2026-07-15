@@ -8,8 +8,8 @@ suite:
 # repository — init, backup, list snapshots as JSON, restore, diff, integrity
 # check, retention, and the failure mode a wrong password must produce.
 # Everything is hermetic: the repository and the data live in the scenario's
-# isolated workdir. Install with:
-#   go install github.com/restic/restic/cmd/restic@latest
+# isolated workdir. Install: see .github/workflows/thirdparty.yml for the
+# pinned CI version.
 
 defaults:
   scenario:

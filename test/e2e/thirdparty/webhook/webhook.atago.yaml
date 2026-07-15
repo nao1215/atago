@@ -12,9 +12,8 @@ suite:
 # not run when unsatisfied), an HMAC signature is verified against an
 # independently computed oracle, the http-methods allowlist rejects the wrong
 # verb, and a command that exits non-zero surfaces as a 500. Each scenario runs
-# its own daemon with a minimal hook config.
-# Install:
-#   go install github.com/adnanh/webhook@latest
+# its own daemon with a minimal hook config. Install: see
+# .github/workflows/thirdparty.yml for the pinned CI version.
 
 permissions:
   network:

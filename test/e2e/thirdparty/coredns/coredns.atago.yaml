@@ -8,8 +8,8 @@ suite:
 # for, which is the point: the real server is booted from an authored Corefile
 # and zone file, queried with the stock `dig` client over actual DNS (A, TXT,
 # CNAME chasing, NXDOMAIN, and the REFUSED answer for out-of-zone names), and
-# its health plugin is probed through the http runner. Install with:
-#   go install github.com/coredns/coredns@latest
+# its health plugin is probed through the http runner. Install: see
+# .github/workflows/thirdparty.yml for the pinned CI version.
 # (`dig` ships with bind9-dnsutils, preinstalled on GitHub runners.)
 #
 # Each server scenario binds its own port so the suite runs under the default

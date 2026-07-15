@@ -7,10 +7,10 @@ name: ThirdParty
 # gate (e2e.yml e2e-representative); these depend on external modules/releases,
 # so like the dogfood matrix they run on a schedule and on demand to keep the
 # required push checks fast and deterministic. Each program is its own matrix
-# leg so a failure localizes to one external dependency. `go install` legs
-# track @latest (integrity comes from the Go checksum database); prebuilt
-# binary legs (prometheus, gitea) are pinned to a version + SHA256 instead,
-# since a raw CDN download has no implicit integrity check.
+# leg so a failure localizes to one external dependency. Every external tool is
+# pinned deliberately: `go install` legs pin a module version (integrity still
+# comes from the Go checksum database), and raw binary-download legs pin a
+# version + SHA256 because a CDN download has no implicit integrity check.
 on:
   workflow_dispatch:
   schedule:
@@ -31,13 +31,13 @@ jobs:
         program:
           - name: caddy
             dir: ./test/e2e/thirdparty/caddy
-            install: go install github.com/caddyserver/caddy/v2/cmd/caddy@latest
+            install: go install github.com/caddyserver/caddy/v2/cmd/caddy@v2.11.4
           - name: pushgateway
             dir: ./test/e2e/thirdparty/pushgateway
-            install: go install github.com/prometheus/pushgateway@latest
+            install: go install github.com/prometheus/pushgateway@v1.11.3
           - name: webhook
             dir: ./test/e2e/thirdparty/webhook
-            install: go install github.com/adnanh/webhook@latest
+            install: go install github.com/adnanh/webhook@v0.0.0-20260212225928-857e708f87a6
           # jq/openssl/sqlite3 ship on the runner image; the guard installs
           # them only if a future image drops one.
           - name: jq
@@ -51,7 +51,7 @@ jobs:
             install: command -v sqlite3 >/dev/null || (sudo apt-get update && sudo apt-get install -y sqlite3)
           - name: fzf
             dir: ./test/e2e/thirdparty/fzf
-            install: go install github.com/junegunn/fzf@latest
+            install: go install github.com/junegunn/fzf@v0.74.0
           # htop drives the pty runner's alternate-screen rendering and named
           # function keys; from apt where the runner image lacks it.
           - name: htop
@@ -62,25 +62,25 @@ jobs:
             install: command -v redis-server >/dev/null || (sudo apt-get update && sudo apt-get install -y redis-server redis-tools)
           - name: hugo
             dir: ./test/e2e/thirdparty/hugo
-            install: go install github.com/gohugoio/hugo@latest
+            install: go install github.com/gohugoio/hugo@v0.164.0
           - name: restic
             dir: ./test/e2e/thirdparty/restic
-            install: go install github.com/restic/restic/cmd/restic@latest
+            install: go install github.com/restic/restic/cmd/restic@v0.19.1
           - name: rclone
             dir: ./test/e2e/thirdparty/rclone
-            install: go install github.com/rclone/rclone@latest
+            install: go install github.com/rclone/rclone@v1.74.4
           - name: minio
             dir: ./test/e2e/thirdparty/minio
             install: |
-              go install github.com/minio/minio@latest
-              go install github.com/minio/mc@latest
+              go install github.com/minio/minio@v0.0.0-20260212201848-7aac2a2c5b7c
+              go install github.com/minio/mc@v0.0.0-20251106162529-77f82e18b540
           # The AWS CLI is driven against a local MinIO S3 endpoint (#32): a
           # cloud CLI tested with no cloud account, fully offline. minio is the
           # server; the aws CLI ships on the runner image (installed if absent).
           - name: awscli
             dir: ./test/e2e/thirdparty/awscli
             install: |
-              go install github.com/minio/minio@latest
+              go install github.com/minio/minio@v0.0.0-20260212201848-7aac2a2c5b7c
               command -v aws >/dev/null || (sudo apt-get update && sudo apt-get install -y awscli)
           # python3 ships on every runner image; the guard installs it only if
           # a future image drops it. The pty scenarios exercise the REPL.
@@ -108,41 +108,42 @@ jobs:
           - name: age
             dir: ./test/e2e/thirdparty/age
             install: |
-              go install filippo.io/age/cmd/age@latest
-              go install filippo.io/age/cmd/age-keygen@latest
+              go install filippo.io/age/cmd/age@v1.3.1
+              go install filippo.io/age/cmd/age-keygen@v1.3.1
           # kustomize renders Kubernetes manifests offline and deterministically
           # (build/create/edit); go-installed from the kustomize module.
           - name: kustomize
             dir: ./test/e2e/thirdparty/kustomize
-            install: go install sigs.k8s.io/kustomize/kustomize/v5@latest
+            install: go install sigs.k8s.io/kustomize/kustomize/v5@v5.8.1
           # actionlint statically lints GitHub Actions workflows offline; the
           # specs disable shellcheck so results do not depend on its presence.
           - name: actionlint
             dir: ./test/e2e/thirdparty/actionlint
-            install: go install github.com/rhysd/actionlint/cmd/actionlint@latest
+            install: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
           # sops encrypts structured files with age as the key backend; both are
           # go-installed (age and age-keygen provide the throwaway keys).
           - name: sops
             dir: ./test/e2e/thirdparty/sops
             install: |
-              go install github.com/getsops/sops/v3/cmd/sops@latest
-              go install filippo.io/age/cmd/age@latest
-              go install filippo.io/age/cmd/age-keygen@latest
+              go install github.com/getsops/sops/v3/cmd/sops@v3.13.2
+              go install filippo.io/age/cmd/age@v1.3.1
+              go install filippo.io/age/cmd/age-keygen@v1.3.1
           # aqua is a declarative CLI version manager; the suite runs a real
           # `aqua install` from a local registry + local HTTP file server (python3
-          # ships on the runner) and its offline surface. aqua fetches its pinned
-          # aqua-proxy bootstrap from GitHub during install.
+          # ships on the runner) and its offline surface. v2.61.0 raised its
+          # minimum Go toolchain to 1.26.5, so pin v2.60.2 to stay compatible
+          # with this repo's current Go setup while still testing a recent aqua.
           - name: aqua
             dir: ./test/e2e/thirdparty/aqua
-            install: go install github.com/aquaproj/aqua/v2/cmd/aqua@latest
+            install: go install github.com/aquaproj/aqua/v2/cmd/aqua@v2.60.2
           # ecspresso deploys ECS services. The suite renders offline AND runs a
           # real deploy against moto (an in-memory AWS mock, pip-installed) with
           # the aws CLI (preinstalled on the runner) observing the ECS state.
           - name: ecspresso
             dir: ./test/e2e/thirdparty/ecspresso
             install: |
-              go install github.com/kayac/ecspresso/v2/cmd/ecspresso@latest
-              pipx install 'moto[server]'
+              go install github.com/kayac/ecspresso/v2/cmd/ecspresso@v2.8.5
+              pipx install 'moto[server]==5.2.2'
           - name: terraform
             dir: ./test/e2e/thirdparty/terraform
             install: |
@@ -156,19 +157,19 @@ jobs:
           - name: coredns
             dir: ./test/e2e/thirdparty/coredns
             install: |
-              go install github.com/coredns/coredns@latest
+              go install github.com/coredns/coredns@v1.14.6
               command -v dig >/dev/null || (sudo apt-get update && sudo apt-get install -y bind9-dnsutils)
           - name: nats
             dir: ./test/e2e/thirdparty/nats
             install: |
-              go install github.com/nats-io/nats-server/v2@latest
-              go install github.com/nats-io/natscli/nats@latest
+              go install github.com/nats-io/nats-server/v2@v2.14.3
+              go install github.com/nats-io/natscli/nats@v0.4.0
           - name: mailpit
             dir: ./test/e2e/thirdparty/mailpit
-            install: go install github.com/axllent/mailpit@latest
+            install: go install github.com/axllent/mailpit@v1.30.4
           - name: transfersh
             dir: ./test/e2e/thirdparty/transfersh
-            install: go install github.com/dutchcoders/transfer.sh@latest
+            install: go install github.com/dutchcoders/transfer.sh@v1.6.1
           # Gotify compiles its web UI into the binary, so `go install` cannot
           # build it; pinned release zip + SHA256. Gotify publishes no checksum
           # sidecars, so this SHA was recorded from a verified download

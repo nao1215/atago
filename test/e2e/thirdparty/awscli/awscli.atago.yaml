@@ -6,9 +6,9 @@ suite:
 # Drives the real AWS CLI against a local MinIO S3 endpoint (#32): test a
 # cloud CLI with no cloud account, no network, fully hermetic. MinIO is
 # started per scenario as a background service (its client peers already have
-# a suite here); `aws --endpoint-url` points at it. Install:
-#   go install github.com/minio/minio@latest   (server)
-#   pip install awscli / apt-get install awscli (client)
+# a suite here); `aws --endpoint-url` points at it. Install: see
+# .github/workflows/thirdparty.yml for the pinned server version and the CI
+# client-install path.
 #
 # Each scenario binds its own port and data dir so the suite runs under the
 # default scenario concurrency. Credentials come from scenario env; the

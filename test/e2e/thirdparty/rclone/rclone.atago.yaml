@@ -8,8 +8,8 @@ suite:
 # scenario hermetic: copy/sync semantics, machine-readable listings, integrity
 # checks and their failure mode, the obscure/reveal password round-trip, and
 # `rclone serve http` as a real background server queried through the http
-# runner. Install with:
-#   go install github.com/rclone/rclone@latest
+# runner. Install: see .github/workflows/thirdparty.yml for the pinned CI
+# version.
 
 permissions:
   network:

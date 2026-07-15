@@ -10,8 +10,8 @@ suite:
 # the response, the file is downloaded back to disk (`body_to`), and the
 # round-tripped bytes are verified with the image assertion target plus a
 # byte-for-byte cmp. The browser-style multipart upload path is exercised too
-# (`files:`). Install with:
-#   go install github.com/dutchcoders/transfer.sh@latest
+# (`files:`). Install: see .github/workflows/thirdparty.yml for the pinned CI
+# version.
 #
 # Each server scenario binds its own port so the suite runs under the default
 # scenario concurrency.
