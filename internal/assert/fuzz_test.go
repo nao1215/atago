@@ -6,6 +6,13 @@ import (
 	"github.com/nao1215/atago/internal/spec"
 )
 
+const (
+	// Keep mutation fuzzing focused on comparison semantics instead of spending
+	// the entire job on giant adversarial payloads.
+	maxFuzzJSONBytes = 8 << 10
+	maxFuzzJSONNodes = 4096
+)
+
 // FuzzCheckJSON feeds arbitrary document bytes and an arbitrary JSONPath to the
 // JSON matcher (issue #46). The matcher must never panic and must always return
 // a diagnosis (invalid JSON, invalid path, no match, or a comparison) rather
@@ -42,10 +49,16 @@ func FuzzValuesEqual(f *testing.F) {
 		f.Add([]byte(s), []byte(`{"a":1}`))
 	}
 	f.Fuzz(func(t *testing.T, a, b []byte) {
+		if len(a) > maxFuzzJSONBytes || len(b) > maxFuzzJSONBytes {
+			t.Skip()
+		}
 		va, errA := parseJSON(a)
 		vb, errB := parseJSON(b)
 		if errA != nil || errB != nil {
 			return
+		}
+		if exceedsJSONNodeBudget(va, maxFuzzJSONNodes) || exceedsJSONNodeBudget(vb, maxFuzzJSONNodes) {
+			t.Skip()
 		}
 		if !valuesEqual(va, va) {
 			t.Fatalf("valuesEqual is not reflexive for %q", a)
@@ -54,4 +67,26 @@ func FuzzValuesEqual(f *testing.F) {
 		// boolean result itself is not constrained here.
 		_ = valuesEqual(va, vb)
 	})
+}
+
+func exceedsJSONNodeBudget(root any, budget int) bool {
+	stack := []any{root}
+	for len(stack) > 0 {
+		if budget == 0 {
+			return true
+		}
+		budget--
+
+		n := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+		switch v := n.(type) {
+		case []any:
+			stack = append(stack, v...)
+		case map[string]any:
+			for _, child := range v {
+				stack = append(stack, child)
+			}
+		}
+	}
+	return false
 }
