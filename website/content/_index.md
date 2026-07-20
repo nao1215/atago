@@ -65,7 +65,7 @@ atago (愛宕) is named for Mount Atago in Kyoto, whose shrine enshrines a deity
 
 ## Where to go
 
-- [Install](/install/) — `go install`, Homebrew, AUR, prebuilt binaries, a GitHub Action.
+- [Install](/install/) — `go install`, Homebrew, AUR, aqua, mise, prebuilt binaries, a GitHub Action.
 - [Getting started](/getting-started/) — record a real run, read the spec it wrote, keep it as a test.
 - [Cookbook](/cookbook/) — 50+ copyable recipes indexed by task, plus the runnable, CI-tested example for every feature.
 - [Use it in CI](/ci/) — report formats, retries, flake detection, artifacts, secret masking.
