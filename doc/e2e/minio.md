@@ -79,7 +79,7 @@ mc ls lifecycle/atago-bucket
   - stdout is empty
 ### Scenario: bucket versioning can be enabled and reported
 #### Given
-- Background service `minio` is started: `minio server data1 data2 data3 data4 --address 127.0.0.1:18123`.
+- Background service `minio` is started: `minio server data --address 127.0.0.1:18123`.
 #### When
 ```shell
 mc alias set versioned http://127.0.0.1:18123 atago atago-secret-key

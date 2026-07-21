@@ -72,15 +72,15 @@ jobs:
           - name: minio
             dir: ./test/e2e/thirdparty/minio
             install: |
-              go install github.com/minio/minio@v0.0.0-20260212201848-7aac2a2c5b7c
-              go install github.com/minio/mc@v0.0.0-20251106162529-77f82e18b540
+              go install github.com/minio/minio@RELEASE.2025-07-18T21-56-31Z
+              go install github.com/minio/mc@RELEASE.2025-07-21T05-28-08Z
           # The AWS CLI is driven against a local MinIO S3 endpoint (#32): a
           # cloud CLI tested with no cloud account, fully offline. minio is the
           # server; the aws CLI ships on the runner image (installed if absent).
           - name: awscli
             dir: ./test/e2e/thirdparty/awscli
             install: |
-              go install github.com/minio/minio@v0.0.0-20260212201848-7aac2a2c5b7c
+              go install github.com/minio/minio@RELEASE.2025-07-18T21-56-31Z
               command -v aws >/dev/null || (sudo apt-get update && sudo apt-get install -y awscli)
           # python3 ships on every runner image; the guard installs it only if
           # a future image drops it. The pty scenarios exercise the REPL.
