@@ -161,6 +161,8 @@ var (
 	// windowsSpecRe extracts each ./test/e2e spec path listed in the single-source
 	// scripts/windows_portable_specs.sh.
 	windowsSpecRe = regexp.MustCompile(`(\./test/e2e/\S+)`)
+	// thirdpartyRunsOnRe extracts the thirdparty workflow's Linux runner label.
+	thirdpartyRunsOnRe = regexp.MustCompile(`(?m)^\s*runs-on:\s*(\S+)\s*$`)
 )
 
 // collectSpecs mirrors cli.collectSpecFiles for a single directory target: every
@@ -354,6 +356,36 @@ func TestThirdParty_MatrixCoversEverySuite(t *testing.T) {
 		if !inMatrix[e.Name()] {
 			t.Errorf("test/e2e/thirdparty/%s has specs but no matrix leg in .github/workflows/thirdparty.yml", e.Name())
 		}
+	}
+}
+
+// TestThirdParty_InstallersArePinned guards the scheduled thirdparty matrix
+// against reintroducing floating external-tool installs. The whole point of the
+// matrix is to exercise fixed third-party contracts; `@latest`, a moving
+// ubuntu-latest base image, or ad-hoc apt installs from today's repository all
+// reintroduce drift.
+func TestThirdParty_InstallersArePinned(t *testing.T) {
+	data, err := os.ReadFile(".github/workflows/thirdparty.yml")
+	if err != nil {
+		t.Fatalf("read thirdparty.yml: %v", err)
+	}
+	yml := string(data)
+
+	m := thirdpartyRunsOnRe.FindStringSubmatch(yml)
+	if len(m) != 2 {
+		t.Fatal("could not find runs-on in .github/workflows/thirdparty.yml")
+	}
+	if got := m[1]; got != "ubuntu-24.04" {
+		t.Errorf("thirdparty.yml runs-on = %q; want ubuntu-24.04 so the pinned Ubuntu snapshot stays on a fixed distro", got)
+	}
+	if strings.Contains(yml, "@latest") {
+		t.Error("thirdparty.yml still contains @latest; every third-party tool install must pin an explicit version or release tag")
+	}
+	if strings.Contains(yml, "sudo apt-get install -y") || strings.Contains(yml, "sudo apt install -y") {
+		t.Error("thirdparty.yml still shells out to a raw apt install; Ubuntu-packaged tools must come through scripts/install_ubuntu_snapshot_packages.sh")
+	}
+	if strings.Contains(yml, "command -v ") {
+		t.Error("thirdparty.yml still has command -v install guards; the third-party matrix must install fixed tool versions even if the runner image already ships one")
 	}
 }
 
