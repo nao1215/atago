@@ -41,7 +41,9 @@ defaults:
 
 # mc seeds a builtin "local" alias for http://localhost:9000. Use distinct
 # alias names here so a resolution fallback cannot silently talk to that default
-# during fresh CI installs.
+# during fresh CI installs. Newer MinIO builds can also accept TCP connections
+# before admin auth is fully initialized, so the `mc alias set` steps below poll
+# until the server accepts credentials.
 
 scenarios:
   - name: the server reports itself alive over the health API
@@ -97,6 +99,11 @@ scenarios:
     steps:
       - run:
           command: mc alias set lifecycle http://127.0.0.1:18122 atago atago-secret-key
+          retry:
+            times: 20
+            interval: 250ms
+            until:
+              exit_code: 0
       - assert:
           exit_code: 0
       - run:
@@ -155,13 +162,20 @@ scenarios:
   - name: bucket versioning can be enabled and reported
     services:
       - name: minio
-        command: minio server data --address 127.0.0.1:18123
+        # Bucket versioning is unsupported on MinIO's single-path filesystem
+        # backend; multiple data dirs force the single-node erasure-coded mode.
+        command: minio server data1 data2 data3 data4 --address 127.0.0.1:18123
         ready:
           port: 127.0.0.1:18123
           timeout: 30s
     steps:
       - run:
           command: mc alias set versioned http://127.0.0.1:18123 atago atago-secret-key
+          retry:
+            times: 20
+            interval: 250ms
+            until:
+              exit_code: 0
       - run:
           command: mc mb versioned/versioned
       - run:
@@ -189,6 +203,11 @@ scenarios:
     steps:
       - run:
           command: mc alias set publichost http://127.0.0.1:18124 atago atago-secret-key
+          retry:
+            times: 20
+            interval: 250ms
+            until:
+              exit_code: 0
       - run:
           command: mc mb publichost/public-bucket
       - fixture:
