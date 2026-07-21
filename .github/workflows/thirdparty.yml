@@ -23,8 +23,13 @@ permissions:
 jobs:
   thirdparty:
     name: thirdparty (${{ matrix.program.name }})
-    runs-on: ubuntu-latest
+    # Keep the base distro fixed too: the pinned Ubuntu snapshot below targets
+    # noble's package set, so a future ubuntu-latest rollover cannot silently
+    # change third-party tool versions.
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
+    env:
+      ATAGO_UBUNTU_SNAPSHOT_ID: 20260721T000000Z
     strategy:
       fail-fast: false
       matrix:
@@ -38,28 +43,29 @@ jobs:
           - name: webhook
             dir: ./test/e2e/thirdparty/webhook
             install: go install github.com/adnanh/webhook@v0.0.0-20260212225928-857e708f87a6
-          # jq/openssl/sqlite3 ship on the runner image; the guard installs
-          # them only if a future image drops one.
+          # Ubuntu-packaged tools are always installed from a pinned noble
+          # snapshot so their versions do not drift with runner-image refreshes
+          # or moving apt repositories.
           - name: jq
             dir: ./test/e2e/thirdparty/jq
-            install: command -v jq >/dev/null || (sudo apt-get update && sudo apt-get install -y jq)
+            install: bash ./scripts/install_ubuntu_snapshot_packages.sh jq
           - name: openssl
             dir: ./test/e2e/thirdparty/openssl
-            install: command -v openssl >/dev/null || (sudo apt-get update && sudo apt-get install -y openssl)
+            install: bash ./scripts/install_ubuntu_snapshot_packages.sh openssl
           - name: sqlite3
             dir: ./test/e2e/thirdparty/sqlite3
-            install: command -v sqlite3 >/dev/null || (sudo apt-get update && sudo apt-get install -y sqlite3)
+            install: bash ./scripts/install_ubuntu_snapshot_packages.sh sqlite3
           - name: fzf
             dir: ./test/e2e/thirdparty/fzf
             install: go install github.com/junegunn/fzf@v0.74.0
           # htop drives the pty runner's alternate-screen rendering and named
-          # function keys; from apt where the runner image lacks it.
+          # function keys.
           - name: htop
             dir: ./test/e2e/thirdparty/htop
-            install: command -v htop >/dev/null || (sudo apt-get update && sudo apt-get install -y htop)
+            install: bash ./scripts/install_ubuntu_snapshot_packages.sh htop
           - name: redis
             dir: ./test/e2e/thirdparty/redis
-            install: command -v redis-server >/dev/null || (sudo apt-get update && sudo apt-get install -y redis-server redis-tools)
+            install: bash ./scripts/install_ubuntu_snapshot_packages.sh redis-server redis-tools
           - name: hugo
             dir: ./test/e2e/thirdparty/hugo
             install: go install github.com/gohugoio/hugo@v0.164.0
@@ -76,34 +82,33 @@ jobs:
               go install github.com/minio/mc@RELEASE.2025-07-21T05-28-08Z
           # The AWS CLI is driven against a local MinIO S3 endpoint (#32): a
           # cloud CLI tested with no cloud account, fully offline. minio is the
-          # server; the aws CLI ships on the runner image (installed if absent).
+          # server; the AWS CLI itself comes from the pinned Ubuntu snapshot.
           - name: awscli
             dir: ./test/e2e/thirdparty/awscli
             install: |
               go install github.com/minio/minio@RELEASE.2025-07-18T21-56-31Z
-              command -v aws >/dev/null || (sudo apt-get update && sudo apt-get install -y awscli)
-          # python3 ships on every runner image; the guard installs it only if
-          # a future image drops it. The pty scenarios exercise the REPL.
+              bash ./scripts/install_ubuntu_snapshot_packages.sh awscli
+          # The pty scenarios exercise the real CPython REPL.
           - name: python
             dir: ./test/e2e/thirdparty/python
-            install: command -v python3 >/dev/null || (sudo apt-get update && sudo apt-get install -y python3)
-          # ssh-keygen ships with OpenSSH on every runner image; guard-install
-          # openssh-client if a future image drops it.
+            install: bash ./scripts/install_ubuntu_snapshot_packages.sh python3
+          # ssh-keygen is provided by openssh-client from the pinned snapshot.
           - name: ssh-keygen
             dir: ./test/e2e/thirdparty/ssh-keygen
-            install: command -v ssh-keygen >/dev/null || (sudo apt-get update && sudo apt-get install -y openssh-client)
+            install: bash ./scripts/install_ubuntu_snapshot_packages.sh openssh-client
           # ffmpeg (with ffprobe) synthesizes tiny test video and extracts
-          # frames; installed from apt where the runner image lacks it.
+          # frames.
           - name: ffmpeg
             dir: ./test/e2e/thirdparty/ffmpeg
-            install: command -v ffmpeg >/dev/null || (sudo apt-get update && sudo apt-get install -y ffmpeg)
-          # pandoc converts documents (md/html/docx/json AST); apt on Linux.
+            install: bash ./scripts/install_ubuntu_snapshot_packages.sh ffmpeg
+          # pandoc converts documents (md/html/docx/json AST).
           - name: pandoc
             dir: ./test/e2e/thirdparty/pandoc
-            install: command -v pandoc >/dev/null || (sudo apt-get update && sudo apt-get install -y pandoc)
-          # terraform from the official HashiCorp apt repo (pinned key). Only
-          # the builtin terraform_data resource is used, so `init` downloads no
-          # providers and the suite stays fully offline.
+            install: bash ./scripts/install_ubuntu_snapshot_packages.sh pandoc
+          # Terraform comes from the official HashiCorp release archive instead
+          # of a moving apt repository. Only the builtin terraform_data
+          # resource is used, so `init` downloads no providers and the suite
+          # stays fully offline.
           # age (and age-keygen) — the Go-native encryption CLI, go-installed.
           - name: age
             dir: ./test/e2e/thirdparty/age
@@ -147,18 +152,18 @@ jobs:
           - name: terraform
             dir: ./test/e2e/thirdparty/terraform
             install: |
-              command -v terraform >/dev/null || {
-                wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
-                echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
-                sudo apt-get update && sudo apt-get install -y terraform
-              }
-          # The suite queries the DNS server with dig (bind9-dnsutils); most
-          # runner images ship it, but install it if absent.
+              ver="1.12.2"
+              sha256="1eaed12ca41fcfe094da3d76a7e9aa0639ad3409c43be0103ee9f5a1ff4b7437"
+              curl -fsSL "https://releases.hashicorp.com/terraform/${ver}/terraform_${ver}_linux_amd64.zip" -o terraform.zip
+              echo "${sha256}  terraform.zip" | sha256sum -c -
+              unzip -o terraform.zip terraform
+              install terraform "$(go env GOPATH)/bin/terraform"
+          # The suite queries the DNS server with dig from the pinned snapshot.
           - name: coredns
             dir: ./test/e2e/thirdparty/coredns
             install: |
               go install github.com/coredns/coredns@v1.14.6
-              command -v dig >/dev/null || (sudo apt-get update && sudo apt-get install -y bind9-dnsutils)
+              bash ./scripts/install_ubuntu_snapshot_packages.sh bind9-dnsutils
           - name: nats
             dir: ./test/e2e/thirdparty/nats
             install: |
