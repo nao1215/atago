@@ -165,6 +165,21 @@ var (
 	thirdpartyRunsOnRe = regexp.MustCompile(`(?m)^\s*runs-on:\s*(\S+)\s*$`)
 )
 
+func thirdpartyMatrixBlock(t *testing.T, yml, name string) string {
+	t.Helper()
+	marker := "          - name: " + name + "\n"
+	start := strings.Index(yml, marker)
+	if start < 0 {
+		t.Fatalf("could not find thirdparty matrix block for %q", name)
+	}
+	rest := yml[start+len(marker):]
+	next := strings.Index(rest, "\n          - name: ")
+	if next < 0 {
+		return yml[start:]
+	}
+	return yml[start : start+len(marker)+next]
+}
+
 // collectSpecs mirrors cli.collectSpecFiles for a single directory target: every
 // *.atago.yaml/.yml under dir in filepath.WalkDir's lexical order, cleaned. The
 // cleaned path is what docgen prints as each scenario's `Source:`, so it must
@@ -386,6 +401,16 @@ func TestThirdParty_InstallersArePinned(t *testing.T) {
 	}
 	if strings.Contains(yml, "command -v ") {
 		t.Error("thirdparty.yml still has command -v install guards; the third-party matrix must install fixed tool versions even if the runner image already ships one")
+	}
+
+	for _, leg := range []string{"awscli", "ecspresso"} {
+		block := thirdpartyMatrixBlock(t, yml, leg)
+		if !strings.Contains(block, "bash ./scripts/install_awscli_pinned.sh") {
+			t.Errorf("thirdparty.yml %s block does not install the pinned AWS CLI bundle", leg)
+		}
+		if strings.Contains(block, "install_ubuntu_snapshot_packages.sh") {
+			t.Errorf("thirdparty.yml %s block still installs awscli from the Ubuntu snapshot", leg)
+		}
 	}
 }
 
