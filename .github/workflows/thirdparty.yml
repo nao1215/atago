@@ -82,12 +82,13 @@ jobs:
               go install github.com/minio/mc@RELEASE.2025-07-21T05-28-08Z
           # The AWS CLI is driven against a local MinIO S3 endpoint (#32): a
           # cloud CLI tested with no cloud account, fully offline. minio is the
-          # server; the AWS CLI itself comes from the pinned Ubuntu snapshot.
+          # server; the AWS CLI itself comes from the official pinned v2 bundle
+          # because Ubuntu's awscli package disappeared from the noble snapshot.
           - name: awscli
             dir: ./test/e2e/thirdparty/awscli
             install: |
               go install github.com/minio/minio@RELEASE.2025-07-18T21-56-31Z
-              bash ./scripts/install_ubuntu_snapshot_packages.sh awscli
+              bash ./scripts/install_awscli_pinned.sh
           # The pty scenarios exercise the real CPython REPL.
           - name: python
             dir: ./test/e2e/thirdparty/python
@@ -143,12 +144,13 @@ jobs:
             install: go install github.com/aquaproj/aqua/v2/cmd/aqua@v2.60.2
           # ecspresso deploys ECS services. The suite renders offline AND runs a
           # real deploy against moto (an in-memory AWS mock, pip-installed) with
-          # the aws CLI (preinstalled on the runner) observing the ECS state.
+          # the same pinned AWS CLI v2 bundle observing the ECS state.
           - name: ecspresso
             dir: ./test/e2e/thirdparty/ecspresso
             install: |
               go install github.com/kayac/ecspresso/v2/cmd/ecspresso@v2.8.5
               pipx install 'moto[server]==5.2.2'
+              bash ./scripts/install_awscli_pinned.sh
           - name: terraform
             dir: ./test/e2e/thirdparty/terraform
             install: |

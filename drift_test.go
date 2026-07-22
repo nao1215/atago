@@ -387,6 +387,12 @@ func TestThirdParty_InstallersArePinned(t *testing.T) {
 	if strings.Contains(yml, "command -v ") {
 		t.Error("thirdparty.yml still has command -v install guards; the third-party matrix must install fixed tool versions even if the runner image already ships one")
 	}
+	if strings.Contains(yml, "bash ./scripts/install_ubuntu_snapshot_packages.sh awscli") {
+		t.Error("thirdparty.yml still installs awscli from the Ubuntu snapshot; use the pinned official AWS CLI bundle because the package is no longer available there")
+	}
+	if strings.Contains(yml, "preinstalled on the runner") {
+		t.Error("thirdparty.yml still relies on a preinstalled runner tool; third-party CLIs must be installed at pinned versions inside the workflow")
+	}
 }
 
 // TestWindowsPortableSubset_Exists asserts every spec path in the single-source
