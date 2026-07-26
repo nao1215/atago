@@ -223,3 +223,131 @@ scenarios:
 		t.Errorf("hint = %q, want it to name run.timeout", hint)
 	}
 }
+
+// TestEngine_TimeoutKillFailsWithoutAssert pins what issue #17 set out to
+// deliver: a hanging command must fail, not stall. Every other timeout test
+// here pairs the killed step with an `assert: exit_code: 0`, so the failure
+// they observe comes from the assertion, not from the kill. A spec that just
+// runs a command — the shape a first-time user writes — used to go green after
+// the timeout fired, which is the "no failure, just a frozen run" outcome #17
+// exists to prevent, only slower.
+func TestEngine_TimeoutKillFailsWithoutAssert(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name, src, wantSource string
+	}{
+		{
+			name: "step timeout with no assert",
+			src: `
+version: "1"
+suite:
+  name: s
+scenarios:
+  - name: the killed step has nothing asserting on it
+    steps:
+      - run: {shell: true, timeout: 150ms, command: ` + sleepCmd(5) + `}
+`,
+			wantSource: "run.timeout",
+		},
+		{
+			name: "suite timeout with no assert",
+			src: `
+version: "1"
+suite:
+  name: s
+  timeout: 150ms
+scenarios:
+  - name: the killed step has nothing asserting on it
+    steps:
+      - run: {shell: true, command: ` + sleepCmd(5) + `}
+`,
+			wantSource: "suite.timeout",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			res := runSpec(t, tc.src)
+			if res.Status != StatusFailed {
+				t.Fatalf("status = %s, want failed (a killed command must not pass): %+v", res.Status, res.Scenarios)
+			}
+			if hint := timeoutHint(t, res); !strings.Contains(hint, tc.wantSource) {
+				t.Errorf("hint = %q, want it to name %s", hint, tc.wantSource)
+			}
+		})
+	}
+}
+
+// TestEngine_TimeoutKillFailsWhenAssertIgnoresTheResult pins that only an
+// assert reading the killed command's own result counts as observing it. A
+// file/dir/image/pdf/mock assert inspects something the step wrote, not whether
+// the command finished, so it must not suppress the timeout failure.
+func TestEngine_TimeoutKillFailsWhenAssertIgnoresTheResult(t *testing.T) {
+	t.Parallel()
+	res := runSpec(t, `
+version: "1"
+suite:
+  name: s
+scenarios:
+  - name: the assert looks at a file, not at the killed command
+    steps:
+      - fixture:
+          file: made.txt
+          content: "hi\n"
+      - run: {shell: true, timeout: 150ms, command: `+sleepCmd(5)+`}
+      - assert:
+          file:
+            path: made.txt
+            contains: hi
+`)
+	if res.Status != StatusFailed {
+		t.Fatalf("status = %s, want failed (a file assert does not observe the kill): %+v", res.Status, res.Scenarios)
+	}
+	if hint := timeoutHint(t, res); !strings.Contains(hint, "run.timeout") {
+		t.Errorf("hint = %q, want it to name run.timeout", hint)
+	}
+}
+
+// TestEngine_TimeoutZeroStillPassesWithoutAssert guards the escape hatch
+// against the fix above: opting out of the timeout means the command is never
+// killed, so a bare run step with no assert stays green.
+func TestEngine_TimeoutZeroStillPassesWithoutAssert(t *testing.T) {
+	t.Parallel()
+	res := runSpec(t, `
+version: "1"
+suite:
+  name: s
+  timeout: 150ms
+scenarios:
+  - name: an opted-out step is never killed
+    steps:
+      - run: {shell: true, timeout: "0", command: `+sleepCmd(1)+`}
+`)
+	if res.Status != StatusPassed {
+		t.Fatalf("status = %s, want passed (timeout 0 must keep the step unbounded): %+v", res.Status, res.Scenarios)
+	}
+}
+
+// TestEngine_PTYTimeoutFailsWithoutExpect covers the same false green on the
+// pty side. A session whose expectations all pass (or that has none) leaves
+// nothing to notice that the program never exited before the session timeout.
+func TestEngine_PTYTimeoutFailsWithoutExpect(t *testing.T) {
+	skipOnWindows(t)
+	t.Parallel()
+	res := runSpec(t, `
+version: "1"
+suite:
+  name: s
+scenarios:
+  - name: the session sends but never waits for the program to finish
+    steps:
+      - pty:
+          command: `+sleepCmd(5)+`
+          timeout: 150ms
+          session:
+            - send: "x"
+`)
+	if res.Status != StatusFailed {
+		t.Fatalf("status = %s, want failed (a killed pty program must not pass): %+v", res.Status, res.Scenarios)
+	}
+}

@@ -12,6 +12,10 @@ version: "1"
 # timeout fails with "the command timed out after ... and was killed" and the
 # hint names WHICH level supplied the timeout (run.timeout / runner.timeout /
 # defaults.run.timeout / suite.timeout / built-in 60s default timeout).
+#
+# The kill fails the step on its own, so a bare `run:` with nothing asserting on
+# it still goes red. Add an assert on the result (`exit_code: {not: 0}`) when a
+# timeout is the outcome you are testing for, and the step stays green.
 # Runs green as-is on every OS: atago run examples/timeouts.atago.yaml
 
 suite:
