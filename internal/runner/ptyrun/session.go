@@ -60,6 +60,13 @@ func driveSession(ctx context.Context, p *spec.PTY, proc ptyProcess) (*runner.Re
 	defer cancel()
 
 	start := time.Now()
+	var writeMu sync.Mutex
+	writeTerm := func(b []byte) (int, error) {
+		writeMu.Lock()
+		defer writeMu.Unlock()
+		return proc.rw.Write(b)
+	}
+	queries := newTerminalQueries(p, writerFunc(writeTerm))
 
 	// Transcript accumulator: one goroutine drains the master so the child never
 	// blocks on a full terminal buffer. Reads end when the child exits (EOF/EIO)
@@ -76,6 +83,7 @@ func driveSession(ctx context.Context, p *spec.PTY, proc ptyProcess) (*runner.Re
 				mu.Lock()
 				transcript = append(transcript, buf[:n]...)
 				mu.Unlock()
+				queries.consume(buf[:n])
 			}
 			if rerr != nil {
 				return
@@ -214,7 +222,7 @@ func driveSession(ctx context.Context, p *spec.PTY, proc ptyProcess) (*runner.Re
 		if a.Send != nil {
 			// Bytes resolves named keys to their xterm sequences and keeps the
 			// historical rule that an empty verbatim send transmits EOF (^D).
-			if _, werr := proc.rw.Write(a.Send.Bytes()); werr != nil {
+			if _, werr := writeTerm(a.Send.Bytes()); werr != nil {
 				return failHard(fmt.Errorf("pty: send: %w", werr))
 			}
 		}
