@@ -13,6 +13,8 @@ import (
 	"strings"
 
 	"github.com/goccy/go-yaml"
+	"github.com/goccy/go-yaml/ast"
+	"github.com/goccy/go-yaml/parser"
 	"github.com/nao1215/atago/internal/spec"
 )
 
@@ -50,11 +52,90 @@ func Load(path string) (*spec.Spec, error) {
 	return LoadBytes(path, data)
 }
 
+// binaryTag is the one explicit YAML tag a spec may carry. `atago record`
+// writes it when a captured stream is not valid UTF-8, so recorded specs must
+// keep loading; every other tag is an authoring mistake.
+const binaryTag = "!!binary"
+
+// explicitTagError describes the first unsupported explicit YAML tag in a spec
+// document, or returns "" when the document has none. atago's schema is closed
+// and fully typed — every field's Go type already fixes how its value is read —
+// so a tag can only ever restate or contradict the schema, and no spec,
+// example, or doc in this repository authors one.
+//
+// Turning tags away up front is also what keeps the decoder's nil-panic path
+// out of everyday use. When a tagged node lands on a list field,
+// goccy/go-yaml v1.19.2 panics: ast.TagNode.ArrayRange returns a nil
+// *ArrayNodeIter whenever the tag's value is not a sequence, and decodeSlice
+// dereferences it without a nil check (decode.go:1593 -> ast.go:1543).
+// decodeSpec recovers from that, but internal/loader is then the only package
+// here that raises a real runtime nil dereference on every test run, and it is
+// also the only package that has crashed Windows CI with Go GC heap-corruption
+// fatal errors ("found pointer to free object"). Not provoking the panic costs
+// nothing and removes that correlation.
+//
+// A `!!binary` over a list field still reaches the panic, because record's
+// output has to stay loadable; decodeSpec's recover remains the backstop for
+// that residue.
+//
+// A parse failure yields no usable AST; that case reports "" so the decoder can
+// produce its own, better-positioned syntax error.
+func explicitTagError(data []byte) string {
+	f, err := parser.ParseBytes(data, 0)
+	if err != nil || f == nil || len(f.Docs) == 0 {
+		return ""
+	}
+	// Decode reads a single document, so only that document can reach the panic.
+	v := &tagFinder{}
+	ast.Walk(v, f.Docs[0])
+	if v.found == nil || v.found.Start == nil {
+		return ""
+	}
+	pos := v.found.Start.Position
+	name := strings.TrimSpace(v.found.Start.Value)
+	where := ""
+	if pos != nil {
+		where = fmt.Sprintf("[%d:%d] ", pos.Line, pos.Column)
+	}
+	if name == "" || name == "!" {
+		return where + "explicit YAML tag is not supported in a spec: remove the tag"
+	}
+	return fmt.Sprintf("%sexplicit YAML tag %q is not supported in a spec: remove the tag", where, name)
+}
+
+// tagFinder is an ast.Visitor that stops at the first unsupported explicit tag
+// it meets.
+type tagFinder struct {
+	found *ast.TagNode
+}
+
+// Visit records the first unsupported *ast.TagNode and then stops descending.
+// A `!!binary` scalar is skipped over rather than accepted wholesale: the walk
+// continues into its children so a tag nested under it is still caught. Walk
+// also calls Visit(nil) after a node's children, which the type assertion
+// ignores.
+func (v *tagFinder) Visit(n ast.Node) ast.Visitor {
+	if v.found != nil {
+		return nil
+	}
+	tag, ok := n.(*ast.TagNode)
+	if !ok {
+		return v
+	}
+	if tag.Start != nil && strings.TrimSpace(tag.Start.Value) == binaryTag {
+		return v
+	}
+	v.found = tag
+	return nil
+}
+
 // decodeSpec decodes one YAML document into s, converting a panic from the
 // third-party decoder into an ordinary error. goccy/go-yaml can nil-panic on
 // some malformed input (a bare `!` tag over a broken mapping, found by
 // FuzzLoadBytes); atago's contract is that loading untrusted spec bytes never
 // crashes the process, so recover here and let the caller report a parse error.
+// explicitTagError already turns away the inputs known to reach that panic, so
+// this stays as a backstop for any shape not yet found.
 func decodeSpec(dec *yaml.Decoder, s *spec.Spec) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -75,6 +156,9 @@ func LoadBytes(path string, data []byte) (*spec.Spec, error) {
 	// field" error naming a field the author wrote right. Most YAML tooling strips
 	// a single leading BOM transparently.
 	data = bytes.TrimPrefix(data, []byte("\ufeff"))
+	if msg := explicitTagError(data); msg != "" {
+		return nil, &Error{Path: path, Kind: KindParse, Msg: msg}
+	}
 	var s spec.Spec
 	dec := yaml.NewDecoder(bytes.NewReader(data), yaml.Strict())
 	if err := decodeSpec(dec, &s); err != nil {

@@ -7,6 +7,25 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- The spec loader now rejects explicit YAML tags (`!foo`, `!!str`, a bare `!`)
+  with an error naming the tag and its line/column, instead of letting them
+  reach the decoder. atago's schema is closed and fully typed, so a tag could
+  only restate or contradict it, and no spec, example, or doc authored one.
+  `!!binary` stays accepted because `atago record` emits it for captures that
+  are not valid UTF-8.
+
+### Fixed
+
+- Loading a spec no longer provokes a runtime nil-pointer panic on the way to a
+  parse error. A tagged node on a list field made goccy/go-yaml v1.19.2 nil-deref
+  inside `decodeSlice`; the loader recovered from it, but `internal/loader` was
+  then the only package raising real runtime panics on every test run, and the
+  only one whose Windows CI job kept dying with Go GC heap-corruption fatal
+  errors (`found pointer to free object`). Rejecting the tags up front takes the
+  loader test suite from 9 recovered panics per run to zero.
+
 ## [0.12.0] - 2026-07-26
 
 A minor release focused on PTY/TUI correctness, reproducible third-party CI,
