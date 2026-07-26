@@ -25,6 +25,7 @@ A browsable, repo-local index of atago's documentation, generated from repositor
 - [gitea.md](../doc/e2e/gitea.md)
 - [gotify.md](../doc/e2e/gotify.md)
 - [grafana.md](../doc/e2e/grafana.md)
+- [gum.md](../doc/e2e/gum.md)
 - [gup.md](../doc/e2e/gup.md)
 - [htop.md](../doc/e2e/htop.md)
 - [hugo.md](../doc/e2e/hugo.md)

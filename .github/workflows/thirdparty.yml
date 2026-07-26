@@ -67,6 +67,9 @@ jobs:
               echo "${sha256}  lazygit.tar.gz" | sha256sum -c -
               tar -xzf lazygit.tar.gz lazygit
               install lazygit "$(go env GOPATH)/bin/lazygit"
+          - name: gum
+            dir: ./test/e2e/thirdparty/gum
+            install: go install github.com/charmbracelet/gum@v0.17.0
           # htop drives the pty runner's alternate-screen rendering and named
           # function keys.
           - name: htop
