@@ -27,6 +27,7 @@ A browsable, repo-local index of atago's documentation, generated from repositor
 - [grafana.md](../doc/e2e/grafana.md)
 - [gum.md](../doc/e2e/gum.md)
 - [gup.md](../doc/e2e/gup.md)
+- [helix.md](../doc/e2e/helix.md)
 - [htop.md](../doc/e2e/htop.md)
 - [hugo.md](../doc/e2e/hugo.md)
 - [iso8583tool.md](../doc/e2e/iso8583tool.md)

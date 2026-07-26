@@ -58,6 +58,16 @@ jobs:
           - name: fzf
             dir: ./test/e2e/thirdparty/fzf
             install: go install github.com/junegunn/fzf@v0.74.0
+          - name: helix
+            dir: ./test/e2e/thirdparty/helix
+            install: |
+              ver="25.07.1"
+              sha256="3f08e63ecd388fff657ad39722f88bb03dcf326f1f2da2700d99e1dc40ab2e8b"
+              curl -fsSL "https://github.com/helix-editor/helix/releases/download/${ver}/helix-${ver}-x86_64-linux.tar.xz" -o helix.tar.xz
+              echo "${sha256}  helix.tar.xz" | sha256sum -c -
+              tar -xJf helix.tar.xz -C "$HOME"
+              echo "HELIX_RUNTIME=$HOME/helix-${ver}-x86_64-linux/runtime" >> "$GITHUB_ENV"
+              echo "$HOME/helix-${ver}-x86_64-linux" >> "$GITHUB_PATH"
           - name: lazygit
             dir: ./test/e2e/thirdparty/lazygit
             install: |
