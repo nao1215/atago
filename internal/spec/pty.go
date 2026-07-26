@@ -41,13 +41,15 @@ type PTY struct {
 	// state directories under `${workdir}/.atago-home`, mirroring run.sandbox_home.
 	SandboxHome *bool `yaml:"sandbox_home,omitempty"`
 	// Session is the ordered expect/send script. Each entry sets exactly one
-	// of Expect (wait until the accumulated transcript matches the regexp) or
+	// of Expect (wait until the accumulated transcript matches the regexp),
 	// Send (write the string to the terminal; an empty send transmits EOF,
-	// i.e. ^D). Deliberately no branching — atago is not a scripting language.
+	// i.e. ^D), or ExpectScreen (wait until the rendered terminal screen matches
+	// a stream matcher, optionally stably for a duration). Deliberately no
+	// branching — atago is not a scripting language.
 	Session []PTYAction `yaml:"session,omitempty"`
 }
 
-// PTYAction is one expect-or-send entry in a pty session (#8).
+// PTYAction is one expect/send/expect_screen entry in a pty session (#8).
 type PTYAction struct {
 	// Expect waits until the transcript matches this regexp. A never-matching
 	// expect fails the step (reported like an assertion) when the session
@@ -58,6 +60,12 @@ type PTYAction struct {
 	// key (#26) — enter, tab, esc, arrows, f1-f12, ctrl-a..ctrl-z — so
 	// sessions stay readable instead of embedding \x1b escapes.
 	Send *PTYSend `yaml:"send,omitempty"`
+	// ExpectScreen waits until the CURRENT rendered screen (the transcript
+	// replayed through the same vt10x emulator as a top-level `screen:` assert)
+	// satisfies the matcher. `stable_for` requires the matcher to stay true
+	// continuously for that long; `timeout` optionally bounds only this wait,
+	// within the pty step's wider session timeout.
+	ExpectScreen *PTYExpectScreen `yaml:"expect_screen,omitempty"`
 }
 
 // PTYSend is the polymorphic pty send payload (#26): exactly one of Text
@@ -67,6 +75,22 @@ type PTYSend struct {
 	Text *string
 	// Key is a named key, normalized to lower case.
 	Key string
+}
+
+// PTYExpectScreen is a session-local rendered-screen wait: the matcher runs on
+// the live terminal screen during a pty session, not only after the program
+// exits. It reuses the StreamAssert surface (line/contains/matches/equals/json/
+// yaml, etc.) except snapshot/trim, which are validated out of this
+// mid-session context.
+type PTYExpectScreen struct {
+	StreamAssert `yaml:",inline"`
+	// Timeout bounds THIS wait only; when empty, the enclosing pty timeout
+	// supplies the budget.
+	Timeout string `yaml:"timeout,omitempty"`
+	// StableFor requires the screen to keep matching continuously for at least
+	// this duration before the action passes, absorbing redraw churn without a
+	// blind sleep.
+	StableFor string `yaml:"stable_for,omitempty"`
 }
 
 // SendText is sugar for authoring the scalar form in Go literals (tests).

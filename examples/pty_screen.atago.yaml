@@ -6,9 +6,10 @@ version: "1"
 # overwrites. The `screen:` assertion target replays the transcript through a
 # vt100 terminal emulator sized by the step's rows/cols and asserts on the
 # final rendered screen as plain text (trailing whitespace stripped, colors
-# dropped). All stream matchers work; `line: N` addresses screen rows
-# (1-based); `snapshot:` pins the whole screen against a committed golden,
-# refreshed with:
+# dropped). `expect_screen:` uses the same rendered-screen model DURING the
+# session, so a test can wait for a transient frame before quitting. `line: N`
+# addresses screen rows (1-based); `snapshot:` pins the final screen against a
+# committed golden, refreshed with:
 #   atago snapshot update examples/pty_screen.atago.yaml
 # The raw transcript stays on `stdout`, so both views are assertable.
 # POSIX-only like pty. Runs green as-is on Linux/macOS:
@@ -18,6 +19,26 @@ suite:
   name: pty screen
 
 scenarios:
+  - name: wait for a live redraw before the command exits
+    skip:
+      os: windows
+    steps:
+      - pty:
+          shell: true
+          command: "printf 'loading...\\r'; sleep 0.05; printf 'ready.     \\r'; sleep 0.08; printf '\\n'"
+          rows: 10
+          cols: 40
+          session:
+            - expect_screen:
+                contains: "ready."
+                stable_for: 40ms
+      - assert:
+          exit_code: 0
+      - assert:
+          screen:
+            line: 1
+            equals: "ready."
+
   - name: the screen shows the final overwrite, the transcript shows history
     skip:
       os: windows

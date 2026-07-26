@@ -3,13 +3,13 @@ package loader
 import (
 	"fmt"
 	"regexp"
+	"time"
 
 	"github.com/nao1215/atago/internal/spec"
 )
 
 // validatePTY checks a pty step (#8): a command, sane duration/size values,
-// and a session whose entries each set exactly one of expect/send with
-// compilable expect regexps.
+// and a session whose entries each set exactly one of expect/send/expect_screen.
 func validatePTY(add func(string, ...any), where string, p *spec.PTY) {
 	if p.Command == "" {
 		add("%s.pty.command is required", where)
@@ -25,11 +25,12 @@ func validatePTY(add func(string, ...any), where string, p *spec.PTY) {
 		aw := fmt.Sprintf("%s.pty.session[%d]", where, i)
 		hasExpect := a.Expect != ""
 		hasSend := a.Send != nil
+		hasExpectScreen := a.ExpectScreen != nil
 		switch {
-		case hasExpect && hasSend:
-			add("%s: set exactly one of expect/send (got both)", aw)
-		case !hasExpect && !hasSend:
-			add("%s: set exactly one of expect/send (an empty send: \"\" transmits EOF)", aw)
+		case countBools(hasExpect, hasSend, hasExpectScreen) > 1:
+			add("%s: set exactly one of expect/send/expect_screen (got more than one)", aw)
+		case !hasExpect && !hasSend && !hasExpectScreen:
+			add("%s: set exactly one of expect/send/expect_screen (an empty send: \"\" transmits EOF)", aw)
 		case hasExpect:
 			if _, err := regexp.Compile(a.Expect); err != nil {
 				add("%s.expect %q is not a valid regexp: %v", aw, a.Expect, err)
@@ -40,6 +41,37 @@ func validatePTY(add func(string, ...any), where string, p *spec.PTY) {
 			if a.Send.Key != "" && !spec.ValidPTYKey(a.Send.Key) {
 				add("%s.send.key %q is not a supported key (supported: %s)", aw, a.Send.Key, spec.PTYKeyNames())
 			}
+		case hasExpectScreen:
+			validatePTYExpectScreen(add, aw+".expect_screen", a.ExpectScreen)
 		}
 	}
+}
+
+func validatePTYExpectScreen(add func(string, ...any), where string, es *spec.PTYExpectScreen) {
+	validateStream(add, where, &es.StreamAssert)
+	if es.Snapshot != "" {
+		add("%s.snapshot is not supported in expect_screen; use a post-step assert screen snapshot or text matchers here", where)
+	}
+	if es.Trim != nil {
+		add("%s.trim is not supported in expect_screen", where)
+	}
+	positiveDuration(add, where+".timeout", es.Timeout, "", "")
+	positiveDuration(add, where+".stable_for", es.StableFor, "", "")
+	if es.Timeout != "" && es.StableFor != "" {
+		timeout, terr := time.ParseDuration(es.Timeout)
+		stable, serr := time.ParseDuration(es.StableFor)
+		if terr == nil && serr == nil && stable > timeout {
+			add("%s.stable_for %q must not exceed expect_screen.timeout %q", where, es.StableFor, es.Timeout)
+		}
+	}
+}
+
+func countBools(xs ...bool) int {
+	n := 0
+	for _, x := range xs {
+		if x {
+			n++
+		}
+	}
+	return n
 }

@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/nao1215/atago/internal/assert"
 	"github.com/nao1215/atago/internal/spec"
 )
 
@@ -24,12 +25,13 @@ const (
 	defaultCols = 80
 )
 
-// ExpectFailure describes the first session `expect` that never matched within
-// the session budget. The engine reports it like a failed assertion (the
-// scenario fails; it is not an execution error).
+// ExpectFailure describes the first session wait that never completed within
+// the session budget. A transcript `expect` fills Pattern/Transcript; an
+// `expect_screen` carries its ready-to-report assertion-style Check.
 type ExpectFailure struct {
 	Pattern    string // the regexp that never matched
 	Transcript string // the transcript at the moment the budget elapsed
+	Check      *assert.CheckResult
 }
 
 // compileSession validates and compiles the expect patterns up front so a bad

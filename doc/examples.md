@@ -87,7 +87,7 @@
 | [mock_server](../examples/mock_server.atago.yaml) | test API-client CLIs offline: `mock_servers` serve canned routes, record every request, and `mock:` asserts what the client actually sent |
 | [pty](../examples/pty.atago.yaml) | interactive testing in a real pseudo-terminal: expect/send sessions, named keys (`send: {key: enter}`), TTY-detection (scenarios use POSIX-only inner commands) |
 | [pty_portable](../examples/pty_portable.atago.yaml) | the same `pty` mechanism on every OS — Linux, macOS, and Windows (ConPTY): drive a self-terminating command, match its output, assert the rendered screen |
-| [pty_screen](../examples/pty_screen.atago.yaml) | TUI testing on the RENDERED terminal screen: vt100 emulation, row-addressed asserts, and screen snapshots (scenarios use POSIX-only inner commands) |
+| [pty_screen](../examples/pty_screen.atago.yaml) | TUI testing on the RENDERED terminal screen: mid-session `expect_screen`, row-addressed final `screen:` asserts, and screen snapshots (scenarios use POSIX-only inner commands) |
 | [retry](../examples/retry.atago.yaml) | polling a command until an assertion passes |
 | [snapshot](../examples/snapshot.atago.yaml) | golden-file testing with normalized output |
 | [scrub](../examples/scrub.atago.yaml) | `scrub:` rewrites volatile output patterns (auto-increment IDs, request identifiers, epoch times) to a placeholder before a snapshot compares — the flake-killer the built-in normalizers do not cover |

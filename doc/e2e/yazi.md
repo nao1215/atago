@@ -1,8 +1,8 @@
 # atago Behavior Specs
 ## Summary
-1 suite · 43 scenarios
+1 suite · 47 scenarios
 ## Contents
-- [yazi (third-party terminal file manager)](#yazi-third-party-terminal-file-manager) — 43 scenarios
+- [yazi (third-party terminal file manager)](#yazi-third-party-terminal-file-manager) — 47 scenarios
   - [version prints a semantic version banner](#scenario-version-prints-a-semantic-version-banner)
   - [hidden files stay hidden by default](#scenario-hidden-files-stay-hidden-by-default)
   - [dot toggles hidden files into view](#scenario-dot-toggles-hidden-files-into-view)
@@ -14,12 +14,14 @@
   - [select-all then yank copies multiple files into a sibling directory](#scenario-select-all-then-yank-copies-multiple-files-into-a-sibling-directory)
   - [cut then paste moves a file into a sibling directory](#scenario-cut-then-paste-moves-a-file-into-a-sibling-directory)
   - [uppercase D permanently deletes the hovered file after confirmation](#scenario-uppercase-d-permanently-deletes-the-hovered-file-after-confirmation)
+  - [canceling permanent delete returns to the file list and keeps the file](#scenario-canceling-permanent-delete-returns-to-the-file-list-and-keeps-the-file)
   - [canceling a yank leaves nothing to paste](#scenario-canceling-a-yank-leaves-nothing-to-paste)
   - [canceling a cut leaves nothing to paste](#scenario-canceling-a-cut-leaves-nothing-to-paste)
   - [select-all then cut moves multiple files into a sibling directory](#scenario-select-all-then-cut-moves-multiple-files-into-a-sibling-directory)
   - [select-all then permanent delete removes multiple files](#scenario-select-all-then-permanent-delete-removes-multiple-files)
   - [trash moves the hovered file into sandbox home trash](#scenario-trash-moves-the-hovered-file-into-sandbox-home-trash)
   - [trashing selected files moves both into sandbox home trash](#scenario-trashing-selected-files-moves-both-into-sandbox-home-trash)
+  - [canceling trash returns to the file list and keeps the file](#scenario-canceling-trash-returns-to-the-file-list-and-keeps-the-file)
   - [space-selected file is copied even when the cursor moves away](#scenario-space-selected-file-is-copied-even-when-the-cursor-moves-away)
   - [visual mode selects a range and copies both files](#scenario-visual-mode-selects-a-range-and-copies-both-files)
   - [lowercase p copies to item_1 when the destination already exists](#scenario-lowercase-p-copies-to-item_1-when-the-destination-already-exists)
@@ -33,7 +35,9 @@
   - [size sort puts one then two then three at the cursor](#scenario-size-sort-puts-one-then-two-then-three-at-the-cursor)
   - [reverse size sort puts three then two then one at the cursor](#scenario-reverse-size-sort-puts-three-then-two-then-one-at-the-cursor)
   - [natural sort puts 3 then 20 then 100 at the cursor](#scenario-natural-sort-puts-3-then-20-then-100-at-the-cursor)
+  - [natural sort is visible on the rendered file list before quitting](#scenario-natural-sort-is-visible-on-the-rendered-file-list-before-quitting)
   - [reverse natural sort puts 100 then 20 then 3 at the cursor](#scenario-reverse-natural-sort-puts-100-then-20-then-3-at-the-cursor)
+  - [reverse natural sort is visible on the rendered file list before quitting](#scenario-reverse-natural-sort-is-visible-on-the-rendered-file-list-before-quitting)
   - [chooser-file writes the hovered path and exits on enter](#scenario-chooser-file-writes-the-hovered-path-and-exits-on-enter)
   - [chooser-file writes all selected paths on enter](#scenario-chooser-file-writes-all-selected-paths-on-enter)
   - [chooser-file remains absent when quitting with uppercase Q](#scenario-chooser-file-remains-absent-when-quitting-with-uppercase-q)
@@ -241,6 +245,24 @@ doomed
 - exit code is `0`
 - the step changed exactly created nothing, modified nothing, deleted `doomed.txt`
 - file `doomed.txt` does not exist
+### Scenario: canceling permanent delete returns to the file list and keeps the file
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `keep.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `keep.txt`:_
+```text
+keep
+```
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- exit code is `0`
+- file `keep.txt` contains `keep`
 ### Scenario: canceling a yank leaves nothing to paste
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -375,6 +397,24 @@ b
 - file `b.txt` does not exist
 - file `.atago-home/.local/share/Trash/files/a.txt` contains `a`
 - file `.atago-home/.local/share/Trash/files/b.txt` contains `b`
+### Scenario: canceling trash returns to the file list and keeps the file
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `keep.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `keep.txt`:_
+```text
+keep
+```
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- exit code is `0`
+- file `keep.txt` contains `keep`
 ### Scenario: space-selected file is copied even when the cursor moves away
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -653,7 +693,35 @@ _only when `yazi --version` succeeds · skipped on Windows_
 ```
 #### Then
 - exit code is `0`
+### Scenario: natural sort is visible on the rendered file list before quitting
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `20.txt` is created.
+- Fixture file `3.txt` is created.
+- Fixture file `100.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- exit code is `0`
 ### Scenario: reverse natural sort puts 100 then 20 then 3 at the cursor
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `20.txt` is created.
+- Fixture file `3.txt` is created.
+- Fixture file `100.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- exit code is `0`
+### Scenario: reverse natural sort is visible on the rendered file list before quitting
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `20.txt` is created.

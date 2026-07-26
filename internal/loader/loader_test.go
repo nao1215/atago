@@ -535,10 +535,10 @@ func TestLoadBytes_Errors(t *testing.T) {
 			wantMsg:  "run.command is required",
 		},
 		{
-			name:     "pty session entry needs exactly one of expect and send",
+			name:     "pty session entry needs exactly one of expect, send, and expect_screen",
 			src:      "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - pty:\n          command: cat\n          session:\n            - expect: hi\n              send: \"yo\\n\"",
 			wantKind: KindValidation,
-			wantMsg:  "set exactly one of expect/send",
+			wantMsg:  "set exactly one of expect/send/expect_screen",
 		},
 		{
 			name:     "pty expect must be a valid regexp",
@@ -981,10 +981,12 @@ func TestBugHunt_Rejections(t *testing.T) {
 		{"pty bad timeout", specSteps("pty: {command: sh, timeout: abc}"), "is not a valid duration"},
 		{"pty nonpositive timeout", specSteps("pty: {command: sh, timeout: \"-1s\"}"), "must be positive"},
 		{"pty size overflow", specSteps("pty: {command: sh, rows: 70000}"), "rows/cols must be between 0 and 65535"},
-		{"pty expect and send", specSteps("pty: {command: sh, session: [{expect: hi, send: x}]}"), "set exactly one of expect/send (got both)"},
-		{"pty neither expect nor send", specSteps("pty: {command: sh, session: [{}]}"), "set exactly one of expect/send"},
+		{"pty expect and send", specSteps("pty: {command: sh, session: [{expect: hi, send: x}]}"), "set exactly one of expect/send/expect_screen (got more than one)"},
+		{"pty neither expect nor send", specSteps("pty: {command: sh, session: [{}]}"), "set exactly one of expect/send/expect_screen"},
 		{"pty bad expect regexp", specSteps("pty: {command: sh, session: [{expect: \"a[\"}]}"), "is not a valid regexp"},
 		{"pty bad send key", specSteps("pty: {command: sh, session: [{send: {key: BOGUS}}]}"), "is not a supported key"},
+		{"pty expect_screen with snapshot rejected", specSteps("pty: {command: sh, session: [{expect_screen: {snapshot: snap.txt}}]}"), "snapshot is not supported in expect_screen"},
+		{"pty expect_screen stable exceeds timeout", specSteps("pty: {command: sh, session: [{expect_screen: {contains: hi, timeout: \"20ms\", stable_for: \"30ms\"}}]}"), "must not exceed expect_screen.timeout"},
 
 		// ---- validateMockRoutes (scenario) ----
 		{"route method required", "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    mock_servers:\n      - name: m\n        routes:\n          - {path: /}\n    steps:\n      - run: {command: echo}\n", "method is required"},
@@ -1056,6 +1058,7 @@ func TestBugHunt_Acceptances(t *testing.T) {
 		{"cdp navigate", withRunner(browserRunner, specSteps("cdp: {runner: b, actions: [{navigate: \"https://x\"}, {click: \"#go\"}]}"))},
 		{"fixture content", specSteps("fixture: {file: a.txt, content: hello}")},
 		{"pty valid", specSteps("pty: {command: sh, session: [{expect: \"[$] \"}, {send: \"ls\\n\"}]}")},
+		{"pty expect_screen valid", specSteps("pty: {command: sh, session: [{expect_screen: {contains: hi, stable_for: \"20ms\"}}]}")},
 		{"assert message", specSteps("assert: {message: {equals: ok}}")},
 		{"assert value", specSteps("assert: {value: {contains: hi}}")},
 		{"assert grpc_status", specSteps("assert: {grpc_status: 0}")},

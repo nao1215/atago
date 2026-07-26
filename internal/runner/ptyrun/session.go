@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/nao1215/atago/internal/assert"
 	"github.com/nao1215/atago/internal/runner"
 	"github.com/nao1215/atago/internal/spec"
 )
@@ -44,11 +45,11 @@ type ptyProcess struct {
 }
 
 // driveSession runs the platform-neutral half of a pty step: it drains the
-// transcript, walks the expect/send session in order, and shapes the Result.
-// Every terminal- and process-specific detail is behind proc, so POSIX and
-// Windows share this exact control flow. A never-matching expect is returned as
-// an ExpectFailure (reported like a failed assertion); only "could not
-// start/drive the terminal" conditions are hard errors.
+// transcript, walks the expect/send/expect_screen session in order, and shapes
+// the Result. Every terminal- and process-specific detail is behind proc, so
+// POSIX and Windows share this exact control flow. A never-satisfied session
+// wait is returned as an ExpectFailure (reported like a failed assertion); only
+// "could not start/drive the terminal" conditions are hard errors.
 func driveSession(ctx context.Context, p *spec.PTY, proc ptyProcess) (*runner.Result, *ExpectFailure, error) {
 	expects, err := compileSession(p.Session)
 	if err != nil {
@@ -115,6 +116,7 @@ func driveSession(ctx context.Context, p *spec.PTY, proc ptyProcess) (*runner.Re
 		defer mu.Unlock()
 		return len(transcript)
 	}
+	currentScreen := func() []byte { return []byte(RenderScreen(snapshot(), p)) }
 
 	finish := func(timedOut bool, code int, ef *ExpectFailure) (*runner.Result, *ExpectFailure, error) {
 		// Drain before closing: a fast-exiting child's final output may still sit
@@ -172,8 +174,9 @@ func driveSession(ctx context.Context, p *spec.PTY, proc ptyProcess) (*runner.Re
 		return failHard(fmt.Errorf("pty %q canceled: %w", p.Command, ctx.Err()))
 	}
 
-	// Drive the session in order. expect polls the transcript; send writes to the
-	// terminal; an empty send transmits EOF (^D).
+	// Drive the session in order. expect polls the transcript; expect_screen
+	// polls the rendered screen; send writes to the terminal; an empty send
+	// transmits EOF (^D).
 	//
 	// matchOffset is the byte index just past the previously matched expect: each
 	// expect scans only transcript[matchOffset:], so a pattern that recurs (any
@@ -219,6 +222,80 @@ func driveSession(ctx context.Context, p *spec.PTY, proc ptyProcess) (*runner.Re
 			}
 			continue
 		}
+		if a.ExpectScreen != nil {
+			waitCtx, cancelWait := sessionWaitContext(ctx, a.ExpectScreen.Timeout)
+			matched := false
+			var stableSince time.Time
+			stableFor := parsePositiveDuration(a.ExpectScreen.StableFor)
+			scannedTo := -1 // transcript length at the last render; -1 forces one
+			for {
+				if n := curLen(); n != scannedTo {
+					scannedTo = n
+					cr := checkRenderedScreen(a.ExpectScreen, currentScreen())
+					if cr.OK {
+						if stableFor <= 0 {
+							matched = true
+							break
+						}
+						if stableSince.IsZero() {
+							stableSince = time.Now()
+						}
+						if time.Since(stableSince) >= stableFor {
+							matched = true
+							break
+						}
+					} else {
+						stableSince = time.Time{}
+					}
+				}
+				select {
+				case <-waitCtx.Done():
+					cr := checkRenderedScreen(a.ExpectScreen, currentScreen())
+					if cr.OK {
+						if stableFor <= 0 {
+							matched = true
+						} else {
+							if stableSince.IsZero() {
+								stableSince = time.Now()
+							}
+							if time.Since(stableSince) >= stableFor {
+								matched = true
+							}
+						}
+					}
+				case <-time.After(pollInterval):
+					if !stableSince.IsZero() && stableFor > 0 && time.Since(stableSince) >= stableFor {
+						matched = true
+					}
+					if matched {
+						break
+					}
+					continue
+				}
+				break
+			}
+			cancelWait()
+			if !matched {
+				// A parent-context cancellation is an execution error that must stop
+				// the scenario; only a genuine wait timeout becomes a failed check.
+				if errors.Is(waitCtx.Err(), context.Canceled) || errors.Is(ctx.Err(), context.Canceled) {
+					return canceledResult()
+				}
+				cr := checkRenderedScreen(a.ExpectScreen, currentScreen())
+				if cr.OK && stableFor > 0 {
+					cr = &assert.CheckResult{
+						Desc:           fmt.Sprintf("pty expect_screen stable for %s", stableFor),
+						Expected:       fmt.Sprintf("rendered screen to keep satisfying the matcher for %s", stableFor),
+						Actual:         string(currentScreen()),
+						Hint:           fmt.Sprintf("the rendered screen matched, but not continuously for %s before the timeout elapsed", stableFor),
+						ArtifactKind:   "screen",
+						ArtifactActual: currentScreen(),
+					}
+				}
+				return abort(&ExpectFailure{Check: cr})
+			}
+			continue
+		}
 		if a.Send != nil {
 			// Bytes resolves named keys to their xterm sequences and keeps the
 			// historical rule that an empty verbatim send transmits EOF (^D).
@@ -240,4 +317,30 @@ func driveSession(ctx context.Context, p *spec.PTY, proc ptyProcess) (*runner.Re
 		}
 		return abort(nil)
 	}
+}
+
+func sessionWaitContext(parent context.Context, timeout string) (context.Context, context.CancelFunc) {
+	d := parsePositiveDuration(timeout)
+	if d <= 0 {
+		return parent, func() {}
+	}
+	return context.WithTimeout(parent, d)
+}
+
+func parsePositiveDuration(s string) time.Duration {
+	if s == "" {
+		return 0
+	}
+	d, err := time.ParseDuration(s)
+	if err != nil || d <= 0 {
+		return 0
+	}
+	return d
+}
+
+func checkRenderedScreen(es *spec.PTYExpectScreen, screen []byte) *assert.CheckResult {
+	return assert.Check(&spec.Assert{Screen: &es.StreamAssert}, &runner.Result{
+		IsPTY:  true,
+		Screen: screen,
+	}, assert.Env{})
 }

@@ -135,7 +135,22 @@ scenarios:
           exit_code: 0
 ```
 
-Named keys (`send: {key: enter}`) and asserts on the RENDERED terminal screen cover full TUIs — see [pty](https://github.com/nao1215/atago/blob/main/examples/pty.atago.yaml), [pty_screen](https://github.com/nao1215/atago/blob/main/examples/pty_screen.atago.yaml), and the cross-platform [pty_portable](https://github.com/nao1215/atago/blob/main/examples/pty_portable.atago.yaml). `pty` steps and `atago record --pty` run on Linux, macOS, and Windows (where they drive a ConPTY pseudo-console); only `signal:` stays POSIX-only.
+For full-screen TUIs, `expect_screen:` waits on the LIVE rendered frame during the session, and `screen:` asserts the final rendered frame after exit:
+
+```yaml
+      - pty:
+          command: mytool dashboard
+          session:
+            - expect_screen:
+                contains: "Ready"
+                stable_for: 100ms
+            - send: "q"
+      - assert:
+          screen:
+            contains: "Summary"
+```
+
+Named keys (`send: {key: enter}`) and rendered-screen checks cover full TUIs — see [pty](https://github.com/nao1215/atago/blob/main/examples/pty.atago.yaml), [pty_screen](https://github.com/nao1215/atago/blob/main/examples/pty_screen.atago.yaml), and the cross-platform [pty_portable](https://github.com/nao1215/atago/blob/main/examples/pty_portable.atago.yaml). `pty` steps and `atago record --pty` run on Linux, macOS, and Windows (where they drive a ConPTY pseudo-console); only `signal:` stays POSIX-only.
 
 ## When your CLI talks to a server
 

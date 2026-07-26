@@ -232,9 +232,13 @@ func TestCollectStepVars_KnownFields(t *testing.T) {
 			t.Errorf("run field %q not collected; got %v", want, got)
 		}
 	}
-	pty := &Step{PTY: &PTY{Command: "${pcmd}", Cwd: "${pcwd}", Env: map[string]string{"K": "${penv}"}, Session: []PTYAction{{Expect: "${pexp}"}, {Send: SendText("${psend}")}}}}
+	pty := &Step{PTY: &PTY{Command: "${pcmd}", Cwd: "${pcwd}", Env: map[string]string{"K": "${penv}"}, Session: []PTYAction{
+		{Expect: "${pexp}"},
+		{Send: SendText("${psend}")},
+		{ExpectScreen: &PTYExpectScreen{StreamAssert: StreamAssert{Contains: StringList{"${pscreen}"}}}},
+	}}}
 	got = collectStep(pty)
-	for _, want := range []string{"pcmd", "pcwd", "penv", "pexp", "psend"} {
+	for _, want := range []string{"pcmd", "pcwd", "penv", "pexp", "psend", "pscreen"} {
 		if !hasVar(got, want) {
 			t.Errorf("pty field %q not collected; got %v", want, got)
 		}

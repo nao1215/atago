@@ -1233,7 +1233,7 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "description": "Exactly one of expect (wait until the transcript matches the regexp) or send (write to the terminal; \"\" sends EOF/^D; {key: enter} presses a named key, #26). ${name}/${env:NAME} references in a send or expect are expanded against the store; a reference nothing resolves fails the step before any terminal I/O (#78) — write $${name} for literal text.",
+            "description": "Exactly one of expect (wait until the transcript matches the regexp), send (write to the terminal; \"\" sends EOF/^D; {key: enter} presses a named key, #26), or expect_screen (wait until the rendered screen matches, optionally stably for a duration). ${name}/${env:NAME} references in a send, expect, or expect_screen matcher are expanded against the store; a reference nothing resolves fails the step before any terminal I/O (#78) — write $${name} for literal text.",
             "properties": {
               "expect": {
                 "type": "string",
@@ -1260,6 +1260,114 @@
                   }
                 ],
                 "description": "Writes to the terminal: a string verbatim (\"\" sends EOF/^D; `${name}` expansion applies) or `{key: <name>}` for a named key — enter, tab, esc, arrows, f1-f12, ctrl-a..ctrl-z."
+              },
+              "expect_screen": {
+                "type": "object",
+                "additionalProperties": false,
+                "description": "Waits until the CURRENT rendered terminal screen matches, using the same text/JSON/YAML matcher surface as `screen:` except `snapshot:`. `stable_for` requires the screen to keep matching continuously for that duration, which is safer than a blind sleep across Linux/macOS/Windows redraw timing.",
+                "oneOf": [
+                  {
+                    "required": [
+                      "empty"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "equals"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "not_equals"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "json"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "yaml"
+                    ]
+                  },
+                  {
+                    "comment": "The text matchers contains/not_contains/matches/not_matches may be combined (all must hold).",
+                    "anyOf": [
+                      {
+                        "required": [
+                          "contains"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "not_contains"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "matches"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "not_matches"
+                        ]
+                      }
+                    ]
+                  }
+                ],
+                "properties": {
+                  "timeout": {
+                    "type": "string",
+                    "description": "Optional Go duration bounding only this wait; the enclosing pty timeout still caps the whole session."
+                  },
+                  "stable_for": {
+                    "type": "string",
+                    "description": "Optional Go duration the rendered screen must keep matching continuously before the wait passes."
+                  },
+                  "line": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "1-based line selector: applies the matcher to that single rendered row instead of the whole screen."
+                  },
+                  "empty": {
+                    "type": "boolean",
+                    "description": "Asserts the rendered screen is empty (`true`) or non-empty (`false`)."
+                  },
+                  "contains": {
+                    "$ref": "#/$defs/stringOrList",
+                    "description": "Requires every listed substring (a scalar counts as a one-element list) to be present on the rendered screen."
+                  },
+                  "not_contains": {
+                    "$ref": "#/$defs/stringOrList",
+                    "description": "Requires every listed substring to be absent from the rendered screen."
+                  },
+                  "matches": {
+                    "type": "string",
+                    "description": "Requires the rendered screen to match this Go (RE2) regular expression."
+                  },
+                  "not_matches": {
+                    "type": "string",
+                    "description": "Requires the rendered screen NOT to match this Go (RE2) regular expression."
+                  },
+                  "equals": {
+                    "type": "string",
+                    "description": "Requires the rendered screen to equal this string exactly (CRLF and one trailing newline are normalized)."
+                  },
+                  "not_equals": {
+                    "type": "string",
+                    "description": "Requires the rendered screen NOT to equal this string."
+                  },
+                  "json": {
+                    "$ref": "#/$defs/jsonChecks",
+                    "description": "Parses the rendered screen as JSON and applies one JSONPath check, or a list of checks that must all hold."
+                  },
+                  "yaml": {
+                    "$ref": "#/$defs/jsonChecks",
+                    "description": "Parses the rendered screen as YAML and applies one JSONPath check, or a list of checks that must all hold."
+                  }
+                }
               }
             }
           },

@@ -415,6 +415,39 @@ scenarios:
             path: doomed.txt
             exists: false
 
+  - name: canceling permanent delete returns to the file list and keeps the file
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: keep.txt
+          content: keep
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "keep.txt"
+            - send: "D"
+            - expect: "Permanently delete"
+            - send: "n"
+            - expect_screen:
+                contains: keep.txt
+                stable_for: 150ms
+            - send: "Q"
+      - assert:
+          exit_code: 0
+      - assert:
+          file:
+            path: keep.txt
+            contains: keep
+
   - name: canceling a yank leaves nothing to paste
     only:
       command: yazi --version
@@ -669,6 +702,39 @@ scenarios:
           file:
             path: .atago-home/.local/share/Trash/files/b.txt
             contains: b
+
+  - name: canceling trash returns to the file list and keeps the file
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: keep.txt
+          content: keep
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "keep.txt"
+            - send: "d"
+            - expect: "Trash"
+            - send: "n"
+            - expect_screen:
+                contains: keep.txt
+                stable_for: 150ms
+            - send: "Q"
+      - assert:
+          exit_code: 0
+      - assert:
+          file:
+            path: keep.txt
+            contains: keep
 
   - name: space-selected file is copied even when the cursor moves away
     only:
@@ -1203,6 +1269,39 @@ scenarios:
       - assert:
           exit_code: 0
 
+  - name: natural sort is visible on the rendered file list before quitting
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: 20.txt
+          content: ""
+      - fixture:
+          file: 3.txt
+          content: ""
+      - fixture:
+          file: 100.txt
+          content: ""
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "20.txt"
+            - send: ",n"
+            - expect_screen:
+                matches: "(?s)3\\.txt.*20\\.txt.*100\\.txt"
+                stable_for: 100ms
+            - send: "Q"
+      - assert:
+          exit_code: 0
+
   - name: reverse natural sort puts 100 then 20 then 3 at the cursor
     only:
       command: yazi --version
@@ -1234,6 +1333,39 @@ scenarios:
             - expect: "20.txt"
             - send: "j"
             - expect: "3.txt"
+            - send: "Q"
+      - assert:
+          exit_code: 0
+
+  - name: reverse natural sort is visible on the rendered file list before quitting
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: 20.txt
+          content: ""
+      - fixture:
+          file: 3.txt
+          content: ""
+      - fixture:
+          file: 100.txt
+          content: ""
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "20.txt"
+            - send: ",N"
+            - expect_screen:
+                matches: "(?s)100\\.txt.*20\\.txt.*3\\.txt"
+                stable_for: 100ms
             - send: "Q"
       - assert:
           exit_code: 0
