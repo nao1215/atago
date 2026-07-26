@@ -60,7 +60,7 @@ e2e: ## Build the binary and run the hermetic self-hosted E2E specs plus the git
 	env CGO_ENABLED=0 $(GO_BUILD) $(GO_LDFLAGS) -o ./dist/$(APP) .
 	./dist/$(APP) run --parallel $(PARALLEL) ./test/e2e/atago ./test/e2e/thirdparty/git
 
-thirdparty: ## Run atago against third-party programs (needs git, caddy, pushgateway, webhook, restic, rclone, minio+mc, prometheus+promtool, gitea, coredns+dig, nats-server+nats, mailpit, ntfy, yazi, gum on PATH)
+thirdparty: ## Run atago against third-party programs (needs git, caddy, pushgateway, webhook, restic, rclone, minio+mc, prometheus+promtool, gitea, coredns+dig, lazygit, nats-server+nats, mailpit, ntfy, yazi, gum on PATH)
 	env CGO_ENABLED=0 $(GO_BUILD) $(GO_LDFLAGS) -o ./dist/$(APP) .
 	./dist/$(APP) run ./test/e2e/thirdparty
 
@@ -108,7 +108,9 @@ docs: ## Regenerate the committed behavior docs under doc/e2e/ from the specs
 	./dist/$(APP) doc --out doc/e2e/gitea.md       ./test/e2e/thirdparty/gitea
 	./dist/$(APP) doc --out doc/e2e/jq.md          ./test/e2e/thirdparty/jq
 	./dist/$(APP) doc --out doc/e2e/fzf.md         ./test/e2e/thirdparty/fzf
+	./dist/$(APP) doc --out doc/e2e/lazygit.md     ./test/e2e/thirdparty/lazygit
 	./dist/$(APP) doc --out doc/e2e/gum.md         ./test/e2e/thirdparty/gum
+	./dist/$(APP) doc --out doc/e2e/lazygit.md     ./test/e2e/thirdparty/lazygit
 	./dist/$(APP) doc --out doc/e2e/htop.md        ./test/e2e/thirdparty/htop
 	./dist/$(APP) doc --out doc/e2e/yazi.md        ./test/e2e/thirdparty/yazi
 	./dist/$(APP) doc --out doc/e2e/redis.md       ./test/e2e/thirdparty/redis
