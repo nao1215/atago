@@ -134,3 +134,31 @@ scenarios:
             contains:
               - "assets/app.css"
               - "index.html"
+
+  # Asserting a directory at a path that holds a file used to report a bare
+  # "exists=false", which reads as "nothing is there" and hides the real
+  # problem: the output is exactly where it was asked for, as a file.
+  - name: a dir assertion on a file path says the path is a file
+    steps:
+      - fixture:
+          file: mistaken.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: mistaken}
+            scenarios:
+              - name: out is a file, not a directory
+                steps:
+                  - fixture: {file: out, content: "report\n"}
+                  - run: {command: echo built}
+                  - assert:
+                      dir:
+                        path: out
+                        exists: true
+      - run:
+          command: ${atago} run mistaken.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - 'exists but is a regular file'
+              - 'use a file: assertion'

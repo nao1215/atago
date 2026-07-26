@@ -1481,7 +1481,7 @@ func TestDirStatActual(t *testing.T) {
 	if got := dirStatActual(nil, os.ErrNotExist); got != os.ErrNotExist.Error() {
 		t.Errorf("err branch = %q", got)
 	}
-	// A regular file's FileInfo → "not a directory".
+	// A regular file's FileInfo → "not a directory", naming what it is instead.
 	f := filepath.Join(t.TempDir(), "x")
 	if err := os.WriteFile(f, []byte("y"), 0o600); err != nil {
 		t.Fatal(err)
@@ -1490,7 +1490,7 @@ func TestDirStatActual(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := dirStatActual(info, nil); got != "not a directory" {
+	if got := dirStatActual(info, nil); got != "not a directory (regular file)" {
 		t.Errorf("not-a-dir branch = %q", got)
 	}
 }
@@ -2214,5 +2214,89 @@ func TestCheck_JSON_BoolNotEqualStringSpelling(t *testing.T) {
 	got = Check(&spec.Assert{Stdout: &spec.StreamAssert{JSON: spec.JSONChecks{{Path: "$.b", Equals: true}}}}, res, Env{})
 	if !got.OK {
 		t.Errorf("JSON boolean true did not equal true (%s)", got.Hint)
+	}
+}
+
+// TestCheck_JSONEquals_MismatchNamesTheDifference pins that a failing equals
+// says which value it saw. Rendering both sides bare made a type or whitespace
+// mismatch print the same text twice — "expected true, got true" for a boolean
+// against the string "true", and "expected x, got  x " with the spaces
+// invisible — so the report gave the author nothing to act on.
+func TestCheck_JSONEquals_MismatchNamesTheDifference(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		stdout   string
+		want     any
+		expected string
+		actual   string
+	}{
+		{
+			name:     "string expected against a boolean",
+			stdout:   `{"v":true}`,
+			want:     "true",
+			expected: `$.v == "true"`,
+			actual:   `$.v = true`,
+		},
+		{
+			name:     "surrounding whitespace stays visible",
+			stdout:   `{"v":" x "}`,
+			want:     "x",
+			expected: `$.v == "x"`,
+			actual:   `$.v = " x "`,
+		},
+		{
+			name:     "null actual is named",
+			stdout:   `{"v":null}`,
+			want:     "none",
+			expected: `$.v == "none"`,
+			actual:   `$.v = null`,
+		},
+		{
+			name:     "numbers stay bare",
+			stdout:   `{"v":2}`,
+			want:     1,
+			expected: `$.v == 1`,
+			actual:   `$.v = 2`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			res := &runner.Result{Stdout: []byte(tt.stdout)}
+			got := Check(&spec.Assert{Stdout: &spec.StreamAssert{JSON: spec.JSONChecks{{Path: "$.v", Equals: tt.want}}}}, res, Env{})
+			if got.OK {
+				t.Fatalf("assertion unexpectedly passed")
+			}
+			if got.Expected != tt.expected {
+				t.Errorf("Expected = %q, want %q", got.Expected, tt.expected)
+			}
+			if got.Actual != tt.actual {
+				t.Errorf("Actual = %q, want %q", got.Actual, tt.actual)
+			}
+		})
+	}
+}
+
+// TestCheck_DirExists_OnAFilePathSaysSo pins the hint for the confusing case: a
+// path that exists as a file reported a bare "exists=false", which reads as
+// "nothing is there" and sends the author looking for output that is sitting
+// exactly where they asked, as a file.
+func TestCheck_DirExists_OnAFilePathSaysSo(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "out"), []byte("data"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	yes := true
+	got := Check(&spec.Assert{Dir: &spec.DirAssert{Path: "out", Exists: &yes}}, &runner.Result{}, Env{Workdir: dir})
+	if got.OK {
+		t.Fatalf("dir assertion on a file unexpectedly passed")
+	}
+	if !strings.Contains(got.Hint, "exists but is a regular file") {
+		t.Errorf("Hint = %q, want it to say the path is a regular file", got.Hint)
+	}
+	if !strings.Contains(got.Actual, "regular file") {
+		t.Errorf("Actual = %q, want it to name the kind of entry", got.Actual)
 	}
 }

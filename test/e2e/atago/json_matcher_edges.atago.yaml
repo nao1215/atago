@@ -114,3 +114,68 @@ scenarios:
           exit_code: 1
           stdout:
             contains: "selected no value"
+
+  # A failing equals has to say which value it saw. Rendering both sides bare
+  # printed the same text twice for a type mismatch — "expected true, got true"
+  # for a boolean against the string "true" — which tells the author nothing.
+  - name: a type mismatch failure distinguishes a string from a boolean
+    steps:
+      - fixture:
+          file: typed.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: typed}
+            scenarios:
+              - name: string spelling of a boolean
+                steps:
+                  - run: {shell: true, command: 'printf ''{"b":true}'''}
+                  - assert: {stdout: {json: [{path: "$.b", equals: "true"}]}}
+      - run: {command: "${atago} run typed.atago.yaml"}
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - '$.b == "true"'
+              - "$.b = true"
+
+  # Whitespace differences are invisible unless the value is quoted.
+  - name: a whitespace-only mismatch shows the surrounding spaces
+    steps:
+      - fixture:
+          file: spaced.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: spaced}
+            scenarios:
+              - name: padded value
+                steps:
+                  - run: {shell: true, command: 'printf ''{"v":" x "}'''}
+                  - assert: {stdout: {json: [{path: "$.v", equals: "x"}]}}
+      - run: {command: "${atago} run spaced.atago.yaml"}
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: '$.v = " x "'
+
+  - name: a numeric mismatch stays unquoted
+    steps:
+      - fixture:
+          file: nums.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: nums}
+            scenarios:
+              - name: off by one
+                steps:
+                  - run: {shell: true, command: 'printf ''{"n":2}'''}
+                  - assert: {stdout: {json: [{path: "$.n", equals: 1}]}}
+      - run: {command: "${atago} run nums.atago.yaml"}
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - "$.n == 1"
+              - "$.n = 2"
+      - assert:
+          stdout:
+            not_contains: '"2"'

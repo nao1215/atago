@@ -159,7 +159,7 @@ func jsonCompare(desc, path string, nodes []any, op string, want float64) *Check
 		return &CheckResult{
 			Desc:     desc,
 			Expected: fmt.Sprintf("%s is a number %s %v", path, opSymbol(op), want),
-			Actual:   fmt.Sprintf("%s = %v", path, node),
+			Actual:   fmt.Sprintf("%s = %s", path, displayValue(node)),
 			Hint:     fmt.Sprintf("value at %s is not numeric, so it cannot be compared with %s", path, op),
 		}
 	}
@@ -181,8 +181,8 @@ func jsonCompare(desc, path string, nodes []any, op string, want float64) *Check
 	return &CheckResult{
 		Desc:     d,
 		Expected: fmt.Sprintf("%s %s %v", path, opSymbol(op), want),
-		Actual:   fmt.Sprintf("%s = %s", path, renderNode(node)),
-		Hint:     fmt.Sprintf("value at %s (%s) is not %s %v", path, renderNode(node), op, want),
+		Actual:   fmt.Sprintf("%s = %s", path, displayValue(node)),
+		Hint:     fmt.Sprintf("value at %s (%s) is not %s %v", path, displayValue(node), op, want),
 	}
 }
 
@@ -240,15 +240,32 @@ func jsonEquals(desc, path string, nodes []any, want any) *CheckResult {
 	if cr != nil {
 		return cr
 	}
-	d := fmt.Sprintf("%s == %v", desc, want)
+	d := fmt.Sprintf("%s == %s", desc, displayValue(want))
 	if valuesEqual(node, want) {
 		return pass(d)
 	}
 	return &CheckResult{
 		Desc:     d,
-		Expected: fmt.Sprintf("%s == %v", path, want),
-		Actual:   fmt.Sprintf("%s = %s", path, renderNode(node)),
-		Hint:     fmt.Sprintf("value at %s did not equal %v", path, want),
+		Expected: fmt.Sprintf("%s == %s", path, displayValue(want)),
+		Actual:   fmt.Sprintf("%s = %s", path, displayValue(node)),
+		Hint:     fmt.Sprintf("value at %s did not equal %s", path, displayValue(want)),
+	}
+}
+
+// displayValue renders a JSON value for a failure message so two values that
+// differ only in type or in surrounding whitespace do not print identically.
+// The string "true" shows as `"true"` next to the boolean true, and " x " keeps
+// its spaces visible — without quoting, a mismatch report read as "expected x,
+// got x". Numbers, booleans, and null stay bare so the common case reads as the
+// JSON the tool emitted.
+func displayValue(v any) string {
+	switch t := v.(type) {
+	case string:
+		return strconv.Quote(t)
+	case nil:
+		return "null"
+	default:
+		return renderNode(v)
 	}
 }
 
