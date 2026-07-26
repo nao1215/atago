@@ -7,6 +7,18 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- `atago doc` and `atago explain` now describe every matcher an assertion sets
+  instead of the first one. A stream assertion that combines `contains` with
+  `not_contains`, `matches`, or `not_matches` enforces all of them at run time,
+  but the generated page advertised only the first — publishing a weaker
+  contract than the suite guards. A `line: N` selector is named too, so a
+  matcher scoped to one line no longer reads as one pinning the whole stream.
+- `file:` assertions using `not_contains` or `executable` rendered as "the file
+  is checked" in generated docs and `explain` output, hiding what the scenario
+  guarantees. Both matchers now have their own phrasing.
+
 ## [0.14.0] - 2026-07-26
 
 A minor release about the specs as documentation. A spec has always described

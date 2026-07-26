@@ -101,8 +101,8 @@ sqlite3 -csv app.db "SELECT * FROM u ORDER BY id;"
 #### Then
 - after `sqlite3 -csv app.db "SELECT * FROM u ORDER BY id;"`:
   - exit code is `0`
-  - stdout equals an exact value
-  - stdout equals an exact value
+  - stdout line `1` equals an exact value
+  - stdout line `2` equals an exact value
 ### Scenario: .dump emits SQL that rebuilds an identical database
 #### When
 ```shell

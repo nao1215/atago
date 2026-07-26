@@ -35,7 +35,7 @@ ssh-keygen -t ed25519 -N '' -f key -C test@atago
 - file `key` exists
 - file `key.pub` exists
 - file `key.pub` contains `ssh-ed25519`
-- file `key.pub` is checked
+- file `key.pub` is not executable
 #### Generated artifacts
 - `key`
 - `key.pub`

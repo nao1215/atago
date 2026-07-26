@@ -206,5 +206,5 @@ jq -c '.n * 2'
 ```
 #### Then
 - exit code is `0`
-- stdout equals an exact value
-- stdout equals an exact value
+- stdout line `1` equals an exact value
+- stdout line `2` equals an exact value

@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-74 suites · 395 scenarios
+74 suites · 399 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -78,13 +78,14 @@
   - [record, compare green, then a mutation names the changed paths](#scenario-record-compare-green-then-a-mutation-names-the-changed-paths)
   - [recursive matchers and ignore globs walk the tree](#scenario-recursive-matchers-and-ignore-globs-walk-the-tree)
   - [combining snapshot with matchers is a load-time error](#scenario-combining-snapshot-with-matchers-is-a-load-time-error)
-- [atago self-hosting / doc](#atago-self-hosting--doc) — 6 scenarios
+- [atago self-hosting / doc](#atago-self-hosting--doc) — 7 scenarios
   - [doc generates Markdown to a file](#scenario-doc-generates-markdown-to-a-file)
   - [doc writes Markdown to stdout without --out](#scenario-doc-writes-markdown-to-stdout-without---out)
   - [doc emits a summary, table of contents, and input previews](#scenario-doc-emits-a-summary-table-of-contents-and-input-previews)
   - [doc --split-by-spec writes one file per spec and an index](#scenario-doc---split-by-spec-writes-one-file-per-spec-and-an-index)
   - [doc --split-by-spec requires --out-dir](#scenario-doc---split-by-spec-requires---out-dir)
   - [doc renders suite and scenario descriptions verbatim](#scenario-doc-renders-suite-and-scenario-descriptions-verbatim)
+  - [doc renders every matcher an assertion sets](#scenario-doc-renders-every-matcher-an-assertion-sets)
 - [atago self-hosting / duration assertion](#atago-self-hosting--duration-assertion) — 4 scenarios
   - [a fast step passes a generous upper bound](#scenario-a-fast-step-passes-a-generous-upper-bound)
   - [an impossible bound fails and shows the measured duration](#scenario-an-impossible-bound-fails-and-shows-the-measured-duration)
@@ -123,8 +124,11 @@
   - [a signal exit composes with the in matcher alongside normal codes](#scenario-a-signal-exit-composes-with-the-in-matcher-alongside-normal-codes)
   - [a missing command is 127 under the shell](#scenario-a-missing-command-is-127-under-the-shell)
   - [POSIX exit codes wrap modulo 256](#scenario-posix-exit-codes-wrap-modulo-256)
-- [atago self-hosting / explain](#atago-self-hosting--explain) — 1 scenario
+- [atago self-hosting / explain](#atago-self-hosting--explain) — 4 scenarios
   - [explain summarizes a spec without running it](#scenario-explain-summarizes-a-spec-without-running-it)
+  - [explain describes every matcher of a composed stream assertion](#scenario-explain-describes-every-matcher-of-a-composed-stream-assertion)
+  - [explain names the line a line-scoped matcher inspects](#scenario-explain-names-the-line-a-line-scoped-matcher-inspects)
+  - [explain describes file not_contains and executable matchers](#scenario-explain-describes-file-not_contains-and-executable-matchers)
 - [atago self-hosting / file equals and equals_file byte-equality (#155)](#atago-self-hosting--file-equals-and-equals_file-byte-equality-155) — 4 scenarios
   - [equals_file passes for two byte-identical files](#scenario-equals_file-passes-for-two-byte-identical-files)
   - [equals matches an inline literal byte-for-byte](#scenario-equals-matches-an-inline-literal-byte-for-byte)
@@ -1108,7 +1112,7 @@ ${atago} run --ci --report json --filter alpha inner.atago.yaml
 #### Then
 - exit code is `0`
 - stdout at `$.suites[0].scenarios` has length 1
-- stdout contains `"alpha"`
+- stdout contains `"alpha"`, does not contain `"beta"`, `"gamma"`
 ### Scenario: filter is OR across a comma-separated list
 #### Given
 - Fixture file `inner.atago.yaml` is created.
@@ -1135,7 +1139,7 @@ ${atago} run --ci --report json --filter alpha,beta inner.atago.yaml
 #### Then
 - exit code is `0`
 - stdout at `$.suites[0].scenarios` has length 2
-- stdout contains `"alpha"`, `"beta"`
+- stdout contains `"alpha"`, `"beta"`, does not contain `"gamma"`
 ### Scenario: tag selects scenarios carrying the tag
 #### Given
 - Fixture file `inner.atago.yaml` is created.
@@ -1162,7 +1166,7 @@ ${atago} run --ci --report json --tag fast inner.atago.yaml
 #### Then
 - exit code is `0`
 - stdout at `$.suites[0].scenarios` has length 2
-- stdout contains `"alpha"`, `"gamma"`
+- stdout contains `"alpha"`, `"gamma"`, does not contain `"beta"`
 ### Scenario: a repeated tag flag is OR
 #### Given
 - Fixture file `inner.atago.yaml` is created.
@@ -1215,7 +1219,7 @@ ${atago} run --ci --report json --skip-tag slow inner.atago.yaml
 #### Then
 - exit code is `0`
 - stdout at `$.suites[0].scenarios` has length 1
-- stdout contains `"alpha"`
+- stdout contains `"alpha"`, does not contain `"beta"`, `"gamma"`
 ### Scenario: tag and skip-tag compose as selected minus skipped
 #### Given
 - Fixture file `inner.atago.yaml` is created.
@@ -1242,7 +1246,7 @@ ${atago} run --ci --report json --tag fast --skip-tag slow inner.atago.yaml
 #### Then
 - exit code is `0`
 - stdout at `$.suites[0].scenarios` has length 1
-- stdout contains `"alpha"`
+- stdout contains `"alpha"`, does not contain `"gamma"`
 ### Scenario: an empty filter selection fails under --ci with a substring hint
 #### Given
 - Fixture file `inner.atago.yaml` is created.
@@ -1295,7 +1299,7 @@ ${atago} run --ci --report json --tag no_such_tag inner.atago.yaml
 ```
 #### Then
 - exit code is `3`
-- stderr contains `no scenarios matched`, `--tag "no_such_tag"`, `match tags exactly`, `atago list`
+- stderr contains `no scenarios matched`, `--tag "no_such_tag"`, `match tags exactly`, `atago list`, does not contain `case-sensitive substring`
 ### Scenario: without --ci an empty selection only warns and still exits zero
 #### Given
 - Fixture file `inner.atago.yaml` is created.
@@ -2001,6 +2005,47 @@ ${atago} run described.atago.yaml
 - after `${atago} run described.atago.yaml`:
   - exit code is `0`
   - stdout contains `1 passed`
+### Scenario: doc renders every matcher an assertion sets
+#### Given
+- Fixture file `matchers.atago.yaml` is created.
+#### Inputs
+_Fixture `matchers.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: matchers
+scenarios:
+  - name: composed stream
+    steps:
+      - run:
+          command: echo hello
+      - assert:
+          stdout:
+            contains: hello
+            not_contains: goodbye
+  - name: line scoped
+    steps:
+      - run:
+          shell: true
+          command: printf 'one\ntwo\n'
+      - assert:
+          stdout:
+            line: 2
+… (truncated, 17 more lines)
+```
+#### When
+```shell
+${atago} doc matchers.atago.yaml
+${atago} run matchers.atago.yaml
+```
+#### Then
+- after `${atago} doc matchers.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `stdout contains `hello`, does not contain `goodbye``, `stdout line `2` equals an exact value`, `file `install.sh` is executable`, `file `install.sh` does not contain `rm -rf /``
+  - stdout does not contain ``install.sh` is checked`
+- after `${atago} run matchers.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `3 passed`
 ## atago self-hosting / duration assertion
 Source: `test/e2e/atago/duration.atago.yaml`
 ### Scenario: a fast step passes a generous upper bound
@@ -2164,7 +2209,7 @@ ${atago} snapshot update no-such-spec.atago.yaml
 ```
 #### Then
 - exit code is `3`
-- stderr contains `atago snapshot update: cannot access`
+- stderr contains `atago snapshot update: cannot access`, does not contain `atago run:`
 ### Scenario: a json assertion on malformed input fails cleanly, without a crash
 #### Given
 - Fixture file `bad.atago.yaml` is created.
@@ -2229,7 +2274,7 @@ alpha
 beta
 ```
 #### Then
-- file `data.txt` is checked
+- file `data.txt` does not contain `gamma`
 ### Scenario: not_contains fails when the substring is present
 #### Given
 - Fixture file `inner.atago.yaml` is created.
@@ -2516,6 +2561,117 @@ ${atago} explain target.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `Suite: sample`, `Scenario: list as json`, `Commands:`, `Network policy:`
+### Scenario: explain describes every matcher of a composed stream assertion
+#### Given
+- Fixture file `composed.atago.yaml` is created.
+- Fixture file `broken.atago.yaml` is created.
+#### Inputs
+_Fixture `composed.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: composed
+scenarios:
+  - name: guards both directions
+    steps:
+      - run:
+          command: echo hello
+      - assert:
+          stdout:
+            contains: hello
+            not_contains: goodbye
+            matches: "^hel"
+```
+_Fixture `broken.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: composed
+scenarios:
+  - name: guards both directions
+    steps:
+      - run:
+          shell: true
+          command: printf 'hello goodbye\n'
+      - assert:
+          stdout:
+            contains: hello
+            not_contains: goodbye
+```
+#### When
+```shell
+${atago} explain composed.atago.yaml
+${atago} run broken.atago.yaml
+```
+#### Then
+- after `${atago} explain composed.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `stdout contains "hello", does not contain "goodbye", matches /^hel/`
+- after `${atago} run broken.atago.yaml`:
+  - exit code is `1`
+  - stdout contains `does not contain`
+### Scenario: explain names the line a line-scoped matcher inspects
+#### Given
+- Fixture file `lined.atago.yaml` is created.
+#### Inputs
+_Fixture `lined.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: lined
+scenarios:
+  - name: second line only
+    steps:
+      - run:
+          shell: true
+          command: printf 'one\ntwo\n'
+      - assert:
+          stdout:
+            line: 2
+            equals: two
+```
+#### When
+```shell
+${atago} explain lined.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout contains `stdout line 2 equals exact text`
+### Scenario: explain describes file not_contains and executable matchers
+#### Given
+- Fixture file `filematch.atago.yaml` is created.
+#### Inputs
+_Fixture `filematch.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: filematch
+scenarios:
+  - name: no secret leaked
+    steps:
+      - fixture:
+          file: out.txt
+          content: "public\n"
+      - run:
+          command: echo hi
+      - assert:
+          file:
+            path: out.txt
+            not_contains: "secret-token"
+  - name: installer stays executable
+    steps:
+      - fixture:
+          file: install.sh
+          content: "#!/bin/sh\n"
+… (truncated, 7 more lines)
+```
+#### When
+```shell
+${atago} explain filematch.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout contains `file "out.txt" does not contain "secret-token"`, `file "install.sh" is executable`
 ## atago self-hosting / file equals and equals_file byte-equality (#155)
 Source: `test/e2e/atago/file_equals.atago.yaml`
 ### Scenario: equals_file passes for two byte-identical files
@@ -2672,8 +2828,8 @@ _Fixture `data.txt`:_
 plain
 ```
 #### Then
-- file `run.sh` is checked
-- file `data.txt` is checked
+- file `run.sh` is executable
+- file `data.txt` is not executable
 ### Scenario: fixture.mtime pins the modification time
 #### Given
 - Fixture file `stamped.txt` is created.
@@ -3601,16 +3757,16 @@ Source: `test/e2e/atago/line.atago.yaml`
 printf '[\n  {"id":1}\n]\n'
 ```
 #### Then
-- stdout equals an exact value
-- stdout contains `"id":1`
-- stdout equals an exact value
+- stdout line `1` equals an exact value
+- stdout line `2` contains `"id":1`
+- stdout line `3` equals an exact value
 ### Scenario: a trailing newline does not add a phantom final line
 #### When
 ```shell
 printf 'only-line\n'
 ```
 #### Then
-- stdout equals an exact value
+- stdout line `1` equals an exact value
 ### Scenario: an out-of-range line fails the inner spec
 #### Given
 - Fixture file `oor.atago.yaml` is created.
@@ -3720,7 +3876,7 @@ printf 'north\r\nsouth\r\n'
 printf 'header\r\npayload\r\n'
 ```
 #### Then
-- stdout equals an exact value
+- stdout line `2` equals an exact value
 ### Scenario: json parses a CRLF-formatted document
 #### When
 ```shell
@@ -4460,28 +4616,28 @@ Source: `test/e2e/atago/multi_matcher.atago.yaml`
 echo "hello world"
 ```
 #### Then
-- stdout contains `hello`
+- stdout contains `hello`, does not contain `goodbye`
 ### Scenario: matches and not_matches hold together
 #### When
 ```shell
 echo "release 1.2.3"
 ```
 #### Then
-- stdout matches `/[0-9]+\.[0-9]+\.[0-9]+/`
+- stdout matches `/[0-9]+\.[0-9]+\.[0-9]+/`, does not match `/(?i)error/`
 ### Scenario: all four text matchers compose
 #### When
 ```shell
 echo "Alice and Bob"
 ```
 #### Then
-- stdout contains `Alice`, `Bob`
+- stdout contains `Alice`, `Bob`, does not contain `Carol`, matches `/A.+e/`, does not match `/Dave/`
 ### Scenario: a combined matcher composes with a line selector
 #### When
 ```shell
 printf 'first line\nsecond line\n'
 ```
 #### Then
-- stdout contains `second`
+- stdout line `2` contains `second`, does not contain `first`
 ### Scenario: a failing member fails the inner spec and names the offender
 #### Given
 - Fixture file `inner.atago.yaml` is created.
@@ -4507,7 +4663,7 @@ ${atago} run inner.atago.yaml
 ```
 #### Then
 - exit code is `1`
-- stdout contains `goodbye`
+- stdout contains `goodbye`, does not contain `internal error`
 ### Scenario: mixing a whole-stream matcher with a text matcher is a load error
 #### Given
 - Fixture file `bad.atago.yaml` is created.
@@ -4556,7 +4712,7 @@ echo hello
 printf 'first\nsecond\n'
 ```
 #### Then
-- stdout does not equal an exact value
+- stdout line `2` does not equal an exact value
 ### Scenario: not_equals fails the inner spec when the text matches exactly
 #### Given
 - Fixture file `ne.atago.yaml` is created.
@@ -4903,7 +5059,7 @@ _skipped on Windows_
 '
 ```
 #### Then
-- rendered screen equals an exact value
+- rendered screen line `1` equals an exact value
 - rendered screen does not contain `loading`
 - stdout contains `loading`
 ### Scenario: a screen snapshot round-trips through update and compare
@@ -5229,7 +5385,7 @@ ${atago} run echo.atago.yaml
 #### Then
 - exit code is `0`
 - file `echo.atago.yaml` contains `- pty:`, `command: echo done`
-- file `echo.atago.yaml` is checked
+- file `echo.atago.yaml` does not contain `- send:`, `session:`
 - exit code is `0`
 - stdout contains `1 passed`
 ### Scenario: a prompt with regex metacharacters is escaped in the generated expect
@@ -5271,7 +5427,7 @@ ${atago} run sec.atago.yaml
 #### Then
 - exit code is `0`
 - file `sec.atago.yaml` contains `${env:ATAGO_SECRET_1}`
-- file `sec.atago.yaml` is checked
+- file `sec.atago.yaml` does not contain `hunter2`
 - after `${atago} run sec.atago.yaml`:
   - exit code is `0`
   - stdout contains `1 passed`
@@ -5587,8 +5743,8 @@ ${atago} run --report tap mixed.atago.yaml
 ```
 #### Then
 - exit code is `1`
-- stdout equals an exact value
-- stdout equals an exact value
+- stdout line `1` equals an exact value
+- stdout line `2` equals an exact value
 - stdout contains `ok 1 - sample / good`, `not ok 2 - sample / bad`
 ### Scenario: failure artifacts are written and referenced in the JSON report
 #### Given
@@ -6736,7 +6892,7 @@ ${atago} snapshot update uuid.atago.yaml
 ```
 #### Then
 - file `g.txt` contains `id=<uuid>`
-- file `g.txt` is checked
+- file `g.txt` does not contain `550e8400`
 ### Scenario: an ISO timestamp is masked in the golden
 #### Given
 - Fixture file `ts.atago.yaml` is created.
@@ -6777,7 +6933,7 @@ ${atago} snapshot update port.atago.yaml
 ```
 #### Then
 - file `g.txt` contains `127.0.0.1:<port>`
-- file `g.txt` is checked
+- file `g.txt` does not contain `54321`
 ### Scenario: the home directory is masked to a tilde in the golden
 #### Given
 - Fixture file `home.atago.yaml` is created.
@@ -7325,7 +7481,7 @@ printf 'αβγδ\n'
 printf 'ひらがな\nカタカナ\n漢字\n'
 ```
 #### Then
-- stdout equals an exact value
+- stdout line `2` equals an exact value
 ### Scenario: not_contains a multibyte needle that is absent
 #### When
 ```shell
@@ -7360,7 +7516,7 @@ printf 'noeol'
 printf 'body\n\n'
 ```
 #### Then
-- stdout equals an exact value
+- stdout line `2` equals an exact value
 ### Scenario: contains treats a needle with regex metacharacters literally
 #### When
 ```shell
@@ -7402,21 +7558,21 @@ printf '[{"id":1}]\n'
 seq 1 100
 ```
 #### Then
-- stdout equals an exact value
+- stdout line `100` equals an exact value
 ### Scenario: a line selector composes with contains
 #### When
 ```shell
 printf 'alpha\nbeta-gamma\n'
 ```
 #### Then
-- stdout contains `gamma`
+- stdout line `2` contains `gamma`
 ### Scenario: a line selector composes with a regex
 #### When
 ```shell
 printf 'k=1\nk=2\n'
 ```
 #### Then
-- stdout matches `/^k=[0-9]$/`
+- stdout line `2` matches `/^k=[0-9]$/`
 ### Scenario: stderr carries the same matcher semantics as stdout
 #### When
 ```shell

@@ -74,37 +74,59 @@ type StreamStyle struct {
 	JSON      JSONStyle
 	YAML      JSONStyle
 	Snapshot  func(string) string
+	Line      func(int) string
 	NoMatcher string
 }
 
+// DescribeStream renders every matcher a stream assertion sets, not just the
+// first one: the text matchers compose (contains + not_contains + matches +
+// not_matches all have to hold), so describing one of them would publish a
+// weaker contract than the run enforces. A `line: N` selector is rendered as a
+// prefix because it narrows what every matcher sees.
 func DescribeStream(s *spec.StreamAssert, style StreamStyle) string {
-	switch {
-	case s.Empty != nil:
+	var parts []string
+	if s.Empty != nil {
 		if *s.Empty {
-			return "is empty"
+			parts = append(parts, "is empty")
+		} else {
+			parts = append(parts, "is not empty")
 		}
-		return "is not empty"
-	case s.Contains != nil:
-		return "contains " + style.List(s.Contains)
-	case s.NotContains != nil:
-		return "does not contain " + style.List(s.NotContains)
-	case s.Matches != nil:
-		return "matches " + style.Regex(*s.Matches)
-	case s.NotMatches != nil:
-		return "does not match " + style.Regex(*s.NotMatches)
-	case s.Equals != nil:
-		return style.Equals
-	case s.NotEquals != nil:
-		return style.NotEquals
-	case len(s.JSON) > 0:
-		return DescribeJSONChecks(s.JSON, style.JSON)
-	case len(s.YAML) > 0:
-		return DescribeJSONChecks(s.YAML, style.YAML)
-	case s.Snapshot != "":
-		return "matches snapshot " + style.Snapshot(s.Snapshot)
-	default:
+	}
+	if s.Contains != nil {
+		parts = append(parts, "contains "+style.List(s.Contains))
+	}
+	if s.NotContains != nil {
+		parts = append(parts, "does not contain "+style.List(s.NotContains))
+	}
+	if s.Matches != nil {
+		parts = append(parts, "matches "+style.Regex(*s.Matches))
+	}
+	if s.NotMatches != nil {
+		parts = append(parts, "does not match "+style.Regex(*s.NotMatches))
+	}
+	if s.Equals != nil {
+		parts = append(parts, style.Equals)
+	}
+	if s.NotEquals != nil {
+		parts = append(parts, style.NotEquals)
+	}
+	if len(s.JSON) > 0 {
+		parts = append(parts, DescribeJSONChecks(s.JSON, style.JSON))
+	}
+	if len(s.YAML) > 0 {
+		parts = append(parts, DescribeJSONChecks(s.YAML, style.YAML))
+	}
+	if s.Snapshot != "" {
+		parts = append(parts, "matches snapshot "+style.Snapshot(s.Snapshot))
+	}
+	if len(parts) == 0 {
 		return style.NoMatcher
 	}
+	desc := strings.Join(parts, ", ")
+	if s.Line != nil && style.Line != nil {
+		return style.Line(*s.Line) + " " + desc
+	}
+	return desc
 }
 
 type FileStyle struct {
@@ -116,6 +138,10 @@ type FileStyle struct {
 	ExactBytes string
 }
 
+// DescribeFile renders the single matcher a file assertion sets. Every matcher
+// the loader accepts has a case here: one that fell through to Checked would
+// publish "the file is checked" for an assertion that actually pins content or
+// permissions.
 func DescribeFile(f *spec.FileAssert, style FileStyle) string {
 	switch {
 	case f.Exists != nil:
@@ -125,6 +151,13 @@ func DescribeFile(f *spec.FileAssert, style FileStyle) string {
 		return style.Path(f.Path) + " does not exist"
 	case f.Contains != nil:
 		return style.Path(f.Path) + " contains " + style.List(f.Contains)
+	case f.NotContains != nil:
+		return style.Path(f.Path) + " does not contain " + style.List(f.NotContains)
+	case f.Executable != nil:
+		if *f.Executable {
+			return style.Path(f.Path) + " is executable"
+		}
+		return style.Path(f.Path) + " is not executable"
 	case f.Equals != nil:
 		return style.Path(f.Path) + " " + style.ExactBytes
 	case f.EqualsFile != nil:

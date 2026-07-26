@@ -99,7 +99,7 @@ kustomize edit fix
 - exit code is `0`
 - the step changed exactly created nothing, modified `kustomization.yaml`, deleted nothing
 - file `kustomization.yaml` contains `labels:`
-- file `kustomization.yaml` is checked
+- file `kustomization.yaml` does not contain `commonLabels:`
 ### Scenario: edit without a kustomization file fails
 _only when `kustomize version` succeeds_
 #### When

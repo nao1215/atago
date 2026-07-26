@@ -142,7 +142,7 @@ openssl enc -d -aes-256-cbc -pbkdf2 -pass pass:wrong-password -in secret.enc -ou
 - after `openssl enc -aes-256-cbc -pbkdf2 -pass pass:correct-horse -in secret.txt -out secret.enc`:
   - exit code is `0`
   - file `secret.enc` exists
-  - file `secret.enc` is checked
+  - file `secret.enc` does not contain `attack at dawn`
 - after `openssl enc -d -aes-256-cbc -pbkdf2 -pass pass:correct-horse -in secret.enc -out roundtrip.txt`:
   - exit code is `0`
   - file `roundtrip.txt` contains `attack at dawn`
