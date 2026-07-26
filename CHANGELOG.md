@@ -7,19 +7,31 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-07-26
+
+A minor release focused on removing false greens. A command killed by its
+timeout no longer reports passed when nothing asserts on it, and the spec loader
+turns away explicit YAML tags instead of provoking a decoder panic on the way to
+a parse error. Three more third-party CLI suites join the real-world coverage.
+
+### Added
+
+- Third-party coverage grows by three pinned suites: gum (15 scenarios),
+  lazygit (21), and helix (21). Each downloads a fixed release verified against
+  its published SHA256, so the scheduled matrix stays reproducible.
+
 ### Changed
 
+- A command killed by its timeout now fails the step when no assert reads its
+  result. Asserting on a killed command still works and still reports the
+  timeout as an observable outcome, and `timeout: "0"` still opts a step out of
+  every timeout level.
 - The spec loader now rejects explicit YAML tags (`!foo`, `!!str`, a bare `!`)
   with an error naming the tag and its line/column, instead of letting them
   reach the decoder. atago's schema is closed and fully typed, so a tag could
   only restate or contradict it, and no spec, example, or doc authored one.
   `!!binary` stays accepted because `atago record` emits it for captures that
   are not valid UTF-8.
-
-- A command killed by its timeout now fails the step when no assert inspects the
-  result. Asserting on a killed command still works and still reports the
-  timeout as an observable outcome, and `timeout: "0"` still opts a step out of
-  every timeout level.
 
 ### Fixed
 
@@ -30,7 +42,6 @@ and this project follows [Semantic Versioning](https://semver.org/).
   That is the outcome the timeout defaults exist to prevent, only slower. The
   same false green applied to a `pty` step whose session never waited on the
   program.
-
 - Loading a spec no longer provokes a runtime nil-pointer panic on the way to a
   parse error. A tagged node on a list field made goccy/go-yaml v1.19.2 nil-deref
   inside `decodeSlice`; the loader recovered from it, but `internal/loader` was
