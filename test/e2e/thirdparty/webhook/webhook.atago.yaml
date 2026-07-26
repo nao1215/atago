@@ -2,17 +2,23 @@ version: "1"
 
 suite:
   name: webhook (self-hosted webhook receiver)
+  description: |
+    [webhook](https://github.com/adnanh/webhook) turns an HTTP request into a
+    command execution, which makes it a piece of security-relevant plumbing:
+    everything about it is a question of what should and should not run.
 
-# Exercises adnanh/webhook (from awesome-selfhosted's automation corner) as a
-# third-party target: the daemon reads its hook definitions from a JSON config
-# — written as a leading fixture, applied before the service starts — and an
-# HTTP request triggers a command whose real effect (a file written on disk)
-# and whose output are both observed. Beyond the happy path this pins the
-# contract's branches: trigger-rules gate execution (and prove the command did
-# not run when unsatisfied), an HMAC signature is verified against an
-# independently computed oracle, the http-methods allowlist rejects the wrong
-# verb, and a command that exits non-zero surfaces as a 500. Each scenario runs
-# its own daemon with a minimal hook config. Install: see
+    The happy path is verified by its effect, not its response — the triggered
+    command writes a file, and that file is checked on disk.
+
+    The refusals are pinned just as carefully. When a trigger rule is not
+    satisfied the command must not run at all, which is asserted by the absence
+    of its effect rather than by the status code. An HMAC signature is verified
+    against an independently computed value, so a forged one is rejected. The
+    allowed-methods list rejects the wrong verb. And a command that exits
+    non-zero surfaces as a 500 instead of being reported as success.
+
+# Each scenario runs its own daemon with a minimal hook config, written as a
+# leading fixture and applied before the service starts. Install: see
 # .github/workflows/thirdparty.yml for the pinned CI version.
 
 permissions:

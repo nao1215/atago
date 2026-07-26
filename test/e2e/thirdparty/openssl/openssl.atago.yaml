@@ -2,13 +2,21 @@ version: "1"
 
 suite:
   name: openssl (third-party CLI, no build required)
+  description: |
+    [OpenSSL](https://www.openssl.org/) is the cryptography tool most scripts
+    reach for, and cryptography is where "it produced output" is the least
+    convincing evidence of anything.
 
-# openssl is the first cryptography tool in the third-party matrix. The suite
-# pins observable contracts a script would depend on: digests are exact and
-# stable, key generation produces working keys (proven by deriving the public
-# half and signing/verifying), encryption round-trips byte-for-byte, a WRONG
-# password fails loudly instead of producing garbage, and a self-signed
-# certificate carries the requested subject.
+    So each guarantee here is checked against something independent. Digests are
+    pinned to their known values. A generated key is proven to work by deriving
+    its public half and then signing and verifying with the pair — not by
+    checking that a file appeared. Encryption is proven by decrypting back to
+    the original bytes.
+
+    And the failure case is treated as a feature: decrypting with the wrong
+    password must fail loudly, because a crypto tool that silently emits garbage
+    on a bad key is worse than one that crashes. A self-signed certificate is
+    checked to carry the subject that was requested.
 scenarios:
   - name: sha256 digest of a fixed input is exact and stable
     steps:

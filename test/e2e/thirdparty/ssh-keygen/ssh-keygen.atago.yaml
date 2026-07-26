@@ -2,13 +2,20 @@ version: "1"
 
 suite:
   name: ssh-keygen (OpenSSH key generation)
+  description: |
+    `ssh-keygen` is small, ships with OpenSSH everywhere, and happens to combine
+    three things that are each awkward to test: an interactive passphrase
+    prompt, files written to disk, and an exit code that carries meaning.
 
-# ssh-keygen ships with OpenSSH on every CI image and mixes three atago
-# strengths in one small tool (#34): interactive passphrase prompts (pty),
-# generated-file assertions (the key pair on disk), and a crisp
-# stdout/exit-code contract (fingerprints, verification failures). Every key
-# here is a throwaway generated inside the scenario's isolated workdir — no
-# real credentials, and the workdir is discarded when the scenario ends.
+    All three are covered together. The passphrase is typed at the real prompt
+    inside a terminal, the resulting key pair is asserted as files with the
+    right shape and permissions, and the fingerprint output is checked — as is
+    the failure when a key cannot be verified.
+
+    Every key here is a throwaway generated inside the scenario's own workspace,
+    which is discarded when the scenario ends. No real credential is involved at
+    any point.
+
 # Gate: only where ssh-keygen is installed. pty scenarios are POSIX-only.
 
 secrets:

@@ -2,13 +2,19 @@ version: "1"
 
 suite:
   name: sqlite3 (third-party CLI, no build required)
+  description: |
+    The `sqlite3` shell driven as a user drives it — the actual binary on a
+    command line, not SQLite embedded as a library.
 
-# The sqlite3 shell is the first embedded-database CLI in the third-party
-# matrix (distinct from atago's db runner, which speaks to SQLite as a
-# library: this suite drives the /usr/bin/sqlite3 *binary* like a user would).
-# It pins the one-shot SQL contract, machine-readable -json/-csv output modes,
-# dot-command behavior (.dump/.schema/.import), durability of the database
-# file across invocations, and the bad-SQL failure mode.
+    What is guaranteed: one-shot SQL passed as an argument runs and prints its
+    result; the machine-readable output modes (`-json`, `-csv`) produce output a
+    script can parse; the dot-commands behave as documented, so `.dump` can
+    reproduce a database, `.schema` reports it, and `.import` reads a file back
+    in; and bad SQL fails with a message instead of a partial result.
+
+    Durability gets its own attention: data written by one invocation must still
+    be there for the next one, which is the whole reason to use a file-backed
+    database rather than a pipe.
 scenarios:
   - name: one-shot SQL creates, inserts, and counts in a single invocation
     steps:

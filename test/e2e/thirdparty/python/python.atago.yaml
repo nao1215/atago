@@ -2,13 +2,23 @@ version: "1"
 
 suite:
   name: python3 REPL (interactive pty testbed)
+  description: |
+    The Python REPL is the canonical long-lived interactive session: it prints a
+    prompt, waits, answers, and prompts again, for as many exchanges as you
+    want.
 
-# The python3 REPL is the canonical long-lived interactive session (#33):
-# prompt detection (>>>), multi-exchange expect/send, tracebacks, TTY
-# branching, and clean EOF exit. python3 ships on every CI image, so this is
-# the cheapest always-available pty workout and a copy-paste template for
-# testing your own REPL. Non-interactive `-c` contracts run everywhere; the
-# pty scenarios are POSIX-only. Gate: only where python3 is installed.
+    That conversational shape is what this suite pins — recognizing the `>>>`
+    prompt, carrying on a multi-step exchange where each answer depends on the
+    last, getting a traceback back for bad input without the session dying, and
+    exiting cleanly on end-of-input. Python also behaves differently when it
+    detects a terminal, so that branch is exercised too.
+
+    Python is on every CI image, which makes this the most portable worked
+    example here of testing an interactive program — and a template to copy for
+    your own REPL.
+
+# Non-interactive `-c` contracts run everywhere; the pty scenarios are
+# POSIX-only. Gate: only where python3 is installed.
 scenarios:
   - name: version and -c contracts (non-interactive)
     only:

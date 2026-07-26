@@ -2,13 +2,19 @@ version: "1"
 
 suite:
   name: sqlite3 + changes (workdir-delta of a database write)
+  description: |
+    SQLite creates side files while it works — a rollback journal by default, or
+    a write-ahead log and shared-memory file in WAL mode. A process that dies
+    mid-transaction leaves them behind.
 
-# The companion to sqlite3.atago.yaml, pinning the exact filesystem footprint
-# of a one-shot write with the `changes:` assert. Counterintuitively, the
-# rollback-journal (default) and WAL modes both create side files
-# (t.db-journal / t.db-wal / t.db-shm) DURING the invocation, but a clean
-# sqlite3 process close deletes or checkpoints them before it exits — so the
-# pre/post workdir delta ever only sees the database file itself.
+    This suite pins the cleanup guarantee: after a `sqlite3` process exits
+    normally, those files are gone — deleted or checkpointed back into the
+    database — and the only thing that changed on disk is the database file
+    itself. In both journal modes.
+
+    That is a stronger statement than "the write worked", and it is what makes a
+    leftover journal file a detectable regression rather than something nobody
+    notices until a restore.
 scenarios:
   - name: default rollback-journal mode creates exactly the db file
     steps:

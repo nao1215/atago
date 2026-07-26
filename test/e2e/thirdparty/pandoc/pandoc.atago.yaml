@@ -2,12 +2,21 @@ version: "1"
 
 suite:
   name: pandoc (document conversion filter)
+  description: |
+    [Pandoc](https://pandoc.org/) converts documents between formats, and it can
+    be used two entirely different ways: as a file-to-file converter, or as a
+    filter in a pipeline reading stdin and writing stdout.
 
-# The classic document-conversion filter (#36): file-to-file and
-# stdin-to-stdout modes, structured JSON output (its AST), and multi-format
-# artifacts. It exercises the stdin story hard — a concrete consumer of the
-# stdin: {file:} feature (#18). PDF output is out of scope (needs LaTeX).
-# Gate: only where pandoc is installed.
+    Both are pinned, because a script may depend on either, and they must agree:
+    the same input converted either way must produce the same document.
+
+    Beyond the rendered output, pandoc can emit its internal AST as JSON — a
+    structured oracle that says what pandoc *understood* the document to be, not
+    merely what it printed. Asserting on that catches a parsing regression that
+    happens to render plausibly.
+
+# PDF output is out of scope (needs LaTeX). Gate: only where pandoc is
+# installed.
 scenarios:
   - name: markdown converts to HTML and a binary docx
     only:

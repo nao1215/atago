@@ -2,12 +2,17 @@ version: "1"
 
 suite:
   name: openssl + changes (key and cert generation footprints)
+  description: |
+    A tool that generates private key material should write exactly the file you
+    named and nothing else — no copy, no temporary file left in the directory,
+    no cache entry elsewhere. With secrets, a stray extra file is a leak.
 
-# Companion to openssl.atago.yaml: key/cert generation should write exactly the
-# file named by -out and nothing else. Each `changes:` assert pins one created
-# artifact; the second scenario's baseline includes key.pem (created by the
-# prior step, whose delta is not asserted there). Gate: only where openssl is
-# installed.
+    This suite states that as an exhaustive contract: after generating a key,
+    and after generating a certificate, the directory contains precisely the one
+    new artifact that was asked for.
+
+# The second scenario's baseline includes key.pem (created by the prior step,
+# whose delta is not asserted there). Gate: only where openssl is installed.
 scenarios:
   - name: genrsa writes exactly the key file
     only:
