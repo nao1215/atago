@@ -89,6 +89,77 @@ scenarios:
           stdout:
             contains: "alpha beta"
 
+  - name: insert mode prefixes the first line and write quit saves it
+    only:
+      command: hx --version
+    skip:
+      os: windows
+    steps:
+      - fixture: *config
+      - fixture:
+          file: note.txt
+          content: "alpha\n"
+      - pty:
+          command: hx note.txt
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH, HELIX_RUNTIME]
+          env: *hx_env
+          session:
+            - expect: Loaded
+            - send: "i"
+            - send: "start-"
+            - send: {key: "ctrl-["}
+            - expect: NOR
+            - send: ":wq"
+            - send: {key: enter}
+      - run:
+          command: cat note.txt
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "start-alpha"
+
+  - name: append mode after j edits only the second line
+    only:
+      command: hx --version
+    skip:
+      os: windows
+    steps:
+      - fixture: *config
+      - fixture:
+          file: note.txt
+          content: |
+            first
+            second
+      - pty:
+          command: hx note.txt
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH, HELIX_RUNTIME]
+          env: *hx_env
+          session:
+            - expect: Loaded
+            - send: "j"
+            - send: "A"
+            - send: " updated"
+            - send: {key: "ctrl-["}
+            - expect: NOR
+            - send: ":wq"
+            - send: {key: enter}
+      - run:
+          command: cat note.txt
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              first
+              second updated
+
   - name: force quit discards unsaved changes
     only:
       command: hx --version
@@ -152,6 +223,39 @@ scenarios:
           stdout:
             equals: "first line"
 
+  - name: saving a new file path under an existing directory creates the file
+    only:
+      command: hx --version
+    skip:
+      os: windows
+    steps:
+      - fixture: *config
+      - fixture:
+          file: dir/.keep
+          content: ""
+      - pty:
+          command: hx dir/fresh.txt
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH, HELIX_RUNTIME]
+          env: *hx_env
+          session:
+            - expect: Loaded
+            - send: "i"
+            - send: "nested line"
+            - send: {key: "ctrl-["}
+            - expect: NOR
+            - send: ":wq"
+            - send: {key: enter}
+      - run:
+          command: cat dir/fresh.txt
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "nested line"
+
   - name: enter in insert mode writes multiple lines
     only:
       command: hx --version
@@ -186,6 +290,82 @@ scenarios:
               first
               second
 
+  - name: o opens a line below the current line
+    only:
+      command: hx --version
+    skip:
+      os: windows
+    steps:
+      - fixture: *config
+      - fixture:
+          file: note.txt
+          content: |
+            first
+            third
+      - pty:
+          command: hx note.txt
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH, HELIX_RUNTIME]
+          env: *hx_env
+          session:
+            - expect: Loaded
+            - send: "o"
+            - send: "second"
+            - send: {key: "ctrl-["}
+            - expect: NOR
+            - send: ":wq"
+            - send: {key: enter}
+      - run:
+          command: cat note.txt
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              first
+              second
+              third
+
+  - name: capital O opens a line above the current line
+    only:
+      command: hx --version
+    skip:
+      os: windows
+    steps:
+      - fixture: *config
+      - fixture:
+          file: note.txt
+          content: |
+            second
+            third
+      - pty:
+          command: hx note.txt
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH, HELIX_RUNTIME]
+          env: *hx_env
+          session:
+            - expect: Loaded
+            - send: "O"
+            - send: "first"
+            - send: {key: "ctrl-["}
+            - expect: NOR
+            - send: ":wq"
+            - send: {key: enter}
+      - run:
+          command: cat note.txt
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              first
+              second
+              third
+
   - name: undo removes an appended edit before save
     only:
       command: hx --version
@@ -219,6 +399,42 @@ scenarios:
           exit_code: 0
           stdout:
             equals: "alpha"
+
+  - name: x d then undo restores the deleted line before save
+    only:
+      command: hx --version
+    skip:
+      os: windows
+    steps:
+      - fixture: *config
+      - fixture:
+          file: note.txt
+          content: |
+            first
+            second
+      - pty:
+          command: hx note.txt
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH, HELIX_RUNTIME]
+          env: *hx_env
+          session:
+            - expect: Loaded
+            - send: "x"
+            - send: "d"
+            - send: "u"
+            - send: ":wq"
+            - send: {key: enter}
+      - run:
+          command: cat note.txt
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              first
+              second
 
   - name: search selects a match and change replaces only that match
     only:
@@ -326,6 +542,139 @@ scenarios:
           exit_code: 0
           stdout:
             contains: "two-start updated"
+
+  - name: buffer-previous returns to the first file in a multi-file session
+    only:
+      command: hx --version
+    skip:
+      os: windows
+    steps:
+      - fixture: *config
+      - fixture:
+          file: one.txt
+          content: "one-start\n"
+      - fixture:
+          file: two.txt
+          content: "two-start\n"
+      - pty:
+          command: hx one.txt two.txt
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH, HELIX_RUNTIME]
+          env: *hx_env
+          session:
+            - expect: Loaded
+            - send: ":buffer-next"
+            - send: {key: enter}
+            - expect: two.txt
+            - send: ":buffer-previous"
+            - send: {key: enter}
+            - send: "A"
+            - send: " updated"
+            - send: {key: "ctrl-["}
+            - expect: NOR
+            - send: ":wq"
+            - send: {key: enter}
+      - run:
+          command: cat one.txt
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "one-start updated"
+
+  - name: buffer-next then buffer-previous can edit both buffers before quit
+    only:
+      command: hx --version
+    skip:
+      os: windows
+    steps:
+      - fixture: *config
+      - fixture:
+          file: one.txt
+          content: "one-start\n"
+      - fixture:
+          file: two.txt
+          content: "two-start\n"
+      - pty:
+          command: hx one.txt two.txt
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH, HELIX_RUNTIME]
+          env: *hx_env
+          session:
+            - expect: Loaded
+            - send: ":buffer-next"
+            - send: {key: enter}
+            - expect: two.txt
+            - send: "A"
+            - send: " second"
+            - send: {key: "ctrl-["}
+            - expect: NOR
+            - send: ":buffer-previous"
+            - send: {key: enter}
+            - send: "A"
+            - send: " first"
+            - send: {key: "ctrl-["}
+            - expect: NOR
+            - send: ":write-quit-all"
+            - send: {key: enter}
+      - run:
+          command: cat one.txt
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "one-start first"
+      - run:
+          command: cat two.txt
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "two-start second"
+
+  - name: write saves a copy to another path without changing the source file
+    only:
+      command: hx --version
+    skip:
+      os: windows
+    steps:
+      - fixture: *config
+      - fixture:
+          file: note.txt
+          content: "alpha\n"
+      - pty:
+          command: hx note.txt
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH, HELIX_RUNTIME]
+          env: *hx_env
+          session:
+            - expect: Loaded
+            - send: "A"
+            - send: " beta"
+            - send: {key: "ctrl-["}
+            - expect: NOR
+            - send: ":w copy.txt"
+            - send: {key: enter}
+            - send: ":q!"
+            - send: {key: enter}
+      - run:
+          command: cat note.txt
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "alpha"
+      - run:
+          command: cat copy.txt
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "alpha beta"
 
   - name: unicode filenames and Japanese text save without mangling
     only:
