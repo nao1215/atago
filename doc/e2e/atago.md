@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-74 suites · 387 scenarios
+74 suites · 390 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -434,10 +434,13 @@
   - [a failing setup errors every scenario and none runs (exit 4)](#scenario-a-failing-setup-errors-every-scenario-and-none-runs-exit-4)
   - [a suite service starts once and its store reaches every scenario](#scenario-a-suite-service-starts-once-and-its-store-reaches-every-scenario)
   - [a failing suite teardown is loud but does not flip the verdict](#scenario-a-failing-suite-teardown-is-loud-but-does-not-flip-the-verdict)
-- [atago self-hosting / step timeouts (suite default + escape hatch)](#atago-self-hosting--step-timeouts-suite-default--escape-hatch) — 4 scenarios
+- [atago self-hosting / step timeouts (suite default + escape hatch)](#atago-self-hosting--step-timeouts-suite-default--escape-hatch) — 7 scenarios
   - [suite.timeout kills a hanging step and the hint names it](#scenario-suitetimeout-kills-a-hanging-step-and-the-hint-names-it)
   - [a step timeout beats the suite timeout and the hint says run.timeout](#scenario-a-step-timeout-beats-the-suite-timeout-and-the-hint-says-runtimeout)
   - [timeout zero disables a short suite bound](#scenario-timeout-zero-disables-a-short-suite-bound)
+  - [a killed step fails even when nothing asserts on it](#scenario-a-killed-step-fails-even-when-nothing-asserts-on-it)
+  - [an assert on the killed result keeps the timeout observable](#scenario-an-assert-on-the-killed-result-keeps-the-timeout-observable)
+  - [timeout zero keeps an unasserted step green](#scenario-timeout-zero-keeps-an-unasserted-step-green)
   - [an invalid suite.timeout is a load-time error](#scenario-an-invalid-suitetimeout-is-a-load-time-error)
 - [atago self-hosting / tui](#atago-self-hosting--tui) — 4 scenarios
   - [a pty step exports a usable TERM by default](#scenario-a-pty-step-exports-a-usable-term-by-default)
@@ -7506,6 +7509,83 @@ scenarios:
 #### When
 ```shell
 ${atago} run optout.atago.yaml
+```
+#### Then
+- exit code is `0`
+### Scenario: a killed step fails even when nothing asserts on it
+_skipped on Windows_
+#### Given
+- Fixture file `unobserved.atago.yaml` is created.
+#### Inputs
+_Fixture `unobserved.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: unobserved
+  timeout: 1s
+scenarios:
+  - name: nothing looks at the killed command
+    steps:
+      - run:
+          shell: true
+          command: sleep 300
+```
+#### When
+```shell
+${atago} run unobserved.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `run completes before its timeout`, `was killed`, `suite.timeout`
+### Scenario: an assert on the killed result keeps the timeout observable
+_skipped on Windows_
+#### Given
+- Fixture file `observed.atago.yaml` is created.
+#### Inputs
+_Fixture `observed.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: observed
+scenarios:
+  - name: the assert inspects the timeout instead of ignoring it
+    steps:
+      - run:
+          shell: true
+          command: sleep 300
+          timeout: 500ms
+      - assert:
+          exit_code:
+            not: 0
+```
+#### When
+```shell
+${atago} run observed.atago.yaml
+```
+#### Then
+- exit code is `0`
+### Scenario: timeout zero keeps an unasserted step green
+_skipped on Windows_
+#### Given
+- Fixture file `optout_bare.atago.yaml` is created.
+#### Inputs
+_Fixture `optout_bare.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: optout-bare
+  timeout: 500ms
+scenarios:
+  - name: the opted-out step is never killed so nothing fails it
+    steps:
+      - run:
+          shell: true
+          command: sleep 1
+          timeout: "0"
+```
+#### When
+```shell
+${atago} run optout_bare.atago.yaml
 ```
 #### Then
 - exit code is `0`

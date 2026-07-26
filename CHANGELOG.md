@@ -16,7 +16,20 @@ and this project follows [Semantic Versioning](https://semver.org/).
   `!!binary` stays accepted because `atago record` emits it for captures that
   are not valid UTF-8.
 
+- A command killed by its timeout now fails the step when no assert inspects the
+  result. Asserting on a killed command still works and still reports the
+  timeout as an observable outcome, and `timeout: "0"` still opts a step out of
+  every timeout level.
+
 ### Fixed
+
+- A hanging command no longer passes. A step killed by `run.timeout`,
+  `runner.timeout`, `defaults.run.timeout`, `suite.timeout`, or the built-in 60s
+  default reported passed whenever the spec did not assert on the result, so the
+  bare `run:` step a first-time user writes went green after the timeout fired.
+  That is the outcome the timeout defaults exist to prevent, only slower. The
+  same false green applied to a `pty` step whose session never waited on the
+  program.
 
 - Loading a spec no longer provokes a runtime nil-pointer panic on the way to a
   parse error. A tagged node on a list field made goccy/go-yaml v1.19.2 nil-deref

@@ -15,6 +15,58 @@ import (
 	"github.com/nao1215/atago/internal/store"
 )
 
+// resultObserved reports whether an assert step inspects the result produced by
+// the step at index i. Only the assert steps before the next result-producing
+// step count: once another run/http/query/grpc/pty/cdp step lands, it replaces
+// the current result, so a later assert is looking at that one instead.
+func resultObserved(steps []spec.Step, i int) bool {
+	for k := i + 1; k < len(steps); k++ {
+		switch steps[k].Kind() {
+		case spec.StepAssert:
+			return true
+		case spec.StepRun, spec.StepHTTP, spec.StepQuery, spec.StepGRPC, spec.StepPTY, spec.StepCDP:
+			return false
+		}
+	}
+	return false
+}
+
+// timeoutKillCheck turns an unobserved timeout kill into a failing check, or
+// returns nil when the command exited on its own or an assert inspects it.
+//
+// A timeout is a guard, not an outcome to observe: issue #17 added the
+// suite/built-in defaults so "an unconfigured hanging command can no longer
+// stall a run", and a killed command that still reports passed delivers the
+// same green verdict as before, only later. Asserting on the killed result
+// catches it — that is the documented way to treat a timeout as an observable
+// outcome, and it keeps working. But it requires the author to have anticipated
+// the hang, and the bare `run:` step a first-time user writes had nothing to
+// notice it.
+//
+// The escape hatch is unchanged: `timeout: "0"` at any level opts the step out,
+// and a step that is never killed never reaches this check. Target is
+// exit_code so the console failure block appends the captured output the
+// command produced before it was killed, which is usually where the hang shows.
+func timeoutKillCheck(res *runner.Result, steps []spec.Step, i int) *assert.CheckResult {
+	if res == nil || !res.TimedOut || resultObserved(steps, i) {
+		return nil
+	}
+	source := res.TimeoutSource
+	if source == "" {
+		source = "run.timeout"
+	}
+	elapsed := res.Duration.Round(time.Millisecond)
+	return &assert.CheckResult{
+		Target:   string(spec.AssertExitCode),
+		Desc:     "run completes before its timeout",
+		Expected: "the command to exit on its own",
+		Actual:   fmt.Sprintf("the command timed out after %s and was killed", elapsed),
+		Hint: fmt.Sprintf(
+			"the command hit its %s after %s and was killed before exiting; raise the timeout if the command is merely slow, or set timeout: \"0\" to let it run unbounded",
+			source, elapsed),
+	}
+}
+
 // unresolvedRunRefMsg explains a run field that references a ${name} no variable
 // defines. field names the spec field ("run.command"/"run.cwd"). shellExpandable
 // says whether enabling shell could expand it: true for the command argv, false
@@ -101,7 +153,7 @@ func runRefGuard(st *store.Store, run *spec.Run, runners map[string]spec.Runner)
 // baseline before every attempt, so the recorded delta reflects only the final
 // (converged) attempt rather than the cumulative delta of all attempts (#251).
 // It is nil for the teardown path and for every non-run step kind.
-func (x *scenarioRun) execStep(ctx context.Context, i int, step *spec.Step, beforeAttempt func()) (StepResult, Status, bool) {
+func (x *scenarioRun) execStep(ctx context.Context, steps []spec.Step, i int, step *spec.Step, beforeAttempt func()) (StepResult, Status, bool) {
 	sr := StepResult{Index: i, Kind: step.Kind()}
 	status := StatusPassed
 	secViolation := false
@@ -135,6 +187,11 @@ func (x *scenarioRun) execStep(ctx context.Context, i int, step *spec.Step, befo
 			if !assert.AllOK(untilChecks) {
 				status = StatusFailed
 			}
+		}
+		if ck := timeoutKillCheck(r, steps, i); ck != nil {
+			x.e.recordChecks(x.masker, []*assert.CheckResult{ck}, x.rc.specPath, x.sc.Name, x.idx, i)
+			sr.Checks = append(sr.Checks, ck)
+			status = StatusFailed
 		}
 	case spec.StepAssert:
 		crs := assert.CheckAll(expandAssert(x.st, step.Assert), x.current, assert.Env{
@@ -206,6 +263,12 @@ func (x *scenarioRun) execStep(ctx context.Context, i int, step *spec.Step, befo
 			x.e.recordChecks(x.masker, []*assert.CheckResult{ck}, x.rc.specPath, x.sc.Name, x.idx, i)
 			sr.Checks = []*assert.CheckResult{ck}
 			status = StatusFailed
+		} else if ck := timeoutKillCheck(r, steps, i); ck != nil {
+			// No expect failed, so nothing else would notice that the program
+			// never exited before the session timeout killed it.
+			x.e.recordChecks(x.masker, []*assert.CheckResult{ck}, x.rc.specPath, x.sc.Name, x.idx, i)
+			sr.Checks = []*assert.CheckResult{ck}
+			status = StatusFailed
 		}
 	case spec.StepCDP:
 		r, err := x.e.runCDP(ctx, expandCDP(x.st, step.CDP), x.workdir, x.st, x.rc, x.browserConns)
@@ -266,7 +329,7 @@ func (x *scenarioRun) runSteps(ctx context.Context, leadingFixtures int) {
 			rescan()
 		}
 
-		sr, status, secViolation := x.execStep(ctx, i, step, rescan)
+		sr, status, secViolation := x.execStep(ctx, x.sc.Steps, i, step, rescan)
 		if scanChanges && x.current != nil {
 			post, _ := fsdelta.Scan(x.workdir)
 			delta := fsdelta.Diff(preScan, post)
@@ -308,7 +371,7 @@ func (x *scenarioRun) runTeardown(ctx context.Context) {
 			defer cancel()
 		}
 		for i := range x.sc.Teardown {
-			sr, _, secViolation := x.execStep(tctx, i, &x.sc.Teardown[i], nil) // teardown never carries a changes assert
+			sr, _, secViolation := x.execStep(tctx, x.sc.Teardown, i, &x.sc.Teardown[i], nil) // teardown never carries a changes assert
 			// A teardown failure never changes the scenario verdict — the behavior
 			// under test was decided by the steps above. But a security-policy
 			// breach (e.g. a denied network host contacted during cleanup) is not a
