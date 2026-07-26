@@ -1,0 +1,388 @@
+version: "1"
+
+suite:
+  name: helix (third-party modal editor)
+
+# Helix is a real modal text editor: these scenarios drive the actual TUI
+# against isolated config/cache/home directories and assert durable file-system
+# side effects (saved files, discarded edits, and multi-file workflows) instead
+# of brittle full-screen snapshots.
+# Install: see .github/workflows/thirdparty.yml for the pinned CI version.
+scenarios:
+  - name: version prints the pinned release
+    only:
+      command: hx --version
+    steps:
+      - run:
+          command: hx --version
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: helix 25.07.1
+
+  - name: opening an existing file reaches the editor and quits cleanly
+    only:
+      command: hx --version
+    skip:
+      os: windows
+    steps:
+      - fixture: &config
+          file: cfg/config.toml
+          content: |
+            theme = "default"
+            [editor]
+            mouse = false
+            auto-save = false
+      - fixture:
+          file: note.txt
+          content: "alpha\n"
+      - pty:
+          command: hx note.txt
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH, HELIX_RUNTIME]
+          env: &hx_env
+            HOME: ${workdir}/home
+            XDG_CONFIG_HOME: ${workdir}/cfg
+            XDG_CACHE_HOME: ${workdir}/cache
+            LANG: C.UTF-8
+            LC_ALL: C.UTF-8
+          session:
+            - expect: Loaded
+            - send: ":q!"
+            - send: {key: enter}
+      - assert:
+          exit_code: 0
+
+  - name: append mode edits an existing file and write quit saves it
+    only:
+      command: hx --version
+    skip:
+      os: windows
+    steps:
+      - fixture: *config
+      - fixture:
+          file: note.txt
+          content: "alpha\n"
+      - pty:
+          command: hx note.txt
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH, HELIX_RUNTIME]
+          env: *hx_env
+          session:
+            - expect: Loaded
+            - send: "A"
+            - send: " beta"
+            - send: {key: "ctrl-["}
+            - expect: NOR
+            - send: ":wq"
+            - send: {key: enter}
+      - run:
+          command: cat note.txt
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "alpha beta"
+
+  - name: force quit discards unsaved changes
+    only:
+      command: hx --version
+    skip:
+      os: windows
+    steps:
+      - fixture: *config
+      - fixture:
+          file: note.txt
+          content: "alpha\n"
+      - pty:
+          command: hx note.txt
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH, HELIX_RUNTIME]
+          env: *hx_env
+          session:
+            - expect: Loaded
+            - send: "A"
+            - send: " beta"
+            - send: {key: "ctrl-["}
+            - expect: NOR
+            - send: ":q!"
+            - send: {key: enter}
+      - run:
+          command: cat note.txt
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "alpha"
+
+  - name: saving a new file path creates the file on disk
+    only:
+      command: hx --version
+    skip:
+      os: windows
+    steps:
+      - fixture: *config
+      - pty:
+          command: hx fresh.txt
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH, HELIX_RUNTIME]
+          env: *hx_env
+          session:
+            - expect: Loaded
+            - send: "i"
+            - send: "first line"
+            - send: {key: "ctrl-["}
+            - expect: NOR
+            - send: ":wq"
+            - send: {key: enter}
+      - run:
+          command: cat fresh.txt
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "first line"
+
+  - name: enter in insert mode writes multiple lines
+    only:
+      command: hx --version
+    skip:
+      os: windows
+    steps:
+      - fixture: *config
+      - pty:
+          command: hx lines.txt
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH, HELIX_RUNTIME]
+          env: *hx_env
+          session:
+            - expect: Loaded
+            - send: "i"
+            - send: "first"
+            - send: {key: enter}
+            - send: "second"
+            - send: {key: "ctrl-["}
+            - expect: NOR
+            - send: ":wq"
+            - send: {key: enter}
+      - run:
+          command: cat lines.txt
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              first
+              second
+
+  - name: undo removes an appended edit before save
+    only:
+      command: hx --version
+    skip:
+      os: windows
+    steps:
+      - fixture: *config
+      - fixture:
+          file: note.txt
+          content: "alpha\n"
+      - pty:
+          command: hx note.txt
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH, HELIX_RUNTIME]
+          env: *hx_env
+          session:
+            - expect: Loaded
+            - send: "A"
+            - send: " beta"
+            - send: {key: "ctrl-["}
+            - expect: NOR
+            - send: "u"
+            - send: ":wq"
+            - send: {key: enter}
+      - run:
+          command: cat note.txt
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "alpha"
+
+  - name: search selects a match and change replaces only that match
+    only:
+      command: hx --version
+    skip:
+      os: windows
+    steps:
+      - fixture: *config
+      - fixture:
+          file: note.txt
+          content: "alpha beta gamma\n"
+      - pty:
+          command: hx note.txt
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH, HELIX_RUNTIME]
+          env: *hx_env
+          session:
+            - expect: Loaded
+            - send: "/beta"
+            - send: {key: enter}
+            - send: "c"
+            - send: "BETA"
+            - send: {key: "ctrl-["}
+            - expect: NOR
+            - send: ":wq"
+            - send: {key: enter}
+      - run:
+          command: cat note.txt
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "alpha BETA gamma"
+
+  - name: x then d deletes the selected line and saves the shorter file
+    only:
+      command: hx --version
+    skip:
+      os: windows
+    steps:
+      - fixture: *config
+      - fixture:
+          file: note.txt
+          content: |
+            first
+            second
+      - pty:
+          command: hx note.txt
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH, HELIX_RUNTIME]
+          env: *hx_env
+          session:
+            - expect: Loaded
+            - send: "x"
+            - send: "d"
+            - send: ":wq"
+            - send: {key: enter}
+      - run:
+          command: cat note.txt
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "second"
+
+  - name: buffer-next switches to the second file in a multi-file session
+    only:
+      command: hx --version
+    skip:
+      os: windows
+    steps:
+      - fixture: *config
+      - fixture:
+          file: one.txt
+          content: "one-start\n"
+      - fixture:
+          file: two.txt
+          content: "two-start\n"
+      - pty:
+          command: hx one.txt two.txt
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH, HELIX_RUNTIME]
+          env: *hx_env
+          session:
+            - expect: Loaded
+            - send: ":buffer-next"
+            - send: {key: enter}
+            - expect: two.txt
+            - send: "A"
+            - send: " updated"
+            - send: {key: "ctrl-["}
+            - expect: NOR
+            - send: ":wq"
+            - send: {key: enter}
+      - run:
+          command: cat two.txt
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "two-start updated"
+
+  - name: unicode filenames and Japanese text save without mangling
+    only:
+      command: hx --version
+    skip:
+      os: windows
+    steps:
+      - fixture: *config
+      - pty:
+          command: hx 日本語メモ.txt
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH, HELIX_RUNTIME]
+          env: *hx_env
+          session:
+            - expect: Loaded
+            - send: "i"
+            - send: "こんにちは 世界"
+            - send: {key: "ctrl-["}
+            - expect: NOR
+            - send: ":wq"
+            - send: {key: enter}
+      - run:
+          command: cat 日本語メモ.txt
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "こんにちは 世界"
+
+  - name: wide and combining characters round-trip through a save
+    only:
+      command: hx --version
+    skip:
+      os: windows
+    steps:
+      - fixture: *config
+      - pty:
+          command: hx unicode.txt
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH, HELIX_RUNTIME]
+          env: *hx_env
+          session:
+            - expect: Loaded
+            - send: "i"
+            - send: "表éwide"
+            - send: {key: "ctrl-["}
+            - expect: NOR
+            - send: ":wq"
+            - send: {key: enter}
+      - run:
+          command: od -An -tx1 -v unicode.txt
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "65 cc 81"
