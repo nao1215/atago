@@ -122,6 +122,41 @@ scenarios:
               - "was killed"
               - "suite.timeout"
 
+  - name: an assert that ignores the result does not mask the kill
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: file_assert.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: file-assert
+            scenarios:
+              - name: the assert reads a file the step did not produce
+                steps:
+                  - fixture:
+                      file: made.txt
+                      content: |
+                        hi
+                  - run:
+                      shell: true
+                      command: sleep 300
+                      timeout: 500ms
+                  - assert:
+                      file:
+                        path: made.txt
+                        contains: hi
+      - run:
+          command: ${atago} run file_assert.atago.yaml
+          timeout: 30s
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - "run completes before its timeout"
+              - "run.timeout"
+
   - name: an assert on the killed result keeps the timeout observable
     skip:
       os: windows

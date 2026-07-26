@@ -278,6 +278,36 @@ scenarios:
 	}
 }
 
+// TestEngine_TimeoutKillFailsWhenAssertIgnoresTheResult pins that only an
+// assert reading the killed command's own result counts as observing it. A
+// file/dir/image/pdf/mock assert inspects something the step wrote, not whether
+// the command finished, so it must not suppress the timeout failure.
+func TestEngine_TimeoutKillFailsWhenAssertIgnoresTheResult(t *testing.T) {
+	t.Parallel()
+	res := runSpec(t, `
+version: "1"
+suite:
+  name: s
+scenarios:
+  - name: the assert looks at a file, not at the killed command
+    steps:
+      - fixture:
+          file: made.txt
+          content: "hi\n"
+      - run: {shell: true, timeout: 150ms, command: `+sleepCmd(5)+`}
+      - assert:
+          file:
+            path: made.txt
+            contains: hi
+`)
+	if res.Status != StatusFailed {
+		t.Fatalf("status = %s, want failed (a file assert does not observe the kill): %+v", res.Status, res.Scenarios)
+	}
+	if hint := timeoutHint(t, res); !strings.Contains(hint, "run.timeout") {
+		t.Errorf("hint = %q, want it to name run.timeout", hint)
+	}
+}
+
 // TestEngine_TimeoutZeroStillPassesWithoutAssert guards the escape hatch
 // against the fix above: opting out of the timeout means the command is never
 // killed, so a bare run step with no assert stays green.

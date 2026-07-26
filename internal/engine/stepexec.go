@@ -15,6 +15,25 @@ import (
 	"github.com/nao1215/atago/internal/store"
 )
 
+// assertReadsResult reports whether an assert inspects the runner result of the
+// step it follows, rather than something that step left behind. file, dir,
+// image, pdf, and mock targets read the filesystem or a mock server's log, so
+// they say nothing about whether the command itself finished.
+//
+// A target not listed here counts as not reading the result, which is the loud
+// direction: a new target added without updating this function leaves a timeout
+// kill failing rather than silently green.
+func assertReadsResult(a *spec.Assert) bool {
+	if a == nil {
+		return false
+	}
+	return a.ExitCode != nil || a.Stdout != nil || a.Stderr != nil ||
+		a.Status != nil || a.Header != nil || a.Body != nil ||
+		a.Rows != nil || a.GRPCStatus != nil || a.Message != nil ||
+		a.Value != nil || a.Screen != nil ||
+		a.Duration != nil || a.Changes != nil
+}
+
 // resultObserved reports whether an assert step inspects the result produced by
 // the step at index i. Only the assert steps before the next result-producing
 // step count: once another run/http/query/grpc/pty/cdp step lands, it replaces
@@ -23,7 +42,9 @@ func resultObserved(steps []spec.Step, i int) bool {
 	for k := i + 1; k < len(steps); k++ {
 		switch steps[k].Kind() {
 		case spec.StepAssert:
-			return true
+			if assertReadsResult(steps[k].Assert) {
+				return true
+			}
 		case spec.StepRun, spec.StepHTTP, spec.StepQuery, spec.StepGRPC, spec.StepPTY, spec.StepCDP:
 			return false
 		}

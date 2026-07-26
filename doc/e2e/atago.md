@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-74 suites · 390 scenarios
+74 suites · 391 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -434,11 +434,12 @@
   - [a failing setup errors every scenario and none runs (exit 4)](#scenario-a-failing-setup-errors-every-scenario-and-none-runs-exit-4)
   - [a suite service starts once and its store reaches every scenario](#scenario-a-suite-service-starts-once-and-its-store-reaches-every-scenario)
   - [a failing suite teardown is loud but does not flip the verdict](#scenario-a-failing-suite-teardown-is-loud-but-does-not-flip-the-verdict)
-- [atago self-hosting / step timeouts (suite default + escape hatch)](#atago-self-hosting--step-timeouts-suite-default--escape-hatch) — 7 scenarios
+- [atago self-hosting / step timeouts (suite default + escape hatch)](#atago-self-hosting--step-timeouts-suite-default--escape-hatch) — 8 scenarios
   - [suite.timeout kills a hanging step and the hint names it](#scenario-suitetimeout-kills-a-hanging-step-and-the-hint-names-it)
   - [a step timeout beats the suite timeout and the hint says run.timeout](#scenario-a-step-timeout-beats-the-suite-timeout-and-the-hint-says-runtimeout)
   - [timeout zero disables a short suite bound](#scenario-timeout-zero-disables-a-short-suite-bound)
   - [a killed step fails even when nothing asserts on it](#scenario-a-killed-step-fails-even-when-nothing-asserts-on-it)
+  - [an assert that ignores the result does not mask the kill](#scenario-an-assert-that-ignores-the-result-does-not-mask-the-kill)
   - [an assert on the killed result keeps the timeout observable](#scenario-an-assert-on-the-killed-result-keeps-the-timeout-observable)
   - [timeout zero keeps an unasserted step green](#scenario-timeout-zero-keeps-an-unasserted-step-green)
   - [an invalid suite.timeout is a load-time error](#scenario-an-invalid-suitetimeout-is-a-load-time-error)
@@ -7537,6 +7538,39 @@ ${atago} run unobserved.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `run completes before its timeout`, `was killed`, `suite.timeout`
+### Scenario: an assert that ignores the result does not mask the kill
+_skipped on Windows_
+#### Given
+- Fixture file `file_assert.atago.yaml` is created.
+#### Inputs
+_Fixture `file_assert.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: file-assert
+scenarios:
+  - name: the assert reads a file the step did not produce
+    steps:
+      - fixture:
+          file: made.txt
+          content: |
+            hi
+      - run:
+          shell: true
+          command: sleep 300
+          timeout: 500ms
+      - assert:
+          file:
+            path: made.txt
+            contains: hi
+```
+#### When
+```shell
+${atago} run file_assert.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `run completes before its timeout`, `run.timeout`
 ### Scenario: an assert on the killed result keeps the timeout observable
 _skipped on Windows_
 #### Given
