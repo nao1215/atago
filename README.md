@@ -352,7 +352,7 @@ version: "1"
 
 ## Real CLIs tested with atago
 
-These suites run real programs of every shape: the author's Go tools (atago tests itself) and unmodified third-party binaries — git and jq, interactive TUIs (fzf, htop), the python3 REPL, servers driven as scenario services (redis, gitea, grafana, prometheus), cloud and IaC CLIs tested offline (aws-cli, terraform, ecspresso), crypto tools (openssl, age, sops), and document/media pipelines (pandoc, ffmpeg). Most were migrated from ShellSpec. [Real CLIs tested with atago](https://nao1215.github.io/atago/real-world/) lists all 40+ with specs and generated behavior docs.
+These suites run real programs of every shape: the author's Go tools (atago tests itself) and unmodified third-party binaries — git and jq, interactive TUIs (fzf, htop, yazi), the python3 REPL, servers driven as scenario services (redis, gitea, grafana, prometheus), cloud and IaC CLIs tested offline (aws-cli, terraform, ecspresso), crypto tools (openssl, age, sops), and document/media pipelines (pandoc, ffmpeg). Most were migrated from ShellSpec. [Real CLIs tested with atago](https://nao1215.github.io/atago/real-world/) lists all 40+ with specs and generated behavior docs.
 
 ## The name
 

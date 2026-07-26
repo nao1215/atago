@@ -54,6 +54,7 @@ A browsable, repo-local index of atago's documentation, generated from repositor
 - [transfersh.md](../doc/e2e/transfersh.md)
 - [truss.md](../doc/e2e/truss.md)
 - [webhook.md](../doc/e2e/webhook.md)
+- [yazi.md](../doc/e2e/yazi.md)
 
 ## Schemas
 

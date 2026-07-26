@@ -63,6 +63,17 @@ jobs:
           - name: htop
             dir: ./test/e2e/thirdparty/htop
             install: bash ./scripts/install_ubuntu_snapshot_packages.sh htop
+          # yazi ships official archives containing both `yazi` and `ya`; pin
+          # the musl build and verify its SHA256 before installing either.
+          - name: yazi
+            dir: ./test/e2e/thirdparty/yazi
+            install: |
+              ver="26.5.6"
+              sha256="1031a02560d053301537195a6661d227c15cb4ce5c30481050b31e2b88681bff"
+              curl -fsSL "https://github.com/sxyazi/yazi/releases/download/v${ver}/yazi-x86_64-unknown-linux-musl.zip" -o yazi.zip
+              echo "${sha256}  yazi.zip" | sha256sum -c -
+              unzip -q yazi.zip
+              install "yazi-x86_64-unknown-linux-musl/yazi" "yazi-x86_64-unknown-linux-musl/ya" "$(go env GOPATH)/bin/"
           - name: redis
             dir: ./test/e2e/thirdparty/redis
             install: bash ./scripts/install_ubuntu_snapshot_packages.sh redis-server redis-tools

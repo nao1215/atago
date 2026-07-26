@@ -70,6 +70,6 @@ atago (愛宕) is named for Mount Atago in Kyoto, whose shrine enshrines a deity
 - [Cookbook](/cookbook/) — 50+ copyable recipes indexed by task, plus the runnable, CI-tested example for every feature.
 - [Use it in CI](/ci/) — report formats, retries, flake detection, artifacts, secret masking.
 - [Reference](/reference/) — subcommands, exit codes, and every spec key with the release that introduced it.
-- [Real CLIs tested with atago](/real-world/) — 40+ programs from jq to terraform to htop that atago tests on its own initiative, each with executable specs and generated behavior docs.
+- [Real CLIs tested with atago](/real-world/) — 40+ programs from jq to terraform to yazi that atago tests on its own initiative, each with executable specs and generated behavior docs.
 
 Everything on this site comes from files committed in the [repository](https://github.com/nao1215/atago). The behavior docs are regenerated from executable specs, and drift tests fail the build when docs and specs disagree — if an example is on this site, it runs.

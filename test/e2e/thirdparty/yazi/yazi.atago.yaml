@@ -1,0 +1,353 @@
+version: "1"
+
+suite:
+  name: yazi (third-party terminal file manager)
+
+# yazi is not just "a screen that appears": its core contract is that real file
+# operations are driven from a TUI with typed inputs, modal keybindings, live
+# filtering, and shell-wrapper cwd handoff. These scenarios therefore pin both
+# the rendered terminal UI and the actual filesystem effects under the scenario
+# workdir. Install: see .github/workflows/thirdparty.yml for the pinned CI
+# version.
+scenarios:
+  - name: version prints a semantic version banner
+    only:
+      command: yazi --version
+    steps:
+      - run:
+          command: yazi --version
+      - assert:
+          exit_code: 0
+          stdout:
+            matches: "^Yazi [0-9]+\\.[0-9]+\\.[0-9]+"
+
+  - name: hidden files stay hidden by default
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: alpha.txt
+          content: ""
+      - fixture:
+          file: .secret
+          content: ""
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 5s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "alpha.txt"
+      - assert:
+          screen:
+            contains: alpha.txt
+      - assert:
+          screen:
+            not_contains: .secret
+
+  - name: dot toggles hidden files into view
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: alpha.txt
+          content: ""
+      - fixture:
+          file: .secret
+          content: ""
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 5s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "alpha.txt"
+            - send: "."
+            - expect: "\\.secret"
+      - assert:
+          screen:
+            contains: alpha.txt
+      - assert:
+          screen:
+            contains: .secret
+
+  - name: filter narrows the visible file list
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: alpha.txt
+          content: ""
+      - fixture:
+          file: beta.txt
+          content: ""
+      - fixture:
+          file: gamma.log
+          content: ""
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 5s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "alpha.txt"
+            - send: "f"
+            - expect: "Filter:"
+            - send: "beta"
+            - expect: "filter: beta"
+      - assert:
+          screen:
+            contains: beta.txt
+      - assert:
+          screen:
+            not_contains: alpha.txt
+      - assert:
+          screen:
+            not_contains: gamma.log
+
+  - name: create makes a new file
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: keep.txt
+          content: keep
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "keep.txt"
+            - send: "a"
+            - expect: "Create:"
+            - send: "notes.txt"
+            - send: {key: enter}
+            - expect: "notes.txt"
+            - send: "q"
+      - assert:
+          exit_code: 0
+          changes:
+            created:
+              - notes.txt
+            modified: []
+            deleted: []
+      - assert:
+          file:
+            path: notes.txt
+            exists: true
+
+  - name: rename changes the hovered file name and nothing else
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: old.txt
+          content: old
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "old.txt"
+            - send: "r"
+            - expect: "Rename:"
+            - send: ".bak"
+            - send: {key: enter}
+      - assert:
+          changes:
+            created:
+              - old.bak.txt
+            modified: []
+            deleted:
+              - old.txt
+      - assert:
+          file:
+            path: old.txt
+            exists: false
+      - assert:
+          file:
+            path: old.bak.txt
+            contains: old
+
+  - name: yank then paste copies a file into a sibling directory
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: src/alpha.txt
+          content: alpha
+      - fixture:
+          file: dst/.keep
+          content: ""
+      - pty:
+          command: yazi src
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "alpha.txt"
+            - send: "y"
+            - send: "h"
+            - expect: "src"
+            - send: "k"
+            - expect: "dst"
+            - send: "l"
+            - expect: "No items"
+            - send: "p"
+            - expect: "alpha.txt"
+            - send: "Q"
+      - assert:
+          exit_code: 0
+          changes:
+            created:
+              - dst/alpha.txt
+            modified: []
+            deleted: []
+      - assert:
+          file:
+            path: src/alpha.txt
+            contains: alpha
+      - assert:
+          file:
+            path: dst/alpha.txt
+            contains: alpha
+
+  - name: cut then paste moves a file into a sibling directory
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: src/beta.txt
+          content: beta
+      - fixture:
+          file: dst/.keep
+          content: ""
+      - pty:
+          command: yazi src
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "beta.txt"
+            - send: "x"
+            - send: "h"
+            - expect: "src"
+            - send: "k"
+            - expect: "dst"
+            - send: "l"
+            - expect: "No items"
+            - send: "p"
+            - expect: "beta.txt"
+            - send: "Q"
+      - assert:
+          exit_code: 0
+          changes:
+            created:
+              - dst/beta.txt
+            modified: []
+            deleted:
+              - src/beta.txt
+      - assert:
+          file:
+            path: src/beta.txt
+            exists: false
+      - assert:
+          file:
+            path: dst/beta.txt
+            contains: beta
+
+  - name: quitting after entering a directory writes the final cwd
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: z-nested/inside.txt
+          content: ""
+      - pty:
+          # `l` is yazi's documented "enter hovered directory" binding.
+          command: yazi --cwd-file ${workdir}/cwd.txt .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "z-nested"
+            - send: "l"
+            - expect: "inside.txt"
+            - send: "q"
+      - assert:
+          exit_code: 0
+      - assert:
+          file:
+            path: cwd.txt
+            contains: z-nested
+
+  - name: uppercase Q exits without writing the cwd file
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: z-nested/inside.txt
+          content: ""
+      - pty:
+          command: yazi --cwd-file ${workdir}/cwd.txt .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "z-nested"
+            - send: "l"
+            - expect: "inside.txt"
+            - send: "Q"
+      - assert:
+          exit_code: 0
+      - assert:
+          file:
+            path: cwd.txt
+            exists: false
