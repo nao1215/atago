@@ -61,7 +61,7 @@ func validatePTYExpectScreen(add func(string, ...any), where string, es *spec.PT
 		timeout, terr := time.ParseDuration(es.Timeout)
 		stable, serr := time.ParseDuration(es.StableFor)
 		if terr == nil && serr == nil && stable > timeout {
-			add("%s.stable_for %q must not exceed expect_screen.timeout %q", where, es.StableFor, es.Timeout)
+			add("%s.stable_for %q must not exceed %s.timeout %q", where, es.StableFor, where, es.Timeout)
 		}
 	}
 }

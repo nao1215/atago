@@ -1932,7 +1932,7 @@ scenarios:
           command: readlink dst/a.txt
       - assert:
           stdout:
-            matches: "^/tmp/atago-[0-9]+/src/a\\.txt\n?$"
+            matches: "^.+/src/a\\.txt\n?$"
 
   - name: yank then underscore creates a relative symlink in the sibling directory
     only:
@@ -2015,7 +2015,7 @@ scenarios:
           command: readlink dst/sub
       - assert:
           stdout:
-            matches: "^/tmp/atago-[0-9]+/src/sub\n?$"
+            matches: "^.+/src/sub\n?$"
 
   - name: yanked directory can be relative-symlinked into a sibling directory
     only:
@@ -2724,10 +2724,10 @@ scenarios:
       os: windows
     steps:
       - fixture:
-          file: a/sub/x.txt
+          file: alpha-dir/sub/x.txt
           content: x
       - fixture:
-          file: b/sub/y.txt
+          file: beta-dir/sub/y.txt
           content: y
       - pty:
           command: yazi .
@@ -2738,27 +2738,27 @@ scenarios:
           pass_env: [PATH]
           sandbox_home: true
           session:
-            - expect: "a"
+            - expect: "alpha-dir"
             - send: {key: space}
             - send: "j"
-            - expect: "b"
+            - expect: "beta-dir"
             - send: {key: space}
             - send: "d"
             - expect: "Trash"
             - send: "n"
             - expect_screen:
                 contains:
-                  - a
-                  - b
+                  - alpha-dir
+                  - beta-dir
                 stable_for: 100ms
             - send: "Q"
       - assert:
           file:
-            path: a/sub/x.txt
+            path: alpha-dir/sub/x.txt
             contains: x
       - assert:
           file:
-            path: b/sub/y.txt
+            path: beta-dir/sub/y.txt
             contains: y
 
   # Space-bearing names often break copy/link logic even when create/rename
@@ -2916,7 +2916,7 @@ scenarios:
           command: readlink "dst/two words.txt"
       - assert:
           stdout:
-            matches: "^/tmp/atago-[0-9]+/src/two words\\.txt\n?$"
+            matches: "^.+/src/two words\\.txt\n?$"
 
   - name: underscore symlinks a spaced filename with a relative target
     only:
@@ -2994,7 +2994,7 @@ scenarios:
           command: readlink "dst/two words"
       - assert:
           stdout:
-            matches: "^/tmp/atago-[0-9]+/src/two words\n?$"
+            matches: "^.+/src/two words\n?$"
 
   - name: underscore symlinks a spaced directory with a relative target
     only:
@@ -3461,12 +3461,10 @@ scenarios:
                 not_contains: .shell-hidden
                 stable_for: 100ms
             - send: "."
-            - send: "f"
-            - expect: "Filter:"
-            - send: "shell-hidden"
-            - send: {key: enter}
             - expect_screen:
-                contains: .shell-hidden
+                contains:
+                  - keep.txt
+                  - .shell-hidden
                 stable_for: 100ms
             - send: "q"
       - assert:

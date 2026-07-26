@@ -116,7 +116,29 @@ func driveSession(ctx context.Context, p *spec.PTY, proc ptyProcess) (*runner.Re
 		defer mu.Unlock()
 		return len(transcript)
 	}
-	currentScreen := func() []byte { return []byte(RenderScreen(snapshot(), p)) }
+	screenLen := -1
+	var screenCache []byte
+	currentScreen := func() []byte {
+		mu.Lock()
+		n := len(transcript)
+		if n == screenLen {
+			screen := append([]byte(nil), screenCache...)
+			mu.Unlock()
+			return screen
+		}
+		snap := append([]byte(nil), transcript...)
+		mu.Unlock()
+
+		rendered := []byte(RenderScreen(snap, p))
+
+		mu.Lock()
+		if len(transcript) == n {
+			screenCache = append(screenCache[:0], rendered...)
+			screenLen = n
+		}
+		mu.Unlock()
+		return rendered
+	}
 
 	finish := func(timedOut bool, code int, ef *ExpectFailure) (*runner.Result, *ExpectFailure, error) {
 		// Drain before closing: a fast-exiting child's final output may still sit
@@ -231,7 +253,8 @@ func driveSession(ctx context.Context, p *spec.PTY, proc ptyProcess) (*runner.Re
 			for {
 				if n := curLen(); n != scannedTo {
 					scannedTo = n
-					cr := checkRenderedScreen(a.ExpectScreen, currentScreen())
+					screen := currentScreen()
+					cr := checkRenderedScreen(a.ExpectScreen, screen)
 					if cr.OK {
 						if stableFor <= 0 {
 							matched = true
@@ -250,7 +273,8 @@ func driveSession(ctx context.Context, p *spec.PTY, proc ptyProcess) (*runner.Re
 				}
 				select {
 				case <-waitCtx.Done():
-					cr := checkRenderedScreen(a.ExpectScreen, currentScreen())
+					screen := currentScreen()
+					cr := checkRenderedScreen(a.ExpectScreen, screen)
 					if cr.OK {
 						if stableFor <= 0 {
 							matched = true
@@ -281,15 +305,16 @@ func driveSession(ctx context.Context, p *spec.PTY, proc ptyProcess) (*runner.Re
 				if errors.Is(waitCtx.Err(), context.Canceled) || errors.Is(ctx.Err(), context.Canceled) {
 					return canceledResult()
 				}
-				cr := checkRenderedScreen(a.ExpectScreen, currentScreen())
+				screen := currentScreen()
+				cr := checkRenderedScreen(a.ExpectScreen, screen)
 				if cr.OK && stableFor > 0 {
 					cr = &assert.CheckResult{
 						Desc:           fmt.Sprintf("pty expect_screen stable for %s", stableFor),
 						Expected:       fmt.Sprintf("rendered screen to keep satisfying the matcher for %s", stableFor),
-						Actual:         string(currentScreen()),
+						Actual:         string(screen),
 						Hint:           fmt.Sprintf("the rendered screen matched, but not continuously for %s before the timeout elapsed", stableFor),
 						ArtifactKind:   "screen",
-						ArtifactActual: currentScreen(),
+						ArtifactActual: screen,
 					}
 				}
 				return abort(&ExpectFailure{Check: cr})

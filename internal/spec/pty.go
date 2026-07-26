@@ -243,7 +243,7 @@ func PTYKeyForSequence(seq string) (string, bool) {
 
 // PTYKeyNames lists the vocabulary for error messages, compactly.
 func PTYKeyNames() string {
-	return "enter, tab, esc, space, backspace, delete, up, down, left, right, home, end, pageup, pagedown, f1-f12, ctrl-a..ctrl-z, ctrl-space/ctrl-@, ctrl-[, ctrl-\\\\, ctrl-], ctrl-^, ctrl-_, ctrl-hyphen/ctrl-minus"
+	return "enter, tab, esc, space, backspace, delete, up, down, left, right, home, end, pageup, pagedown, f1-f12, ctrl-a..ctrl-z, ctrl-space/ctrl-@, ctrl-[, ctrl-\\, ctrl-], ctrl-^, ctrl-_, ctrl-hyphen/ctrl-minus"
 }
 
 // Bytes resolves the send payload to the bytes written to the terminal: the

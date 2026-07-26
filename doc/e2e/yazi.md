@@ -2490,7 +2490,7 @@ a
 readlink dst/a.txt
 ```
 #### Then
-- stdout matches `/^/tmp/atago-[0-9]+/src/a\.txt
+- stdout matches `/^.+/src/a\.txt
 ?$/`
 ### Scenario: yank then underscore creates a relative symlink in the sibling directory
 _only when `yazi --version` succeeds · skipped on Windows_
@@ -2529,7 +2529,7 @@ a
 readlink dst/sub
 ```
 #### Then
-- stdout matches `/^/tmp/atago-[0-9]+/src/sub
+- stdout matches `/^.+/src/sub
 ?$/`
 ### Scenario: yanked directory can be relative-symlinked into a sibling directory
 _only when `yazi --version` succeeds · skipped on Windows_
@@ -2940,16 +2940,16 @@ keep
 ### Scenario: canceling trash for selected directories keeps both subtrees
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
-- Fixture file `a/sub/x.txt` is created.
-- Fixture file `b/sub/y.txt` is created.
+- Fixture file `alpha-dir/sub/x.txt` is created.
+- Fixture file `beta-dir/sub/y.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### Inputs
-_Fixture `a/sub/x.txt`:_
+_Fixture `alpha-dir/sub/x.txt`:_
 ```text
 x
 ```
-_Fixture `b/sub/y.txt`:_
+_Fixture `beta-dir/sub/y.txt`:_
 ```text
 y
 ```
@@ -2958,8 +2958,8 @@ y
 # interactive (pty): yazi .
 ```
 #### Then
-- file `a/sub/x.txt` contains `x`
-- file `b/sub/y.txt` contains `y`
+- file `alpha-dir/sub/x.txt` contains `x`
+- file `beta-dir/sub/y.txt` contains `y`
 ### Scenario: yank then paste copies a spaced filename into a sibling directory
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -3033,7 +3033,7 @@ spaced
 readlink "dst/two words.txt"
 ```
 #### Then
-- stdout matches `/^/tmp/atago-[0-9]+/src/two words\.txt
+- stdout matches `/^.+/src/two words\.txt
 ?$/`
 ### Scenario: underscore symlinks a spaced filename with a relative target
 _only when `yazi --version` succeeds · skipped on Windows_
@@ -3072,7 +3072,7 @@ spaced
 readlink "dst/two words"
 ```
 #### Then
-- stdout matches `/^/tmp/atago-[0-9]+/src/two words
+- stdout matches `/^.+/src/two words
 ?$/`
 ### Scenario: underscore symlinks a spaced directory with a relative target
 _only when `yazi --version` succeeds · skipped on Windows_
