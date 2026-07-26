@@ -69,7 +69,7 @@ scenarios:
 $ atago run ./specs
 .....................................................................................................
 
-PASSED  126 scenarios: 126 passed, 0 failed, 0 errored, 0 skipped (20.3s)
+PASSED  160 scenarios: 160 passed, 0 failed, 0 errored, 0 skipped (20.5s)
 ```
 
 Scenarios run concurrently by default (`--parallel N`, defaulting to your CPU count; set `--parallel 1` to serialize). Workdirs are isolated, but the host network is shared — so if two scenarios each start a background `service:`, give them distinct ports, or one scenario's requests can reach the other's server.

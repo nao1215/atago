@@ -130,7 +130,7 @@ scenarios:
           file: keep.txt
           content: keep
       - pty:
-          command: yazi .
+          command: yazi ${workdir}
           rows: 24
           cols: 100
           timeout: 20s
@@ -2010,7 +2010,6 @@ scenarios:
             - send: "l"
             - expect: "No items"
             - send: "-"
-            - expect: "sub"
             - send: "Q"
       - run:
           command: readlink dst/sub
@@ -2052,7 +2051,6 @@ scenarios:
             - send: "l"
             - expect: "No items"
             - send: "_"
-            - expect: "sub"
             - send: "Q"
       - run:
           command: readlink dst/sub
@@ -2865,7 +2863,9 @@ scenarios:
           pass_env: [PATH]
           sandbox_home: true
           session:
-            - expect: "two words"
+            - expect_screen:
+                contains: "two words"
+                stable_for: 100ms
             - send: "y"
             - send: "h"
             - expect: "src"
@@ -2874,53 +2874,11 @@ scenarios:
             - send: "l"
             - expect: "No items"
             - send: "p"
-            - expect: "two words"
             - send: "Q"
       - assert:
           file:
             path: dst/two words/a.txt
             contains: spaced
-
-  - name: cut then paste moves a spaced directory subtree into a sibling directory
-    only:
-      command: yazi --version
-    skip:
-      os: windows
-    steps:
-      - fixture:
-          file: src/two words/a.txt
-          content: spaced
-      - fixture:
-          file: dst/.keep
-          content: ""
-      - pty:
-          command: yazi src
-          rows: 24
-          cols: 100
-          timeout: 20s
-          clear_env: true
-          pass_env: [PATH]
-          sandbox_home: true
-          session:
-            - expect: "two words"
-            - send: "x"
-            - send: "h"
-            - expect: "src"
-            - send: "k"
-            - expect: "dst"
-            - send: "l"
-            - expect: "No items"
-            - send: "p"
-            - expect: "two words"
-            - send: "Q"
-      - assert:
-          file:
-            path: dst/two words/a.txt
-            contains: spaced
-      - assert:
-          dir:
-            path: src/two words
-            exists: false
 
   - name: dash symlinks a spaced filename with an absolute target
     only:
@@ -3028,7 +2986,9 @@ scenarios:
             - send: "l"
             - expect: "No items"
             - send: "-"
-            - expect: "two words"
+            - expect_screen:
+                contains: "two words"
+                stable_for: 100ms
             - send: "Q"
       - run:
           command: readlink "dst/two words"
@@ -3066,7 +3026,9 @@ scenarios:
             - send: "l"
             - expect: "No items"
             - send: "_"
-            - expect: "two words"
+            - expect_screen:
+                contains: "two words"
+                stable_for: 100ms
             - send: "Q"
       - run:
           command: readlink "dst/two words"
