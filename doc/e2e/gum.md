@@ -83,7 +83,7 @@ gum log --file app.log --level info --prefix app hello world
 _only when `gum --version` succeeds_
 #### When
 ```shell
-printf 'alpha\nbeta\ngamma\n' | gum choose --select-if-one beta
+printf 'beta\n' | gum choose --select-if-one
 ```
 #### Then
 - exit code is `0`

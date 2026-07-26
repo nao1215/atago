@@ -96,7 +96,7 @@ scenarios:
     steps:
       - run:
           shell: true
-          command: printf 'alpha\nbeta\ngamma\n' | gum choose --select-if-one beta
+          command: printf 'beta\n' | gum choose --select-if-one
       - assert:
           exit_code: 0
           stdout:
