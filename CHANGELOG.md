@@ -7,6 +7,13 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-07-26
+
+A minor release about the specs as documentation. A spec has always described
+what a CLI does; now it can also say what that is *for*. Suites and scenarios
+take an optional `description:` that `atago doc` publishes, and every
+third-party suite on the real-world pages has been given one.
+
 ### Added
 
 - `suite.description` and `scenario.description`: optional prose that `atago
@@ -29,6 +36,16 @@ and this project follows [Semantic Versioning](https://semver.org/).
   cannot bury the rest of the report. This needs no spec change: every existing
   `dir:` assertion produces the better failure block as-is. A count failure also
   reads "has 1 entry" rather than "has 1 entries".
+
+### Documentation
+
+- Every third-party suite behind the
+  [real-world pages](https://nao1215.github.io/atago/real-world/) now carries a
+  suite description, so each of the 38 published pages opens by saying what the
+  tool is and what the suite guarantees about it rather than starting cold at
+  the first scenario. The maintenance notes those specs already carried —
+  install steps, port allocation, platform gates — stay YAML comments and remain
+  out of the published output.
 
 ## [0.13.0] - 2026-07-26
 
