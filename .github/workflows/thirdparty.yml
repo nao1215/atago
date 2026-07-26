@@ -68,6 +68,15 @@ jobs:
               tar -xJf helix.tar.xz -C "$HOME"
               echo "HELIX_RUNTIME=$HOME/helix-${ver}-x86_64-linux/runtime" >> "$GITHUB_ENV"
               echo "$HOME/helix-${ver}-x86_64-linux" >> "$GITHUB_PATH"
+          - name: lazygit
+            dir: ./test/e2e/thirdparty/lazygit
+            install: |
+              ver="0.63.1"
+              sha256="8e033bc78c8e192dee9510e951f6c9e154289b7198d22c924ed1d0a951b0dac1"
+              curl -fsSL "https://github.com/jesseduffield/lazygit/releases/download/v${ver}/lazygit_${ver}_linux_x86_64.tar.gz" -o lazygit.tar.gz
+              echo "${sha256}  lazygit.tar.gz" | sha256sum -c -
+              tar -xzf lazygit.tar.gz lazygit
+              install lazygit "$(go env GOPATH)/bin/lazygit"
           - name: gum
             dir: ./test/e2e/thirdparty/gum
             install: go install github.com/charmbracelet/gum@v0.17.0
