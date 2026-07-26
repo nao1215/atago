@@ -10,8 +10,9 @@ suite:
     Three contracts are pinned here, all of them things an upgrade can quietly
     break: the server reports health and its build version once first-boot
     migrations finish, an anonymous visitor is bounced to the login page while
-    the API refuses them outright, and a dashboard plus a datasource can be
-    created and read back through the REST API.
+    the API refuses them outright, and a dashboard created over the REST API
+    survives a read-back by uid and turns up in search — with a datasource
+    accepted alongside it.
 
 # Install (prebuilt release; see .github/workflows/thirdparty.yml): extract
 # the tarball, put bin/ on PATH, and export GF_PATHS_HOME pointing at the

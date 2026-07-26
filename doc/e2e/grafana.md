@@ -14,8 +14,9 @@ an operator's smoke test — or a CLI that talks to Grafana — would meet it.
 Three contracts are pinned here, all of them things an upgrade can quietly
 break: the server reports health and its build version once first-boot
 migrations finish, an anonymous visitor is bounced to the login page while
-the API refuses them outright, and a dashboard plus a datasource can be
-created and read back through the REST API.
+the API refuses them outright, and a dashboard created over the REST API
+survives a read-back by uid and turns up in search — with a datasource
+accepted alongside it.
 
 Source: `test/e2e/thirdparty/grafana/grafana.atago.yaml`
 ### Scenario: the server boots and reports health and build info
