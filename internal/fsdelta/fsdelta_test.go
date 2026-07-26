@@ -118,9 +118,13 @@ func TestScan_MissingRootReturnsEmpty(t *testing.T) {
 	}
 }
 
-// TestScan_SkipsSymlinks proves symlinks are not tracked (only regular files
-// are), so a symlink cannot be mistaken for a created/modified content file.
-func TestScan_SkipsSymlinks(t *testing.T) {
+// TestScan_TracksSymlinksByTarget proves a symlink is tracked by the target it
+// names, not by the content behind it: a step that plants a link has to show up
+// in `created:` instead of slipping past an exhaustive assertion, and the
+// fingerprint must not be the target file's digest (that would report the link
+// and its target as the same content, and would follow a link out of the
+// workdir).
+func TestScan_TracksSymlinksByTarget(t *testing.T) {
 	t.Parallel()
 	if runtime.GOOS == "windows" {
 		t.Skip("symlink creation is restricted on Windows")
@@ -137,11 +141,105 @@ func TestScan_SkipsSymlinks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Scan: %v", err)
 	}
-	if _, ok := snap["link.txt"]; ok {
-		t.Errorf("symlink should not be tracked, snapshot = %v", snap)
+	got, ok := snap["link.txt"]
+	if !ok {
+		t.Fatalf("symlink should be tracked, snapshot = %v", snap)
 	}
-	if _, ok := snap["real.txt"]; !ok {
-		t.Errorf("regular file should be tracked, snapshot = %v", snap)
+	if want := "symlink:" + filepath.ToSlash(target); got != want {
+		t.Errorf("symlink fingerprint = %q, want %q", got, want)
+	}
+	real, ok := snap["real.txt"]
+	if !ok {
+		t.Fatalf("regular file should be tracked, snapshot = %v", snap)
+	}
+	if real == got {
+		t.Errorf("symlink and its target share a fingerprint %q", got)
+	}
+}
+
+// TestDiff_SymlinkLifecycle drives a symlink through create, retarget, and
+// delete. Retargeting is a modification because the observable thing a symlink
+// carries is where it points.
+func TestDiff_SymlinkLifecycle(t *testing.T) {
+	t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink creation is restricted on Windows")
+	}
+	root := t.TempDir()
+	write(t, root, "v1.txt", "one")
+	write(t, root, "v2.txt", "two")
+	link := filepath.Join(root, "current")
+
+	empty, err := Scan(root)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	if err := os.Symlink("v1.txt", link); err != nil {
+		t.Fatal(err)
+	}
+	created, err := Scan(root)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	if d := Diff(empty, created); !reflect.DeepEqual(d.Created, []string{"current"}) {
+		t.Errorf("creating a symlink: Created = %v, want [current]", d.Created)
+	}
+
+	if err := os.Remove(link); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("v2.txt", link); err != nil {
+		t.Fatal(err)
+	}
+	retargeted, err := Scan(root)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	d := Diff(created, retargeted)
+	if !reflect.DeepEqual(d.Modified, []string{"current"}) {
+		t.Errorf("retargeting a symlink: Modified = %v, want [current]", d.Modified)
+	}
+	if len(d.Created) != 0 || len(d.Deleted) != 0 {
+		t.Errorf("retargeting a symlink: Created = %v, Deleted = %v, want both empty", d.Created, d.Deleted)
+	}
+
+	if err := os.Remove(link); err != nil {
+		t.Fatal(err)
+	}
+	removed, err := Scan(root)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	if d := Diff(retargeted, removed); !reflect.DeepEqual(d.Deleted, []string{"current"}) {
+		t.Errorf("removing a symlink: Deleted = %v, want [current]", d.Deleted)
+	}
+}
+
+// TestDiff_SymlinkContentChangeIsNotALinkChange pins that writing through a
+// symlink is a modification of the target file, not of the link: the link still
+// points where it did.
+func TestDiff_SymlinkContentChangeIsNotALinkChange(t *testing.T) {
+	t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink creation is restricted on Windows")
+	}
+	root := t.TempDir()
+	write(t, root, "real.txt", "before")
+	if err := os.Symlink("real.txt", filepath.Join(root, "link")); err != nil {
+		t.Fatal(err)
+	}
+	pre, err := Scan(root)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	write(t, root, "real.txt", "after")
+	post, err := Scan(root)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	d := Diff(pre, post)
+	if !reflect.DeepEqual(d.Modified, []string{"real.txt"}) {
+		t.Errorf("Modified = %v, want [real.txt]", d.Modified)
 	}
 }
 
@@ -323,7 +421,8 @@ func TestDiff_FileReplacedByDirectoryAndReverse(t *testing.T) {
 
 // TestScan_BrokenAndCyclicSymlinksNoCrash proves Scan never follows a symlink
 // into a crash or infinite loop: a dangling link and a self-referential cyclic
-// link are both skipped (only regular files are tracked), leaving the real file.
+// link are both recorded by the target they name, which is exactly why they are
+// safe to track — the target is read, never resolved.
 func TestScan_BrokenAndCyclicSymlinksNoCrash(t *testing.T) {
 	t.Parallel()
 	if runtime.GOOS == "windows" {
@@ -345,8 +444,8 @@ func TestScan_BrokenAndCyclicSymlinksNoCrash(t *testing.T) {
 		t.Errorf("regular file should be tracked, snapshot = %v", keys(snap))
 	}
 	for _, link := range []string{"broken", "loop"} {
-		if _, ok := snap[link]; ok {
-			t.Errorf("symlink %q should not be tracked, snapshot = %v", link, keys(snap))
+		if _, ok := snap[link]; !ok {
+			t.Errorf("symlink %q should be tracked, snapshot = %v", link, keys(snap))
 		}
 	}
 }

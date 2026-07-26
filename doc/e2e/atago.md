@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-74 suites · 400 scenarios
+74 suites · 406 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -28,7 +28,7 @@
   - [manifest surfaces the browser-runner configuration](#scenario-manifest-surfaces-the-browser-runner-configuration)
   - [an upload action without a file fails validation (exit 2)](#scenario-an-upload-action-without-a-file-fails-validation-exit-2)
   - [a download action without a click selector fails validation (exit 2)](#scenario-a-download-action-without-a-click-selector-fails-validation-exit-2)
-- [atago self-hosting / changes (workdir delta assertions)](#atago-self-hosting--changes-workdir-delta-assertions) — 12 scenarios
+- [atago self-hosting / changes (workdir delta assertions)](#atago-self-hosting--changes-workdir-delta-assertions) — 18 scenarios
   - [a generator touches exactly the files it should (POSIX)](#scenario-a-generator-touches-exactly-the-files-it-should-posix)
   - [an unexpected creation breaks the exact contract (POSIX)](#scenario-an-unexpected-creation-breaks-the-exact-contract-posix)
   - [stdout_to counts as created, and modified nothing holds (portable)](#scenario-stdout_to-counts-as-created-and-modified-nothing-holds-portable)
@@ -41,6 +41,12 @@
   - [a stray file outside the doublestar prefix breaks the exact contract (POSIX)](#scenario-a-stray-file-outside-the-doublestar-prefix-breaks-the-exact-contract-posix)
   - [a doublestar glob matches a nested redirect target (portable)](#scenario-a-doublestar-glob-matches-a-nested-redirect-target-portable)
   - [a doublestar prefix covers both redirect streams (portable)](#scenario-a-doublestar-prefix-covers-both-redirect-streams-portable)
+  - [creating a symlink is a creation](#scenario-creating-a-symlink-is-a-creation)
+  - [an exhaustive created list catches an unexpected symlink](#scenario-an-exhaustive-created-list-catches-an-unexpected-symlink)
+  - [retargeting a symlink is a modification](#scenario-retargeting-a-symlink-is-a-modification)
+  - [writing through a symlink modifies the target only](#scenario-writing-through-a-symlink-modifies-the-target-only)
+  - [removing a symlink is a deletion](#scenario-removing-a-symlink-is-a-deletion)
+  - [a dangling symlink is still a creation](#scenario-a-dangling-symlink-is-still-a-creation)
 - [atago self-hosting / CLI scenario selection](#atago-self-hosting--cli-scenario-selection) — 9 scenarios
   - [filter selects by a name substring](#scenario-filter-selects-by-a-name-substring)
   - [filter is OR across a comma-separated list](#scenario-filter-is-or-across-a-comma-separated-list)
@@ -1085,6 +1091,115 @@ echo out
 #### Generated artifacts
 - `logs/out.txt`
 - `logs/err.txt`
+### Scenario: creating a symlink is a creation
+_skipped on Windows_
+#### Given
+- Fixture file `real.txt` is created.
+#### Inputs
+_Fixture `real.txt`:_
+```text
+payload
+```
+#### When
+```shell
+ln -s real.txt link.txt
+```
+#### Then
+- exit code is `0`
+- the step changed exactly created `link.txt`, modified nothing, deleted nothing
+### Scenario: an exhaustive created list catches an unexpected symlink
+_skipped on Windows_
+#### Given
+- Fixture file `check.atago.yaml` is created.
+#### Inputs
+_Fixture `check.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: claims to create nothing
+    steps:
+      - run:
+          shell: true
+          command: ln -s /etc/passwd sneaky
+      - assert:
+          exit_code: 0
+          changes:
+            created: []
+```
+#### When
+```shell
+${atago} run check.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `unexpected created file`
+### Scenario: retargeting a symlink is a modification
+_skipped on Windows_
+#### Given
+- Fixture file `v1.txt` is created.
+- Fixture file `v2.txt` is created.
+- Fixture file `current` is created.
+#### Inputs
+_Fixture `v1.txt`:_
+```text
+one
+```
+_Fixture `v2.txt`:_
+```text
+two
+```
+#### When
+```shell
+ln -sfn v2.txt current
+```
+#### Then
+- exit code is `0`
+- the step changed exactly created nothing, modified `current`, deleted nothing
+### Scenario: writing through a symlink modifies the target only
+_skipped on Windows_
+#### Given
+- Fixture file `real.txt` is created.
+- Fixture file `link.txt` is created.
+#### Inputs
+_Fixture `real.txt`:_
+```text
+before
+```
+#### When
+```shell
+printf 'after\n' > link.txt
+```
+#### Then
+- exit code is `0`
+- the step changed exactly created nothing, modified `real.txt`, deleted nothing
+### Scenario: removing a symlink is a deletion
+_skipped on Windows_
+#### Given
+- Fixture file `real.txt` is created.
+- Fixture file `link.txt` is created.
+#### Inputs
+_Fixture `real.txt`:_
+```text
+payload
+```
+#### When
+```shell
+rm link.txt
+```
+#### Then
+- exit code is `0`
+- the step changed exactly created nothing, modified nothing, deleted `link.txt`
+### Scenario: a dangling symlink is still a creation
+_skipped on Windows_
+#### When
+```shell
+ln -s no/such/target dangling
+```
+#### Then
+- exit code is `0`
+- the step changed exactly created `dangling`, modified nothing, deleted nothing
 ## atago self-hosting / CLI scenario selection
 Source: `test/e2e/atago/cli_selection.atago.yaml`
 ### Scenario: filter selects by a name substring

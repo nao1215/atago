@@ -282,3 +282,133 @@ scenarios:
               - "logs/**"
             modified: []
             deleted: []
+
+  # A symlink is part of the workdir delta. Before this was tracked, a step that
+  # planted a link slipped past `created: []` entirely — the assertion reported
+  # "nothing happened" for a run that wired up a new path.
+  - name: creating a symlink is a creation
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: real.txt
+          content: "payload\n"
+      - run:
+          shell: true
+          command: ln -s real.txt link.txt
+      - assert:
+          exit_code: 0
+          changes:
+            created: [link.txt]
+            modified: []
+            deleted: []
+
+  - name: an exhaustive created list catches an unexpected symlink
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: check.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: claims to create nothing
+                steps:
+                  - run:
+                      shell: true
+                      command: ln -s /etc/passwd sneaky
+                  - assert:
+                      exit_code: 0
+                      changes:
+                        created: []
+      - run:
+          command: ${atago} run check.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: "unexpected created file"
+
+  # A symlink is compared by the target it names, so retargeting it is a
+  # modification even though no file content changed.
+  - name: retargeting a symlink is a modification
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: v1.txt
+          content: "one\n"
+      - fixture:
+          file: v2.txt
+          content: "two\n"
+      - fixture:
+          file: current
+          symlink: v1.txt
+      - run:
+          shell: true
+          command: ln -sfn v2.txt current
+      - assert:
+          exit_code: 0
+          changes:
+            created: []
+            modified: [current]
+            deleted: []
+
+  # Writing through a link changes the target file, not the link: the link still
+  # points where it did.
+  - name: writing through a symlink modifies the target only
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: real.txt
+          content: "before\n"
+      - fixture:
+          file: link.txt
+          symlink: real.txt
+      - run:
+          shell: true
+          command: printf 'after\n' > link.txt
+      - assert:
+          exit_code: 0
+          changes:
+            created: []
+            modified: [real.txt]
+            deleted: []
+
+  - name: removing a symlink is a deletion
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: real.txt
+          content: "payload\n"
+      - fixture:
+          file: link.txt
+          symlink: real.txt
+      - run:
+          shell: true
+          command: rm link.txt
+      - assert:
+          exit_code: 0
+          changes:
+            created: []
+            modified: []
+            deleted: [link.txt]
+
+  # A dangling link names a target that does not exist. It is still an
+  # observable creation: the delta reads the target, it never resolves it.
+  - name: a dangling symlink is still a creation
+    skip:
+      os: windows
+    steps:
+      - run:
+          shell: true
+          command: ln -s no/such/target dangling
+      - assert:
+          exit_code: 0
+          changes:
+            created: [dangling]
+            modified: []
+            deleted: []
