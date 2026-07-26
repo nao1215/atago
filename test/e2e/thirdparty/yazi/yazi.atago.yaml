@@ -157,6 +157,38 @@ scenarios:
             path: notes.txt
             exists: true
 
+  - name: create with a trailing slash makes a directory
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: keep.txt
+          content: ""
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "keep.txt"
+            - send: "a"
+            - expect: "Create:"
+            - send: "nested/"
+            - send: {key: enter}
+            - expect: "nested"
+            - send: "q"
+      - assert:
+          exit_code: 0
+      - assert:
+          dir:
+            path: nested
+            exists: true
+
   - name: rename changes the hovered file name and nothing else
     only:
       command: yazi --version
@@ -244,6 +276,60 @@ scenarios:
             path: dst/alpha.txt
             contains: alpha
 
+  - name: select-all then yank copies multiple files into a sibling directory
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: src/a.txt
+          content: a
+      - fixture:
+          file: src/b.txt
+          content: b
+      - fixture:
+          file: dst/.keep
+          content: ""
+      - pty:
+          command: yazi src
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a.txt"
+            - send: {key: ctrl-a}
+            - send: "y"
+            - send: "h"
+            - expect: "src"
+            - send: "k"
+            - expect: "dst"
+            - send: "l"
+            - expect: "No items"
+            - send: "p"
+            - expect: "a.txt"
+            - expect: "b.txt"
+            - send: "Q"
+      - assert:
+          exit_code: 0
+          changes:
+            created:
+              - dst/a.txt
+              - dst/b.txt
+            modified: []
+            deleted: []
+      - assert:
+          file:
+            path: dst/a.txt
+            contains: a
+      - assert:
+          file:
+            path: dst/b.txt
+            contains: b
+
   - name: cut then paste moves a file into a sibling directory
     only:
       command: yazi --version
@@ -293,6 +379,42 @@ scenarios:
             path: dst/beta.txt
             contains: beta
 
+  - name: uppercase D permanently deletes the hovered file after confirmation
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: doomed.txt
+          content: doomed
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "doomed.txt"
+            - send: "D"
+            - expect: "Permanently delete"
+            - send: "y"
+            - expect: "No items"
+            - send: "Q"
+      - assert:
+          exit_code: 0
+          changes:
+            created: []
+            modified: []
+            deleted:
+              - doomed.txt
+      - assert:
+          file:
+            path: doomed.txt
+            exists: false
+
   - name: quitting after entering a directory writes the final cwd
     only:
       command: yazi --version
@@ -322,6 +444,48 @@ scenarios:
           file:
             path: cwd.txt
             contains: z-nested
+
+  - name: tabs preserve per-tab cwd and q writes the active tab cwd
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: a-dir/a.txt
+          content: ""
+      - fixture:
+          file: z-dir/z.txt
+          content: ""
+      - pty:
+          command: yazi --cwd-file ${workdir}/cwd.txt .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a-dir"
+            - send: "l"
+            - expect: "a.txt"
+            - send: "tt"
+            - expect: "a.txt"
+            - send: "h"
+            - expect: "z-dir"
+            - send: "j"
+            - expect: "z-dir"
+            - send: "l"
+            - expect: "z.txt"
+            - send: "1"
+            - expect: "a-dir"
+            - send: "q"
+      - assert:
+          exit_code: 0
+      - assert:
+          file:
+            path: cwd.txt
+            contains: a-dir
 
   - name: uppercase Q exits without writing the cwd file
     only:

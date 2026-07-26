@@ -1,17 +1,21 @@
 # atago Behavior Specs
 ## Summary
-1 suite · 10 scenarios
+1 suite · 14 scenarios
 ## Contents
-- [yazi (third-party terminal file manager)](#yazi-third-party-terminal-file-manager) — 10 scenarios
+- [yazi (third-party terminal file manager)](#yazi-third-party-terminal-file-manager) — 14 scenarios
   - [version prints a semantic version banner](#scenario-version-prints-a-semantic-version-banner)
   - [hidden files stay hidden by default](#scenario-hidden-files-stay-hidden-by-default)
   - [dot toggles hidden files into view](#scenario-dot-toggles-hidden-files-into-view)
   - [filter narrows the visible file list](#scenario-filter-narrows-the-visible-file-list)
   - [create makes a new file](#scenario-create-makes-a-new-file)
+  - [create with a trailing slash makes a directory](#scenario-create-with-a-trailing-slash-makes-a-directory)
   - [rename changes the hovered file name and nothing else](#scenario-rename-changes-the-hovered-file-name-and-nothing-else)
   - [yank then paste copies a file into a sibling directory](#scenario-yank-then-paste-copies-a-file-into-a-sibling-directory)
+  - [select-all then yank copies multiple files into a sibling directory](#scenario-select-all-then-yank-copies-multiple-files-into-a-sibling-directory)
   - [cut then paste moves a file into a sibling directory](#scenario-cut-then-paste-moves-a-file-into-a-sibling-directory)
+  - [uppercase D permanently deletes the hovered file after confirmation](#scenario-uppercase-d-permanently-deletes-the-hovered-file-after-confirmation)
   - [quitting after entering a directory writes the final cwd](#scenario-quitting-after-entering-a-directory-writes-the-final-cwd)
+  - [tabs preserve per-tab cwd and q writes the active tab cwd](#scenario-tabs-preserve-per-tab-cwd-and-q-writes-the-active-tab-cwd)
   - [uppercase Q exits without writing the cwd file](#scenario-uppercase-q-exits-without-writing-the-cwd-file)
 ## yazi (third-party terminal file manager)
 Source: `test/e2e/thirdparty/yazi/yazi.atago.yaml`
@@ -89,6 +93,19 @@ keep
 - file `notes.txt` exists
 #### Generated artifacts
 - `notes.txt`
+### Scenario: create with a trailing slash makes a directory
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `keep.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- exit code is `0`
+- dir `nested` exists
 ### Scenario: rename changes the hovered file name and nothing else
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -129,6 +146,32 @@ alpha
 - the step changed exactly created `dst/alpha.txt`, modified nothing, deleted nothing
 - file `src/alpha.txt` contains `alpha`
 - file `dst/alpha.txt` contains `alpha`
+### Scenario: select-all then yank copies multiple files into a sibling directory
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `src/a.txt` is created.
+- Fixture file `src/b.txt` is created.
+- Fixture file `dst/.keep` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `src/a.txt`:_
+```text
+a
+```
+_Fixture `src/b.txt`:_
+```text
+b
+```
+#### When
+```shell
+# interactive (pty): yazi src
+```
+#### Then
+- exit code is `0`
+- the step changed exactly created `dst/a.txt`, `dst/b.txt`, modified nothing, deleted nothing
+- file `dst/a.txt` contains `a`
+- file `dst/b.txt` contains `b`
 ### Scenario: cut then paste moves a file into a sibling directory
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -150,6 +193,25 @@ beta
 - the step changed exactly created `dst/beta.txt`, modified nothing, deleted `src/beta.txt`
 - file `src/beta.txt` does not exist
 - file `dst/beta.txt` contains `beta`
+### Scenario: uppercase D permanently deletes the hovered file after confirmation
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `doomed.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `doomed.txt`:_
+```text
+doomed
+```
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- exit code is `0`
+- the step changed exactly created nothing, modified nothing, deleted `doomed.txt`
+- file `doomed.txt` does not exist
 ### Scenario: quitting after entering a directory writes the final cwd
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -163,6 +225,20 @@ _only when `yazi --version` succeeds · skipped on Windows_
 #### Then
 - exit code is `0`
 - file `cwd.txt` contains `z-nested`
+### Scenario: tabs preserve per-tab cwd and q writes the active tab cwd
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `a-dir/a.txt` is created.
+- Fixture file `z-dir/z.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### When
+```shell
+# interactive (pty): yazi --cwd-file ${workdir}/cwd.txt .
+```
+#### Then
+- exit code is `0`
+- file `cwd.txt` contains `a-dir`
 ### Scenario: uppercase Q exits without writing the cwd file
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
