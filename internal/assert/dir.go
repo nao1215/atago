@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/nao1215/atago/internal/security"
 	"github.com/nao1215/atago/internal/spec"
@@ -97,7 +98,7 @@ func checkDirChildren(d *spec.DirAssert, dirPath string) *CheckResult {
 			return &CheckResult{
 				Desc:     fmt.Sprintf("assert dir %q contains %q", d.Path, child),
 				Expected: fmt.Sprintf("child %q present", child),
-				Actual:   "missing",
+				Actual:   dirListing(dirPath),
 				Hint:     fmt.Sprintf("expected %q to exist under %q", child, d.Path),
 			}
 		}
@@ -113,7 +114,7 @@ func checkDirChildren(d *spec.DirAssert, dirPath string) *CheckResult {
 			return &CheckResult{
 				Desc:     fmt.Sprintf("assert dir %q does not contain %q", d.Path, child),
 				Expected: fmt.Sprintf("child %q absent", child),
-				Actual:   "present",
+				Actual:   dirListing(dirPath),
 				Hint:     fmt.Sprintf("expected %q not to exist under %q", child, d.Path),
 			}
 		}
@@ -131,24 +132,33 @@ func checkDirCounts(d *spec.DirAssert, dirPath string) *CheckResult {
 	}
 	n := len(entries)
 	if d.Count != nil && n != *d.Count {
-		return dirCountFailure(d, n, fmt.Sprintf("exactly %d entries", *d.Count))
+		return dirCountFailure(d, n, fmt.Sprintf("exactly %d entries", *d.Count), dirListing(dirPath))
 	}
 	if d.MinCount != nil && n < *d.MinCount {
-		return dirCountFailure(d, n, fmt.Sprintf("at least %d entries", *d.MinCount))
+		return dirCountFailure(d, n, fmt.Sprintf("at least %d entries", *d.MinCount), dirListing(dirPath))
 	}
 	if d.MaxCount != nil && n > *d.MaxCount {
-		return dirCountFailure(d, n, fmt.Sprintf("at most %d entries", *d.MaxCount))
+		return dirCountFailure(d, n, fmt.Sprintf("at most %d entries", *d.MaxCount), dirListing(dirPath))
 	}
 	return nil
 }
 
-func dirCountFailure(d *spec.DirAssert, got int, want string) *CheckResult {
+func dirCountFailure(d *spec.DirAssert, got int, want, listing string) *CheckResult {
 	return &CheckResult{
 		Desc:     fmt.Sprintf("assert dir %q entry count", d.Path),
 		Expected: want,
-		Actual:   fmt.Sprintf("%d entries", got),
-		Hint:     fmt.Sprintf("directory %q has %d entries, expected %s", d.Path, got, want),
+		Actual:   listing,
+		Hint:     fmt.Sprintf("directory %q has %s, expected %s", d.Path, pluralEntries(got), want),
 	}
+}
+
+// pluralEntries renders an entry count with the right noun, so a failure reads
+// "has 1 entry" instead of "has 1 entries".
+func pluralEntries(n int) string {
+	if n == 1 {
+		return "1 entry"
+	}
+	return fmt.Sprintf("%d entries", n)
 }
 
 func checkDirGlob(d *spec.DirAssert, dirPath string) *CheckResult {
@@ -176,9 +186,55 @@ func checkDirGlob(d *spec.DirAssert, dirPath string) *CheckResult {
 	return &CheckResult{
 		Desc:     fmt.Sprintf("assert dir %q glob %q", d.Path, d.Glob),
 		Expected: fmt.Sprintf("at least one entry matching %q", d.Glob),
-		Actual:   fmt.Sprintf("no match among %d entries", len(names)),
+		Actual:   dirListing(dirPath),
 		Hint:     fmt.Sprintf("no direct entry of %q matched glob %q", d.Path, d.Glob),
 	}
+}
+
+// dirListingLimit caps how many entries a failure block lists. A generator that
+// produced thousands of files would otherwise bury the rest of the report.
+const dirListingLimit = 40
+
+// dirListing renders a directory's direct entries for a failure block: one
+// sorted name per line, directories marked with a trailing slash. A directory
+// assertion that failed is asking "what did the step actually produce?", and
+// answering with a count alone ("3 entries") makes the reader re-run the
+// generator by hand. This mirrors what a file assertion does by showing the
+// file's content.
+//
+// A read error becomes the listing text rather than an error return: the caller
+// is already reporting a failure and the read problem is the useful detail.
+func dirListing(dirPath string) string {
+	entries, err := os.ReadDir(dirPath)
+	if err != nil {
+		return fmt.Sprintf("(could not read directory: %v)", err)
+	}
+	names := make([]string, 0, len(entries))
+	for _, e := range entries {
+		name := e.Name()
+		if e.IsDir() {
+			name += "/"
+		}
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return renderListing(names, "entries")
+}
+
+// renderListing joins names one per line, capping the list at dirListingLimit
+// and reporting how many were elided. noun labels what is being listed so the
+// direct and recursive callers can say "entries" or "paths".
+func renderListing(names []string, noun string) string {
+	if len(names) == 0 {
+		return fmt.Sprintf("(no %s)", noun)
+	}
+	shown := names
+	suffix := ""
+	if len(names) > dirListingLimit {
+		shown = names[:dirListingLimit]
+		suffix = fmt.Sprintf("\n... (%d more)", len(names)-dirListingLimit)
+	}
+	return strings.Join(shown, "\n") + suffix
 }
 
 func dirStatActual(info os.FileInfo, err error) string {

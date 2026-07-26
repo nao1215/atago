@@ -7,6 +7,17 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- A failed `dir:` assertion now lists what the directory actually holds instead
+  of reporting only an abstraction (`missing`, `present`, `3 entries`,
+  `no match among 2 entries`). Every matcher in the family is covered, in both
+  direct and recursive mode, and the listing marks directories with a trailing
+  slash and shows symlink targets. It is capped at 40 entries so a large tree
+  cannot bury the rest of the report. This needs no spec change: every existing
+  `dir:` assertion produces the better failure block as-is. A count failure also
+  reads "has 1 entry" rather than "has 1 entries".
+
 ## [0.13.0] - 2026-07-26
 
 A minor release focused on removing false greens. A command killed by its

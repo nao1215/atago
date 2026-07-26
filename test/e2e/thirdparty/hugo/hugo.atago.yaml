@@ -21,20 +21,25 @@ scenarios:
           exit_code: 0
           stdout:
             contains: Congratulations
-      # Friction inventory for #25: pinning the scaffold takes one dir assert
-      # per level plus a file assert for the config — a recursive `tree:`
-      # assertion (or a directory-tree snapshot) would collapse all of this
-      # into a single declarative block, and would also catch UNEXPECTED
-      # entries, which `contains` cannot.
+      # Recursive mode pins the whole scaffold in one block, including the
+      # nested archetype, and rejects UNEXPECTED entries via the file count —
+      # `contains` alone would pass on a scaffold that grew extra files.
       - assert:
           dir:
             path: mysite
+            recursive: true
             contains:
               - archetypes
+              - archetypes/default.md
+              - assets
               - content
+              - data
+              - hugo.toml
+              - i18n
               - layouts
               - static
               - themes
+            count: 2
       - assert:
           file:
             path: mysite/hugo.toml
@@ -82,16 +87,15 @@ scenarios:
           file:
             path: mysite/public/posts/hello/index.html
             contains: "<h1>Hello</h1>"
-      # More #25 friction: "the build produced exactly these files and nothing
-      # else" is inexpressible today — count/glob check one directory level
-      # at a time.
       - assert:
           dir:
             path: mysite/public
+            recursive: true
             contains:
               - index.html
               - sitemap.xml
               - posts/hello/index.html
+            glob: "*.xml"
 
   - name: building outside a site directory fails with a config hint
     only:
@@ -105,3 +109,137 @@ scenarios:
       - assert:
           stderr:
             matches: "(?i)config"
+
+  - name: scaffolding into a non-empty directory is refused until --force
+    only:
+      command: hugo version
+    steps:
+      - fixture:
+          file: occupied/keep.txt
+          content: |
+            not written by hugo
+      - run:
+          command: hugo new site occupied
+      # hugo names the conflict and the flag that overrides it, rather than
+      # failing bare. The pre-existing file must survive the refusal.
+      - assert:
+          exit_code: 1
+          stderr:
+            contains:
+              - "already exists and is not empty"
+              - "--force"
+      - assert:
+          file:
+            path: occupied/keep.txt
+            contains: not written by hugo
+      - assert:
+          dir:
+            path: occupied
+            not_contains: [hugo.toml]
+      - run:
+          command: hugo new site occupied --force
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: Congratulations
+      # --force scaffolds alongside the existing file instead of wiping it.
+      - assert:
+          dir:
+            path: occupied
+            contains: [hugo.toml, keep.txt]
+
+  - name: creating content that already exists is refused
+    only:
+      command: hugo version
+    steps:
+      - run:
+          command: hugo new site mysite --quiet
+      - run:
+          command: hugo new content posts/dup.md
+          cwd: mysite
+      - assert:
+          exit_code: 0
+      - run:
+          command: hugo new content posts/dup.md
+          cwd: mysite
+      - assert:
+          exit_code: 1
+          stderr:
+            contains: conflicts with existing content
+
+  - name: drafts stay out of the build until --buildDrafts asks for them
+    only:
+      command: hugo version
+    steps:
+      - run:
+          command: hugo new site mysite --quiet
+      - fixture:
+          file: mysite/layouts/home.html
+          content: '<!DOCTYPE html><html><body><h1>HOME</h1></body></html>'
+      - fixture:
+          file: mysite/layouts/single.html
+          content: '<html><body><h1>{{ .Title }}</h1></body></html>'
+      - fixture:
+          file: mysite/layouts/list.html
+          content: '<html><body>list</body></html>'
+      - run:
+          command: hugo new content posts/draft-post.md
+          cwd: mysite
+      - assert:
+          exit_code: 0
+          file:
+            path: mysite/content/posts/draft-post.md
+            contains: "draft = true"
+      - run:
+          command: hugo --quiet
+          cwd: mysite
+      # Negative space: the draft must NOT be published by a default build.
+      - assert:
+          exit_code: 0
+      - assert:
+          dir:
+            path: mysite/public/posts
+            not_contains: [draft-post]
+      - run:
+          command: hugo --quiet --buildDrafts
+          cwd: mysite
+      # Same input, one flag flipped: now the page exists and renders.
+      - assert:
+          exit_code: 0
+      - assert:
+          dir:
+            path: mysite/public/posts
+            contains: [draft-post]
+      - assert:
+          file:
+            path: mysite/public/posts/draft-post/index.html
+            contains: "Draft Post"
+
+  - name: rebuilding an unchanged site is byte-for-byte idempotent
+    only:
+      command: hugo version
+    steps:
+      - run:
+          command: hugo new site mysite --quiet
+      - fixture:
+          file: mysite/layouts/home.html
+          content: '<!DOCTYPE html><html><body><h1>HOME</h1></body></html>'
+      - run:
+          command: hugo --quiet
+          cwd: mysite
+      - assert:
+          exit_code: 0
+      # Building again over an already-built site changes nothing at all:
+      # not the sources, and not even the rendered output, which pins the
+      # generator as deterministic rather than merely non-destructive.
+      # changes is content-based and exhaustive in both directions, so any
+      # embedded timestamp or reordered map would show up here.
+      - run:
+          shell: true
+          command: cd mysite && hugo --quiet
+      - assert:
+          exit_code: 0
+          changes:
+            created: []
+            modified: []
+            deleted: []

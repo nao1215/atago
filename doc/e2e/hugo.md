@@ -1,11 +1,15 @@
 # atago Behavior Specs
 ## Summary
-2 suites · 6 scenarios
+2 suites · 10 scenarios
 ## Contents
-- [hugo (scaffold + build CLI, tree-snapshot testbed)](#hugo-scaffold--build-cli-tree-snapshot-testbed) — 3 scenarios
+- [hugo (scaffold + build CLI, tree-snapshot testbed)](#hugo-scaffold--build-cli-tree-snapshot-testbed) — 7 scenarios
   - [new site scaffolds the documented directory tree](#scenario-new-site-scaffolds-the-documented-directory-tree)
   - [new content plus a minimal layout builds the public tree](#scenario-new-content-plus-a-minimal-layout-builds-the-public-tree)
   - [building outside a site directory fails with a config hint](#scenario-building-outside-a-site-directory-fails-with-a-config-hint)
+  - [scaffolding into a non-empty directory is refused until --force](#scenario-scaffolding-into-a-non-empty-directory-is-refused-until---force)
+  - [creating content that already exists is refused](#scenario-creating-content-that-already-exists-is-refused)
+  - [drafts stay out of the build until --buildDrafts asks for them](#scenario-drafts-stay-out-of-the-build-until---builddrafts-asks-for-them)
+  - [rebuilding an unchanged site is byte-for-byte idempotent](#scenario-rebuilding-an-unchanged-site-is-byte-for-byte-idempotent)
 - [hugo server (suite-wide service + http peer)](#hugo-server-suite-wide-service--http-peer) — 3 scenarios
   - [the home page lists the post](#scenario-the-home-page-lists-the-post)
   - [the post page renders its title](#scenario-the-post-page-renders-its-title)
@@ -21,7 +25,7 @@ hugo new site mysite
 #### Then
 - exit code is `0`
 - stdout contains `Congratulations`
-- dir `mysite` contains `archetypes`, contains `content`, contains `layouts`, contains `static`, contains `themes`
+- dir `mysite` contains `archetypes`, contains `archetypes/default.md`, contains `assets`, contains `content`, contains `data`, contains `hugo.toml`, contains `i18n`, contains `layouts`, contains `static`, contains `themes`, has 2 entries, (recursive)
 - file `mysite/hugo.toml` contains `baseURL`
 ### Scenario: new content plus a minimal layout builds the public tree
 _only when `hugo version` succeeds_
@@ -57,7 +61,7 @@ hugo --minify --buildDrafts
   - file `mysite/public/index.html` contains `HOME`
   - file `mysite/public/index.html` contains `/posts/hello/`
   - file `mysite/public/posts/hello/index.html` contains `<h1>Hello</h1>`
-  - dir `mysite/public` contains `index.html`, contains `sitemap.xml`, contains `posts/hello/index.html`
+  - dir `mysite/public` contains `index.html`, contains `sitemap.xml`, contains `posts/hello/index.html`, matches glob `*.xml`, (recursive)
 ### Scenario: building outside a site directory fails with a config hint
 _only when `hugo version` succeeds_
 #### When
@@ -67,6 +71,102 @@ hugo
 #### Then
 - exit code is not `0`
 - stderr matches `/(?i)config/`
+### Scenario: scaffolding into a non-empty directory is refused until --force
+_only when `hugo version` succeeds_
+#### Given
+- Fixture file `occupied/keep.txt` is created.
+#### Inputs
+_Fixture `occupied/keep.txt`:_
+```text
+not written by hugo
+```
+#### When
+```shell
+hugo new site occupied
+hugo new site occupied --force
+```
+#### Then
+- after `hugo new site occupied`:
+  - exit code is `1`
+  - stderr contains `already exists and is not empty`, `--force`
+  - file `occupied/keep.txt` contains `not written by hugo`
+  - dir `occupied` does not contain `hugo.toml`
+- after `hugo new site occupied --force`:
+  - exit code is `0`
+  - stdout contains `Congratulations`
+  - dir `occupied` contains `hugo.toml`, contains `keep.txt`
+### Scenario: creating content that already exists is refused
+_only when `hugo version` succeeds_
+#### When
+```shell
+hugo new site mysite --quiet
+hugo new content posts/dup.md
+hugo new content posts/dup.md
+```
+#### Then
+- after `hugo new content posts/dup.md`:
+  - exit code is `0`
+- after `hugo new content posts/dup.md`:
+  - exit code is `1`
+  - stderr contains `conflicts with existing content`
+### Scenario: drafts stay out of the build until --buildDrafts asks for them
+_only when `hugo version` succeeds_
+#### Given
+- Fixture file `mysite/layouts/home.html` is created.
+- Fixture file `mysite/layouts/single.html` is created.
+- Fixture file `mysite/layouts/list.html` is created.
+#### Inputs
+_Fixture `mysite/layouts/home.html`:_
+```text
+<!DOCTYPE html><html><body><h1>HOME</h1></body></html>
+```
+_Fixture `mysite/layouts/single.html`:_
+```text
+<html><body><h1>{{ .Title }}</h1></body></html>
+```
+_Fixture `mysite/layouts/list.html`:_
+```text
+<html><body>list</body></html>
+```
+#### When
+```shell
+hugo new site mysite --quiet
+hugo new content posts/draft-post.md
+hugo --quiet
+hugo --quiet --buildDrafts
+```
+#### Then
+- after `hugo new content posts/draft-post.md`:
+  - exit code is `0`
+  - file `mysite/content/posts/draft-post.md` contains `draft = true`
+- after `hugo --quiet`:
+  - exit code is `0`
+  - dir `mysite/public/posts` does not contain `draft-post`
+- after `hugo --quiet --buildDrafts`:
+  - exit code is `0`
+  - dir `mysite/public/posts` contains `draft-post`
+  - file `mysite/public/posts/draft-post/index.html` contains `Draft Post`
+### Scenario: rebuilding an unchanged site is byte-for-byte idempotent
+_only when `hugo version` succeeds_
+#### Given
+- Fixture file `mysite/layouts/home.html` is created.
+#### Inputs
+_Fixture `mysite/layouts/home.html`:_
+```text
+<!DOCTYPE html><html><body><h1>HOME</h1></body></html>
+```
+#### When
+```shell
+hugo new site mysite --quiet
+hugo --quiet
+cd mysite && hugo --quiet
+```
+#### Then
+- after `hugo --quiet`:
+  - exit code is `0`
+- after `cd mysite && hugo --quiet`:
+  - exit code is `0`
+  - the step changed exactly created nothing, modified nothing, deleted nothing
 ## hugo server (suite-wide service + http peer)
 Source: `test/e2e/thirdparty/hugo/hugo_server.atago.yaml`
 ### Scenario: the home page lists the post

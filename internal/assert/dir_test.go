@@ -1,8 +1,10 @@
 package assert
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/nao1215/atago/internal/spec"
@@ -130,5 +132,88 @@ func TestCheckDir_NotADirectory(t *testing.T) {
 	}
 	if cr := checkDirOK(t, wd, &spec.DirAssert{Path: "afile", Count: ptrInt(0)}); cr.OK {
 		t.Error("a regular file is not a directory; count constraint should fail")
+	}
+}
+
+// TestCheckDir_FailureShowsListing pins the diagnostic contract for directory
+// assertions: a failure must show what the directory actually holds, the way a
+// file assertion shows the file's content and a changes assertion shows the
+// observed delta. Reporting only "missing" or "3 entries" forces the reader to
+// re-run the generator by hand to learn what it produced.
+func TestCheckDir_FailureShowsListing(t *testing.T) {
+	wd := makeTree(t)
+	cases := []struct {
+		name string
+		dir  *spec.DirAssert
+		want []string
+	}{
+		{
+			name: "contains names the entries that are there",
+			dir:  &spec.DirAssert{Path: "site", Contains: []string{"style.css"}},
+			want: []string{"about.html", "assets/", "index.html"},
+		},
+		{
+			name: "not_contains shows the listing too",
+			dir:  &spec.DirAssert{Path: "site", NotContains: []string{"index.html"}},
+			want: []string{"about.html", "assets/", "index.html"},
+		},
+		{
+			name: "count shows which entries were counted",
+			dir:  &spec.DirAssert{Path: "site", Count: ptrInt(9)},
+			want: []string{"about.html", "assets/", "index.html"},
+		},
+		{
+			name: "glob shows the entries it tried to match",
+			dir:  &spec.DirAssert{Path: "site", Glob: "*.js"},
+			want: []string{"about.html", "assets/", "index.html"},
+		},
+		{
+			name: "recursive contains shows the walked tree",
+			dir:  &spec.DirAssert{Path: "site", Recursive: true, Contains: []string{"nope.txt"}},
+			want: []string{"assets/app.css", "index.html"},
+		},
+		{
+			name: "recursive glob shows the walked tree",
+			dir:  &spec.DirAssert{Path: "site", Recursive: true, Glob: "*.js"},
+			want: []string{"assets/app.css", "index.html"},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cr := checkDirOK(t, wd, tc.dir)
+			if cr.OK {
+				t.Fatalf("assertion should have failed: %+v", cr)
+			}
+			for _, want := range tc.want {
+				if !strings.Contains(cr.Actual, want) {
+					t.Errorf("Actual = %q, want it to list %q", cr.Actual, want)
+				}
+			}
+		})
+	}
+}
+
+// TestCheckDir_ListingIsBounded keeps a huge directory from flooding the
+// failure block: the listing is capped and says how many entries it elided.
+func TestCheckDir_ListingIsBounded(t *testing.T) {
+	wd := t.TempDir()
+	big := filepath.Join(wd, "big")
+	if err := os.MkdirAll(big, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	for i := range 200 {
+		if err := os.WriteFile(filepath.Join(big, fmt.Sprintf("f%03d.txt", i)), []byte("x"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cr := checkDirOK(t, wd, &spec.DirAssert{Path: "big", Contains: []string{"nope"}})
+	if cr.OK {
+		t.Fatal("assertion should have failed")
+	}
+	if n := strings.Count(cr.Actual, "\n"); n > dirListingLimit+3 {
+		t.Errorf("Actual has %d lines, want the listing capped near %d", n, dirListingLimit)
+	}
+	if !strings.Contains(cr.Actual, "more") {
+		t.Errorf("Actual = %q, want it to say how many entries were elided", cr.Actual)
 	}
 }
