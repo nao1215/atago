@@ -2,6 +2,7 @@ package docgen
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -941,5 +942,124 @@ scenarios: [{name: s, steps: [{run: {command: "true"}}, {assert: {exit_code: 0}}
 	}
 	if !bytes.Contains(index, []byte("Documents")) {
 		t.Errorf("index missing Documents section:\n%s", index)
+	}
+}
+
+// TestGenerate_Descriptions pins the whole rendering contract of the optional
+// suite/scenario `description:` in one place: where each lands relative
+// to the heading and the metadata already there, that a multi-line, Markdown-
+// formatted, non-ASCII body survives verbatim, and that a ${name} reference in
+// it is documentation text rather than something the generator expands.
+func TestGenerate_Descriptions(t *testing.T) {
+	t.Parallel()
+	src := load(t, "app.atago.yaml", `version: "1"
+suite:
+  name: releases
+  description: |
+    What **myapp release** guarantees end to end, per [RFC-7](https://example.com/rfc7).
+
+    - the archive is reproducible
+    - a bad tag never publishes
+
+    リリース処理は日本語ロケールでも同じ結果になる。
+scenarios:
+  - name: refuses an unsigned tag
+    description: "Regression for the 0.4.0 leak: an unsigned tag reached the registry. ${TOKEN} stays literal."
+    tags: [smoke]
+    steps:
+      - run: {command: "myapp release v1.0.0"}
+      - assert: {exit_code: 1}
+`)
+	out := gen(t, *src)
+
+	// The suite's prose sits between its heading and the Source line, keeping its
+	// blank lines, list, and Japanese text exactly as authored.
+	wantSuite := "## releases\n" +
+		"What **myapp release** guarantees end to end, per [RFC-7](https://example.com/rfc7).\n" +
+		"\n" +
+		"- the archive is reproducible\n" +
+		"- a bad tag never publishes\n" +
+		"\n" +
+		"リリース処理は日本語ロケールでも同じ結果になる。\n" +
+		"\n" +
+		"Source: `app.atago.yaml`\n"
+	if !strings.Contains(out, wantSuite) {
+		t.Errorf("suite description block not rendered as expected\n--- want ---\n%s\n--- got ---\n%s", wantSuite, out)
+	}
+
+	// The scenario's prose sits between its heading and the italic tag metadata,
+	// and ${TOKEN} is still there, unexpanded.
+	wantScenario := "### Scenario: refuses an unsigned tag\n" +
+		"Regression for the 0.4.0 leak: an unsigned tag reached the registry. ${TOKEN} stays literal.\n" +
+		"\n" +
+		"_tags: smoke_\n" +
+		"#### When\n"
+	if !strings.Contains(out, wantScenario) {
+		t.Errorf("scenario description block not rendered as expected\n--- want ---\n%s\n--- got ---\n%s", wantScenario, out)
+	}
+}
+
+// TestGenerate_DescriptionAbsentOrBlankChangesNothing is the backward-compatibility
+// guard: a spec that omits `description:`, and one that sets it to an
+// empty or whitespace-only value, must both generate exactly the document the
+// generator produced before the field existed — no stray blank line, no empty
+// heading.
+func TestGenerate_DescriptionAbsentOrBlankChangesNothing(t *testing.T) {
+	t.Parallel()
+	const body = `version: "1"
+suite:
+  name: releases%s
+scenarios:
+  - name: refuses an unsigned tag%s
+    steps:
+      - run: {command: "myapp release v1.0.0"}
+      - assert: {exit_code: 1}
+`
+	baseline := gen(t, *load(t, "app.atago.yaml", fmt.Sprintf(body, "", "")))
+
+	for name, blank := range map[string]string{
+		"empty string":     `""`,
+		"whitespace only":  `"   "`,
+		"newlines only":    "\"\\n\\n\"",
+		"empty block form": "|\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			suiteKey := "\n  description: " + blank
+			scenarioKey := "\n    description: " + blank
+			got := gen(t, *load(t, "app.atago.yaml", fmt.Sprintf(body, suiteKey, scenarioKey)))
+			if got != baseline {
+				t.Errorf("a blank description changed the document\n--- baseline ---\n%s\n--- got ---\n%s", baseline, got)
+			}
+		})
+	}
+}
+
+// TestGenerate_DescriptionNotExpandedForMatrixInstance guards the one place a
+// reader might expect expansion: a matrix scenario's commands and assertions are
+// rendered with the row's concrete values, but its description is authored once
+// for the template and stays literal, so it cannot silently disagree across the
+// instances it is copied into.
+func TestGenerate_DescriptionNotExpandedForMatrixInstance(t *testing.T) {
+	t.Parallel()
+	src := load(t, "m.atago.yaml", `version: "1"
+suite: {name: matrix}
+scenarios:
+  - name: builds for ${goos}
+    description: "One row per ${goos}; the same guarantee holds on each."
+    matrix:
+      - {goos: linux}
+      - {goos: darwin}
+    steps:
+      - run: {command: "build --os ${goos}"}
+      - assert: {exit_code: 0}
+`)
+	out := gen(t, *src)
+	if n := strings.Count(out, "One row per ${goos}; the same guarantee holds on each."); n != 2 {
+		t.Errorf("description rendered %d times unexpanded, want 2 (once per matrix instance):\n%s", n, out)
+	}
+	// The command still expands, so the two behaviors are visibly different.
+	if !strings.Contains(out, "build --os linux") || !strings.Contains(out, "build --os darwin") {
+		t.Errorf("matrix commands are no longer expanded:\n%s", out)
 	}
 }

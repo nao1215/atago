@@ -149,3 +149,45 @@ scenarios:
           exit_code: 3
           stderr:
             contains: requires --out-dir
+
+  # The suite/scenario `description:` is doc-only data: it must reach the
+  # generated Markdown verbatim — including a ${...} reference, which is prose
+  # here and not a variable — and must not change how the spec runs.
+  - name: doc renders suite and scenario descriptions verbatim
+    steps:
+      - fixture:
+          file: described.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: described
+              description: |
+                What this suite guarantees for its users.
+
+                Second paragraph, ${not_a_variable} included.
+            scenarios:
+              - name: greets
+                description: "Guards the regression from #123."
+                steps:
+                  - run: {command: echo hi}
+                  - assert: {exit_code: 0}
+      - run:
+          command: ${atago} doc described.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "What this suite guarantees for its users."
+      - assert:
+          stdout:
+            contains: "Second paragraph, ${not_a_variable} included."
+      - assert:
+          stdout:
+            contains: "Guards the regression from #123."
+      # Documentation prose changes nothing about execution: the same spec still
+      # runs and passes.
+      - run:
+          command: ${atago} run described.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "1 passed"

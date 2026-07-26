@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-74 suites · 394 scenarios
+74 suites · 395 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -78,12 +78,13 @@
   - [record, compare green, then a mutation names the changed paths](#scenario-record-compare-green-then-a-mutation-names-the-changed-paths)
   - [recursive matchers and ignore globs walk the tree](#scenario-recursive-matchers-and-ignore-globs-walk-the-tree)
   - [combining snapshot with matchers is a load-time error](#scenario-combining-snapshot-with-matchers-is-a-load-time-error)
-- [atago self-hosting / doc](#atago-self-hosting--doc) — 5 scenarios
+- [atago self-hosting / doc](#atago-self-hosting--doc) — 6 scenarios
   - [doc generates Markdown to a file](#scenario-doc-generates-markdown-to-a-file)
   - [doc writes Markdown to stdout without --out](#scenario-doc-writes-markdown-to-stdout-without---out)
   - [doc emits a summary, table of contents, and input previews](#scenario-doc-emits-a-summary-table-of-contents-and-input-previews)
   - [doc --split-by-spec writes one file per spec and an index](#scenario-doc---split-by-spec-writes-one-file-per-spec-and-an-index)
   - [doc --split-by-spec requires --out-dir](#scenario-doc---split-by-spec-requires---out-dir)
+  - [doc renders suite and scenario descriptions verbatim](#scenario-doc-renders-suite-and-scenario-descriptions-verbatim)
 - [atago self-hosting / duration assertion](#atago-self-hosting--duration-assertion) — 4 scenarios
   - [a fast step passes a generous upper bound](#scenario-a-fast-step-passes-a-generous-upper-bound)
   - [an impossible bound fails and shows the measured duration](#scenario-an-impossible-bound-fails-and-shows-the-measured-duration)
@@ -1966,6 +1967,40 @@ ${atago} doc --split-by-spec solo.atago.yaml
 #### Then
 - exit code is `3`
 - stderr contains `requires --out-dir`
+### Scenario: doc renders suite and scenario descriptions verbatim
+#### Given
+- Fixture file `described.atago.yaml` is created.
+#### Inputs
+_Fixture `described.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: described
+  description: |
+    What this suite guarantees for its users.
+
+    Second paragraph, ${not_a_variable} included.
+scenarios:
+  - name: greets
+    description: "Guards the regression from #123."
+    steps:
+      - run: {command: echo hi}
+      - assert: {exit_code: 0}
+```
+#### When
+```shell
+${atago} doc described.atago.yaml
+${atago} run described.atago.yaml
+```
+#### Then
+- after `${atago} doc described.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `What this suite guarantees for its users.`
+  - stdout contains `Second paragraph, ${not_a_variable} included.`
+  - stdout contains `Guards the regression from #123.`
+- after `${atago} run described.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `1 passed`
 ## atago self-hosting / duration assertion
 Source: `test/e2e/atago/duration.atago.yaml`
 ### Scenario: a fast step passes a generous upper bound

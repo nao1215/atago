@@ -2,19 +2,25 @@ version: "1"
 
 suite:
   name: grafana (self-hosted observability platform)
+  description: |
+    [Grafana](https://grafana.com/oss/grafana/) treated as a black box: a real
+    server is booted per scenario on SQLite and driven only over HTTP, the way
+    an operator's smoke test — or a CLI that talks to Grafana — would meet it.
 
-# Exercises Grafana (https://grafana.com/oss/grafana/, one of the most-starred
-# projects on awesome-selfhosted) as a third-party target: the real server
-# booted per scenario with SQLite, health and build info over the API, the
-# login redirect asserted with `follow_redirects: false` (the feature this
-# suite motivated — a followed 302 is unassertable), the anonymous-access
-# failure mode, and a dashboard + datasource lifecycle over the REST API.
+    Three contracts are pinned here, all of them things an upgrade can quietly
+    break: the server reports health and its build version once first-boot
+    migrations finish, an anonymous visitor is bounced to the login page while
+    the API refuses them outright, and a dashboard created over the REST API
+    survives a read-back by uid and turns up in search — with a datasource
+    accepted alongside it.
+
 # Install (prebuilt release; see .github/workflows/thirdparty.yml): extract
 # the tarball, put bin/ on PATH, and export GF_PATHS_HOME pointing at the
 # extracted directory — grafana needs its bundled assets at runtime.
 #
 # Each scenario binds its own port and keeps its state (data/logs) in the
 # scenario workdir, so the suite runs under the default scenario concurrency.
+# The login-redirect scenario is why `follow_redirects:` exists.
 
 permissions:
   network:
@@ -82,6 +88,16 @@ scenarios:
               matches: "^[0-9]+\\.[0-9]+\\.[0-9]+"
 
   - name: anonymous visitors are redirected to the login page
+    description: |
+      An unauthenticated visitor asking for `/` must land on the login page,
+      and the same visitor asking the API for data must be refused with 401 —
+      the two halves of "anonymous access is off" that a misconfigured
+      deployment can get half-right.
+
+      The 302 itself is the behavior under test, so the request is made with
+      `follow_redirects: false`. A client that follows the redirect sees a
+      perfectly healthy login page and can no longer tell whether Grafana
+      redirected at all.
     services:
       - name: grafana
         # The shell expands $GF_PATHS_HOME (set by the CI install step / the
