@@ -2,16 +2,22 @@ version: "1"
 
 suite:
   name: kustomize (declarative Kubernetes config)
+  description: |
+    [kustomize](https://kustomize.io/) turns a base set of Kubernetes manifests
+    plus a list of edits into the final YAML you apply. No cluster is involved
+    and no network is touched, which means the same inputs must always render
+    the same bytes — the property everything else depends on.
 
-# kustomize renders Kubernetes manifests declaratively: `kustomize build` reads a
-# kustomization.yaml plus its resources and emits the transformed, merged YAML on
-# stdout. It is fully offline and deterministic — no cluster, no network — which
-# makes it an exemplary contract to pin: the same inputs always render the same
-# bytes, transformations compose in a defined order, generators derive a content
-# hash, the load restrictor refuses to escape the kustomization root, and
-# failures report on stderr with exit 1. Every scenario authors its inputs with
-# fixtures inside the isolated workdir and probes for kustomize first so the
-# suite skips cleanly where it is absent.
+    What is guaranteed: transformations compose in the defined order, so name
+    prefixes, labels, and patches land predictably rather than by accident of
+    evaluation order; generators derive the content hash that makes a config map
+    change roll its consumers; the load restrictor refuses to read files outside
+    the kustomization root, which is a security boundary and not a convenience;
+    and a broken kustomization fails on stderr with exit 1 instead of emitting
+    partial YAML someone might apply.
+
+# Every scenario authors its inputs with fixtures inside the isolated workdir
+# and probes for kustomize first so the suite skips cleanly where it is absent.
 scenarios:
   - name: version prints a semantic version
     only:

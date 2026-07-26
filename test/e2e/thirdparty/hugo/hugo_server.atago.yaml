@@ -2,11 +2,19 @@ version: "1"
 
 suite:
   name: hugo server (suite-wide service + http peer)
-  # The site must exist BEFORE the server starts, so the scaffold happens in
-  # suite.setup (ordered steps in ${suitedir}) and the `service:` step starts
-  # `hugo server` at that exact point in the sequence — the build-then-serve
-  # bootstrap pattern (#7). Like the caddy suite, this file assumes hugo is
-  # on PATH (make thirdparty documents the toolset; CI installs it).
+  description: |
+    `hugo server` is the half of Hugo a developer actually looks at: the site,
+    served over HTTP, rendered. This suite scaffolds a site, starts the real
+    development server against it, and then asks for pages the way a browser
+    would — so what is asserted is the HTML that reached the client.
+
+    The ordering is the interesting constraint. A site must exist before a
+    server can serve it, so the scaffold runs first and the server starts at
+    exactly that point in the sequence, once, for the whole suite — the
+    build-then-serve bootstrap every "run my app and test it" setup needs.
+
+  # Like the caddy suite, this file assumes hugo is on PATH (make thirdparty
+  # documents the toolset; CI installs it).
   setup:
     - run:
         command: hugo new site mysite --quiet

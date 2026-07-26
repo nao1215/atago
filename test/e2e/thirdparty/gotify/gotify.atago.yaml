@@ -2,17 +2,23 @@ version: "1"
 
 suite:
   name: gotify (self-hosted notification server)
+  description: |
+    [Gotify](https://gotify.net/) receives notifications and hands them back
+    out. The full path is exercised against a real server on SQLite: an
+    application is provisioned over the REST API, a message is pushed with that
+    application's token, and it is read back with admin credentials — so the
+    message is proven to have been stored and served, not merely accepted.
 
-# Exercises Gotify (https://gotify.net/, from awesome-selfhosted's
-# notification corner) as a third-party target: the real server booted with
-# SQLite, an application provisioned over the REST API, messages pushed with
-# the app token and read back with admin credentials, the failure mode for
-# missing credentials — and the app icon uploaded as a real multipart
-# form-data request (`files:`), then downloaded back (`body_to`) and verified
-# as a PNG with the image assertion target. Install (prebuilt release; the UI
-# is compiled in, so `go install` cannot build it):
-#   see .github/workflows/thirdparty.yml for the download-and-verify step
-#
+    The refusal matters as much as the delivery: pushing without valid
+    credentials must fail rather than silently drop the notification.
+
+    One scenario goes further than JSON. The application's icon is uploaded as a
+    genuine multipart form-data request, downloaded back to disk, and verified
+    as a real PNG — the same round trip a browser performs, asserted on the
+    bytes that came back.
+
+# Install (prebuilt release; the UI is compiled in, so `go install` cannot build
+# it): see .github/workflows/thirdparty.yml for the download-and-verify step.
 # Each server scenario binds its own port so the suite runs under the default
 # scenario concurrency. admin/admin is Gotify's out-of-the-box default user,
 # used here against throwaway per-scenario databases.

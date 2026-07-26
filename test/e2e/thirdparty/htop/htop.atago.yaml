@@ -2,16 +2,21 @@ version: "1"
 
 suite:
   name: htop (third-party CLI, full-screen TUI testbed)
+  description: |
+    [htop](https://htop.dev/) is a full-screen program in the strict sense: it
+    switches the terminal to the alternate screen buffer, paints meters and a
+    process table with cursor movement and color, and restores what was there
+    before when it quits.
 
-# htop is the archetype of a FULL-SCREEN TUI: it switches to the alternate
-# screen buffer, paints meters and a process table with cursor moves and
-# colors, and restores the primary screen when it quits. That makes it the
-# real-world testbed for the pty runner's screen rendering (#27) that fzf — a
-# partial-screen finder — does not reach: the vt100 emulator must track the
-# alternate-screen switch to render the live frame, and a full-screen program
-# must run and quit cleanly under the pty. Every scenario probes for htop first
-# so the suite skips cleanly where it is absent; the interactive scenarios are
-# POSIX-only (the pty runner does not support Windows).
+    That is a harder thing to assert than scrolling output, and it is what this
+    suite pins. The rendered frame is reconstructed the way a terminal would
+    reconstruct it — following the alternate-screen switch and the cursor
+    movements — so the assertion is about what a user sees on screen, not about
+    the raw escape sequences that produced it. Quitting cleanly, and leaving the
+    terminal in a usable state, is part of the contract too.
+
+# Every scenario probes for htop first so the suite skips cleanly where it is
+# absent; the interactive scenarios are POSIX-only.
 scenarios:
   - name: version prints a semantic version
     only:

@@ -2,13 +2,18 @@ version: "1"
 
 suite:
   name: kustomize + changes (kustomization file authoring)
+  description: |
+    `kustomize create` and `kustomize edit` modify your project in place, which
+    makes their footprint part of their contract: they should write the
+    kustomization file and leave everything else alone.
 
-# Companion to kustomize.atago.yaml: where that suite pins the render output,
-# this one pins the filesystem side effects of `kustomize create`, `kustomize
-# edit`, and `kustomize edit fix`. sandbox_home points HOME inside the workdir
-# so any stray home write would surface in the delta — the "touches only the
-# kustomization file" claim is enforced by the changes assert, not merely
-# asserted in prose. Gate: only where kustomize is installed.
+    That is stated here as an exhaustive claim. Each command's effect on the
+    directory is compared before and after, so an extra file, a backup left
+    behind, or a stray write into the user's home directory would all fail —
+    the home directory included, because it is redirected inside the workspace
+    where the delta can see it.
+
+# Gate: only where kustomize is installed.
 scenarios:
   - name: create writes exactly the kustomization file
     only:

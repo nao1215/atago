@@ -2,17 +2,21 @@ version: "1"
 
 suite:
   name: gitea (self-hosted git service)
+  description: |
+    [Gitea](https://about.gitea.com/) is a whole git forge, and this suite meets
+    it the way an administrator would: a real server is booted from an authored
+    `app.ini` on SQLite, a user and an access token are provisioned through
+    Gitea's own CLI, and everything after that goes over the REST API —
+    creating a repository, committing files into it, opening issues.
 
-# Exercises Gitea (https://about.gitea.com/, from awesome-selfhosted's
-# software-development corner) as a third-party target: the real server booted
-# from an authored app.ini with SQLite, administered through its CLI (user +
-# access token), then driven over the REST API — repository creation, file
-# commits, issues — and finally cloned with real git over HTTP, proving two
-# third-party programs interoperate under one spec. Install (prebuilt binary):
-#   see .github/workflows/thirdparty.yml for the download step
-#
-# Each server scenario binds its own port so the suite runs under the default
-# scenario concurrency.
+    The suite ends by cloning that repository with real `git` over HTTP. That
+    last step is the point: two independent third-party programs, neither aware
+    of this test, are shown to interoperate — the forge really serves git, not
+    just a JSON API that claims a repository exists.
+
+# Install (prebuilt binary): see .github/workflows/thirdparty.yml for the
+# download step. Each server scenario binds its own port so the suite runs under
+# the default scenario concurrency.
 
 permissions:
   network:
