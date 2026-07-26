@@ -7,6 +7,55 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-07-26
+
+A minor release focused on PTY/TUI correctness, reproducible third-party CI,
+and much deeper real-world coverage. atago can now wait on the rendered screen
+of an interactive terminal, responds to the terminal capability probes that
+full-screen TUIs emit, and ships a substantially expanded yazi suite backed by
+pinned installer versions so the same checks stay stable in CI.
+
+### Added
+
+- PTY sessions gain `expect_screen`, a rendered-screen matcher surface for TUIs
+  with the usual text/JSON/YAML checks plus optional `timeout` and `stable_for`
+  waits. This makes specs assert what a user actually sees on screen instead of
+  only matching the raw terminal transcript.
+- PTY input/output handling now covers more real terminal behavior: atago can
+  answer common terminal capability probes emitted by TUIs and accepts the
+  additional named control-key aliases `ctrl-hyphen` / `ctrl-minus`.
+- The third-party yazi coverage grows into a dedicated 7-suite, 160-scenario
+  corpus covering selection semantics, chooser mode, tab navigation, link and
+  overwrite flows, spaced-path handling, entry arguments, and shell-driven file
+  mutations.
+
+### Changed
+
+- Third-party CI is now pinned more aggressively: external installers and
+  releases used by scheduled suites (including yazi, awscli, and minio legs)
+  are version-locked, and CI has guards that fail if those pins drift.
+- The README, generated E2E docs, real-world index, and GitHub Pages site now
+  describe the PTY screen-assert feature, the expanded yazi coverage, and the
+  additional install paths via `aqua` and `mise`.
+
+### Fixed
+
+- PTY/TUI execution is more stable and cheaper under load: rendered-screen waits
+  now cache the screen between transcript changes instead of re-rendering on
+  every poll, and failure reports reuse the captured screen instead of rendering
+  it repeatedly.
+- Interactive TUIs that query terminal capabilities no longer misbehave under
+  atago because the PTY runner now replies to those probes instead of leaving
+  them hanging in the transcript.
+- Assertion correctness tightened in a few hot paths: identical JSON values now
+  short-circuit cleanly, slice-length mismatches are validated before identity
+  fast paths claim equality, and fuzz coverage was extended to keep those cases
+  pinned.
+- CI and test stability improved across the board: scheduled dogfood/minio
+  suites were stabilized, Windows loader validation tests were de-parallelized
+  to avoid a Go runtime crash, and the yazi specs were tightened to assert
+  distinctive screen states instead of broad/noisy matches.
+
 ## [0.11.0] - 2026-07-09
 
 A minor release focused on manifest visibility, documentation discoverability,
