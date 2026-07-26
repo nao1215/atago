@@ -32,6 +32,7 @@ A browsable, repo-local index of atago's documentation, generated from repositor
 - [jose.md](../doc/e2e/jose.md)
 - [jq.md](../doc/e2e/jq.md)
 - [kustomize.md](../doc/e2e/kustomize.md)
+- [lazygit.md](../doc/e2e/lazygit.md)
 - [mailpit.md](../doc/e2e/mailpit.md)
 - [mimixbox.md](../doc/e2e/mimixbox.md)
 - [minio.md](../doc/e2e/minio.md)
