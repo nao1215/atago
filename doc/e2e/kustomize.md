@@ -23,6 +23,16 @@
   - [a missing referenced resource is reported on stderr](#scenario-a-missing-referenced-resource-is-reported-on-stderr)
   - [the load restrictor refuses to read a file outside the root](#scenario-the-load-restrictor-refuses-to-read-a-file-outside-the-root)
 ## kustomize + changes (kustomization file authoring)
+`kustomize create` and `kustomize edit` modify your project in place, which
+makes their footprint part of their contract: they should write the
+kustomization file and leave everything else alone.
+
+That is stated here as an exhaustive claim. Each command's effect on the
+directory is compared before and after, so an extra file, a backup left
+behind, or a stray write into the user's home directory would all fail —
+the home directory included, because it is redirected inside the workspace
+where the delta can see it.
+
 Source: `test/e2e/thirdparty/kustomize/changes.atago.yaml`
 ### Scenario: create writes exactly the kustomization file
 _only when `kustomize version` succeeds_
@@ -100,6 +110,19 @@ kustomize edit set namespace staging
 - exit code is `1`
 - stderr contains `Missing kustomization file`
 ## kustomize (declarative Kubernetes config)
+[kustomize](https://kustomize.io/) turns a base set of Kubernetes manifests
+plus a list of edits into the final YAML you apply. No cluster is involved
+and no network is touched, which means the same inputs must always render
+the same bytes — the property everything else depends on.
+
+What is guaranteed: transformations compose in the defined order, so name
+prefixes, labels, and patches land predictably rather than by accident of
+evaluation order; generators derive the content hash that makes a config map
+change roll its consumers; the load restrictor refuses to read files outside
+the kustomization root, which is a security boundary and not a convenience;
+and a broken kustomization fails on stderr with exit 1 instead of emitting
+partial YAML someone might apply.
+
 Source: `test/e2e/thirdparty/kustomize/kustomize.atago.yaml`
 ### Scenario: version prints a semantic version
 _only when `kustomize version` succeeds_

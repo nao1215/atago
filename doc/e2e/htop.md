@@ -8,6 +8,18 @@
   - [the finder loads its function-key bar and quits on q](#scenario-the-finder-loads-its-function-key-bar-and-quits-on-q)
   - [the rendered screen shows the live meters and column header](#scenario-the-rendered-screen-shows-the-live-meters-and-column-header)
 ## htop (third-party CLI, full-screen TUI testbed)
+[htop](https://htop.dev/) is a full-screen program in the strict sense: it
+switches the terminal to the alternate screen buffer, paints meters and a
+process table with cursor movement and color, and restores what was there
+before when it quits.
+
+That is a harder thing to assert than scrolling output, and it is what this
+suite pins. The rendered frame is reconstructed the way a terminal would
+reconstruct it — following the alternate-screen switch and the cursor
+movements — so the assertion is about what a user sees on screen, not about
+the raw escape sequences that produced it. Quitting cleanly, and leaving the
+terminal in a usable state, is part of the contract too.
+
 Source: `test/e2e/thirdparty/htop/htop.atago.yaml`
 ### Scenario: version prints a semantic version
 _only when `htop --version` succeeds_

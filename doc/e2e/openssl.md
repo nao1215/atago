@@ -14,6 +14,14 @@
   - [a self-signed certificate carries the requested subject](#scenario-a-self-signed-certificate-carries-the-requested-subject)
   - [signing with the private key verifies with the public key](#scenario-signing-with-the-private-key-verifies-with-the-public-key)
 ## openssl + changes (key and cert generation footprints)
+A tool that generates private key material should write exactly the file you
+named and nothing else — no copy, no temporary file left in the directory,
+no cache entry elsewhere. With secrets, a stray extra file is a leak.
+
+This suite states that as an exhaustive contract: after generating a key,
+and after generating a certificate, the directory contains precisely the one
+new artifact that was asked for.
+
 Source: `test/e2e/thirdparty/openssl/changes.atago.yaml`
 ### Scenario: genrsa writes exactly the key file
 _only when `openssl version` succeeds_
@@ -39,6 +47,21 @@ openssl req -new -x509 -key key.pem -out cert.pem -subj /CN=atago-test -days 1
   - the step changed exactly created `cert.pem`, modified nothing, deleted nothing
   - file `cert.pem` contains `BEGIN CERTIFICATE`
 ## openssl (third-party CLI, no build required)
+[OpenSSL](https://www.openssl.org/) is the cryptography tool most scripts
+reach for, and cryptography is where "it produced output" is the least
+convincing evidence of anything.
+
+So each guarantee here is checked against something independent. Digests are
+pinned to their known values. A generated key is proven to work by deriving
+its public half and then signing and verifying with the pair — not by
+checking that a file appeared. Encryption is proven by decrypting back to
+the original bytes.
+
+And the failure case is treated as a feature: decrypting with the wrong
+password must fail loudly, because a crypto tool that silently emits garbage
+on a bad key is worse than one that crashes. A self-signed certificate is
+checked to carry the subject that was requested.
+
 Source: `test/e2e/thirdparty/openssl/openssl.atago.yaml`
 ### Scenario: sha256 digest of a fixed input is exact and stable
 #### Given

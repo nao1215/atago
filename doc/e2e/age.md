@@ -11,6 +11,16 @@
 - [age + changes (single-artifact generator)](#age--changes-single-artifact-generator) — 1 scenario
   - [age-keygen writes exactly the key file (HOME untouched)](#scenario-age-keygen-writes-exactly-the-key-file-home-untouched)
 ## age (modern file encryption)
+[age](https://age-encryption.org/) is a small, modern file-encryption CLI —
+a Go-native tool many people ship alongside their own commands, and the
+counterpart to the openssl suite here.
+
+What is guaranteed: an encrypt/decrypt round trip returns the original bytes
+exactly, including binary payloads; armored output stays ASCII and
+round-trips the same way; a passphrase typed at the interactive prompt works
+like a key file; and every failure — the wrong key, the wrong passphrase, a
+corrupted file — is refused loudly rather than yielding plausible garbage.
+
 Source: `test/e2e/thirdparty/age/age.atago.yaml`
 ### Scenario: keygen writes a key and reports the public half
 _only when `age --version` succeeds_
@@ -121,6 +131,16 @@ passphrase protected
 #### Generated artifacts
 - `secret.age`
 ## age + changes (single-artifact generator)
+A key generator should create the key and nothing else. This companion to
+the main age suite states that as an exact contract: `age-keygen` writes
+precisely one file, and the rest of the filesystem — including the user's
+home directory — is left untouched.
+
+The "HOME untouched" half is enforced rather than asserted in prose.
+`sandbox_home` moves HOME and the per-OS config/cache directories inside the
+scenario workdir, so a stray home write would show up in the workdir delta
+and break the exhaustive created list.
+
 Source: `test/e2e/thirdparty/age/changes.atago.yaml`
 ### Scenario: age-keygen writes exactly the key file (HOME untouched)
 _only when `age --version` succeeds_

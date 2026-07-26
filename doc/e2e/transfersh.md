@@ -7,6 +7,19 @@
   - [a binary upload round-trips byte-for-byte](#scenario-a-binary-upload-round-trips-byte-for-byte)
   - [a browser-style multipart upload is accepted too](#scenario-a-browser-style-multipart-upload-is-accepted-too)
 ## transfer.sh (self-hosted file sharing)
+[transfer.sh](https://github.com/dutchcoders/transfer.sh) takes a file and
+gives you a URL to fetch it back from. The only guarantee that matters is
+that what comes back is what went in.
+
+So this suite tests it with binary data rather than text. A PNG is uploaded
+as a raw request body, the share URL is captured from the response, the file
+is downloaded back to disk, and the bytes are compared to the original —
+both as a valid image and byte for byte. Text survives a lot of accidental
+mangling that binary does not.
+
+The browser-style multipart upload path is exercised as well, since that is
+how a file arrives from a web form rather than from `curl`.
+
 Source: `test/e2e/thirdparty/transfersh/transfersh.atago.yaml`
 ### Scenario: the binary reports its version
 #### When

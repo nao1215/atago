@@ -10,6 +10,17 @@
   - [a config-driven server boots from an authored Caddyfile](#scenario-a-config-driven-server-boots-from-an-authored-caddyfile)
   - [the file server serves fixtures over real HTTP](#scenario-the-file-server-serves-fixtures-over-real-http)
 ## caddy (self-hosted web server)
+[Caddy](https://caddyserver.com/) has two faces, and both are covered here.
+
+As a CLI it is a config tool: `caddy adapt`, `fmt`, and `validate` must
+accept a well-formed Caddyfile, normalize it predictably, and reject a
+broken one with a diagnostic instead of starting anyway.
+
+As a server it must actually serve. A real `caddy run` is started as a
+background process, waited for on its port, and then queried over HTTP —
+so what is asserted is the response a browser would get, not a log line
+claiming the server came up.
+
 Source: `test/e2e/thirdparty/caddy/caddy.atago.yaml`
 ### Scenario: the standard module set is compiled in
 #### When

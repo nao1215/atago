@@ -9,6 +9,19 @@
   - [the health plugin answers over HTTP while DNS serves](#scenario-the-health-plugin-answers-over-http-while-dns-serves)
   - [a broken Corefile is rejected at startup](#scenario-a-broken-corefile-is-rejected-at-startup)
 ## coredns (self-hosted DNS server)
+[CoreDNS](https://coredns.io/) speaks DNS, a protocol atago has no runner
+for — which is exactly why this suite exists. A protocol you cannot address
+directly is still testable through the client everybody already has: the
+real server is booted from an authored Corefile and zone file, and `dig`
+asks it real questions.
+
+What is guaranteed: A and TXT records resolve to the authored values, a
+CNAME is chased to its target, a name that does not exist comes back
+NXDOMAIN rather than empty-but-successful, and a name outside the served
+zone is REFUSED instead of answered. The health plugin is checked over HTTP
+alongside, so "the process is up" and "the resolver is correct" are pinned
+separately.
+
 Source: `test/e2e/thirdparty/coredns/coredns.atago.yaml`
 ### Scenario: the binary reports its version
 #### When

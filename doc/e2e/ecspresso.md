@@ -13,6 +13,16 @@
   - [an undefined must_env fails the render](#scenario-an-undefined-must_env-fails-the-render)
   - [a missing config file fails cleanly](#scenario-a-missing-config-file-fails-cleanly)
 ## ecspresso + deploy (real ECS deploy against a mock)
+The thing ecspresso exists to do: deploy an ECS service, and roll it when
+the definition changes. This suite runs that for real against a mock AWS
+endpoint (moto, an in-memory AWS mock), so no AWS account is involved and
+nothing is billed.
+
+The deploy is verified from the outside. Rather than trusting ecspresso's
+own log output, the resulting ECS state is read back with
+`aws ecs describe-services` — a second, independent client — so the
+assertion is about what the service actually looks like afterwards.
+
 Source: `test/e2e/thirdparty/ecspresso/deploy.atago.yaml`
 ### Scenario: deploy registers the task definition, creates the service, and rolls it
 _only when `command -v ecspresso && command -v moto_server && command -v aws` succeeds_
@@ -80,6 +90,23 @@ aws --endpoint-url http://127.0.0.1:15111 ecs list-task-definitions --query "len
   - exit code is `0`
   - stdout contains `2`
 ## ecspresso (Amazon ECS deploy tool)
+[ecspresso](https://github.com/kayac/ecspresso) deploys ECS services, which
+needs AWS — but everything that decides *what* gets deployed happens locally
+first. `ecspresso render` evaluates a task and service definition without
+touching a cluster, and that is the surface pinned here: the step where a
+mistake becomes a bad deploy.
+
+What is guaranteed: template functions expand to the documented values and
+fall back to their defaults when unset; jsonnet definitions resolve with
+external variables supplied; config paths resolve as documented; and the
+failure modes stay loud and distinct — an undefined `must_env` and a missing
+config file each fail with their own exit code rather than rendering
+something half-substituted.
+
+The rendered task definition is asserted as structured JSON, so a
+reformatting change cannot break the suite while a semantic change slips
+through.
+
 Source: `test/e2e/thirdparty/ecspresso/ecspresso.atago.yaml`
 ### Scenario: version prints without error
 _only when `ecspresso version` succeeds_

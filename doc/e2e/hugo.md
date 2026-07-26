@@ -15,6 +15,20 @@
   - [the post page renders its title](#scenario-the-post-page-renders-its-title)
   - [an unknown path is a 404](#scenario-an-unknown-path-is-a-404)
 ## hugo (scaffold + build CLI, tree-snapshot testbed)
+[Hugo](https://gohugo.io/) is a scaffolder and a build tool in one binary,
+and both produce their result as a directory tree rather than as output on
+stdout.
+
+That shape is what this suite is about. `hugo new site` must generate the
+documented layout — the whole tree, asserted against a committed snapshot,
+so an unexpected new file or a silently dropped one both show up. `hugo
+--minify` must then turn content into a built site whose files exist and
+contain what they should.
+
+A generator is only trustworthy if the shape of what it generates is
+trustworthy, which is why the assertion is the tree, not a spot check on one
+file.
+
 Source: `test/e2e/thirdparty/hugo/hugo.atago.yaml`
 ### Scenario: new site scaffolds the documented directory tree
 _only when `hugo version` succeeds_
@@ -168,6 +182,16 @@ cd mysite && hugo --quiet
   - exit code is `0`
   - the step changed exactly created nothing, modified nothing, deleted nothing
 ## hugo server (suite-wide service + http peer)
+`hugo server` is the half of Hugo a developer actually looks at: the site,
+served over HTTP, rendered. This suite scaffolds a site, starts the real
+development server against it, and then asks for pages the way a browser
+would — so what is asserted is the HTML that reached the client.
+
+The ordering is the interesting constraint. A site must exist before a
+server can serve it, so the scaffold runs first and the server starts at
+exactly that point in the sequence, once, for the whole suite — the
+build-then-serve bootstrap every "run my app and test it" setup needs.
+
 Source: `test/e2e/thirdparty/hugo/hugo_server.atago.yaml`
 ### Scenario: the home page lists the post
 #### When

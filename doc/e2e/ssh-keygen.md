@@ -10,6 +10,19 @@
   - [interactive passphrase generation prompts twice](#scenario-interactive-passphrase-generation-prompts-twice)
   - [the wrong passphrase is rejected](#scenario-the-wrong-passphrase-is-rejected)
 ## ssh-keygen (OpenSSH key generation)
+`ssh-keygen` is small, ships with OpenSSH everywhere, and happens to combine
+three things that are each awkward to test: an interactive passphrase
+prompt, files written to disk, and an exit code that carries meaning.
+
+All three are covered together. The passphrase is typed at the real prompt
+inside a terminal, the resulting key pair is asserted as files with the
+right shape and permissions, and the fingerprint output is checked — as is
+the failure when a key cannot be verified.
+
+Every key here is a throwaway generated inside the scenario's own workspace,
+which is discarded when the scenario ends. No real credential is involved at
+any point.
+
 Source: `test/e2e/thirdparty/ssh-keygen/ssh-keygen.atago.yaml`
 ### Scenario: non-interactive generation writes the key pair
 _only when `command -v ssh-keygen` succeeds_

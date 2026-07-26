@@ -25,6 +25,16 @@
   - [g then enter pops the selected stash entry back into the worktree](#scenario-g-then-enter-pops-the-selected-stash-entry-back-into-the-worktree)
   - [g then escape cancels stash pop and keeps the stash stored](#scenario-g-then-escape-cancels-stash-pop-and-keeps-the-stash-stored)
 ## lazygit (third-party git TUI)
+[lazygit](https://github.com/jesseduffield/lazygit) is a terminal interface
+in front of a real repository: keystrokes stage files, write commits,
+discard changes, create branches, and push and pop stashes.
+
+Both sides of that are asserted. The rendered screen must show the user what
+they expect at each checkpoint — otherwise the tool is unusable even when it
+works — and the repository underneath must have actually changed, checked by
+reading git state afterwards. A TUI test that only looked at the screen
+would pass on a version that draws a commit it never made.
+
 Source: `test/e2e/thirdparty/lazygit/lazygit.atago.yaml`
 ### Scenario: version prints the pinned release
 _only when `lazygit --version` succeeds_

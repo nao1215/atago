@@ -2,6 +2,21 @@ version: "1"
 
 suite:
   name: yazi (third-party terminal file manager) / chooser selection
+  description: |
+    Used as a file chooser, yazi's job is to hand a shell script the paths the
+    user picked. The rule that matters — and the one easiest to get wrong — is
+    that an explicit selection beats whatever the cursor happens to be sitting
+    on. A user who selects three files and then moves the cursor elsewhere must
+    still get those three.
+
+    Every way of selecting is put through that test: pressing space on
+    individual entries, sweeping a range in visual mode, selecting everything at
+    once, and inverting a selection. Toggling the same entry twice must clear
+    it, not select it again.
+
+    Files and directories are covered separately, and so are names containing
+    spaces — the classic point where a path list gets silently split into the
+    wrong number of entries.
 
 scenarios:
   - name: chooser-file writes a space-selected file instead of the hovered file

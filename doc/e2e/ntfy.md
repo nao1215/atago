@@ -8,6 +8,20 @@
   - [the bundled CLI publishes against the same server](#scenario-the-bundled-cli-publishes-against-the-same-server)
   - [deny-all access control locks a topic until a user is granted](#scenario-deny-all-access-control-locks-a-topic-until-a-user-is-granted)
 ## ntfy (self-hosted push notification service)
+[ntfy](https://ntfy.sh/) sends push notifications over plain HTTP, which
+means anything that can make a request can publish — and that is both its
+appeal and the reason its access control matters.
+
+The publish path is pinned with its metadata intact: a notification's title,
+priority, and tags must survive as sent and come back on the JSON feed.
+Topics must stay isolated, so a subscriber to one topic never sees another's
+messages. The bundled CLI is exercised against the same server as the raw
+HTTP client, so the two agree.
+
+Access control gets the same treatment as the happy path: with a deny-all
+default in place, publishing is refused; after a user is created and granted
+access through the admin CLI, the same publish succeeds.
+
 Source: `test/e2e/thirdparty/ntfy/ntfy.atago.yaml`
 ### Scenario: the binary reports its version
 #### When

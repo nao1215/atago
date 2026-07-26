@@ -7,6 +7,17 @@
   - [the server boots from an authored app.ini and reports healthy](#scenario-the-server-boots-from-an-authored-appini-and-reports-healthy)
   - [admin CLI, REST API, and a real git clone interoperate](#scenario-admin-cli-rest-api-and-a-real-git-clone-interoperate)
 ## gitea (self-hosted git service)
+[Gitea](https://about.gitea.com/) is a whole git forge, and this suite meets
+it the way an administrator would: a real server is booted from an authored
+`app.ini` on SQLite, a user and an access token are provisioned through
+Gitea's own CLI, and everything after that goes over the REST API —
+creating a repository, committing files into it, opening issues.
+
+The suite ends by cloning that repository with real `git` over HTTP. That
+last step is the point: two independent third-party programs, neither aware
+of this test, are shown to interoperate — the forge really serves git, not
+just a JSON API that claims a repository exists.
+
 Source: `test/e2e/thirdparty/gitea/gitea.atago.yaml`
 ### Scenario: the binary reports its version
 #### When

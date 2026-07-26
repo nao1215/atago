@@ -9,6 +9,17 @@
   - [a MIME attachment survives delivery intact](#scenario-a-mime-attachment-survives-delivery-intact)
   - [deleting all messages empties the mailbox](#scenario-deleting-all-messages-empties-the-mailbox)
 ## mailpit (self-hosted email testing server)
+[Mailpit](https://mailpit.axllent.org/) catches email so it can be
+inspected, and testing it means using two protocols at once: mail goes in
+over SMTP and comes back out over HTTP.
+
+Messages are delivered by the stock `curl` client speaking real SMTP — no
+library shim, no injected fixture — and everything after that is asserted
+through Mailpit's REST API: that the message was captured with its headers
+and body intact, that full-text search finds it, that a MIME attachment
+survives as a distinct part, and that clearing the mailbox really empties
+it.
+
 Source: `test/e2e/thirdparty/mailpit/mailpit.atago.yaml`
 ### Scenario: the binary reports its version
 #### When

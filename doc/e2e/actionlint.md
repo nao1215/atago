@@ -13,6 +13,17 @@
   - [-ignore removes a matching finding](#scenario--ignore-removes-a-matching-finding)
   - [stdin mode lints piped content under the given filename](#scenario-stdin-mode-lints-piped-content-under-the-given-filename)
 ## actionlint (GitHub Actions workflow linter)
+[actionlint](https://github.com/rhysd/actionlint) statically checks GitHub
+Actions workflow YAML. It is offline and deterministic — the same workflow
+always produces the same findings — which makes its contract unusually
+precise to pin.
+
+What is guaranteed here: exit 0 and silence on a clean workflow, exit 1 with
+every problem printed as `file:line:col`, a rule tag, and a code snippet;
+distinct rule categories producing distinctly tagged errors; the JSON format
+agreeing with the human one over the same findings; and `-ignore` removing a
+matching error without hiding the rest.
+
 Source: `test/e2e/thirdparty/actionlint/actionlint.atago.yaml`
 ### Scenario: version prints a semantic version
 _only when `actionlint -version` succeeds_

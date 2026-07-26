@@ -12,6 +12,17 @@
   - [aborting the finder exits 130](#scenario-aborting-the-finder-exits-130)
   - [the finder screen narrows to the typed query](#scenario-the-finder-screen-narrows-to-the-typed-query)
 ## fzf (third-party CLI, pty testbed)
+[fzf](https://github.com/junegunn/fzf) is the archetype of a CLI you cannot
+test by piping to it: it refuses to run without a terminal, redraws the
+screen as you type, and is driven entirely by keystrokes.
+
+Both halves are covered. `fzf --filter` is a plain program with a plain
+contract — given a query and a list on stdin, it prints the matches and
+exits with a code that says whether anything matched. The interactive
+scenarios run the real finder inside a pseudo-terminal and drive it the way
+a person does: type to narrow the list, move the selection, press Enter, and
+assert on what fzf finally printed.
+
 Source: `test/e2e/thirdparty/fzf/fzf.atago.yaml`
 ### Scenario: version prints a semantic version
 _only when `fzf --version` succeeds_

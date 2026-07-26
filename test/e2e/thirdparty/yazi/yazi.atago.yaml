@@ -2,13 +2,25 @@ version: "1"
 
 suite:
   name: yazi (third-party terminal file manager)
+  description: |
+    [yazi](https://yazi-rs.github.io/) is a file manager, so every keystroke is
+    a potential file operation. A test that only checked the screen would pass
+    on a version that draws a successful copy it never performed — and on a file
+    manager, that class of bug destroys data.
 
-# yazi is not just "a screen that appears": its core contract is that real file
-# operations are driven from a TUI with typed inputs, modal keybindings, live
-# filtering, and shell-wrapper cwd handoff. These scenarios therefore pin both
-# the rendered terminal UI and the actual filesystem effects under the scenario
-# workdir. Install: see .github/workflows/thirdparty.yml for the pinned CI
-# version.
+    So both are asserted throughout: what the terminal displays, and what
+    actually happened on disk afterwards.
+
+    This suite covers the core interactions — hidden files staying hidden until
+    toggled, live filtering narrowing the list, creating files and directories,
+    renaming exactly one entry and nothing else, yank/paste and cut/paste
+    between directories, and permanent deletion including the case where the
+    confirmation is declined and the file must survive.
+
+    The remaining yazi suites break out selection semantics, entry arguments,
+    navigation and tabs, search, and hardlinks and overwrites.
+
+# Install: see .github/workflows/thirdparty.yml for the pinned CI version.
 scenarios:
   - name: version prints a semantic version banner
     only:

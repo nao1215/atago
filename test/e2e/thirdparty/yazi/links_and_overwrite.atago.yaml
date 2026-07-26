@@ -2,6 +2,24 @@ version: "1"
 
 suite:
   name: yazi (third-party terminal file manager) / links and overwrite
+  description: |
+    The operations here are the ones that can lose data, so each is pinned in
+    both directions.
+
+    Cancelling a pending cut or copy must really cancel it: a later paste must
+    do nothing, rather than quietly completing the operation the user thought
+    they had abandoned.
+
+    Overwriting must really overwrite. When the destination already exists, the
+    forced paste has to replace it — for a file and for a whole directory
+    subtree, under both copy and move — and the result on disk is checked
+    afterwards, not just the absence of an error.
+
+    Hardlinking is covered as its own case, since a hardlink that silently
+    degrades into a copy looks identical until something writes through it.
+
+    Spaced names run through all of it, being where path handling tends to
+    fail.
 
 scenarios:
   - name: uppercase X cancels a cut before pasting

@@ -14,6 +14,18 @@
 - [aqua + install (declarative install of a real tool)](#aqua--install-declarative-install-of-a-real-tool) — 1 scenario
   - [install downloads the tool and makes it runnable](#scenario-install-downloads-the-tool-and-makes-it-runnable)
 ## aqua (declarative CLI version manager)
+[aqua](https://aquaproj.github.io/) manages CLI tools declaratively from an
+`aqua.yaml`. Actually installing a tool needs the network and the registry,
+so this suite pins the half that must work offline and identically every
+time — the half a developer hits before anything is downloaded.
+
+What is guaranteed: authoring a config and a policy leaves exactly the files
+it should; `aqua init` is idempotent, so re-running it does not corrupt an
+existing config; the offline generators (shell completion, root-dir) print
+usable output; and the exit codes keep a usage mistake (3) distinct from a
+runtime failure (1), so a script can tell "you typed it wrong" from "it
+broke".
+
 Source: `test/e2e/thirdparty/aqua/aqua.atago.yaml`
 ### Scenario: version prints without error
 _only when `aqua version` succeeds_
@@ -111,6 +123,18 @@ aqua bogus-subcommand-xyz
 - exit code is `3`
 - stderr contains `No help topic`
 ## aqua + install (declarative install of a real tool)
+The thing aqua exists to do: turn a line in a config file into a tool you
+can run. This suite exercises that end to end — declare a package, install
+it, execute it — rather than stopping at the offline surface its companion
+suite covers.
+
+It stays hermetic by moving only the registry, not the mechanism. A local
+registry describes an http package whose asset is a tiny self-authored
+"tool" served from a loopback file server, so `aqua install` performs a real
+download, lands a real binary under `AQUA_ROOT_DIR`, and `aqua exec` really
+runs it — with no dependency on the public registry or on GitHub for the
+tool itself.
+
 Source: `test/e2e/thirdparty/aqua/install.atago.yaml`
 ### Scenario: install downloads the tool and makes it runnable
 _only when `aqua version` succeeds_

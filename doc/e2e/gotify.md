@@ -7,6 +7,20 @@
   - [an application pushes and the admin reads it back](#scenario-an-application-pushes-and-the-admin-reads-it-back)
   - [the app icon round-trips through a multipart upload](#scenario-the-app-icon-round-trips-through-a-multipart-upload)
 ## gotify (self-hosted notification server)
+[Gotify](https://gotify.net/) receives notifications and hands them back
+out. The full path is exercised against a real server on SQLite: an
+application is provisioned over the REST API, a message is pushed with that
+application's token, and it is read back with admin credentials — so the
+message is proven to have been stored and served, not merely accepted.
+
+The refusal matters as much as the delivery: pushing without valid
+credentials must fail rather than silently drop the notification.
+
+One scenario goes further than JSON. The application's icon is uploaded as a
+genuine multipart form-data request, downloaded back to disk, and verified
+as a real PNG — the same round trip a browser performs, asserted on the
+bytes that came back.
+
 Source: `test/e2e/thirdparty/gotify/gotify.atago.yaml`
 ### Scenario: the server reports health and version
 #### Given

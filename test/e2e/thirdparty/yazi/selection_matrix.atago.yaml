@@ -2,6 +2,19 @@ version: "1"
 
 suite:
   name: yazi (third-party terminal file manager) / selection matrix
+  description: |
+    One rule, checked against every combination that could break it: an
+    operation acts on what is selected, not on what the cursor is pointing at.
+
+    Select an entry, move the cursor somewhere else, then copy, move, or delete
+    — and the selected entry must be the one affected, while the entry now under
+    the cursor must be left alone. Acting on the hovered file instead is the
+    failure mode that quietly destroys the wrong data.
+
+    The matrix runs that rule across files and directories, single entries and
+    visual-mode ranges, and copy, move, and permanent delete — with spaced names
+    included, since a path that splits on a space turns one operation into
+    several wrong ones.
 
 scenarios:
   - name: space-selected file is moved even when the cursor moves away
