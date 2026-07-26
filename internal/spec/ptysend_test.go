@@ -27,9 +27,18 @@ func TestPTYKeySequences_GoldenTable(t *testing.T) {
 		"f4":        "\x1bOS",
 		"f5":        "\x1b[15~",
 		"f12":       "\x1b[24~",
+		"ctrl-space":"\x00",
+		"ctrl-@":    "\x00",
 		"ctrl-a":    "\x01",
 		"ctrl-c":    "\x03",
 		"ctrl-d":    "\x04",
+		"ctrl-[":    "\x1b",
+		"ctrl-\\":   "\x1c",
+		"ctrl-]":    "\x1d",
+		"ctrl-^":    "\x1e",
+		"ctrl-_":    "\x1f",
+		"ctrl-hyphen":"\x1f",
+		"ctrl-minus":"\x1f",
 		"ctrl-z":    "\x1a",
 	}
 	for name, bytes := range want {

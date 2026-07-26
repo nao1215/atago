@@ -149,9 +149,9 @@ scenarios:
 
 ```shell
 $ atago run ./specs
-...............................................
+.....................................................................................................
 
-PASSED  47 scenarios: 47 passed, 0 failed, 0 errored, 0 skipped (1.2s)
+PASSED  101 scenarios: 101 passed, 0 failed, 0 errored, 0 skipped (20.2s)
 ```
 
 Scenarios run concurrently by default (`--parallel N`, defaulting to your CPU count; set `--parallel 1` to serialize). Workdirs are isolated, but the host network is shared — so if two scenarios each start a background `service:`, give them distinct ports, or one scenario's requests can reach the other's server.
@@ -232,7 +232,7 @@ For full-screen TUIs, `expect_screen:` waits on the LIVE rendered frame during t
             contains: "Summary"
 ```
 
-Named keys (`send: {key: enter}`) and rendered-screen checks cover full TUIs — see [pty](examples/pty.atago.yaml), [pty_screen](examples/pty_screen.atago.yaml), and the cross-platform [pty_portable](examples/pty_portable.atago.yaml). `pty` steps and `atago record --pty` run on Linux, macOS, and Windows (where they drive a ConPTY pseudo-console); only `signal:` stays POSIX-only. The `pty`/`pty_screen` examples skip on Windows because their inner commands (`[ -t 0 ]`, `cat -v`, a SIGINT trap) are POSIX-specific, not because the `pty` mechanism is.
+Named keys (`send: {key: enter}`) and rendered-screen checks cover full TUIs — including control-key aliases like `ctrl-space`, `ctrl-[`, and `ctrl-hyphen`/`ctrl-minus` — see [pty](examples/pty.atago.yaml), [pty_screen](examples/pty_screen.atago.yaml), and the cross-platform [pty_portable](examples/pty_portable.atago.yaml). `pty` steps and `atago record --pty` run on Linux, macOS, and Windows (where they drive a ConPTY pseudo-console); only `signal:` stays POSIX-only. The `pty`/`pty_screen` examples skip on Windows because their inner commands (`[ -t 0 ]`, `cat -v`, a SIGINT trap) are POSIX-specific, not because the `pty` mechanism is.
 
 ### When your CLI talks to a server
 

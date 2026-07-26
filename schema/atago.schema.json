@@ -1254,12 +1254,12 @@
                       "key": {
                         "type": "string",
                         "minLength": 1,
-                        "description": "Named key: enter, tab, esc, space, backspace, delete, arrows, home/end, pageup/pagedown, f1-f12, ctrl-a..ctrl-z."
+                        "description": "Named key: enter, tab, esc, space, backspace, delete, arrows, home/end, pageup/pagedown, f1-f12, ctrl-a..ctrl-z, ctrl-space/ctrl-@, ctrl-[, ctrl-\\\\, ctrl-], ctrl-^, ctrl-_/ctrl-hyphen/ctrl-minus."
                       }
                     }
                   }
                 ],
-                "description": "Writes to the terminal: a string verbatim (\"\" sends EOF/^D; `${name}` expansion applies) or `{key: <name>}` for a named key — enter, tab, esc, arrows, f1-f12, ctrl-a..ctrl-z."
+                "description": "Writes to the terminal: a string verbatim (\"\" sends EOF/^D; `${name}` expansion applies) or `{key: <name>}` for a named key — enter, tab, esc, arrows, f1-f12, ctrl-a..ctrl-z, ctrl-space/ctrl-@, ctrl-[, ctrl-\\\\, ctrl-], ctrl-^, ctrl-_/ctrl-hyphen/ctrl-minus."
               },
               "expect_screen": {
                 "type": "object",
