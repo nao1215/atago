@@ -1008,9 +1008,11 @@ func TestBugHunt_Rejections(t *testing.T) {
 		{"suite step no action", "version: \"1\"\nsuite:\n  name: x\n  setup:\n    - {}\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n", "step must set exactly one action"},
 	}
 
+	// Keep these bulk validation tables serial inside the parent test. The
+	// loader work here is tiny, and aggressive nested parallelism has crashed
+	// the Go runtime on Windows CI.
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			mustReject(t, tt.name, tt.src, tt.want)
 		})
 	}
@@ -1071,7 +1073,6 @@ func TestBugHunt_Acceptances(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			mustAccept(t, tt.name, tt.src)
 		})
 	}
@@ -1166,7 +1167,6 @@ func TestBugHunt_DirAssert(t *testing.T) {
 	}
 	for _, tt := range reject {
 		t.Run("reject/"+tt.name, func(t *testing.T) {
-			t.Parallel()
 			mustReject(t, tt.name, tt.src, tt.want)
 		})
 	}
@@ -1188,7 +1188,6 @@ func TestBugHunt_DirAssert(t *testing.T) {
 	}
 	for _, tt := range accept {
 		t.Run("accept/"+tt.name, func(t *testing.T) {
-			t.Parallel()
 			mustAccept(t, tt.name, tt.src)
 		})
 	}
