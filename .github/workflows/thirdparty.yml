@@ -68,6 +68,9 @@ jobs:
               tar -xJf helix.tar.xz -C "$HOME"
               echo "HELIX_RUNTIME=$HOME/helix-${ver}-x86_64-linux/runtime" >> "$GITHUB_ENV"
               echo "$HOME/helix-${ver}-x86_64-linux" >> "$GITHUB_PATH"
+          - name: gum
+            dir: ./test/e2e/thirdparty/gum
+            install: go install github.com/charmbracelet/gum@v0.17.0
           # htop drives the pty runner's alternate-screen rendering and named
           # function keys.
           - name: htop
