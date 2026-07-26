@@ -50,3 +50,87 @@ scenarios:
             path: linkdir
             contains: [planted]
             not_contains: [never-planted]
+
+  - name: a failed dir assert lists what the directory actually holds
+    steps:
+      - fixture:
+          file: listing.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: listing
+            scenarios:
+              - name: the generator produced the wrong tree
+                steps:
+                  - fixture: {file: out/index.html, content: "x"}
+                  - fixture: {file: out/app.js, content: "x"}
+                  - run: {command: echo built}
+                  - assert:
+                      dir:
+                        path: out
+                        contains: [style.css]
+      - run:
+          command: ${atago} run listing.atago.yaml
+      # The failure must name the files that ARE there, so the reader does not
+      # have to re-run the generator by hand to find out.
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - "app.js"
+              - "index.html"
+
+  - name: a failed count assert lists the entries it counted
+    steps:
+      - fixture:
+          file: counted.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: counted
+            scenarios:
+              - name: the count is off
+                steps:
+                  - fixture: {file: out/only.txt, content: "x"}
+                  - run: {command: echo built}
+                  - assert:
+                      dir:
+                        path: out
+                        count: 4
+      - run:
+          command: ${atago} run counted.atago.yaml
+      # Singular noun when exactly one entry was found, and the entry is named.
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - "only.txt"
+              - "has 1 entry"
+
+  - name: a failed recursive assert lists the walked tree
+    steps:
+      - fixture:
+          file: walked.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: walked
+            scenarios:
+              - name: the nested path is missing
+                steps:
+                  - fixture: {file: out/assets/app.css, content: "x"}
+                  - fixture: {file: out/index.html, content: "x"}
+                  - run: {command: echo built}
+                  - assert:
+                      dir:
+                        path: out
+                        recursive: true
+                        contains: [assets/missing.css]
+      - run:
+          command: ${atago} run walked.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - "assets/app.css"
+              - "index.html"

@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-74 suites · 391 scenarios
+74 suites · 394 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -67,10 +67,13 @@
   - [an unsupported defaults field is a load-time error (exit 2)](#scenario-an-unsupported-defaults-field-is-a-load-time-error-exit-2)
   - [defaults.run.env merges per key and a step env wins the collisions](#scenario-defaultsrunenv-merges-per-key-and-a-step-env-wins-the-collisions)
   - [a step opts out of defaults.run.shell with an explicit shell false](#scenario-a-step-opts-out-of-defaultsrunshell-with-an-explicit-shell-false)
-- [atago self-hosting / dir assertion](#atago-self-hosting--dir-assertion) — 3 scenarios
+- [atago self-hosting / dir assertion](#atago-self-hosting--dir-assertion) — 6 scenarios
   - [directory/tree assertions cover a multi-file generator](#scenario-directorytree-assertions-cover-a-multi-file-generator)
   - [a missing directory can be asserted absent](#scenario-a-missing-directory-can-be-asserted-absent)
   - [a dangling symlink is a present directory entry (membership uses Lstat)](#scenario-a-dangling-symlink-is-a-present-directory-entry-membership-uses-lstat)
+  - [a failed dir assert lists what the directory actually holds](#scenario-a-failed-dir-assert-lists-what-the-directory-actually-holds)
+  - [a failed count assert lists the entries it counted](#scenario-a-failed-count-assert-lists-the-entries-it-counted)
+  - [a failed recursive assert lists the walked tree](#scenario-a-failed-recursive-assert-lists-the-walked-tree)
 - [atago self-hosting / recursive dir asserts + tree snapshots](#atago-self-hosting--recursive-dir-asserts--tree-snapshots) — 3 scenarios
   - [record, compare green, then a mutation names the changed paths](#scenario-record-compare-green-then-a-mutation-names-the-changed-paths)
   - [recursive matchers and ignore globs walk the tree](#scenario-recursive-matchers-and-ignore-globs-walk-the-tree)
@@ -1630,6 +1633,87 @@ mkdir -p linkdir && ln -s /nonexistent-target-xyz linkdir/planted
 #### Then
 - exit code is `0`
 - dir `linkdir` contains `planted`, does not contain `never-planted`
+### Scenario: a failed dir assert lists what the directory actually holds
+#### Given
+- Fixture file `listing.atago.yaml` is created.
+#### Inputs
+_Fixture `listing.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: listing
+scenarios:
+  - name: the generator produced the wrong tree
+    steps:
+      - fixture: {file: out/index.html, content: "x"}
+      - fixture: {file: out/app.js, content: "x"}
+      - run: {command: echo built}
+      - assert:
+          dir:
+            path: out
+            contains: [style.css]
+```
+#### When
+```shell
+${atago} run listing.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `app.js`, `index.html`
+### Scenario: a failed count assert lists the entries it counted
+#### Given
+- Fixture file `counted.atago.yaml` is created.
+#### Inputs
+_Fixture `counted.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: counted
+scenarios:
+  - name: the count is off
+    steps:
+      - fixture: {file: out/only.txt, content: "x"}
+      - run: {command: echo built}
+      - assert:
+          dir:
+            path: out
+            count: 4
+```
+#### When
+```shell
+${atago} run counted.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `only.txt`, `has 1 entry`
+### Scenario: a failed recursive assert lists the walked tree
+#### Given
+- Fixture file `walked.atago.yaml` is created.
+#### Inputs
+_Fixture `walked.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: walked
+scenarios:
+  - name: the nested path is missing
+    steps:
+      - fixture: {file: out/assets/app.css, content: "x"}
+      - fixture: {file: out/index.html, content: "x"}
+      - run: {command: echo built}
+      - assert:
+          dir:
+            path: out
+            recursive: true
+            contains: [assets/missing.css]
+```
+#### When
+```shell
+${atago} run walked.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `assets/app.css`, `index.html`
 ## atago self-hosting / recursive dir asserts + tree snapshots
 Source: `test/e2e/atago/dir_tree.atago.yaml`
 ### Scenario: record, compare green, then a mutation names the changed paths

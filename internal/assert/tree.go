@@ -144,6 +144,25 @@ func ignoredPath(rel string, ignore []string) bool {
 // checkDirRecursive evaluates the recursive matcher family over the walked
 // tree (#25): contains/not_contains against relative paths, counts over files
 // only, glob against each relative path (or basename for /-less patterns).
+// treeListing renders a walked tree for a failure block: one sorted
+// /-separated path per line, directories marked with a trailing slash and
+// symlinks shown with their target, capped like dirListing.
+func treeListing(entries []treeEntry) string {
+	names := make([]string, 0, len(entries))
+	for _, e := range entries {
+		switch e.kind {
+		case "dir":
+			names = append(names, e.rel+"/")
+		case "link":
+			names = append(names, e.rel+" -> "+e.target)
+		default:
+			names = append(names, e.rel)
+		}
+	}
+	sort.Strings(names)
+	return renderListing(names, "paths")
+}
+
 func checkDirRecursive(d *spec.DirAssert, dirPath string) *CheckResult {
 	entries, err := walkTree(dirPath, d.Ignore)
 	if err != nil {
@@ -157,13 +176,16 @@ func checkDirRecursive(d *spec.DirAssert, dirPath string) *CheckResult {
 			files++
 		}
 	}
+	// Rendered once and reused: every failure below answers the same question,
+	// "what does the tree actually hold?".
+	listing := treeListing(entries)
 
 	for _, child := range d.Contains {
 		if !present[path.Clean(filepath.ToSlash(child))] {
 			return &CheckResult{
 				Desc:     fmt.Sprintf("assert dir %q contains %q", d.Path, child),
 				Expected: fmt.Sprintf("path %q present in the tree", child),
-				Actual:   "missing",
+				Actual:   listing,
 				Hint:     fmt.Sprintf("expected %q to exist under %q (recursive)", child, d.Path),
 			}
 		}
@@ -173,20 +195,20 @@ func checkDirRecursive(d *spec.DirAssert, dirPath string) *CheckResult {
 			return &CheckResult{
 				Desc:     fmt.Sprintf("assert dir %q does not contain %q", d.Path, child),
 				Expected: fmt.Sprintf("path %q absent from the tree", child),
-				Actual:   "present",
+				Actual:   listing,
 				Hint:     fmt.Sprintf("expected %q not to exist under %q (recursive)", child, d.Path),
 			}
 		}
 	}
 
 	if d.Count != nil && files != *d.Count {
-		return dirCountFailure(d, files, fmt.Sprintf("exactly %d files in the tree", *d.Count))
+		return dirCountFailure(d, files, fmt.Sprintf("exactly %d files in the tree", *d.Count), listing)
 	}
 	if d.MinCount != nil && files < *d.MinCount {
-		return dirCountFailure(d, files, fmt.Sprintf("at least %d files in the tree", *d.MinCount))
+		return dirCountFailure(d, files, fmt.Sprintf("at least %d files in the tree", *d.MinCount), listing)
 	}
 	if d.MaxCount != nil && files > *d.MaxCount {
-		return dirCountFailure(d, files, fmt.Sprintf("at most %d files in the tree", *d.MaxCount))
+		return dirCountFailure(d, files, fmt.Sprintf("at most %d files in the tree", *d.MaxCount), listing)
 	}
 
 	if d.Glob != "" {
@@ -207,7 +229,7 @@ func checkDirRecursive(d *spec.DirAssert, dirPath string) *CheckResult {
 			return &CheckResult{
 				Desc:     fmt.Sprintf("assert dir %q glob %q", d.Path, d.Glob),
 				Expected: fmt.Sprintf("at least one tree entry matching %q", d.Glob),
-				Actual:   fmt.Sprintf("no match among %d entries", len(entries)),
+				Actual:   listing,
 				Hint:     fmt.Sprintf("no entry under %q matched glob %q (recursive)", d.Path, d.Glob),
 			}
 		}
