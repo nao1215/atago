@@ -178,6 +178,13 @@ func collectStructPaths() map[string]bool {
 			if prefix != "" {
 				path = prefix + "." + name
 			}
+			// expect_screen reuses StreamAssert's matcher fields but the loader
+			// deliberately rejects snapshot/trim there; parity should compare the
+			// user-visible accepted key set, not every embedded field in the Go
+			// struct.
+			if prefix == "pty.session[].expect_screen" && (name == "snapshot" || name == "trim") {
+				continue
+			}
 			paths[path] = true
 			recurse(f.Type, path)
 		}

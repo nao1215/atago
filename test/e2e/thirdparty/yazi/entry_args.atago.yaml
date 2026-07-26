@@ -1,0 +1,274 @@
+version: "1"
+
+suite:
+  name: yazi (third-party terminal file manager) / entry args
+
+scenarios:
+  - name: starting on an explicit directory writes that cwd on quit
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: target/a.txt, content: a}
+      - pty:
+          command: yazi --cwd-file ${workdir}/cwd.txt target
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a.txt"
+            - send: "q"
+      - assert: {file: {path: cwd.txt, contains: "/target"}}
+
+  - name: starting on an explicit file can choose that file immediately
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: target/a.txt, content: a}
+      - pty:
+          command: yazi --chooser-file ${workdir}/chosen.txt target/a.txt
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a.txt"
+            - send: {key: enter}
+      - assert: {file: {path: chosen.txt, contains: "/target/a.txt"}}
+
+  - name: starting on an explicit file writes its parent cwd on q
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: target/a.txt, content: a}
+      - pty:
+          command: yazi --cwd-file ${workdir}/cwd.txt target/a.txt
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a.txt"
+            - send: "q"
+      - assert: {file: {path: cwd.txt, contains: "/target"}}
+
+  - name: starting on an explicit file can leave to its parent and choose a sibling
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: target/a.txt, content: a}
+      - fixture: {file: target/b.txt, content: b}
+      - pty:
+          command: yazi --chooser-file ${workdir}/chosen.txt target/a.txt
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a.txt"
+            - send: "j"
+            - expect: "b.txt"
+            - send: {key: enter}
+      - assert: {file: {path: chosen.txt, contains: "/target/b.txt"}}
+
+  - name: starting on a spaced directory writes that cwd on quit
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: two words/a.txt, content: a}
+      - pty:
+          command: yazi --cwd-file ${workdir}/cwd.txt "two words"
+          shell: true
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a.txt"
+            - send: "q"
+      - assert: {file: {path: cwd.txt, contains: "/two words"}}
+
+  - name: starting on a spaced file can choose that file immediately
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: two words/a file.txt, content: a}
+      - pty:
+          command: yazi --chooser-file ${workdir}/chosen.txt "two words/a file.txt"
+          shell: true
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a file.txt"
+            - send: {key: enter}
+      - assert: {file: {path: chosen.txt, contains: "/two words/a file.txt"}}
+
+  - name: starting with a spaced file writes its parent cwd on q
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: two words/a file.txt, content: a}
+      - pty:
+          command: yazi --cwd-file ${workdir}/cwd.txt "two words/a file.txt"
+          shell: true
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a file.txt"
+            - send: "q"
+      - assert: {file: {path: cwd.txt, contains: "/two words"}}
+
+  - name: starting on a hidden directory writes that cwd on quit
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: .hidden/a.txt, content: a}
+      - pty:
+          command: yazi --cwd-file ${workdir}/cwd.txt .hidden
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a.txt"
+            - send: "q"
+      - assert: {file: {path: cwd.txt, contains: "/.hidden"}}
+
+  - name: starting on a nested file lets q write its parent cwd
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: nested/deeper/file.txt, content: a}
+      - pty:
+          command: yazi --cwd-file ${workdir}/cwd.txt nested/deeper/file.txt
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "file.txt"
+            - send: "q"
+      - assert: {file: {path: cwd.txt, contains: "/nested/deeper"}}
+
+  - name: starting with two explicit directories opens the second as another tab
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: one/a.txt, content: a}
+      - fixture: {file: two/b.txt, content: b}
+      - pty:
+          command: yazi --cwd-file ${workdir}/cwd.txt one two
+          shell: true
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a.txt"
+            - send: "]"
+            - expect_screen:
+                contains: "b.txt"
+                not_contains: "a.txt"
+                stable_for: 100ms
+            - send: "q"
+      - assert: {file: {path: cwd.txt, contains: "/two"}}
+
+  - name: starting with a directory and a file lets numeric switching choose the file tab
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: one/a.txt, content: a}
+      - fixture: {file: two/b.txt, content: b}
+      - pty:
+          command: yazi --chooser-file ${workdir}/chosen.txt one two/b.txt
+          shell: true
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a.txt"
+            - send: "2"
+            - expect_screen:
+                contains: "b.txt"
+                not_contains: "a.txt"
+                stable_for: 100ms
+            - send: {key: enter}
+      - assert: {file: {path: chosen.txt, contains: "/two/b.txt"}}
+
+  - name: starting with two explicit files lets next-tab choose the second file tab
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: one/a.txt, content: a}
+      - fixture: {file: two/b.txt, content: b}
+      - pty:
+          command: yazi --chooser-file ${workdir}/chosen.txt one/a.txt two/b.txt
+          shell: true
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a.txt"
+            - send: "]"
+            - expect_screen:
+                contains: "b.txt"
+                not_contains: "a.txt"
+                stable_for: 100ms
+            - send: {key: enter}
+      - assert: {file: {path: chosen.txt, contains: "/two/b.txt"}}
+
+  - name: starting with three explicit directories can switch to the third tab
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: one/a.txt, content: a}
+      - fixture: {file: two/b.txt, content: b}
+      - fixture: {file: three/c.txt, content: c}
+      - pty:
+          command: yazi --cwd-file ${workdir}/cwd.txt one two three
+          shell: true
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a.txt"
+            - send: "3"
+            - expect_screen:
+                contains: "c.txt"
+                not_contains: "a.txt"
+                stable_for: 100ms
+            - send: "q"
+      - assert: {file: {path: cwd.txt, contains: "/three"}}

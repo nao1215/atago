@@ -232,9 +232,13 @@ func TestCollectStepVars_KnownFields(t *testing.T) {
 			t.Errorf("run field %q not collected; got %v", want, got)
 		}
 	}
-	pty := &Step{PTY: &PTY{Command: "${pcmd}", Cwd: "${pcwd}", Env: map[string]string{"K": "${penv}"}, Session: []PTYAction{{Expect: "${pexp}"}, {Send: SendText("${psend}")}}}}
+	pty := &Step{PTY: &PTY{Command: "${pcmd}", Cwd: "${pcwd}", Env: map[string]string{"K": "${penv}"}, Session: []PTYAction{
+		{Expect: "${pexp}"},
+		{Send: SendText("${psend}")},
+		{ExpectScreen: &PTYExpectScreen{StreamAssert: StreamAssert{Contains: StringList{"${pscreen}"}}}},
+	}}}
 	got = collectStep(pty)
-	for _, want := range []string{"pcmd", "pcwd", "penv", "pexp", "psend"} {
+	for _, want := range []string{"pcmd", "pcwd", "penv", "pexp", "psend", "pscreen"} {
 		if !hasVar(got, want) {
 			t.Errorf("pty field %q not collected; got %v", want, got)
 		}
@@ -613,6 +617,12 @@ func TestPTYKeyForSequence(t *testing.T) {
 	}
 	if name, ok := PTYKeyForSequence("\x03"); !ok || name != "ctrl-c" {
 		t.Errorf("\\x03 reverse = (%q, %v), want ctrl-c", name, ok)
+	}
+	if name, ok := PTYKeyForSequence("\x1f"); !ok || name != "ctrl-_" {
+		t.Errorf("\\x1f reverse = (%q, %v), want ctrl-_", name, ok)
+	}
+	if name, ok := PTYKeyForSequence("\x1b[45;5u"); !ok || name != "ctrl-hyphen" {
+		t.Errorf("CSI-u ctrl-hyphen reverse = (%q, %v), want ctrl-hyphen", name, ok)
 	}
 	if name, ok := PTYKeyForSequence("\x1b[A"); !ok || name != "up" {
 		t.Errorf("up-arrow reverse = (%q, %v), want up", name, ok)

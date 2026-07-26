@@ -1,0 +1,347 @@
+version: "1"
+
+suite:
+  name: yazi (third-party terminal file manager) / chooser selection
+
+scenarios:
+  - name: chooser-file writes a space-selected file instead of the hovered file
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: a.txt, content: a}
+      - fixture: {file: b.txt, content: b}
+      - pty:
+          command: yazi --chooser-file ${workdir}/chosen.txt .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a.txt"
+            - send: "j"
+            - expect: "b.txt"
+            - send: {key: space}
+            - send: "k"
+            - expect: "a.txt"
+            - send: {key: enter}
+      - assert: {file: {path: chosen.txt, contains: "/b.txt"}}
+
+  - name: chooser-file writes a space-selected directory instead of the hovered directory
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: a-dir/a.txt, content: a}
+      - fixture: {file: b-dir/b.txt, content: b}
+      - pty:
+          command: yazi --chooser-file ${workdir}/chosen.txt .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a-dir"
+            - send: "j"
+            - expect: "b-dir"
+            - send: {key: space}
+            - send: "k"
+            - expect: "a-dir"
+            - send: {key: enter}
+      - assert: {file: {path: chosen.txt, contains: "/b-dir"}}
+
+  - name: chooser-file writes space-selected spaced directories
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: a one/a.txt, content: a}
+      - fixture: {file: b two/b.txt, content: b}
+      - pty:
+          command: yazi --chooser-file ${workdir}/chosen.txt .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a one"
+            - send: "j"
+            - expect: "b two"
+            - send: {key: space}
+            - send: "k"
+            - expect: "a one"
+            - send: {key: enter}
+      - assert: {file: {path: chosen.txt, contains: "/b two"}}
+
+  - name: chooser-file writes a visual-selected file range
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: a.txt, content: a}
+      - fixture: {file: b.txt, content: b}
+      - fixture: {file: c.txt, content: c}
+      - pty:
+          command: yazi --chooser-file ${workdir}/chosen.txt .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a.txt"
+            - send: "v"
+            - send: "j"
+            - expect: "b.txt"
+            - send: {key: enter}
+      - assert: {file: {path: chosen.txt, contains: ["/a.txt", "/b.txt"]}}
+
+  - name: chooser-file writes a visual-selected directory range
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: a-dir/a.txt, content: a}
+      - fixture: {file: b-dir/b.txt, content: b}
+      - fixture: {file: c-dir/c.txt, content: c}
+      - pty:
+          command: yazi --chooser-file ${workdir}/chosen.txt .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a-dir"
+            - send: "v"
+            - send: "j"
+            - expect: "b-dir"
+            - send: {key: enter}
+      - assert: {file: {path: chosen.txt, contains: ["/a-dir", "/b-dir"]}}
+
+  - name: chooser-file writes a visual-selected spaced file range
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: a one.txt, content: a}
+      - fixture: {file: b two.txt, content: b}
+      - fixture: {file: c three.txt, content: c}
+      - pty:
+          command: yazi --chooser-file ${workdir}/chosen.txt .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a one.txt"
+            - send: "v"
+            - send: "j"
+            - expect: "b two.txt"
+            - send: {key: enter}
+      - assert: {file: {path: chosen.txt, contains: ["/a one.txt", "/b two.txt"]}}
+
+  - name: chooser-file writes a visual-selected spaced directory range
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: a one/a.txt, content: a}
+      - fixture: {file: b two/b.txt, content: b}
+      - fixture: {file: c three/c.txt, content: c}
+      - pty:
+          command: yazi --chooser-file ${workdir}/chosen.txt .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a one"
+            - send: "v"
+            - send: "j"
+            - expect: "b two"
+            - send: {key: enter}
+      - assert: {file: {path: chosen.txt, contains: ["/a one", "/b two"]}}
+
+  - name: chooser-file writes ctrl-a selected directories
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: a-dir/a.txt, content: a}
+      - fixture: {file: b-dir/b.txt, content: b}
+      - pty:
+          command: yazi --chooser-file ${workdir}/chosen.txt .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a-dir"
+            - send: {key: ctrl-a}
+            - send: {key: enter}
+      - assert: {file: {path: chosen.txt, contains: ["/a-dir", "/b-dir"]}}
+
+  - name: chooser-file writes ctrl-a selected spaced files
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: a one.txt, content: a}
+      - fixture: {file: b two.txt, content: b}
+      - pty:
+          command: yazi --chooser-file ${workdir}/chosen.txt .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a one.txt"
+            - send: {key: ctrl-a}
+            - send: {key: enter}
+      - assert: {file: {path: chosen.txt, contains: ["/a one.txt", "/b two.txt"]}}
+
+  - name: inverse selection with one chosen directory writes the other two
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: a-dir/a.txt, content: a}
+      - fixture: {file: b-dir/b.txt, content: b}
+      - fixture: {file: c-dir/c.txt, content: c}
+      - pty:
+          command: yazi --chooser-file ${workdir}/chosen.txt .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a-dir"
+            - send: {key: space}
+            - send: {key: ctrl-r}
+            - send: {key: enter}
+      - run: {command: cat chosen.txt}
+      - assert: {stdout: {matches: '(?m)^.*/b-dir\n.*/c-dir\n?$'}}
+
+  - name: inverse selection with one spaced file writes the other two
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: a one.txt, content: a}
+      - fixture: {file: b two.txt, content: b}
+      - fixture: {file: c three.txt, content: c}
+      - pty:
+          command: yazi --chooser-file ${workdir}/chosen.txt .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a one.txt"
+            - send: {key: space}
+            - send: {key: ctrl-r}
+            - send: {key: enter}
+      - run: {command: cat chosen.txt}
+      - assert: {stdout: {matches: '(?m)^.*/b two\.txt\n.*/c three\.txt\n?$'}}
+
+  - name: toggling the same directory twice removes the explicit selection
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: a-dir/a.txt, content: a}
+      - fixture: {file: b-dir/b.txt, content: b}
+      - pty:
+          command: yazi --chooser-file ${workdir}/chosen.txt .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a-dir"
+            - send: {key: space}
+            - send: {key: space}
+            - send: "j"
+            - expect: "b-dir"
+            - send: {key: enter}
+      - assert: {file: {path: chosen.txt, contains: "/b-dir"}}
+
+  - name: toggling the same spaced directory twice removes the explicit selection
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: a one/a.txt, content: a}
+      - fixture: {file: b two/b.txt, content: b}
+      - pty:
+          command: yazi --chooser-file ${workdir}/chosen.txt .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a one"
+            - send: {key: space}
+            - send: {key: space}
+            - send: "j"
+            - expect: "b two"
+            - send: {key: enter}
+      - assert: {file: {path: chosen.txt, contains: "/b two"}}
+
+  - name: ctrl-a then esc on files restores enter to the hovered file
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: a.txt, content: a}
+      - fixture: {file: b.txt, content: b}
+      - pty:
+          command: yazi --chooser-file ${workdir}/chosen.txt .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a.txt"
+            - send: {key: ctrl-a}
+            - send: {key: esc}
+            - send: "j"
+            - expect: "b.txt"
+            - send: {key: enter}
+      - assert: {file: {path: chosen.txt, contains: "/b.txt"}}
+
+  - name: ctrl-a then esc on spaced directories restores enter to the hovered directory
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: a one/a.txt, content: a}
+      - fixture: {file: b two/b.txt, content: b}
+      - pty:
+          command: yazi --chooser-file ${workdir}/chosen.txt .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a one"
+            - send: {key: ctrl-a}
+            - send: {key: esc}
+            - send: "j"
+            - expect: "b two"
+            - send: {key: enter}
+      - assert: {file: {path: chosen.txt, contains: "/b two"}}

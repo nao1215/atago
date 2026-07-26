@@ -1,0 +1,328 @@
+version: "1"
+
+suite:
+  name: yazi (third-party terminal file manager) / selection matrix
+
+scenarios:
+  - name: space-selected file is moved even when the cursor moves away
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: src/a.txt, content: a}
+      - fixture: {file: src/b.txt, content: b}
+      - fixture: {file: dst/.keep, content: ""}
+      - pty:
+          command: yazi src
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a.txt"
+            - send: "j"
+            - expect: "b.txt"
+            - send: {key: space}
+            - send: "k"
+            - expect: "a.txt"
+            - send: "x"
+            - send: "h"
+            - expect: "src"
+            - send: "k"
+            - expect: "dst"
+            - send: "l"
+            - expect: "No items"
+            - send: "p"
+            - expect: "b.txt"
+            - send: "Q"
+      - assert: {file: {path: dst/b.txt, contains: b}}
+      - assert: {file: {path: src/b.txt, exists: false}}
+      - assert: {file: {path: dst/a.txt, exists: false}}
+
+  - name: space-selected directory is copied even when the cursor moves away
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: src/a-dir/a.txt, content: a}
+      - fixture: {file: src/b-dir/b.txt, content: b}
+      - fixture: {file: dst/.keep, content: ""}
+      - pty:
+          command: yazi src
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a-dir"
+            - send: "j"
+            - expect: "b-dir"
+            - send: {key: space}
+            - send: "k"
+            - expect: "a-dir"
+            - send: "y"
+            - send: "h"
+            - expect: "src"
+            - send: "k"
+            - expect: "dst"
+            - send: "l"
+            - expect: "No items"
+            - send: "p"
+            - expect: "b-dir"
+            - send: "Q"
+      - assert: {file: {path: dst/b-dir/b.txt, contains: b}}
+      - assert: {dir: {path: dst/a-dir, exists: false}}
+
+  - name: space-selected directory is moved even when the cursor moves away
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: src/a-dir/a.txt, content: a}
+      - fixture: {file: src/b-dir/b.txt, content: b}
+      - fixture: {file: dst/.keep, content: ""}
+      - pty:
+          command: yazi src
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a-dir"
+            - send: "j"
+            - expect: "b-dir"
+            - send: {key: space}
+            - send: "k"
+            - expect: "a-dir"
+            - send: "x"
+            - send: "h"
+            - expect: "src"
+            - send: "k"
+            - expect: "dst"
+            - send: "l"
+            - expect: "No items"
+            - send: "p"
+            - expect: "b-dir"
+            - send: "Q"
+      - assert: {file: {path: dst/b-dir/b.txt, contains: b}}
+      - assert: {dir: {path: src/b-dir, exists: false}}
+      - assert: {dir: {path: dst/a-dir, exists: false}}
+
+  - name: space-selected spaced directory is moved even when the cursor moves away
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: src/a-dir/a.txt, content: a}
+      - fixture: {file: src/two words/b.txt, content: b}
+      - fixture: {file: dst/.keep, content: ""}
+      - pty:
+          command: yazi src
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a-dir"
+            - send: "j"
+            - expect_screen:
+                contains: "two words"
+                stable_for: 100ms
+            - send: {key: space}
+            - send: "k"
+            - expect: "a-dir"
+            - send: "x"
+            - send: "h"
+            - expect: "src"
+            - send: "k"
+            - expect: "dst"
+            - send: "l"
+            - expect: "No items"
+            - send: "p"
+            - send: "Q"
+      - assert: {file: {path: dst/two words/b.txt, contains: b}}
+      - assert: {dir: {path: src/two words, exists: false}}
+      - assert: {dir: {path: dst/a-dir, exists: false}}
+
+  - name: visual mode selects a file range and moves both files
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: src/a.txt, content: a}
+      - fixture: {file: src/b.txt, content: b}
+      - fixture: {file: src/c.txt, content: c}
+      - fixture: {file: dst/.keep, content: ""}
+      - pty:
+          command: yazi src
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a.txt"
+            - send: "v"
+            - send: "j"
+            - expect: "b.txt"
+            - send: "x"
+            - send: "h"
+            - expect: "src"
+            - send: "k"
+            - expect: "dst"
+            - send: "l"
+            - expect: "No items"
+            - send: "p"
+            - expect: "a.txt"
+            - expect: "b.txt"
+            - send: "Q"
+      - assert: {file: {path: dst/a.txt, contains: a}}
+      - assert: {file: {path: dst/b.txt, contains: b}}
+      - assert: {file: {path: src/c.txt, contains: c}}
+      - assert: {file: {path: src/a.txt, exists: false}}
+
+  - name: visual mode selects a file range and permanently deletes both files
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: a.txt, content: a}
+      - fixture: {file: b.txt, content: b}
+      - fixture: {file: c.txt, content: c}
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a.txt"
+            - send: "v"
+            - send: "j"
+            - expect: "b.txt"
+            - send: "D"
+            - expect: "Permanently delete"
+            - send: "y"
+            - expect_screen:
+                contains: c.txt
+                not_contains: [a.txt, b.txt]
+                stable_for: 100ms
+            - send: "Q"
+      - assert: {file: {path: a.txt, exists: false}}
+      - assert: {file: {path: b.txt, exists: false}}
+      - assert: {file: {path: c.txt, contains: c}}
+
+  - name: visual mode selects a directory range and copies both directories
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: src/a-dir/a.txt, content: a}
+      - fixture: {file: src/b-dir/b.txt, content: b}
+      - fixture: {file: src/c-dir/c.txt, content: c}
+      - fixture: {file: dst/.keep, content: ""}
+      - pty:
+          command: yazi src
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a-dir"
+            - send: "v"
+            - send: "j"
+            - expect: "b-dir"
+            - send: "y"
+            - send: "h"
+            - expect: "src"
+            - send: "k"
+            - expect: "dst"
+            - send: "l"
+            - expect: "No items"
+            - send: "p"
+            - expect: "a-dir"
+            - expect: "b-dir"
+            - send: "Q"
+      - assert: {file: {path: dst/a-dir/a.txt, contains: a}}
+      - assert: {file: {path: dst/b-dir/b.txt, contains: b}}
+      - assert: {dir: {path: dst/c-dir, exists: false}}
+
+  - name: visual mode selects a directory range and moves both directories
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: src/a-dir/a.txt, content: a}
+      - fixture: {file: src/b-dir/b.txt, content: b}
+      - fixture: {file: src/c-dir/c.txt, content: c}
+      - fixture: {file: dst/.keep, content: ""}
+      - pty:
+          command: yazi src
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a-dir"
+            - send: "v"
+            - send: "j"
+            - expect: "b-dir"
+            - send: "x"
+            - send: "h"
+            - expect: "src"
+            - send: "k"
+            - expect: "dst"
+            - send: "l"
+            - expect: "No items"
+            - send: "p"
+            - expect: "a-dir"
+            - expect: "b-dir"
+            - send: "Q"
+      - assert: {file: {path: dst/a-dir/a.txt, contains: a}}
+      - assert: {file: {path: dst/b-dir/b.txt, contains: b}}
+      - assert: {dir: {path: src/a-dir, exists: false}}
+      - assert: {file: {path: src/c-dir/c.txt, contains: c}}
+
+  - name: visual mode selects spaced directories and moves both
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: src/a one/a.txt, content: a}
+      - fixture: {file: src/b two/b.txt, content: b}
+      - fixture: {file: src/c three/c.txt, content: c}
+      - fixture: {file: dst/.keep, content: ""}
+      - pty:
+          command: yazi src
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a one"
+            - send: "v"
+            - send: "j"
+            - expect: "b two"
+            - send: "x"
+            - send: "h"
+            - expect: "src"
+            - send: "k"
+            - expect: "dst"
+            - send: "l"
+            - expect: "No items"
+            - send: "p"
+            - expect: "a one"
+            - expect: "b two"
+            - send: "Q"
+      - assert: {file: {path: dst/a one/a.txt, contains: a}}
+      - assert: {file: {path: dst/b two/b.txt, contains: b}}
+      - assert: {dir: {path: src/a one, exists: false}}
+      - assert: {file: {path: src/c three/c.txt, contains: c}}

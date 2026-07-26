@@ -1,0 +1,291 @@
+version: "1"
+
+suite:
+  name: yazi (third-party terminal file manager) / navigation and tabs
+
+scenarios:
+  - name: down arrow moves to the second file before choosing
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: a.txt, content: a}
+      - fixture: {file: b.txt, content: b}
+      - pty:
+          command: yazi --chooser-file ${workdir}/chosen.txt .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a.txt"
+            - send: {key: down}
+            - expect: "b.txt"
+            - send: {key: enter}
+      - assert: {file: {path: chosen.txt, contains: "/b.txt"}}
+
+  - name: up arrow returns from the third file to the second before choosing
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: a.txt, content: a}
+      - fixture: {file: b.txt, content: b}
+      - fixture: {file: c.txt, content: c}
+      - pty:
+          command: yazi --chooser-file ${workdir}/chosen.txt .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a.txt"
+            - send: {key: down}
+            - expect: "b.txt"
+            - send: {key: down}
+            - expect: "c.txt"
+            - send: {key: up}
+            - expect: "b.txt"
+            - send: {key: enter}
+      - assert: {file: {path: chosen.txt, contains: "/b.txt"}}
+
+  - name: right arrow enters the hovered directory before choosing a file
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: sub/inside.txt, content: inside}
+      - pty:
+          command: yazi --chooser-file ${workdir}/chosen.txt .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "sub"
+            - send: {key: right}
+            - expect: "inside.txt"
+            - send: {key: enter}
+      - assert: {file: {path: chosen.txt, contains: "/sub/inside.txt"}}
+
+  - name: left arrow leaves the entered directory and q writes the parent cwd
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: sub/inside.txt, content: inside}
+      - pty:
+          command: yazi --cwd-file ${workdir}/cwd.txt .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "sub"
+            - send: {key: right}
+            - expect: "inside.txt"
+            - send: {key: left}
+            - expect: "sub"
+            - send: "q"
+      - assert: {file: {path: cwd.txt, not_contains: "/sub"}}
+
+  - name: right arrow enters a spaced directory before choosing a file
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: two words/inside.txt, content: inside}
+      - pty:
+          command: yazi --chooser-file ${workdir}/chosen.txt .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "two words"
+            - send: {key: right}
+            - expect: "inside.txt"
+            - send: {key: enter}
+      - assert: {file: {path: chosen.txt, contains: "/two words/inside.txt"}}
+
+  - name: down arrow reaches a spaced filename before choosing
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: a.txt, content: a}
+      - fixture: {file: two words.txt, content: b}
+      - pty:
+          command: yazi --chooser-file ${workdir}/chosen.txt .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a.txt"
+            - send: {key: down}
+            - expect: "two words.txt"
+            - send: {key: enter}
+      - assert: {file: {path: chosen.txt, contains: "/two words.txt"}}
+
+  - name: swap-left reorders two directory tabs for numeric switching
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: one/a.txt, content: a}
+      - fixture: {file: two/b.txt, content: b}
+      - pty:
+          command: yazi --cwd-file ${workdir}/cwd.txt one two
+          shell: true
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a.txt"
+            - send: "]"
+            - expect_screen:
+                contains: b.txt
+                not_contains: a.txt
+                stable_for: 100ms
+            - send: "{"
+            - send: "2"
+            - expect_screen:
+                contains: a.txt
+                not_contains: b.txt
+                stable_for: 100ms
+            - send: "1"
+            - expect_screen:
+                contains: b.txt
+                not_contains: a.txt
+                stable_for: 100ms
+            - send: "q"
+      - assert: {file: {path: cwd.txt, contains: "/two"}}
+
+  - name: swap-right reorders two directory tabs for numeric switching
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: one/a.txt, content: a}
+      - fixture: {file: two/b.txt, content: b}
+      - pty:
+          command: yazi --cwd-file ${workdir}/cwd.txt one two
+          shell: true
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a.txt"
+            - send: "}"
+            - send: "1"
+            - expect_screen:
+                contains: b.txt
+                not_contains: a.txt
+                stable_for: 100ms
+            - send: "2"
+            - expect_screen:
+                contains: a.txt
+                not_contains: b.txt
+                stable_for: 100ms
+            - send: "q"
+      - assert: {file: {path: cwd.txt, contains: "/one"}}
+
+  - name: swap-left reorders two file tabs for numeric switching
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: one/a.txt, content: a}
+      - fixture: {file: two/b.txt, content: b}
+      - pty:
+          command: yazi --chooser-file ${workdir}/chosen.txt one/a.txt two/b.txt
+          shell: true
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a.txt"
+            - send: "]"
+            - expect_screen:
+                contains: b.txt
+                not_contains: a.txt
+                stable_for: 100ms
+            - send: "{"
+            - send: "2"
+            - expect_screen:
+                contains: a.txt
+                not_contains: b.txt
+                stable_for: 100ms
+            - send: "1"
+            - expect_screen:
+                contains: b.txt
+                not_contains: a.txt
+                stable_for: 100ms
+            - send: {key: enter}
+      - assert: {file: {path: chosen.txt, contains: "/two/b.txt"}}
+
+  - name: tt twice creates a third tab that 3 can activate
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: alpha.txt, content: a}
+      - pty:
+          command: yazi --cwd-file ${workdir}/cwd.txt .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "alpha.txt"
+            - send: "tt"
+            - send: "tt"
+            - send: "3"
+            - expect_screen:
+                contains: alpha.txt
+                stable_for: 100ms
+            - send: "q"
+      - assert: {file: {path: cwd.txt, contains: "${workdir}"}}
+
+  - name: closing the third tab with ctrl-c returns to the second tab
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: alpha.txt, content: a}
+      - pty:
+          command: yazi --cwd-file ${workdir}/cwd.txt .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "alpha.txt"
+            - send: "tt"
+            - send: "tt"
+            - send: "3"
+            - expect_screen:
+                contains: alpha.txt
+                stable_for: 100ms
+            - send: {key: ctrl-c}
+            - expect_screen:
+                contains: alpha.txt
+                stable_for: 100ms
+            - send: "q"
+      - assert: {file: {path: cwd.txt, contains: "${workdir}"}}
+

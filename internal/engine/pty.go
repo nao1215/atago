@@ -63,6 +63,7 @@ func (e *Engine) runPTY(ctx context.Context, p *spec.PTY, st *store.Store, scena
 				}
 				na.Send = &cs
 			}
+			na.ExpectScreen = spec.WalkPTYExpectScreenStrings(a.ExpectScreen, st.Expand)
 			c.Session[i] = na
 		}
 	}
@@ -93,6 +94,16 @@ func checkPTYSessionResolved(session []spec.PTYAction, st *store.Store) error {
 				return err
 			}
 		}
+		var unresolved error
+		spec.WalkPTYExpectScreenStrings(a.ExpectScreen, func(s string) string {
+			if unresolved == nil {
+				unresolved = unresolvedRefError(i, "expect_screen", s, st)
+			}
+			return s
+		})
+		if unresolved != nil {
+			return unresolved
+		}
 	}
 	return nil
 }
@@ -119,6 +130,9 @@ func unresolvedRefError(idx int, field, text string, st *store.Store) error {
 // check shape every other failure uses, so the console block and JSON report
 // need no new machinery.
 func ptyExpectCheck(ef *ptyrun.ExpectFailure) *assert.CheckResult {
+	if ef.Check != nil {
+		return ef.Check
+	}
 	return &assert.CheckResult{
 		Desc:           fmt.Sprintf("pty expect /%s/", ef.Pattern),
 		Expected:       fmt.Sprintf("terminal transcript matches /%s/", ef.Pattern),

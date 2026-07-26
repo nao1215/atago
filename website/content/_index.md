@@ -57,7 +57,7 @@ The first spec comes from a real run: `atago record -- <command>` executes the t
 
 ## Real terminals, not faked pipes
 
-A `pty:` step runs the command in a real pseudo-terminal — on Windows too (ConPTY) — and drives it with declarative expect/send pairs and named keys, no `expect(1)` scripting. `screen:` asserts the RENDERED frame a user actually sees, after cursor movement and clears are applied, and screen snapshots pin full TUI layouts. TTY-detection branches, wizards, REPLs, htop-style dashboards: all of it is spec-able.
+A `pty:` step runs the command in a real pseudo-terminal — on Windows too (ConPTY) — and drives it with declarative expect/send pairs and named keys, no `expect(1)` scripting. That includes control-byte aliases such as `ctrl-space`, `ctrl-[`, and `ctrl-_`, plus modified key events like `ctrl-hyphen` for TUIs that distinguish the physical `Ctrl+-` key. `expect_screen:` waits on the LIVE rendered frame while the program is still running; `screen:` asserts the final rendered frame after cursor movement and clears are applied, and screen snapshots pin full TUI layouts. TTY-detection branches, wizards, REPLs, htop-style dashboards: all of it is spec-able.
 
 ## The name
 
@@ -70,6 +70,6 @@ atago (愛宕) is named for Mount Atago in Kyoto, whose shrine enshrines a deity
 - [Cookbook](/cookbook/) — 50+ copyable recipes indexed by task, plus the runnable, CI-tested example for every feature.
 - [Use it in CI](/ci/) — report formats, retries, flake detection, artifacts, secret masking.
 - [Reference](/reference/) — subcommands, exit codes, and every spec key with the release that introduced it.
-- [Real CLIs tested with atago](/real-world/) — 40+ programs from jq to terraform to htop that atago tests on its own initiative, each with executable specs and generated behavior docs.
+- [Real CLIs tested with atago](/real-world/) — 40+ programs from jq to terraform to yazi that atago tests on its own initiative, each with executable specs and generated behavior docs.
 
 Everything on this site comes from files committed in the [repository](https://github.com/nao1215/atago). The behavior docs are regenerated from executable specs, and drift tests fail the build when docs and specs disagree — if an example is on this site, it runs.

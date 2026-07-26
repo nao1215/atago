@@ -41,13 +41,15 @@ type PTY struct {
 	// state directories under `${workdir}/.atago-home`, mirroring run.sandbox_home.
 	SandboxHome *bool `yaml:"sandbox_home,omitempty"`
 	// Session is the ordered expect/send script. Each entry sets exactly one
-	// of Expect (wait until the accumulated transcript matches the regexp) or
+	// of Expect (wait until the accumulated transcript matches the regexp),
 	// Send (write the string to the terminal; an empty send transmits EOF,
-	// i.e. ^D). Deliberately no branching — atago is not a scripting language.
+	// i.e. ^D), or ExpectScreen (wait until the rendered terminal screen matches
+	// a stream matcher, optionally stably for a duration). Deliberately no
+	// branching — atago is not a scripting language.
 	Session []PTYAction `yaml:"session,omitempty"`
 }
 
-// PTYAction is one expect-or-send entry in a pty session (#8).
+// PTYAction is one expect/send/expect_screen entry in a pty session (#8).
 type PTYAction struct {
 	// Expect waits until the transcript matches this regexp. A never-matching
 	// expect fails the step (reported like an assertion) when the session
@@ -55,9 +57,17 @@ type PTYAction struct {
 	Expect string `yaml:"expect,omitempty"`
 	// Send writes to the terminal: a scalar string verbatim (the empty string
 	// sends EOF/^D; ${name} expansion applies) or {key: <name>} for a named
-	// key (#26) — enter, tab, esc, arrows, f1-f12, ctrl-a..ctrl-z — so
-	// sessions stay readable instead of embedding \x1b escapes.
+	// key (#26) — enter, tab, esc, arrows, f1-f12, ctrl-a..ctrl-z, and common
+	// control-key aliases like ctrl-space / ctrl-[ / ctrl-_ plus terminal key
+	// events like ctrl-hyphen — so sessions stay readable instead of embedding
+	// \x1b escapes.
 	Send *PTYSend `yaml:"send,omitempty"`
+	// ExpectScreen waits until the CURRENT rendered screen (the transcript
+	// replayed through the same vt10x emulator as a top-level `screen:` assert)
+	// satisfies the matcher. `stable_for` requires the matcher to stay true
+	// continuously for that long; `timeout` optionally bounds only this wait,
+	// within the pty step's wider session timeout.
+	ExpectScreen *PTYExpectScreen `yaml:"expect_screen,omitempty"`
 }
 
 // PTYSend is the polymorphic pty send payload (#26): exactly one of Text
@@ -67,6 +77,22 @@ type PTYSend struct {
 	Text *string
 	// Key is a named key, normalized to lower case.
 	Key string
+}
+
+// PTYExpectScreen is a session-local rendered-screen wait: the matcher runs on
+// the live terminal screen during a pty session, not only after the program
+// exits. It reuses the StreamAssert surface (line/contains/matches/equals/json/
+// yaml, etc.) except snapshot/trim, which are validated out of this
+// mid-session context.
+type PTYExpectScreen struct {
+	StreamAssert `yaml:",inline"`
+	// Timeout bounds THIS wait only; when empty, the enclosing pty timeout
+	// supplies the budget.
+	Timeout string `yaml:"timeout,omitempty"`
+	// StableFor requires the screen to keep matching continuously for at least
+	// this duration before the action passes, absorbing redraw churn without a
+	// blind sleep.
+	StableFor string `yaml:"stable_for,omitempty"`
 }
 
 // SendText is sugar for authoring the scalar form in Go literals (tests).
@@ -121,8 +147,13 @@ func (p PTYSend) MarshalYAML() (any, error) {
 // backspace=\x7f (DEL, the modern erase), delete=\x1b[3~, arrows
 // up/down/right/left=\x1b[A/B/C/D, home=\x1b[H, end=\x1b[F,
 // pageup=\x1b[5~, pagedown=\x1b[6~, f1-f4=\x1bOP..\x1bOS,
-// f5..f12=\x1b[15~,[17~..[21~,[23~,[24~, ctrl-a..ctrl-z=0x01..0x1a
-// (ctrl-d is therefore the readable alias for the empty-send EOF rule).
+// f5..f12=\x1b[15~,[17~..[21~,[23~,[24~, ctrl-a..ctrl-z=0x01..0x1a,
+// plus the punctuation aliases terminals conventionally expose for the
+// remaining C0 controls: ctrl-space/ctrl-@=NUL, ctrl-[=ESC, ctrl-\=FS,
+// ctrl-]=GS, ctrl-^=RS, ctrl-_=US. For modifier combos whose physical key does
+// not have a stable legacy C0 byte (e.g. Ctrl+-), use the terminal's CSI-u key
+// event instead so modern TUIs like Yazi see the intended modified key. ctrl-d
+// therefore stays the readable alias for the empty-send EOF rule.
 var ptyKeySequences = func() map[string]string {
 	m := map[string]string{
 		"enter":     "\r",
@@ -155,6 +186,17 @@ var ptyKeySequences = func() map[string]string {
 	for c := byte('a'); c <= 'z'; c++ {
 		m["ctrl-"+string(c)] = string([]byte{c - 'a' + 1})
 	}
+	m["ctrl-space"] = "\x00"
+	m["ctrl-@"] = "\x00"
+	m["ctrl-["] = "\x1b"
+	m["ctrl-\\"] = "\x1c"
+	m["ctrl-]"] = "\x1d"
+	m["ctrl-^"] = "\x1e"
+	m["ctrl-_"] = "\x1f"
+	// xterm/kitty CSI-u for Ctrl+- (#286): raw 0x1f is Ctrl+_ and does not
+	// trigger TUIs that bind the physical hyphen key as a distinct modified key.
+	m["ctrl-hyphen"] = "\x1b[45;5u"
+	m["ctrl-minus"] = "\x1b[45;5u"
 	return m
 }()
 
@@ -170,9 +212,15 @@ func ValidPTYKey(name string) bool {
 // ctrl-* aliases go in first, then the friendly names overwrite any collision.
 var ptyKeyBySequence = func() map[string]string {
 	m := make(map[string]string, len(ptyKeySequences))
+	m["\x00"] = "ctrl-space"
 	for c := byte('a'); c <= 'z'; c++ {
 		m[string([]byte{c - 'a' + 1})] = "ctrl-" + string(c)
 	}
+	m["\x1c"] = "ctrl-\\"
+	m["\x1d"] = "ctrl-]"
+	m["\x1e"] = "ctrl-^"
+	m["\x1f"] = "ctrl-_"
+	m["\x1b[45;5u"] = "ctrl-hyphen"
 	for _, name := range []string{
 		"enter", "tab", "esc", "space", "backspace", "delete",
 		"up", "down", "right", "left", "home", "end",
@@ -195,7 +243,7 @@ func PTYKeyForSequence(seq string) (string, bool) {
 
 // PTYKeyNames lists the vocabulary for error messages, compactly.
 func PTYKeyNames() string {
-	return "enter, tab, esc, space, backspace, delete, up, down, left, right, home, end, pageup, pagedown, f1-f12, ctrl-a..ctrl-z"
+	return "enter, tab, esc, space, backspace, delete, up, down, left, right, home, end, pageup, pagedown, f1-f12, ctrl-a..ctrl-z, ctrl-space/ctrl-@, ctrl-[, ctrl-\\, ctrl-], ctrl-^, ctrl-_, ctrl-hyphen/ctrl-minus"
 }
 
 // Bytes resolves the send payload to the bytes written to the terminal: the

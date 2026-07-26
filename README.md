@@ -149,9 +149,9 @@ scenarios:
 
 ```shell
 $ atago run ./specs
-...............................................
+.....................................................................................................
 
-PASSED  47 scenarios: 47 passed, 0 failed, 0 errored, 0 skipped (1.2s)
+PASSED  160 scenarios: 160 passed, 0 failed, 0 errored, 0 skipped (20.5s)
 ```
 
 Scenarios run concurrently by default (`--parallel N`, defaulting to your CPU count; set `--parallel 1` to serialize). Workdirs are isolated, but the host network is shared — so if two scenarios each start a background `service:`, give them distinct ports, or one scenario's requests can reach the other's server.
@@ -217,7 +217,22 @@ scenarios:
           exit_code: 0
 ```
 
-Named keys (`send: {key: enter}`) and asserts on the RENDERED terminal screen cover full TUIs — see [pty](examples/pty.atago.yaml), [pty_screen](examples/pty_screen.atago.yaml), and the cross-platform [pty_portable](examples/pty_portable.atago.yaml). `pty` steps and `atago record --pty` run on Linux, macOS, and Windows (where they drive a ConPTY pseudo-console); only `signal:` stays POSIX-only. The `pty`/`pty_screen` examples skip on Windows because their inner commands (`[ -t 0 ]`, `cat -v`, a SIGINT trap) are POSIX-specific, not because the `pty` mechanism is.
+For full-screen TUIs, `expect_screen:` waits on the LIVE rendered frame during the session, and `screen:` asserts the final rendered frame after exit:
+
+```yaml
+      - pty:
+          command: mytool dashboard
+          session:
+            - expect_screen:
+                contains: "Ready"
+                stable_for: 100ms
+            - send: "q"
+      - assert:
+          screen:
+            contains: "Summary"
+```
+
+Named keys (`send: {key: enter}`) and rendered-screen checks cover full TUIs — including control-byte aliases like `ctrl-space`, `ctrl-[`, and `ctrl-_`, plus modified key events like `ctrl-hyphen`/`ctrl-minus` for apps that distinguish the physical `Ctrl+-` key — see [pty](examples/pty.atago.yaml), [pty_screen](examples/pty_screen.atago.yaml), and the cross-platform [pty_portable](examples/pty_portable.atago.yaml). `pty` steps and `atago record --pty` run on Linux, macOS, and Windows (where they drive a ConPTY pseudo-console); only `signal:` stays POSIX-only. The `pty`/`pty_screen` examples skip on Windows because their inner commands (`[ -t 0 ]`, `cat -v`, a SIGINT trap) are POSIX-specific, not because the `pty` mechanism is.
 
 ### When your CLI talks to a server
 
@@ -352,7 +367,7 @@ version: "1"
 
 ## Real CLIs tested with atago
 
-These suites run real programs of every shape: the author's Go tools (atago tests itself) and unmodified third-party binaries — git and jq, interactive TUIs (fzf, htop), the python3 REPL, servers driven as scenario services (redis, gitea, grafana, prometheus), cloud and IaC CLIs tested offline (aws-cli, terraform, ecspresso), crypto tools (openssl, age, sops), and document/media pipelines (pandoc, ffmpeg). Most were migrated from ShellSpec. [Real CLIs tested with atago](https://nao1215.github.io/atago/real-world/) lists all 40+ with specs and generated behavior docs.
+These suites run real programs of every shape: the author's Go tools (atago tests itself) and unmodified third-party binaries — git and jq, interactive TUIs (fzf, htop, yazi), the python3 REPL, servers driven as scenario services (redis, gitea, grafana, prometheus), cloud and IaC CLIs tested offline (aws-cli, terraform, ecspresso), crypto tools (openssl, age, sops), and document/media pipelines (pandoc, ffmpeg). Most were migrated from ShellSpec. The generated [real-world index](https://nao1215.github.io/atago/real-world/) includes deep behavior docs for those binaries, including Yazi file operations, chooser/cwd handoff, tabs, and sort modes.
 
 ## The name
 

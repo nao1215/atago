@@ -1885,6 +1885,40 @@ than after quitting.
 
 Full spec: [pty_screen](../examples/pty_screen.atago.yaml)
 
+## Wait for a live TUI frame before quitting
+
+Some TUIs restore the primary screen on exit or redraw through brief
+intermediate states. `expect_screen:` waits on the current rendered frame while
+the session is still alive, and `stable_for` requires it to stay matched
+continuously instead of relying on a blind sleep:
+
+```yaml
+version: "1"
+suite:
+  name: live tui frame
+
+scenarios:
+  - name: the dashboard becomes ready before we quit it
+    steps:
+      - pty:
+          command: mytool dashboard
+          rows: 24
+          cols: 80
+          session:
+            - expect_screen:
+                contains: "Ready"
+                stable_for: 100ms
+            - send: "q"
+      - assert:
+          exit_code: 0
+      - assert:
+          screen:
+            contains: "Summary"
+```
+
+This is cross-platform in the right way: the wait is driven by observed redraws
+on the rendered screen, not a fixed sleep tuned to one OS's terminal timing.
+
 ## Prove a dry run changes nothing
 
 `--dry-run` has exactly one contract: describe what would happen, touch

@@ -706,6 +706,7 @@ func TestValidate_PTYNamedKeys(t *testing.T) {
 		{"unknown key lists vocabulary", "{key: entr}", "not a supported key (supported: enter, tab"},
 		{"unknown mapping field", "{kye: enter}", "unknown key"},
 		{"valid named key", "{key: ctrl-c}", ""},
+		{"valid control punctuation alias", "{key: ctrl-hyphen}", ""},
 		{"valid scalar still works", `"hello"`, ""},
 	}
 	for _, tc := range cases {

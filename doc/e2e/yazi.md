@@ -1,0 +1,3445 @@
+# atago Behavior Specs
+## Summary
+7 suites · 160 scenarios
+## Contents
+- [yazi (third-party terminal file manager) / chooser selection](#yazi-third-party-terminal-file-manager--chooser-selection) — 15 scenarios
+  - [chooser-file writes a space-selected file instead of the hovered file](#scenario-chooser-file-writes-a-space-selected-file-instead-of-the-hovered-file)
+  - [chooser-file writes a space-selected directory instead of the hovered directory](#scenario-chooser-file-writes-a-space-selected-directory-instead-of-the-hovered-directory)
+  - [chooser-file writes space-selected spaced directories](#scenario-chooser-file-writes-space-selected-spaced-directories)
+  - [chooser-file writes a visual-selected file range](#scenario-chooser-file-writes-a-visual-selected-file-range)
+  - [chooser-file writes a visual-selected directory range](#scenario-chooser-file-writes-a-visual-selected-directory-range)
+  - [chooser-file writes a visual-selected spaced file range](#scenario-chooser-file-writes-a-visual-selected-spaced-file-range)
+  - [chooser-file writes a visual-selected spaced directory range](#scenario-chooser-file-writes-a-visual-selected-spaced-directory-range)
+  - [chooser-file writes ctrl-a selected directories](#scenario-chooser-file-writes-ctrl-a-selected-directories)
+  - [chooser-file writes ctrl-a selected spaced files](#scenario-chooser-file-writes-ctrl-a-selected-spaced-files)
+  - [inverse selection with one chosen directory writes the other two](#scenario-inverse-selection-with-one-chosen-directory-writes-the-other-two)
+  - [inverse selection with one spaced file writes the other two](#scenario-inverse-selection-with-one-spaced-file-writes-the-other-two)
+  - [toggling the same directory twice removes the explicit selection](#scenario-toggling-the-same-directory-twice-removes-the-explicit-selection)
+  - [toggling the same spaced directory twice removes the explicit selection](#scenario-toggling-the-same-spaced-directory-twice-removes-the-explicit-selection)
+  - [ctrl-a then esc on files restores enter to the hovered file](#scenario-ctrl-a-then-esc-on-files-restores-enter-to-the-hovered-file)
+  - [ctrl-a then esc on spaced directories restores enter to the hovered directory](#scenario-ctrl-a-then-esc-on-spaced-directories-restores-enter-to-the-hovered-directory)
+- [yazi (third-party terminal file manager) / entry args](#yazi-third-party-terminal-file-manager--entry-args) — 13 scenarios
+  - [starting on an explicit directory writes that cwd on quit](#scenario-starting-on-an-explicit-directory-writes-that-cwd-on-quit)
+  - [starting on an explicit file can choose that file immediately](#scenario-starting-on-an-explicit-file-can-choose-that-file-immediately)
+  - [starting on an explicit file writes its parent cwd on q](#scenario-starting-on-an-explicit-file-writes-its-parent-cwd-on-q)
+  - [starting on an explicit file can leave to its parent and choose a sibling](#scenario-starting-on-an-explicit-file-can-leave-to-its-parent-and-choose-a-sibling)
+  - [starting on a spaced directory writes that cwd on quit](#scenario-starting-on-a-spaced-directory-writes-that-cwd-on-quit)
+  - [starting on a spaced file can choose that file immediately](#scenario-starting-on-a-spaced-file-can-choose-that-file-immediately)
+  - [starting with a spaced file writes its parent cwd on q](#scenario-starting-with-a-spaced-file-writes-its-parent-cwd-on-q)
+  - [starting on a hidden directory writes that cwd on quit](#scenario-starting-on-a-hidden-directory-writes-that-cwd-on-quit)
+  - [starting on a nested file lets q write its parent cwd](#scenario-starting-on-a-nested-file-lets-q-write-its-parent-cwd)
+  - [starting with two explicit directories opens the second as another tab](#scenario-starting-with-two-explicit-directories-opens-the-second-as-another-tab)
+  - [starting with a directory and a file lets numeric switching choose the file tab](#scenario-starting-with-a-directory-and-a-file-lets-numeric-switching-choose-the-file-tab)
+  - [starting with two explicit files lets next-tab choose the second file tab](#scenario-starting-with-two-explicit-files-lets-next-tab-choose-the-second-file-tab)
+  - [starting with three explicit directories can switch to the third tab](#scenario-starting-with-three-explicit-directories-can-switch-to-the-third-tab)
+- [yazi (third-party terminal file manager) / links and overwrite](#yazi-third-party-terminal-file-manager--links-and-overwrite) — 8 scenarios
+  - [uppercase X cancels a cut before pasting](#scenario-uppercase-x-cancels-a-cut-before-pasting)
+  - [uppercase Y cancels a copy before pasting](#scenario-uppercase-y-cancels-a-copy-before-pasting)
+  - [uppercase P overwrites an existing spaced file during copy](#scenario-uppercase-p-overwrites-an-existing-spaced-file-during-copy)
+  - [uppercase P overwrites an existing spaced file during move](#scenario-uppercase-p-overwrites-an-existing-spaced-file-during-move)
+  - [uppercase P overwrites an existing directory subtree during copy](#scenario-uppercase-p-overwrites-an-existing-directory-subtree-during-copy)
+  - [uppercase P overwrites an existing directory subtree during move](#scenario-uppercase-p-overwrites-an-existing-directory-subtree-during-move)
+  - [ctrl-hyphen hardlinks a hovered file into a sibling directory](#scenario-ctrl-hyphen-hardlinks-a-hovered-file-into-a-sibling-directory)
+  - [ctrl-minus hardlinks a spaced file into a sibling directory](#scenario-ctrl-minus-hardlinks-a-spaced-file-into-a-sibling-directory)
+- [yazi (third-party terminal file manager) / navigation and tabs](#yazi-third-party-terminal-file-manager--navigation-and-tabs) — 11 scenarios
+  - [down arrow moves to the second file before choosing](#scenario-down-arrow-moves-to-the-second-file-before-choosing)
+  - [up arrow returns from the third file to the second before choosing](#scenario-up-arrow-returns-from-the-third-file-to-the-second-before-choosing)
+  - [right arrow enters the hovered directory before choosing a file](#scenario-right-arrow-enters-the-hovered-directory-before-choosing-a-file)
+  - [left arrow leaves the entered directory and q writes the parent cwd](#scenario-left-arrow-leaves-the-entered-directory-and-q-writes-the-parent-cwd)
+  - [right arrow enters a spaced directory before choosing a file](#scenario-right-arrow-enters-a-spaced-directory-before-choosing-a-file)
+  - [down arrow reaches a spaced filename before choosing](#scenario-down-arrow-reaches-a-spaced-filename-before-choosing)
+  - [swap-left reorders two directory tabs for numeric switching](#scenario-swap-left-reorders-two-directory-tabs-for-numeric-switching)
+  - [swap-right reorders two directory tabs for numeric switching](#scenario-swap-right-reorders-two-directory-tabs-for-numeric-switching)
+  - [swap-left reorders two file tabs for numeric switching](#scenario-swap-left-reorders-two-file-tabs-for-numeric-switching)
+  - [tt twice creates a third tab that 3 can activate](#scenario-tt-twice-creates-a-third-tab-that-3-can-activate)
+  - [closing the third tab with ctrl-c returns to the second tab](#scenario-closing-the-third-tab-with-ctrl-c-returns-to-the-second-tab)
+- [yazi (third-party terminal file manager) / search and tabs](#yazi-third-party-terminal-file-manager--search-and-tabs) — 4 scenarios
+  - [uppercase S content search finds the matching file](#scenario-uppercase-s-content-search-finds-the-matching-file)
+  - [tab shows file information for the hovered file](#scenario-tab-shows-file-information-for-the-hovered-file)
+  - [tt opens a new tab rooted at the current cwd](#scenario-tt-opens-a-new-tab-rooted-at-the-current-cwd)
+  - [ctrl-c closes the current tab and returns to the previous tab cwd](#scenario-ctrl-c-closes-the-current-tab-and-returns-to-the-previous-tab-cwd)
+- [yazi (third-party terminal file manager) / selection matrix](#yazi-third-party-terminal-file-manager--selection-matrix) — 9 scenarios
+  - [space-selected file is moved even when the cursor moves away](#scenario-space-selected-file-is-moved-even-when-the-cursor-moves-away)
+  - [space-selected directory is copied even when the cursor moves away](#scenario-space-selected-directory-is-copied-even-when-the-cursor-moves-away)
+  - [space-selected directory is moved even when the cursor moves away](#scenario-space-selected-directory-is-moved-even-when-the-cursor-moves-away)
+  - [space-selected spaced directory is moved even when the cursor moves away](#scenario-space-selected-spaced-directory-is-moved-even-when-the-cursor-moves-away)
+  - [visual mode selects a file range and moves both files](#scenario-visual-mode-selects-a-file-range-and-moves-both-files)
+  - [visual mode selects a file range and permanently deletes both files](#scenario-visual-mode-selects-a-file-range-and-permanently-deletes-both-files)
+  - [visual mode selects a directory range and copies both directories](#scenario-visual-mode-selects-a-directory-range-and-copies-both-directories)
+  - [visual mode selects a directory range and moves both directories](#scenario-visual-mode-selects-a-directory-range-and-moves-both-directories)
+  - [visual mode selects spaced directories and moves both](#scenario-visual-mode-selects-spaced-directories-and-moves-both)
+- [yazi (third-party terminal file manager)](#yazi-third-party-terminal-file-manager) — 100 scenarios
+  - [version prints a semantic version banner](#scenario-version-prints-a-semantic-version-banner)
+  - [hidden files stay hidden by default](#scenario-hidden-files-stay-hidden-by-default)
+  - [dot toggles hidden files into view](#scenario-dot-toggles-hidden-files-into-view)
+  - [filter narrows the visible file list](#scenario-filter-narrows-the-visible-file-list)
+  - [create makes a new file](#scenario-create-makes-a-new-file)
+  - [create with a trailing slash makes a directory](#scenario-create-with-a-trailing-slash-makes-a-directory)
+  - [rename changes the hovered file name and nothing else](#scenario-rename-changes-the-hovered-file-name-and-nothing-else)
+  - [yank then paste copies a file into a sibling directory](#scenario-yank-then-paste-copies-a-file-into-a-sibling-directory)
+  - [select-all then yank copies multiple files into a sibling directory](#scenario-select-all-then-yank-copies-multiple-files-into-a-sibling-directory)
+  - [cut then paste moves a file into a sibling directory](#scenario-cut-then-paste-moves-a-file-into-a-sibling-directory)
+  - [uppercase D permanently deletes the hovered file after confirmation](#scenario-uppercase-d-permanently-deletes-the-hovered-file-after-confirmation)
+  - [canceling permanent delete returns to the file list and keeps the file](#scenario-canceling-permanent-delete-returns-to-the-file-list-and-keeps-the-file)
+  - [canceling a yank leaves nothing to paste](#scenario-canceling-a-yank-leaves-nothing-to-paste)
+  - [canceling a cut leaves nothing to paste](#scenario-canceling-a-cut-leaves-nothing-to-paste)
+  - [select-all then cut moves multiple files into a sibling directory](#scenario-select-all-then-cut-moves-multiple-files-into-a-sibling-directory)
+  - [select-all then permanent delete removes multiple files](#scenario-select-all-then-permanent-delete-removes-multiple-files)
+  - [trash moves the hovered file into sandbox home trash](#scenario-trash-moves-the-hovered-file-into-sandbox-home-trash)
+  - [trashing selected files moves both into sandbox home trash](#scenario-trashing-selected-files-moves-both-into-sandbox-home-trash)
+  - [canceling trash returns to the file list and keeps the file](#scenario-canceling-trash-returns-to-the-file-list-and-keeps-the-file)
+  - [space-selected file is copied even when the cursor moves away](#scenario-space-selected-file-is-copied-even-when-the-cursor-moves-away)
+  - [visual mode selects a range and copies both files](#scenario-visual-mode-selects-a-range-and-copies-both-files)
+  - [lowercase p copies to item_1 when the destination already exists](#scenario-lowercase-p-copies-to-item_1-when-the-destination-already-exists)
+  - [lowercase p moves to item_1 when the destination already exists](#scenario-lowercase-p-moves-to-item_1-when-the-destination-already-exists)
+  - [uppercase P overwrites an existing file during copy](#scenario-uppercase-p-overwrites-an-existing-file-during-copy)
+  - [uppercase P overwrites an existing file during move](#scenario-uppercase-p-overwrites-an-existing-file-during-move)
+  - [alphabetical sort puts a then b then c at the cursor](#scenario-alphabetical-sort-puts-a-then-b-then-c-at-the-cursor)
+  - [reverse alphabetical sort puts c then b then a at the cursor](#scenario-reverse-alphabetical-sort-puts-c-then-b-then-a-at-the-cursor)
+  - [extension sort puts log then md then txt at the cursor](#scenario-extension-sort-puts-log-then-md-then-txt-at-the-cursor)
+  - [reverse extension sort puts txt then md then log at the cursor](#scenario-reverse-extension-sort-puts-txt-then-md-then-log-at-the-cursor)
+  - [size sort puts one then two then three at the cursor](#scenario-size-sort-puts-one-then-two-then-three-at-the-cursor)
+  - [reverse size sort puts three then two then one at the cursor](#scenario-reverse-size-sort-puts-three-then-two-then-one-at-the-cursor)
+  - [natural sort puts 3 then 20 then 100 at the cursor](#scenario-natural-sort-puts-3-then-20-then-100-at-the-cursor)
+  - [natural sort is visible on the rendered file list before quitting](#scenario-natural-sort-is-visible-on-the-rendered-file-list-before-quitting)
+  - [reverse natural sort puts 100 then 20 then 3 at the cursor](#scenario-reverse-natural-sort-puts-100-then-20-then-3-at-the-cursor)
+  - [reverse natural sort is visible on the rendered file list before quitting](#scenario-reverse-natural-sort-is-visible-on-the-rendered-file-list-before-quitting)
+  - [chooser-file writes the hovered path and exits on enter](#scenario-chooser-file-writes-the-hovered-path-and-exits-on-enter)
+  - [chooser-file writes all selected paths on enter](#scenario-chooser-file-writes-all-selected-paths-on-enter)
+  - [chooser-file remains absent when quitting with uppercase Q](#scenario-chooser-file-remains-absent-when-quitting-with-uppercase-q)
+  - [uppercase G moves to the bottom item before choosing](#scenario-uppercase-g-moves-to-the-bottom-item-before-choosing)
+  - [gg moves to the top item before choosing](#scenario-gg-moves-to-the-top-item-before-choosing)
+  - [quitting immediately writes the initial cwd to cwd-file](#scenario-quitting-immediately-writes-the-initial-cwd-to-cwd-file)
+  - [quitting after entering a directory writes the final cwd](#scenario-quitting-after-entering-a-directory-writes-the-final-cwd)
+  - [leaving a directory then quitting writes the parent cwd](#scenario-leaving-a-directory-then-quitting-writes-the-parent-cwd)
+  - [tabs preserve per-tab cwd and q writes the active tab cwd](#scenario-tabs-preserve-per-tab-cwd-and-q-writes-the-active-tab-cwd)
+  - [closing the current tab returns to the previous tab cwd](#scenario-closing-the-current-tab-returns-to-the-previous-tab-cwd)
+  - [previous and next tab navigation preserve each tab cwd](#scenario-previous-and-next-tab-navigation-preserve-each-tab-cwd)
+  - [uppercase Q exits without writing the cwd file](#scenario-uppercase-q-exits-without-writing-the-cwd-file)
+  - [create accepts filenames with spaces](#scenario-create-accepts-filenames-with-spaces)
+  - [create accepts directory names with spaces](#scenario-create-accepts-directory-names-with-spaces)
+  - [rename accepts spaces in filenames](#scenario-rename-accepts-spaces-in-filenames)
+  - [rename accepts spaces in directory names](#scenario-rename-accepts-spaces-in-directory-names)
+  - [yank then dash creates an absolute symlink in the sibling directory](#scenario-yank-then-dash-creates-an-absolute-symlink-in-the-sibling-directory)
+  - [yank then underscore creates a relative symlink in the sibling directory](#scenario-yank-then-underscore-creates-a-relative-symlink-in-the-sibling-directory)
+  - [yanked directory can be absolute-symlinked into a sibling directory](#scenario-yanked-directory-can-be-absolute-symlinked-into-a-sibling-directory)
+  - [yanked directory can be relative-symlinked into a sibling directory](#scenario-yanked-directory-can-be-relative-symlinked-into-a-sibling-directory)
+  - [modified time sort reorders the rendered list](#scenario-modified-time-sort-reorders-the-rendered-list)
+  - [reverse modified time sort reorders the rendered list](#scenario-reverse-modified-time-sort-reorders-the-rendered-list)
+  - [modified time sort chooses the oldest file first](#scenario-modified-time-sort-chooses-the-oldest-file-first)
+  - [reverse modified time sort chooses the newest file first](#scenario-reverse-modified-time-sort-chooses-the-newest-file-first)
+  - [toggling the same file twice removes the explicit selection](#scenario-toggling-the-same-file-twice-removes-the-explicit-selection)
+  - [inverse selection flips one picked file into the other two](#scenario-inverse-selection-flips-one-picked-file-into-the-other-two)
+  - [direct tab switching with 1 and 2 preserves per-tab cwd](#scenario-direct-tab-switching-with-1-and-2-preserves-per-tab-cwd)
+  - [block shell command creates a file and returns to the browser](#scenario-block-shell-command-creates-a-file-and-returns-to-the-browser)
+  - [filter can be cleared after confirming it](#scenario-filter-can-be-cleared-after-confirming-it)
+  - [yank then paste copies a directory subtree into a sibling directory](#scenario-yank-then-paste-copies-a-directory-subtree-into-a-sibling-directory)
+  - [cut then paste moves a directory subtree into a sibling directory](#scenario-cut-then-paste-moves-a-directory-subtree-into-a-sibling-directory)
+  - [lowercase p copies a directory to name_1 when the destination exists](#scenario-lowercase-p-copies-a-directory-to-name_1-when-the-destination-exists)
+  - [lowercase p moves a directory to name_1 when the destination exists](#scenario-lowercase-p-moves-a-directory-to-name_1-when-the-destination-exists)
+  - [uppercase D permanently deletes a directory subtree after confirmation](#scenario-uppercase-d-permanently-deletes-a-directory-subtree-after-confirmation)
+  - [canceling uppercase D keeps a directory subtree intact](#scenario-canceling-uppercase-d-keeps-a-directory-subtree-intact)
+  - [trash moves a directory subtree into sandbox home trash](#scenario-trash-moves-a-directory-subtree-into-sandbox-home-trash)
+  - [canceling trash keeps a directory subtree intact](#scenario-canceling-trash-keeps-a-directory-subtree-intact)
+  - [canceling trash for selected directories keeps both subtrees](#scenario-canceling-trash-for-selected-directories-keeps-both-subtrees)
+  - [yank then paste copies a spaced filename into a sibling directory](#scenario-yank-then-paste-copies-a-spaced-filename-into-a-sibling-directory)
+  - [cut then paste moves a spaced filename into a sibling directory](#scenario-cut-then-paste-moves-a-spaced-filename-into-a-sibling-directory)
+  - [yank then paste copies a spaced directory subtree into a sibling directory](#scenario-yank-then-paste-copies-a-spaced-directory-subtree-into-a-sibling-directory)
+  - [dash symlinks a spaced filename with an absolute target](#scenario-dash-symlinks-a-spaced-filename-with-an-absolute-target)
+  - [underscore symlinks a spaced filename with a relative target](#scenario-underscore-symlinks-a-spaced-filename-with-a-relative-target)
+  - [dash symlinks a spaced directory with an absolute target](#scenario-dash-symlinks-a-spaced-directory-with-an-absolute-target)
+  - [underscore symlinks a spaced directory with a relative target](#scenario-underscore-symlinks-a-spaced-directory-with-a-relative-target)
+  - [hidden toggle can be turned back off](#scenario-hidden-toggle-can-be-turned-back-off)
+  - [block shell command creates a directory and returns to the browser](#scenario-block-shell-command-creates-a-directory-and-returns-to-the-browser)
+  - [block shell command can rename a file in place](#scenario-block-shell-command-can-rename-a-file-in-place)
+  - [block shell command creates a spaced filename](#scenario-block-shell-command-creates-a-spaced-filename)
+  - [block shell command creates a spaced directory](#scenario-block-shell-command-creates-a-spaced-directory)
+  - [block shell command deletes the hovered file](#scenario-block-shell-command-deletes-the-hovered-file)
+  - [block shell command copies the hovered file to a new name](#scenario-block-shell-command-copies-the-hovered-file-to-a-new-name)
+  - [block shell command runs inside the entered directory](#scenario-block-shell-command-runs-inside-the-entered-directory)
+  - [block shell command can create nested files inside a new directory](#scenario-block-shell-command-can-create-nested-files-inside-a-new-directory)
+  - [block shell command moves a file into a new directory](#scenario-block-shell-command-moves-a-file-into-a-new-directory)
+  - [block shell command renames a directory](#scenario-block-shell-command-renames-a-directory)
+  - [block shell command appends to the hovered file content](#scenario-block-shell-command-appends-to-the-hovered-file-content)
+  - [block shell command can create a hidden file that dot then reveals](#scenario-block-shell-command-can-create-a-hidden-file-that-dot-then-reveals)
+  - [block shell command deletes a directory subtree](#scenario-block-shell-command-deletes-a-directory-subtree)
+  - [block shell command copies a directory subtree to a new name](#scenario-block-shell-command-copies-a-directory-subtree-to-a-new-name)
+  - [block shell command creates a symlink to a file](#scenario-block-shell-command-creates-a-symlink-to-a-file)
+  - [block shell command creates a symlink to a directory](#scenario-block-shell-command-creates-a-symlink-to-a-directory)
+  - [block shell command renames a spaced filename](#scenario-block-shell-command-renames-a-spaced-filename)
+  - [block shell command creates a symlink to a spaced filename](#scenario-block-shell-command-creates-a-symlink-to-a-spaced-filename)
+  - [block shell command creates a symlink to a spaced directory](#scenario-block-shell-command-creates-a-symlink-to-a-spaced-directory)
+## yazi (third-party terminal file manager) / chooser selection
+Source: `test/e2e/thirdparty/yazi/chooser_selection.atago.yaml`
+### Scenario: chooser-file writes a space-selected file instead of the hovered file
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `a.txt` is created.
+- Fixture file `b.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `a.txt`:_
+```text
+a
+```
+_Fixture `b.txt`:_
+```text
+b
+```
+#### When
+```shell
+# interactive (pty): yazi --chooser-file ${workdir}/chosen.txt .
+```
+#### Then
+- file `chosen.txt` contains `/b.txt`
+### Scenario: chooser-file writes a space-selected directory instead of the hovered directory
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `a-dir/a.txt` is created.
+- Fixture file `b-dir/b.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `a-dir/a.txt`:_
+```text
+a
+```
+_Fixture `b-dir/b.txt`:_
+```text
+b
+```
+#### When
+```shell
+# interactive (pty): yazi --chooser-file ${workdir}/chosen.txt .
+```
+#### Then
+- file `chosen.txt` contains `/b-dir`
+### Scenario: chooser-file writes space-selected spaced directories
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `a one/a.txt` is created.
+- Fixture file `b two/b.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `a one/a.txt`:_
+```text
+a
+```
+_Fixture `b two/b.txt`:_
+```text
+b
+```
+#### When
+```shell
+# interactive (pty): yazi --chooser-file ${workdir}/chosen.txt .
+```
+#### Then
+- file `chosen.txt` contains `/b two`
+### Scenario: chooser-file writes a visual-selected file range
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `a.txt` is created.
+- Fixture file `b.txt` is created.
+- Fixture file `c.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `a.txt`:_
+```text
+a
+```
+_Fixture `b.txt`:_
+```text
+b
+```
+_Fixture `c.txt`:_
+```text
+c
+```
+#### When
+```shell
+# interactive (pty): yazi --chooser-file ${workdir}/chosen.txt .
+```
+#### Then
+- file `chosen.txt` contains `/a.txt`, `/b.txt`
+### Scenario: chooser-file writes a visual-selected directory range
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `a-dir/a.txt` is created.
+- Fixture file `b-dir/b.txt` is created.
+- Fixture file `c-dir/c.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `a-dir/a.txt`:_
+```text
+a
+```
+_Fixture `b-dir/b.txt`:_
+```text
+b
+```
+_Fixture `c-dir/c.txt`:_
+```text
+c
+```
+#### When
+```shell
+# interactive (pty): yazi --chooser-file ${workdir}/chosen.txt .
+```
+#### Then
+- file `chosen.txt` contains `/a-dir`, `/b-dir`
+### Scenario: chooser-file writes a visual-selected spaced file range
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `a one.txt` is created.
+- Fixture file `b two.txt` is created.
+- Fixture file `c three.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `a one.txt`:_
+```text
+a
+```
+_Fixture `b two.txt`:_
+```text
+b
+```
+_Fixture `c three.txt`:_
+```text
+c
+```
+#### When
+```shell
+# interactive (pty): yazi --chooser-file ${workdir}/chosen.txt .
+```
+#### Then
+- file `chosen.txt` contains `/a one.txt`, `/b two.txt`
+### Scenario: chooser-file writes a visual-selected spaced directory range
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `a one/a.txt` is created.
+- Fixture file `b two/b.txt` is created.
+- Fixture file `c three/c.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `a one/a.txt`:_
+```text
+a
+```
+_Fixture `b two/b.txt`:_
+```text
+b
+```
+_Fixture `c three/c.txt`:_
+```text
+c
+```
+#### When
+```shell
+# interactive (pty): yazi --chooser-file ${workdir}/chosen.txt .
+```
+#### Then
+- file `chosen.txt` contains `/a one`, `/b two`
+### Scenario: chooser-file writes ctrl-a selected directories
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `a-dir/a.txt` is created.
+- Fixture file `b-dir/b.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `a-dir/a.txt`:_
+```text
+a
+```
+_Fixture `b-dir/b.txt`:_
+```text
+b
+```
+#### When
+```shell
+# interactive (pty): yazi --chooser-file ${workdir}/chosen.txt .
+```
+#### Then
+- file `chosen.txt` contains `/a-dir`, `/b-dir`
+### Scenario: chooser-file writes ctrl-a selected spaced files
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `a one.txt` is created.
+- Fixture file `b two.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `a one.txt`:_
+```text
+a
+```
+_Fixture `b two.txt`:_
+```text
+b
+```
+#### When
+```shell
+# interactive (pty): yazi --chooser-file ${workdir}/chosen.txt .
+```
+#### Then
+- file `chosen.txt` contains `/a one.txt`, `/b two.txt`
+### Scenario: inverse selection with one chosen directory writes the other two
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `a-dir/a.txt` is created.
+- Fixture file `b-dir/b.txt` is created.
+- Fixture file `c-dir/c.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `a-dir/a.txt`:_
+```text
+a
+```
+_Fixture `b-dir/b.txt`:_
+```text
+b
+```
+_Fixture `c-dir/c.txt`:_
+```text
+c
+```
+#### When
+```shell
+# interactive (pty): yazi --chooser-file ${workdir}/chosen.txt .
+cat chosen.txt
+```
+#### Then
+- stdout matches `/(?m)^.*/b-dir\n.*/c-dir\n?$/`
+### Scenario: inverse selection with one spaced file writes the other two
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `a one.txt` is created.
+- Fixture file `b two.txt` is created.
+- Fixture file `c three.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `a one.txt`:_
+```text
+a
+```
+_Fixture `b two.txt`:_
+```text
+b
+```
+_Fixture `c three.txt`:_
+```text
+c
+```
+#### When
+```shell
+# interactive (pty): yazi --chooser-file ${workdir}/chosen.txt .
+cat chosen.txt
+```
+#### Then
+- stdout matches `/(?m)^.*/b two\.txt\n.*/c three\.txt\n?$/`
+### Scenario: toggling the same directory twice removes the explicit selection
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `a-dir/a.txt` is created.
+- Fixture file `b-dir/b.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `a-dir/a.txt`:_
+```text
+a
+```
+_Fixture `b-dir/b.txt`:_
+```text
+b
+```
+#### When
+```shell
+# interactive (pty): yazi --chooser-file ${workdir}/chosen.txt .
+```
+#### Then
+- file `chosen.txt` contains `/b-dir`
+### Scenario: toggling the same spaced directory twice removes the explicit selection
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `a one/a.txt` is created.
+- Fixture file `b two/b.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `a one/a.txt`:_
+```text
+a
+```
+_Fixture `b two/b.txt`:_
+```text
+b
+```
+#### When
+```shell
+# interactive (pty): yazi --chooser-file ${workdir}/chosen.txt .
+```
+#### Then
+- file `chosen.txt` contains `/b two`
+### Scenario: ctrl-a then esc on files restores enter to the hovered file
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `a.txt` is created.
+- Fixture file `b.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `a.txt`:_
+```text
+a
+```
+_Fixture `b.txt`:_
+```text
+b
+```
+#### When
+```shell
+# interactive (pty): yazi --chooser-file ${workdir}/chosen.txt .
+```
+#### Then
+- file `chosen.txt` contains `/b.txt`
+### Scenario: ctrl-a then esc on spaced directories restores enter to the hovered directory
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `a one/a.txt` is created.
+- Fixture file `b two/b.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `a one/a.txt`:_
+```text
+a
+```
+_Fixture `b two/b.txt`:_
+```text
+b
+```
+#### When
+```shell
+# interactive (pty): yazi --chooser-file ${workdir}/chosen.txt .
+```
+#### Then
+- file `chosen.txt` contains `/b two`
+## yazi (third-party terminal file manager) / entry args
+Source: `test/e2e/thirdparty/yazi/entry_args.atago.yaml`
+### Scenario: starting on an explicit directory writes that cwd on quit
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `target/a.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `target/a.txt`:_
+```text
+a
+```
+#### When
+```shell
+# interactive (pty): yazi --cwd-file ${workdir}/cwd.txt target
+```
+#### Then
+- file `cwd.txt` contains `/target`
+### Scenario: starting on an explicit file can choose that file immediately
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `target/a.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `target/a.txt`:_
+```text
+a
+```
+#### When
+```shell
+# interactive (pty): yazi --chooser-file ${workdir}/chosen.txt target/a.txt
+```
+#### Then
+- file `chosen.txt` contains `/target/a.txt`
+### Scenario: starting on an explicit file writes its parent cwd on q
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `target/a.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `target/a.txt`:_
+```text
+a
+```
+#### When
+```shell
+# interactive (pty): yazi --cwd-file ${workdir}/cwd.txt target/a.txt
+```
+#### Then
+- file `cwd.txt` contains `/target`
+### Scenario: starting on an explicit file can leave to its parent and choose a sibling
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `target/a.txt` is created.
+- Fixture file `target/b.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `target/a.txt`:_
+```text
+a
+```
+_Fixture `target/b.txt`:_
+```text
+b
+```
+#### When
+```shell
+# interactive (pty): yazi --chooser-file ${workdir}/chosen.txt target/a.txt
+```
+#### Then
+- file `chosen.txt` contains `/target/b.txt`
+### Scenario: starting on a spaced directory writes that cwd on quit
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `two words/a.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `two words/a.txt`:_
+```text
+a
+```
+#### When
+```shell
+# interactive (pty): yazi --cwd-file ${workdir}/cwd.txt "two words"
+```
+#### Then
+- file `cwd.txt` contains `/two words`
+### Scenario: starting on a spaced file can choose that file immediately
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `two words/a file.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `two words/a file.txt`:_
+```text
+a
+```
+#### When
+```shell
+# interactive (pty): yazi --chooser-file ${workdir}/chosen.txt "two words/a file.txt"
+```
+#### Then
+- file `chosen.txt` contains `/two words/a file.txt`
+### Scenario: starting with a spaced file writes its parent cwd on q
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `two words/a file.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `two words/a file.txt`:_
+```text
+a
+```
+#### When
+```shell
+# interactive (pty): yazi --cwd-file ${workdir}/cwd.txt "two words/a file.txt"
+```
+#### Then
+- file `cwd.txt` contains `/two words`
+### Scenario: starting on a hidden directory writes that cwd on quit
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `.hidden/a.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `.hidden/a.txt`:_
+```text
+a
+```
+#### When
+```shell
+# interactive (pty): yazi --cwd-file ${workdir}/cwd.txt .hidden
+```
+#### Then
+- file `cwd.txt` contains `/.hidden`
+### Scenario: starting on a nested file lets q write its parent cwd
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `nested/deeper/file.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `nested/deeper/file.txt`:_
+```text
+a
+```
+#### When
+```shell
+# interactive (pty): yazi --cwd-file ${workdir}/cwd.txt nested/deeper/file.txt
+```
+#### Then
+- file `cwd.txt` contains `/nested/deeper`
+### Scenario: starting with two explicit directories opens the second as another tab
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `one/a.txt` is created.
+- Fixture file `two/b.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `one/a.txt`:_
+```text
+a
+```
+_Fixture `two/b.txt`:_
+```text
+b
+```
+#### When
+```shell
+# interactive (pty): yazi --cwd-file ${workdir}/cwd.txt one two
+```
+#### Then
+- file `cwd.txt` contains `/two`
+### Scenario: starting with a directory and a file lets numeric switching choose the file tab
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `one/a.txt` is created.
+- Fixture file `two/b.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `one/a.txt`:_
+```text
+a
+```
+_Fixture `two/b.txt`:_
+```text
+b
+```
+#### When
+```shell
+# interactive (pty): yazi --chooser-file ${workdir}/chosen.txt one two/b.txt
+```
+#### Then
+- file `chosen.txt` contains `/two/b.txt`
+### Scenario: starting with two explicit files lets next-tab choose the second file tab
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `one/a.txt` is created.
+- Fixture file `two/b.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `one/a.txt`:_
+```text
+a
+```
+_Fixture `two/b.txt`:_
+```text
+b
+```
+#### When
+```shell
+# interactive (pty): yazi --chooser-file ${workdir}/chosen.txt one/a.txt two/b.txt
+```
+#### Then
+- file `chosen.txt` contains `/two/b.txt`
+### Scenario: starting with three explicit directories can switch to the third tab
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `one/a.txt` is created.
+- Fixture file `two/b.txt` is created.
+- Fixture file `three/c.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `one/a.txt`:_
+```text
+a
+```
+_Fixture `two/b.txt`:_
+```text
+b
+```
+_Fixture `three/c.txt`:_
+```text
+c
+```
+#### When
+```shell
+# interactive (pty): yazi --cwd-file ${workdir}/cwd.txt one two three
+```
+#### Then
+- file `cwd.txt` contains `/three`
+## yazi (third-party terminal file manager) / links and overwrite
+Source: `test/e2e/thirdparty/yazi/links_and_overwrite.atago.yaml`
+### Scenario: uppercase X cancels a cut before pasting
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `src/move-me.txt` is created.
+- Fixture file `dst/keep.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `src/move-me.txt`:_
+```text
+keep
+```
+_Fixture `dst/keep.txt`:_
+```text
+keep
+```
+#### When
+```shell
+# interactive (pty): yazi src
+```
+#### Then
+- file `src/move-me.txt` contains `keep`
+- file `dst/move-me.txt` does not exist
+- file `dst/keep.txt` contains `keep`
+### Scenario: uppercase Y cancels a copy before pasting
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `src/copy-me.txt` is created.
+- Fixture file `dst/keep.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `src/copy-me.txt`:_
+```text
+keep
+```
+_Fixture `dst/keep.txt`:_
+```text
+keep
+```
+#### When
+```shell
+# interactive (pty): yazi src
+```
+#### Then
+- file `src/copy-me.txt` contains `keep`
+- file `dst/copy-me.txt` does not exist
+- file `dst/keep.txt` contains `keep`
+### Scenario: uppercase P overwrites an existing spaced file during copy
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `src/two words.txt` is created.
+- Fixture file `dst/two words.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `src/two words.txt`:_
+```text
+src
+```
+_Fixture `dst/two words.txt`:_
+```text
+dst
+```
+#### When
+```shell
+# interactive (pty): yazi src
+```
+#### Then
+- file `dst/two words.txt` contains `src`
+### Scenario: uppercase P overwrites an existing spaced file during move
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `src/two words.txt` is created.
+- Fixture file `dst/two words.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `src/two words.txt`:_
+```text
+src
+```
+_Fixture `dst/two words.txt`:_
+```text
+dst
+```
+#### When
+```shell
+# interactive (pty): yazi src
+```
+#### Then
+- file `dst/two words.txt` contains `src`
+- file `src/two words.txt` does not exist
+### Scenario: uppercase P overwrites an existing directory subtree during copy
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `src/sub/a.txt` is created.
+- Fixture file `dst/src/sub/a.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `src/sub/a.txt`:_
+```text
+src
+```
+_Fixture `dst/src/sub/a.txt`:_
+```text
+dst
+```
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- file `dst/src/sub/a.txt` contains `src`
+### Scenario: uppercase P overwrites an existing directory subtree during move
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `src/sub/a.txt` is created.
+- Fixture file `dst/src/sub/a.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `src/sub/a.txt`:_
+```text
+src
+```
+_Fixture `dst/src/sub/a.txt`:_
+```text
+dst
+```
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- file `dst/src/sub/a.txt` contains `src`
+- dir `src` does not exist
+### Scenario: ctrl-hyphen hardlinks a hovered file into a sibling directory
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `src/alpha.txt` is created.
+- Fixture file `dst/keep.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `src/alpha.txt`:_
+```text
+alpha
+```
+_Fixture `dst/keep.txt`:_
+```text
+keep
+```
+#### When
+```shell
+# interactive (pty): yazi src
+stat -c '%h' src/alpha.txt
+```
+#### Then
+- file `dst/alpha.txt` contains `alpha`
+- stdout equals an exact value
+### Scenario: ctrl-minus hardlinks a spaced file into a sibling directory
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `src/two words.txt` is created.
+- Fixture file `dst/keep.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `src/two words.txt`:_
+```text
+alpha
+```
+_Fixture `dst/keep.txt`:_
+```text
+keep
+```
+#### When
+```shell
+# interactive (pty): yazi src
+stat -c '%h' 'src/two words.txt'
+```
+#### Then
+- file `dst/two words.txt` contains `alpha`
+- stdout equals an exact value
+## yazi (third-party terminal file manager) / navigation and tabs
+Source: `test/e2e/thirdparty/yazi/navigation_tabs.atago.yaml`
+### Scenario: down arrow moves to the second file before choosing
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `a.txt` is created.
+- Fixture file `b.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `a.txt`:_
+```text
+a
+```
+_Fixture `b.txt`:_
+```text
+b
+```
+#### When
+```shell
+# interactive (pty): yazi --chooser-file ${workdir}/chosen.txt .
+```
+#### Then
+- file `chosen.txt` contains `/b.txt`
+### Scenario: up arrow returns from the third file to the second before choosing
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `a.txt` is created.
+- Fixture file `b.txt` is created.
+- Fixture file `c.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `a.txt`:_
+```text
+a
+```
+_Fixture `b.txt`:_
+```text
+b
+```
+_Fixture `c.txt`:_
+```text
+c
+```
+#### When
+```shell
+# interactive (pty): yazi --chooser-file ${workdir}/chosen.txt .
+```
+#### Then
+- file `chosen.txt` contains `/b.txt`
+### Scenario: right arrow enters the hovered directory before choosing a file
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `sub/inside.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `sub/inside.txt`:_
+```text
+inside
+```
+#### When
+```shell
+# interactive (pty): yazi --chooser-file ${workdir}/chosen.txt .
+```
+#### Then
+- file `chosen.txt` contains `/sub/inside.txt`
+### Scenario: left arrow leaves the entered directory and q writes the parent cwd
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `sub/inside.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `sub/inside.txt`:_
+```text
+inside
+```
+#### When
+```shell
+# interactive (pty): yazi --cwd-file ${workdir}/cwd.txt .
+```
+#### Then
+- file `cwd.txt` is checked
+### Scenario: right arrow enters a spaced directory before choosing a file
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `two words/inside.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `two words/inside.txt`:_
+```text
+inside
+```
+#### When
+```shell
+# interactive (pty): yazi --chooser-file ${workdir}/chosen.txt .
+```
+#### Then
+- file `chosen.txt` contains `/two words/inside.txt`
+### Scenario: down arrow reaches a spaced filename before choosing
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `a.txt` is created.
+- Fixture file `two words.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `a.txt`:_
+```text
+a
+```
+_Fixture `two words.txt`:_
+```text
+b
+```
+#### When
+```shell
+# interactive (pty): yazi --chooser-file ${workdir}/chosen.txt .
+```
+#### Then
+- file `chosen.txt` contains `/two words.txt`
+### Scenario: swap-left reorders two directory tabs for numeric switching
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `one/a.txt` is created.
+- Fixture file `two/b.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `one/a.txt`:_
+```text
+a
+```
+_Fixture `two/b.txt`:_
+```text
+b
+```
+#### When
+```shell
+# interactive (pty): yazi --cwd-file ${workdir}/cwd.txt one two
+```
+#### Then
+- file `cwd.txt` contains `/two`
+### Scenario: swap-right reorders two directory tabs for numeric switching
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `one/a.txt` is created.
+- Fixture file `two/b.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `one/a.txt`:_
+```text
+a
+```
+_Fixture `two/b.txt`:_
+```text
+b
+```
+#### When
+```shell
+# interactive (pty): yazi --cwd-file ${workdir}/cwd.txt one two
+```
+#### Then
+- file `cwd.txt` contains `/one`
+### Scenario: swap-left reorders two file tabs for numeric switching
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `one/a.txt` is created.
+- Fixture file `two/b.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `one/a.txt`:_
+```text
+a
+```
+_Fixture `two/b.txt`:_
+```text
+b
+```
+#### When
+```shell
+# interactive (pty): yazi --chooser-file ${workdir}/chosen.txt one/a.txt two/b.txt
+```
+#### Then
+- file `chosen.txt` contains `/two/b.txt`
+### Scenario: tt twice creates a third tab that 3 can activate
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `alpha.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `alpha.txt`:_
+```text
+a
+```
+#### When
+```shell
+# interactive (pty): yazi --cwd-file ${workdir}/cwd.txt .
+```
+#### Then
+- file `cwd.txt` contains `${workdir}`
+### Scenario: closing the third tab with ctrl-c returns to the second tab
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `alpha.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `alpha.txt`:_
+```text
+a
+```
+#### When
+```shell
+# interactive (pty): yazi --cwd-file ${workdir}/cwd.txt .
+```
+#### Then
+- file `cwd.txt` contains `${workdir}`
+## yazi (third-party terminal file manager) / search and tabs
+Source: `test/e2e/thirdparty/yazi/search_tabs.atago.yaml`
+### Scenario: uppercase S content search finds the matching file
+_only when `rg --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `alpha.txt` is created.
+- Fixture file `beta.txt` is created.
+- Fixture file `gamma.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `alpha.txt`:_
+```text
+alpha
+```
+_Fixture `beta.txt`:_
+```text
+needle
+```
+_Fixture `gamma.txt`:_
+```text
+gamma
+```
+#### When
+```shell
+# interactive (pty): yazi --chooser-file ${workdir}/chosen.txt .
+```
+#### Then
+- file `chosen.txt` contains `beta.txt`
+### Scenario: tab shows file information for the hovered file
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `alpha.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `alpha.txt`:_
+```text
+alpha
+```
+#### When
+```shell
+# interactive (pty): yazi .
+```
+### Scenario: tt opens a new tab rooted at the current cwd
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `alpha.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `alpha.txt`:_
+```text
+a
+```
+#### When
+```shell
+# interactive (pty): yazi --cwd-file ${workdir}/cwd.txt .
+```
+#### Then
+- file `cwd.txt` contains `${workdir}`
+### Scenario: ctrl-c closes the current tab and returns to the previous tab cwd
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `one/a.txt` is created.
+- Fixture file `two/b.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `one/a.txt`:_
+```text
+a
+```
+_Fixture `two/b.txt`:_
+```text
+b
+```
+#### When
+```shell
+# interactive (pty): yazi --cwd-file ${workdir}/cwd.txt one two
+```
+#### Then
+- file `cwd.txt` contains `/one`
+## yazi (third-party terminal file manager) / selection matrix
+Source: `test/e2e/thirdparty/yazi/selection_matrix.atago.yaml`
+### Scenario: space-selected file is moved even when the cursor moves away
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `src/a.txt` is created.
+- Fixture file `src/b.txt` is created.
+- Fixture file `dst/.keep` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `src/a.txt`:_
+```text
+a
+```
+_Fixture `src/b.txt`:_
+```text
+b
+```
+#### When
+```shell
+# interactive (pty): yazi src
+```
+#### Then
+- file `dst/b.txt` contains `b`
+- file `src/b.txt` does not exist
+- file `dst/a.txt` does not exist
+### Scenario: space-selected directory is copied even when the cursor moves away
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `src/a-dir/a.txt` is created.
+- Fixture file `src/b-dir/b.txt` is created.
+- Fixture file `dst/.keep` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `src/a-dir/a.txt`:_
+```text
+a
+```
+_Fixture `src/b-dir/b.txt`:_
+```text
+b
+```
+#### When
+```shell
+# interactive (pty): yazi src
+```
+#### Then
+- file `dst/b-dir/b.txt` contains `b`
+- dir `dst/a-dir` does not exist
+### Scenario: space-selected directory is moved even when the cursor moves away
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `src/a-dir/a.txt` is created.
+- Fixture file `src/b-dir/b.txt` is created.
+- Fixture file `dst/.keep` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `src/a-dir/a.txt`:_
+```text
+a
+```
+_Fixture `src/b-dir/b.txt`:_
+```text
+b
+```
+#### When
+```shell
+# interactive (pty): yazi src
+```
+#### Then
+- file `dst/b-dir/b.txt` contains `b`
+- dir `src/b-dir` does not exist
+- dir `dst/a-dir` does not exist
+### Scenario: space-selected spaced directory is moved even when the cursor moves away
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `src/a-dir/a.txt` is created.
+- Fixture file `src/two words/b.txt` is created.
+- Fixture file `dst/.keep` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `src/a-dir/a.txt`:_
+```text
+a
+```
+_Fixture `src/two words/b.txt`:_
+```text
+b
+```
+#### When
+```shell
+# interactive (pty): yazi src
+```
+#### Then
+- file `dst/two words/b.txt` contains `b`
+- dir `src/two words` does not exist
+- dir `dst/a-dir` does not exist
+### Scenario: visual mode selects a file range and moves both files
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `src/a.txt` is created.
+- Fixture file `src/b.txt` is created.
+- Fixture file `src/c.txt` is created.
+- Fixture file `dst/.keep` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `src/a.txt`:_
+```text
+a
+```
+_Fixture `src/b.txt`:_
+```text
+b
+```
+_Fixture `src/c.txt`:_
+```text
+c
+```
+#### When
+```shell
+# interactive (pty): yazi src
+```
+#### Then
+- file `dst/a.txt` contains `a`
+- file `dst/b.txt` contains `b`
+- file `src/c.txt` contains `c`
+- file `src/a.txt` does not exist
+### Scenario: visual mode selects a file range and permanently deletes both files
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `a.txt` is created.
+- Fixture file `b.txt` is created.
+- Fixture file `c.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `a.txt`:_
+```text
+a
+```
+_Fixture `b.txt`:_
+```text
+b
+```
+_Fixture `c.txt`:_
+```text
+c
+```
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- file `a.txt` does not exist
+- file `b.txt` does not exist
+- file `c.txt` contains `c`
+### Scenario: visual mode selects a directory range and copies both directories
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `src/a-dir/a.txt` is created.
+- Fixture file `src/b-dir/b.txt` is created.
+- Fixture file `src/c-dir/c.txt` is created.
+- Fixture file `dst/.keep` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `src/a-dir/a.txt`:_
+```text
+a
+```
+_Fixture `src/b-dir/b.txt`:_
+```text
+b
+```
+_Fixture `src/c-dir/c.txt`:_
+```text
+c
+```
+#### When
+```shell
+# interactive (pty): yazi src
+```
+#### Then
+- file `dst/a-dir/a.txt` contains `a`
+- file `dst/b-dir/b.txt` contains `b`
+- dir `dst/c-dir` does not exist
+### Scenario: visual mode selects a directory range and moves both directories
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `src/a-dir/a.txt` is created.
+- Fixture file `src/b-dir/b.txt` is created.
+- Fixture file `src/c-dir/c.txt` is created.
+- Fixture file `dst/.keep` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `src/a-dir/a.txt`:_
+```text
+a
+```
+_Fixture `src/b-dir/b.txt`:_
+```text
+b
+```
+_Fixture `src/c-dir/c.txt`:_
+```text
+c
+```
+#### When
+```shell
+# interactive (pty): yazi src
+```
+#### Then
+- file `dst/a-dir/a.txt` contains `a`
+- file `dst/b-dir/b.txt` contains `b`
+- dir `src/a-dir` does not exist
+- file `src/c-dir/c.txt` contains `c`
+### Scenario: visual mode selects spaced directories and moves both
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `src/a one/a.txt` is created.
+- Fixture file `src/b two/b.txt` is created.
+- Fixture file `src/c three/c.txt` is created.
+- Fixture file `dst/.keep` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `src/a one/a.txt`:_
+```text
+a
+```
+_Fixture `src/b two/b.txt`:_
+```text
+b
+```
+_Fixture `src/c three/c.txt`:_
+```text
+c
+```
+#### When
+```shell
+# interactive (pty): yazi src
+```
+#### Then
+- file `dst/a one/a.txt` contains `a`
+- file `dst/b two/b.txt` contains `b`
+- dir `src/a one` does not exist
+- file `src/c three/c.txt` contains `c`
+## yazi (third-party terminal file manager)
+Source: `test/e2e/thirdparty/yazi/yazi.atago.yaml`
+### Scenario: version prints a semantic version banner
+_only when `yazi --version` succeeds_
+#### When
+```shell
+yazi --version
+```
+#### Then
+- exit code is `0`
+- stdout matches `/^Yazi [0-9]+\.[0-9]+\.[0-9]+/`
+### Scenario: hidden files stay hidden by default
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `alpha.txt` is created.
+- Fixture file `.secret` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- rendered screen contains `alpha.txt`
+- rendered screen does not contain `.secret`
+### Scenario: dot toggles hidden files into view
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `alpha.txt` is created.
+- Fixture file `.secret` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- rendered screen contains `alpha.txt`
+- rendered screen contains `.secret`
+### Scenario: filter narrows the visible file list
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `alpha.txt` is created.
+- Fixture file `beta.txt` is created.
+- Fixture file `gamma.log` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- rendered screen contains `beta.txt`
+- rendered screen does not contain `alpha.txt`
+- rendered screen does not contain `gamma.log`
+### Scenario: create makes a new file
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `keep.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `keep.txt`:_
+```text
+keep
+```
+#### When
+```shell
+# interactive (pty): yazi ${workdir}
+```
+#### Then
+- exit code is `0`
+- the step changed exactly created `notes.txt`, modified nothing, deleted nothing
+- file `notes.txt` exists
+#### Generated artifacts
+- `notes.txt`
+### Scenario: create with a trailing slash makes a directory
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `keep.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- exit code is `0`
+- dir `nested` exists
+### Scenario: rename changes the hovered file name and nothing else
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `old.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `old.txt`:_
+```text
+old
+```
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- the step changed exactly created `old.bak.txt`, modified nothing, deleted `old.txt`
+- file `old.txt` does not exist
+- file `old.bak.txt` contains `old`
+### Scenario: yank then paste copies a file into a sibling directory
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `src/alpha.txt` is created.
+- Fixture file `dst/.keep` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `src/alpha.txt`:_
+```text
+alpha
+```
+#### When
+```shell
+# interactive (pty): yazi src
+```
+#### Then
+- exit code is `0`
+- the step changed exactly created `dst/alpha.txt`, modified nothing, deleted nothing
+- file `src/alpha.txt` contains `alpha`
+- file `dst/alpha.txt` contains `alpha`
+### Scenario: select-all then yank copies multiple files into a sibling directory
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `src/a.txt` is created.
+- Fixture file `src/b.txt` is created.
+- Fixture file `dst/.keep` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `src/a.txt`:_
+```text
+a
+```
+_Fixture `src/b.txt`:_
+```text
+b
+```
+#### When
+```shell
+# interactive (pty): yazi src
+```
+#### Then
+- exit code is `0`
+- the step changed exactly created `dst/a.txt`, `dst/b.txt`, modified nothing, deleted nothing
+- file `dst/a.txt` contains `a`
+- file `dst/b.txt` contains `b`
+### Scenario: cut then paste moves a file into a sibling directory
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `src/beta.txt` is created.
+- Fixture file `dst/.keep` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `src/beta.txt`:_
+```text
+beta
+```
+#### When
+```shell
+# interactive (pty): yazi src
+```
+#### Then
+- exit code is `0`
+- the step changed exactly created `dst/beta.txt`, modified nothing, deleted `src/beta.txt`
+- file `src/beta.txt` does not exist
+- file `dst/beta.txt` contains `beta`
+### Scenario: uppercase D permanently deletes the hovered file after confirmation
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `doomed.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `doomed.txt`:_
+```text
+doomed
+```
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- exit code is `0`
+- the step changed exactly created nothing, modified nothing, deleted `doomed.txt`
+- file `doomed.txt` does not exist
+### Scenario: canceling permanent delete returns to the file list and keeps the file
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `keep.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `keep.txt`:_
+```text
+keep
+```
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- exit code is `0`
+- file `keep.txt` contains `keep`
+### Scenario: canceling a yank leaves nothing to paste
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `src/one.txt` is created.
+- Fixture file `dst/.keep` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `src/one.txt`:_
+```text
+one
+```
+#### When
+```shell
+# interactive (pty): yazi src
+```
+#### Then
+- exit code is `0`
+- the step changed exactly created nothing, modified nothing, deleted nothing
+### Scenario: canceling a cut leaves nothing to paste
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `src/one.txt` is created.
+- Fixture file `dst/.keep` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `src/one.txt`:_
+```text
+one
+```
+#### When
+```shell
+# interactive (pty): yazi src
+```
+#### Then
+- exit code is `0`
+- the step changed exactly created nothing, modified nothing, deleted nothing
+### Scenario: select-all then cut moves multiple files into a sibling directory
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `src/a.txt` is created.
+- Fixture file `src/b.txt` is created.
+- Fixture file `dst/.keep` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `src/a.txt`:_
+```text
+a
+```
+_Fixture `src/b.txt`:_
+```text
+b
+```
+#### When
+```shell
+# interactive (pty): yazi src
+```
+#### Then
+- exit code is `0`
+- file `dst/a.txt` contains `a`
+- file `dst/b.txt` contains `b`
+- file `src/a.txt` does not exist
+- file `src/b.txt` does not exist
+### Scenario: select-all then permanent delete removes multiple files
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `a.txt` is created.
+- Fixture file `b.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `a.txt`:_
+```text
+a
+```
+_Fixture `b.txt`:_
+```text
+b
+```
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- exit code is `0`
+- file `a.txt` does not exist
+- file `b.txt` does not exist
+### Scenario: trash moves the hovered file into sandbox home trash
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `trashme.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `trashme.txt`:_
+```text
+trash
+```
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- exit code is `0`
+- file `trashme.txt` does not exist
+- file `.atago-home/.local/share/Trash/files/trashme.txt` contains `trash`
+### Scenario: trashing selected files moves both into sandbox home trash
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `a.txt` is created.
+- Fixture file `b.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `a.txt`:_
+```text
+a
+```
+_Fixture `b.txt`:_
+```text
+b
+```
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- exit code is `0`
+- file `a.txt` does not exist
+- file `b.txt` does not exist
+- file `.atago-home/.local/share/Trash/files/a.txt` contains `a`
+- file `.atago-home/.local/share/Trash/files/b.txt` contains `b`
+### Scenario: canceling trash returns to the file list and keeps the file
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `keep.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `keep.txt`:_
+```text
+keep
+```
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- exit code is `0`
+- file `keep.txt` contains `keep`
+### Scenario: space-selected file is copied even when the cursor moves away
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `src/a.txt` is created.
+- Fixture file `src/b.txt` is created.
+- Fixture file `dst/.keep` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `src/a.txt`:_
+```text
+a
+```
+_Fixture `src/b.txt`:_
+```text
+b
+```
+#### When
+```shell
+# interactive (pty): yazi src
+```
+#### Then
+- exit code is `0`
+- file `dst/b.txt` contains `b`
+- file `dst/a.txt` does not exist
+### Scenario: visual mode selects a range and copies both files
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `src/a.txt` is created.
+- Fixture file `src/b.txt` is created.
+- Fixture file `src/c.txt` is created.
+- Fixture file `dst/.keep` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `src/a.txt`:_
+```text
+a
+```
+_Fixture `src/b.txt`:_
+```text
+b
+```
+_Fixture `src/c.txt`:_
+```text
+c
+```
+#### When
+```shell
+# interactive (pty): yazi src
+```
+#### Then
+- exit code is `0`
+- file `dst/a.txt` contains `a`
+- file `dst/b.txt` contains `b`
+- file `dst/c.txt` does not exist
+### Scenario: lowercase p copies to item_1 when the destination already exists
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `src/item.txt` is created.
+- Fixture file `dst/item.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `src/item.txt`:_
+```text
+new
+```
+_Fixture `dst/item.txt`:_
+```text
+old
+```
+#### When
+```shell
+# interactive (pty): yazi src
+```
+#### Then
+- exit code is `0`
+- file `src/item.txt` contains `new`
+- file `dst/item.txt` contains `old`
+- file `dst/item_1.txt` contains `new`
+### Scenario: lowercase p moves to item_1 when the destination already exists
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `src/item.txt` is created.
+- Fixture file `dst/item.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `src/item.txt`:_
+```text
+new
+```
+_Fixture `dst/item.txt`:_
+```text
+old
+```
+#### When
+```shell
+# interactive (pty): yazi src
+```
+#### Then
+- exit code is `0`
+- file `src/item.txt` does not exist
+- file `dst/item.txt` contains `old`
+- file `dst/item_1.txt` contains `new`
+### Scenario: uppercase P overwrites an existing file during copy
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `src/item.txt` is created.
+- Fixture file `dst/item.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `src/item.txt`:_
+```text
+new
+```
+_Fixture `dst/item.txt`:_
+```text
+old
+```
+#### When
+```shell
+# interactive (pty): yazi src
+```
+#### Then
+- exit code is `0`
+- file `src/item.txt` contains `new`
+- file `dst/item.txt` contains `new`
+### Scenario: uppercase P overwrites an existing file during move
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `src/item.txt` is created.
+- Fixture file `dst/item.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `src/item.txt`:_
+```text
+new
+```
+_Fixture `dst/item.txt`:_
+```text
+old
+```
+#### When
+```shell
+# interactive (pty): yazi src
+```
+#### Then
+- exit code is `0`
+- file `src/item.txt` does not exist
+- file `dst/item.txt` contains `new`
+### Scenario: alphabetical sort puts a then b then c at the cursor
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `b.txt` is created.
+- Fixture file `a.txt` is created.
+- Fixture file `c.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- exit code is `0`
+### Scenario: reverse alphabetical sort puts c then b then a at the cursor
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `b.txt` is created.
+- Fixture file `a.txt` is created.
+- Fixture file `c.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- exit code is `0`
+### Scenario: extension sort puts log then md then txt at the cursor
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `b.md` is created.
+- Fixture file `a.txt` is created.
+- Fixture file `c.log` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- exit code is `0`
+### Scenario: reverse extension sort puts txt then md then log at the cursor
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `b.md` is created.
+- Fixture file `a.txt` is created.
+- Fixture file `c.log` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- exit code is `0`
+### Scenario: size sort puts one then two then three at the cursor
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `one.txt` is created.
+- Fixture file `three.txt` is created.
+- Fixture file `two.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `one.txt`:_
+```text
+1
+```
+_Fixture `three.txt`:_
+```text
+333
+```
+_Fixture `two.txt`:_
+```text
+22
+```
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- exit code is `0`
+### Scenario: reverse size sort puts three then two then one at the cursor
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `one.txt` is created.
+- Fixture file `three.txt` is created.
+- Fixture file `two.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `one.txt`:_
+```text
+1
+```
+_Fixture `three.txt`:_
+```text
+333
+```
+_Fixture `two.txt`:_
+```text
+22
+```
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- exit code is `0`
+### Scenario: natural sort puts 3 then 20 then 100 at the cursor
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `20.txt` is created.
+- Fixture file `3.txt` is created.
+- Fixture file `100.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- exit code is `0`
+### Scenario: natural sort is visible on the rendered file list before quitting
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `20.txt` is created.
+- Fixture file `3.txt` is created.
+- Fixture file `100.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- exit code is `0`
+### Scenario: reverse natural sort puts 100 then 20 then 3 at the cursor
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `20.txt` is created.
+- Fixture file `3.txt` is created.
+- Fixture file `100.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- exit code is `0`
+### Scenario: reverse natural sort is visible on the rendered file list before quitting
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `20.txt` is created.
+- Fixture file `3.txt` is created.
+- Fixture file `100.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- exit code is `0`
+### Scenario: chooser-file writes the hovered path and exits on enter
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `picked.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `picked.txt`:_
+```text
+picked
+```
+#### When
+```shell
+# interactive (pty): yazi --chooser-file ${workdir}/chosen.txt .
+```
+#### Then
+- exit code is `0`
+- file `chosen.txt` contains `picked.txt`
+### Scenario: chooser-file writes all selected paths on enter
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `a.txt` is created.
+- Fixture file `b.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `a.txt`:_
+```text
+a
+```
+_Fixture `b.txt`:_
+```text
+b
+```
+#### When
+```shell
+# interactive (pty): yazi --chooser-file ${workdir}/chosen.txt .
+```
+#### Then
+- exit code is `0`
+- file `chosen.txt` contains `a.txt`, `b.txt`
+### Scenario: chooser-file remains absent when quitting with uppercase Q
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `picked.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `picked.txt`:_
+```text
+picked
+```
+#### When
+```shell
+# interactive (pty): yazi --chooser-file ${workdir}/chosen.txt .
+```
+#### Then
+- exit code is `0`
+- file `chosen.txt` does not exist
+### Scenario: uppercase G moves to the bottom item before choosing
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `a.txt` is created.
+- Fixture file `b.txt` is created.
+- Fixture file `z.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### When
+```shell
+# interactive (pty): yazi --chooser-file ${workdir}/chosen.txt .
+```
+#### Then
+- exit code is `0`
+- file `chosen.txt` contains `z.txt`
+### Scenario: gg moves to the top item before choosing
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `a.txt` is created.
+- Fixture file `b.txt` is created.
+- Fixture file `z.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### When
+```shell
+# interactive (pty): yazi --chooser-file ${workdir}/chosen.txt .
+```
+#### Then
+- exit code is `0`
+- file `chosen.txt` contains `a.txt`
+### Scenario: quitting immediately writes the initial cwd to cwd-file
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `alpha.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### When
+```shell
+# interactive (pty): yazi --cwd-file ${workdir}/cwd.txt .
+```
+#### Then
+- exit code is `0`
+- file `cwd.txt` contains `/atago-`
+### Scenario: quitting after entering a directory writes the final cwd
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `z-nested/inside.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### When
+```shell
+# interactive (pty): yazi --cwd-file ${workdir}/cwd.txt .
+```
+#### Then
+- exit code is `0`
+- file `cwd.txt` contains `z-nested`
+### Scenario: leaving a directory then quitting writes the parent cwd
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `a-dir/a.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### When
+```shell
+# interactive (pty): yazi --cwd-file ${workdir}/cwd.txt .
+```
+#### Then
+- exit code is `0`
+- file `cwd.txt` is checked
+### Scenario: tabs preserve per-tab cwd and q writes the active tab cwd
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `a-dir/a.txt` is created.
+- Fixture file `z-dir/z.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### When
+```shell
+# interactive (pty): yazi --cwd-file ${workdir}/cwd.txt .
+```
+#### Then
+- exit code is `0`
+- file `cwd.txt` contains `a-dir`
+### Scenario: closing the current tab returns to the previous tab cwd
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `a-dir/a.txt` is created.
+- Fixture file `z-dir/z.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### When
+```shell
+# interactive (pty): yazi --cwd-file ${workdir}/cwd.txt .
+```
+#### Then
+- exit code is `0`
+- file `cwd.txt` contains `a-dir`
+### Scenario: previous and next tab navigation preserve each tab cwd
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `a-dir/a.txt` is created.
+- Fixture file `z-dir/z.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### When
+```shell
+# interactive (pty): yazi --cwd-file ${workdir}/cwd.txt .
+```
+#### Then
+- exit code is `0`
+- file `cwd.txt` contains `z-dir`
+### Scenario: uppercase Q exits without writing the cwd file
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `z-nested/inside.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### When
+```shell
+# interactive (pty): yazi --cwd-file ${workdir}/cwd.txt .
+```
+#### Then
+- exit code is `0`
+- file `cwd.txt` does not exist
+### Scenario: create accepts filenames with spaces
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `keep.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `keep.txt`:_
+```text
+keep
+```
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- file `two words.txt` exists
+#### Generated artifacts
+- `two words.txt`
+### Scenario: create accepts directory names with spaces
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `keep.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `keep.txt`:_
+```text
+keep
+```
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- dir `two words` exists
+### Scenario: rename accepts spaces in filenames
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `old.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `old.txt`:_
+```text
+old
+```
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- file `old two words.txt` contains `old`
+### Scenario: rename accepts spaces in directory names
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `old-dir/keep.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `old-dir/keep.txt`:_
+```text
+keep
+```
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- file `old-dir two words/keep.txt` contains `keep`
+### Scenario: yank then dash creates an absolute symlink in the sibling directory
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `src/a.txt` is created.
+- Fixture file `dst/.keep` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `src/a.txt`:_
+```text
+a
+```
+#### When
+```shell
+# interactive (pty): yazi .
+readlink dst/a.txt
+```
+#### Then
+- stdout matches `/^.+/src/a\.txt
+?$/`
+### Scenario: yank then underscore creates a relative symlink in the sibling directory
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `src/a.txt` is created.
+- Fixture file `dst/.keep` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `src/a.txt`:_
+```text
+a
+```
+#### When
+```shell
+# interactive (pty): yazi .
+readlink dst/a.txt
+```
+#### Then
+- stdout equals an exact value
+### Scenario: yanked directory can be absolute-symlinked into a sibling directory
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `src/sub/a.txt` is created.
+- Fixture file `dst/.keep` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `src/sub/a.txt`:_
+```text
+a
+```
+#### When
+```shell
+# interactive (pty): yazi .
+readlink dst/sub
+```
+#### Then
+- stdout matches `/^.+/src/sub
+?$/`
+### Scenario: yanked directory can be relative-symlinked into a sibling directory
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `src/sub/a.txt` is created.
+- Fixture file `dst/.keep` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `src/sub/a.txt`:_
+```text
+a
+```
+#### When
+```shell
+# interactive (pty): yazi .
+readlink dst/sub
+```
+#### Then
+- stdout equals an exact value
+### Scenario: modified time sort reorders the rendered list
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `oldest.txt` is created.
+- Fixture file `newest.txt` is created.
+- Fixture file `middle.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `oldest.txt`:_
+```text
+old
+```
+_Fixture `newest.txt`:_
+```text
+new
+```
+_Fixture `middle.txt`:_
+```text
+mid
+```
+#### When
+```shell
+# interactive (pty): yazi .
+```
+### Scenario: reverse modified time sort reorders the rendered list
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `oldest.txt` is created.
+- Fixture file `newest.txt` is created.
+- Fixture file `middle.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `oldest.txt`:_
+```text
+old
+```
+_Fixture `newest.txt`:_
+```text
+new
+```
+_Fixture `middle.txt`:_
+```text
+mid
+```
+#### When
+```shell
+# interactive (pty): yazi .
+```
+### Scenario: modified time sort chooses the oldest file first
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `oldest.txt` is created.
+- Fixture file `newest.txt` is created.
+- Fixture file `middle.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `oldest.txt`:_
+```text
+old
+```
+_Fixture `newest.txt`:_
+```text
+new
+```
+_Fixture `middle.txt`:_
+```text
+mid
+```
+#### When
+```shell
+# interactive (pty): yazi --chooser-file ${workdir}/chosen.txt .
+```
+#### Then
+- file `chosen.txt` contains `oldest.txt`
+### Scenario: reverse modified time sort chooses the newest file first
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `oldest.txt` is created.
+- Fixture file `newest.txt` is created.
+- Fixture file `middle.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `oldest.txt`:_
+```text
+old
+```
+_Fixture `newest.txt`:_
+```text
+new
+```
+_Fixture `middle.txt`:_
+```text
+mid
+```
+#### When
+```shell
+# interactive (pty): yazi --chooser-file ${workdir}/chosen.txt .
+```
+#### Then
+- file `chosen.txt` contains `newest.txt`
+### Scenario: toggling the same file twice removes the explicit selection
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `a.txt` is created.
+- Fixture file `b.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `a.txt`:_
+```text
+a
+```
+_Fixture `b.txt`:_
+```text
+b
+```
+#### When
+```shell
+# interactive (pty): yazi --chooser-file ${workdir}/chosen.txt .
+```
+#### Then
+- file `chosen.txt` contains `/b.txt`
+### Scenario: inverse selection flips one picked file into the other two
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `a.txt` is created.
+- Fixture file `b.txt` is created.
+- Fixture file `c.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `a.txt`:_
+```text
+a
+```
+_Fixture `b.txt`:_
+```text
+b
+```
+_Fixture `c.txt`:_
+```text
+c
+```
+#### When
+```shell
+# interactive (pty): yazi --chooser-file ${workdir}/chosen.txt .
+cat chosen.txt
+```
+#### Then
+- stdout matches `/(?m)^.*/b\.txt\n.*/c\.txt\n?$/`
+### Scenario: direct tab switching with 1 and 2 preserves per-tab cwd
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `one/a.txt` is created.
+- Fixture file `two/b.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `one/a.txt`:_
+```text
+a
+```
+_Fixture `two/b.txt`:_
+```text
+b
+```
+#### When
+```shell
+# interactive (pty): yazi --cwd-file ${workdir}/cwd.txt .
+```
+#### Then
+- file `cwd.txt` contains `/two`
+### Scenario: block shell command creates a file and returns to the browser
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `keep.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `keep.txt`:_
+```text
+keep
+```
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- file `shell-created.txt` contains `shell-created`
+### Scenario: filter can be cleared after confirming it
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `alpha.txt` is created.
+- Fixture file `beta.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `alpha.txt`:_
+```text
+a
+```
+_Fixture `beta.txt`:_
+```text
+b
+```
+#### When
+```shell
+# interactive (pty): yazi .
+```
+### Scenario: yank then paste copies a directory subtree into a sibling directory
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `src/sub/a.txt` is created.
+- Fixture file `dst/.keep` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `src/sub/a.txt`:_
+```text
+a
+```
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- file `dst/src/sub/a.txt` contains `a`
+- file `src/sub/a.txt` contains `a`
+### Scenario: cut then paste moves a directory subtree into a sibling directory
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `src/sub/a.txt` is created.
+- Fixture file `dst/.keep` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `src/sub/a.txt`:_
+```text
+a
+```
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- file `dst/src/sub/a.txt` contains `a`
+- dir `src` does not exist
+### Scenario: lowercase p copies a directory to name_1 when the destination exists
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `src/sub/a.txt` is created.
+- Fixture file `dst/src/existing.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `src/sub/a.txt`:_
+```text
+src
+```
+_Fixture `dst/src/existing.txt`:_
+```text
+dst
+```
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- file `dst/src/existing.txt` contains `dst`
+- file `dst/src_1/sub/a.txt` contains `src`
+### Scenario: lowercase p moves a directory to name_1 when the destination exists
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `src/sub/a.txt` is created.
+- Fixture file `dst/src/existing.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `src/sub/a.txt`:_
+```text
+src
+```
+_Fixture `dst/src/existing.txt`:_
+```text
+dst
+```
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- file `dst/src/existing.txt` contains `dst`
+- file `dst/src_1/sub/a.txt` contains `src`
+- dir `src` does not exist
+### Scenario: uppercase D permanently deletes a directory subtree after confirmation
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `doomed/sub/a.txt` is created.
+- Fixture file `keep.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `doomed/sub/a.txt`:_
+```text
+a
+```
+_Fixture `keep.txt`:_
+```text
+keep
+```
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- dir `doomed` does not exist
+### Scenario: canceling uppercase D keeps a directory subtree intact
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `doomed/sub/a.txt` is created.
+- Fixture file `keep.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `doomed/sub/a.txt`:_
+```text
+a
+```
+_Fixture `keep.txt`:_
+```text
+keep
+```
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- file `doomed/sub/a.txt` contains `a`
+### Scenario: trash moves a directory subtree into sandbox home trash
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `doomed/sub/a.txt` is created.
+- Fixture file `keep.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `doomed/sub/a.txt`:_
+```text
+a
+```
+_Fixture `keep.txt`:_
+```text
+keep
+```
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- dir `doomed` does not exist
+- file `.atago-home/.local/share/Trash/files/doomed/sub/a.txt` contains `a`
+### Scenario: canceling trash keeps a directory subtree intact
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `doomed/sub/a.txt` is created.
+- Fixture file `keep.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `doomed/sub/a.txt`:_
+```text
+a
+```
+_Fixture `keep.txt`:_
+```text
+keep
+```
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- file `doomed/sub/a.txt` contains `a`
+### Scenario: canceling trash for selected directories keeps both subtrees
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `alpha-dir/sub/x.txt` is created.
+- Fixture file `beta-dir/sub/y.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `alpha-dir/sub/x.txt`:_
+```text
+x
+```
+_Fixture `beta-dir/sub/y.txt`:_
+```text
+y
+```
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- file `alpha-dir/sub/x.txt` contains `x`
+- file `beta-dir/sub/y.txt` contains `y`
+### Scenario: yank then paste copies a spaced filename into a sibling directory
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `src/two words.txt` is created.
+- Fixture file `dst/.keep` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `src/two words.txt`:_
+```text
+spaced
+```
+#### When
+```shell
+# interactive (pty): yazi src
+```
+#### Then
+- file `dst/two words.txt` contains `spaced`
+### Scenario: cut then paste moves a spaced filename into a sibling directory
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `src/two words.txt` is created.
+- Fixture file `dst/.keep` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `src/two words.txt`:_
+```text
+spaced
+```
+#### When
+```shell
+# interactive (pty): yazi src
+```
+#### Then
+- file `dst/two words.txt` contains `spaced`
+- file `src/two words.txt` does not exist
+### Scenario: yank then paste copies a spaced directory subtree into a sibling directory
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `src/two words/a.txt` is created.
+- Fixture file `dst/.keep` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `src/two words/a.txt`:_
+```text
+spaced
+```
+#### When
+```shell
+# interactive (pty): yazi src
+```
+#### Then
+- file `dst/two words/a.txt` contains `spaced`
+### Scenario: dash symlinks a spaced filename with an absolute target
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `src/two words.txt` is created.
+- Fixture file `dst/.keep` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `src/two words.txt`:_
+```text
+spaced
+```
+#### When
+```shell
+# interactive (pty): yazi src
+readlink "dst/two words.txt"
+```
+#### Then
+- stdout matches `/^.+/src/two words\.txt
+?$/`
+### Scenario: underscore symlinks a spaced filename with a relative target
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `src/two words.txt` is created.
+- Fixture file `dst/.keep` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `src/two words.txt`:_
+```text
+spaced
+```
+#### When
+```shell
+# interactive (pty): yazi src
+readlink "dst/two words.txt"
+```
+#### Then
+- stdout equals an exact value
+### Scenario: dash symlinks a spaced directory with an absolute target
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `src/two words/a.txt` is created.
+- Fixture file `dst/.keep` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `src/two words/a.txt`:_
+```text
+spaced
+```
+#### When
+```shell
+# interactive (pty): yazi src
+readlink "dst/two words"
+```
+#### Then
+- stdout matches `/^.+/src/two words
+?$/`
+### Scenario: underscore symlinks a spaced directory with a relative target
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `src/two words/a.txt` is created.
+- Fixture file `dst/.keep` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `src/two words/a.txt`:_
+```text
+spaced
+```
+#### When
+```shell
+# interactive (pty): yazi src
+readlink "dst/two words"
+```
+#### Then
+- stdout equals an exact value
+### Scenario: hidden toggle can be turned back off
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `alpha.txt` is created.
+- Fixture file `.secret` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### When
+```shell
+# interactive (pty): yazi --chooser-file ${workdir}/chosen.txt .
+```
+#### Then
+- file `chosen.txt` contains `alpha.txt`
+### Scenario: block shell command creates a directory and returns to the browser
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `keep.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `keep.txt`:_
+```text
+keep
+```
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- dir `shell-dir` exists
+### Scenario: block shell command can rename a file in place
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `old.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `old.txt`:_
+```text
+old
+```
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- file `shell-renamed.txt` contains `old`
+### Scenario: block shell command creates a spaced filename
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `keep.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `keep.txt`:_
+```text
+keep
+```
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- file `two words.txt` contains `spaced`
+### Scenario: block shell command creates a spaced directory
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `keep.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `keep.txt`:_
+```text
+keep
+```
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- dir `two words` exists
+### Scenario: block shell command deletes the hovered file
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `doomed.txt` is created.
+- Fixture file `keep.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `doomed.txt`:_
+```text
+doomed
+```
+_Fixture `keep.txt`:_
+```text
+keep
+```
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- file `doomed.txt` does not exist
+### Scenario: block shell command copies the hovered file to a new name
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `old.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `old.txt`:_
+```text
+old
+```
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- file `shell-copy.txt` contains `old`
+### Scenario: block shell command runs inside the entered directory
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `sub/keep.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `sub/keep.txt`:_
+```text
+keep
+```
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- file `sub/inside.txt` contains `inside`
+### Scenario: block shell command can create nested files inside a new directory
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `keep.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `keep.txt`:_
+```text
+keep
+```
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- file `shell-nested/file.txt` contains `nested`
+### Scenario: block shell command moves a file into a new directory
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `move-me.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `move-me.txt`:_
+```text
+move
+```
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- file `moved/move-me.txt` contains `move`
+### Scenario: block shell command renames a directory
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `old-dir/a.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `old-dir/a.txt`:_
+```text
+a
+```
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- file `shell-dir/a.txt` contains `a`
+### Scenario: block shell command appends to the hovered file content
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `note.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `note.txt`:_
+```text
+first
+```
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- file `note.txt` contains `second`
+### Scenario: block shell command can create a hidden file that dot then reveals
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `keep.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `keep.txt`:_
+```text
+keep
+```
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- file `.shell-hidden` contains `hidden`
+### Scenario: block shell command deletes a directory subtree
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `doomed/a.txt` is created.
+- Fixture file `keep.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `doomed/a.txt`:_
+```text
+doomed
+```
+_Fixture `keep.txt`:_
+```text
+keep
+```
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- dir `doomed` does not exist
+### Scenario: block shell command copies a directory subtree to a new name
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `src/a.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `src/a.txt`:_
+```text
+a
+```
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- file `shell-copy-dir/a.txt` contains `a`
+### Scenario: block shell command creates a symlink to a file
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `target.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `target.txt`:_
+```text
+target
+```
+#### When
+```shell
+# interactive (pty): yazi .
+readlink linked.txt
+```
+#### Then
+- stdout equals an exact value
+### Scenario: block shell command creates a symlink to a directory
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `target-dir/a.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `target-dir/a.txt`:_
+```text
+a
+```
+#### When
+```shell
+# interactive (pty): yazi .
+readlink linked-dir
+```
+#### Then
+- stdout equals an exact value
+### Scenario: block shell command renames a spaced filename
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `old name.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `old name.txt`:_
+```text
+old
+```
+#### When
+```shell
+# interactive (pty): yazi .
+```
+#### Then
+- file `new name.txt` contains `old`
+### Scenario: block shell command creates a symlink to a spaced filename
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `target file.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `target file.txt`:_
+```text
+target
+```
+#### When
+```shell
+# interactive (pty): yazi .
+readlink "linked file.txt"
+```
+#### Then
+- stdout equals an exact value
+### Scenario: block shell command creates a symlink to a spaced directory
+_only when `yazi --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `target dir/a.txt` is created.
+- The command runs with a cleared environment (passing through: PATH).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+#### Inputs
+_Fixture `target dir/a.txt`:_
+```text
+a
+```
+#### When
+```shell
+# interactive (pty): yazi .
+readlink "linked dir"
+```
+#### Then
+- stdout equals an exact value

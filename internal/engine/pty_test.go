@@ -390,6 +390,35 @@ scenarios:
 	}
 }
 
+// TestEngine_PTY_UnresolvedExpectScreenVarErrors proves the same preflight
+// guard covers expect_screen matchers: an unresolved ${name} must fail before
+// any terminal I/O instead of becoming a literal screen matcher.
+func TestEngine_PTY_UnresolvedExpectScreenVarErrors(t *testing.T) {
+	skipOnWindows(t)
+	t.Parallel()
+	res := runSpec(t, `
+version: "1"
+suite:
+  name: v
+scenarios:
+  - name: typo in an expect_screen variable
+    steps:
+      - pty:
+          shell: true
+          command: "printf 'ready\r\n'"
+          session:
+            - expect_screen:
+                contains: "${no_such_var}"
+`)
+	if res.Status != StatusError {
+		t.Fatalf("status = %s, want error: %+v", res.Status, res.Scenarios)
+	}
+	msg := res.Scenarios[0].Steps[0].ErrMsg
+	if !strings.Contains(msg, "${no_such_var}") {
+		t.Errorf("error should name the reference, got %q", msg)
+	}
+}
+
 // TestEngine_PTY_EscapedLiteralSendTypesLiteral: a $${...} escaped reference in
 // a send still types the literal ${...} into the program (this is how recorded
 // sessions carry literal `${`), so the guard must not touch it (#78).
@@ -491,6 +520,40 @@ scenarios:
       - assert:
           stdout:
             contains: "loading"
+`)
+	if res.Status != StatusPassed {
+		t.Fatalf("status = %s, want passed: %+v", res.Status, res.Scenarios)
+	}
+}
+
+// TestEngine_PTY_ExpectScreen waits on the LIVE rendered screen while the TUI
+// is still running, instead of asserting only after exit. stable_for absorbs
+// a brief redraw window without a blind sleep.
+func TestEngine_PTY_ExpectScreen(t *testing.T) {
+	skipOnWindows(t)
+	t.Parallel()
+	res := runSpec(t, `
+version: "1"
+suite:
+  name: s
+scenarios:
+  - name: mid-session screen wait sees the final redraw before exit
+    steps:
+      - pty:
+          shell: true
+          command: "printf 'loading...\r'; sleep 0.05; printf 'done.      \r'; sleep 0.08; printf '\n'"
+          session:
+            - expect_screen:
+                contains: "done."
+                stable_for: 40ms
+      - assert:
+          exit_code: 0
+      - assert:
+          stdout:
+            contains: "loading"
+      - assert:
+          screen:
+            contains: "done."
 `)
 	if res.Status != StatusPassed {
 		t.Fatalf("status = %s, want passed: %+v", res.Status, res.Scenarios)

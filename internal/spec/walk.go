@@ -135,6 +135,12 @@ func CollectStepVars(set map[string]bool, step *Step) {
 				CollectVars(set, *a.Send.Text)
 			}
 			CollectVars(set, a.Expect)
+			if a.ExpectScreen != nil {
+				WalkPTYExpectScreenStrings(a.ExpectScreen, func(s string) string {
+					CollectVars(set, s)
+					return s
+				})
+			}
 		}
 	case StepSignal:
 		CollectVars(set, step.Signal.Service)
@@ -197,6 +203,23 @@ func collectCDPActionVars(set map[string]bool, a CDPAction) {
 	if a.Download != nil {
 		CollectVars(set, a.Download.Click, a.Download.Dir)
 	}
+}
+
+// WalkPTYExpectScreenStrings returns a copy of a session-local expect_screen
+// matcher with visit applied to every interpolatable matcher string. The timing
+// knobs (timeout/stable_for) are durations, not variable-bearing text.
+func WalkPTYExpectScreenStrings(es *PTYExpectScreen, visit func(string) string) *PTYExpectScreen {
+	if es == nil {
+		return nil
+	}
+	c := *es
+	// Reuse the assert walker so the matcher surface stays in exact lockstep
+	// with top-level `screen:` strings.
+	a := WalkAssertStrings(&Assert{Screen: &es.StreamAssert}, visit)
+	if a.Screen != nil {
+		c.StreamAssert = *a.Screen
+	}
+	return &c
 }
 
 // WalkAssertStrings returns a deep copy of a in which visit has been applied to

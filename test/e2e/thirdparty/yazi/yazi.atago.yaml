@@ -1,0 +1,3705 @@
+version: "1"
+
+suite:
+  name: yazi (third-party terminal file manager)
+
+# yazi is not just "a screen that appears": its core contract is that real file
+# operations are driven from a TUI with typed inputs, modal keybindings, live
+# filtering, and shell-wrapper cwd handoff. These scenarios therefore pin both
+# the rendered terminal UI and the actual filesystem effects under the scenario
+# workdir. Install: see .github/workflows/thirdparty.yml for the pinned CI
+# version.
+scenarios:
+  - name: version prints a semantic version banner
+    only:
+      command: yazi --version
+    steps:
+      - run:
+          command: yazi --version
+      - assert:
+          exit_code: 0
+          stdout:
+            matches: "^Yazi [0-9]+\\.[0-9]+\\.[0-9]+"
+
+  - name: hidden files stay hidden by default
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: alpha.txt
+          content: ""
+      - fixture:
+          file: .secret
+          content: ""
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 5s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "alpha.txt"
+      - assert:
+          screen:
+            contains: alpha.txt
+      - assert:
+          screen:
+            not_contains: .secret
+
+  - name: dot toggles hidden files into view
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: alpha.txt
+          content: ""
+      - fixture:
+          file: .secret
+          content: ""
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 5s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "alpha.txt"
+            - send: "."
+            - expect: "\\.secret"
+      - assert:
+          screen:
+            contains: alpha.txt
+      - assert:
+          screen:
+            contains: .secret
+
+  - name: filter narrows the visible file list
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: alpha.txt
+          content: ""
+      - fixture:
+          file: beta.txt
+          content: ""
+      - fixture:
+          file: gamma.log
+          content: ""
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 5s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "alpha.txt"
+            - send: "f"
+            - expect: "Filter:"
+            - send: "beta"
+            - expect: "filter: beta"
+      - assert:
+          screen:
+            contains: beta.txt
+      - assert:
+          screen:
+            not_contains: alpha.txt
+      - assert:
+          screen:
+            not_contains: gamma.log
+
+  - name: create makes a new file
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: keep.txt
+          content: keep
+      - pty:
+          command: yazi ${workdir}
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "keep.txt"
+            - send: "a"
+            - expect: "Create:"
+            - send: "notes.txt"
+            - send: {key: enter}
+            - expect: "notes.txt"
+            - send: "q"
+      - assert:
+          exit_code: 0
+          changes:
+            created:
+              - notes.txt
+            modified: []
+            deleted: []
+      - assert:
+          file:
+            path: notes.txt
+            exists: true
+
+  - name: create with a trailing slash makes a directory
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: keep.txt
+          content: ""
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "keep.txt"
+            - send: "a"
+            - expect: "Create:"
+            - send: "nested/"
+            - send: {key: enter}
+            - expect: "nested"
+            - send: "q"
+      - assert:
+          exit_code: 0
+      - assert:
+          dir:
+            path: nested
+            exists: true
+
+  - name: rename changes the hovered file name and nothing else
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: old.txt
+          content: old
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "old.txt"
+            - send: "r"
+            - expect: "Rename:"
+            - send: ".bak"
+            - send: {key: enter}
+      - assert:
+          changes:
+            created:
+              - old.bak.txt
+            modified: []
+            deleted:
+              - old.txt
+      - assert:
+          file:
+            path: old.txt
+            exists: false
+      - assert:
+          file:
+            path: old.bak.txt
+            contains: old
+
+  - name: yank then paste copies a file into a sibling directory
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: src/alpha.txt
+          content: alpha
+      - fixture:
+          file: dst/.keep
+          content: ""
+      - pty:
+          command: yazi src
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "alpha.txt"
+            - send: "y"
+            - send: "h"
+            - expect: "src"
+            - send: "k"
+            - expect: "dst"
+            - send: "l"
+            - expect: "No items"
+            - send: "p"
+            - expect: "alpha.txt"
+            - send: "Q"
+      - assert:
+          exit_code: 0
+          changes:
+            created:
+              - dst/alpha.txt
+            modified: []
+            deleted: []
+      - assert:
+          file:
+            path: src/alpha.txt
+            contains: alpha
+      - assert:
+          file:
+            path: dst/alpha.txt
+            contains: alpha
+
+  - name: select-all then yank copies multiple files into a sibling directory
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: src/a.txt
+          content: a
+      - fixture:
+          file: src/b.txt
+          content: b
+      - fixture:
+          file: dst/.keep
+          content: ""
+      - pty:
+          command: yazi src
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a.txt"
+            - send: {key: ctrl-a}
+            - send: "y"
+            - send: "h"
+            - expect: "src"
+            - send: "k"
+            - expect: "dst"
+            - send: "l"
+            - expect: "No items"
+            - send: "p"
+            - send: "Q"
+      - assert:
+          exit_code: 0
+          changes:
+            created:
+              - dst/a.txt
+              - dst/b.txt
+            modified: []
+            deleted: []
+      - assert:
+          file:
+            path: dst/a.txt
+            contains: a
+      - assert:
+          file:
+            path: dst/b.txt
+            contains: b
+
+  - name: cut then paste moves a file into a sibling directory
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: src/beta.txt
+          content: beta
+      - fixture:
+          file: dst/.keep
+          content: ""
+      - pty:
+          command: yazi src
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "beta.txt"
+            - send: "x"
+            - send: "h"
+            - expect: "src"
+            - send: "k"
+            - expect: "dst"
+            - send: "l"
+            - expect: "No items"
+            - send: "p"
+            - expect: "beta.txt"
+            - send: "Q"
+      - assert:
+          exit_code: 0
+          changes:
+            created:
+              - dst/beta.txt
+            modified: []
+            deleted:
+              - src/beta.txt
+      - assert:
+          file:
+            path: src/beta.txt
+            exists: false
+      - assert:
+          file:
+            path: dst/beta.txt
+            contains: beta
+
+  - name: uppercase D permanently deletes the hovered file after confirmation
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: doomed.txt
+          content: doomed
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "doomed.txt"
+            - send: "D"
+            - expect: "Permanently delete"
+            - send: "y"
+            - expect: "No items"
+            - send: "Q"
+      - assert:
+          exit_code: 0
+          changes:
+            created: []
+            modified: []
+            deleted:
+              - doomed.txt
+      - assert:
+          file:
+            path: doomed.txt
+            exists: false
+
+  - name: canceling permanent delete returns to the file list and keeps the file
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: keep.txt
+          content: keep
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "keep.txt"
+            - send: "D"
+            - expect: "Permanently delete"
+            - send: "n"
+            - expect_screen:
+                contains: keep.txt
+                stable_for: 150ms
+            - send: "Q"
+      - assert:
+          exit_code: 0
+      - assert:
+          file:
+            path: keep.txt
+            contains: keep
+
+  - name: canceling a yank leaves nothing to paste
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: src/one.txt
+          content: one
+      - fixture:
+          file: dst/.keep
+          content: ""
+      - pty:
+          command: yazi src
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "one.txt"
+            - send: "y"
+            - send: "Y"
+            - send: "h"
+            - expect: "src"
+            - send: "k"
+            - expect: "dst"
+            - send: "l"
+            - expect: "No items"
+            - send: "p"
+            - send: "Q"
+      - assert:
+          exit_code: 0
+          changes:
+            created: []
+            modified: []
+            deleted: []
+
+  - name: canceling a cut leaves nothing to paste
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: src/one.txt
+          content: one
+      - fixture:
+          file: dst/.keep
+          content: ""
+      - pty:
+          command: yazi src
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "one.txt"
+            - send: "x"
+            - send: "X"
+            - send: "h"
+            - expect: "src"
+            - send: "k"
+            - expect: "dst"
+            - send: "l"
+            - expect: "No items"
+            - send: "p"
+            - send: "Q"
+      - assert:
+          exit_code: 0
+          changes:
+            created: []
+            modified: []
+            deleted: []
+
+  - name: select-all then cut moves multiple files into a sibling directory
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: src/a.txt
+          content: a
+      - fixture:
+          file: src/b.txt
+          content: b
+      - fixture:
+          file: dst/.keep
+          content: ""
+      - pty:
+          command: yazi src
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a.txt"
+            - send: {key: ctrl-a}
+            - send: "x"
+            - send: "h"
+            - expect: "src"
+            - send: "k"
+            - expect: "dst"
+            - send: "l"
+            - expect: "No items"
+            - send: "p"
+            - expect: "a.txt"
+            - expect: "b.txt"
+            - send: "Q"
+      - assert:
+          exit_code: 0
+      - assert:
+          file:
+            path: dst/a.txt
+            contains: a
+      - assert:
+          file:
+            path: dst/b.txt
+            contains: b
+      - assert:
+          file:
+            path: src/a.txt
+            exists: false
+      - assert:
+          file:
+            path: src/b.txt
+            exists: false
+
+  - name: select-all then permanent delete removes multiple files
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: a.txt
+          content: a
+      - fixture:
+          file: b.txt
+          content: b
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a.txt"
+            - send: {key: ctrl-a}
+            - send: "D"
+            - expect: "Permanently delete"
+            - send: "y"
+            - expect: "No items"
+            - send: "Q"
+      - assert:
+          exit_code: 0
+      - assert:
+          file:
+            path: a.txt
+            exists: false
+      - assert:
+          file:
+            path: b.txt
+            exists: false
+
+  - name: trash moves the hovered file into sandbox home trash
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: trashme.txt
+          content: trash
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "trashme.txt"
+            - send: "d"
+            - expect: "Trash"
+            - send: "y"
+            - expect: "No items"
+            - send: "Q"
+      - assert:
+          exit_code: 0
+      - assert:
+          file:
+            path: trashme.txt
+            exists: false
+      - assert:
+          file:
+            path: .atago-home/.local/share/Trash/files/trashme.txt
+            contains: trash
+
+  - name: trashing selected files moves both into sandbox home trash
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: a.txt
+          content: a
+      - fixture:
+          file: b.txt
+          content: b
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a.txt"
+            - send: {key: ctrl-a}
+            - send: "d"
+            - expect: "Trash"
+            - send: "y"
+            - expect: "No items"
+            - send: "Q"
+      - assert:
+          exit_code: 0
+      - assert:
+          file:
+            path: a.txt
+            exists: false
+      - assert:
+          file:
+            path: b.txt
+            exists: false
+      - assert:
+          file:
+            path: .atago-home/.local/share/Trash/files/a.txt
+            contains: a
+      - assert:
+          file:
+            path: .atago-home/.local/share/Trash/files/b.txt
+            contains: b
+
+  - name: canceling trash returns to the file list and keeps the file
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: keep.txt
+          content: keep
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "keep.txt"
+            - send: "d"
+            - expect: "Trash"
+            - send: "n"
+            - expect_screen:
+                contains: keep.txt
+                stable_for: 150ms
+            - send: "Q"
+      - assert:
+          exit_code: 0
+      - assert:
+          file:
+            path: keep.txt
+            contains: keep
+
+  - name: space-selected file is copied even when the cursor moves away
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: src/a.txt
+          content: a
+      - fixture:
+          file: src/b.txt
+          content: b
+      - fixture:
+          file: dst/.keep
+          content: ""
+      - pty:
+          command: yazi src
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a.txt"
+            - send: "j"
+            - expect: "b.txt"
+            - send: {key: space}
+            - send: "k"
+            - expect: "a.txt"
+            - send: "y"
+            - send: "h"
+            - expect: "src"
+            - send: "k"
+            - expect: "dst"
+            - send: "l"
+            - expect: "No items"
+            - send: "p"
+            - expect: "b.txt"
+            - send: "Q"
+      - assert:
+          exit_code: 0
+      - assert:
+          file:
+            path: dst/b.txt
+            contains: b
+      - assert:
+          file:
+            path: dst/a.txt
+            exists: false
+
+  - name: visual mode selects a range and copies both files
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: src/a.txt
+          content: a
+      - fixture:
+          file: src/b.txt
+          content: b
+      - fixture:
+          file: src/c.txt
+          content: c
+      - fixture:
+          file: dst/.keep
+          content: ""
+      - pty:
+          command: yazi src
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a.txt"
+            - send: "v"
+            - send: "j"
+            - expect: "b.txt"
+            - send: "y"
+            - send: "h"
+            - expect: "src"
+            - send: "k"
+            - expect: "dst"
+            - send: "l"
+            - expect: "No items"
+            - send: "p"
+            - expect: "a.txt"
+            - expect: "b.txt"
+            - send: "Q"
+      - assert:
+          exit_code: 0
+      - assert:
+          file:
+            path: dst/a.txt
+            contains: a
+      - assert:
+          file:
+            path: dst/b.txt
+            contains: b
+      - assert:
+          file:
+            path: dst/c.txt
+            exists: false
+
+  - name: lowercase p copies to item_1 when the destination already exists
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: src/item.txt
+          content: new
+      - fixture:
+          file: dst/item.txt
+          content: old
+      - pty:
+          command: yazi src
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "item.txt"
+            - send: "y"
+            - send: "h"
+            - expect: "src"
+            - send: "k"
+            - expect: "dst"
+            - send: "l"
+            - expect: "item.txt"
+            - send: "p"
+            - expect: "item_1.txt"
+            - send: "Q"
+      - assert:
+          exit_code: 0
+      - assert:
+          file:
+            path: src/item.txt
+            contains: new
+      - assert:
+          file:
+            path: dst/item.txt
+            contains: old
+      - assert:
+          file:
+            path: dst/item_1.txt
+            contains: new
+
+  - name: lowercase p moves to item_1 when the destination already exists
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: src/item.txt
+          content: new
+      - fixture:
+          file: dst/item.txt
+          content: old
+      - pty:
+          command: yazi src
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "item.txt"
+            - send: "x"
+            - send: "h"
+            - expect: "src"
+            - send: "k"
+            - expect: "dst"
+            - send: "l"
+            - expect: "item.txt"
+            - send: "p"
+            - expect: "item_1.txt"
+            - send: "Q"
+      - assert:
+          exit_code: 0
+      - assert:
+          file:
+            path: src/item.txt
+            exists: false
+      - assert:
+          file:
+            path: dst/item.txt
+            contains: old
+      - assert:
+          file:
+            path: dst/item_1.txt
+            contains: new
+
+  - name: uppercase P overwrites an existing file during copy
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: src/item.txt
+          content: new
+      - fixture:
+          file: dst/item.txt
+          content: old
+      - pty:
+          command: yazi src
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "item.txt"
+            - send: "y"
+            - send: "h"
+            - expect: "src"
+            - send: "k"
+            - expect: "dst"
+            - send: "l"
+            - expect: "item.txt"
+            - send: "P"
+            - expect: "item.txt"
+            - send: "Q"
+      - assert:
+          exit_code: 0
+      - assert:
+          file:
+            path: src/item.txt
+            contains: new
+      - assert:
+          file:
+            path: dst/item.txt
+            contains: new
+
+  - name: uppercase P overwrites an existing file during move
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: src/item.txt
+          content: new
+      - fixture:
+          file: dst/item.txt
+          content: old
+      - pty:
+          command: yazi src
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "item.txt"
+            - send: "x"
+            - send: "h"
+            - expect: "src"
+            - send: "k"
+            - expect: "dst"
+            - send: "l"
+            - expect: "item.txt"
+            - send: "P"
+            - expect: "item.txt"
+            - send: "Q"
+      - assert:
+          exit_code: 0
+      - assert:
+          file:
+            path: src/item.txt
+            exists: false
+      - assert:
+          file:
+            path: dst/item.txt
+            contains: new
+
+  - name: alphabetical sort puts a then b then c at the cursor
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: b.txt
+          content: ""
+      - fixture:
+          file: a.txt
+          content: ""
+      - fixture:
+          file: c.txt
+          content: ""
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "b.txt"
+            - send: ",a"
+            - expect: "a.txt"
+            - send: "j"
+            - expect: "b.txt"
+            - send: "j"
+            - expect: "c.txt"
+            - send: "Q"
+      - assert:
+          exit_code: 0
+
+  - name: reverse alphabetical sort puts c then b then a at the cursor
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: b.txt
+          content: ""
+      - fixture:
+          file: a.txt
+          content: ""
+      - fixture:
+          file: c.txt
+          content: ""
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "b.txt"
+            - send: ",A"
+            - expect: "c.txt"
+            - send: "j"
+            - expect: "b.txt"
+            - send: "j"
+            - expect: "a.txt"
+            - send: "Q"
+      - assert:
+          exit_code: 0
+
+  - name: extension sort puts log then md then txt at the cursor
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: b.md
+          content: ""
+      - fixture:
+          file: a.txt
+          content: ""
+      - fixture:
+          file: c.log
+          content: ""
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "b.md"
+            - send: ",e"
+            - expect: "c.log"
+            - send: "j"
+            - expect: "b.md"
+            - send: "j"
+            - expect: "a.txt"
+            - send: "Q"
+      - assert:
+          exit_code: 0
+
+  - name: reverse extension sort puts txt then md then log at the cursor
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: b.md
+          content: ""
+      - fixture:
+          file: a.txt
+          content: ""
+      - fixture:
+          file: c.log
+          content: ""
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "b.md"
+            - send: ",E"
+            - expect: "a.txt"
+            - send: "j"
+            - expect: "b.md"
+            - send: "j"
+            - expect: "c.log"
+            - send: "Q"
+      - assert:
+          exit_code: 0
+
+  - name: size sort puts one then two then three at the cursor
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: one.txt
+          content: "1"
+      - fixture:
+          file: three.txt
+          content: "333"
+      - fixture:
+          file: two.txt
+          content: "22"
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "one.txt"
+            - send: ",s"
+            - expect: "one.txt"
+            - send: "j"
+            - expect: "two.txt"
+            - send: "j"
+            - expect: "three.txt"
+            - send: "Q"
+      - assert:
+          exit_code: 0
+
+  - name: reverse size sort puts three then two then one at the cursor
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: one.txt
+          content: "1"
+      - fixture:
+          file: three.txt
+          content: "333"
+      - fixture:
+          file: two.txt
+          content: "22"
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "one.txt"
+            - send: ",S"
+            - expect: "three.txt"
+            - send: "j"
+            - expect: "two.txt"
+            - send: "j"
+            - expect: "one.txt"
+            - send: "Q"
+      - assert:
+          exit_code: 0
+
+  - name: natural sort puts 3 then 20 then 100 at the cursor
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: 20.txt
+          content: ""
+      - fixture:
+          file: 3.txt
+          content: ""
+      - fixture:
+          file: 100.txt
+          content: ""
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "20.txt"
+            - send: ",n"
+            - expect: "3.txt"
+            - send: "j"
+            - expect: "20.txt"
+            - send: "j"
+            - expect: "100.txt"
+            - send: "Q"
+      - assert:
+          exit_code: 0
+
+  - name: natural sort is visible on the rendered file list before quitting
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: 20.txt
+          content: ""
+      - fixture:
+          file: 3.txt
+          content: ""
+      - fixture:
+          file: 100.txt
+          content: ""
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "20.txt"
+            - send: ",n"
+            - expect_screen:
+                matches: "(?s)3\\.txt.*20\\.txt.*100\\.txt"
+                stable_for: 100ms
+            - send: "Q"
+      - assert:
+          exit_code: 0
+
+  - name: reverse natural sort puts 100 then 20 then 3 at the cursor
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: 20.txt
+          content: ""
+      - fixture:
+          file: 3.txt
+          content: ""
+      - fixture:
+          file: 100.txt
+          content: ""
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "20.txt"
+            - send: ",N"
+            - expect: "100.txt"
+            - send: "j"
+            - expect: "20.txt"
+            - send: "j"
+            - expect: "3.txt"
+            - send: "Q"
+      - assert:
+          exit_code: 0
+
+  - name: reverse natural sort is visible on the rendered file list before quitting
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: 20.txt
+          content: ""
+      - fixture:
+          file: 3.txt
+          content: ""
+      - fixture:
+          file: 100.txt
+          content: ""
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "20.txt"
+            - send: ",N"
+            - expect_screen:
+                matches: "(?s)100\\.txt.*20\\.txt.*3\\.txt"
+                stable_for: 100ms
+            - send: "Q"
+      - assert:
+          exit_code: 0
+
+  - name: chooser-file writes the hovered path and exits on enter
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: picked.txt
+          content: picked
+      - pty:
+          command: yazi --chooser-file ${workdir}/chosen.txt .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "picked.txt"
+            - send: {key: enter}
+      - assert:
+          exit_code: 0
+      - assert:
+          file:
+            path: chosen.txt
+            contains: picked.txt
+
+  - name: chooser-file writes all selected paths on enter
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: a.txt
+          content: a
+      - fixture:
+          file: b.txt
+          content: b
+      - pty:
+          command: yazi --chooser-file ${workdir}/chosen.txt .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a.txt"
+            - send: {key: ctrl-a}
+            - send: {key: enter}
+      - assert:
+          exit_code: 0
+      - assert:
+          file:
+            path: chosen.txt
+            contains:
+              - a.txt
+              - b.txt
+
+  - name: chooser-file remains absent when quitting with uppercase Q
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: picked.txt
+          content: picked
+      - pty:
+          command: yazi --chooser-file ${workdir}/chosen.txt .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "picked.txt"
+            - send: "Q"
+      - assert:
+          exit_code: 0
+      - assert:
+          file:
+            path: chosen.txt
+            exists: false
+
+  - name: uppercase G moves to the bottom item before choosing
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: a.txt
+          content: ""
+      - fixture:
+          file: b.txt
+          content: ""
+      - fixture:
+          file: z.txt
+          content: ""
+      - pty:
+          command: yazi --chooser-file ${workdir}/chosen.txt .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a.txt"
+            - send: "G"
+            - expect: "z.txt"
+            - send: {key: enter}
+      - assert:
+          exit_code: 0
+      - assert:
+          file:
+            path: chosen.txt
+            contains: z.txt
+
+  - name: gg moves to the top item before choosing
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: a.txt
+          content: ""
+      - fixture:
+          file: b.txt
+          content: ""
+      - fixture:
+          file: z.txt
+          content: ""
+      - pty:
+          command: yazi --chooser-file ${workdir}/chosen.txt .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a.txt"
+            - send: "G"
+            - expect: "z.txt"
+            - send: "gg"
+            - expect: "a.txt"
+            - send: {key: enter}
+      - assert:
+          exit_code: 0
+      - assert:
+          file:
+            path: chosen.txt
+            contains: a.txt
+
+  - name: quitting immediately writes the initial cwd to cwd-file
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: alpha.txt
+          content: ""
+      - pty:
+          command: yazi --cwd-file ${workdir}/cwd.txt .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "alpha.txt"
+            - send: "q"
+      - assert:
+          exit_code: 0
+      - assert:
+          file:
+            path: cwd.txt
+            contains: /atago-
+
+  - name: quitting after entering a directory writes the final cwd
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: z-nested/inside.txt
+          content: ""
+      - pty:
+          # `l` is yazi's documented "enter hovered directory" binding.
+          command: yazi --cwd-file ${workdir}/cwd.txt .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "z-nested"
+            - send: "l"
+            - expect: "inside.txt"
+            - send: "q"
+      - assert:
+          exit_code: 0
+      - assert:
+          file:
+            path: cwd.txt
+            contains: z-nested
+
+  - name: leaving a directory then quitting writes the parent cwd
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: a-dir/a.txt
+          content: ""
+      - pty:
+          command: yazi --cwd-file ${workdir}/cwd.txt .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a-dir"
+            - send: "l"
+            - expect: "a.txt"
+            - send: "h"
+            - expect: "a-dir"
+            - send: "q"
+      - assert:
+          exit_code: 0
+      - assert:
+          file:
+            path: cwd.txt
+            not_contains: a-dir
+
+  - name: tabs preserve per-tab cwd and q writes the active tab cwd
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: a-dir/a.txt
+          content: ""
+      - fixture:
+          file: z-dir/z.txt
+          content: ""
+      - pty:
+          command: yazi --cwd-file ${workdir}/cwd.txt .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a-dir"
+            - send: "l"
+            - expect: "a.txt"
+            - send: "tt"
+            - expect: "a.txt"
+            - send: "h"
+            - expect: "z-dir"
+            - send: "j"
+            - expect: "z-dir"
+            - send: "l"
+            - expect: "z.txt"
+            - send: "1"
+            - expect: "a-dir"
+            - send: "q"
+      - assert:
+          exit_code: 0
+      - assert:
+          file:
+            path: cwd.txt
+            contains: a-dir
+
+  - name: closing the current tab returns to the previous tab cwd
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: a-dir/a.txt
+          content: ""
+      - fixture:
+          file: z-dir/z.txt
+          content: ""
+      - pty:
+          command: yazi --cwd-file ${workdir}/cwd.txt .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a-dir"
+            - send: "l"
+            - expect: "a.txt"
+            - send: "tt"
+            - expect: "a.txt"
+            - send: "h"
+            - expect: "z-dir"
+            - send: "j"
+            - expect: "z-dir"
+            - send: "l"
+            - expect: "z.txt"
+            - send: {key: ctrl-c}
+            - expect: "a-dir"
+            - send: "q"
+      - assert:
+          exit_code: 0
+      - assert:
+          file:
+            path: cwd.txt
+            contains: a-dir
+
+  - name: previous and next tab navigation preserve each tab cwd
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: a-dir/a.txt
+          content: ""
+      - fixture:
+          file: z-dir/z.txt
+          content: ""
+      - pty:
+          command: yazi --cwd-file ${workdir}/cwd.txt .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a-dir"
+            - send: "l"
+            - expect: "a.txt"
+            - send: "tt"
+            - expect: "a.txt"
+            - send: "h"
+            - expect: "z-dir"
+            - send: "j"
+            - expect: "z-dir"
+            - send: "l"
+            - expect: "z.txt"
+            - send: "["
+            - expect: "a-dir"
+            - send: "]"
+            - expect: "z-dir"
+            - send: "q"
+      - assert:
+          exit_code: 0
+      - assert:
+          file:
+            path: cwd.txt
+            contains: z-dir
+
+  - name: uppercase Q exits without writing the cwd file
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: z-nested/inside.txt
+          content: ""
+      - pty:
+          command: yazi --cwd-file ${workdir}/cwd.txt .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "z-nested"
+            - send: "l"
+            - expect: "inside.txt"
+            - send: "Q"
+      - assert:
+          exit_code: 0
+      - assert:
+          file:
+            path: cwd.txt
+            exists: false
+
+  # Pathnames with spaces are a common TUI/FS edge case: these scenarios prove
+  # Yazi's interactive create/rename/link flows preserve exact names instead of
+  # collapsing whitespace or truncating at the prompt boundary.
+
+  - name: create accepts filenames with spaces
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: keep.txt
+          content: keep
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "keep.txt"
+            - send: "a"
+            - expect: "Create:"
+            - send: "two words.txt"
+            - send: {key: enter}
+            - expect: "two words.txt"
+            - send: "q"
+      - assert:
+          file:
+            path: two words.txt
+            exists: true
+
+  - name: create accepts directory names with spaces
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: keep.txt
+          content: keep
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "keep.txt"
+            - send: "a"
+            - expect: "Create:"
+            - send: "two words/"
+            - send: {key: enter}
+            - expect: "two words"
+            - send: "q"
+      - assert:
+          dir:
+            path: two words
+            exists: true
+
+  - name: rename accepts spaces in filenames
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: old.txt
+          content: old
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "old.txt"
+            - send: "r"
+            - expect: "Rename:"
+            - send: " two words"
+            - send: {key: enter}
+      - assert:
+          file:
+            path: old two words.txt
+            contains: old
+
+  - name: rename accepts spaces in directory names
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: old-dir/keep.txt
+          content: keep
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "old-dir"
+            - send: "r"
+            - expect: "Rename:"
+            - send: " two words"
+            - send: {key: enter}
+      - assert:
+          file:
+            path: old-dir two words/keep.txt
+            contains: keep
+
+  - name: yank then dash creates an absolute symlink in the sibling directory
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: src/a.txt
+          content: a
+      - fixture:
+          file: dst/.keep
+          content: ""
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "dst"
+            - send: "j"
+            - expect: "src"
+            - send: "l"
+            - expect: "a.txt"
+            - send: "y"
+            - send: "h"
+            - expect: "src"
+            - send: "k"
+            - expect: "dst"
+            - send: "l"
+            - expect: "No items"
+            - send: "-"
+            - expect: "a.txt"
+            - send: "Q"
+      - run:
+          command: readlink dst/a.txt
+      - assert:
+          stdout:
+            matches: "^.+/src/a\\.txt\n?$"
+
+  - name: yank then underscore creates a relative symlink in the sibling directory
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: src/a.txt
+          content: a
+      - fixture:
+          file: dst/.keep
+          content: ""
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "dst"
+            - send: "j"
+            - expect: "src"
+            - send: "l"
+            - expect: "a.txt"
+            - send: "y"
+            - send: "h"
+            - expect: "src"
+            - send: "k"
+            - expect: "dst"
+            - send: "l"
+            - expect: "No items"
+            - send: "_"
+            - expect: "a.txt"
+            - send: "Q"
+      - run:
+          command: readlink dst/a.txt
+      - assert:
+          stdout:
+            equals: "../src/a.txt"
+
+  - name: yanked directory can be absolute-symlinked into a sibling directory
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: src/sub/a.txt
+          content: a
+      - fixture:
+          file: dst/.keep
+          content: ""
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "dst"
+            - send: "j"
+            - expect: "src"
+            - send: "l"
+            - expect: "sub"
+            - send: "y"
+            - send: "h"
+            - expect: "src"
+            - send: "k"
+            - expect: "dst"
+            - send: "l"
+            - expect: "No items"
+            - send: "-"
+            - send: "Q"
+      - run:
+          command: readlink dst/sub
+      - assert:
+          stdout:
+            matches: "^.+/src/sub\n?$"
+
+  - name: yanked directory can be relative-symlinked into a sibling directory
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: src/sub/a.txt
+          content: a
+      - fixture:
+          file: dst/.keep
+          content: ""
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "dst"
+            - send: "j"
+            - expect: "src"
+            - send: "l"
+            - expect: "sub"
+            - send: "y"
+            - send: "h"
+            - expect: "src"
+            - send: "k"
+            - expect: "dst"
+            - send: "l"
+            - expect: "No items"
+            - send: "_"
+            - send: "Q"
+      - run:
+          command: readlink dst/sub
+      - assert:
+          stdout:
+            equals: "../src/sub"
+
+  - name: modified time sort reorders the rendered list
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: oldest.txt
+          content: old
+          mtime: "2024-01-01T00:00:00Z"
+      - fixture:
+          file: newest.txt
+          content: new
+          mtime: "2024-01-03T00:00:00Z"
+      - fixture:
+          file: middle.txt
+          content: mid
+          mtime: "2024-01-02T00:00:00Z"
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "middle.txt"
+            - send: ",m"
+            - expect_screen:
+                matches: '(?s)oldest\.txt.*middle\.txt.*newest\.txt'
+                stable_for: 100ms
+            - send: "Q"
+
+  - name: reverse modified time sort reorders the rendered list
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: oldest.txt
+          content: old
+          mtime: "2024-01-01T00:00:00Z"
+      - fixture:
+          file: newest.txt
+          content: new
+          mtime: "2024-01-03T00:00:00Z"
+      - fixture:
+          file: middle.txt
+          content: mid
+          mtime: "2024-01-02T00:00:00Z"
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "middle.txt"
+            - send: ",M"
+            - expect_screen:
+                matches: '(?s)newest\.txt.*middle\.txt.*oldest\.txt'
+                stable_for: 100ms
+            - send: "Q"
+
+  - name: modified time sort chooses the oldest file first
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: oldest.txt
+          content: old
+          mtime: "2024-01-01T00:00:00Z"
+      - fixture:
+          file: newest.txt
+          content: new
+          mtime: "2024-01-03T00:00:00Z"
+      - fixture:
+          file: middle.txt
+          content: mid
+          mtime: "2024-01-02T00:00:00Z"
+      - pty:
+          command: yazi --chooser-file ${workdir}/chosen.txt .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "middle.txt"
+            - send: ",m"
+            - expect_screen:
+                contains:
+                  - oldest.txt
+                  - middle.txt
+                  - newest.txt
+                stable_for: 100ms
+            - send: {key: enter}
+      - assert:
+          file:
+            path: chosen.txt
+            contains: oldest.txt
+
+  - name: reverse modified time sort chooses the newest file first
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: oldest.txt
+          content: old
+          mtime: "2024-01-01T00:00:00Z"
+      - fixture:
+          file: newest.txt
+          content: new
+          mtime: "2024-01-03T00:00:00Z"
+      - fixture:
+          file: middle.txt
+          content: mid
+          mtime: "2024-01-02T00:00:00Z"
+      - pty:
+          command: yazi --chooser-file ${workdir}/chosen.txt .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "middle.txt"
+            - send: ",M"
+            - expect_screen:
+                contains:
+                  - newest.txt
+                  - middle.txt
+                  - oldest.txt
+                stable_for: 100ms
+            - send: {key: enter}
+      - assert:
+          file:
+            path: chosen.txt
+            contains: newest.txt
+
+  # These chooser/cwd-file scenarios assert Yazi's selection model and tab
+  # state directly, instead of inferring them from copy side-effects alone.
+
+  - name: toggling the same file twice removes the explicit selection
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: a.txt
+          content: a
+      - fixture:
+          file: b.txt
+          content: b
+      - pty:
+          command: yazi --chooser-file ${workdir}/chosen.txt .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a.txt"
+            - send: {key: space}
+            - send: {key: space}
+            - send: "j"
+            - expect: "b.txt"
+            - send: {key: enter}
+      - assert:
+          file:
+            path: chosen.txt
+            contains: "/b.txt"
+
+  - name: inverse selection flips one picked file into the other two
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: a.txt
+          content: a
+      - fixture:
+          file: b.txt
+          content: b
+      - fixture:
+          file: c.txt
+          content: c
+      - pty:
+          command: yazi --chooser-file ${workdir}/chosen.txt .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a.txt"
+            - send: {key: space}
+            - send: {key: ctrl-r}
+            - expect_screen:
+                contains:
+                  - b.txt
+                  - c.txt
+                stable_for: 100ms
+            - send: {key: enter}
+      - run:
+          command: cat chosen.txt
+      - assert:
+          stdout:
+            matches: '(?m)^.*/b\.txt\n.*/c\.txt\n?$'
+
+  - name: direct tab switching with 1 and 2 preserves per-tab cwd
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: one/a.txt
+          content: a
+      - fixture:
+          file: two/b.txt
+          content: b
+      - pty:
+          command: yazi --cwd-file ${workdir}/cwd.txt .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "one"
+            - send: "l"
+            - expect: "a.txt"
+            - send: "tt"
+            - expect: "a.txt"
+            - send: "h"
+            - expect: "one"
+            - send: "j"
+            - expect: "two"
+            - send: "l"
+            - expect: "b.txt"
+            - send: "1"
+            - expect_screen:
+                contains: "a.txt"
+                not_contains: "b.txt"
+                stable_for: 100ms
+            - send: "2"
+            - expect_screen:
+                contains: "b.txt"
+                not_contains: "a.txt"
+                stable_for: 100ms
+            - send: "q"
+      - assert:
+          file:
+            path: cwd.txt
+            contains: "/two"
+
+  - name: block shell command creates a file and returns to the browser
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: keep.txt
+          content: keep
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "keep.txt"
+            - send: ":"
+            - expect: ":"
+            - send: "printf shell-created > shell-created.txt"
+            - send: {key: enter}
+            - expect_screen:
+                contains: shell-created.txt
+                stable_for: 100ms
+            - send: "q"
+      - assert:
+          file:
+            path: shell-created.txt
+            contains: shell-created
+
+  - name: filter can be cleared after confirming it
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: alpha.txt
+          content: a
+      - fixture:
+          file: beta.txt
+          content: b
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "alpha.txt"
+            - send: "f"
+            - expect: "Filter:"
+            - send: "beta"
+            - send: {key: enter}
+            - expect_screen:
+                contains: beta.txt
+                not_contains: alpha.txt
+                stable_for: 100ms
+            - send: {key: esc}
+            - expect_screen:
+                contains:
+                  - alpha.txt
+                  - beta.txt
+                stable_for: 100ms
+            - send: "Q"
+
+  # Subtree operations are the high-value part of a file manager: copy/move,
+  # conflict suffixing, delete, and trash all need coverage on directories too.
+
+  - name: yank then paste copies a directory subtree into a sibling directory
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: src/sub/a.txt
+          content: a
+      - fixture:
+          file: dst/.keep
+          content: ""
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "dst"
+            - send: "j"
+            - expect: "src"
+            - send: "y"
+            - send: "k"
+            - expect: "dst"
+            - send: "l"
+            - expect: "No items"
+            - send: "p"
+            - expect: "src"
+            - send: "Q"
+      - assert:
+          file:
+            path: dst/src/sub/a.txt
+            contains: a
+      - assert:
+          file:
+            path: src/sub/a.txt
+            contains: a
+
+  - name: cut then paste moves a directory subtree into a sibling directory
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: src/sub/a.txt
+          content: a
+      - fixture:
+          file: dst/.keep
+          content: ""
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "dst"
+            - send: "j"
+            - expect: "src"
+            - send: "x"
+            - send: "k"
+            - expect: "dst"
+            - send: "l"
+            - expect: "No items"
+            - send: "p"
+            - expect: "src"
+            - send: "Q"
+      - assert:
+          file:
+            path: dst/src/sub/a.txt
+            contains: a
+      - assert:
+          dir:
+            path: src
+            exists: false
+
+  - name: lowercase p copies a directory to name_1 when the destination exists
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: src/sub/a.txt
+          content: src
+      - fixture:
+          file: dst/src/existing.txt
+          content: dst
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "dst"
+            - send: "j"
+            - expect: "src"
+            - send: "y"
+            - send: "k"
+            - expect: "dst"
+            - send: "l"
+            - expect: "src"
+            - send: "p"
+            - expect: "src_1"
+            - send: "Q"
+      - assert:
+          file:
+            path: dst/src/existing.txt
+            contains: dst
+      - assert:
+          file:
+            path: dst/src_1/sub/a.txt
+            contains: src
+
+  - name: lowercase p moves a directory to name_1 when the destination exists
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: src/sub/a.txt
+          content: src
+      - fixture:
+          file: dst/src/existing.txt
+          content: dst
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "dst"
+            - send: "j"
+            - expect: "src"
+            - send: "x"
+            - send: "k"
+            - expect: "dst"
+            - send: "l"
+            - expect: "src"
+            - send: "p"
+            - expect: "src_1"
+            - send: "Q"
+      - assert:
+          file:
+            path: dst/src/existing.txt
+            contains: dst
+      - assert:
+          file:
+            path: dst/src_1/sub/a.txt
+            contains: src
+      - assert:
+          dir:
+            path: src
+            exists: false
+
+  - name: uppercase D permanently deletes a directory subtree after confirmation
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: doomed/sub/a.txt
+          content: a
+      - fixture:
+          file: keep.txt
+          content: keep
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "doomed"
+            - send: "D"
+            - expect: "Permanently delete"
+            - send: "y"
+            - expect_screen:
+                not_contains: doomed
+                contains: keep.txt
+                stable_for: 100ms
+            - send: "Q"
+      - assert:
+          dir:
+            path: doomed
+            exists: false
+
+  - name: canceling uppercase D keeps a directory subtree intact
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: doomed/sub/a.txt
+          content: a
+      - fixture:
+          file: keep.txt
+          content: keep
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "doomed"
+            - send: "D"
+            - expect: "Permanently delete"
+            - send: "n"
+            - expect_screen:
+                contains:
+                  - doomed
+                  - keep.txt
+                stable_for: 100ms
+            - send: "Q"
+      - assert:
+          file:
+            path: doomed/sub/a.txt
+            contains: a
+
+  - name: trash moves a directory subtree into sandbox home trash
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: doomed/sub/a.txt
+          content: a
+      - fixture:
+          file: keep.txt
+          content: keep
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "doomed"
+            - send: "d"
+            - expect: "Trash"
+            - send: "y"
+            - expect_screen:
+                not_contains: doomed
+                contains: keep.txt
+                stable_for: 100ms
+            - send: "Q"
+      - assert:
+          dir:
+            path: doomed
+            exists: false
+      - assert:
+          file:
+            path: .atago-home/.local/share/Trash/files/doomed/sub/a.txt
+            contains: a
+
+  - name: canceling trash keeps a directory subtree intact
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: doomed/sub/a.txt
+          content: a
+      - fixture:
+          file: keep.txt
+          content: keep
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "doomed"
+            - send: "d"
+            - expect: "Trash"
+            - send: "n"
+            - expect_screen:
+                contains:
+                  - doomed
+                  - keep.txt
+                stable_for: 100ms
+            - send: "Q"
+      - assert:
+          file:
+            path: doomed/sub/a.txt
+            contains: a
+
+  - name: canceling trash for selected directories keeps both subtrees
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: alpha-dir/sub/x.txt
+          content: x
+      - fixture:
+          file: beta-dir/sub/y.txt
+          content: y
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "alpha-dir"
+            - send: {key: space}
+            - send: "j"
+            - expect: "beta-dir"
+            - send: {key: space}
+            - send: "d"
+            - expect: "Trash"
+            - send: "n"
+            - expect_screen:
+                contains:
+                  - alpha-dir
+                  - beta-dir
+                stable_for: 100ms
+            - send: "Q"
+      - assert:
+          file:
+            path: alpha-dir/sub/x.txt
+            contains: x
+      - assert:
+          file:
+            path: beta-dir/sub/y.txt
+            contains: y
+
+  # Space-bearing names often break copy/link logic even when create/rename
+  # worked, so keep explicit coverage on the copy/cut/link paths too.
+
+  - name: yank then paste copies a spaced filename into a sibling directory
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: src/two words.txt
+          content: spaced
+      - fixture:
+          file: dst/.keep
+          content: ""
+      - pty:
+          command: yazi src
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "two words.txt"
+            - send: "y"
+            - send: "h"
+            - expect: "src"
+            - send: "k"
+            - expect: "dst"
+            - send: "l"
+            - expect: "No items"
+            - send: "p"
+            - expect: "two words.txt"
+            - send: "Q"
+      - assert:
+          file:
+            path: dst/two words.txt
+            contains: spaced
+
+  - name: cut then paste moves a spaced filename into a sibling directory
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: src/two words.txt
+          content: spaced
+      - fixture:
+          file: dst/.keep
+          content: ""
+      - pty:
+          command: yazi src
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "two words.txt"
+            - send: "x"
+            - send: "h"
+            - expect: "src"
+            - send: "k"
+            - expect: "dst"
+            - send: "l"
+            - expect: "No items"
+            - send: "p"
+            - expect: "two words.txt"
+            - send: "Q"
+      - assert:
+          file:
+            path: dst/two words.txt
+            contains: spaced
+      - assert:
+          file:
+            path: src/two words.txt
+            exists: false
+
+  - name: yank then paste copies a spaced directory subtree into a sibling directory
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: src/two words/a.txt
+          content: spaced
+      - fixture:
+          file: dst/.keep
+          content: ""
+      - pty:
+          command: yazi src
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect_screen:
+                contains: "two words"
+                stable_for: 100ms
+            - send: "y"
+            - send: "h"
+            - expect: "src"
+            - send: "k"
+            - expect: "dst"
+            - send: "l"
+            - expect: "No items"
+            - send: "p"
+            - send: "Q"
+      - assert:
+          file:
+            path: dst/two words/a.txt
+            contains: spaced
+
+  - name: dash symlinks a spaced filename with an absolute target
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: src/two words.txt
+          content: spaced
+      - fixture:
+          file: dst/.keep
+          content: ""
+      - pty:
+          command: yazi src
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "two words.txt"
+            - send: "y"
+            - send: "h"
+            - expect: "src"
+            - send: "k"
+            - expect: "dst"
+            - send: "l"
+            - expect: "No items"
+            - send: "-"
+            - expect: "two words.txt"
+            - send: "Q"
+      - run:
+          command: readlink "dst/two words.txt"
+      - assert:
+          stdout:
+            matches: "^.+/src/two words\\.txt\n?$"
+
+  - name: underscore symlinks a spaced filename with a relative target
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: src/two words.txt
+          content: spaced
+      - fixture:
+          file: dst/.keep
+          content: ""
+      - pty:
+          command: yazi src
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "two words.txt"
+            - send: "y"
+            - send: "h"
+            - expect: "src"
+            - send: "k"
+            - expect: "dst"
+            - send: "l"
+            - expect: "No items"
+            - send: "_"
+            - expect: "two words.txt"
+            - send: "Q"
+      - run:
+          command: readlink "dst/two words.txt"
+      - assert:
+          stdout:
+            equals: "../src/two words.txt"
+
+  - name: dash symlinks a spaced directory with an absolute target
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: src/two words/a.txt
+          content: spaced
+      - fixture:
+          file: dst/.keep
+          content: ""
+      - pty:
+          command: yazi src
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "two words"
+            - send: "y"
+            - send: "h"
+            - expect: "src"
+            - send: "k"
+            - expect: "dst"
+            - send: "l"
+            - expect: "No items"
+            - send: "-"
+            - expect_screen:
+                contains: "two words"
+                stable_for: 100ms
+            - send: "Q"
+      - run:
+          command: readlink "dst/two words"
+      - assert:
+          stdout:
+            matches: "^.+/src/two words\n?$"
+
+  - name: underscore symlinks a spaced directory with a relative target
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: src/two words/a.txt
+          content: spaced
+      - fixture:
+          file: dst/.keep
+          content: ""
+      - pty:
+          command: yazi src
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "two words"
+            - send: "y"
+            - send: "h"
+            - expect: "src"
+            - send: "k"
+            - expect: "dst"
+            - send: "l"
+            - expect: "No items"
+            - send: "_"
+            - expect_screen:
+                contains: "two words"
+                stable_for: 100ms
+            - send: "Q"
+      - run:
+          command: readlink "dst/two words"
+      - assert:
+          stdout:
+            equals: "../src/two words"
+
+  - name: hidden toggle can be turned back off
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: alpha.txt
+          content: ""
+      - fixture:
+          file: .secret
+          content: ""
+      - pty:
+          command: yazi --chooser-file ${workdir}/chosen.txt .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "alpha.txt"
+            - send: "."
+            - expect: "\\.secret"
+            - send: "."
+            - expect_screen:
+                contains: alpha.txt
+                not_contains: .secret
+                stable_for: 100ms
+            - send: {key: enter}
+      - assert:
+          file:
+            path: chosen.txt
+            contains: alpha.txt
+
+  - name: block shell command creates a directory and returns to the browser
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: keep.txt
+          content: keep
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "keep.txt"
+            - send: ":"
+            - expect: ":"
+            - send: "mkdir shell-dir"
+            - send: {key: enter}
+            - expect_screen:
+                contains: shell-dir
+                stable_for: 100ms
+            - send: "q"
+      - assert:
+          dir:
+            path: shell-dir
+            exists: true
+
+  - name: block shell command can rename a file in place
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: old.txt
+          content: old
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "old.txt"
+            - send: ":"
+            - expect: ":"
+            - send: "mv old.txt shell-renamed.txt"
+            - send: {key: enter}
+            - expect_screen:
+                contains: shell-renamed.txt
+                not_contains: old.txt
+                stable_for: 100ms
+            - send: "q"
+      - assert:
+          file:
+            path: shell-renamed.txt
+            contains: old
+
+  - name: block shell command creates a spaced filename
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: keep.txt
+          content: keep
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "keep.txt"
+            - send: ":"
+            - expect: ":"
+            - send: "printf spaced > 'two words.txt'"
+            - send: {key: enter}
+            - expect_screen:
+                contains: two words.txt
+                stable_for: 100ms
+            - send: "q"
+      - assert:
+          file:
+            path: two words.txt
+            contains: spaced
+
+  - name: block shell command creates a spaced directory
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: keep.txt
+          content: keep
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "keep.txt"
+            - send: ":"
+            - expect: ":"
+            - send: "mkdir 'two words'"
+            - send: {key: enter}
+            - expect_screen:
+                contains: two words
+                stable_for: 100ms
+            - send: "q"
+      - assert:
+          dir:
+            path: two words
+            exists: true
+
+  - name: block shell command deletes the hovered file
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: doomed.txt
+          content: doomed
+      - fixture:
+          file: keep.txt
+          content: keep
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "doomed.txt"
+            - send: ":"
+            - expect: ":"
+            - send: "rm doomed.txt"
+            - send: {key: enter}
+            - expect_screen:
+                contains: keep.txt
+                not_contains: doomed.txt
+                stable_for: 100ms
+            - send: "q"
+      - assert:
+          file:
+            path: doomed.txt
+            exists: false
+
+  - name: block shell command copies the hovered file to a new name
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: old.txt
+          content: old
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "old.txt"
+            - send: ":"
+            - expect: ":"
+            - send: "cp old.txt shell-copy.txt"
+            - send: {key: enter}
+            - expect_screen:
+                contains:
+                  - old.txt
+                  - shell-copy.txt
+                stable_for: 100ms
+            - send: "q"
+      - assert:
+          file:
+            path: shell-copy.txt
+            contains: old
+
+  - name: block shell command runs inside the entered directory
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: sub/keep.txt
+          content: keep
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "sub"
+            - send: "l"
+            - expect: "keep.txt"
+            - send: ":"
+            - expect: ":"
+            - send: "printf inside > inside.txt"
+            - send: {key: enter}
+            - expect_screen:
+                contains: inside.txt
+                stable_for: 100ms
+            - send: "q"
+      - assert:
+          file:
+            path: sub/inside.txt
+            contains: inside
+
+  - name: block shell command can create nested files inside a new directory
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: keep.txt
+          content: keep
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "keep.txt"
+            - send: ":"
+            - expect: ":"
+            - send: "mkdir -p shell-nested && printf nested > shell-nested/file.txt"
+            - send: {key: enter}
+            - expect_screen:
+                contains: shell-nested
+                stable_for: 100ms
+            - send: "q"
+      - assert:
+          file:
+            path: shell-nested/file.txt
+            contains: nested
+
+  - name: block shell command moves a file into a new directory
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: move-me.txt
+          content: move
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "move-me.txt"
+            - send: ":"
+            - expect: ":"
+            - send: "mkdir moved && mv move-me.txt moved/"
+            - send: {key: enter}
+            - expect_screen:
+                contains: moved
+                stable_for: 100ms
+            - send: "q"
+      - assert:
+          file:
+            path: moved/move-me.txt
+            contains: move
+
+  - name: block shell command renames a directory
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: old-dir/a.txt
+          content: a
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "old-dir"
+            - send: ":"
+            - expect: ":"
+            - send: "mv old-dir shell-dir"
+            - send: {key: enter}
+            - expect_screen:
+                contains: shell-dir
+                not_contains: old-dir
+                stable_for: 100ms
+            - send: "q"
+      - assert:
+          file:
+            path: shell-dir/a.txt
+            contains: a
+
+  - name: block shell command appends to the hovered file content
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: note.txt
+          content: first
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "note.txt"
+            - send: ":"
+            - expect: ":"
+            - send: "printf '\\nsecond' >> note.txt"
+            - send: {key: enter}
+            - expect_screen:
+                contains: note.txt
+                stable_for: 100ms
+            - send: "q"
+      - assert:
+          file:
+            path: note.txt
+            contains: second
+
+  - name: block shell command can create a hidden file that dot then reveals
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: keep.txt
+          content: keep
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "keep.txt"
+            - send: ":"
+            - expect: ":"
+            - send: "printf hidden > .shell-hidden"
+            - send: {key: enter}
+            - expect_screen:
+                contains: keep.txt
+                not_contains: .shell-hidden
+                stable_for: 100ms
+            - send: "."
+            - expect_screen:
+                contains:
+                  - keep.txt
+                  - .shell-hidden
+                stable_for: 100ms
+            - send: "q"
+      - assert:
+          file:
+            path: .shell-hidden
+            contains: hidden
+
+  - name: block shell command deletes a directory subtree
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: doomed/a.txt
+          content: doomed
+      - fixture:
+          file: keep.txt
+          content: keep
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "doomed"
+            - send: ":"
+            - expect: ":"
+            - send: "rm -rf doomed"
+            - send: {key: enter}
+            - expect_screen:
+                contains: keep.txt
+                not_contains: doomed
+                stable_for: 100ms
+            - send: "q"
+      - assert:
+          dir:
+            path: doomed
+            exists: false
+
+  - name: block shell command copies a directory subtree to a new name
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: src/a.txt
+          content: a
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "src"
+            - send: ":"
+            - expect: ":"
+            - send: "cp -r src shell-copy-dir"
+            - send: {key: enter}
+            - expect_screen:
+                contains: shell-copy-dir
+                stable_for: 100ms
+            - send: "q"
+      - assert:
+          file:
+            path: shell-copy-dir/a.txt
+            contains: a
+
+  - name: block shell command creates a symlink to a file
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: target.txt
+          content: target
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "target.txt"
+            - send: ":"
+            - expect: ":"
+            - send: "ln -s target.txt linked.txt"
+            - send: {key: enter}
+            - expect_screen:
+                contains: linked.txt
+                stable_for: 100ms
+            - send: "q"
+      - run:
+          command: readlink linked.txt
+      - assert:
+          stdout:
+            equals: "target.txt"
+
+  - name: block shell command creates a symlink to a directory
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: target-dir/a.txt
+          content: a
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "target-dir"
+            - send: ":"
+            - expect: ":"
+            - send: "ln -s target-dir linked-dir"
+            - send: {key: enter}
+            - expect_screen:
+                contains: linked-dir
+                stable_for: 100ms
+            - send: "q"
+      - run:
+          command: readlink linked-dir
+      - assert:
+          stdout:
+            equals: "target-dir"
+
+  - name: block shell command renames a spaced filename
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: old name.txt
+          content: old
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "old name.txt"
+            - send: ":"
+            - expect: ":"
+            - send: "mv 'old name.txt' 'new name.txt'"
+            - send: {key: enter}
+            - expect_screen:
+                contains: new name.txt
+                stable_for: 100ms
+            - send: "q"
+      - assert:
+          file:
+            path: new name.txt
+            contains: old
+
+  - name: block shell command creates a symlink to a spaced filename
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: target file.txt
+          content: target
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "target file.txt"
+            - send: ":"
+            - expect: ":"
+            - send: "ln -s 'target file.txt' 'linked file.txt'"
+            - send: {key: enter}
+            - expect_screen:
+                contains: linked file.txt
+                stable_for: 100ms
+            - send: "q"
+      - run:
+          command: readlink "linked file.txt"
+      - assert:
+          stdout:
+            equals: "target file.txt"
+
+  - name: block shell command creates a symlink to a spaced directory
+    only:
+      command: yazi --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: target dir/a.txt
+          content: a
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "target dir"
+            - send: ":"
+            - expect: ":"
+            - send: "ln -s 'target dir' 'linked dir'"
+            - send: {key: enter}
+            - expect_screen:
+                contains: linked dir
+                stable_for: 100ms
+            - send: "q"
+      - run:
+          command: readlink "linked dir"
+      - assert:
+          stdout:
+            equals: "target dir"
