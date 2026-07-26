@@ -7,6 +7,18 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- `suite.description` and `scenario.description`: optional prose that `atago
+  doc` renders as Markdown under the matching heading, so a generated page
+  explains what a suite guarantees and why a scenario exists instead of leaving
+  the reader to infer it from step mechanics. Both are documentation-only —
+  never expanded, never read by the engine, absent from `explain`, `manifest`,
+  and the JSON report — and both are optional: a spec without them generates
+  byte-identical output to before. YAML comments are unaffected and still never
+  reach the generated docs, which is what keeps install notes and TODOs out of
+  published pages.
+
 ### Changed
 
 - A failed `dir:` assertion now lists what the directory actually holds instead

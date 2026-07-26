@@ -319,6 +319,12 @@ atago manifest ./specs
 atago list ./specs
 ```
 
+Scenario names say what happens; an optional `description:` on the suite and on
+a scenario says why it matters. Both are prose for the reader of the generated
+Markdown — rendered under the matching heading, never expanded, and with no
+effect on the run. Maintenance notes stay in YAML comments, which never appear
+in the generated page.
+
 ## Snapshot testing
 
 `snapshot` matchers compare output against committed golden files; ANSI colors, temp paths, UUIDs, timestamps, ports, and CRLF are normalized so snapshots stay stable across machines. Record or refresh them with:

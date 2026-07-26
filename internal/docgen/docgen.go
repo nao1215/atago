@@ -81,6 +81,10 @@ func writeHeader(md *markdown.Markdown, sources []Source) {
 func writeSuite(md *markdown.Markdown, src Source, outputDir string) {
 	s := src.Spec
 	md.H2f("%s", s.Suite.Name)
+	// The suite's own words about what it guarantees come before the mechanical
+	// metadata: a reader who opens the section wants the purpose first and the
+	// file path second.
+	writeDescription(md, s.Suite.Description)
 	// Always render the source path with forward slashes so the generated docs are
 	// byte-identical across platforms (Windows filepath.Clean uses backslashes).
 	md.PlainTextf("Source: `%s`", filepath.ToSlash(src.Path))
@@ -96,6 +100,7 @@ func writeSuite(md *markdown.Markdown, src Source, outputDir string) {
 
 func writeScenario(md *markdown.Markdown, sc *spec.Scenario, specDir, outputDir string) {
 	md.H3f("Scenario: %s", sc.Name)
+	writeDescription(md, sc.Description)
 	if meta := scenarioMeta(sc); meta != "" {
 		md.PlainText(meta)
 	}
@@ -175,6 +180,39 @@ func writePreviews(md *markdown.Markdown, blocks []previewBlock) {
 			md.CodeBlocks(markdown.SyntaxHighlight(lang), b.body)
 		}
 	}
+}
+
+// writeDescription emits an authored suite/scenario `description:` as prose
+// directly under its heading, and emits nothing at all when there is
+// none — so every doc generated from a spec without descriptions is byte-for-
+// byte what it was before the field existed.
+//
+// The text is written through as Markdown, which is what the field is for: a
+// paragraph, a list, a link to the issue a regression guards. It is never run
+// through the ${name} expander, never templated, and never sourced from
+// anything but the spec file itself, so what a reader sees is exactly the
+// literal the author typed.
+//
+// The trailing newline is what separates the description from whatever follows
+// it. The generated document has no blank lines anywhere else, and without one
+// here the next line ("Source: `...`", or a scenario's italic metadata) would
+// be swallowed into the description's last paragraph by Markdown's lazy
+// continuation rule.
+func writeDescription(md *markdown.Markdown, desc string) {
+	text := normalizeDescription(desc)
+	if text == "" {
+		return
+	}
+	md.PlainText(text + "\n")
+}
+
+// normalizeDescription trims the surrounding whitespace a YAML block scalar
+// carries (a leading newline, the trailing one) and folds CRLF, so a spec
+// authored on Windows and the same spec on Linux generate identical bytes. A
+// value that is empty or only whitespace normalizes to "" and is treated as
+// unset rather than rendered as a blank paragraph.
+func normalizeDescription(desc string) string {
+	return strings.TrimSpace(strings.ReplaceAll(desc, "\r\n", "\n"))
 }
 
 func scenarioMeta(sc *spec.Scenario) string {

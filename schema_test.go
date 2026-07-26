@@ -159,6 +159,27 @@ scenarios:
 	}
 }
 
+// TestSchema_AcceptsDescriptions confirms the published schema accepts the
+// optional suite/scenario `description:` that `atago doc` renders, so an
+// editor validating against the schema does not flag a spec the loader runs.
+func TestSchema_AcceptsDescriptions(t *testing.T) {
+	s := loadSchema(t)
+	src := `version: "1"
+suite:
+  name: x
+  description: |
+    What this suite guarantees.
+
+    Second paragraph.
+scenarios:
+  - name: a
+    description: Why this scenario exists.
+    steps: [{run: {command: echo}}]`
+	if err := s.Validate(yamlToAny(t, []byte(src))); err != nil {
+		t.Errorf("schema rejected valid suite/scenario description spec:\n%v", err)
+	}
+}
+
 // TestSchema_AcceptsStdinSources confirms the three stdin shapes (#18) are
 // accepted.
 func TestSchema_AcceptsStdinSources(t *testing.T) {

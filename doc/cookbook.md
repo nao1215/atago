@@ -1784,6 +1784,42 @@ A spec file is also documentation: `atago doc --out docs/specs.md ./specs`
 renders every scenario, fixture, and expectation as Markdown — this cookbook's
 sibling [real-world docs](real-world.md) are generated exactly that way.
 
+Names carry the behavior; the background is what a reader is missing. An
+optional `description:` on the suite and on a scenario supplies it, and lands
+under the matching heading in the generated Markdown:
+
+```yaml
+version: "1"
+suite:
+  name: mytool convert
+  description: |
+    What the convert command guarantees for the files it is handed.
+
+    Anything it rejects, it rejects before writing — a failed conversion never
+    leaves a half-written output behind.
+scenarios:
+  - name: refuses a source file it cannot parse
+    description: |
+      Regression for the truncation bug in 0.4.0: a malformed input exited 0
+      and wrote an empty file, so a pipeline downstream saw success.
+    steps:
+      - fixture:
+          file: broken.csv
+          content: "id,name\n1,\"unterminated\n"
+      - run:
+          command: mytool convert broken.csv --out out.json
+      - assert:
+          exit_code: 1
+          file:
+            path: out.json
+            exists: false
+```
+
+Both are optional, both are prose for whoever reads the docs, and neither
+changes how the spec runs. Keep the notes that are only for whoever maintains
+the spec — install steps, TODOs, why a workaround is there — in YAML comments:
+those stay in the file and never reach the generated page.
+
 ## Record an interactive session instead of scripting it
 
 You don't hand-write expect/send choreography either. `record --pty` runs the

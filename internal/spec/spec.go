@@ -71,6 +71,19 @@ type ScenarioDefaults struct {
 // Suite groups scenarios under a name.
 type Suite struct {
 	Name string `yaml:"name"`
+	// Description is optional prose explaining what the suite as a whole
+	// guarantees, rendered under the suite heading by `atago doc`. It is
+	// documentation data, not behavior: nothing in the engine reads it, and it
+	// never takes part in ${name} expansion, so it is exactly the literal text
+	// the author wrote. Multi-line Markdown is allowed; an empty or
+	// whitespace-only value renders nothing.
+	//
+	// It exists because the narrative every spec author already writes as a
+	// file-top YAML comment — what this suite covers and why — is invisible to
+	// every reader of the generated docs. Comments stay what they are (notes for
+	// whoever maintains the spec: install steps, migration history, TODOs);
+	// `description` is the part meant to be published.
+	Description string `yaml:"description,omitempty"`
 	// Timeout is the suite-level default step timeout (#17): every run, http,
 	// query, and grpc step without a more specific timeout (step > runner >
 	// defaults.run > suite) is bounded by this Go duration. "0"/"0s" disables
@@ -156,11 +169,18 @@ type NetworkPolicy struct {
 
 // Scenario is a single named behavior under test.
 type Scenario struct {
-	Name string            `yaml:"name"`
-	Tags []string          `yaml:"tags,omitempty"`
-	Skip *Condition        `yaml:"skip,omitempty"`
-	Only *Condition        `yaml:"only,omitempty"`
-	Env  map[string]string `yaml:"env,omitempty"`
+	Name string `yaml:"name"`
+	// Description is optional prose explaining the behavior this scenario pins
+	// down and why it matters, rendered under the scenario heading by `atago
+	// doc`. Same contract as Suite.Description: documentation only, never
+	// expanded, never read by the engine. Use it where the name cannot carry the
+	// background — the regression it guards, the failure mode it rules out — not
+	// to restate the name.
+	Description string            `yaml:"description,omitempty"`
+	Tags        []string          `yaml:"tags,omitempty"`
+	Skip        *Condition        `yaml:"skip,omitempty"`
+	Only        *Condition        `yaml:"only,omitempty"`
+	Env         map[string]string `yaml:"env,omitempty"`
 	// Matrix, when set, makes this scenario a template: the loader expands it into
 	// one concrete scenario per row before validation.
 	// Each row's key/value pairs are seeded as ${name} variables for that instance.

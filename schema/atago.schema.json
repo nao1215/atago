@@ -30,6 +30,10 @@
           "minLength": 1,
           "description": "The suite name shown in reports and generated docs."
         },
+        "description": {
+          "type": "string",
+          "description": "Optional prose describing what the suite guarantees, rendered as Markdown under the suite heading by `atago doc`. Documentation only: it never affects execution, and `${name}` references in it are not expanded."
+        },
         "timeout": {
           "type": "string",
           "description": "Suite-level default step timeout (#17): every run/http/query/grpc step without a more specific timeout (step > runner > defaults.run > suite) is bounded by this Go duration. \"0\" disables. When no level configures one, a built-in 60s default applies."
@@ -498,6 +502,10 @@
           "type": "string",
           "minLength": 1,
           "description": "The scenario name shown in reports; with `matrix:`, `${var}` placeholders make each instance's name unique."
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional prose describing the behavior this scenario pins down and why it matters, rendered as Markdown under the scenario heading by `atago doc`. Documentation only: it never affects execution, and `${name}` references in it are not expanded."
         },
         "tags": {
           "type": "array",
