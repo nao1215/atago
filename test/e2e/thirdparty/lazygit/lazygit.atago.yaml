@@ -59,6 +59,48 @@ scenarios:
       - assert:
           exit_code: 0
 
+  - name: opening from a nested repository path rejects the subdirectory as invalid
+    only:
+      command: lazygit --version
+    skip:
+      os: windows
+    steps:
+      - fixture: {file: repo/sub/note.txt, content: "hello\n"}
+      - run: {command: git init -q repo}
+      - run: {command: git -C repo add sub/note.txt}
+      - run: {command: git -C repo -c user.name=atago -c user.email=atago@example.com commit -q -m initial}
+      - run:
+          shell: true
+          command: printf 'nested\n' >> repo/sub/note.txt
+      - fixture:
+          file: cfg/config.yml
+          content: |
+            gui:
+              nerdFontsVersion: "3"
+              showFileTree: false
+              showBottomLine: false
+              showCommandLog: false
+              showRandomTip: false
+              showFileIcons: false
+              showListFooter: false
+            disableStartupPopups: true
+            promptToReturnFromSubprocess: false
+      - pty:
+          command: lazygit -ucd ${workdir}/cfg -p ${workdir}/repo/sub
+          rows: 30
+          cols: 120
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          session:
+            - expect: "not a valid git repository"
+      - run:
+          command: git -C repo status --porcelain
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: " M sub/note.txt"
+
   - name: space stages the selected unstaged file
     only:
       command: lazygit --version
@@ -107,6 +149,98 @@ scenarios:
               - "M  a.txt"
               - "?? b.txt"
 
+  - name: space stages an untracked file into the index
+    only:
+      command: lazygit --version
+    skip:
+      os: windows
+    steps:
+      - fixture: {file: repo/a.txt, content: "hello\n"}
+      - fixture: {file: repo/b.txt, content: "new\n"}
+      - run: {command: git init -q repo}
+      - run: {command: git -C repo add a.txt}
+      - run: {command: git -C repo -c user.name=atago -c user.email=atago@example.com commit -q -m initial}
+      - fixture:
+          file: cfg/config.yml
+          content: |
+            gui:
+              nerdFontsVersion: "3"
+              showFileTree: false
+              showBottomLine: false
+              showCommandLog: false
+              showRandomTip: false
+              showFileIcons: false
+              showListFooter: false
+            disableStartupPopups: true
+            promptToReturnFromSubprocess: false
+      - pty:
+          command: lazygit -ucd ${workdir}/cfg -p ${workdir}/repo
+          rows: 30
+          cols: 120
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          session:
+            - expect: "Unstaged changes"
+            - send: " "
+            - expect: "Staged changes"
+            - send: "q"
+      - run:
+          command: git -C repo status --porcelain
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "A  b.txt"
+
+  - name: down then space stages only the second modified file
+    only:
+      command: lazygit --version
+    skip:
+      os: windows
+    steps:
+      - fixture: {file: repo/a.txt, content: "hello\n"}
+      - fixture: {file: repo/b.txt, content: "world\n"}
+      - run: {command: git init -q repo}
+      - run: {command: git -C repo add a.txt b.txt}
+      - run: {command: git -C repo -c user.name=atago -c user.email=atago@example.com commit -q -m initial}
+      - run:
+          shell: true
+          command: printf 'more-a\n' >> repo/a.txt && printf 'more-b\n' >> repo/b.txt
+      - fixture:
+          file: cfg/config.yml
+          content: |
+            gui:
+              nerdFontsVersion: "3"
+              showFileTree: false
+              showBottomLine: false
+              showCommandLog: false
+              showRandomTip: false
+              showFileIcons: false
+              showListFooter: false
+            disableStartupPopups: true
+            promptToReturnFromSubprocess: false
+      - pty:
+          command: lazygit -ucd ${workdir}/cfg -p ${workdir}/repo
+          rows: 30
+          cols: 120
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          session:
+            - expect: "Unstaged changes"
+            - send: {key: down}
+            - send: " "
+            - expect: "Staged changes"
+            - send: "q"
+      - run:
+          command: git -C repo status --porcelain
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - " M a.txt"
+              - "M  b.txt"
+
   - name: space toggles a staged file back to unstaged
     only:
       command: lazygit --version
@@ -151,6 +285,50 @@ scenarios:
           exit_code: 0
           stdout:
             equals: " M a.txt"
+
+  - name: space toggles an added file back to untracked
+    only:
+      command: lazygit --version
+    skip:
+      os: windows
+    steps:
+      - fixture: {file: repo/a.txt, content: "hello\n"}
+      - fixture: {file: repo/b.txt, content: "new\n"}
+      - run: {command: git init -q repo}
+      - run: {command: git -C repo add a.txt}
+      - run: {command: git -C repo -c user.name=atago -c user.email=atago@example.com commit -q -m initial}
+      - run: {command: git -C repo add b.txt}
+      - fixture:
+          file: cfg/config.yml
+          content: |
+            gui:
+              nerdFontsVersion: "3"
+              showFileTree: false
+              showBottomLine: false
+              showCommandLog: false
+              showRandomTip: false
+              showFileIcons: false
+              showListFooter: false
+            disableStartupPopups: true
+            promptToReturnFromSubprocess: false
+      - pty:
+          command: lazygit -ucd ${workdir}/cfg -p ${workdir}/repo
+          rows: 30
+          cols: 120
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          session:
+            - expect: "Staged changes"
+            - send: " "
+            - expect: "Unstaged changes"
+            - send: "q"
+      - run:
+          command: git -C repo status --porcelain
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "?? b.txt"
 
   - name: capital C commits staged changes through git's editor
     only:
@@ -208,6 +386,67 @@ scenarios:
           exit_code: 0
           stdout:
             contains: editor commit
+
+  - name: capital C commits pre-staged changes and leaves a clean worktree
+    only:
+      command: lazygit --version
+    skip:
+      os: windows
+    steps:
+      - fixture: {file: repo/a.txt, content: "hello\n"}
+      - run: {command: git init -q repo}
+      - run: {command: git -C repo add a.txt}
+      - run: {command: git -C repo -c user.name=atago -c user.email=atago@example.com commit -q -m initial}
+      - run: {command: git -C repo config user.name atago}
+      - run: {command: git -C repo config user.email atago@example.com}
+      - run:
+          shell: true
+          command: printf 'more\n' >> repo/a.txt && git -C repo add a.txt
+      - fixture:
+          file: editor.sh
+          content: |
+            #!/bin/sh
+            printf 'pre-staged commit\n' > "$1"
+      - run:
+          shell: true
+          command: chmod +x editor.sh
+      - run:
+          command: git -C repo config core.editor ${workdir}/editor.sh
+      - fixture:
+          file: cfg/config.yml
+          content: |
+            gui:
+              nerdFontsVersion: "3"
+              showFileTree: false
+              showBottomLine: false
+              showCommandLog: false
+              showRandomTip: false
+              showFileIcons: false
+              showListFooter: false
+            disableStartupPopups: true
+            promptToReturnFromSubprocess: false
+      - pty:
+          command: lazygit -ucd ${workdir}/cfg -p ${workdir}/repo
+          rows: 30
+          cols: 120
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          session:
+            - expect: "Staged changes"
+            - send: "C"
+      - run:
+          command: git -C repo status --porcelain
+      - assert:
+          exit_code: 0
+          stdout:
+            empty: true
+      - run:
+          command: git -C repo log --oneline -1
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: pre-staged commit
 
   - name: escape cancels the discard dialog and preserves the diff
     only:
@@ -300,6 +539,59 @@ scenarios:
           stdout:
             empty: true
 
+  - name: down then discard reverts only the second modified file
+    only:
+      command: lazygit --version
+    skip:
+      os: windows
+    steps:
+      - fixture: {file: repo/a.txt, content: "hello\n"}
+      - fixture: {file: repo/b.txt, content: "world\n"}
+      - run: {command: git init -q repo}
+      - run: {command: git -C repo add a.txt b.txt}
+      - run: {command: git -C repo -c user.name=atago -c user.email=atago@example.com commit -q -m initial}
+      - run:
+          shell: true
+          command: printf 'more-a\n' >> repo/a.txt && printf 'more-b\n' >> repo/b.txt
+      - fixture:
+          file: cfg/config.yml
+          content: |
+            gui:
+              nerdFontsVersion: "3"
+              showFileTree: false
+              showBottomLine: false
+              showCommandLog: false
+              showRandomTip: false
+              showFileIcons: false
+              showListFooter: false
+            disableStartupPopups: true
+            promptToReturnFromSubprocess: false
+      - pty:
+          command: lazygit -ucd ${workdir}/cfg -p ${workdir}/repo
+          rows: 30
+          cols: 120
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          session:
+            - expect: "Unstaged changes"
+            - send: {key: down}
+            - send: "d"
+            - expect: "Discard changes"
+            - send: {key: enter}
+      - run:
+          command: git -C repo diff -- a.txt
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "+more-a"
+      - run:
+          command: git -C repo diff -- b.txt
+      - assert:
+          exit_code: 0
+          stdout:
+            empty: true
+
   - name: n creates a new branch from the branch panel
     only:
       command: lazygit --version
@@ -342,6 +634,92 @@ scenarios:
           exit_code: 0
           stdout:
             equals: feature-one
+
+  - name: n creates a slash branch name from the branch panel
+    only:
+      command: lazygit --version
+    skip:
+      os: windows
+    steps:
+      - fixture: {file: repo/a.txt, content: "hello\n"}
+      - run: {command: git init -q repo}
+      - run: {command: git -C repo add a.txt}
+      - run: {command: git -C repo -c user.name=atago -c user.email=atago@example.com commit -q -m initial}
+      - fixture:
+          file: cfg/config.yml
+          content: |
+            gui:
+              nerdFontsVersion: "3"
+              showFileTree: false
+              showBottomLine: false
+              showCommandLog: false
+              showRandomTip: false
+              showFileIcons: false
+              showListFooter: false
+            disableStartupPopups: true
+            promptToReturnFromSubprocess: false
+      - pty:
+          command: lazygit -ucd ${workdir}/cfg -p ${workdir}/repo branch
+          rows: 30
+          cols: 120
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          session:
+            - expect: "Local branches"
+            - send: "n"
+            - expect: "New branch name"
+            - send: "feature/two"
+            - send: {key: enter}
+      - run:
+          command: git -C repo branch --show-current
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: feature/two
+
+  - name: escape cancels the new branch dialog and keeps the current branch
+    only:
+      command: lazygit --version
+    skip:
+      os: windows
+    steps:
+      - fixture: {file: repo/a.txt, content: "hello\n"}
+      - run: {command: git init -q repo}
+      - run: {command: git -C repo add a.txt}
+      - run: {command: git -C repo -c user.name=atago -c user.email=atago@example.com commit -q -m initial}
+      - fixture:
+          file: cfg/config.yml
+          content: |
+            gui:
+              nerdFontsVersion: "3"
+              showFileTree: false
+              showBottomLine: false
+              showCommandLog: false
+              showRandomTip: false
+              showFileIcons: false
+              showListFooter: false
+            disableStartupPopups: true
+            promptToReturnFromSubprocess: false
+      - pty:
+          command: lazygit -ucd ${workdir}/cfg -p ${workdir}/repo branch
+          rows: 30
+          cols: 120
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          session:
+            - expect: "Local branches"
+            - send: "n"
+            - expect: "New branch name"
+            - send: {key: esc}
+            - send: "q"
+      - run:
+          command: git -C repo branch --show-current
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: master
 
   - name: space checks out the selected branch
     only:
@@ -440,6 +818,58 @@ scenarios:
           stdout:
             empty: true
 
+  - name: escape cancels the stash prompt and leaves the diff in place
+    only:
+      command: lazygit --version
+    skip:
+      os: windows
+    steps:
+      - fixture: {file: repo/a.txt, content: "hello\n"}
+      - run: {command: git init -q repo}
+      - run: {command: git -C repo add a.txt}
+      - run: {command: git -C repo -c user.name=atago -c user.email=atago@example.com commit -q -m initial}
+      - run:
+          shell: true
+          command: printf 'more\n' >> repo/a.txt
+      - fixture:
+          file: cfg/config.yml
+          content: |
+            gui:
+              nerdFontsVersion: "3"
+              showFileTree: false
+              showBottomLine: false
+              showCommandLog: false
+              showRandomTip: false
+              showFileIcons: false
+              showListFooter: false
+            disableStartupPopups: true
+            promptToReturnFromSubprocess: false
+      - pty:
+          command: lazygit -ucd ${workdir}/cfg -p ${workdir}/repo
+          rows: 30
+          cols: 120
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          session:
+            - expect: "Unstaged changes"
+            - send: "s"
+            - expect: "Stash changes"
+            - send: {key: esc}
+            - send: "q"
+      - run:
+          command: git -C repo stash list
+      - assert:
+          exit_code: 0
+          stdout:
+            empty: true
+      - run:
+          command: git -C repo diff -- a.txt
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "+more"
+
   - name: g then enter pops the selected stash entry back into the worktree
     only:
       command: lazygit --version
@@ -492,3 +922,59 @@ scenarios:
           exit_code: 0
           stdout:
             contains: "+more"
+
+  - name: g then escape cancels stash pop and keeps the stash stored
+    only:
+      command: lazygit --version
+    skip:
+      os: windows
+    steps:
+      - fixture: {file: repo/a.txt, content: "hello\n"}
+      - run: {command: git init -q repo}
+      - run: {command: git -C repo add a.txt}
+      - run: {command: git -C repo -c user.name=atago -c user.email=atago@example.com commit -q -m initial}
+      - run:
+          shell: true
+          command: printf 'more\n' >> repo/a.txt
+      - run:
+          command: git -C repo stash push -m probe
+      - fixture:
+          file: cfg/config.yml
+          content: |
+            gui:
+              nerdFontsVersion: "3"
+              showFileTree: false
+              showBottomLine: false
+              showCommandLog: false
+              showRandomTip: false
+              showFileIcons: false
+              showListFooter: false
+            disableStartupPopups: true
+            promptToReturnFromSubprocess: false
+      - pty:
+          command: lazygit -ucd ${workdir}/cfg -p ${workdir}/repo stash
+          rows: 30
+          cols: 120
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          session:
+            - expect: "stash@{0}"
+            - send: "g"
+            - expect: "Stash pop"
+            - send: {key: esc}
+            - send: "q"
+      - run:
+          command: git -C repo stash list
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - stash@{0}
+              - probe
+      - run:
+          command: git -C repo diff -- a.txt
+      - assert:
+          exit_code: 0
+          stdout:
+            empty: true
