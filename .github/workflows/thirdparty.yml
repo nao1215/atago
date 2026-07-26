@@ -58,6 +58,9 @@ jobs:
           - name: fzf
             dir: ./test/e2e/thirdparty/fzf
             install: go install github.com/junegunn/fzf@v0.74.0
+          - name: gum
+            dir: ./test/e2e/thirdparty/gum
+            install: go install github.com/charmbracelet/gum@v0.17.0
           # htop drives the pty runner's alternate-screen rendering and named
           # function keys.
           - name: htop

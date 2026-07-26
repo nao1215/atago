@@ -1,0 +1,294 @@
+version: "1"
+
+suite:
+  name: gum (third-party shell-script TUI toolkit)
+
+# gum mixes plain stdout-oriented commands (`join`, `table`, `log`,
+# `version-check`) with real terminal prompts (`choose`, `filter`, `confirm`,
+# `input`, `file`, `pager`). This suite covers both: script-friendly output
+# contracts and the TTY-only flows that actually justify gum's existence.
+# Install: see .github/workflows/thirdparty.yml for the pinned CI version.
+scenarios:
+  - name: version prints the pinned semantic version
+    only:
+      command: gum --version
+    steps:
+      - run:
+          command: gum --version
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: gum version v0.17.0
+
+  - name: version-check succeeds silently for a satisfied constraint
+    only:
+      command: gum --version
+    steps:
+      - run:
+          command: gum version-check ">=0.17.0"
+      - assert:
+          exit_code: 0
+          stdout:
+            empty: true
+          stderr:
+            empty: true
+
+  - name: version-check rejects an unsatisfied constraint
+    only:
+      command: gum --version
+    steps:
+      - run:
+          command: gum version-check ">0.17.0"
+      - assert:
+          exit_code: 1
+          stderr:
+            contains:
+              - v0.17.0
+              - ">0.17.0"
+
+  - name: join horizontal concatenates adjacent arguments
+    only:
+      command: gum --version
+    steps:
+      - run:
+          command: gum join --horizontal alpha beta gamma
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: alphabetagamma
+
+  - name: table print renders a static border and rows from stdin
+    only:
+      command: gum --version
+    steps:
+      - run:
+          shell: true
+          command: |
+            cat <<'EOF' | gum table --print -c Name,Lang
+            alpha,Go
+            beta,Rust
+            EOF
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - Name
+              - Lang
+              - alpha
+              - beta
+
+  - name: log writes a leveled message to a file
+    only:
+      command: gum --version
+    steps:
+      - run:
+          command: gum log --file app.log --level info --prefix app hello world
+      - assert:
+          exit_code: 0
+      - assert:
+          file:
+            path: app.log
+            contains: "INFO app: hello world"
+
+  - name: choose select-if-one returns the only matching stdin option without a tty
+    only:
+      command: gum --version
+    steps:
+      - run:
+          shell: true
+          command: printf 'alpha\nbeta\ngamma\n' | gum choose --select-if-one beta
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: beta
+
+  - name: filter select-if-one returns the only fuzzy match without a tty
+    only:
+      command: gum --version
+    steps:
+      - run:
+          shell: true
+          command: printf 'alpha\nbeta\ngamma\n' | gum filter --value=ga --select-if-one
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: gamma
+
+  - name: interactive choose moves the cursor and writes the chosen option
+    only:
+      command: gum --version
+    skip:
+      os: windows
+    steps:
+      - pty:
+          shell: true
+          command: gum choose alpha beta gamma > pick.txt
+          rows: 10
+          cols: 80
+          timeout: 15s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "Choose:"
+            - expect: "alpha"
+            - send: "j"
+            - send: { key: enter }
+      - assert:
+          exit_code: 0
+      - assert:
+          file:
+            path: pick.txt
+            contains: beta
+
+  - name: interactive filter narrows to the typed query and submits the match
+    only:
+      command: gum --version
+    skip:
+      os: windows
+    steps:
+      - pty:
+          shell: true
+          command: gum filter alpha beta gamma > pick.txt
+          rows: 24
+          cols: 80
+          timeout: 15s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "alpha"
+            - send: "ga"
+            - expect: "gamma"
+            - send: { key: enter }
+      - assert:
+          exit_code: 0
+      - assert:
+          file:
+            path: pick.txt
+            contains: gamma
+
+  - name: confirm exits 0 on affirmative input
+    only:
+      command: gum --version
+    skip:
+      os: windows
+    steps:
+      - pty:
+          command: gum confirm "Deploy?"
+          rows: 6
+          cols: 80
+          timeout: 15s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "Deploy?"
+            - send: "y"
+      - assert:
+          exit_code: 0
+
+  - name: confirm exits 1 on negative input
+    only:
+      command: gum --version
+    skip:
+      os: windows
+    steps:
+      - pty:
+          command: gum confirm "Deploy?"
+          rows: 6
+          cols: 80
+          timeout: 15s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "Deploy?"
+            - send: "n"
+      - assert:
+          exit_code: 1
+
+  - name: input starts from a seeded value and writes the edited result
+    only:
+      command: gum --version
+    skip:
+      os: windows
+    steps:
+      - pty:
+          shell: true
+          command: gum input --value seed > out.txt
+          rows: 6
+          cols: 80
+          timeout: 15s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "seed"
+            - send: "-tail"
+            - send: { key: enter }
+      - assert:
+          exit_code: 0
+      - assert:
+          file:
+            path: out.txt
+            contains: seed-tail
+
+  - name: file picker returns the selected file path
+    only:
+      command: gum --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: a.txt
+          content: ""
+      - fixture:
+          file: b.txt
+          content: ""
+      - pty:
+          shell: true
+          command: gum file --file . > pick.txt
+          rows: 24
+          cols: 80
+          timeout: 15s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "navigate"
+            - send: { key: enter }
+      - assert:
+          exit_code: 0
+      - assert:
+          file:
+            path: pick.txt
+            contains: /a.txt
+
+  - name: pager shows line numbers and quits on q
+    only:
+      command: gum --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: sample.txt
+          content: |
+            first
+            second
+            third
+      - pty:
+          shell: true
+          command: cat sample.txt | gum pager --show-line-numbers
+          rows: 24
+          cols: 80
+          timeout: 15s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "1"
+            - expect: "first"
+            - send: "q"
+      - assert:
+          exit_code: 0
