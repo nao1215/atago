@@ -798,6 +798,115 @@ func TestLoadBytes_MalformedYAMLDoesNotPanic(t *testing.T) {
 	}
 }
 
+// TestLoadBytes_ExplicitTagRejected pins the tag rejection that keeps the
+// decoder's nil-panic path unreachable. Every input here reaches
+// ast.TagNode.ArrayRange -> nil *ArrayNodeIter -> decodeSlice panic in
+// goccy/go-yaml v1.19.2 when it is allowed through, so each must now be
+// rejected before decoding, with a message that names the tag and its position
+// instead of the opaque "malformed YAML" the recover path produces.
+func TestLoadBytes_ExplicitTagRejected(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		src  string
+		want []string
+	}{
+		{
+			name: "bare tag over a scalar where a list belongs",
+			src:  "scenarios:\n  ! 0",
+			want: []string{"explicit YAML tag", "[2:3]"},
+		},
+		{
+			name: "fuzz crasher 230de42ba4751bda",
+			src:  "A: 0\nrunners:\n 0: {0000000000000\"}\nscenarios:\n  ! 00",
+			want: []string{"explicit YAML tag", "[5:3]"},
+		},
+		{
+			name: "custom tag on a list field",
+			src:  "version: \"1\"\nsuite:\n  name: x\nscenarios: !foo 0\n",
+			want: []string{"!foo", "[4:12]"},
+		},
+		{
+			name: "std tag on a list field",
+			src:  "version: \"1\"\nsuite:\n  name: x\nscenarios: !!str 0\n",
+			want: []string{"!!str", "[4:12]"},
+		},
+		{
+			name: "tag on a nested list field",
+			src:  "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps: ! 0\n",
+			want: []string{"explicit YAML tag", "[6:12]"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s, err := LoadBytes("t.atago.yaml", []byte(tt.src))
+			if err == nil {
+				t.Fatalf("LoadBytes() = nil error, want a parse error naming the tag")
+			}
+			if s != nil {
+				t.Errorf("LoadBytes() returned a non-nil spec alongside an error")
+			}
+			var lerr *Error
+			if !errors.As(err, &lerr) {
+				t.Fatalf("LoadBytes() error = %T, want *loader.Error", err)
+			}
+			if lerr.Kind != KindParse {
+				t.Errorf("kind = %v, want KindParse", lerr.Kind)
+			}
+			for _, want := range tt.want {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("error = %q, want substring %q", err.Error(), want)
+				}
+			}
+			// The recover path must no longer be what produces this error.
+			if strings.Contains(err.Error(), "malformed YAML") {
+				t.Errorf("error = %q, want the tag to be rejected before decoding", err.Error())
+			}
+		})
+	}
+}
+
+// TestLoadBytes_TagRejectionLeavesOtherErrorsAlone guards the blast radius of
+// the tag check: a spec with no explicit tag must keep loading, and a malformed
+// spec that the parser itself rejects must keep its original syntax error
+// rather than being reported as a tag problem.
+func TestLoadBytes_TagRejectionLeavesOtherErrorsAlone(t *testing.T) {
+	t.Parallel()
+	good := "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n"
+	if _, err := LoadBytes("t.atago.yaml", []byte(good)); err != nil {
+		t.Errorf("LoadBytes(untagged spec) error = %v, want a clean load", err)
+	}
+	// An unclosed flow mapping is a syntax error the parser itself catches, so
+	// the tag check never gets a usable AST to walk.
+	broken := "version: \"1\"\nsuite: {name: x\n"
+	_, err := LoadBytes("t.atago.yaml", []byte(broken))
+	if err == nil {
+		t.Fatalf("LoadBytes(unclosed flow mapping) = nil error, want a parse error")
+	}
+	if strings.Contains(err.Error(), "explicit YAML tag") {
+		t.Errorf("error = %q, want the original syntax error, not a tag error", err.Error())
+	}
+}
+
+// TestLoadBytes_BinaryTagAccepted pins the one tag a spec may carry. `atago
+// record` emits !!binary whenever a captured stream is not valid UTF-8, so
+// rejecting it would make recorded specs unloadable — a round trip the record
+// package's own tests depend on.
+func TestLoadBytes_BinaryTagAccepted(t *testing.T) {
+	t.Parallel()
+	src := "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n" +
+		"      - run: {command: echo}\n      - assert:\n          stdout:\n            equals: !!binary \"//4K\"\n"
+	if _, err := LoadBytes("t.atago.yaml", []byte(src)); err != nil {
+		t.Errorf("LoadBytes(!!binary scalar) error = %v, want a clean load", err)
+	}
+	// A tag nested under a !!binary node must still be caught: skipping the
+	// binary tag must not skip the rest of the subtree.
+	nested := "version: \"1\"\nsuite:\n  name: x\nscenarios: !!binary !foo 0\n"
+	if _, err := LoadBytes("t.atago.yaml", []byte(nested)); err == nil {
+		t.Errorf("LoadBytes(tag nested under !!binary) = nil error, want the inner tag rejected")
+	}
+}
+
 // specSteps assembles a minimal one-scenario spec whose steps are the given
 // flow-style step entries (each is the text after "- " in a steps list). It
 // keeps the many one-off validation cases readable without hand-indenting YAML.
