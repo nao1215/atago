@@ -251,7 +251,54 @@ scenarios:
       - assert:
           stdout:
             not_contains: "`install.sh` is checked"
-      # The documented spec is the one that runs: it still passes as written.
+
+  # The documented spec is the one that runs: it still passes as written. The
+  # executable matcher needs a POSIX exec bit, so this half is POSIX-only while
+  # the rendering above stays portable.
+  - name: a spec whose matchers doc renders still runs green
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: matchers.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: matchers
+            scenarios:
+              - name: composed stream
+                steps:
+                  - run:
+                      command: echo hello
+                  - assert:
+                      stdout:
+                        contains: hello
+                        not_contains: goodbye
+              - name: line scoped
+                steps:
+                  - run:
+                      shell: true
+                      command: printf 'one\ntwo\n'
+                  - assert:
+                      stdout:
+                        line: 2
+                        equals: two
+              - name: file matchers
+                steps:
+                  - fixture:
+                      file: install.sh
+                      content: "#!/bin/sh\n"
+                      mode: "0755"
+                  - run:
+                      command: echo hi
+                  - assert:
+                      file:
+                        path: install.sh
+                        executable: true
+                  - assert:
+                      file:
+                        path: install.sh
+                        not_contains: "rm -rf /"
       - run:
           command: ${atago} run matchers.atago.yaml
       - assert:
