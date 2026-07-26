@@ -2,16 +2,22 @@ version: "1"
 
 suite:
   name: aqua + install (declarative install of a real tool)
+  description: |
+    The thing aqua exists to do: turn a line in a config file into a tool you
+    can run. This suite exercises that end to end — declare a package, install
+    it, execute it — rather than stopping at the offline surface its companion
+    suite covers.
 
-# Companion to aqua.atago.yaml: where that suite pins aqua's offline surface,
-# this one exercises aqua's essential function — declaratively installing a tool
-# and making it runnable — without reaching the live registry or GitHub for the
-# tool itself. A local registry (type: local) describes an http package whose
-# asset is a tiny self-authored "tool" served from a local HTTP file server, so
-# `aqua install` downloads it from 127.0.0.1, lands it under AQUA_ROOT_DIR, and
-# `aqua exec` runs it. AQUA_ROOT_DIR and the policy file are pinned inside the
-# workdir. (aqua still fetches its pinned aqua-proxy bootstrap from GitHub on
-# install, the one external dependency of aqua's own design.) Install: see
+    It stays hermetic by moving only the registry, not the mechanism. A local
+    registry describes an http package whose asset is a tiny self-authored
+    "tool" served from a loopback file server, so `aqua install` performs a real
+    download, lands a real binary under `AQUA_ROOT_DIR`, and `aqua exec` really
+    runs it — with no dependency on the public registry or on GitHub for the
+    tool itself.
+
+# aqua still fetches its pinned aqua-proxy bootstrap from GitHub on install, the
+# one external dependency of aqua's own design. AQUA_ROOT_DIR and the policy
+# file are pinned inside the workdir. Install: see
 # .github/workflows/thirdparty.yml for the pinned CI version.
 
 permissions:

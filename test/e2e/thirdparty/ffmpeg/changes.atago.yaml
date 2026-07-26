@@ -2,11 +2,14 @@ version: "1"
 
 suite:
   name: ffmpeg + changes (single-artifact encode)
+  description: |
+    An encode should produce the output file and no debris. Media tools are
+    notorious for temporary files, and this suite pins that ffmpeg leaves none:
+    a synthesized encode creates exactly one file in the working directory, and
+    the exhaustive delta names it.
 
-# Companion to ffmpeg.atago.yaml: a lavfi-sourced encode writes exactly one
-# output file and touches nothing else. A minimal proof that the delta engine
-# reports a clean single creation for a media tool. Encodes are kept tiny so
-# the job stays fast. Gate: only where ffmpeg is installed.
+# Encodes are kept tiny so the job stays fast. Gate: only where ffmpeg is
+# installed.
 scenarios:
   - name: lavfi source encodes exactly one output file
     only:

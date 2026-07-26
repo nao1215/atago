@@ -2,14 +2,20 @@ version: "1"
 
 suite:
   name: git + changes (a staged blob touches exactly index + one object)
+  description: |
+    `git add` is documented as writing a blob and updating the index. This suite
+    holds git to that literally: after initializing a repository, staging one
+    file must create exactly two things on disk — the staging index, and one
+    loose object under `.git/objects` — and nothing else anywhere.
 
-# A practical workdir-delta over git internals, companion to git.atago.yaml.
-# `git init` (a prior step) lays down the whole .git tree as the delta
-# baseline; the immediately-following `git add` then touches exactly two new
-# files: the staging index and one loose object. Object files are hash-named at
-# EXACTLY two levels (objects/<2-hex>/<38-hex>), so the v1 glob
-# `repo/.git/objects/*/*` covers them precisely — path.Match '*' never crosses
-# '/', so it cannot match a deeper path by accident.
+    It is an exhaustive claim, not a spot check. Any extra file git wrote would
+    fail the assertion, which is what makes it a real statement about git's
+    footprint rather than a restatement of the documentation.
+
+# `git init` (a prior step) lays down the whole .git tree as the delta baseline.
+# Object files are hash-named at EXACTLY two levels (objects/<2-hex>/<38-hex>),
+# so the glob `repo/.git/objects/*/*` covers them precisely — path.Match '*'
+# never crosses '/', so it cannot match a deeper path by accident.
 #
 # Unlike the rest of the git suite (which runs unchanged on every OS), this
 # scenario is POSIX-only: git-for-windows applies core.autocrlf/filemode

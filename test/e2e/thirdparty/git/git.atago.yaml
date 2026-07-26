@@ -2,13 +2,18 @@ version: "1"
 
 suite:
   name: git (third-party CLI, no build required)
+  description: |
+    The proof that testing someone else's CLI takes no cooperation from it. git
+    was not written with this test suite in mind, ships no hooks for it, and
+    exposes nothing but a command line — and that is enough.
 
-# atago's dogfood suites test CLIs the author maintains; this suite tests a CLI
-# nobody here wrote. git is on every dev machine and CI runner, so it runs on
-# Linux/macOS/Windows in CI as living proof that testing an arbitrary
-# third-party CLI needs no test code — only observable behavior. Every command
-# uses git's own -C/-c flags instead of a shell, so the same spec runs
-# unchanged on every OS.
+    What is guaranteed here is ordinary git as a script would meet it: a
+    repository is initialized, files are staged and committed, history and
+    status report the expected state, branches and tags behave, and the failure
+    cases (a bad revision, a dirty tree) exit non-zero with a message.
+
+    Every command uses git's own `-C`/`-c` flags instead of a shell, so this
+    exact spec runs unchanged on Linux, macOS, and Windows.
 scenarios:
   - name: init creates an empty repository
     steps:

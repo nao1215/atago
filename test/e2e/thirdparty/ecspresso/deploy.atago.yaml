@@ -2,17 +2,21 @@ version: "1"
 
 suite:
   name: ecspresso + deploy (real ECS deploy against a mock)
+  description: |
+    The thing ecspresso exists to do: deploy an ECS service, and roll it when
+    the definition changes. This suite runs that for real against a mock AWS
+    endpoint (moto, an in-memory AWS mock), so no AWS account is involved and
+    nothing is billed.
 
-# Companion to ecspresso.atago.yaml: where that suite pins the offline render
-# surface, this one exercises ecspresso's essential function — deploying an ECS
-# service and rolling it on change — against a mock AWS endpoint (moto, an
-# in-memory Apache-2.0 AWS mock) so no real AWS account is used. ecspresso and
-# the aws CLI are pointed at moto with AWS_ENDPOINT_URL and dummy credentials;
-# the ECS state change is observed with `aws ecs describe-services`, not just
-# asserted from ecspresso's logs. `--no-wait` is used because moto never runs
-# tasks, so a wait-for-stable would hang; the registration and service update
-# are synchronous and complete before it returns. Install: see
-# .github/workflows/thirdparty.yml for the pinned CI versions.
+    The deploy is verified from the outside. Rather than trusting ecspresso's
+    own log output, the resulting ECS state is read back with
+    `aws ecs describe-services` — a second, independent client — so the
+    assertion is about what the service actually looks like afterwards.
+
+# `--no-wait` is used because moto never runs tasks, so a wait-for-stable would
+# hang; the registration and service update are synchronous and complete before
+# it returns. Install: see .github/workflows/thirdparty.yml for the pinned CI
+# versions.
 
 permissions:
   network:

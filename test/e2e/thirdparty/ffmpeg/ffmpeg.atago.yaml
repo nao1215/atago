@@ -2,12 +2,20 @@ version: "1"
 
 suite:
   name: ffmpeg / ffprobe (media pipeline)
+  description: |
+    A whole media pipeline in one suite: [ffmpeg](https://ffmpeg.org/)
+    synthesizes a video, ffprobe describes it, and a frame is extracted back out
+    of it.
 
-# A media pipeline in one package (#35): ffmpeg synthesizes video, ffprobe
-# reports a JSON contract, and extracted frames are verified with atago's
-# image assertions (format/dimensions/pixel similarity) — assertion types no
-# other third-party spec exercises together. Encodes are kept tiny (1s,
-# 320x240) so the job stays fast. Gate: only where ffmpeg is installed.
+    What is guaranteed is the thing a media tool must not get wrong — that the
+    bytes it produced are really the media it claims. ffprobe's JSON is checked
+    as structure (codec, duration, dimensions), and the extracted frame is
+    verified as an actual image: its format, its pixel dimensions, and its
+    similarity to the expected picture. A file that exists and has a plausible
+    size is not enough.
+
+# Encodes are kept tiny (1s, 320x240) so the job stays fast. Gate: only where
+# ffmpeg is installed.
 scenarios:
   - name: lavfi synthesizes a video file
     only:

@@ -2,13 +2,19 @@ version: "1"
 
 suite:
   name: age (modern file encryption)
+  description: |
+    [age](https://age-encryption.org/) is a small, modern file-encryption CLI —
+    a Go-native tool many people ship alongside their own commands, and the
+    counterpart to the openssl suite here.
 
-# age is a small, modern encryption CLI with an exemplary UX contract (#38):
-# binary-safe round-trips, armored output, interactive passphrase mode, and
-# clean failure semantics. It complements the openssl specs with a Go-native
-# tool many users ship alongside their own CLIs. Keys and passphrases here are
-# throwaways generated inside each scenario's isolated workdir. Gate: only
-# where age is installed; pty scenarios are POSIX-only.
+    What is guaranteed: an encrypt/decrypt round trip returns the original bytes
+    exactly, including binary payloads; armored output stays ASCII and
+    round-trips the same way; a passphrase typed at the interactive prompt works
+    like a key file; and every failure — the wrong key, the wrong passphrase, a
+    corrupted file — is refused loudly rather than yielding plausible garbage.
+
+# Keys and passphrases are throwaways generated inside each scenario's isolated
+# workdir. Gate: only where age is installed; pty scenarios are POSIX-only.
 
 secrets:
   - PASSPHRASE

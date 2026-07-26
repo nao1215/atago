@@ -2,16 +2,20 @@ version: "1"
 
 suite:
   name: actionlint (GitHub Actions workflow linter)
+  description: |
+    [actionlint](https://github.com/rhysd/actionlint) statically checks GitHub
+    Actions workflow YAML. It is offline and deterministic — the same workflow
+    always produces the same findings — which makes its contract unusually
+    precise to pin.
 
-# actionlint statically checks GitHub Actions workflow YAML: it is fully offline
-# and deterministic, exits 0 with no output on a clean workflow, and exits 1
-# printing each problem (with file:line:col, a rule tag like [job-needs], and a
-# code snippet) to stdout. That makes its contract precise to pin: the exit code
-# splits clean from problematic, distinct rule categories produce distinct
-# tagged errors, the JSON format is a structured oracle over the same findings,
-# and -ignore removes a matching error. Every workflow here is authored as a
-# fixture, and shellcheck is disabled (-shellcheck=) so the results do not depend
-# on whether shellcheck is present on the runner.
+    What is guaranteed here: exit 0 and silence on a clean workflow, exit 1 with
+    every problem printed as `file:line:col`, a rule tag, and a code snippet;
+    distinct rule categories producing distinctly tagged errors; the JSON format
+    agreeing with the human one over the same findings; and `-ignore` removing a
+    matching error without hiding the rest.
+
+# Every workflow is authored as a fixture, and shellcheck is disabled
+# (-shellcheck=) so results do not depend on whether shellcheck is on the runner.
 scenarios:
   - name: version prints a semantic version
     only:

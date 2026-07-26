@@ -2,13 +2,21 @@ version: "1"
 
 suite:
   name: aqua (declarative CLI version manager)
+  description: |
+    [aqua](https://aquaproj.github.io/) manages CLI tools declaratively from an
+    `aqua.yaml`. Actually installing a tool needs the network and the registry,
+    so this suite pins the half that must work offline and identically every
+    time — the half a developer hits before anything is downloaded.
 
-# aqua manages CLI tools declaratively from an aqua.yaml. Installing tools needs
-# the network and the registry, so this suite pins aqua's offline, deterministic
-# surface instead: authoring a config and a policy (with their filesystem side
-# effects), the idempotence of init, the offline generators (completion,
-# root-dir), and the exit-code semantics that separate a usage error (3) from a
-# runtime error (1). Gate: only where aqua is installed.
+    What is guaranteed: authoring a config and a policy leaves exactly the files
+    it should; `aqua init` is idempotent, so re-running it does not corrupt an
+    existing config; the offline generators (shell completion, root-dir) print
+    usable output; and the exit codes keep a usage mistake (3) distinct from a
+    runtime failure (1), so a script can tell "you typed it wrong" from "it
+    broke".
+
+# Gate: only where aqua is installed. The live-install half lives in
+# install.atago.yaml.
 scenarios:
   - name: version prints without error
     only:

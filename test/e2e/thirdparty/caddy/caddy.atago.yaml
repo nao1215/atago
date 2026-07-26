@@ -2,12 +2,19 @@ version: "1"
 
 suite:
   name: caddy (self-hosted web server)
+  description: |
+    [Caddy](https://caddyserver.com/) has two faces, and both are covered here.
 
-# Exercises Caddy (https://caddyserver.com/, from awesome-selfhosted) as a
-# third-party target: pure CLI behavior (version/adapt/fmt/validate), and the
-# real server started as a background service with a TCP readiness probe and
-# queried through the http runner. Install: see
-# .github/workflows/thirdparty.yml for the pinned CI version.
+    As a CLI it is a config tool: `caddy adapt`, `fmt`, and `validate` must
+    accept a well-formed Caddyfile, normalize it predictably, and reject a
+    broken one with a diagnostic instead of starting anyway.
+
+    As a server it must actually serve. A real `caddy run` is started as a
+    background process, waited for on its port, and then queried over HTTP —
+    so what is asserted is the response a browser would get, not a log line
+    claiming the server came up.
+
+# Install: see .github/workflows/thirdparty.yml for the pinned CI version.
 
 permissions:
   network:
