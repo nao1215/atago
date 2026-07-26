@@ -2,6 +2,21 @@ version: "1"
 
 suite:
   name: yazi (third-party terminal file manager) / navigation and tabs
+  description: |
+    Moving around is what a file manager does between operations, and it has to
+    put the cursor exactly where the user believes it is — because the next
+    keystroke acts on whatever is hovered.
+
+    Arrow-key movement is therefore checked by its consequence: after moving,
+    the entry that gets chosen must be the one the user moved to. Entering and
+    leaving directories is checked the same way, including the working directory
+    reported on quit after stepping back out.
+
+    Tabs get the same treatment. Opening new tabs, switching by number, closing
+    one and returning to the previous, and reordering tabs — after which the
+    numbers must follow the new order, not the original one.
+
+    Spaced names appear throughout.
 
 scenarios:
   - name: down arrow moves to the second file before choosing

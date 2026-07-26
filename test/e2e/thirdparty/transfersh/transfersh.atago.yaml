@@ -2,19 +2,23 @@ version: "1"
 
 suite:
   name: transfer.sh (self-hosted file sharing)
+  description: |
+    [transfer.sh](https://github.com/dutchcoders/transfer.sh) takes a file and
+    gives you a URL to fetch it back from. The only guarantee that matters is
+    that what comes back is what went in.
 
-# Exercises transfer.sh (https://github.com/dutchcoders/transfer.sh, from
-# awesome-selfhosted's file-transfer corner) as a third-party target. This is
-# the suite the binary-payload spec features exist for: a PNG is uploaded as
-# the raw request body (`body_file`), the returned share URL is captured from
-# the response, the file is downloaded back to disk (`body_to`), and the
-# round-tripped bytes are verified with the image assertion target plus a
-# byte-for-byte cmp. The browser-style multipart upload path is exercised too
-# (`files:`). Install: see .github/workflows/thirdparty.yml for the pinned CI
-# version.
-#
+    So this suite tests it with binary data rather than text. A PNG is uploaded
+    as a raw request body, the share URL is captured from the response, the file
+    is downloaded back to disk, and the bytes are compared to the original —
+    both as a valid image and byte for byte. Text survives a lot of accidental
+    mangling that binary does not.
+
+    The browser-style multipart upload path is exercised as well, since that is
+    how a file arrives from a web form rather than from `curl`.
+
 # Each server scenario binds its own port so the suite runs under the default
-# scenario concurrency.
+# scenario concurrency. Install: see .github/workflows/thirdparty.yml for the
+# pinned CI version.
 
 permissions:
   network:

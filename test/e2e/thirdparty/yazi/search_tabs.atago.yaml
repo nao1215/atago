@@ -2,6 +2,18 @@ version: "1"
 
 suite:
   name: yazi (third-party terminal file manager) / search and tabs
+  description: |
+    Two things a file manager offers beyond moving files: finding them, and
+    keeping more than one place open at a time.
+
+    Content search must locate a file by what is inside it, not by its name, and
+    leave the user positioned on the match. The information panel must describe
+    the entry currently hovered — the wrong entry's details is a subtle bug,
+    since the panel still looks right.
+
+    Tabs are checked as a pair of operations that must undo each other: opening
+    a tab roots it at the current directory, and closing it returns to the
+    directory the previous tab was showing.
 
 scenarios:
   - name: uppercase S content search finds the matching file

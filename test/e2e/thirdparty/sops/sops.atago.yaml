@@ -2,15 +2,25 @@ version: "1"
 
 suite:
   name: sops + age (secrets encryption)
+  description: |
+    [sops](https://github.com/getsops/sops) encrypts the *values* in a
+    structured file while leaving its keys readable, so a secrets file stays
+    reviewable in a pull request while its contents stay secret.
 
-# sops encrypts the values of a structured file while leaving its keys readable,
-# using age as the key backend here. The suite pins the contract that matters
-# for a secrets tool: encryption hides every value but the structure, decryption
-# recovers the values, a specific field can be extracted, the wrong key cannot
-# decrypt, a single flipped byte fails the MAC (the integrity guarantee), and a
-# regex can scope which keys are encrypted. Every age key is generated fresh
-# inside the workdir (never committed) and the plaintext values are throwaway
-# placeholders. Gate: only where both sops and age are installed.
+    That split is the contract pinned here: after encryption the structure is
+    still legible and every value is hidden; after decryption the values come
+    back; and a single field can be extracted without decrypting the rest.
+
+    The negative guarantees carry equal weight. The wrong key must not decrypt.
+    And flipping one byte of the ciphertext must fail the message
+    authentication check rather than yielding subtly wrong plaintext — the
+    integrity property that separates an encrypted file from an obfuscated one.
+    A regex scoping which keys get encrypted is checked too, since a
+    misconfigured scope is how secrets end up committed in the clear.
+
+# Every age key is generated fresh inside the workdir (never committed) and the
+# plaintext values are throwaway placeholders. Gate: only where both sops and
+# age are installed.
 scenarios:
   - name: version prints a semantic version offline
     only:

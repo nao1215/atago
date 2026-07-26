@@ -11,6 +11,20 @@
   - [obscure and reveal round-trip a secret](#scenario-obscure-and-reveal-round-trip-a-secret)
   - [serve http publishes the tree over real HTTP](#scenario-serve-http-publishes-the-tree-over-real-http)
 ## rclone (self-hosted file sync program)
+[rclone](https://rclone.org/) moves files between storage backends, and the
+distinction it must never blur is copy versus sync: one adds, the other
+makes the destination match the source — including deleting what is no
+longer there. Getting that wrong destroys data, so both are pinned
+explicitly.
+
+Around them: machine-readable listings a script can parse, integrity
+checking that passes on matching trees and *fails* on a corrupted one, and
+the obscure/reveal password round trip returning the original secret.
+
+`rclone serve http` is started as a real server and queried over HTTP, so
+the serving half is proven from the outside too. Everything runs against the
+local backend, which keeps every scenario hermetic.
+
 Source: `test/e2e/thirdparty/rclone/rclone.atago.yaml`
 ### Scenario: version prints a semantic version
 #### When

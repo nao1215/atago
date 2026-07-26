@@ -2,12 +2,18 @@ version: "1"
 
 suite:
   name: jq (uncovered contracts — unicode passthrough + empty validation)
+  description: |
+    Two guarantees the main jq suite leaves untested.
 
-# Two contracts the main jq suite does not pin: multibyte unicode survives a
-# round-trip byte-exact, and `jq empty` is the canonical "validate only" idiom
-# — it consumes the document, prints nothing, and exits 0 on valid JSON but 5
-# on malformed input (the same not-JSON code the suite already relies on
-# elsewhere, here proven for the validation use-case with clean stdout).
+    First, that jq is safe for text that is not ASCII: multibyte characters must
+    survive a round trip byte for byte, with no re-encoding and no escaping
+    applied on the way through.
+
+    Second, that `jq empty` works as the validator everyone uses it as. It
+    consumes the document, prints nothing at all, and exits 0 — but exits 5 on
+    malformed input. That combination (silent on success, non-zero on garbage)
+    is what makes it usable as a JSON check in a script, and both halves are
+    pinned here.
 scenarios:
   - name: multibyte unicode passes through unchanged
     steps:

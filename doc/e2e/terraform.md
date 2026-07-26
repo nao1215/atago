@@ -10,6 +10,19 @@
   - [fmt -check exits 3 on a misformatted file](#scenario-fmt--check-exits-3-on-a-misformatted-file)
   - [a broken configuration is rejected](#scenario-a-broken-configuration-is-rejected)
 ## terraform (offline via the builtin terraform_data resource)
+Terraform's exit codes are not a detail — they are the interface CI
+pipelines are built on. `terraform plan -detailed-exitcode` answers with 0
+for "nothing to do", 2 for "there are changes", and 1 for "it failed", and a
+pipeline that confuses 2 with 1 either blocks on every change or deploys
+through every error.
+
+That three-way contract is what this suite pins, alongside the ordinary path
+through init, validate, plan, and apply.
+
+It stays entirely offline by using only Terraform's builtin
+`terraform_data` resource, so `init` downloads no providers and no network
+access is needed to run any of it.
+
 Source: `test/e2e/thirdparty/terraform/terraform.atago.yaml`
 ### Scenario: init downloads nothing and validate reports valid
 _only when `terraform version` succeeds_

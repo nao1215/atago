@@ -2,14 +2,22 @@ version: "1"
 
 suite:
   name: rclone (self-hosted file sync program)
+  description: |
+    [rclone](https://rclone.org/) moves files between storage backends, and the
+    distinction it must never blur is copy versus sync: one adds, the other
+    makes the destination match the source — including deleting what is no
+    longer there. Getting that wrong destroys data, so both are pinned
+    explicitly.
 
-# Exercises rclone (https://rclone.org/, from awesome-selfhosted's file
-# transfer corner) as a third-party target. The local backend keeps every
-# scenario hermetic: copy/sync semantics, machine-readable listings, integrity
-# checks and their failure mode, the obscure/reveal password round-trip, and
-# `rclone serve http` as a real background server queried through the http
-# runner. Install: see .github/workflows/thirdparty.yml for the pinned CI
-# version.
+    Around them: machine-readable listings a script can parse, integrity
+    checking that passes on matching trees and *fails* on a corrupted one, and
+    the obscure/reveal password round trip returning the original secret.
+
+    `rclone serve http` is started as a real server and queried over HTTP, so
+    the serving half is proven from the outside too. Everything runs against the
+    local backend, which keeps every scenario hermetic.
+
+# Install: see .github/workflows/thirdparty.yml for the pinned CI version.
 
 permissions:
   network:

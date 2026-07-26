@@ -2,11 +2,17 @@ version: "1"
 
 suite:
   name: pandoc + changes (a conversion writes exactly its output)
+  description: |
+    Converting a document should produce the converted document — and nothing
+    besides. This suite states that exactly: with the source file present as the
+    baseline, a conversion creates precisely one new file, the one named on the
+    command line.
 
-# Companion to pandoc.atago.yaml: a file-to-file conversion should touch
-# nothing but its named output. The `changes:` assert states that as an exact
-# contract — the input is a fixture (baseline), and the single created file is
-# out.html. Gate: only where pandoc is installed.
+    Anything else pandoc happened to write would fail the assertion, which is
+    what makes this a claim about its footprint rather than a check that the
+    output exists.
+
+# Gate: only where pandoc is installed.
 scenarios:
   - name: markdown-to-html creates exactly the output file
     only:

@@ -13,6 +13,15 @@
   - [markdown survives a round-trip through HTML](#scenario-markdown-survives-a-round-trip-through-html)
   - [a missing input file fails cleanly](#scenario-a-missing-input-file-fails-cleanly)
 ## pandoc + changes (a conversion writes exactly its output)
+Converting a document should produce the converted document — and nothing
+besides. This suite states that exactly: with the source file present as the
+baseline, a conversion creates precisely one new file, the one named on the
+command line.
+
+Anything else pandoc happened to write would fail the assertion, which is
+what makes this a claim about its footprint rather than a check that the
+output exists.
+
 Source: `test/e2e/thirdparty/pandoc/changes.atago.yaml`
 ### Scenario: markdown-to-html creates exactly the output file
 _only when `pandoc --version` succeeds_
@@ -34,6 +43,18 @@ pandoc in.md -o out.html
 - the step changed exactly created `out.html`, modified nothing, deleted nothing
 - file `out.html` contains `<em>emphasis</em>`
 ## pandoc (document conversion filter)
+[Pandoc](https://pandoc.org/) converts documents between formats, and it can
+be used two entirely different ways: as a file-to-file converter, or as a
+filter in a pipeline reading stdin and writing stdout.
+
+Both are pinned, because a script may depend on either, and they must agree:
+the same input converted either way must produce the same document.
+
+Beyond the rendered output, pandoc can emit its internal AST as JSON — a
+structured oracle that says what pandoc *understood* the document to be, not
+merely what it printed. Asserting on that catches a parsing regression that
+happens to render plausibly.
+
 Source: `test/e2e/thirdparty/pandoc/pandoc.atago.yaml`
 ### Scenario: markdown converts to HTML and a binary docx
 _only when `pandoc --version` succeeds_

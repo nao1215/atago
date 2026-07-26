@@ -2,17 +2,23 @@ version: "1"
 
 suite:
   name: minio (self-hosted object storage)
+  description: |
+    [MinIO](https://min.io/) is S3-compatible object storage, driven here by its
+    own `mc` client against a real server.
 
-# Exercises MinIO (https://min.io/, from awesome-selfhosted's object storage
-# corner) as a third-party target: the real S3-compatible server booted as a
-# background service per scenario, health probed over HTTP, driven end-to-end
-# with the mc client (bucket + object lifecycle, versioning, anonymous
-# policies), and the unauthenticated failure mode asserted as S3 XML. Install:
-# see .github/workflows/thirdparty.yml for the pinned CI versions.
-#
-# Each scenario binds its own port so the suite runs under the default
-# scenario concurrency. Pin MC_CONFIG_DIR under the scenario workdir so mc
-# state is isolated per scenario too.
+    What is guaranteed is the storage contract an application relies on: the
+    bucket and object lifecycle end to end, versioning keeping earlier revisions
+    retrievable rather than overwritten, and anonymous access policies actually
+    granting and denying what they say.
+
+    The unauthenticated case is checked as S3 XML, not just as a non-zero exit —
+    because a client library parses that error document, and "denied" has to
+    arrive in a form the client can understand.
+
+# Each scenario binds its own port so the suite runs under the default scenario
+# concurrency; MC_CONFIG_DIR is pinned under the scenario workdir so mc state is
+# isolated per scenario too. Install: see .github/workflows/thirdparty.yml for
+# the pinned CI versions.
 
 permissions:
   network:

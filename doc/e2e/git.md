@@ -14,6 +14,15 @@
 - [git + sandbox_home (global config in an isolated HOME)](#git--sandbox_home-global-config-in-an-isolated-home) — 1 scenario
   - [global user.name is written under the sandbox home and read back (POSIX)](#scenario-global-username-is-written-under-the-sandbox-home-and-read-back-posix)
 ## git + changes (a staged blob touches exactly index + one object)
+`git add` is documented as writing a blob and updating the index. This suite
+holds git to that literally: after initializing a repository, staging one
+file must create exactly two things on disk — the staging index, and one
+loose object under `.git/objects` — and nothing else anywhere.
+
+It is an exhaustive claim, not a spot check. Any extra file git wrote would
+fail the assertion, which is what makes it a real statement about git's
+footprint rather than a restatement of the documentation.
+
 Source: `test/e2e/thirdparty/git/changes.atago.yaml`
 ### Scenario: staging one file creates the index and a single loose object (POSIX)
 _skipped on Windows_
@@ -45,6 +54,18 @@ git init -q repo
 - exit code is `0`
 - the step changed exactly created `repo/.git/**`, modified nothing, deleted nothing
 ## git (third-party CLI, no build required)
+The proof that testing someone else's CLI takes no cooperation from it. git
+was not written with this test suite in mind, ships no hooks for it, and
+exposes nothing but a command line — and that is enough.
+
+What is guaranteed here is ordinary git as a script would meet it: a
+repository is initialized, files are staged and committed, history and
+status report the expected state, branches and tags behave, and the failure
+cases (a bad revision, a dirty tree) exit non-zero with a message.
+
+Every command uses git's own `-C`/`-c` flags instead of a shell, so this
+exact spec runs unchanged on Linux, macOS, and Windows.
+
 Source: `test/e2e/thirdparty/git/git.atago.yaml`
 ### Scenario: init creates an empty repository
 #### When
@@ -124,6 +145,16 @@ git -C repo checkout v9.9.9
   - exit code is not `0`
   - stderr contains `v9.9.9`
 ## git + sandbox_home (global config in an isolated HOME)
+`git config --global` writes to the user's home directory — the one thing a
+test must never do to the machine running it. This suite shows the
+alternative: the command runs with its home redirected inside the scenario's
+own workspace, so a genuine `--global` write happens, lands at a
+deterministic path, and disappears with the workspace.
+
+The isolated home persists across steps, not just within one: a later
+command reads the same setting back, proving it is a real home directory
+rather than a write that went nowhere.
+
 Source: `test/e2e/thirdparty/git/sandbox_home.atago.yaml`
 ### Scenario: global user.name is written under the sandbox home and read back (POSIX)
 _skipped on Windows_

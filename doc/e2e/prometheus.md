@@ -8,6 +8,20 @@
   - [the server boots from an authored config and answers the query API](#scenario-the-server-boots-from-an-authored-config-and-answers-the-query-api)
   - [a self-scrape is ingested and queryable as up == 1](#scenario-a-self-scrape-is-ingested-and-queryable-as-up--1)
 ## prometheus (self-hosted monitoring system)
+[Prometheus](https://prometheus.io/) ships as two things, and this suite
+covers both.
+
+`promtool` is an ordinary CLI: it must accept a valid configuration and
+reject an invalid one with a diagnostic, and it must be able to unit-test
+alerting rules — catching a bad alert before it reaches production rather
+than during an incident.
+
+The server is booted from an authored config and then genuinely used: its
+health endpoints answer, its query API returns JSON that can be asserted as
+structure, and a metric it scraped from itself is polled until it appears.
+That last one closes the loop — configuration, scrape, storage, and query
+all had to work for the sample to be there.
+
 Source: `test/e2e/thirdparty/prometheus/prometheus.atago.yaml`
 ### Scenario: promtool accepts a valid config and rejects a broken one
 #### Given

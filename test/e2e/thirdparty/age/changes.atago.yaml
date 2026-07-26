@@ -2,13 +2,18 @@ version: "1"
 
 suite:
   name: age + changes (single-artifact generator)
+  description: |
+    A key generator should create the key and nothing else. This companion to
+    the main age suite states that as an exact contract: `age-keygen` writes
+    precisely one file, and the rest of the filesystem — including the user's
+    home directory — is left untouched.
 
-# Companion to age.atago.yaml: age-keygen writes exactly one file and touches
-# nothing else — not even HOME. sandbox_home points HOME (and the per-OS
-# config/cache dirs) INSIDE the workdir, so a home write would surface in the
-# delta and break the exhaustive created list below — the "HOME untouched"
-# claim is enforced by the assert, not just stated in prose. Gate: only where
-# age is installed.
+    The "HOME untouched" half is enforced rather than asserted in prose.
+    `sandbox_home` moves HOME and the per-OS config/cache directories inside the
+    scenario workdir, so a stray home write would show up in the workdir delta
+    and break the exhaustive created list.
+
+# Gate: only where age is installed.
 scenarios:
   - name: age-keygen writes exactly the key file (HOME untouched)
     only:

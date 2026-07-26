@@ -2,14 +2,20 @@ version: "1"
 
 suite:
   name: fzf (third-party CLI, pty testbed)
+  description: |
+    [fzf](https://github.com/junegunn/fzf) is the archetype of a CLI you cannot
+    test by piping to it: it refuses to run without a terminal, redraws the
+    screen as you type, and is driven entirely by keystrokes.
 
-# fzf is the archetype of a TTY-dependent CLI: it refuses to run without a
-# terminal, redraws the screen, and is driven entirely by keystrokes — the
-# perfect real-world testbed for the pty runner (#20). The non-interactive
-# --filter mode pins the plain-run contract; the pty scenarios drive the real
-# finder UI with expect/send. Every scenario probes for fzf first so the suite
-# skips cleanly where it is absent; the interactive scenarios are POSIX-only
-# (the pty runner does not support Windows).
+    Both halves are covered. `fzf --filter` is a plain program with a plain
+    contract — given a query and a list on stdin, it prints the matches and
+    exits with a code that says whether anything matched. The interactive
+    scenarios run the real finder inside a pseudo-terminal and drive it the way
+    a person does: type to narrow the list, move the selection, press Enter, and
+    assert on what fzf finally printed.
+
+# Every scenario probes for fzf first so the suite skips cleanly where it is
+# absent; the interactive scenarios are POSIX-only.
 scenarios:
   - name: version prints a semantic version
     only:

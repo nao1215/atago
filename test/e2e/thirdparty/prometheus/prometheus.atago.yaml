@@ -2,16 +2,24 @@ version: "1"
 
 suite:
   name: prometheus (self-hosted monitoring system)
+  description: |
+    [Prometheus](https://prometheus.io/) ships as two things, and this suite
+    covers both.
 
-# Exercises Prometheus (https://prometheus.io/, from awesome-selfhosted's
-# monitoring corner) as a third-party target: promtool as a pure CLI (config
-# validation both ways, plus unit-testing alerting rules), and the real server
-# booted from an authored config — health endpoints, the query API as JSON,
-# and a self-scrape polled with http retry until the sample is ingested.
+    `promtool` is an ordinary CLI: it must accept a valid configuration and
+    reject an invalid one with a diagnostic, and it must be able to unit-test
+    alerting rules — catching a bad alert before it reaches production rather
+    than during an incident.
+
+    The server is booted from an authored config and then genuinely used: its
+    health endpoints answer, its query API returns JSON that can be asserted as
+    structure, and a metric it scraped from itself is polled until it appears.
+    That last one closes the loop — configuration, scrape, storage, and query
+    all had to work for the sample to be there.
+
 # Install (prebuilt release; `go install` is blocked by replace directives):
-#   see .github/workflows/thirdparty.yml for the download-and-unpack step
-#
-# Each server scenario binds its own port so the suite runs under the default
+# see .github/workflows/thirdparty.yml for the download-and-unpack step. Each
+# server scenario binds its own port so the suite runs under the default
 # scenario concurrency.
 
 permissions:

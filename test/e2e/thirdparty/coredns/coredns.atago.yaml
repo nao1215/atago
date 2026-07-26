@@ -2,18 +2,24 @@ version: "1"
 
 suite:
   name: coredns (self-hosted DNS server)
+  description: |
+    [CoreDNS](https://coredns.io/) speaks DNS, a protocol atago has no runner
+    for — which is exactly why this suite exists. A protocol you cannot address
+    directly is still testable through the client everybody already has: the
+    real server is booted from an authored Corefile and zone file, and `dig`
+    asks it real questions.
 
-# Exercises CoreDNS (https://coredns.io/, from awesome-selfhosted's DNS
-# corner) as a third-party target — a protocol atago has no built-in runner
-# for, which is the point: the real server is booted from an authored Corefile
-# and zone file, queried with the stock `dig` client over actual DNS (A, TXT,
-# CNAME chasing, NXDOMAIN, and the REFUSED answer for out-of-zone names), and
-# its health plugin is probed through the http runner. Install: see
-# .github/workflows/thirdparty.yml for the pinned CI version.
-# (`dig` ships with bind9-dnsutils, preinstalled on GitHub runners.)
-#
-# Each server scenario binds its own port so the suite runs under the default
-# scenario concurrency.
+    What is guaranteed: A and TXT records resolve to the authored values, a
+    CNAME is chased to its target, a name that does not exist comes back
+    NXDOMAIN rather than empty-but-successful, and a name outside the served
+    zone is REFUSED instead of answered. The health plugin is checked over HTTP
+    alongside, so "the process is up" and "the resolver is correct" are pinned
+    separately.
+
+# `dig` ships with bind9-dnsutils, preinstalled on GitHub runners. Each server
+# scenario binds its own port so the suite runs under the default scenario
+# concurrency. Install: see .github/workflows/thirdparty.yml for the pinned CI
+# version.
 
 permissions:
   network:

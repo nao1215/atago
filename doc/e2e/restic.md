@@ -11,6 +11,21 @@
   - [forget --keep-last 1 --prune drops the older snapshot](#scenario-forget---keep-last-1---prune-drops-the-older-snapshot)
   - [the wrong password cannot unlock the repository](#scenario-the-wrong-password-cannot-unlock-the-repository)
 ## restic (self-hosted backup program)
+A backup tool is only worth anything if the restore works, so this suite
+follows [restic](https://restic.net/) through the entire lifecycle rather
+than stopping at "the backup succeeded".
+
+A repository is initialized, real data is backed up, snapshots are listed as
+JSON, and the data is restored — and the restored files are compared against
+the originals. Beyond that: `diff` between snapshots reports what actually
+changed, the integrity check passes on a healthy repository, and retention
+policies remove the snapshots they say they will and keep the rest.
+
+The wrong password must fail. For an encrypted backup that is not an error
+path but the core guarantee: without the password the data is not
+recoverable, and that is asserted here as deliberately as the successful
+restore.
+
 Source: `test/e2e/thirdparty/restic/restic.atago.yaml`
 ### Scenario: version prints a semantic version
 #### When

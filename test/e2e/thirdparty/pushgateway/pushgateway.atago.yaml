@@ -2,14 +2,20 @@ version: "1"
 
 suite:
   name: pushgateway (self-hosted metrics gateway)
+  description: |
+    [Pushgateway](https://github.com/prometheus/pushgateway) exists so that a
+    job too short-lived to be scraped can push its metrics somewhere Prometheus
+    will find them later.
 
-# Exercises Prometheus Pushgateway (from awesome-selfhosted's monitoring
-# corner) as a third-party target. Its push API takes the raw text exposition
-# format — the workload the http step's `body:` payload exists for. Install:
-# see .github/workflows/thirdparty.yml for the pinned CI version.
-#
-# Each scenario binds its own port so the suite runs under the default
-# scenario concurrency.
+    Its API is unusual in that the payload is not JSON but Prometheus's own
+    plain-text exposition format, sent as a raw request body. This suite pushes
+    real metrics that way and then reads them back from the gateway's own
+    endpoint — so what is asserted is that the gateway stored and re-exposed the
+    samples, in the format a Prometheus scrape would consume.
+
+# Each scenario binds its own port so the suite runs under the default scenario
+# concurrency. Install: see .github/workflows/thirdparty.yml for the pinned CI
+# version.
 
 permissions:
   network:

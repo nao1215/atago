@@ -2,15 +2,27 @@ version: "1"
 
 suite:
   name: ecspresso (Amazon ECS deploy tool)
+  description: |
+    [ecspresso](https://github.com/kayac/ecspresso) deploys ECS services, which
+    needs AWS — but everything that decides *what* gets deployed happens locally
+    first. `ecspresso render` evaluates a task and service definition without
+    touching a cluster, and that is the surface pinned here: the step where a
+    mistake becomes a bad deploy.
 
-# ecspresso deploys ECS services, which needs AWS — but its render subcommand
-# evaluates a task/service definition locally, so this suite pins that offline,
-# deterministic surface: template functions and their defaults, jsonnet with
-# external variables, config resolution, and the failure modes (an undefined
-# must_env, a missing config file) with their distinct exit codes. The rendered
-# task definition is checked as structured JSON. Gate: only where ecspresso is
-# installed. ecspresso logs a version line to stderr on every run, so stderr is
-# not asserted empty on success.
+    What is guaranteed: template functions expand to the documented values and
+    fall back to their defaults when unset; jsonnet definitions resolve with
+    external variables supplied; config paths resolve as documented; and the
+    failure modes stay loud and distinct — an undefined `must_env` and a missing
+    config file each fail with their own exit code rather than rendering
+    something half-substituted.
+
+    The rendered task definition is asserted as structured JSON, so a
+    reformatting change cannot break the suite while a semantic change slips
+    through.
+
+# ecspresso logs a version line to stderr on every run, so stderr is not
+# asserted empty on success. Gate: only where ecspresso is installed. The live
+# deploy half lives in deploy.atago.yaml.
 scenarios:
   - name: version prints without error
     only:

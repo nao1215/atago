@@ -11,6 +11,21 @@
   - [a tampered ciphertext fails the MAC](#scenario-a-tampered-ciphertext-fails-the-mac)
   - [an encrypted-regex scopes which keys are encrypted](#scenario-an-encrypted-regex-scopes-which-keys-are-encrypted)
 ## sops + age (secrets encryption)
+[sops](https://github.com/getsops/sops) encrypts the *values* in a
+structured file while leaving its keys readable, so a secrets file stays
+reviewable in a pull request while its contents stay secret.
+
+That split is the contract pinned here: after encryption the structure is
+still legible and every value is hidden; after decryption the values come
+back; and a single field can be extracted without decrypting the rest.
+
+The negative guarantees carry equal weight. The wrong key must not decrypt.
+And flipping one byte of the ciphertext must fail the message
+authentication check rather than yielding subtly wrong plaintext — the
+integrity property that separates an encrypted file from an obfuscated one.
+A regex scoping which keys get encrypted is checked too, since a
+misconfigured scope is how secrets end up committed in the clear.
+
 Source: `test/e2e/thirdparty/sops/sops.atago.yaml`
 ### Scenario: version prints a semantic version offline
 _only when `sops --version --disable-version-check` succeeds_

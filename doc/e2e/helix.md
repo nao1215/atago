@@ -25,6 +25,16 @@
   - [unicode filenames and Japanese text save without mangling](#scenario-unicode-filenames-and-japanese-text-save-without-mangling)
   - [wide and combining characters round-trip through a save](#scenario-wide-and-combining-characters-round-trip-through-a-save)
 ## helix (third-party modal editor)
+[Helix](https://helix-editor.com/) is a modal text editor, driven here as a
+person drives it: the real TUI is launched in a terminal, keys are typed in
+normal and insert mode, and commands are issued at the prompt.
+
+What is asserted is what survives the editor — the file on disk. A save
+must write the edited text; a quit-without-saving must leave the original
+untouched; and a multi-file workflow must put each change in the right file.
+Full-screen snapshots are deliberately avoided: they break when a status bar
+changes, while "did the edit land?" is the contract that actually matters.
+
 Source: `test/e2e/thirdparty/helix/helix.atago.yaml`
 ### Scenario: version prints the pinned release
 _only when `hx --version` succeeds_

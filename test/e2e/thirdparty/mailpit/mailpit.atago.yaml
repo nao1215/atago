@@ -2,16 +2,21 @@ version: "1"
 
 suite:
   name: mailpit (self-hosted email testing server)
+  description: |
+    [Mailpit](https://mailpit.axllent.org/) catches email so it can be
+    inspected, and testing it means using two protocols at once: mail goes in
+    over SMTP and comes back out over HTTP.
 
-# Exercises Mailpit (https://mailpit.axllent.org/, from awesome-selfhosted's
-# email corner) as a third-party target — a protocol pairing nothing else in
-# this directory covers: real messages are delivered over SMTP with the stock
-# curl client (smtp://), then asserted through Mailpit's REST API — capture,
-# full-text search, MIME attachments, and mailbox teardown. Install: see
-# .github/workflows/thirdparty.yml for the pinned CI version.
-#
+    Messages are delivered by the stock `curl` client speaking real SMTP — no
+    library shim, no injected fixture — and everything after that is asserted
+    through Mailpit's REST API: that the message was captured with its headers
+    and body intact, that full-text search finds it, that a MIME attachment
+    survives as a distinct part, and that clearing the mailbox really empties
+    it.
+
 # Each scenario binds its own SMTP+HTTP port pair so the suite runs under the
-# default scenario concurrency.
+# default scenario concurrency. Install: see .github/workflows/thirdparty.yml
+# for the pinned CI version.
 
 permissions:
   network:

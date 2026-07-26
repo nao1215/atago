@@ -2,18 +2,23 @@ version: "1"
 
 suite:
   name: nats (self-hosted messaging system)
+  description: |
+    [NATS](https://nats.io/) is a message broker, which makes it the one
+    workload here that needs two live participants to mean anything.
 
-# Exercises NATS (https://nats.io/, from awesome-selfhosted's messaging
-# corner) as a third-party target — a messaging workload unlike anything else
-# in this directory: the real broker runs as a background service and is
-# driven with the official nats CLI through request/reply (a second background
-# service answers), JetStream persistence (stream create → publish → counted
-# state → purge), and the JetStream KV store, while the monitoring endpoint is
-# asserted through the http runner. Install: see
-# .github/workflows/thirdparty.yml for the pinned CI versions.
-#
-# Each scenario binds its own port so the suite runs under the default
-# scenario concurrency.
+    Request/reply is tested with a real responder: a second background process
+    subscribes and answers, so a request is proven to have reached something and
+    come back — not merely to have been accepted by the broker.
+
+    JetStream, the persistence layer, is followed through its whole cycle:
+    create a stream, publish into it, read the stream's state back and count
+    what is stored, then purge it and confirm the count fell. The key-value
+    store built on top is exercised the same way, and the broker's monitoring
+    endpoint is checked over HTTP alongside.
+
+# Each scenario binds its own port so the suite runs under the default scenario
+# concurrency. Install: see .github/workflows/thirdparty.yml for the pinned CI
+# versions.
 
 permissions:
   network:

@@ -2,17 +2,24 @@ version: "1"
 
 suite:
   name: ntfy (self-hosted push notification service)
+  description: |
+    [ntfy](https://ntfy.sh/) sends push notifications over plain HTTP, which
+    means anything that can make a request can publish — and that is both its
+    appeal and the reason its access control matters.
 
-# Exercises ntfy (https://ntfy.sh/, from awesome-selfhosted's notification
-# corner) as a third-party target: publish/subscribe push notifications over
-# plain HTTP — publishing with headers (title, priority, tags), polling the
-# JSON feed, topic isolation, the bundled CLI publishing against the same
-# server, and access control (deny-all default, user + grant via the admin
-# CLI, then authorized publish). Install (prebuilt release; `go install` is
-# blocked by replace directives):
-#   see .github/workflows/thirdparty.yml for the download-and-verify step
-#
-# Each server scenario binds its own port so the suite runs under the default
+    The publish path is pinned with its metadata intact: a notification's title,
+    priority, and tags must survive as sent and come back on the JSON feed.
+    Topics must stay isolated, so a subscriber to one topic never sees another's
+    messages. The bundled CLI is exercised against the same server as the raw
+    HTTP client, so the two agree.
+
+    Access control gets the same treatment as the happy path: with a deny-all
+    default in place, publishing is refused; after a user is created and granted
+    access through the admin CLI, the same publish succeeds.
+
+# Install (prebuilt release; `go install` is blocked by replace directives):
+# see .github/workflows/thirdparty.yml for the download-and-verify step. Each
+# server scenario binds its own port so the suite runs under the default
 # scenario concurrency.
 
 permissions:

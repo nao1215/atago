@@ -12,6 +12,11 @@
   - [a missing input file fails with a not-found error](#scenario-a-missing-input-file-fails-with-a-not-found-error)
   - [ffprobe on non-media data reports invalid input](#scenario-ffprobe-on-non-media-data-reports-invalid-input)
 ## ffmpeg + changes (single-artifact encode)
+An encode should produce the output file and no debris. Media tools are
+notorious for temporary files, and this suite pins that ffmpeg leaves none:
+a synthesized encode creates exactly one file in the working directory, and
+the exhaustive delta names it.
+
 Source: `test/e2e/thirdparty/ffmpeg/changes.atago.yaml`
 ### Scenario: lavfi source encodes exactly one output file
 _only when `ffmpeg -version` succeeds_
@@ -23,6 +28,17 @@ ffmpeg -v error -f lavfi -i testsrc=duration=0.1:size=64x64 -y out.mp4
 - exit code is `0`
 - the step changed exactly created `out.mp4`, modified nothing, deleted nothing
 ## ffmpeg / ffprobe (media pipeline)
+A whole media pipeline in one suite: [ffmpeg](https://ffmpeg.org/)
+synthesizes a video, ffprobe describes it, and a frame is extracted back out
+of it.
+
+What is guaranteed is the thing a media tool must not get wrong — that the
+bytes it produced are really the media it claims. ffprobe's JSON is checked
+as structure (codec, duration, dimensions), and the extracted frame is
+verified as an actual image: its format, its pixel dimensions, and its
+similarity to the expected picture. A file that exists and has a plausible
+size is not enough.
+
 Source: `test/e2e/thirdparty/ffmpeg/ffmpeg.atago.yaml`
 ### Scenario: lavfi synthesizes a video file
 _only when `ffmpeg -version` succeeds_

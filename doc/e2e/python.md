@@ -13,6 +13,15 @@
   - [EOF (ctrl-d) ends the session cleanly](#scenario-eof-ctrl-d-ends-the-session-cleanly)
   - [a traceback is reported and the REPL recovers](#scenario-a-traceback-is-reported-and-the-repl-recovers)
 ## python3 + changes (bytecode cache footprint)
+Running a Python script quietly writes files you did not ask for: importing a
+local module leaves a compiled `.pyc` behind in `__pycache__`, while the
+entry script itself is never cached. That asymmetry surprises people, so it
+is pinned here exactly.
+
+The paired scenario pins the escape hatch: with `PYTHONDONTWRITEBYTECODE`
+set, the same run creates nothing at all — an empty delta, which is the
+strongest form this assertion can take.
+
 Source: `test/e2e/thirdparty/python/changes.atago.yaml`
 ### Scenario: importing a local module writes exactly one .pyc
 _only when `python3 --version` succeeds_
@@ -64,6 +73,20 @@ python3 main.py
 - stdout equals an exact value
 - the step changed exactly created nothing, modified nothing, deleted nothing
 ## python3 REPL (interactive pty testbed)
+The Python REPL is the canonical long-lived interactive session: it prints a
+prompt, waits, answers, and prompts again, for as many exchanges as you
+want.
+
+That conversational shape is what this suite pins — recognizing the `>>>`
+prompt, carrying on a multi-step exchange where each answer depends on the
+last, getting a traceback back for bad input without the session dying, and
+exiting cleanly on end-of-input. Python also behaves differently when it
+detects a terminal, so that branch is exercised too.
+
+Python is on every CI image, which makes this the most portable worked
+example here of testing an interactive program — and a template to copy for
+your own REPL.
+
 Source: `test/e2e/thirdparty/python/python.atago.yaml`
 ### Scenario: version and -c contracts (non-interactive)
 _only when `python3 --version` succeeds_

@@ -2,12 +2,17 @@ version: "1"
 
 suite:
   name: git + sandbox_home (global config in an isolated HOME)
+  description: |
+    `git config --global` writes to the user's home directory — the one thing a
+    test must never do to the machine running it. This suite shows the
+    alternative: the command runs with its home redirected inside the scenario's
+    own workspace, so a genuine `--global` write happens, lands at a
+    deterministic path, and disappears with the workspace.
 
-# git --global writes to $HOME/.gitconfig. With sandbox_home the child's HOME
-# is redirected to ${workdir}/.atago-home, so the write is hermetic and the
-# result is inspectable at a deterministic path. A second sandbox_home step
-# reads the same value back — the isolated home is reused across steps.
-#
+    The isolated home persists across steps, not just within one: a later
+    command reads the same setting back, proving it is a real home directory
+    rather than a write that went nowhere.
+
 # POSIX-only: this pins the HOME-based path .atago-home/.gitconfig. On Windows
 # git resolves config through USERPROFILE (which sandbox_home also sets), but
 # the exact on-disk path was not verified here, so the scenario is gated.

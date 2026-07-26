@@ -15,6 +15,19 @@
   - [bad SQL exits 1 with the error position on stderr](#scenario-bad-sql-exits-1-with-the-error-position-on-stderr)
   - [querying a missing table names it in the diagnostics](#scenario-querying-a-missing-table-names-it-in-the-diagnostics)
 ## sqlite3 + changes (workdir-delta of a database write)
+SQLite creates side files while it works — a rollback journal by default, or
+a write-ahead log and shared-memory file in WAL mode. A process that dies
+mid-transaction leaves them behind.
+
+This suite pins the cleanup guarantee: after a `sqlite3` process exits
+normally, those files are gone — deleted or checkpointed back into the
+database — and the only thing that changed on disk is the database file
+itself. In both journal modes.
+
+That is a stronger statement than "the write worked", and it is what makes a
+leftover journal file a detectable regression rather than something nobody
+notices until a restore.
+
 Source: `test/e2e/thirdparty/sqlite3/changes.atago.yaml`
 ### Scenario: default rollback-journal mode creates exactly the db file
 #### When
@@ -33,6 +46,19 @@ sqlite3 t.db "PRAGMA journal_mode=WAL; create table x(a); insert into x values(1
 - exit code is `0`
 - the step changed exactly created `t.db`, modified nothing, deleted nothing
 ## sqlite3 (third-party CLI, no build required)
+The `sqlite3` shell driven as a user drives it — the actual binary on a
+command line, not SQLite embedded as a library.
+
+What is guaranteed: one-shot SQL passed as an argument runs and prints its
+result; the machine-readable output modes (`-json`, `-csv`) produce output a
+script can parse; the dot-commands behave as documented, so `.dump` can
+reproduce a database, `.schema` reports it, and `.import` reads a file back
+in; and bad SQL fails with a message instead of a partial result.
+
+Durability gets its own attention: data written by one invocation must still
+be there for the next one, which is the whole reason to use a file-backed
+database rather than a pipe.
+
 Source: `test/e2e/thirdparty/sqlite3/sqlite3.atago.yaml`
 ### Scenario: one-shot SQL creates, inserts, and counts in a single invocation
 #### When

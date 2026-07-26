@@ -19,6 +19,19 @@
   - [file picker returns the selected file path](#scenario-file-picker-returns-the-selected-file-path)
   - [pager shows line numbers and quits on q](#scenario-pager-shows-line-numbers-and-quits-on-q)
 ## gum (third-party shell-script TUI toolkit)
+[gum](https://github.com/charmbracelet/gum) exists to put a real interface
+on a shell script, and it has two personalities to match.
+
+Some subcommands are ordinary filters — `join`, `table`, `log`,
+`version-check` — with output a script parses; those are pinned as plain
+stdout contracts.
+
+The rest are prompts that only exist in front of a person: `choose`,
+`filter`, `confirm`, `input`, `file`, `pager`. Those are driven inside a
+pseudo-terminal with real keystrokes, because they are the reason anyone
+installs gum, and a test that skipped them would cover everything except the
+product.
+
 Source: `test/e2e/thirdparty/gum/gum.atago.yaml`
 ### Scenario: version prints the pinned semantic version
 _only when `gum --version` succeeds_

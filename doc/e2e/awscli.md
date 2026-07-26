@@ -8,6 +8,19 @@
   - [a presigned URL is fetchable without credentials](#scenario-a-presigned-url-is-fetchable-without-credentials)
   - [head-object on a missing key fails with Not Found](#scenario-head-object-on-a-missing-key-fails-with-not-found)
 ## aws-cli against MinIO (offline cloud-CLI story)
+The real AWS CLI, tested with no AWS account, no credentials that matter,
+and no network beyond loopback. A MinIO server stands in for S3 and
+`aws --endpoint-url` is pointed at it, so the actual `aws` binary performs
+actual S3 requests against a real S3-compatible server.
+
+What is guaranteed: the bucket and object lifecycle a script depends on —
+create, upload, list, download, delete — plus the machine-readable JSON
+output those scripts parse, and the failure modes that must stay
+distinguishable (a missing bucket, a missing object, bad credentials).
+
+This is the answer to "how do I test a cloud CLI in CI?": swap the endpoint,
+keep the CLI.
+
 Source: `test/e2e/thirdparty/awscli/awscli.atago.yaml`
 ### Scenario: bucket and object lifecycle round-trips byte-identically
 _only when `aws --version` succeeds_

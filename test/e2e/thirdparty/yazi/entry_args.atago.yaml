@@ -2,6 +2,23 @@ version: "1"
 
 suite:
   name: yazi (third-party terminal file manager) / entry args
+  description: |
+    Where yazi starts depends on what you pass it, and the two cases differ: a
+    directory argument opens that directory, while a file argument opens its
+    parent with the file already hovered — so it can be chosen immediately, or
+    left behind for a sibling.
+
+    Quitting must then report the right working directory. A shell wrapper uses
+    that value to cd, so reporting the file's own path, or the directory the
+    user started in rather than the one they navigated to, sends the caller to
+    the wrong place.
+
+    Several arguments open several tabs, and this suite checks that they land in
+    the given order and that switching between them by number, or by stepping to
+    the next one, selects from the tab actually in front of the user.
+
+    Spaced, hidden, and nested paths are covered throughout, since those are
+    where argument handling usually breaks.
 
 scenarios:
   - name: starting on an explicit directory writes that cwd on quit

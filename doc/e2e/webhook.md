@@ -9,6 +9,20 @@
   - [the http-methods allowlist rejects the wrong verb](#scenario-the-http-methods-allowlist-rejects-the-wrong-verb)
   - [a command that exits non-zero surfaces as a 500](#scenario-a-command-that-exits-non-zero-surfaces-as-a-500)
 ## webhook (self-hosted webhook receiver)
+[webhook](https://github.com/adnanh/webhook) turns an HTTP request into a
+command execution, which makes it a piece of security-relevant plumbing:
+everything about it is a question of what should and should not run.
+
+The happy path is verified by its effect, not its response — the triggered
+command writes a file, and that file is checked on disk.
+
+The refusals are pinned just as carefully. When a trigger rule is not
+satisfied the command must not run at all, which is asserted by the absence
+of its effect rather than by the status code. An HMAC signature is verified
+against an independently computed value, so a forged one is rejected. The
+allowed-methods list rejects the wrong verb. And a command that exits
+non-zero surfaces as a 500 instead of being reported as success.
+
 Source: `test/e2e/thirdparty/webhook/webhook.atago.yaml`
 ### Scenario: a post runs the command, returns its output, and writes its file
 #### Given

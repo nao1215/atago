@@ -9,6 +9,19 @@
   - [a JetStream stream persists, counts, and purges messages](#scenario-a-jetstream-stream-persists-counts-and-purges-messages)
   - [the JetStream KV bucket stores and serves configuration](#scenario-the-jetstream-kv-bucket-stores-and-serves-configuration)
 ## nats (self-hosted messaging system)
+[NATS](https://nats.io/) is a message broker, which makes it the one
+workload here that needs two live participants to mean anything.
+
+Request/reply is tested with a real responder: a second background process
+subscribes and answers, so a request is proven to have reached something and
+come back — not merely to have been accepted by the broker.
+
+JetStream, the persistence layer, is followed through its whole cycle:
+create a stream, publish into it, read the stream's state back and count
+what is stored, then purge it and confirm the count fell. The key-value
+store built on top is exercised the same way, and the broker's monitoring
+endpoint is checked over HTTP alongside.
+
 Source: `test/e2e/thirdparty/nats/nats.atago.yaml`
 ### Scenario: the binary reports its version
 #### When

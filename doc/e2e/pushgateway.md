@@ -9,6 +9,16 @@
   - [POST merges into a group while PUT replaces it](#scenario-post-merges-into-a-group-while-put-replaces-it)
   - [a grouping label decorates every metric in the group](#scenario-a-grouping-label-decorates-every-metric-in-the-group)
 ## pushgateway (self-hosted metrics gateway)
+[Pushgateway](https://github.com/prometheus/pushgateway) exists so that a
+job too short-lived to be scraped can push its metrics somewhere Prometheus
+will find them later.
+
+Its API is unusual in that the payload is not JSON but Prometheus's own
+plain-text exposition format, sent as a raw request body. This suite pushes
+real metrics that way and then reads them back from the gateway's own
+endpoint — so what is asserted is that the gateway stored and re-exposed the
+samples, in the format a Prometheus scrape would consume.
+
 Source: `test/e2e/thirdparty/pushgateway/pushgateway.atago.yaml`
 ### Scenario: a pushed metric appears on the scrape endpoint
 #### Given

@@ -170,6 +170,21 @@
   - [block shell command creates a symlink to a spaced filename](#scenario-block-shell-command-creates-a-symlink-to-a-spaced-filename)
   - [block shell command creates a symlink to a spaced directory](#scenario-block-shell-command-creates-a-symlink-to-a-spaced-directory)
 ## yazi (third-party terminal file manager) / chooser selection
+Used as a file chooser, yazi's job is to hand a shell script the paths the
+user picked. The rule that matters — and the one easiest to get wrong — is
+that an explicit selection beats whatever the cursor happens to be sitting
+on. A user who selects three files and then moves the cursor elsewhere must
+still get those three.
+
+Every way of selecting is put through that test: pressing space on
+individual entries, sweeping a range in visual mode, selecting everything at
+once, and inverting a selection. Toggling the same entry twice must clear
+it, not select it again.
+
+Files and directories are covered separately, and so are names containing
+spaces — the classic point where a path list gets silently split into the
+wrong number of entries.
+
 Source: `test/e2e/thirdparty/yazi/chooser_selection.atago.yaml`
 ### Scenario: chooser-file writes a space-selected file instead of the hovered file
 _only when `yazi --version` succeeds · skipped on Windows_
@@ -534,6 +549,23 @@ b
 #### Then
 - file `chosen.txt` contains `/b two`
 ## yazi (third-party terminal file manager) / entry args
+Where yazi starts depends on what you pass it, and the two cases differ: a
+directory argument opens that directory, while a file argument opens its
+parent with the file already hovered — so it can be chosen immediately, or
+left behind for a sibling.
+
+Quitting must then report the right working directory. A shell wrapper uses
+that value to cd, so reporting the file's own path, or the directory the
+user started in rather than the one they navigated to, sends the caller to
+the wrong place.
+
+Several arguments open several tabs, and this suite checks that they land in
+the given order and that switching between them by number, or by stepping to
+the next one, selects from the tab actually in front of the user.
+
+Spaced, hidden, and nested paths are covered throughout, since those are
+where argument handling usually breaks.
+
 Source: `test/e2e/thirdparty/yazi/entry_args.atago.yaml`
 ### Scenario: starting on an explicit directory writes that cwd on quit
 _only when `yazi --version` succeeds · skipped on Windows_
@@ -787,6 +819,24 @@ c
 #### Then
 - file `cwd.txt` contains `/three`
 ## yazi (third-party terminal file manager) / links and overwrite
+The operations here are the ones that can lose data, so each is pinned in
+both directions.
+
+Cancelling a pending cut or copy must really cancel it: a later paste must
+do nothing, rather than quietly completing the operation the user thought
+they had abandoned.
+
+Overwriting must really overwrite. When the destination already exists, the
+forced paste has to replace it — for a file and for a whole directory
+subtree, under both copy and move — and the result on disk is checked
+afterwards, not just the absence of an error.
+
+Hardlinking is covered as its own case, since a hardlink that silently
+degrades into a copy looks identical until something writes through it.
+
+Spaced names run through all of it, being where path handling tends to
+fail.
+
 Source: `test/e2e/thirdparty/yazi/links_and_overwrite.atago.yaml`
 ### Scenario: uppercase X cancels a cut before pasting
 _only when `yazi --version` succeeds · skipped on Windows_
@@ -975,6 +1025,21 @@ stat -c '%h' 'src/two words.txt'
 - file `dst/two words.txt` contains `alpha`
 - stdout equals an exact value
 ## yazi (third-party terminal file manager) / navigation and tabs
+Moving around is what a file manager does between operations, and it has to
+put the cursor exactly where the user believes it is — because the next
+keystroke acts on whatever is hovered.
+
+Arrow-key movement is therefore checked by its consequence: after moving,
+the entry that gets chosen must be the one the user moved to. Entering and
+leaving directories is checked the same way, including the working directory
+reported on quit after stepping back out.
+
+Tabs get the same treatment. Opening new tabs, switching by number, closing
+one and returning to the previous, and reordering tabs — after which the
+numbers must follow the new order, not the original one.
+
+Spaced names appear throughout.
+
 Source: `test/e2e/thirdparty/yazi/navigation_tabs.atago.yaml`
 ### Scenario: down arrow moves to the second file before choosing
 _only when `yazi --version` succeeds · skipped on Windows_
@@ -1199,6 +1264,18 @@ a
 #### Then
 - file `cwd.txt` contains `${workdir}`
 ## yazi (third-party terminal file manager) / search and tabs
+Two things a file manager offers beyond moving files: finding them, and
+keeping more than one place open at a time.
+
+Content search must locate a file by what is inside it, not by its name, and
+leave the user positioned on the match. The information panel must describe
+the entry currently hovered — the wrong entry's details is a subtle bug,
+since the panel still looks right.
+
+Tabs are checked as a pair of operations that must undo each other: opening
+a tab roots it at the current directory, and closing it returns to the
+directory the previous tab was showing.
+
 Source: `test/e2e/thirdparty/yazi/search_tabs.atago.yaml`
 ### Scenario: uppercase S content search finds the matching file
 _only when `rg --version` succeeds · skipped on Windows_
@@ -1282,6 +1359,19 @@ b
 #### Then
 - file `cwd.txt` contains `/one`
 ## yazi (third-party terminal file manager) / selection matrix
+One rule, checked against every combination that could break it: an
+operation acts on what is selected, not on what the cursor is pointing at.
+
+Select an entry, move the cursor somewhere else, then copy, move, or delete
+— and the selected entry must be the one affected, while the entry now under
+the cursor must be left alone. Acting on the hovered file instead is the
+failure mode that quietly destroys the wrong data.
+
+The matrix runs that rule across files and directories, single entries and
+visual-mode ranges, and copy, move, and permanent delete — with spaced names
+included, since a path that splits on a space turns one operation into
+several wrong ones.
+
 Source: `test/e2e/thirdparty/yazi/selection_matrix.atago.yaml`
 ### Scenario: space-selected file is moved even when the cursor moves away
 _only when `yazi --version` succeeds · skipped on Windows_
@@ -1535,6 +1625,23 @@ c
 - dir `src/a one` does not exist
 - file `src/c three/c.txt` contains `c`
 ## yazi (third-party terminal file manager)
+[yazi](https://yazi-rs.github.io/) is a file manager, so every keystroke is
+a potential file operation. A test that only checked the screen would pass
+on a version that draws a successful copy it never performed — and on a file
+manager, that class of bug destroys data.
+
+So both are asserted throughout: what the terminal displays, and what
+actually happened on disk afterwards.
+
+This suite covers the core interactions — hidden files staying hidden until
+toggled, live filtering narrowing the list, creating files and directories,
+renaming exactly one entry and nothing else, yank/paste and cut/paste
+between directories, and permanent deletion including the case where the
+confirmation is declined and the file must survive.
+
+The remaining yazi suites break out selection semantics, entry arguments,
+navigation and tabs, search, and hardlinks and overwrites.
+
 Source: `test/e2e/thirdparty/yazi/yazi.atago.yaml`
 ### Scenario: version prints a semantic version banner
 _only when `yazi --version` succeeds_

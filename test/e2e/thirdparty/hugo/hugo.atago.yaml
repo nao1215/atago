@@ -2,14 +2,24 @@ version: "1"
 
 suite:
   name: hugo (scaffold + build CLI, tree-snapshot testbed)
+  description: |
+    [Hugo](https://gohugo.io/) is a scaffolder and a build tool in one binary,
+    and both produce their result as a directory tree rather than as output on
+    stdout.
 
-# hugo is scaffolding + build + serve in one binary (#22). `hugo new site`
-# generates a directory tree — the exact workload that motivates recursive
-# dir assertions and directory-tree snapshots (#25) — and `hugo --minify`
-# builds files worth asserting on. The server half lives in
-# hugo_server.atago.yaml. Every scenario probes for hugo first so the suite
-# skips cleanly where it is absent.
-# Install: see .github/workflows/thirdparty.yml for the pinned CI version.
+    That shape is what this suite is about. `hugo new site` must generate the
+    documented layout — the whole tree, asserted against a committed snapshot,
+    so an unexpected new file or a silently dropped one both show up. `hugo
+    --minify` must then turn content into a built site whose files exist and
+    contain what they should.
+
+    A generator is only trustworthy if the shape of what it generates is
+    trustworthy, which is why the assertion is the tree, not a spot check on one
+    file.
+
+# The server half lives in hugo_server.atago.yaml. Every scenario probes for
+# hugo first so the suite skips cleanly where it is absent. Install: see
+# .github/workflows/thirdparty.yml for the pinned CI version.
 scenarios:
   - name: new site scaffolds the documented directory tree
     only:

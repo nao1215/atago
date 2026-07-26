@@ -16,6 +16,18 @@
   - [invalid JSON input fails loudly and keeps stdout clean](#scenario-invalid-json-input-fails-loudly-and-keeps-stdout-clean)
   - [streaming several documents produces one result per document](#scenario-streaming-several-documents-produces-one-result-per-document)
 ## jq (uncovered contracts — unicode passthrough + empty validation)
+Two guarantees the main jq suite leaves untested.
+
+First, that jq is safe for text that is not ASCII: multibyte characters must
+survive a round trip byte for byte, with no re-encoding and no escaping
+applied on the way through.
+
+Second, that `jq empty` works as the validator everyone uses it as. It
+consumes the document, prints nothing at all, and exits 0 — but exits 5 on
+malformed input. That combination (silent on success, non-zero on garbage)
+is what makes it usable as a JSON check in a script, and both halves are
+pinned here.
+
 Source: `test/e2e/thirdparty/jq/extra.atago.yaml`
 ### Scenario: multibyte unicode passes through unchanged
 #### Inputs
@@ -55,6 +67,16 @@ jq empty
   - stdout is empty
   - stderr contains `parse error`
 ## jq (third-party CLI, no build required)
+[jq](https://jqlang.github.io/jq/) is a filter: JSON in on stdin, JSON out
+on stdout, and an exit code that tells the calling script what happened.
+
+That exit-code contract is unusually rich, and it is what this suite pins,
+because a shell pipeline depends on it: 0 when the filter ran, 1 when `-e`
+saw a false or null result, 2 for a usage or system error, 3 for a program
+that does not compile, and 5 when the input was not valid JSON at all. Four
+different kinds of "it didn't work", each of which a script may need to
+handle differently — and each of which must not be confused for the others.
+
 Source: `test/e2e/thirdparty/jq/jq.atago.yaml`
 ### Scenario: identity filter echoes the document from stdin
 #### Inputs

@@ -2,12 +2,17 @@ version: "1"
 
 suite:
   name: python3 + changes (bytecode cache footprint)
+  description: |
+    Running a Python script quietly writes files you did not ask for: importing a
+    local module leaves a compiled `.pyc` behind in `__pycache__`, while the
+    entry script itself is never cached. That asymmetry surprises people, so it
+    is pinned here exactly.
 
-# Companion to python.atago.yaml, pinning the filesystem side effect of an
-# import with the `changes:` assert. Importing a local module writes a compiled
-# __pycache__/*.pyc; the entry script itself is never cached. A paired scenario
-# proves PYTHONDONTWRITEBYTECODE=1 suppresses the cache entirely (created: [] —
-# the run touches nothing). Gate: only where python3 is installed.
+    The paired scenario pins the escape hatch: with `PYTHONDONTWRITEBYTECODE`
+    set, the same run creates nothing at all — an empty delta, which is the
+    strongest form this assertion can take.
+
+# Gate: only where python3 is installed.
 scenarios:
   - name: importing a local module writes exactly one .pyc
     only:

@@ -10,6 +10,20 @@
   - [an unknown command reports ERR without killing the server](#scenario-an-unknown-command-reports-err-without-killing-the-server)
   - [SHUTDOWN NOSAVE stops the server and PING starts failing](#scenario-shutdown-nosave-stops-the-server-and-ping-starts-failing)
 ## redis (server + client, signal-step testbed)
+Redis ships a server and a client together, so one suite can cover a whole
+round trip: start the server, wait for it to actually be ready, talk to it,
+and shut it down.
+
+Readiness is checked two ways — by the log line the server prints and by the
+port accepting connections — because those can disagree, and a test that
+starts sending commands too early is flaky rather than wrong.
+
+`redis-cli` has a crisp contract worth pinning: when its output is a pipe
+rather than a terminal it prints raw values (`PONG`, `OK`, bare integers),
+which is exactly what a script parses. Shutdown is the other end of the
+lifecycle: the server is asked to stop and is then polled until it really
+stops answering.
+
 Source: `test/e2e/thirdparty/redis/redis.atago.yaml`
 ### Scenario: server boots (log readiness) and answers PING
 _only when `redis-server --version && redis-cli --version` succeeds · skipped on Windows_

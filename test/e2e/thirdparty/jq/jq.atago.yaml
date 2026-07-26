@@ -2,12 +2,18 @@ version: "1"
 
 suite:
   name: jq (third-party CLI, no build required)
+  description: |
+    [jq](https://jqlang.github.io/jq/) is a filter: JSON in on stdin, JSON out
+    on stdout, and an exit code that tells the calling script what happened.
 
-# jq is the first pure text-processing tool in the third-party matrix: a
-# filter program driven almost entirely by stdin, with a documented exit-code
-# contract (0 ok, 1 for false/null under -e, 2 for usage/system errors, 3 for
-# a program that does not compile, 5 when the input is not valid JSON). That
-# contract is exactly what atago's exit_code / stdout / stderr targets pin.
+    That exit-code contract is unusually rich, and it is what this suite pins,
+    because a shell pipeline depends on it: 0 when the filter ran, 1 when `-e`
+    saw a false or null result, 2 for a usage or system error, 3 for a program
+    that does not compile, and 5 when the input was not valid JSON at all. Four
+    different kinds of "it didn't work", each of which a script may need to
+    handle differently — and each of which must not be confused for the others.
+
+# The unicode and `jq empty` contracts live in extra.atago.yaml.
 scenarios:
   - name: identity filter echoes the document from stdin
     steps:
