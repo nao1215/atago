@@ -4746,7 +4746,7 @@ _skipped on Windows_
 ```
 #### Then
 - exit code is `0`
-- stdout contains `^[[B`
+- stdout contains `^[[B`, `^_`, `^[[45;5u`
 - exit code is `130`
 ### Scenario: an unknown key name is a load-time error listing the vocabulary
 #### Given

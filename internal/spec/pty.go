@@ -58,8 +58,9 @@ type PTYAction struct {
 	// Send writes to the terminal: a scalar string verbatim (the empty string
 	// sends EOF/^D; ${name} expansion applies) or {key: <name>} for a named
 	// key (#26) — enter, tab, esc, arrows, f1-f12, ctrl-a..ctrl-z, and common
-	// control-key aliases like ctrl-space / ctrl-[ / ctrl-_ — so sessions stay
-	// readable instead of embedding \x1b escapes.
+	// control-key aliases like ctrl-space / ctrl-[ / ctrl-_ plus terminal key
+	// events like ctrl-hyphen — so sessions stay readable instead of embedding
+	// \x1b escapes.
 	Send *PTYSend `yaml:"send,omitempty"`
 	// ExpectScreen waits until the CURRENT rendered screen (the transcript
 	// replayed through the same vt10x emulator as a top-level `screen:` assert)
@@ -149,8 +150,10 @@ func (p PTYSend) MarshalYAML() (any, error) {
 // f5..f12=\x1b[15~,[17~..[21~,[23~,[24~, ctrl-a..ctrl-z=0x01..0x1a,
 // plus the punctuation aliases terminals conventionally expose for the
 // remaining C0 controls: ctrl-space/ctrl-@=NUL, ctrl-[=ESC, ctrl-\=FS,
-// ctrl-]=GS, ctrl-^=RS, ctrl-_/ctrl-hyphen/ctrl-minus=US. ctrl-d therefore
-// stays the readable alias for the empty-send EOF rule.
+// ctrl-]=GS, ctrl-^=RS, ctrl-_=US. For modifier combos whose physical key does
+// not have a stable legacy C0 byte (e.g. Ctrl+-), use the terminal's CSI-u key
+// event instead so modern TUIs like Yazi see the intended modified key. ctrl-d
+// therefore stays the readable alias for the empty-send EOF rule.
 var ptyKeySequences = func() map[string]string {
 	m := map[string]string{
 		"enter":     "\r",
@@ -190,8 +193,10 @@ var ptyKeySequences = func() map[string]string {
 	m["ctrl-]"] = "\x1d"
 	m["ctrl-^"] = "\x1e"
 	m["ctrl-_"] = "\x1f"
-	m["ctrl-hyphen"] = "\x1f"
-	m["ctrl-minus"] = "\x1f"
+	// xterm/kitty CSI-u for Ctrl+- (#286): raw 0x1f is Ctrl+_ and does not
+	// trigger TUIs that bind the physical hyphen key as a distinct modified key.
+	m["ctrl-hyphen"] = "\x1b[45;5u"
+	m["ctrl-minus"] = "\x1b[45;5u"
 	return m
 }()
 
@@ -215,6 +220,7 @@ var ptyKeyBySequence = func() map[string]string {
 	m["\x1d"] = "ctrl-]"
 	m["\x1e"] = "ctrl-^"
 	m["\x1f"] = "ctrl-_"
+	m["\x1b[45;5u"] = "ctrl-hyphen"
 	for _, name := range []string{
 		"enter", "tab", "esc", "space", "backspace", "delete",
 		"up", "down", "right", "left", "home", "end",
@@ -237,7 +243,7 @@ func PTYKeyForSequence(seq string) (string, bool) {
 
 // PTYKeyNames lists the vocabulary for error messages, compactly.
 func PTYKeyNames() string {
-	return "enter, tab, esc, space, backspace, delete, up, down, left, right, home, end, pageup, pagedown, f1-f12, ctrl-a..ctrl-z, ctrl-space/ctrl-@, ctrl-[, ctrl-\\\\, ctrl-], ctrl-^, ctrl-_/ctrl-hyphen/ctrl-minus"
+	return "enter, tab, esc, space, backspace, delete, up, down, left, right, home, end, pageup, pagedown, f1-f12, ctrl-a..ctrl-z, ctrl-space/ctrl-@, ctrl-[, ctrl-\\\\, ctrl-], ctrl-^, ctrl-_, ctrl-hyphen/ctrl-minus"
 }
 
 // Bytes resolves the send payload to the bytes written to the terminal: the

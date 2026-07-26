@@ -1,0 +1,257 @@
+version: "1"
+
+suite:
+  name: yazi (third-party terminal file manager) / links and overwrite
+
+scenarios:
+  - name: uppercase X cancels a cut before pasting
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: src/move-me.txt, content: keep}
+      - fixture: {file: dst/keep.txt, content: keep}
+      - pty:
+          command: yazi src
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "move-me.txt"
+            - send: "x"
+            - send: "X"
+            - send: "h"
+            - expect: "src"
+            - send: "k"
+            - expect: "dst"
+            - send: "l"
+            - send: "p"
+            - expect_screen:
+                contains: "keep.txt"
+                not_contains: "move-me.txt"
+                stable_for: 100ms
+            - send: "Q"
+      - assert: {file: {path: src/move-me.txt, contains: keep}}
+      - assert: {file: {path: dst/move-me.txt, exists: false}}
+      - assert: {file: {path: dst/keep.txt, contains: keep}}
+
+  - name: uppercase Y cancels a copy before pasting
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: src/copy-me.txt, content: keep}
+      - fixture: {file: dst/keep.txt, content: keep}
+      - pty:
+          command: yazi src
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "copy-me.txt"
+            - send: "y"
+            - send: "Y"
+            - send: "h"
+            - expect: "src"
+            - send: "k"
+            - expect: "dst"
+            - send: "l"
+            - send: "p"
+            - expect_screen:
+                contains: "keep.txt"
+                not_contains: "copy-me.txt"
+                stable_for: 100ms
+            - send: "Q"
+      - assert: {file: {path: src/copy-me.txt, contains: keep}}
+      - assert: {file: {path: dst/copy-me.txt, exists: false}}
+      - assert: {file: {path: dst/keep.txt, contains: keep}}
+
+  - name: uppercase P overwrites an existing spaced file during copy
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: src/two words.txt, content: src}
+      - fixture: {file: dst/two words.txt, content: dst}
+      - pty:
+          command: yazi src
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "two words.txt"
+            - send: "y"
+            - send: "h"
+            - expect: "src"
+            - send: "k"
+            - expect: "dst"
+            - send: "l"
+            - expect: "two words.txt"
+            - send: "P"
+            - expect_screen:
+                contains: two words.txt
+                stable_for: 100ms
+            - send: "Q"
+      - assert: {file: {path: dst/two words.txt, contains: src}}
+
+  - name: uppercase P overwrites an existing spaced file during move
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: src/two words.txt, content: src}
+      - fixture: {file: dst/two words.txt, content: dst}
+      - pty:
+          command: yazi src
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "two words.txt"
+            - send: "x"
+            - send: "h"
+            - expect: "src"
+            - send: "k"
+            - expect: "dst"
+            - send: "l"
+            - expect: "two words.txt"
+            - send: "P"
+            - expect_screen:
+                contains: two words.txt
+                stable_for: 100ms
+            - send: "Q"
+      - assert: {file: {path: dst/two words.txt, contains: src}}
+      - assert: {file: {path: src/two words.txt, exists: false}}
+
+  - name: uppercase P overwrites an existing directory subtree during copy
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: src/sub/a.txt, content: src}
+      - fixture: {file: dst/src/sub/a.txt, content: dst}
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "dst"
+            - send: "j"
+            - expect: "src"
+            - send: "y"
+            - send: "k"
+            - expect: "dst"
+            - send: "l"
+            - expect: "src"
+            - send: "P"
+            - expect_screen:
+                contains: src
+                stable_for: 100ms
+            - send: "Q"
+      - assert: {file: {path: dst/src/sub/a.txt, contains: src}}
+
+  - name: uppercase P overwrites an existing directory subtree during move
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: src/sub/a.txt, content: src}
+      - fixture: {file: dst/src/sub/a.txt, content: dst}
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "dst"
+            - send: "j"
+            - expect: "src"
+            - send: "x"
+            - send: "k"
+            - expect: "dst"
+            - send: "l"
+            - expect: "src"
+            - send: "P"
+            - expect_screen:
+                contains: src
+                stable_for: 100ms
+            - send: "Q"
+      - assert: {file: {path: dst/src/sub/a.txt, contains: src}}
+      - assert: {dir: {path: src, exists: false}}
+
+  - name: ctrl-hyphen hardlinks a hovered file into a sibling directory
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: src/alpha.txt, content: alpha}
+      - fixture: {file: dst/keep.txt, content: keep}
+      - pty:
+          command: yazi src
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "alpha.txt"
+            - send: "y"
+            - send: "h"
+            - expect: "src"
+            - send: "k"
+            - expect: "dst"
+            - send: "l"
+            - expect: "keep.txt"
+            - send: {key: ctrl-hyphen}
+            - expect_screen:
+                contains: alpha.txt
+                stable_for: 100ms
+            - send: "Q"
+      - assert: {file: {path: dst/alpha.txt, contains: alpha}}
+      - run: {command: stat -c '%h' src/alpha.txt}
+      - assert: {stdout: {equals: "2"}}
+
+  - name: ctrl-minus hardlinks a spaced file into a sibling directory
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: src/two words.txt, content: alpha}
+      - fixture: {file: dst/keep.txt, content: keep}
+      - pty:
+          command: yazi src
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "two words.txt"
+            - send: "y"
+            - send: "h"
+            - expect: "src"
+            - send: "k"
+            - expect: "dst"
+            - send: "l"
+            - expect: "keep.txt"
+            - send: {key: ctrl-minus}
+            - expect_screen:
+                contains: two words.txt
+                stable_for: 100ms
+            - send: "Q"
+      - assert: {file: {path: dst/two words.txt, contains: alpha}}
+      - run: {command: stat -c '%h' 'src/two words.txt'}
+      - assert: {stdout: {equals: "2"}}

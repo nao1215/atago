@@ -37,6 +37,7 @@
 | [Record an interactive session instead of scripting it](cookbook.md#record-an-interactive-session-instead-of-scripting-it) | `atago record --pty`, secrets become `${env:...}` |
 | [Refresh snapshots when output legitimately changes](cookbook.md#refresh-snapshots-when-output-legitimately-changes) | `atago snapshot update`, `scrub:`, git-reviewable goldens |
 | [Pin the final TUI frame with a screen snapshot](cookbook.md#pin-the-final-tui-frame-with-a-screen-snapshot) | `screen:` line/contains asserts and snapshots, `rows:`/`cols:` |
+| [Wait for a live TUI frame before quitting](cookbook.md#wait-for-a-live-tui-frame-before-quitting) | `expect_screen:` + `stable_for` on the live rendered frame |
 | [Pin the version and completion contracts](cookbook.md#pin-the-version-and-completion-contracts) | `matches:` on `--version`, completion output |
 | [Simulate API failures offline](cookbook.md#simulate-api-failures-offline) | `mock_servers:` error routes, `mock:` call counting |
 | [Test a download command offline](cookbook.md#test-a-download-command-offline) | mock route body, `equals_file` byte compare |

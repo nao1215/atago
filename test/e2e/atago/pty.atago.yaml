@@ -65,7 +65,9 @@ scenarios:
       os: windows
     steps:
       # An arrow key received by `cat -v` renders as ^[[B — proof the named
-      # key (#26) transmitted the real xterm sequence.
+      # key (#26) transmitted the real xterm sequence. ctrl-_ stays the raw
+      # US control byte, while ctrl-hyphen emits the CSI-u modified-key event
+      # modern TUIs use for the physical Ctrl+- key.
       - pty:
           command: cat -v
           timeout: 10s
@@ -73,11 +75,20 @@ scenarios:
             - send: { key: down }
             - send: { key: enter }
             - expect: '\^\[\[B'
+            - send: { key: ctrl-_ }
+            - send: { key: enter }
+            - expect: '\^_'
+            - send: { key: ctrl-hyphen }
+            - send: { key: enter }
+            - expect: '\^\[\[45;5u'
             - send: { key: ctrl-d }
       - assert:
           exit_code: 0
           stdout:
-            contains: "^[[B"
+            contains:
+              - "^[[B"
+              - "^_"
+              - "^[[45;5u"
       # ctrl-c delivers a real SIGINT to the foreground process group.
       - pty:
           shell: true

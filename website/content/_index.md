@@ -57,7 +57,7 @@ The first spec comes from a real run: `atago record -- <command>` executes the t
 
 ## Real terminals, not faked pipes
 
-A `pty:` step runs the command in a real pseudo-terminal — on Windows too (ConPTY) — and drives it with declarative expect/send pairs and named keys, no `expect(1)` scripting. That includes punctuation control aliases such as `ctrl-space`, `ctrl-[`, and `ctrl-hyphen`, which matter for real TUIs. `expect_screen:` waits on the LIVE rendered frame while the program is still running; `screen:` asserts the final rendered frame after cursor movement and clears are applied, and screen snapshots pin full TUI layouts. TTY-detection branches, wizards, REPLs, htop-style dashboards: all of it is spec-able.
+A `pty:` step runs the command in a real pseudo-terminal — on Windows too (ConPTY) — and drives it with declarative expect/send pairs and named keys, no `expect(1)` scripting. That includes control-byte aliases such as `ctrl-space`, `ctrl-[`, and `ctrl-_`, plus modified key events like `ctrl-hyphen` for TUIs that distinguish the physical `Ctrl+-` key. `expect_screen:` waits on the LIVE rendered frame while the program is still running; `screen:` asserts the final rendered frame after cursor movement and clears are applied, and screen snapshots pin full TUI layouts. TTY-detection branches, wizards, REPLs, htop-style dashboards: all of it is spec-able.
 
 ## The name
 

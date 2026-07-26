@@ -621,6 +621,9 @@ func TestPTYKeyForSequence(t *testing.T) {
 	if name, ok := PTYKeyForSequence("\x1f"); !ok || name != "ctrl-_" {
 		t.Errorf("\\x1f reverse = (%q, %v), want ctrl-_", name, ok)
 	}
+	if name, ok := PTYKeyForSequence("\x1b[45;5u"); !ok || name != "ctrl-hyphen" {
+		t.Errorf("CSI-u ctrl-hyphen reverse = (%q, %v), want ctrl-hyphen", name, ok)
+	}
 	if name, ok := PTYKeyForSequence("\x1b[A"); !ok || name != "up" {
 		t.Errorf("up-arrow reverse = (%q, %v), want up", name, ok)
 	}

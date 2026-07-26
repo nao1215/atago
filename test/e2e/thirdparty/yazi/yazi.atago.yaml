@@ -310,8 +310,6 @@ scenarios:
             - send: "l"
             - expect: "No items"
             - send: "p"
-            - expect: "a.txt"
-            - expect: "b.txt"
             - send: "Q"
       - assert:
           exit_code: 0

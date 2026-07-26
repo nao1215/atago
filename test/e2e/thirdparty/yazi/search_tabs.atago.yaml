@@ -1,0 +1,110 @@
+version: "1"
+
+suite:
+  name: yazi (third-party terminal file manager) / search and tabs
+
+scenarios:
+  - name: uppercase S content search finds the matching file
+    only: {command: rg --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: alpha.txt, content: alpha}
+      - fixture: {file: beta.txt, content: needle}
+      - fixture: {file: gamma.txt, content: gamma}
+      - pty:
+          command: yazi --chooser-file ${workdir}/chosen.txt .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "alpha.txt"
+            - send: "S"
+            - expect_screen:
+                contains: "Search via rg:"
+                stable_for: 100ms
+            - send: "needle"
+            - send: {key: enter}
+            - expect_screen:
+                contains: beta.txt
+                stable_for: 100ms
+            - send: {key: enter}
+      - assert: {file: {path: chosen.txt, contains: "beta.txt"}}
+
+  - name: tab shows file information for the hovered file
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: alpha.txt, content: alpha}
+      - pty:
+          command: yazi .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "alpha.txt"
+            - send: {key: tab}
+            - expect_screen:
+                contains:
+                  - alpha.txt
+                  - alpha
+                stable_for: 100ms
+            - send: "q"
+
+  - name: tt opens a new tab rooted at the current cwd
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: alpha.txt, content: a}
+      - pty:
+          command: yazi --cwd-file ${workdir}/cwd.txt .
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "alpha.txt"
+            - send: "t"
+            - send: "t"
+            - expect_screen:
+                contains: alpha.txt
+                stable_for: 100ms
+            - send: "q"
+      - assert: {file: {path: cwd.txt, contains: "${workdir}"}}
+
+  - name: ctrl-c closes the current tab and returns to the previous tab cwd
+    only: {command: yazi --version}
+    skip: {os: windows}
+    steps:
+      - fixture: {file: one/a.txt, content: a}
+      - fixture: {file: two/b.txt, content: b}
+      - pty:
+          command: yazi --cwd-file ${workdir}/cwd.txt one two
+          shell: true
+          rows: 24
+          cols: 100
+          timeout: 20s
+          clear_env: true
+          pass_env: [PATH]
+          sandbox_home: true
+          session:
+            - expect: "a.txt"
+            - send: "]"
+            - expect_screen:
+                contains: b.txt
+                not_contains: a.txt
+                stable_for: 100ms
+            - send: {key: ctrl-c}
+            - expect_screen:
+                contains: a.txt
+                not_contains: b.txt
+                stable_for: 100ms
+            - send: "q"
+      - assert: {file: {path: cwd.txt, contains: "/one"}}

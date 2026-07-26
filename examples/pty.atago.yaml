@@ -65,8 +65,9 @@ scenarios:
     steps:
       # {key: <name>} presses a named key (#26) instead of embedding raw
       # \x1b escape bytes: enter, tab, esc, space, backspace, delete, the
-      # arrows, home/end, pageup/pagedown, f1-f12, ctrl-a..ctrl-z, and common
-      # control aliases such as ctrl-space, ctrl-[, and ctrl-hyphen.
+      # arrows, home/end, pageup/pagedown, f1-f12, ctrl-a..ctrl-z, control-byte
+      # aliases such as ctrl-space / ctrl-[ / ctrl-_, and modified key events
+      # such as ctrl-hyphen for apps that care about the physical Ctrl+- key.
       # {key: ctrl-d} is the readable alias for the empty-send EOF rule.
       # `cat -v` renders control bytes visibly, so the down arrow it received
       # shows up as ^[[B in the transcript.
