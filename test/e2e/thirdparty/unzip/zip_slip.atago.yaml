@@ -1,0 +1,136 @@
+version: "1"
+
+suite:
+  name: unzip (path traversal in a hostile archive)
+  description: |
+    An archive is untrusted input: the names inside it come from whoever built
+    it. The attack known as zip slip stores an entry called `../escaped.txt` (or
+    an absolute `/etc/passwd`) so that a careless extractor writes outside the
+    directory the user chose.
+
+    `unzip` refuses to. It strips the traversal, says so, extracts the entry
+    under the destination anyway, and reports the warning exit code 1 rather than
+    a silent 0. This suite pins all four parts of that contract, and proves the
+    filesystem claim rather than trusting the message: the destination's tree is
+    asserted exhaustively with `dir:`, and `changes:` states that the workdir
+    around the destination gained nothing.
+
+    The hostile archives cannot be produced by `zip` itself, which never stores a
+    traversing name, so each is written by the spec as base64 — bytes authored
+    here, not a sample taken from anywhere.
+
+scenarios:
+  - name: a traversing entry is stripped and lands inside the destination
+    skip: {os: windows}
+    only:
+      command: unzip -v
+    steps:
+      # An archive holding three entries: "../escaped.txt", "/abs.txt", and a
+      # well-behaved "good.txt".
+      - fixture:
+          file: hostile.zip
+          base64: "UEsDBBQAAAAAAFGL+1xnyqEzCAAAAAgAAAAOAAAALi4vZXNjYXBlZC50eHRFU0NBUEVEClBLAwQUAAAAAABRi/tcAxPVzwkAAAAJAAAACAAAAC9hYnMudHh0QUJTT0xVVEUKUEsDBBQAAAAAAFGL+1zNkoDgBQAAAAUAAAAIAAAAZ29vZC50eHRHT09EClBLAQIUAxQAAAAAAFGL+1xnyqEzCAAAAAgAAAAOAAAAAAAAAAAAAACAAQAAAAAuLi9lc2NhcGVkLnR4dFBLAQIUAxQAAAAAAFGL+1wDE9XPCQAAAAkAAAAIAAAAAAAAAAAAAACAATQAAAAvYWJzLnR4dFBLAQIUAxQAAAAAAFGL+1zNkoDgBQAAAAUAAAAIAAAAAAAAAAAAAACAAWMAAABnb29kLnR4dFBLBQYAAAAAAwADAKgAAACOAAAAAAA="
+      # Listing first: the archive really does carry the hostile names, so the
+      # scenario is testing what it claims to test.
+      - run: {command: unzip -l hostile.zip}
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "../escaped.txt"
+              - "/abs.txt"
+      - run:
+          sandbox_home: true
+          command: unzip hostile.zip -d dest
+      - assert:
+          # 1, not 0: the extraction completed with warnings, and a script that
+          # only checks for zero is told something happened.
+          exit_code: 1
+          # The two warnings do not share a stream: the traversal notice is part
+          # of the extraction transcript on stdout, while the absolute-path one
+          # goes to stderr. A script that watches only one of them sees half the
+          # story, which is why both are pinned.
+          stdout:
+            contains: 'skipped "../" path component(s) in ../escaped.txt'
+          stderr:
+            contains: "stripped absolute path spec from /abs.txt"
+          # Nothing appeared beside the destination, where "../" would have put
+          # it. changes: is exhaustive, so any escape fails here.
+          changes:
+            created:
+              - dest/escaped.txt
+              - dest/abs.txt
+              - dest/good.txt
+            modified: []
+            deleted: []
+      - assert:
+          # The filesystem claim, not the message: every entry landed directly
+          # under the destination, with the traversal and the leading slash gone.
+          dir:
+            path: dest
+            recursive: true
+            count: 3
+            contains: [escaped.txt, abs.txt, good.txt]
+      - assert:
+          file:
+            path: dest/escaped.txt
+            equals: "ESCAPED\n"
+
+  - name: a deeper traversal is stripped down to its basename
+    skip: {os: windows}
+    only:
+      command: unzip -v
+    steps:
+      # One entry: "../../../../tmp/pwned.txt". Every "../" is dropped and the
+      # remaining relative path is kept, so the entry lands at "tmp/pwned.txt"
+      # UNDER the destination — contained, but not flattened to its basename.
+      - fixture:
+          file: deep.zip
+          base64: "UEsDBBQAAAAAAPyL+1xAmeL/BwAAAAcAAAAZAAAALi4vLi4vLi4vLi4vdG1wL3B3bmVkLnR4dFBXTkVEIQpQSwECFAMUAAAAAAD8i/tcQJni/wcAAAAHAAAAGQAAAAAAAAAAAAAAgAEAAAAALi4vLi4vLi4vLi4vdG1wL3B3bmVkLnR4dFBLBQYAAAAAAQABAEcAAAA+AAAAAAA="
+      - fixture: {file: dest/placeholder.txt, content: "kept\n"}
+      - run:
+          sandbox_home: true
+          command: unzip -o deep.zip -d dest
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: 'skipped "../" path component(s)'
+          changes:
+            created: [dest/tmp/pwned.txt]
+            modified: []
+            deleted: []
+      - assert:
+          # The traversal is gone and the rest of the stored path is intact,
+          # entirely inside the destination.
+          dir:
+            path: dest
+            recursive: true
+            count: 2
+            contains: [tmp/pwned.txt, placeholder.txt]
+      - assert:
+          file:
+            path: dest/tmp/pwned.txt
+            equals: "PWNED!\n"
+
+  - name: unzip -t reports the hostile archive as intact
+    skip: {os: windows}
+    only:
+      command: unzip -v
+    steps:
+      # The traversal is a property of the names, not corruption: an integrity
+      # test passes and writes nothing. Testing an archive is not a safe way to
+      # find out whether extracting it is safe, and this pins that distinction.
+      - fixture:
+          file: hostile.zip
+          base64: "UEsDBBQAAAAAAFGL+1xnyqEzCAAAAAgAAAAOAAAALi4vZXNjYXBlZC50eHRFU0NBUEVEClBLAwQUAAAAAABRi/tcAxPVzwkAAAAJAAAACAAAAC9hYnMudHh0QUJTT0xVVEUKUEsDBBQAAAAAAFGL+1zNkoDgBQAAAAUAAAAIAAAAZ29vZC50eHRHT09EClBLAQIUAxQAAAAAAFGL+1xnyqEzCAAAAAgAAAAOAAAAAAAAAAAAAACAAQAAAAAuLi9lc2NhcGVkLnR4dFBLAQIUAxQAAAAAAFGL+1wDE9XPCQAAAAkAAAAIAAAAAAAAAAAAAACAATQAAAAvYWJzLnR4dFBLAQIUAxQAAAAAAFGL+1zNkoDgBQAAAAUAAAAIAAAAAAAAAAAAAACAAWMAAABnb29kLnR4dFBLBQYAAAAAAwADAKgAAACOAAAAAAA="
+      - run:
+          sandbox_home: true
+          command: unzip -t hostile.zip
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "No errors detected in compressed data"
+          changes:
+            created: []
+            modified: []
+            deleted: []

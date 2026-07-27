@@ -58,6 +58,7 @@ A browsable, repo-local index of atago's documentation, generated from repositor
 - [terraform.md](../doc/e2e/terraform.md)
 - [transfersh.md](../doc/e2e/transfersh.md)
 - [truss.md](../doc/e2e/truss.md)
+- [unzip.md](../doc/e2e/unzip.md)
 - [webhook.md](../doc/e2e/webhook.md)
 - [yazi.md](../doc/e2e/yazi.md)
 - [zstd.md](../doc/e2e/zstd.md)
