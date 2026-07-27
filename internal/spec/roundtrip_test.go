@@ -3,6 +3,7 @@ package spec
 import (
 	"math/rand"
 	"reflect"
+	"strings"
 	"testing"
 	"testing/quick"
 
@@ -101,6 +102,63 @@ func TestPTYSend_YAMLRoundTrip(t *testing.T) {
 				t.Errorf("send round-trip:\n in  = %+v\n got = %+v", in, got)
 			}
 		})
+	}
+}
+
+// TestJSONAssert_YAMLRoundTrip covers the pair `equals: null` and no `equals`
+// key at all (#309). The default struct marshal drops a null `equals` (omitempty
+// cannot see the difference between "null" and "unset"), which would rewrite a
+// null assertion as a matcher-less check the loader then rejects.
+func TestJSONAssert_YAMLRoundTrip(t *testing.T) {
+	t.Parallel()
+	cases := map[string]JSONAssert{
+		"equals null":   {Path: "$.v", EqualsSet: true},
+		"equals string": {Path: "$.v", Equals: "x"},
+		"equals number": {Path: "$.v", Equals: uint64(2)},
+		"equals bool":   {Path: "$.v", Equals: true},
+		"equals empty":  {Path: "$.v", Equals: ""},
+		"matches":       {Path: "$.v", Matches: strp("^a")},
+		"length":        {Path: "$.v", Length: intp(0)},
+		"gt":            {Path: "$.v", Gt: float64p(1.5)},
+		"lte":           {Path: "$.v", Lte: float64p(-2)},
+		"no matcher":    {Path: "$.v"}, // invalid, but must not gain one on the way out
+	}
+	for name, in := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			want := in
+			// A non-nil value implies the key: HasEquals reports both the same
+			// way, so a reloaded check carries the flag its YAML shows.
+			want.EqualsSet = in.HasEquals()
+			got := marshalReload(t, in)
+			if !reflect.DeepEqual(want, got) {
+				t.Errorf("json check round-trip:\n in  = %+v\n got = %+v", want, got)
+			}
+			if got.HasEquals() != in.HasEquals() {
+				t.Errorf("HasEquals() = %v, want %v", got.HasEquals(), in.HasEquals())
+			}
+		})
+	}
+}
+
+// TestJSONAssert_MarshalSpellsNull pins the emitted text, not just the reload:
+// the whole point is that the written spec says `equals: null` where an absent
+// matcher writes nothing.
+func TestJSONAssert_MarshalSpellsNull(t *testing.T) {
+	t.Parallel()
+	b, err := yaml.Marshal(JSONAssert{Path: "$.v", EqualsSet: true})
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if got := string(b); !strings.Contains(got, "equals: null") {
+		t.Errorf("marshaled = %q, want it to spell equals: null", got)
+	}
+	b, err = yaml.Marshal(JSONAssert{Path: "$.v"})
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if got := string(b); strings.Contains(got, "equals") {
+		t.Errorf("marshaled = %q, want no equals key at all", got)
 	}
 }
 

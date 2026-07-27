@@ -7,9 +7,10 @@ import (
 	"github.com/goccy/go-yaml"
 )
 
-func intp(i int) *int       { return &i }
-func strp(s string) *string { return &s }
-func boolp(b bool) *bool    { return &b }
+func intp(i int) *int             { return &i }
+func strp(s string) *string       { return &s }
+func boolp(b bool) *bool          { return &b }
+func float64p(f float64) *float64 { return &f }
 
 func TestStep_SetKeysAndKind(t *testing.T) {
 	t.Parallel()

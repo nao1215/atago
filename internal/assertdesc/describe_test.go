@@ -260,6 +260,31 @@ func f64ptr(f float64) *float64 { return &f }
 // TestJSONStyle_WithPrefix pins that only the path prefix changes: the YAML
 // variant of a JSON style used to be a field-by-field copy, so a field added
 // later was silently dropped from it.
+// TestDescribeJSONMatcher_EqualsNull pins that a null assertion (#309) is
+// described as the matcher it is, not as an unset one, and that the value is
+// spelled the way the document spells it rather than as a Go nil.
+func TestDescribeJSONMatcher_EqualsNull(t *testing.T) {
+	t.Parallel()
+	style := JSONStyle{
+		Prefix:  func(path string) string { return path },
+		Equals:  func(v any) string { return "== " + JSONValueText(v) },
+		Matches: func(s string) string { return "matches " + s },
+		Length:  func(n int) string { return fmt.Sprintf("length %d", n) },
+		Compare: func(op string, v any) string { return fmt.Sprintf("%s %v", op, v) },
+		Default: "is checked",
+	}
+	if got := DescribeJSONChecks(spec.JSONChecks{{Path: "$.v", EqualsSet: true}}, style); got != "$.v == null" {
+		t.Errorf("equals null = %q, want %q", got, "$.v == null")
+	}
+	// A check with no matcher at all still falls through to the default text.
+	if got := DescribeJSONChecks(spec.JSONChecks{{Path: "$.v"}}, style); got != "$.v is checked" {
+		t.Errorf("no matcher = %q, want %q", got, "$.v is checked")
+	}
+	if got := JSONValueText("x"); got != "x" {
+		t.Errorf("JSONValueText(%q) = %q, want the value unchanged", "x", got)
+	}
+}
+
 func TestJSONStyle_WithPrefix(t *testing.T) {
 	t.Parallel()
 	base := JSONStyle{

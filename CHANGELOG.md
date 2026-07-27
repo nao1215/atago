@@ -7,6 +7,20 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- `json: equals: null` now asserts that a field is null instead of being
+  rejected as a matcher-less check. A YAML null and an omitted `equals` key both
+  decode to the same Go nil, so the loader could not tell "assert this value is
+  null" from "no matcher was written" and turned the first into an error. It now
+  records which one the spec authored: `equals: null` passes only for a JSON
+  null — the string `"null"`, `0`, `false`, `""` all fail, and a path that
+  selects nothing still reports that rather than passing — while a check with no
+  `equals` key is rejected exactly as before. "This field is null" and "this
+  field is absent" are different contracts, ordinary in API output, and neither
+  could be pinned. `atago doc` and `atago explain` spell the expected value
+  `null` rather than Go's `<nil>`, matching the failure messages.
+
 ## [0.15.0] - 2026-07-27
 
 Two changes can turn a passing spec red, so read these first.

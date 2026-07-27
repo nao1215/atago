@@ -24,7 +24,7 @@ func codeList(subs spec.StringList) string {
 
 var docgenJSONStyle = assertdesc.JSONStyle{
 	Prefix:  func(path string) string { return "at " + markdown.Code(path) },
-	Equals:  func(v any) string { return "equals " + markdown.Code(fmt.Sprint(v)) },
+	Equals:  func(v any) string { return "equals " + markdown.Code(assertdesc.JSONValueText(v)) },
 	Matches: func(s string) string { return "matches " + markdown.Code("/"+s+"/") },
 	Length:  func(n int) string { return fmt.Sprintf("has length %d", n) },
 	Compare: func(op string, v any) string { return "is " + markdown.Code(fmt.Sprintf("%s %v", op, v)) },

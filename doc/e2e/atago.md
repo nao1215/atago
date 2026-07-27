@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-74 suites · 428 scenarios
+74 suites · 433 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -211,7 +211,7 @@
   - [a json list fails the inner spec when one listed path mismatches](#scenario-a-json-list-fails-the-inner-spec-when-one-listed-path-mismatches)
   - [a stdout json list against a JSON-producing command](#scenario-a-stdout-json-list-against-a-json-producing-command)
   - [a yaml list asserts several paths on one document](#scenario-a-yaml-list-asserts-several-paths-on-one-document)
-- [atago self-hosting / json matcher boundary values](#atago-self-hosting--json-matcher-boundary-values) — 14 scenarios
+- [atago self-hosting / json matcher boundary values](#atago-self-hosting--json-matcher-boundary-values) — 19 scenarios
   - [an array element is addressable by index](#scenario-an-array-element-is-addressable-by-index)
   - [a top-level array reports its length](#scenario-a-top-level-array-reports-its-length)
   - [an empty array has length zero](#scenario-an-empty-array-has-length-zero)
@@ -226,6 +226,11 @@
   - [a numeric mismatch stays unquoted](#scenario-a-numeric-mismatch-stays-unquoted)
   - [a null value is spelled null, not the Go zero value](#scenario-a-null-value-is-spelled-null-not-the-go-zero-value)
   - [a failure against a null value names it as null](#scenario-a-failure-against-a-null-value-names-it-as-null)
+  - [equals null asserts the field is null](#scenario-equals-null-asserts-the-field-is-null)
+  - [equals null rejects every value that is not null](#scenario-equals-null-rejects-every-value-that-is-not-null)
+  - [an absent path is not null either](#scenario-an-absent-path-is-not-null-either)
+  - [a json check with no matcher at all is still rejected](#scenario-a-json-check-with-no-matcher-at-all-is-still-rejected)
+  - [explain and doc describe a null assertion as one](#scenario-explain-and-doc-describe-a-null-assertion-as-one)
 - [atago self-hosting / line selector](#atago-self-hosting--line-selector) — 3 scenarios
   - [line selector narrows stdout to a single 1-based line](#scenario-line-selector-narrows-stdout-to-a-single-1-based-line)
   - [a trailing newline does not add a phantom final line](#scenario-a-trailing-newline-does-not-add-a-phantom-final-line)
@@ -4282,6 +4287,115 @@ ${atago} run nulled.atago.yaml
 - exit code is `1`
 - stdout contains `$.v = null`
 - stdout does not contain `<nil>`
+### Scenario: equals null asserts the field is null
+#### When
+```shell
+printf '{"done": null, "count": 0}'
+```
+#### Then
+- stdout at `$.done` equals `null`; at `$.count` equals `0`
+### Scenario: equals null rejects every value that is not null
+#### Given
+- Fixture file `notnull.atago.yaml` is created.
+#### Inputs
+_Fixture `notnull.atago.yaml`:_
+```text
+version: "1"
+suite: {name: notnull}
+scenarios:
+  - name: the string spelling of null
+    steps:
+      - run: {shell: true, command: 'printf ''{"v": "null"}'''}
+      - assert: {stdout: {json: {path: "$.v", equals: null}}}
+  - name: zero is not null
+    steps:
+      - run: {shell: true, command: 'printf ''{"v": 0}'''}
+      - assert: {stdout: {json: {path: "$.v", equals: null}}}
+  - name: false is not null
+    steps:
+      - run: {shell: true, command: 'printf ''{"v": false}'''}
+      - assert: {stdout: {json: {path: "$.v", equals: null}}}
+  - name: the empty string is not null
+    steps:
+      - run: {shell: true, command: 'printf ''{"v": ""}'''}
+      - assert: {stdout: {json: {path: "$.v", equals: null}}}
+```
+#### When
+```shell
+${atago} run notnull.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `0 passed, 4 failed`, `$.v == null`, `$.v = "null"`, `$.v = 0`, `$.v = false`, `$.v = ""`
+### Scenario: an absent path is not null either
+#### Given
+- Fixture file `absent.atago.yaml` is created.
+#### Inputs
+_Fixture `absent.atago.yaml`:_
+```text
+version: "1"
+suite: {name: absent}
+scenarios:
+  - name: the field is not in the document
+    steps:
+      - run: {shell: true, command: 'printf ''{"other": 1}'''}
+      - assert: {stdout: {json: {path: "$.v", equals: null}}}
+```
+#### When
+```shell
+${atago} run absent.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `selected no value`
+### Scenario: a json check with no matcher at all is still rejected
+#### Given
+- Fixture file `bare.atago.yaml` is created.
+#### Inputs
+_Fixture `bare.atago.yaml`:_
+```text
+version: "1"
+suite: {name: bare}
+scenarios:
+  - name: a path with nothing to assert
+    steps:
+      - run: {shell: true, command: 'printf ''{"v": null}'''}
+      - assert: {stdout: {json: {path: "$.v"}}}
+```
+#### When
+```shell
+${atago} run bare.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `must set one of equals/matches/length/gt/gte/lt/lte`
+### Scenario: explain and doc describe a null assertion as one
+#### Given
+- Fixture file `nullspec.atago.yaml` is created.
+#### Inputs
+_Fixture `nullspec.atago.yaml`:_
+```text
+version: "1"
+suite: {name: nullspec}
+scenarios:
+  - name: a cleared field
+    steps:
+      - run: {shell: true, command: 'printf ''{"v": null}'''}
+      - assert: {stdout: {json: {path: "$.v", equals: null}}}
+```
+#### When
+```shell
+${atago} explain nullspec.atago.yaml
+${atago} doc nullspec.atago.yaml
+```
+#### Then
+- after `${atago} explain nullspec.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `stdout JSON $.v == null`
+  - stdout does not contain `<nil>`
+- after `${atago} doc nullspec.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `equals `null``
 ## atago self-hosting / line selector
 Source: `test/e2e/atago/line.atago.yaml`
 ### Scenario: line selector narrows stdout to a single 1-based line

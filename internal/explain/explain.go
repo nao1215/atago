@@ -408,7 +408,7 @@ func describePDF(p *spec.PDFAssert) string {
 
 var explainJSONStyle = assertdesc.JSONStyle{
 	Prefix:  func(path string) string { return "JSON " + path },
-	Equals:  func(v any) string { return fmt.Sprintf("== %v", v) },
+	Equals:  func(v any) string { return "== " + assertdesc.JSONValueText(v) },
 	Matches: func(s string) string { return fmt.Sprintf("matches /%s/", s) },
 	Length:  func(n int) string { return fmt.Sprintf("length %d", n) },
 	Compare: func(op string, v any) string { return fmt.Sprintf("%s %v", op, v) },

@@ -2340,6 +2340,69 @@ func TestCheck_JSON_NullRendersAsNull(t *testing.T) {
 	}
 }
 
+// TestCheck_JSONEquals_Null covers the assertion `equals: null` enables (#309):
+// "this field is null" is a contract of its own, distinct from "this field is
+// absent" and from the string "null". The loader records the key presence;
+// here the matcher has to act on it.
+func TestCheck_JSONEquals_Null(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name    string
+		stdout  string
+		wantOK  bool
+		wantOut string // substring the failure must name
+	}{
+		{name: "a null value passes", stdout: `{"v":null}`, wantOK: true},
+		{name: "the string null fails", stdout: `{"v":"null"}`, wantOut: `$.v = "null"`},
+		{name: "zero fails", stdout: `{"v":0}`, wantOut: "$.v = 0"},
+		{name: "false fails", stdout: `{"v":false}`, wantOut: "$.v = false"},
+		{name: "the empty string fails", stdout: `{"v":""}`, wantOut: `$.v = ""`},
+		{name: "an empty object fails", stdout: `{"v":{}}`, wantOut: "$.v = "},
+		{name: "a missing field is not null", stdout: `{"other":1}`, wantOut: "selected no value"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			res := &runner.Result{Stdout: []byte(tt.stdout)}
+			// EqualsSet is what a decoded `equals: null` carries; Equals stays nil.
+			check := spec.JSONChecks{{Path: "$.v", EqualsSet: true}}
+			got := Check(&spec.Assert{Stdout: &spec.StreamAssert{JSON: check}}, res, Env{})
+			if got.OK != tt.wantOK {
+				t.Fatalf("OK = %v, want %v (hint: %s)", got.OK, tt.wantOK, got.Hint)
+			}
+			if tt.wantOK {
+				if !strings.Contains(got.Desc, "== null") {
+					t.Errorf("Desc = %q, want it to spell the expected value null", got.Desc)
+				}
+				return
+			}
+			if !strings.Contains(got.Actual+got.Hint, tt.wantOut) {
+				t.Errorf("Actual = %q / Hint = %q, want one to contain %q", got.Actual, got.Hint, tt.wantOut)
+			}
+			if strings.Contains(got.Actual, "<nil>") || strings.Contains(got.Expected, "<nil>") {
+				t.Errorf("message leaks a Go nil: Expected = %q, Actual = %q", got.Expected, got.Actual)
+			}
+		})
+	}
+}
+
+// TestCheck_JSONEquals_NullVsNoMatcher pins that the two states the loader
+// separates stay separated at run time: a check carrying only a path is still
+// reported as matcher-less rather than silently asserting null.
+func TestCheck_JSONEquals_NullVsNoMatcher(t *testing.T) {
+	t.Parallel()
+	res := &runner.Result{Stdout: []byte(`{"v":null}`)}
+	got := Check(&spec.Assert{Stdout: &spec.StreamAssert{
+		JSON: spec.JSONChecks{{Path: "$.v"}},
+	}}, res, Env{})
+	if got.OK {
+		t.Fatal("a json check with no matcher must not pass against a null value")
+	}
+	if !strings.Contains(got.Hint, "must set equals/matches/length") {
+		t.Errorf("Hint = %q, want the matcher-less hint", got.Hint)
+	}
+}
+
 // TestCheck_DirExists_OnAFilePathSaysSo pins the hint for the confusing case: a
 // path that exists as a file reported a bare "exists=false", which reads as
 // "nothing is there" and sends the author looking for output that is sitting

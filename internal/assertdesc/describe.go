@@ -47,6 +47,18 @@ func (s JSONStyle) WithPrefix(prefix func(string) string) JSONStyle {
 	return s
 }
 
+// JSONValueText renders a json/yaml matcher's expected value for prose. Go
+// prints a nil as "<nil>", which since #309 is a value a spec can legitimately
+// assert (`equals: null`), and a Go-ism in a sentence about someone else's
+// document. The failure messages already spell a JSON null the way the document
+// does; the generated docs and `explain` now agree with them.
+func JSONValueText(v any) string {
+	if v == nil {
+		return "null"
+	}
+	return fmt.Sprint(v)
+}
+
 func DescribeJSONChecks(list spec.JSONChecks, style JSONStyle) string {
 	parts := make([]string, len(list))
 	for i := range list {
@@ -57,7 +69,7 @@ func DescribeJSONChecks(list spec.JSONChecks, style JSONStyle) string {
 
 func DescribeJSONMatcher(j *spec.JSONAssert, style JSONStyle) string {
 	switch {
-	case j.Equals != nil:
+	case j.HasEquals():
 		return style.Equals(j.Equals)
 	case j.Matches != nil:
 		return style.Matches(*j.Matches)

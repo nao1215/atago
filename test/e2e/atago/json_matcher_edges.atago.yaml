@@ -214,3 +214,124 @@ scenarios:
       - assert:
           stdout:
             not_contains: "<nil>"
+
+  # `equals: null` asserts the value IS null. Both a written null and an omitted
+  # key decode to the same Go nil, so the loader records which was authored;
+  # without that, this assertion was rejected as if no matcher were set.
+  - name: equals null asserts the field is null
+    steps:
+      - run:
+          shell: true
+          command: "printf '{\"done\": null, \"count\": 0}'"
+      - assert:
+          stdout:
+            json:
+              - path: "$.done"
+                equals: null
+              - path: "$.count"
+                equals: 0
+
+  - name: equals null rejects every value that is not null
+    steps:
+      # One spec per value keeps the failure attributable: the string "null", a
+      # zero, a false, and an empty string are the values most likely to be
+      # confused with a null.
+      - fixture:
+          file: notnull.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: notnull}
+            scenarios:
+              - name: the string spelling of null
+                steps:
+                  - run: {shell: true, command: 'printf ''{"v": "null"}'''}
+                  - assert: {stdout: {json: {path: "$.v", equals: null}}}
+              - name: zero is not null
+                steps:
+                  - run: {shell: true, command: 'printf ''{"v": 0}'''}
+                  - assert: {stdout: {json: {path: "$.v", equals: null}}}
+              - name: false is not null
+                steps:
+                  - run: {shell: true, command: 'printf ''{"v": false}'''}
+                  - assert: {stdout: {json: {path: "$.v", equals: null}}}
+              - name: the empty string is not null
+                steps:
+                  - run: {shell: true, command: 'printf ''{"v": ""}'''}
+                  - assert: {stdout: {json: {path: "$.v", equals: null}}}
+      - run: {command: "${atago} run notnull.atago.yaml"}
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - "0 passed, 4 failed"
+              - "$.v == null"
+              - '$.v = "null"'
+              - "$.v = 0"
+              - "$.v = false"
+              - '$.v = ""'
+
+  - name: an absent path is not null either
+    steps:
+      # A missing field and a null field are different contracts: the missing one
+      # reports that the path selected nothing rather than passing as null.
+      - fixture:
+          file: absent.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: absent}
+            scenarios:
+              - name: the field is not in the document
+                steps:
+                  - run: {shell: true, command: 'printf ''{"other": 1}'''}
+                  - assert: {stdout: {json: {path: "$.v", equals: null}}}
+      - run: {command: "${atago} run absent.atago.yaml"}
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: "selected no value"
+
+  - name: a json check with no matcher at all is still rejected
+    steps:
+      # The other half of the contract: recording the null must not turn a
+      # matcher-less check into an accidental null assertion.
+      - fixture:
+          file: bare.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: bare}
+            scenarios:
+              - name: a path with nothing to assert
+                steps:
+                  - run: {shell: true, command: 'printf ''{"v": null}'''}
+                  - assert: {stdout: {json: {path: "$.v"}}}
+      - run: {command: "${atago} run bare.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr:
+            contains: "must set one of equals/matches/length/gt/gte/lt/lte"
+
+  - name: explain and doc describe a null assertion as one
+    steps:
+      - fixture:
+          file: nullspec.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: nullspec}
+            scenarios:
+              - name: a cleared field
+                steps:
+                  - run: {shell: true, command: 'printf ''{"v": null}'''}
+                  - assert: {stdout: {json: {path: "$.v", equals: null}}}
+      - run: {command: "${atago} explain nullspec.atago.yaml"}
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "stdout JSON $.v == null"
+      - assert:
+          stdout:
+            not_contains: "<nil>"
+      - run: {command: "${atago} doc nullspec.atago.yaml"}
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "equals `null`"
