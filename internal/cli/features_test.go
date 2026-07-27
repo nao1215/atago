@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -1128,4 +1129,50 @@ func TestRunCmd_CorruptLedgerLeftUntouchedByPlainRun(t *testing.T) {
 	if !bytes.Equal(data, garbage) {
 		t.Errorf("ledger = %q, want the unreadable bytes preserved verbatim after a green run", data)
 	}
+}
+
+// TestSpecTargets_MessagesNameWhatAtagoWasDoing pins the wording a person meets
+// when they point atago at the wrong place. A bare "stat x: no such file or
+// directory" repeats the path atago already named, and a bare "open
+// /etc/credstore: permission denied" reads as if atago wanted that file rather
+// than as a search of the directory the user named.
+func TestSpecTargets_MessagesNameWhatAtagoWasDoing(t *testing.T) {
+	t.Run("a missing target names the reason once", func(t *testing.T) {
+		var errb bytes.Buffer
+		paths, exit, ok := specTargets("atago run", []string{"no-such.atago.yaml"}, &errb)
+		if ok || paths != nil {
+			t.Fatalf("ok = %v, paths = %v, want a refusal", ok, paths)
+		}
+		if exit != ExitConfig {
+			t.Errorf("exit = %d, want %d", exit, ExitConfig)
+		}
+		got := errb.String()
+		// The reason itself is the OS's ("no such file or directory" on POSIX,
+		// "The system cannot find the file specified." on Windows); what atago
+		// controls is that the path is named once, in quotes, with no syscall
+		// wrapper repeating it.
+		if !strings.Contains(got, `cannot access "no-such.atago.yaml": `) {
+			t.Errorf("stderr = %q, want the quoted path followed by the reason", got)
+		}
+		if strings.Contains(got, "stat ") || strings.Count(got, "no-such.atago.yaml") != 1 {
+			t.Errorf("stderr = %q, want the path exactly once and no syscall noise", got)
+		}
+	})
+
+	t.Run("an empty directory says how to start", func(t *testing.T) {
+		dir := t.TempDir()
+		var errb bytes.Buffer
+		if _, _, ok := specTargets("atago doc", []string{dir}, &errb); ok {
+			t.Fatal("an empty directory must be a refusal")
+		}
+		got := errb.String()
+		// The target is quoted, so a Windows path appears with escaped
+		// separators — compare against the quoted form rather than the raw one.
+		if !strings.Contains(got, "no *.atago.yaml") || !strings.Contains(got, strconv.Quote(dir)) {
+			t.Errorf("stderr = %q, want the searched target named", got)
+		}
+		if !strings.Contains(got, "atago init") {
+			t.Errorf("stderr = %q, want a pointer to `atago init`", got)
+		}
+	})
 }

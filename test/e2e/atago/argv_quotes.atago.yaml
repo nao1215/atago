@@ -17,13 +17,15 @@ scenarios:
     steps:
       # The command carries a single-quoted '{"k":"v"}'. After tokenization the
       # inner double quotes must be preserved literally and the single quotes
-      # stripped, so atago receives the JSON as one argument on every OS.
+      # stripped, so atago receives the JSON as one argument on every OS. The
+      # error quotes the argument it could not use, so the inner quotes appear
+      # escaped — which is exactly the proof that they survived.
       - run:
           command: "${atago} run '{\"k\":\"v\"}'"
       - assert:
           exit_code: 3
           stderr:
-            contains: '{"k":"v"}'
+            contains: '{\"k\":\"v\"}'
 
   - name: a single-quoted argument with a space stays one argument
     steps:

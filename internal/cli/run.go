@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -491,10 +492,32 @@ func specTargets(label string, args []string, stderr io.Writer) (paths []string,
 		return nil, ExitConfig, false
 	}
 	if len(paths) == 0 {
-		fmt.Fprintf(stderr, "%s: no *.atago.yaml (or *.atago.yml) files found\n", label)
+		fmt.Fprintf(stderr, "%s: no *.atago.yaml (or *.atago.yml) files found in %s; run `atago init` to scaffold one\n",
+			label, quotedList(targets))
 		return nil, ExitConfig, false
 	}
 	return paths, ExitOK, true
+}
+
+// statReason strips the syscall wrapper off a stat error so a message that has
+// already named the path does not repeat it: "no such file or directory"
+// rather than "stat specs/: no such file or directory".
+func statReason(err error) error {
+	var pe *fs.PathError
+	if errors.As(err, &pe) {
+		return pe.Err
+	}
+	return err
+}
+
+// quotedList renders the targets a subcommand was given, for a message about
+// all of them.
+func quotedList(targets []string) string {
+	parts := make([]string, len(targets))
+	for i, t := range targets {
+		parts[i] = strconv.Quote(t)
+	}
+	return strings.Join(parts, ", ")
 }
 
 // collectSpecFiles resolves run targets into a deduplicated list of spec files.
@@ -521,7 +544,10 @@ func collectSpecFiles(targets []string) ([]string, error) {
 
 		info, err := os.Stat(t)
 		if err != nil {
-			return nil, fmt.Errorf("cannot access %q: %w", t, err)
+			// os.Stat's error repeats the path and prefixes the syscall
+			// ("stat x: no such file or directory"), which reads as noise next
+			// to the path atago already named. Keep the reason only.
+			return nil, fmt.Errorf("cannot access %q: %w", t, statReason(err))
 		}
 		if !info.IsDir() {
 			add(filepath.Clean(t))
@@ -538,7 +564,11 @@ func collectSpecFiles(targets []string) ([]string, error) {
 func walkSpecDir(dir string, add func(string)) error {
 	return filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
-			return err
+			// Say what atago was doing when it hit this. A bare
+			// "open /etc/credstore: permission denied" reads as if atago
+			// wanted that file, when it was searching a directory the user
+			// named for spec files.
+			return fmt.Errorf("cannot search %q for spec files: %w", dir, err)
 		}
 		if d.IsDir() {
 			return nil

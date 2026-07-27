@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-74 suites · 426 scenarios
+74 suites · 428 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -246,7 +246,7 @@
 - [atago self-hosting / list](#atago-self-hosting--list) — 2 scenarios
   - [list surfaces suites, scenarios, tags, and gates](#scenario-list-surfaces-suites-scenarios-tags-and-gates)
   - [list --json is a stable machine contract](#scenario-list---json-is-a-stable-machine-contract)
-- [atago self-hosting / loader rejects malformed specs](#atago-self-hosting--loader-rejects-malformed-specs) — 15 scenarios
+- [atago self-hosting / loader rejects malformed specs](#atago-self-hosting--loader-rejects-malformed-specs) — 17 scenarios
   - [an empty scenario list is rejected](#scenario-an-empty-scenario-list-is-rejected)
   - [a wrong version string is rejected](#scenario-a-wrong-version-string-is-rejected)
   - [an unknown top-level field is rejected with its position](#scenario-an-unknown-top-level-field-is-rejected-with-its-position)
@@ -262,6 +262,8 @@
   - [an absolute changes glob is rejected as not workdir-relative](#scenario-an-absolute-changes-glob-is-rejected-as-not-workdir-relative)
   - [the inline stdin form is a scalar, not a mapping key](#scenario-the-inline-stdin-form-is-a-scalar-not-a-mapping-key)
   - [a wrong-typed exit_code is rejected with its position and excerpt](#scenario-a-wrong-typed-exit_code-is-rejected-with-its-position-and-excerpt)
+  - [a missing target names the reason without syscall noise](#scenario-a-missing-target-names-the-reason-without-syscall-noise)
+  - [an empty directory says how to create a first spec](#scenario-an-empty-directory-says-how-to-create-a-first-spec)
 - [atago self-hosting / manifest](#atago-self-hosting--manifest) — 2 scenarios
   - [manifest emits a stable JSON summary without running the spec](#scenario-manifest-emits-a-stable-json-summary-without-running-the-spec)
   - [manifest does not execute the spec's commands](#scenario-manifest-does-not-execute-the-specs-commands)
@@ -511,7 +513,7 @@ ${atago} run '{"k":"v"}'
 ```
 #### Then
 - exit code is `3`
-- stderr contains `{"k":"v"}`
+- stderr contains `{\"k\":\"v\"}`
 ### Scenario: a single-quoted argument with a space stays one argument
 #### When
 ```shell
@@ -4782,6 +4784,25 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `[8:22]`, `exit_code must be an integer`, `exit_code: zero`
+### Scenario: a missing target names the reason without syscall noise
+#### When
+```shell
+${atago} run no-such-spec.atago.yaml
+```
+#### Then
+- exit code is `3`
+- stderr contains `cannot access "no-such-spec.atago.yaml": `
+- stderr does not contain `stat no-such-spec`
+### Scenario: an empty directory says how to create a first spec
+#### When
+```shell
+mkdir specs
+${atago} run specs
+```
+#### Then
+- after `${atago} run specs`:
+  - exit code is `3`
+  - stderr contains `no *.atago.yaml`, `specs`, `atago init`
 ## atago self-hosting / manifest
 Source: `test/e2e/atago/manifest.atago.yaml`
 ### Scenario: manifest emits a stable JSON summary without running the spec
