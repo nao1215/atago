@@ -1,0 +1,343 @@
+version: "1"
+
+suite:
+  name: Ghostscript (PostScript and PDF pipeline)
+  description: |
+    [Ghostscript](https://www.ghostscript.com/) turns PostScript into PDF, PDF
+    into text, and PDF into raster images. Its output is the kind a test usually
+    gives up on — a binary document — so this suite asserts the document itself:
+    page count, the text really inside it, and the Info-dictionary metadata,
+    with `pdf:`; and the rasterized page with `image:`.
+
+    The relationships are pinned, not just single outputs: selecting one page of
+    a two-page document yields exactly that page's text and not the other's,
+    merging two documents yields the sum of their pages, and converting the same
+    input twice yields the same extracted text. The input PostScript is written
+    by the spec, so nothing third-party is committed.
+
+    One honest surprise is recorded as a scenario: a failed conversion still
+    leaves a PDF behind. That is Ghostscript's behavior, not a recommendation.
+
+# Gate: only where Ghostscript is installed.
+scenarios:
+  - name: PostScript becomes a PDF with the pages and text it declared
+    only:
+      command: gs --version
+    steps:
+      - fixture:
+          file: doc.ps
+          content: |
+            %!PS-Adobe-3.0
+            /Helvetica findfont 24 scalefont setfont
+            72 720 moveto (Quarterly earnings report) show
+            showpage
+            /Helvetica findfont 18 scalefont setfont
+            72 700 moveto (Appendix and totals) show
+            showpage
+      - run:
+          sandbox_home: true
+          command: gs -q -dNOPAUSE -dBATCH -sDEVICE=pdfwrite -o out.pdf doc.ps
+      - assert:
+          exit_code: 0
+          # Exactly one new file, the input untouched, nothing in the sandboxed HOME.
+          changes:
+            created: [out.pdf]
+            modified: []
+            deleted: []
+      - assert:
+          pdf:
+            path: out.pdf
+            pages: 2
+      - assert:
+          pdf:
+            path: out.pdf
+            text:
+              contains:
+                - "Quarterly earnings report"
+                - "Appendix and totals"
+
+  - name: a DOCINFO pdfmark reaches the Info dictionary
+    only:
+      command: gs --version
+    steps:
+      - fixture:
+          file: doc.ps
+          content: |
+            %!PS-Adobe-3.0
+            /Helvetica findfont 24 scalefont setfont
+            72 720 moveto (Report body) show
+            showpage
+      - run:
+          shell: true
+          command: gs -q -dNOPAUSE -dBATCH -sDEVICE=pdfwrite -o titled.pdf -c "[/Title (Quarterly Report) /Author (atago) /DOCINFO pdfmark" -f doc.ps
+      - assert:
+          exit_code: 0
+          pdf:
+            path: titled.pdf
+            metadata:
+              title: Quarterly Report
+              author: atago
+      # The producer field is Ghostscript's own, and it is there whether or not
+      # the document asked for it.
+      - assert:
+          pdf:
+            path: titled.pdf
+            metadata:
+              producer: Ghostscript
+
+  # Page selection is a relationship, not a single value: the extracted text must
+  # be the selected page's and must NOT be the other page's.
+  - name: selecting one page keeps that page's text and drops the other
+    only:
+      command: gs --version
+    steps:
+      - fixture:
+          file: doc.ps
+          content: |
+            %!PS-Adobe-3.0
+            /Helvetica findfont 24 scalefont setfont
+            72 720 moveto (First page marker) show
+            showpage
+            72 720 moveto (Second page marker) show
+            showpage
+      - run:
+          command: gs -q -dNOPAUSE -dBATCH -sDEVICE=pdfwrite -o whole.pdf doc.ps
+      - assert:
+          exit_code: 0
+          pdf:
+            path: whole.pdf
+            pages: 2
+      - run:
+          command: gs -q -dNOPAUSE -dBATCH -sDEVICE=pdfwrite -dFirstPage=2 -dLastPage=2 -o second.pdf whole.pdf
+      - assert:
+          exit_code: 0
+          pdf:
+            path: second.pdf
+            pages: 1
+      - assert:
+          pdf:
+            path: second.pdf
+            text:
+              contains: "Second page marker"
+      - assert:
+          # Negative space: the discarded page's text is gone.
+          pdf:
+            path: second.pdf
+            text:
+              not_contains: "First page marker"
+
+  - name: merging two documents yields the sum of their pages
+    only:
+      command: gs --version
+    steps:
+      - fixture:
+          file: one.ps
+          content: |
+            %!PS-Adobe-3.0
+            /Helvetica findfont 24 scalefont setfont
+            72 720 moveto (Document one) show
+            showpage
+      - fixture:
+          file: two.ps
+          content: |
+            %!PS-Adobe-3.0
+            /Helvetica findfont 24 scalefont setfont
+            72 720 moveto (Document two page A) show
+            showpage
+            72 700 moveto (Document two page B) show
+            showpage
+      - run:
+          command: gs -q -dNOPAUSE -dBATCH -sDEVICE=pdfwrite -o one.pdf one.ps
+      - assert:
+          exit_code: 0
+          pdf:
+            path: one.pdf
+            pages: 1
+      - run:
+          command: gs -q -dNOPAUSE -dBATCH -sDEVICE=pdfwrite -o two.pdf two.ps
+      - assert:
+          exit_code: 0
+          pdf:
+            path: two.pdf
+            pages: 2
+      - run:
+          command: gs -q -dNOPAUSE -dBATCH -sDEVICE=pdfwrite -o merged.pdf one.pdf two.pdf
+      - assert:
+          exit_code: 0
+          pdf:
+            path: merged.pdf
+            pages: 3
+      - assert:
+          pdf:
+            path: merged.pdf
+            text:
+              contains:
+                - "Document one"
+                - "Document two page A"
+                - "Document two page B"
+
+  # txtwrite is the independent oracle for what the PDF really contains: it and
+  # atago's own extraction have to agree.
+  - name: txtwrite agrees with the text inside the PDF
+    only:
+      command: gs --version
+    steps:
+      - fixture:
+          file: doc.ps
+          content: |
+            %!PS-Adobe-3.0
+            /Helvetica findfont 24 scalefont setfont
+            72 720 moveto (Extractable sentence) show
+            showpage
+      - run:
+          command: gs -q -dNOPAUSE -dBATCH -sDEVICE=pdfwrite -o out.pdf doc.ps
+      - assert:
+          exit_code: 0
+          pdf:
+            path: out.pdf
+            text:
+              contains: "Extractable sentence"
+      - run:
+          command: gs -q -dNOPAUSE -dBATCH -sDEVICE=txtwrite -o extracted.txt out.pdf
+      - assert:
+          exit_code: 0
+          file:
+            path: extracted.txt
+            contains: "Extractable sentence"
+
+  - name: rasterizing a page produces an image of the requested size
+    only:
+      command: gs --version
+    steps:
+      - fixture:
+          file: doc.ps
+          content: |
+            %!PS-Adobe-3.0
+            << /PageSize [200 100] >> setpagedevice
+            /Helvetica findfont 12 scalefont setfont
+            20 50 moveto (Raster me) show
+            showpage
+      - run:
+          command: gs -q -dNOPAUSE -dBATCH -sDEVICE=pdfwrite -o out.pdf doc.ps
+      - assert:
+          exit_code: 0
+      # 72 dpi against a 200x100 point page is a 200x100 pixel raster.
+      - run:
+          command: gs -q -dNOPAUSE -dBATCH -sDEVICE=png16m -r72 -o page.png out.pdf
+      - assert:
+          exit_code: 0
+          image:
+            path: page.png
+            format: png
+            width: 200
+            height: 100
+      # Doubling the resolution doubles the raster, and the picture is not the
+      # same one at a different name.
+      - run:
+          command: gs -q -dNOPAUSE -dBATCH -sDEVICE=png16m -r144 -o page2x.png out.pdf
+      - assert:
+          exit_code: 0
+          image:
+            path: page2x.png
+            width: 400
+            height: 200
+
+  # Converting the same input twice must produce the same document. The bytes
+  # differ (a PDF embeds its creation time), so the contract is pinned where it
+  # is actually deterministic: the extracted text.
+  - name: converting the same input twice yields the same text
+    only:
+      command: gs --version
+    steps:
+      - fixture:
+          file: doc.ps
+          content: |
+            %!PS-Adobe-3.0
+            /Helvetica findfont 24 scalefont setfont
+            72 720 moveto (Deterministic content) show
+            showpage
+      - run:
+          command: gs -q -dNOPAUSE -dBATCH -sDEVICE=pdfwrite -o first.pdf doc.ps
+      - assert:
+          exit_code: 0
+      - run:
+          command: gs -q -dNOPAUSE -dBATCH -sDEVICE=pdfwrite -o second.pdf doc.ps
+      - assert:
+          exit_code: 0
+      - run:
+          command: gs -q -dNOPAUSE -dBATCH -sDEVICE=txtwrite -o first.txt first.pdf
+      - assert:
+          exit_code: 0
+      - run:
+          command: gs -q -dNOPAUSE -dBATCH -sDEVICE=txtwrite -o second.txt second.pdf
+      - assert:
+          exit_code: 0
+          file:
+            path: second.txt
+            equals_file: first.txt
+
+  # Ghostscript splits its failure across the streams in a way worth pinning: the
+  # diagnostic that names the file goes to stdout, and stderr carries only the
+  # one-line summary. A spec that watched stderr alone would learn nothing.
+  - name: a missing input fails, naming the file on stdout
+    only:
+      command: gs --version
+    steps:
+      - run:
+          command: gs -dNOPAUSE -dBATCH -sDEVICE=pdfwrite -o out.pdf no-such-input.ps
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - "undefinedfilename"
+              - "no-such-input.ps"
+          stderr:
+            contains: "Unrecoverable error"
+
+  # Recorded as observed, not as a recommendation: Ghostscript writes the output
+  # file before it knows the job will fail, so a broken input still leaves a
+  # one-page PDF on disk. A spec that only checked "the file exists" after a
+  # conversion would pass here.
+  - name: a failed conversion still leaves a PDF behind
+    only:
+      command: gs --version
+    steps:
+      - fixture:
+          file: broken.ps
+          content: "this is not postscript {{{\n"
+      - run:
+          command: gs -q -dNOPAUSE -dBATCH -sDEVICE=pdfwrite -o out.pdf broken.ps
+      - assert:
+          exit_code: 1
+          stderr:
+            contains: "Unrecoverable error"
+      - assert:
+          pdf:
+            path: out.pdf
+            pages: 1
+      - assert:
+          # Whatever it is, it carries none of the input.
+          pdf:
+            path: out.pdf
+            text:
+              not_contains: "this is not postscript"
+
+  - name: an unknown device is refused
+    only:
+      command: gs --version
+    steps:
+      - fixture:
+          file: doc.ps
+          content: |
+            %!PS-Adobe-3.0
+            /Helvetica findfont 24 scalefont setfont
+            72 720 moveto (body) show
+            showpage
+      - run:
+          command: gs -q -dNOPAUSE -dBATCH -sDEVICE=notadevice -o out.any doc.ps
+      - assert:
+          exit_code:
+            not: 0
+          # Same split as above: the explanation is on stdout.
+          stdout:
+            contains: "Unknown device: notadevice"

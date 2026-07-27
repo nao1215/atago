@@ -16,6 +16,14 @@ and this project follows [Semantic Versioning](https://semver.org/).
   reproducing the same commit, content-addressed identity for two identical
   commits, and the documented failures (no repository, duplicate tag, nothing
   staged) with their own exit codes.
+- Third-party suite for Ghostscript, the first real-world coverage of the `pdf:`
+  matcher: PostScript converted to PDF and asserted by page count, extracted
+  text, and Info-dictionary metadata; the rasterized page asserted with
+  `image:`; and the relationships pinned — a selected page keeps its own text
+  and drops the other, merging sums the pages, `txtwrite` agrees with the
+  extracted text, and a repeated conversion yields identical text. The failure
+  side records what Ghostscript actually does, including a failed conversion
+  that still leaves a PDF behind.
 - Third-party suite for zstd: compression round trips proven byte for byte with
   `equals_file` (including an empty file and one full of NUL bytes), the input
   kept unless `--rm` is asked for, an existing archive never silently
