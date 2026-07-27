@@ -3,6 +3,7 @@ package assert
 import (
 	"bytes"
 	"compress/zlib"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -401,6 +402,27 @@ func TestParsePDF_StreamWithoutTrailingNewline(t *testing.T) {
 		t.Errorf("pages = %d, want 2", doc.pages)
 	}
 	for _, want := range []string{"First page words", "Second page words"} {
+		if !strings.Contains(doc.text, want) {
+			t.Errorf("text = %q, want it to contain %q", doc.text, want)
+		}
+	}
+}
+
+// TestParsePDF_LengthWinsOverEndstreamInPayload pins that a declared /Length is
+// authoritative: a payload that itself contains the bytes "endstream" — drawn
+// text, or compressed data that happens to spell it — must not truncate the
+// stream.
+func TestParsePDF_LengthWinsOverEndstreamInPayload(t *testing.T) {
+	t.Parallel()
+	payload := "BT (endstream is drawn here) Tj ET BT (after the trap) Tj ET"
+	var pdf bytes.Buffer
+	pdf.WriteString("%PDF-1.4\n1 0 obj\n<< /Type /Page >>\nendobj\n")
+	fmt.Fprintf(&pdf, "2 0 obj\n<< /Length %d >>\nstream\n", len(payload))
+	pdf.WriteString(payload)
+	pdf.WriteString("\nendstream\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF\n")
+
+	doc := parsePDF(pdf.Bytes())
+	for _, want := range []string{"endstream is drawn here", "after the trap"} {
 		if !strings.Contains(doc.text, want) {
 			t.Errorf("text = %q, want it to contain %q", doc.text, want)
 		}

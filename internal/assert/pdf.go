@@ -136,11 +136,15 @@ var (
 	// not match `/Type /Pages`). Whitespace between token parts is flexible.
 	rePageObj = regexp.MustCompile(`/Type\s*/Page(?:[^s]|$)`)
 	reCount   = regexp.MustCompile(`/Count\s+(\d+)`)
+	// A stream's payload starts just after the `stream` keyword and its EOL.
+	reStreamStart = regexp.MustCompile(`stream\r?\n`)
 	// The EOL before `endstream` is recommended by ISO 32000 but not required,
 	// and real producers (Ghostscript) omit it. Requiring it made the scan run
 	// past the true end of a stream and swallow the following objects, so a
 	// document's later pages contributed no text at all.
-	reStream = regexp.MustCompile(`(?s)stream\r?\n(.*?)\r?\n?endstream`)
+	reEndStream = regexp.MustCompile(`\r?\n?endstream`)
+	// A direct (non-indirect) stream length: authoritative when present.
+	reDirectLength = regexp.MustCompile(`/Length\s+(\d+)\s*(?:/|>>)`)
 	// /Type /ObjStm marks a stream that holds document objects (PDF 1.5+), which
 	// is where a modern writer puts the Info dictionary.
 	reObjStm = regexp.MustCompile(`/Type\s*/ObjStm`)
@@ -174,16 +178,15 @@ func parsePDF(data []byte) pdfDoc {
 	// so metadata has to be looked for inside them too.
 	var text strings.Builder
 	var objectStreams [][]byte
-	for _, loc := range reStream.FindAllSubmatchIndex(data, -1) {
-		raw := data[loc[2]:loc[3]]
-		decoded := raw
-		if inflated, err := inflate(raw); err == nil {
+	for _, st := range pdfStreams(data) {
+		decoded := st.payload
+		if inflated, err := inflate(st.payload); err == nil {
 			decoded = inflated
 			// Only a stream that declares /Type /ObjStm holds document objects.
 			// Any other decompressed stream is page content, where a literal
 			// "/Title(...)" drawn on the page would otherwise be mistaken for
 			// the document's metadata.
-			if isObjectStream(data, loc[0]) {
+			if reObjStm.Match(st.dict) {
 				objectStreams = append(objectStreams, decoded)
 			}
 		}
@@ -205,19 +208,67 @@ func parsePDF(data []byte) pdfDoc {
 	return doc
 }
 
-// objStmWindow is how far back from a `stream` keyword the object's dictionary
-// is looked for. A dictionary is a short header; a window keeps the scan cheap
-// and cannot wander into the previous object's payload for any realistic PDF.
-const objStmWindow = 512
+// dictWindow is how far back from a `stream` keyword the object's dictionary is
+// looked for. A dictionary is a short header; a window keeps the scan cheap and
+// cannot wander into the previous object's payload for any realistic PDF.
+const dictWindow = 512
 
-// isObjectStream reports whether the stream starting at streamAt is declared as
-// an object stream by the dictionary that precedes it.
-func isObjectStream(data []byte, streamAt int) bool {
-	start := streamAt - objStmWindow
-	if start < 0 {
-		start = 0
+// pdfStream is one stream object: its payload and the dictionary that declared
+// it (used to tell an object stream from page content).
+type pdfStream struct {
+	dict    []byte
+	payload []byte
+}
+
+// pdfStreams walks the file and returns every stream object. The payload's end
+// comes from the dictionary's /Length when that is a direct integer, which is
+// authoritative and survives a payload that happens to contain the bytes
+// "endstream"; otherwise — a producer that writes an indirect length, as
+// Ghostscript does for page content — it falls back to the next `endstream`
+// keyword. Scanning resumes past each stream, so the keyword search can never
+// start inside a payload it has already consumed.
+func pdfStreams(data []byte) []pdfStream {
+	var out []pdfStream
+	for pos := 0; pos < len(data); {
+		loc := reStreamStart.FindIndex(data[pos:])
+		if loc == nil {
+			break
+		}
+		keywordAt := pos + loc[0]
+		payloadAt := pos + loc[1]
+		dictFrom := keywordAt - dictWindow
+		if dictFrom < 0 {
+			dictFrom = 0
+		}
+		dict := data[dictFrom:keywordAt]
+
+		end, resume := streamEnd(data, dict, payloadAt)
+		if end < 0 {
+			break
+		}
+		out = append(out, pdfStream{dict: dict, payload: data[payloadAt:end]})
+		pos = resume
 	}
-	return reObjStm.Match(data[start:streamAt])
+	return out
+}
+
+// streamEnd returns where the payload starting at payloadAt ends and where the
+// scan should resume. It prefers the declared /Length, verifying that the
+// `endstream` keyword really follows, and falls back to the keyword search.
+// (-1, 0) means no terminator was found at all.
+func streamEnd(data, dict []byte, payloadAt int) (end, resume int) {
+	if m := reDirectLength.FindSubmatch(dict); m != nil {
+		if n, err := strconv.Atoi(string(m[1])); err == nil && n >= 0 && payloadAt+n <= len(data) {
+			if tail := reEndStream.FindIndex(data[payloadAt+n:]); tail != nil && tail[0] == 0 {
+				return payloadAt + n, payloadAt + n + tail[1]
+			}
+		}
+	}
+	tail := reEndStream.FindIndex(data[payloadAt:])
+	if tail == nil {
+		return -1, 0
+	}
+	return payloadAt + tail[0], payloadAt + tail[1]
 }
 
 // readMetadata pulls the known Info fields out of buf into meta. When keepFirst
