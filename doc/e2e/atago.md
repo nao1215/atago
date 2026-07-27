@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-74 suites · 434 scenarios
+74 suites · 436 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -74,7 +74,7 @@
   - [an unsupported defaults field is a load-time error (exit 2)](#scenario-an-unsupported-defaults-field-is-a-load-time-error-exit-2)
   - [defaults.run.env merges per key and a step env wins the collisions](#scenario-defaultsrunenv-merges-per-key-and-a-step-env-wins-the-collisions)
   - [a step opts out of defaults.run.shell with an explicit shell false](#scenario-a-step-opts-out-of-defaultsrunshell-with-an-explicit-shell-false)
-- [atago self-hosting / dir assertion](#atago-self-hosting--dir-assertion) — 7 scenarios
+- [atago self-hosting / dir assertion](#atago-self-hosting--dir-assertion) — 9 scenarios
   - [directory/tree assertions cover a multi-file generator](#scenario-directorytree-assertions-cover-a-multi-file-generator)
   - [a missing directory can be asserted absent](#scenario-a-missing-directory-can-be-asserted-absent)
   - [a dangling symlink is a present directory entry (membership uses Lstat)](#scenario-a-dangling-symlink-is-a-present-directory-entry-membership-uses-lstat)
@@ -82,6 +82,8 @@
   - [a failed count assert lists the entries it counted](#scenario-a-failed-count-assert-lists-the-entries-it-counted)
   - [a failed recursive assert lists the walked tree](#scenario-a-failed-recursive-assert-lists-the-walked-tree)
   - [a dir assertion on a file path says the path is a file](#scenario-a-dir-assertion-on-a-file-path-says-the-path-is-a-file)
+  - [a named pipe in the tree does not block the walk](#scenario-a-named-pipe-in-the-tree-does-not-block-the-walk)
+  - [a file assertion on a named pipe fails instead of hanging](#scenario-a-file-assertion-on-a-named-pipe-fails-instead-of-hanging)
 - [atago self-hosting / recursive dir asserts + tree snapshots](#atago-self-hosting--recursive-dir-asserts--tree-snapshots) — 3 scenarios
   - [record, compare green, then a mutation names the changed paths](#scenario-record-compare-green-then-a-mutation-names-the-changed-paths)
   - [recursive matchers and ignore globs walk the tree](#scenario-recursive-matchers-and-ignore-globs-walk-the-tree)
@@ -1927,6 +1929,59 @@ ${atago} run mistaken.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `exists but is a regular file`, `use a file: assertion`
+### Scenario: a named pipe in the tree does not block the walk
+_skipped on Windows_
+#### Given
+- Fixture file `treespec.atago.yaml` is created.
+#### Inputs
+_Fixture `treespec.atago.yaml`:_
+```text
+version: "1"
+suite: {name: treesnap}
+scenarios:
+  - name: snapshot a tree holding a pipe
+    steps:
+      - run: {shell: true, command: "mkdir out && mkfifo out/pipe && printf 'x' > out/real.txt"}
+      - assert: {dir: {path: out, snapshot: pipe_tree}}
+```
+#### When
+```shell
+mkdir out && mkfifo out/pipe && printf 'x' > out/real.txt
+${atago} run --update-snapshots treespec.atago.yaml
+cat pipe_tree
+${atago} run treespec.atago.yaml
+```
+#### Then
+- after `mkdir out && mkfifo out/pipe && printf 'x' > out/real.txt`:
+  - dir `out` contains `pipe`, contains `real.txt`, has 1 entry, (recursive)
+- after `${atago} run --update-snapshots treespec.atago.yaml`:
+  - exit code is `0`
+- after `cat pipe_tree`:
+  - stdout contains `fifo pipe`, `file real.txt sha256:`
+- after `${atago} run treespec.atago.yaml`:
+  - exit code is `0`
+### Scenario: a file assertion on a named pipe fails instead of hanging
+_skipped on Windows_
+#### Given
+- Fixture file `piped.atago.yaml` is created.
+#### Inputs
+_Fixture `piped.atago.yaml`:_
+```text
+version: "1"
+suite: {name: piped}
+scenarios:
+  - name: the tool left a pipe where a file was expected
+    steps:
+      - run: {shell: true, command: "mkfifo out.txt"}
+      - assert: {file: {path: out.txt, equals: "data"}}
+```
+#### When
+```shell
+${atago} run piped.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `is a named pipe, not a regular file`
 ## atago self-hosting / recursive dir asserts + tree snapshots
 Source: `test/e2e/atago/dir_tree.atago.yaml`
 ### Scenario: record, compare green, then a mutation names the changed paths

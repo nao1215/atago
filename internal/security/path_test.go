@@ -2,11 +2,13 @@ package security
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 func TestResolveWorkdirPath(t *testing.T) {
@@ -120,6 +122,48 @@ func TestReadFileNoFollow(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "symlink") {
 		t.Errorf("error %q should name the refused symlink", err)
+	}
+}
+
+// TestReadFileNoFollow_RefusesANamedPipe is the hang regression: opening a named
+// pipe for reading blocks until another process writes to it, and nothing bounds
+// the assertion phase, so a program under test that left a pipe where a file was
+// expected hung the run forever instead of failing it. The refusal has to name
+// what the path is, since "could not read" alone sends the author looking for a
+// permission problem.
+func TestReadFileNoFollow_RefusesANamedPipe(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("no named pipes in the filesystem namespace on Windows")
+	}
+	bin, lookErr := exec.LookPath("mkfifo")
+	if lookErr != nil {
+		t.Skip("mkfifo not available")
+	}
+	t.Parallel()
+	pipe := filepath.Join(t.TempDir(), "pipe")
+	if out, err := exec.CommandContext(t.Context(), bin, pipe).CombinedOutput(); err != nil {
+		t.Skipf("mkfifo: %v (%s)", err, out)
+	}
+
+	type result struct {
+		data []byte
+		err  error
+	}
+	done := make(chan result, 1)
+	go func() {
+		data, err := ReadFileNoFollow(pipe)
+		done <- result{data, err}
+	}()
+	select {
+	case got := <-done:
+		if got.err == nil {
+			t.Fatalf("ReadFileNoFollow(pipe) = %q, nil; want an error", got.data)
+		}
+		if !strings.Contains(got.err.Error(), "named pipe") {
+			t.Errorf("error %q should name the entry as a named pipe", got.err)
+		}
+	case <-time.After(15 * time.Second):
+		t.Fatal("ReadFileNoFollow blocked on a named pipe; it must refuse a non-regular file instead of opening it")
 	}
 }
 

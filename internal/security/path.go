@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+
+	"github.com/nao1215/atago/internal/fskind"
 )
 
 // A user-declared path in a spec (a file assertion target, a store source, a
@@ -56,8 +58,18 @@ func resolveInRoot(field, rootLabel, root, p string) (string, error) {
 // path-taking feature enforces the same rule instead of a plain, link-following
 // os.ReadFile.
 func ReadFileNoFollow(path string) ([]byte, error) {
-	if fi, err := os.Lstat(path); err == nil && fi.Mode()&os.ModeSymlink != 0 {
-		return nil, fmt.Errorf("refusing to read through the symlink %q (it escapes the scenario root)", path)
+	if fi, err := os.Lstat(path); err == nil {
+		switch {
+		case fi.Mode()&os.ModeSymlink != 0:
+			return nil, fmt.Errorf("refusing to read through the symlink %q (it escapes the scenario root)", path)
+		case !fi.IsDir() && !fskind.Openable(fi.Mode()):
+			// Opening a named pipe for reading blocks until another process
+			// writes to it, and nothing bounds the assertion phase, so a program
+			// under test that leaves a pipe where a file was expected used to
+			// hang the whole run instead of failing it. A directory is left to
+			// os.ReadFile, whose "is a directory" error already says it.
+			return nil, fmt.Errorf("%q is a %s, not a regular file", path, fskind.Name(fi.Mode()))
+		}
 	}
 	return os.ReadFile(path) //nolint:gosec // path is containment-checked by the caller and Lstat-guarded against a leaf symlink
 }

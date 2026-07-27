@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/nao1215/atago/internal/fskind"
 	"github.com/nao1215/atago/internal/plural"
 	"github.com/nao1215/atago/internal/security"
 	"github.com/nao1215/atago/internal/spec"
@@ -251,20 +252,8 @@ func dirStatActual(info os.FileInfo, err error) string {
 
 // fileKind names what a non-directory path actually is, so a failure can say
 // "regular file" instead of leaving the author to guess why a directory
-// assertion reports the path as absent.
+// assertion reports the path as absent. The vocabulary is shared with the tree
+// manifest and the read refusals so one word means one thing everywhere.
 func fileKind(info os.FileInfo) string {
-	switch mode := info.Mode(); {
-	case mode.IsRegular():
-		return "regular file"
-	case mode&os.ModeSymlink != 0:
-		return "symlink"
-	case mode&os.ModeNamedPipe != 0:
-		return "named pipe"
-	case mode&os.ModeSocket != 0:
-		return "socket"
-	case mode&os.ModeDevice != 0:
-		return "device"
-	default:
-		return "non-directory entry"
-	}
+	return fskind.Name(info.Mode())
 }
