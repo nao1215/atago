@@ -43,6 +43,7 @@
 | [Test a download command offline](cookbook.md#test-a-download-command-offline) | mock route body, `equals_file` byte compare |
 | [Verify server state after the CLI acts](cookbook.md#verify-server-state-after-the-cli-acts) | `services:` + observer `http:` step, `status`/`header`/`body` |
 | [Send output streams to files](cookbook.md#send-output-streams-to-files) | `stdout_to:`/`stderr_to:` + file asserts |
+| [Test a TUI that keeps stdout clean](cookbook.md#test-a-tui-that-keeps-stdout-clean) | `pty:` + shell redirect: UI on stderr, only the choice on stdout |
 | [Ship binary test data with fixtures](cookbook.md#ship-binary-test-data-with-fixtures) | fixture `from:`/`base64:`/`mode:` |
 | [Test how the CLI treats symlinks](cookbook.md#test-how-the-cli-treats-symlinks) | fixture `symlink:` |
 | [Test freshness logic with fixture timestamps](cookbook.md#test-freshness-logic-with-fixture-timestamps) | fixture `mtime:` + `changes:` delta |
@@ -89,6 +90,7 @@
 | [pty](../examples/pty.atago.yaml) | interactive testing in a real pseudo-terminal: expect/send sessions, named keys (`send: {key: enter}`), TTY-detection (scenarios use POSIX-only inner commands) |
 | [pty_portable](../examples/pty_portable.atago.yaml) | the same `pty` mechanism on every OS — Linux, macOS, and Windows (ConPTY): drive a self-terminating command, match its output, assert the rendered screen |
 | [pty_screen](../examples/pty_screen.atago.yaml) | TUI testing on the RENDERED terminal screen: mid-session `expect_screen`, row-addressed final `screen:` asserts, and screen snapshots (scenarios use POSIX-only inner commands) |
+| [pty_stdout_split](../examples/pty_stdout_split.atago.yaml) | an interactive tool that draws on stderr and prints its result on stdout: `pty:` with a shell redirect, `expect_screen:` on the UI, `file:` on what the pipeline received (POSIX-only) |
 | [retry](../examples/retry.atago.yaml) | polling a command until an assertion passes |
 | [snapshot](../examples/snapshot.atago.yaml) | golden-file testing with normalized output |
 | [scrub](../examples/scrub.atago.yaml) | `scrub:` rewrites volatile output patterns (auto-increment IDs, request identifiers, epoch times) to a placeholder before a snapshot compares — the flake-killer the built-in normalizers do not cover |

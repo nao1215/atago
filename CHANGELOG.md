@@ -25,6 +25,12 @@ and this project follows [Semantic Versioning](https://semver.org/).
   reporting the cursor's JSON path, and the split that makes
   `fx data.json > picked.txt` work, with the interface on stderr and only the
   chosen value on stdout.
+- `examples/pty_stdout_split.atago.yaml` and a matching cookbook recipe for that
+  last pattern: an interactive tool whose UI goes to stderr while stdout carries
+  the result. One pty step with a shell redirect asserts both sides — the
+  interface through `expect_screen:`/`screen:`, and what the pipeline received
+  through a `file:` assert, including the empty file that proves nothing of the
+  UI leaked.
 
 ## [0.16.0] - 2026-07-27
 

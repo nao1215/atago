@@ -1,0 +1,111 @@
+version: "1"
+
+# A pty step and a shell redirect in the same command: the pattern for an
+# interactive tool that draws its interface on stderr and reserves stdout for
+# the value it was asked to produce. `mytool pick > chosen.txt` is a real
+# workflow for such a tool — the user sees the UI on the terminal, and the
+# pipeline behind it receives only the choice.
+#
+# Both halves are asserted in one step. `shell: true` makes `>` a redirect;
+# `expect_screen:` reads the rendered terminal, so it still sees an interface
+# that stdout no longer carries; and a `file:` assert afterwards states exactly
+# what reached the pipeline — including the empty file when the user quits
+# without choosing, which is how a spec says "none of the UI leaked".
+#
+# The stand-in below is a shell script rather than a real TUI so the example
+# runs anywhere; a real one behaves the same way from the outside. POSIX-only
+# like every pty example. Runs green as-is on Linux/macOS:
+#   atago run examples/pty_stdout_split.atago.yaml
+
+suite:
+  name: pty stdout split
+
+scenarios:
+  - name: the picker paints on stderr and prints only the choice
+    skip:
+      os: windows
+    steps:
+      # The menu goes to stderr (>&2), the choice to stdout — which is
+      # redirected into chosen.txt for the whole group.
+      - pty:
+          shell: true
+          command: >-
+            { printf 'Select an item:\r\n  first\r\n  second\r\n> ' >&2;
+            read choice;
+            if [ -n "$choice" ]; then printf '%s\n' "$choice"; fi; }
+            > chosen.txt
+          cols: 60
+          rows: 12
+          timeout: 20s
+          session:
+            - expect_screen:
+                contains: "Select an item"
+                stable_for: 50ms
+            - send: "second\n"
+      - assert:
+          exit_code: 0
+          # Only the choice reached the pipeline: no menu, no prompt, no
+          # redraws.
+          file:
+            path: chosen.txt
+            equals: "second\n"
+
+  - name: quitting without choosing leaves stdout empty
+    skip:
+      os: windows
+    steps:
+      # The negative space of the contract above. The interface was drawn and
+      # the program exited cleanly, yet the redirected stdout holds nothing —
+      # which is only assertable because the two streams are separate.
+      - pty:
+          shell: true
+          command: >-
+            { printf 'Select an item:\r\n  first\r\n  second\r\n> ' >&2;
+            read choice;
+            if [ -n "$choice" ]; then printf '%s\n' "$choice"; fi; }
+            > chosen.txt
+          cols: 60
+          rows: 12
+          timeout: 20s
+          session:
+            - expect_screen:
+                contains: "Select an item"
+                stable_for: 50ms
+            - send: "\n"
+      - assert:
+          exit_code: 0
+          file:
+            path: chosen.txt
+            equals: ""
+
+  - name: the interface itself is still assertable on the rendered screen
+    skip:
+      os: windows
+    steps:
+      # Nothing is lost by redirecting stdout: `screen:` replays the pty
+      # transcript, which carries the stderr side, so the menu is still there
+      # to assert against after the session ends.
+      - pty:
+          shell: true
+          command: >-
+            { printf 'Select an item:\r\n  first\r\n  second\r\n> ' >&2;
+            read choice;
+            if [ -n "$choice" ]; then printf '%s\n' "$choice"; fi; }
+            > chosen.txt
+          cols: 60
+          rows: 12
+          timeout: 20s
+          session:
+            - expect_screen:
+                contains: "second"
+                stable_for: 50ms
+            - send: "first\n"
+      - assert:
+          exit_code: 0
+      - assert:
+          screen:
+            line: 1
+            contains: "Select an item"
+      - assert:
+          screen:
+            contains: "  second"
