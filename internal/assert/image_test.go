@@ -289,6 +289,29 @@ func TestCheckImage_SimilarToWorkdirBaseline(t *testing.T) {
 	}
 }
 
+// TestCheckImage_SimilarToUnreadableGoldenDoesNotFallBack pins that only a
+// MISSING committed baseline falls through to the workdir. A golden that exists
+// but cannot be read must be reported, not quietly replaced by a same-named
+// workdir file that would make the comparison pass against the wrong image.
+func TestCheckImage_SimilarToUnreadableGoldenDoesNotFallBack(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	specDir := t.TempDir()
+	base := makePNG(t, 8, 8, color.RGBA{7, 7, 7, 255})
+	writeImage(t, dir, "out.png", base)
+	writeImage(t, dir, "baseline.png", base)
+	// A directory where the golden should be: it exists, so it is not ErrNotExist.
+	if err := os.Mkdir(filepath.Join(specDir, "baseline.png"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	got := Check(&spec.Assert{Image: &spec.ImageAssert{Path: "out.png", SimilarTo: "baseline.png"}},
+		nil, Env{Workdir: dir, SpecDir: specDir})
+	if got.OK {
+		t.Error("an unreadable committed baseline must fail rather than fall back to the workdir")
+	}
+}
+
 // TestCheckImage_SimilarToEscapingWorkdir pins that the workdir fallback cannot
 // be used to read an image outside the scenario directory.
 func TestCheckImage_SimilarToEscapingWorkdir(t *testing.T) {

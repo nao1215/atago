@@ -3,10 +3,12 @@ package assert
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"image"
 	"image/color"
 	"image/png"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -198,7 +200,11 @@ func readBaselineImage(baseline string, env Env) ([]byte, error) {
 	}
 	specPath := filepath.Join(env.SpecDir, baseline)
 	data, err := os.ReadFile(specPath) //nolint:gosec // path is the user-declared baseline
-	if err == nil || env.Workdir == "" {
+	// Only a missing committed baseline falls through. A golden that exists but
+	// cannot be read (permissions, a directory in its place) is an error worth
+	// reporting, not a reason to silently compare against a same-named workdir
+	// file.
+	if err == nil || env.Workdir == "" || !errors.Is(err, fs.ErrNotExist) {
 		return data, err
 	}
 	// The workdir fallback is confined to the workdir the same way every other

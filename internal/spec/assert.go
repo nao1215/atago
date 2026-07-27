@@ -213,8 +213,10 @@ type ImageAssert struct {
 	Alpha *bool `yaml:"alpha,omitempty"`
 	// SimilarTo compares the decoded pixels against a baseline image. A relative
 	// path resolves against the spec file's directory (like a committed
-	// snapshot); use an absolute or ${workdir}-prefixed path to compare against
-	// another generated file. Both images must share dimensions.
+	// snapshot); when no file is there, it resolves against the scenario workdir
+	// instead, so two images the run produced — the two ends of a round trip —
+	// compare with a plain relative name. An absolute path is used as given.
+	// Both images must share dimensions.
 	SimilarTo string `yaml:"similar_to,omitempty"`
 	// MaxDiff is the maximum allowed normalized mean per-pixel difference (0..1)
 	// for SimilarTo. It defaults to 0 (an exact pixel match); lossy formats need a
