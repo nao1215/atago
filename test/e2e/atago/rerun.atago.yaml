@@ -101,3 +101,85 @@ scenarios:
           file:
             path: .atago/last-failed.json
             contains: [red-a, red-b]
+
+  # Renaming one broken scenario while fixing another leaves the rerun with
+  # fewer scenarios than were recorded, which reads as "the rest are fixed".
+  # The run has to say which recorded failure it did not verify.
+  - name: rerun-failed names the recorded failures that no longer match
+    steps:
+      - fixture:
+          file: two.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: two
+            scenarios:
+              - name: red-a
+                steps:
+                  - run: {shell: true, command: "exit 1"}
+                  - assert: {exit_code: 0}
+              - name: red-b
+                steps:
+                  - run: {shell: true, command: "exit 1"}
+                  - assert: {exit_code: 0}
+      - run:
+          command: ${atago} run two.atago.yaml
+      - assert:
+          exit_code: 1
+      # red-a is renamed while still broken; red-b keeps its name.
+      - fixture:
+          file: two.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: two
+            scenarios:
+              - name: red-a-renamed
+                steps:
+                  - run: {shell: true, command: "exit 1"}
+                  - assert: {exit_code: 0}
+              - name: red-b
+                steps:
+                  - run: {shell: true, command: "exit 1"}
+                  - assert: {exit_code: 0}
+      - run:
+          command: ${atago} run --rerun-failed two.atago.yaml
+      - assert:
+          exit_code: 1
+          stderr:
+            contains:
+              - "1 recorded failing scenario did not match"
+              - "red-a"
+      # The unmatched entry is kept, so the next rerun can still find it.
+      - assert:
+          file:
+            path: .atago/last-failed.json
+            contains: [red-a, red-b]
+
+  - name: rerun-failed stays quiet when every recorded failure still exists
+    steps:
+      - fixture:
+          file: two.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: two
+            scenarios:
+              - name: red-a
+                steps:
+                  - run: {shell: true, command: "exit 1"}
+                  - assert: {exit_code: 0}
+              - name: red-b
+                steps:
+                  - run: {shell: true, command: "exit 1"}
+                  - assert: {exit_code: 0}
+      - run:
+          command: ${atago} run two.atago.yaml
+      - assert:
+          exit_code: 1
+      - run:
+          command: ${atago} run --rerun-failed two.atago.yaml
+      - assert:
+          exit_code: 1
+          stderr:
+            not_contains: "did not match the current specs"
