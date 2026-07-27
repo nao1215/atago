@@ -103,11 +103,18 @@ jobs:
       # `go run .` compiles atago and runs it; os.Executable() (which seeds the
       # ${atago} spec variable) points at that binary, so specs self-invoke
       # atago correctly without per-platform binary-name handling.
+      # --retry-failed 1 absorbs a Windows-only capture flake: a scenario that
+      # drives a nested atago occasionally reads back an EMPTY stdout from it while
+      # the run exits 0, which fails an assertion on output the child certainly
+      # wrote. It reproduced once in fourteen runs of this job and a re-run of the
+      # same commit was green. A retry re-runs in a fresh workdir and reports a
+      # recovery as flaky, so a real regression still fails both attempts. See #339
+      # for the cause; nothing here changes what any scenario asserts.
       - name: Run the portable self-hosted E2E subset
         shell: bash
         run: |
           mapfile -t targets < <(bash scripts/windows_portable_specs.sh)
-          go run . run "${targets[@]}"
+          go run . run --retry-failed 1 "${targets[@]}"
 
       # Real-world proof that the ConPTY pty runner drives an INTERACTIVE CLI on
       # Windows, not just self-terminating output: sqly's shell is a readline
