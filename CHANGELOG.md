@@ -7,28 +7,24 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-### Changed
+## [0.16.0] - 2026-07-27
 
-- A pty step killed because its program was still running now says that, instead
-  of offering a longer timeout that cannot help. A session does not close the
-  program: when the actions run out and it is still up, the step is killed, and
-  the old message ("the command timed out ... raise the timeout if the command is
-  merely slow") sent the reader to a knob that changes nothing, since the session
-  had already run to the end. It now reports that the session finished with the
-  program still running and names the fix — send its quit key last, and wait for
-  the screen to show the program can take it, because a dialog or prompt owns the
-  keyboard until it closes. A wait that never completed is a different failure and
-  keeps its own message naming the pattern. This is the shape that broke thirteen
-  scenarios in the lazygit suite and three in yazi.
+A minor release about output you can act on. Three failure messages were true
+and useless, in the way that costs the most time: they pointed at the wrong step,
+or offered a knob that could not help. The spec language gains one key,
+`changes: ignore:`, for the path a program writes only sometimes.
 
-### Fixed
+Two things a spec or a script may notice:
 
-- A failure now names the command it was observed under. The console block and the
-  JSON report's `failures[].command` used the scenario's LAST run command, so a
-  scenario that keeps working after the failure blamed the wrong step: an
-  interactive step killed by its timeout was reported against the verification
-  command that followed it and passed. That is a diagnosis pointing the wrong way,
-  and it cost real time — the reader tunes a step that never had a problem.
+- A `--repeat` or `--retry-failed` run writes each attempt after the first into an
+  `attempt-<N>` subdirectory of `--artifacts-dir`. A run with neither flag writes
+  exactly where it always did; tooling that globs the artifact tree may see the
+  extra level.
+- A `pty` step killed with its program still running reports a different message
+  and step name (`pty session leaves the program exited`), and a failure block
+  names the command the failing check asserts on instead of the scenario's last
+  command. A spec that pins atago's own console text will need updating; a spec
+  that asserts on the program under test is unaffected.
 
 ### Added
 
@@ -46,7 +42,33 @@ and this project follows [Semantic Versioning](https://semver.org/).
   globs, so a generated page does not advertise a claim the assertion no longer
   makes. The yazi suite uses it for the state directory yazi writes on some runs.
 
+- Third-party suite for Info-ZIP `zip` and `unzip`, the first real-world coverage
+  of the whole `dir:` family: an extracted tree asserted by recursive membership,
+  a file-only count, a glob, and a snapshot manifest that fixes the shape in one
+  assertion. Round trips are proven byte for byte with `equals_file` (an empty
+  file, mixed line endings with no trailing newline, NUL bytes), `-j` flattening
+  is checked as the metamorphic pair of the tree case, and the overwrite decision
+  is pinned in all three forms (declined by default, `-n`, `-o`). The documented
+  exit codes get one scenario each — 0, the warning code 1, 9 for a missing or
+  unreadable archive, 10 for a bad option, 11 for a name that matches nothing,
+  and zip's 12 for nothing to do. A second spec covers path traversal: a hostile
+  archive holding `../escaped.txt`, `/abs.txt`, and a four-level `../../../../`
+  entry is stripped, reported, and kept inside the destination, which `changes:`
+  proves against the filesystem instead of trusting the warning text.
+
 ### Changed
+
+- A pty step killed because its program was still running now says that, instead
+  of offering a longer timeout that cannot help. A session does not close the
+  program: when the actions run out and it is still up, the step is killed, and
+  the old message ("the command timed out ... raise the timeout if the command is
+  merely slow") sent the reader to a knob that changes nothing, since the session
+  had already run to the end. It now reports that the session finished with the
+  program still running and names the fix — send its quit key last, and wait for
+  the screen to show the program can take it, because a dialog or prompt owns the
+  keyboard until it closes. A wait that never completed is a different failure and
+  keeps its own message naming the pattern. This is the shape that broke thirteen
+  scenarios in the lazygit suite and three in yazi.
 
 - The scheduled third-party matrix no longer reports the runner's weather as a
   broken tool. Its pinned Ubuntu snapshot mirror served a 500 for the
@@ -62,8 +84,6 @@ and this project follows [Semantic Versioning](https://semver.org/).
   scenarios became 13, and the suite went from about a minute to six), because the
   failures land on the plain `git` step that follows the pty step rather than on
   the session itself. Tracked in #330.
-
-### Changed
 
 - Adding an assertion target is now guarded instead of remembered. Five layers
   dispatch on a target — the loader's validation, the runtime check, `atago doc`,
@@ -86,23 +106,14 @@ and this project follows [Semantic Versioning](https://semver.org/).
   rejected its own configuration. The captured service output is still shown
   beneath it.
 
-### Added
-
-- Third-party suite for Info-ZIP `zip` and `unzip`, the first real-world coverage
-  of the whole `dir:` family: an extracted tree asserted by recursive membership,
-  a file-only count, a glob, and a snapshot manifest that fixes the shape in one
-  assertion. Round trips are proven byte for byte with `equals_file` (an empty
-  file, mixed line endings with no trailing newline, NUL bytes), `-j` flattening
-  is checked as the metamorphic pair of the tree case, and the overwrite decision
-  is pinned in all three forms (declined by default, `-n`, `-o`). The documented
-  exit codes get one scenario each — 0, the warning code 1, 9 for a missing or
-  unreadable archive, 10 for a bad option, 11 for a name that matches nothing,
-  and zip's 12 for nothing to do. A second spec covers path traversal: a hostile
-  archive holding `../escaped.txt`, `/abs.txt`, and a four-level `../../../../`
-  entry is stripped, reported, and kept inside the destination, which `changes:`
-  proves against the filesystem instead of trusting the warning text.
-
 ### Fixed
+
+- A failure now names the command it was observed under. The console block and the
+  JSON report's `failures[].command` used the scenario's LAST run command, so a
+  scenario that keeps working after the failure blamed the wrong step: an
+  interactive step killed by its timeout was reported against the verification
+  command that followed it and passed. That is a diagnosis pointing the wrong way,
+  and it cost real time — the reader tunes a step that never had a problem.
 
 - `atago record --pty` now replays the bytes it recorded. A typed burst that is
   not valid UTF-8 — a paste in another encoding, a keyboard macro emitting a high

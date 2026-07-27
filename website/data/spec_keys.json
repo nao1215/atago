@@ -53,7 +53,7 @@
   "cdp.runner": "v0.1.0",
   "changesAssert.created": "v0.3.0",
   "changesAssert.deleted": "v0.3.0",
-  "changesAssert.ignore": "unreleased",
+  "changesAssert.ignore": "v0.16.0",
   "changesAssert.modified": "v0.3.0",
   "condition.command": "v0.1.0",
   "condition.env": "v0.1.0",
