@@ -161,13 +161,18 @@ func parsePDF(data []byte) pdfDoc {
 	}
 
 	// Content-stream text: decode every stream (raw + zlib/Flate) and pull the
-	// parenthesized string literals that feed the text-showing operators.
+	// parenthesized string literals that feed the text-showing operators. The
+	// decoded streams are kept: since PDF 1.5 a writer may pack the document's
+	// objects — including the Info dictionary — into a compressed object stream,
+	// so metadata has to be looked for inside them too.
 	var text strings.Builder
+	var decodedStreams [][]byte
 	for _, m := range reStream.FindAllSubmatch(data, -1) {
 		raw := m[1]
 		decoded := raw
 		if inflated, err := inflate(raw); err == nil {
 			decoded = inflated
+			decodedStreams = append(decodedStreams, decoded)
 		}
 		for _, lit := range reTextOp.FindAll(decoded, -1) {
 			text.WriteString(decodePDFString(lit))
@@ -176,15 +181,33 @@ func parsePDF(data []byte) pdfDoc {
 	}
 	doc.text = strings.TrimSpace(text.String())
 
-	// Info metadata: read the parenthesized value after each known field name.
-	for _, loc := range reMetaItem.FindAllSubmatchIndex(data, -1) {
-		field := strings.ToLower(string(data[loc[2]:loc[3]]))
-		// loc[1] is just past the opening delimiter ("(" or "<") of the value.
-		if val, ok := readPDFStringOrHex(data, loc[1]-1); ok {
-			doc.metadata[field] = val
-		}
+	// Info metadata: read the value after each known field name. The raw bytes
+	// come first (a PDF 1.4-style writer leaves the Info dictionary in the
+	// clear); anything still missing is looked for in the decompressed object
+	// streams, which is where Ghostscript 10, LaTeX, and Word put it.
+	readMetadata(doc.metadata, data, false)
+	for _, decoded := range decodedStreams {
+		readMetadata(doc.metadata, decoded, true)
 	}
 	return doc
+}
+
+// readMetadata pulls the known Info fields out of buf into meta. When keepFirst
+// is set, a field already found is not overwritten, so the uncompressed document
+// trailer keeps precedence over whatever a stream repeats.
+func readMetadata(meta map[string]string, buf []byte, keepFirst bool) {
+	for _, loc := range reMetaItem.FindAllSubmatchIndex(buf, -1) {
+		field := strings.ToLower(string(buf[loc[2]:loc[3]]))
+		if keepFirst {
+			if _, ok := meta[field]; ok {
+				continue
+			}
+		}
+		// loc[1] is just past the opening delimiter ("(" or "<") of the value.
+		if val, ok := readPDFStringOrHex(buf, loc[1]-1); ok {
+			meta[field] = val
+		}
+	}
 }
 
 // maxPDFStreamBytes caps how many bytes a single FlateDecode stream may inflate

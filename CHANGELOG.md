@@ -34,6 +34,12 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- `pdf: metadata:` now finds the Info dictionary when the producer stores it in
+  a compressed object stream, which every PDF 1.5+ writer does by default —
+  Ghostscript 10, LaTeX, Word. Only the raw bytes were scanned, so a metadata
+  assertion reported "field not present" for an ordinary modern PDF while page
+  count and text extraction (which already go through the decompressed streams)
+  worked. A value stored in the clear still wins over one repeated in a stream.
 - A JSON `null` is now spelled `null` in matcher subjects and failure messages
   instead of Go's `<nil>`. The Go-ism made a message about someone else's
   document read as a message about atago's implementation, and left `matches`
