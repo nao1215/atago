@@ -14,6 +14,10 @@ suite:
     would pass on a version that draws a commit it never made.
 
 # Install: see .github/workflows/thirdparty.yml for the pinned CI version.
+# Session timeout: 45s. It bounds how long a session waits for a screen, and
+# nothing else — every expect and every assertion is unchanged. 20s was enough on
+# a quiet machine but not on a loaded CI runner, where the same specs and the same
+# pinned binary alternated red and green from one scheduled run to the next.
 scenarios:
   - name: version prints the pinned release
     only:
@@ -56,7 +60,7 @@ scenarios:
           command: lazygit -ucd ${workdir}/cfg -p ${workdir}/repo
           rows: 30
           cols: 120
-          timeout: 20s
+          timeout: 45s
           clear_env: true
           pass_env: [PATH]
           session:
@@ -95,7 +99,7 @@ scenarios:
           command: lazygit -ucd ${workdir}/cfg -p ${workdir}/repo/sub
           rows: 30
           cols: 120
-          timeout: 20s
+          timeout: 45s
           clear_env: true
           pass_env: [PATH]
           session:
@@ -138,7 +142,7 @@ scenarios:
           command: lazygit -ucd ${workdir}/cfg -p ${workdir}/repo
           rows: 30
           cols: 120
-          timeout: 20s
+          timeout: 45s
           clear_env: true
           pass_env: [PATH]
           session:
@@ -183,7 +187,7 @@ scenarios:
           command: lazygit -ucd ${workdir}/cfg -p ${workdir}/repo
           rows: 30
           cols: 120
-          timeout: 20s
+          timeout: 45s
           clear_env: true
           pass_env: [PATH]
           session:
@@ -229,7 +233,7 @@ scenarios:
           command: lazygit -ucd ${workdir}/cfg -p ${workdir}/repo
           rows: 30
           cols: 120
-          timeout: 20s
+          timeout: 45s
           clear_env: true
           pass_env: [PATH]
           session:
@@ -277,7 +281,7 @@ scenarios:
           command: lazygit -ucd ${workdir}/cfg -p ${workdir}/repo
           rows: 30
           cols: 120
-          timeout: 20s
+          timeout: 45s
           clear_env: true
           pass_env: [PATH]
           session:
@@ -321,7 +325,7 @@ scenarios:
           command: lazygit -ucd ${workdir}/cfg -p ${workdir}/repo
           rows: 30
           cols: 120
-          timeout: 20s
+          timeout: 45s
           clear_env: true
           pass_env: [PATH]
           session:
@@ -378,7 +382,7 @@ scenarios:
           command: lazygit -ucd ${workdir}/cfg -p ${workdir}/repo
           rows: 30
           cols: 120
-          timeout: 20s
+          timeout: 45s
           clear_env: true
           pass_env: [PATH]
           session:
@@ -435,7 +439,7 @@ scenarios:
           command: lazygit -ucd ${workdir}/cfg -p ${workdir}/repo
           rows: 30
           cols: 120
-          timeout: 20s
+          timeout: 45s
           clear_env: true
           pass_env: [PATH]
           session:
@@ -484,7 +488,7 @@ scenarios:
           command: lazygit -ucd ${workdir}/cfg -p ${workdir}/repo
           rows: 30
           cols: 120
-          timeout: 20s
+          timeout: 45s
           clear_env: true
           pass_env: [PATH]
           session:
@@ -530,7 +534,7 @@ scenarios:
           command: lazygit -ucd ${workdir}/cfg -p ${workdir}/repo
           rows: 30
           cols: 120
-          timeout: 20s
+          timeout: 45s
           clear_env: true
           pass_env: [PATH]
           session:
@@ -576,7 +580,7 @@ scenarios:
           command: lazygit -ucd ${workdir}/cfg -p ${workdir}/repo
           rows: 30
           cols: 120
-          timeout: 20s
+          timeout: 45s
           clear_env: true
           pass_env: [PATH]
           session:
@@ -625,7 +629,7 @@ scenarios:
           command: lazygit -ucd ${workdir}/cfg -p ${workdir}/repo branch
           rows: 30
           cols: 120
-          timeout: 20s
+          timeout: 45s
           clear_env: true
           pass_env: [PATH]
           session:
@@ -668,7 +672,7 @@ scenarios:
           command: lazygit -ucd ${workdir}/cfg -p ${workdir}/repo branch
           rows: 30
           cols: 120
-          timeout: 20s
+          timeout: 45s
           clear_env: true
           pass_env: [PATH]
           session:
@@ -711,7 +715,7 @@ scenarios:
           command: lazygit -ucd ${workdir}/cfg -p ${workdir}/repo branch
           rows: 30
           cols: 120
-          timeout: 20s
+          timeout: 45s
           clear_env: true
           pass_env: [PATH]
           session:
@@ -755,7 +759,7 @@ scenarios:
           command: lazygit -ucd ${workdir}/cfg -p ${workdir}/repo branch
           rows: 30
           cols: 120
-          timeout: 20s
+          timeout: 45s
           clear_env: true
           pass_env: [PATH]
           session:
@@ -800,7 +804,7 @@ scenarios:
           command: lazygit -ucd ${workdir}/cfg -p ${workdir}/repo
           rows: 30
           cols: 120
-          timeout: 20s
+          timeout: 45s
           clear_env: true
           pass_env: [PATH]
           session:
@@ -854,7 +858,7 @@ scenarios:
           command: lazygit -ucd ${workdir}/cfg -p ${workdir}/repo
           rows: 30
           cols: 120
-          timeout: 20s
+          timeout: 45s
           clear_env: true
           pass_env: [PATH]
           session:
@@ -908,7 +912,7 @@ scenarios:
           command: lazygit -ucd ${workdir}/cfg -p ${workdir}/repo stash
           rows: 30
           cols: 120
-          timeout: 20s
+          timeout: 45s
           clear_env: true
           pass_env: [PATH]
           session:
@@ -961,7 +965,7 @@ scenarios:
           command: lazygit -ucd ${workdir}/cfg -p ${workdir}/repo stash
           rows: 30
           cols: 120
-          timeout: 20s
+          timeout: 45s
           clear_env: true
           pass_env: [PATH]
           session:

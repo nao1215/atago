@@ -32,7 +32,7 @@ scenarios:
           command: yazi src
           rows: 24
           cols: 100
-          timeout: 20s
+          timeout: 45s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -65,7 +65,7 @@ scenarios:
           command: yazi src
           rows: 24
           cols: 100
-          timeout: 20s
+          timeout: 45s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -98,7 +98,7 @@ scenarios:
           command: yazi src
           rows: 24
           cols: 100
-          timeout: 20s
+          timeout: 45s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -128,7 +128,7 @@ scenarios:
           command: yazi src
           rows: 24
           cols: 100
-          timeout: 20s
+          timeout: 45s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -159,7 +159,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 20s
+          timeout: 45s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -189,7 +189,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 20s
+          timeout: 45s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -220,7 +220,7 @@ scenarios:
           command: yazi src
           rows: 24
           cols: 100
-          timeout: 20s
+          timeout: 45s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -252,7 +252,7 @@ scenarios:
           command: yazi src
           rows: 24
           cols: 100
-          timeout: 20s
+          timeout: 45s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true

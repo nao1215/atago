@@ -9,6 +9,21 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- The scheduled third-party matrix no longer reports the runner's weather as a
+  broken tool. Its pinned Ubuntu snapshot mirror served a 500 for the
+  command-not-found index — a file nothing here uses — and `apt-get update` exits
+  100 for any index it cannot fetch, so five suites never ran. That index is no
+  longer requested, and the update and install are retried against a mirror that
+  5xxes under load. The version pin itself is unchanged: the snapshot id and the
+  SHA256-verified release archives still decide what gets installed.
+- The scheduled matrix runs with `--retry-failed 1`, and the two terminal-UI
+  suites wait up to 45s for a screen instead of 20s. The same specs and the same
+  pinned binaries alternated red and green from one scheduled run to the next on
+  nothing but load. A regression still fails both attempts; a flake is absorbed
+  and reported as flaky.
+
+### Changed
+
 - Adding an assertion target is now guarded instead of remembered. Five layers
   dispatch on a target — the loader's validation, the runtime check, `atago doc`,
   `atago explain`, and the published JSON Schema — and each had its own switch
