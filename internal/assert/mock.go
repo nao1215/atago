@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/nao1215/atago/internal/plural"
 	"github.com/nao1215/atago/internal/runner/mock"
 	"github.com/nao1215/atago/internal/spec"
 )
@@ -35,11 +36,11 @@ func checkMock(m *spec.MockAssert, env Env) *CheckResult {
 
 	filter := mockFilterLabel(m)
 	if m.Count != nil {
-		desc := fmt.Sprintf("assert mock %q received %d %s", m.Name, *m.Count, plural("request", *m.Count))
+		desc := fmt.Sprintf("assert mock %q received %s", m.Name, plural.Count(*m.Count, "request", "requests"))
 		if len(matched) != *m.Count {
 			return &CheckResult{
 				Desc:     desc,
-				Expected: fmt.Sprintf("%d %s %s", *m.Count, plural("request", *m.Count), filter),
+				Expected: fmt.Sprintf("%s %s", plural.Count(*m.Count, "request", "requests"), filter),
 				Actual:   fmt.Sprintf("%d matching of %d recorded:\n%s", len(matched), len(records), summarizeRecords(records)),
 				Hint:     "the CLI under test did not send the expected number of matching requests",
 			}
@@ -72,7 +73,7 @@ func checkMock(m *spec.MockAssert, env Env) *CheckResult {
 		}
 	}
 	if m.Count != nil {
-		return pass(fmt.Sprintf("assert mock %q received %d %s", m.Name, *m.Count, plural("request", *m.Count)))
+		return pass(fmt.Sprintf("assert mock %q received %s", m.Name, plural.Count(*m.Count, "request", "requests")))
 	}
 	return pass(desc + " received a matching request")
 }
@@ -102,11 +103,4 @@ func summarizeRecords(records []mock.Record) string {
 		fmt.Fprintf(&b, "  %d: %s %s -> %d\n", i+1, r.Method, r.Path, r.Status)
 	}
 	return strings.TrimRight(b.String(), "\n")
-}
-
-func plural(word string, n int) string {
-	if n == 1 {
-		return word
-	}
-	return word + "s"
 }

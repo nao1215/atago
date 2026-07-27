@@ -256,3 +256,34 @@ func strptr(s string) *string   { return &s }
 func intptr(n int) *int         { return &n }
 func boolptr(b bool) *bool      { return &b }
 func f64ptr(f float64) *float64 { return &f }
+
+// TestJSONStyle_WithPrefix pins that only the path prefix changes: the YAML
+// variant of a JSON style used to be a field-by-field copy, so a field added
+// later was silently dropped from it.
+func TestJSONStyle_WithPrefix(t *testing.T) {
+	t.Parallel()
+	base := JSONStyle{
+		Prefix:  func(path string) string { return "at " + path },
+		Equals:  func(v any) string { return fmt.Sprintf("== %v", v) },
+		Matches: func(s string) string { return "matches " + s },
+		Length:  func(n int) string { return fmt.Sprintf("length %d", n) },
+		Compare: func(op string, v any) string { return fmt.Sprintf("%s %v", op, v) },
+		Default: "checked",
+	}
+	yaml := base.WithPrefix(func(path string) string { return "YAML " + path })
+
+	checks := spec.JSONChecks{{Path: "$.n", Equals: 3}}
+	if got := DescribeJSONChecks(checks, base); got != "at $.n == 3" {
+		t.Errorf("base = %q", got)
+	}
+	if got := DescribeJSONChecks(checks, yaml); got != "YAML $.n == 3" {
+		t.Errorf("with prefix = %q, want only the prefix to change", got)
+	}
+	// The original is untouched: WithPrefix returns a copy.
+	if got := DescribeJSONChecks(checks, base); got != "at $.n == 3" {
+		t.Errorf("base after WithPrefix = %q, want it unchanged", got)
+	}
+	if yaml.Default != base.Default {
+		t.Errorf("Default = %q, want the base value %q carried over", yaml.Default, base.Default)
+	}
+}

@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/nao1215/atago/internal/plural"
 	"github.com/nao1215/atago/internal/security"
 	"github.com/nao1215/atago/internal/spec"
 )
@@ -141,13 +142,13 @@ func checkDirCounts(d *spec.DirAssert, dirPath string) *CheckResult {
 	}
 	n := len(entries)
 	if d.Count != nil && n != *d.Count {
-		return dirCountFailure(d, n, fmt.Sprintf("exactly %d entries", *d.Count), dirListing(dirPath))
+		return dirCountFailure(d, n, "exactly "+plural.Count(*d.Count, "entry", "entries"), dirListing(dirPath))
 	}
 	if d.MinCount != nil && n < *d.MinCount {
-		return dirCountFailure(d, n, fmt.Sprintf("at least %d entries", *d.MinCount), dirListing(dirPath))
+		return dirCountFailure(d, n, "at least "+plural.Count(*d.MinCount, "entry", "entries"), dirListing(dirPath))
 	}
 	if d.MaxCount != nil && n > *d.MaxCount {
-		return dirCountFailure(d, n, fmt.Sprintf("at most %d entries", *d.MaxCount), dirListing(dirPath))
+		return dirCountFailure(d, n, "at most "+plural.Count(*d.MaxCount, "entry", "entries"), dirListing(dirPath))
 	}
 	return nil
 }
@@ -157,17 +158,8 @@ func dirCountFailure(d *spec.DirAssert, got int, want, listing string) *CheckRes
 		Desc:     fmt.Sprintf("assert dir %q entry count", d.Path),
 		Expected: want,
 		Actual:   listing,
-		Hint:     fmt.Sprintf("directory %q has %s, expected %s", d.Path, pluralEntries(got), want),
+		Hint:     fmt.Sprintf("directory %q has %s, expected %s", d.Path, plural.Count(got, "entry", "entries"), want),
 	}
-}
-
-// pluralEntries renders an entry count with the right noun, so a failure reads
-// "has 1 entry" instead of "has 1 entries".
-func pluralEntries(n int) string {
-	if n == 1 {
-		return "1 entry"
-	}
-	return fmt.Sprintf("%d entries", n)
 }
 
 func checkDirGlob(d *spec.DirAssert, dirPath string) *CheckResult {

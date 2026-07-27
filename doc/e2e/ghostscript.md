@@ -100,7 +100,7 @@ gs -q -dNOPAUSE -dBATCH -sDEVICE=pdfwrite -dFirstPage=2 -dLastPage=2 -o second.p
   - pdf `whole.pdf` 2 pages
 - after `gs -q -dNOPAUSE -dBATCH -sDEVICE=pdfwrite -dFirstPage=2 -dLastPage=2 -o second.pdf whole.pdf`:
   - exit code is `0`
-  - pdf `second.pdf` 1 pages
+  - pdf `second.pdf` 1 page
   - pdf `second.pdf` text contains `Second page marker`
   - pdf `second.pdf` text does not contain `First page marker`
 ### Scenario: merging two documents yields the sum of their pages
@@ -134,7 +134,7 @@ gs -q -dNOPAUSE -dBATCH -sDEVICE=pdfwrite -o merged.pdf one.pdf two.pdf
 #### Then
 - after `gs -q -dNOPAUSE -dBATCH -sDEVICE=pdfwrite -o one.pdf one.ps`:
   - exit code is `0`
-  - pdf `one.pdf` 1 pages
+  - pdf `one.pdf` 1 page
 - after `gs -q -dNOPAUSE -dBATCH -sDEVICE=pdfwrite -o two.pdf two.ps`:
   - exit code is `0`
   - pdf `two.pdf` 2 pages
@@ -252,7 +252,7 @@ gs -q -dNOPAUSE -dBATCH -sDEVICE=pdfwrite -o out.pdf broken.ps
 #### Then
 - exit code is `1`
 - stderr contains `Unrecoverable error`
-- pdf `out.pdf` 1 pages
+- pdf `out.pdf` 1 page
 - pdf `out.pdf` text does not contain `this is not postscript`
 ### Scenario: an unknown device is refused
 _only when `gs --version` succeeds_

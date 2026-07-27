@@ -31,14 +31,9 @@ var docgenJSONStyle = assertdesc.JSONStyle{
 	Default: "is checked",
 }
 
-var docgenYAMLStyle = assertdesc.JSONStyle{
-	Prefix:  func(path string) string { return "YAML at " + markdown.Code(path) },
-	Equals:  docgenJSONStyle.Equals,
-	Matches: docgenJSONStyle.Matches,
-	Length:  docgenJSONStyle.Length,
-	Compare: docgenJSONStyle.Compare,
-	Default: docgenJSONStyle.Default,
-}
+var docgenYAMLStyle = docgenJSONStyle.WithPrefix(func(path string) string {
+	return "YAML at " + markdown.Code(path)
+})
 
 var docgenStreamStyle = assertdesc.StreamStyle{
 	List:      codeList,

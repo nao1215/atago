@@ -1761,7 +1761,7 @@ mkdir -p site/assets && printf '<html>' > site/index.html && printf '<html>' > s
 ```
 #### Then
 - exit code is `0`
-- dir `site` exists, contains `index.html`, contains `about.html`, contains `assets/app.css`, does not contain `secret.txt`, has 3 entries, has >= 1 entries, has <= 10 entries, matches glob `*.html`
+- dir `site` exists, contains `index.html`, contains `about.html`, contains `assets/app.css`, does not contain `secret.txt`, has 3 entries, has >= 1 entry, has <= 10 entries, matches glob `*.html`
 ### Scenario: a missing directory can be asserted absent
 #### Then
 - dir `never-created` does not exist
@@ -5476,7 +5476,7 @@ trailer
 … (truncated, 2 more lines)
 ```
 #### Then
-- pdf `report.pdf` 1 pages, >= 1 pages, <= 3 pages, author contains `atago`, title contains `Quarterly`, text contains `Hello atago report`
+- pdf `report.pdf` 1 page, >= 1 page, <= 3 pages, author contains `atago`, title contains `Quarterly`, text contains `Hello atago report`
 ### Scenario: a non-pdf file fails the pdf target
 #### Given
 - Fixture file `notpdf.txt` is created.

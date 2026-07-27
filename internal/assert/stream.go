@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/nao1215/atago/internal/plural"
 	"github.com/nao1215/atago/internal/spec"
 )
 
@@ -42,7 +43,7 @@ func checkStream(name string, s *spec.StreamAssert, data []byte, hasData bool, e
 				Desc:     fmt.Sprintf("assert %s line %d", name, *s.Line),
 				Expected: fmt.Sprintf("%s to have a line %d", name, *s.Line),
 				Actual:   excerpt(got),
-				Hint:     fmt.Sprintf("%s has only %d line(s); line %d is out of range", name, countLines(got), *s.Line),
+				Hint:     fmt.Sprintf("%s has only %s; line %d is out of range", name, plural.Count(countLines(got), "line", "lines"), *s.Line),
 			}
 		}
 		got = line

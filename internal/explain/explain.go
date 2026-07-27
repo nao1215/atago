@@ -426,14 +426,9 @@ var explainJSONStyle = assertdesc.JSONStyle{
 	Default: "",
 }
 
-var explainYAMLStyle = assertdesc.JSONStyle{
-	Prefix:  func(path string) string { return "YAML " + path },
-	Equals:  explainJSONStyle.Equals,
-	Matches: explainJSONStyle.Matches,
-	Length:  explainJSONStyle.Length,
-	Compare: explainJSONStyle.Compare,
-	Default: explainJSONStyle.Default,
-}
+var explainYAMLStyle = explainJSONStyle.WithPrefix(func(path string) string {
+	return "YAML " + path
+})
 
 var explainStreamStyle = assertdesc.StreamStyle{
 	List:      quoteList,

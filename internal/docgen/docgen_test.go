@@ -639,12 +639,12 @@ func TestDescribeTarget_MatcherMatrix(t *testing.T) {
 		{"mock no route", &spec.Assert{Mock: &spec.MockAssert{Name: "api"}}, "mock `api` received a request"},
 		// dir constraints
 		{"dir", &spec.Assert{Dir: &spec.DirAssert{Path: "site", Exists: boolptr(true), Contains: []string{"index.html"}, NotContains: []string{"tmp"}, Count: intptr(3), MinCount: intptr(1), MaxCount: intptr(9), Glob: "*.html", Recursive: true, Snapshot: "tree.snap", Ignore: []string{"*.log"}}},
-			"dir `site` exists, contains `index.html`, does not contain `tmp`, has 3 entries, has >= 1 entries, has <= 9 entries, matches glob `*.html`, tree matches snapshot `tree.snap`, (recursive), ignoring *.log"},
+			"dir `site` exists, contains `index.html`, does not contain `tmp`, has 3 entries, has >= 1 entry, has <= 9 entries, matches glob `*.html`, tree matches snapshot `tree.snap`, (recursive), ignoring *.log"},
 		{"dir absent", &spec.Assert{Dir: &spec.DirAssert{Path: "gone", Exists: boolptr(false)}}, "dir `gone` does not exist"},
 		{"dir checked", &spec.Assert{Dir: &spec.DirAssert{Path: "d"}}, "dir `d` is checked"},
 		// pdf
 		{"pdf", &spec.Assert{PDF: &spec.PDFAssert{Path: "r.pdf", Pages: intptr(3), MinPages: intptr(1), MaxPages: intptr(9), Metadata: map[string]string{"title": "Q1", "author": "me"}, Text: &spec.StreamAssert{Contains: spec.StringList{"total"}}}},
-			"pdf `r.pdf` 3 pages, >= 1 pages, <= 9 pages, author contains `me`, title contains `Q1`, text contains `total`"},
+			"pdf `r.pdf` 3 pages, >= 1 page, <= 9 pages, author contains `me`, title contains `Q1`, text contains `total`"},
 		{"pdf checked", &spec.Assert{PDF: &spec.PDFAssert{Path: "e.pdf"}}, "pdf `e.pdf` is checked"},
 		// image min/max dims + no-alpha + similar
 		{"image", &spec.Assert{Image: &spec.ImageAssert{Path: "o.png", MinWidth: intptr(1), MaxWidth: intptr(2), MinHeight: intptr(3), MaxHeight: intptr(4), Alpha: boolptr(false), SimilarTo: "base.png"}},
