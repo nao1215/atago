@@ -412,3 +412,30 @@ scenarios:
             created: [dangling]
             modified: []
             deleted: []
+
+  # A workdir delta tracks regular files and symlinks. When an entry names a
+  # directory the step really did create, "matched no file the step created" reads
+  # as "the tool never made it" while the author can see it sitting there.
+  - name: a changes entry naming a directory says what the path is
+    steps:
+      - fixture:
+          file: direntry.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: direntry}
+            scenarios:
+              - name: the generator made a directory
+                steps:
+                  - run: {shell: true, command: "mkdir out"}
+                  - assert:
+                      changes:
+                        created: [out]
+      - run:
+          command: ${atago} run direntry.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - '"out" exists as a directory'
+              - "tracks only regular files and symlinks"
+              - "assert it with dir:"

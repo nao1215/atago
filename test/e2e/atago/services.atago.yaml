@@ -184,3 +184,38 @@ scenarios:
       - assert:
           stdout:
             equals: "0"
+
+  # "service exited before it became ready" leaves the author guessing why. The
+  # exit status separates the two cases they will check first: a missing binary
+  # (127) and a command that ran and rejected its own config.
+  - name: a service that dies before readiness names its exit status
+    skip: {os: windows}
+    steps:
+      - fixture:
+          file: crasher.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: sample
+            scenarios:
+              - name: service exits with a status
+                services:
+                  - name: dies
+                    shell: true
+                    command: 'echo starting; exit 3'
+                    ready:
+                      log: never-appears
+                      timeout: 2s
+                steps:
+                  - run:
+                      command: echo unreached
+      - run:
+          command: ${atago} run crasher.atago.yaml
+      - assert:
+          exit_code: 4
+          stdout:
+            contains:
+              - "service exited before it became ready (exit status 3)"
+              # The captured output is still shown, so the two together say what
+              # the service managed to do before dying.
+              - "starting"

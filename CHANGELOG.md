@@ -18,6 +18,17 @@ and this project follows [Semantic Versioning](https://semver.org/).
   proves that table matches the fields on `Assert`, and each layer has a coverage
   test that walks the list. A half-wired target fails a test rather than shipping
   a weaker document.
+- A `changes:` entry that names a path the delta does not track now says what the
+  path is. A workdir delta scans regular files and symlinks, so a directory the
+  step really did create — or a named pipe, or a socket — is invisible to
+  `created`/`modified`/`deleted`, and the failure read "matched no file the step
+  created" while the author could see the thing sitting in the workdir. The note
+  names the kind and, for a directory, points at `dir:`.
+- A service that dies during its readiness probe now reports the exit status.
+  "service exited before it became ready" left the two cases an author checks
+  first indistinguishable: a missing binary (127) and a command that ran and
+  rejected its own configuration. The captured service output is still shown
+  beneath it.
 
 ### Added
 

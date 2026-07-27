@@ -135,6 +135,11 @@ func TestStart_DelayReadyDetectsEarlyExit(t *testing.T) {
 	if !strings.Contains(err.Error(), "exited before it became ready") {
 		t.Errorf("error = %v, want it to report the early exit", err)
 	}
+	// The status is the first thing an author needs: 127 is a missing binary and
+	// 1 is a config error, and "it exited" tells them neither.
+	if !strings.Contains(err.Error(), "exit status 3") {
+		t.Errorf("error = %v, want it to name the exit status the service died with", err)
+	}
 }
 
 // TestStart_DelayBoundedByTimeout is a regression: ready.timeout must bound the
