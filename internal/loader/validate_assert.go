@@ -153,6 +153,19 @@ func validateStream(add func(string, ...any), where string, s *spec.StreamAssert
 	}
 }
 
+// requireExactlyOne reports a matcher block that set none or several of its
+// alternatives. The list of alternatives is written once here per call site:
+// spelling it twice — for "none" and for "several" — is how the two messages
+// drift apart when a matcher is added.
+func requireExactlyOne(add func(string, ...any), where, alternatives string, n int) {
+	switch {
+	case n == 0:
+		add("%s: must set one of %s", where, alternatives)
+	case n > 1:
+		add("%s: must set exactly one of %s", where, alternatives)
+	}
+}
+
 func validateFile(add func(string, ...any), where string, f *spec.FileAssert) {
 	if f.Path == "" {
 		add("%s.path is required", where)
@@ -192,11 +205,7 @@ func validateFile(add func(string, ...any), where string, f *spec.FileAssert) {
 	if f.Snapshot != "" {
 		n++
 	}
-	if n == 0 {
-		add("%s: must set one of exists/contains/not_contains/executable/equals/equals_file/json/snapshot", where)
-	} else if n > 1 {
-		add("%s: must set exactly one of exists/contains/not_contains/executable/equals/equals_file/json/snapshot", where)
-	}
+	requireExactlyOne(add, where, "exists/contains/not_contains/executable/equals/equals_file/json/snapshot", n)
 }
 
 func validateHeaderMatch(add func(string, ...any), where string, h *spec.HeaderMatch) {
@@ -214,13 +223,7 @@ func validateHeaderMatch(add func(string, ...any), where string, h *spec.HeaderM
 		n++
 		validateRegexp(add, where, "matches", *h.Matches)
 	}
-	switch n {
-	case 0:
-		add("%s: must set one of contains/equals/matches", where)
-	case 1:
-	default:
-		add("%s: must set exactly one of contains/equals/matches", where)
-	}
+	requireExactlyOne(add, where, "contains/equals/matches", n)
 }
 
 // validateJSONChecks validates each check in a json/yaml matcher list (#156).
@@ -267,11 +270,7 @@ func validateJSON(add func(string, ...any), where string, j *spec.JSONAssert) {
 	if j.Lte != nil {
 		n++
 	}
-	if n == 0 {
-		add("%s: must set one of equals/matches/length/gt/gte/lt/lte", where)
-	} else if n > 1 {
-		add("%s: must set exactly one of equals/matches/length/gt/gte/lt/lte", where)
-	}
+	requireExactlyOne(add, where, "equals/matches/length/gt/gte/lt/lte", n)
 }
 
 // validateStringList rejects an explicitly-empty contains/not_contains list
