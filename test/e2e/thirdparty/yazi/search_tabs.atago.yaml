@@ -66,6 +66,15 @@ scenarios:
                   - alpha.txt
                   - alpha
                 stable_for: 100ms
+            # The spot panel takes the keyboard: `q` closes it instead of quitting
+            # yazi, so the panel is dismissed first and the session waits for the
+            # screen to prove it is gone. Sending esc and q back to back is not
+            # enough — q arrives while the panel still owns the keys, closes it,
+            # and yazi stays running until the session timeout kills it.
+            - send: {key: esc}
+            - expect_screen:
+                not_contains: [Mimetype]
+                stable_for: 100ms
             - send: "q"
 
   - name: tt opens a new tab rooted at the current cwd
