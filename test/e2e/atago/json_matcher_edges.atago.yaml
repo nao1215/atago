@@ -179,3 +179,38 @@ scenarios:
       - assert:
           stdout:
             not_contains: '"2"'
+
+  # A JSON null is nil in Go, and Go prints that as "<nil>". Leaking that made
+  # the message about Go rather than about the document under test, and left the
+  # matches matcher with nothing writable to match against.
+  - name: a null value is spelled null, not the Go zero value
+    steps:
+      - run:
+          shell: true
+          command: "printf '{\"v\": null}'"
+      - assert:
+          stdout:
+            json:
+              - path: "$.v"
+                matches: "^null$"
+
+  - name: a failure against a null value names it as null
+    steps:
+      - fixture:
+          file: nulled.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: nulled}
+            scenarios:
+              - name: the field is null, the expectation is a string
+                steps:
+                  - run: {shell: true, command: 'printf ''{"v": null}'''}
+                  - assert: {stdout: {json: [{path: "$.v", equals: "something"}]}}
+      - run: {command: "${atago} run nulled.atago.yaml"}
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: "$.v = null"
+      - assert:
+          stdout:
+            not_contains: "<nil>"

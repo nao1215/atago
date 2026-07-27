@@ -262,8 +262,6 @@ func displayValue(v any) string {
 	switch t := v.(type) {
 	case string:
 		return strconv.Quote(t)
-	case nil:
-		return "null"
 	default:
 		return renderNode(v)
 	}
@@ -281,6 +279,12 @@ func renderNode(v any) string {
 		return formatNum(t)
 	case float32:
 		return formatNum(float64(t))
+	case nil:
+		// A JSON null is nil in Go, and fmt prints that as "<nil>" — a Go-ism in
+		// a message about someone else's JSON, and a subject the `matches`
+		// matcher could never be written against. The store path already refuses
+		// to leak it; the matchers now spell it the way the document does.
+		return "null"
 	default:
 		return fmt.Sprintf("%v", v)
 	}
