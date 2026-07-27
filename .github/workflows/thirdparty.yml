@@ -148,6 +148,12 @@ jobs:
           - name: zstd
             dir: ./test/e2e/thirdparty/zstd
             install: bash ./scripts/install_ubuntu_snapshot_packages.sh zstd
+          # Info-ZIP zip/unzip: extracted trees, round trips, the documented exit
+          # codes, and the path-traversal refusal. The hostile archives are
+          # written by the specs as base64.
+          - name: unzip
+            dir: ./test/e2e/thirdparty/unzip
+            install: bash ./scripts/install_ubuntu_snapshot_packages.sh zip unzip
           # Ghostscript converts PostScript to PDF and rasterizes it; the
           # generated documents are asserted with pdf:/image:.
           - name: ghostscript

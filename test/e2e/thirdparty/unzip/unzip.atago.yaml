@@ -1,0 +1,365 @@
+version: "1"
+
+suite:
+  name: zip and unzip (archive round trips and extracted trees)
+  description: |
+    [Info-ZIP](https://infozip.sourceforge.net/) `zip` and `unzip` are the
+    archivers a shell script reaches for. An archiver makes two promises worth
+    testing: what comes back out is what went in, byte for byte, and the tree it
+    writes is exactly the tree the archive describes — no more paths, no fewer.
+
+    This suite pins both. Round trips are compared with `equals_file`, so no
+    newline or encoding normalization can hide a difference. The extracted tree
+    is asserted with `dir:` in every mode the family offers — recursive
+    membership, a count over regular files, a glob, and a snapshot manifest that
+    fixes the whole shape at once — and `changes:` states exhaustively which
+    paths a command created, so "it also wrote something else" fails. The
+    documented exit codes get one scenario each: 0, the warning code 1, 9 for a
+    missing or unreadable archive, 10 for a bad option, 11 when a name pattern
+    matches nothing, and zip's 12 for nothing to do.
+
+    Every archive is built by the spec from files the spec writes, so nothing is
+    committed and no scenario depends on the host's contents.
+
+# Gate: only where both halves of Info-ZIP are installed. The suite is
+# POSIX-oriented (it relies on shell redirection to feed unzip's overwrite
+# prompt), so it is scoped to non-Windows hosts.
+scenarios:
+  - name: zipping a tree keeps the inputs and adds exactly one archive
+    skip: {os: windows}
+    only:
+      command: zip -v
+    steps:
+      - fixture: {file: src/a.txt, content: "hello\n"}
+      - fixture: {file: src/sub/b.txt, content: "nested\n"}
+      - run:
+          sandbox_home: true
+          command: zip -q -r ar.zip src
+      - assert:
+          exit_code: 0
+          # Exhaustive: the archive is the only new path, the inputs are
+          # untouched, and nothing lands in the sandboxed HOME.
+          changes:
+            created: [ar.zip]
+            modified: []
+            deleted: []
+
+  - name: an extracted tree has exactly the paths the archive holds
+    skip: {os: windows}
+    only:
+      command: unzip -v
+    steps:
+      - fixture: {file: src/a.txt, content: "hello\n"}
+      - fixture: {file: src/sub/b.txt, content: "nested\n"}
+      - fixture: {file: src/sub/deep/c.txt, content: "deeper\n"}
+      - run: {command: zip -q -r ar.zip src}
+      - assert: {exit_code: 0}
+      - run:
+          command: unzip -q ar.zip -d out
+      - assert:
+          exit_code: 0
+          # Recursive membership: the nested paths exist under the destination
+          # with their archive-relative layout preserved.
+          dir:
+            path: out
+            recursive: true
+            contains:
+              - src/a.txt
+              - src/sub/b.txt
+              - src/sub/deep/c.txt
+      - assert:
+          # A recursive count is over regular files, so the three directories the
+          # archive carries do not inflate it.
+          dir:
+            path: out
+            recursive: true
+            count: 3
+      - assert:
+          dir:
+            path: out
+            recursive: true
+            glob: "src/sub/deep/*.txt"
+      - assert:
+          # The immediate child of the destination is the archive's single root.
+          dir:
+            path: out
+            count: 1
+            contains: [src]
+
+  - name: the extracted tree matches its snapshot manifest
+    skip: {os: windows}
+    only:
+      command: unzip -v
+    steps:
+      # A tree snapshot fixes the whole shape in one assertion: every path, each
+      # file's content hash, and every directory. Compression is not involved in
+      # the manifest, so it stays stable across zip versions.
+      - fixture: {file: src/a.txt, content: "hello\n"}
+      - fixture: {file: src/sub/b.txt, content: "nested\n"}
+      - run: {command: zip -q -r ar.zip src}
+      - run: {command: unzip -q ar.zip -d out}
+      - assert:
+          exit_code: 0
+          dir:
+            path: out
+            snapshot: extracted_tree
+
+  - name: a round trip restores every byte, including the awkward ones
+    skip: {os: windows}
+    only:
+      command: unzip -v
+    steps:
+      # The three files a naive archiver gets wrong: an empty one, one with no
+      # trailing newline and mixed line endings, and one carrying NUL bytes.
+      - fixture: {file: src/empty.bin, content: ""}
+      - fixture: {file: src/mixed.txt, content: "unix\nwindows\r\nno trailing newline"}
+      - fixture: {file: src/nul.bin, base64: "AAECAAP//wA="}
+      - run: {command: zip -q -r ar.zip src}
+      - assert: {exit_code: 0}
+      - run: {command: unzip -q ar.zip -d out}
+      - assert:
+          exit_code: 0
+          # equals_file compares the restored bytes against the original with no
+          # normalization of any kind.
+          file:
+            path: out/src/mixed.txt
+            equals_file: src/mixed.txt
+      - assert:
+          file:
+            path: out/src/nul.bin
+            equals_file: src/nul.bin
+      - assert:
+          file:
+            path: out/src/empty.bin
+            equals_file: src/empty.bin
+
+  - name: unzip -j drops the directories and keeps the files
+    skip: {os: windows}
+    only:
+      command: unzip -v
+    steps:
+      # The metamorphic pair of the tree case: the same archive extracted with
+      # -j must yield the same file contents at a flat layout, which is what the
+      # flag documents.
+      - fixture: {file: src/a.txt, content: "hello\n"}
+      - fixture: {file: src/sub/b.txt, content: "nested\n"}
+      - run: {command: zip -q -r ar.zip src}
+      - run: {command: unzip -j -q ar.zip -d flat}
+      - assert:
+          exit_code: 0
+          dir:
+            path: flat
+            recursive: true
+            count: 2
+            contains: [a.txt, b.txt]
+            not_contains: [src, sub]
+      - assert:
+          file:
+            path: flat/b.txt
+            equals_file: src/sub/b.txt
+
+  - name: listing an archive names every entry without writing anything
+    skip: {os: windows}
+    only:
+      command: unzip -v
+    steps:
+      - fixture: {file: src/a.txt, content: "hello\n"}
+      - fixture: {file: src/sub/b.txt, content: "nested\n"}
+      - run: {command: zip -q -r ar.zip src}
+      - run:
+          sandbox_home: true
+          command: unzip -l ar.zip
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - src/a.txt
+              - src/sub/b.txt
+              # The tally counts entries, not regular files: the two directory
+              # entries zip -r stored are part of it.
+              - 4 files
+          # Listing is read-only: the archive itself is not touched either.
+          changes:
+            created: []
+            modified: []
+            deleted: []
+
+  - name: an integrity test passes on a good archive and fails on a truncated one
+    skip: {os: windows}
+    only:
+      command: unzip -v
+    steps:
+      - fixture: {file: src/a.txt, content: "hello\n"}
+      - run: {command: zip -q -r ar.zip src}
+      - run: {command: unzip -t ar.zip}
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "No errors detected in compressed data"
+      # A file that is not a zip at all: unzip cannot find a central directory,
+      # which is exit 9 (cannot open or find the archive), not a generic 1.
+      - fixture: {file: broken.zip, content: "PK truncated garbage"}
+      - run: {command: unzip -t broken.zip}
+      - assert:
+          exit_code: 9
+          stdout:
+            contains: "End-of-central-directory signature not found"
+
+  - name: a missing archive is exit 9 and creates nothing
+    skip: {os: windows}
+    only:
+      command: unzip -v
+    steps:
+      - run:
+          sandbox_home: true
+          command: unzip -q absent.zip -d out
+      - assert:
+          exit_code: 9
+          stderr:
+            contains: "cannot find or open absent.zip"
+          # A failed extraction leaves no partial destination behind.
+          changes:
+            created: []
+            modified: []
+            deleted: []
+      - assert:
+          dir:
+            path: out
+            exists: false
+
+  - name: an unknown option is exit 10 and a name that matches nothing is exit 11
+    skip: {os: windows}
+    only:
+      command: unzip -v
+    steps:
+      - fixture: {file: src/a.txt, content: "hello\n"}
+      - run: {command: zip -q -r ar.zip src}
+      # 10: a usage error. The usage text goes to stderr, and stdout stays clean,
+      # so a script that captures stdout gets nothing to misparse.
+      - run: {command: unzip -Q ar.zip}
+      - assert:
+          exit_code: 10
+          stderr:
+            contains: "Usage: unzip"
+          stdout:
+            empty: true
+      # 11: the archive is fine and readable, but no entry matched the pattern.
+      # Distinguishing this from 9 is the point: nothing is wrong with the file.
+      - run: {command: unzip -q ar.zip "no/such/*" -d out}
+      - assert:
+          exit_code: 11
+          # The caution goes to stderr, keeping stdout free of diagnostics.
+          stderr:
+            contains: "filename not matched"
+      - assert:
+          # The destination is created before the entries are matched, so it
+          # exists but stays empty: nothing was extracted.
+          dir:
+            path: out
+            exists: true
+            count: 0
+
+  - name: zip with nothing to archive is exit 12 and writes no archive
+    skip: {os: windows}
+    only:
+      command: zip -v
+    steps:
+      - run:
+          sandbox_home: true
+          shell: true
+          command: zip -q empty.zip
+      - assert:
+          exit_code: 12
+          # zip routes "Nothing to do!" to stdout or stderr depending on how
+          # stdout is connected, so the stream is not asserted; the exit code and
+          # the absence of an archive are the contract a script depends on.
+          changes:
+            created: []
+            modified: []
+            deleted: []
+
+  - name: overwriting is refused by default, forced by -o, and skipped by -n
+    skip: {os: windows}
+    only:
+      command: unzip -v
+    steps:
+      - fixture: {file: src/a.txt, content: "from the archive\n"}
+      - run: {command: zip -q -r ar.zip src}
+      # Plant a different file where the archive's entry will land.
+      - fixture: {file: out/src/a.txt, content: "already here\n"}
+      # With no answer available on stdin, unzip declines rather than clobbering,
+      # and reports the warning code 1 — not 0, and not an error code.
+      - run:
+          shell: true
+          command: unzip -q ar.zip -d out < /dev/null
+      - assert:
+          exit_code: 1
+          file:
+            path: out/src/a.txt
+            equals: "already here\n"
+      # -n makes the same decision explicitly, and succeeds.
+      - run: {command: unzip -qn ar.zip -d out}
+      - assert:
+          exit_code: 0
+          file:
+            path: out/src/a.txt
+            equals: "already here\n"
+      # -o replaces the file with the archived bytes.
+      - run: {command: unzip -qo ar.zip -d out}
+      - assert:
+          exit_code: 0
+          file:
+            path: out/src/a.txt
+            equals_file: src/a.txt
+
+  - name: an updated archive replaces one entry and leaves the rest alone
+    skip: {os: windows}
+    only:
+      command: zip -v
+    steps:
+      - fixture: {file: src/a.txt, content: "first\n"}
+      - fixture: {file: src/b.txt, content: "second\n"}
+      - run: {command: zip -q -r ar.zip src}
+      - assert: {exit_code: 0}
+      # Rewrite one input and update the archive in place: only the archive is
+      # modified, and only the changed entry differs on extraction.
+      - fixture: {file: src/a.txt, content: "rewritten\n"}
+      - run:
+          sandbox_home: true
+          command: zip -q ar.zip src/a.txt
+      - assert:
+          exit_code: 0
+          changes:
+            created: []
+            modified: [ar.zip]
+            deleted: []
+      - run: {command: unzip -q ar.zip -d out}
+      - assert:
+          exit_code: 0
+          file:
+            path: out/src/a.txt
+            equals: "rewritten\n"
+      - assert:
+          file:
+            path: out/src/b.txt
+            equals: "second\n"
+
+  - name: deleting an entry removes it from the extracted tree
+    skip: {os: windows}
+    only:
+      command: zip -v
+    steps:
+      - fixture: {file: src/keep.txt, content: "keep\n"}
+      - fixture: {file: src/drop.txt, content: "drop\n"}
+      - run: {command: zip -q -r ar.zip src}
+      - run: {command: zip -q -d ar.zip "src/drop.txt"}
+      - assert: {exit_code: 0}
+      - run: {command: unzip -q ar.zip -d out}
+      - assert:
+          exit_code: 0
+          dir:
+            path: out
+            recursive: true
+            count: 1
+            contains: [src/keep.txt]
+            not_contains: [src/drop.txt]

@@ -1,0 +1,4 @@
+dir src
+file src/a.txt sha256:5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03
+dir src/sub
+file src/sub/b.txt sha256:370a8c04b8a65bb4494275eec227f1b694db04c76da6b0b8ae88ed1ab19790a3

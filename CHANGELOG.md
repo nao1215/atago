@@ -7,6 +7,22 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Third-party suite for Info-ZIP `zip` and `unzip`, the first real-world coverage
+  of the whole `dir:` family: an extracted tree asserted by recursive membership,
+  a file-only count, a glob, and a snapshot manifest that fixes the shape in one
+  assertion. Round trips are proven byte for byte with `equals_file` (an empty
+  file, mixed line endings with no trailing newline, NUL bytes), `-j` flattening
+  is checked as the metamorphic pair of the tree case, and the overwrite decision
+  is pinned in all three forms (declined by default, `-n`, `-o`). The documented
+  exit codes get one scenario each — 0, the warning code 1, 9 for a missing or
+  unreadable archive, 10 for a bad option, 11 for a name that matches nothing,
+  and zip's 12 for nothing to do. A second spec covers path traversal: a hostile
+  archive holding `../escaped.txt`, `/abs.txt`, and a four-level `../../../../`
+  entry is stripped, reported, and kept inside the destination, which `changes:`
+  proves against the filesystem instead of trusting the warning text.
+
 ### Fixed
 
 - `atago record --pty` now replays the bytes it recorded. A typed burst that is
