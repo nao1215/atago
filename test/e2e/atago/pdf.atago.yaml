@@ -57,3 +57,60 @@ scenarios:
           command: ${atago} version
       - assert:
           exit_code: 0
+
+  # Any PDF 1.5+ writer — Ghostscript 10, LaTeX, Word — packs the Info
+  # dictionary into a compressed object stream. The parser only read the raw
+  # bytes, so a metadata assertion reported "field not present" for a perfectly
+  # ordinary PDF while page count and text extraction worked.
+  - name: metadata is found inside a compressed object stream
+    steps:
+      - fixture:
+          file: objstm.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: objstm}
+            scenarios:
+              - name: the title lives in a Flate-compressed object stream
+                steps:
+                  - fixture:
+                      file: compressed.pdf
+                      base64: JVBERi0xLjUKMSAwIG9iago8PCAvVHlwZSAvUGFnZSA+PgplbmRvYmoKMiAwIG9iago8PCAvVHlwZSAvT2JqU3RtIC9OIDEgL0ZpcnN0IDAgL0ZpbHRlciAvRmxhdGVEZWNvZGUgL0xlbmd0aCA1MCA+PgpzdHJlYW0KeJyzsdEPySzJSdVwzs8tKEotLk5NUQALaOo7lpZk5BdpBJcUpSbmKkB4mnZ2AMDhEaAKZW5kc3RyZWFtCmVuZG9iagp0cmFpbGVyCjw8IC9Sb290IDEgMCBSID4+CiUlRU9GCg==
+                  - run: {command: echo produced}
+                  - assert:
+                      pdf:
+                        path: compressed.pdf
+                        metadata:
+                          title: Compressed Title
+                          author: Stream Author
+      - run:
+          command: ${atago} run objstm.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: PASSED
+
+  - name: a wrong expectation still fails against compressed metadata
+    steps:
+      - fixture:
+          file: wrongmeta.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: wrongmeta}
+            scenarios:
+              - name: the title is not what the spec claims
+                steps:
+                  - fixture:
+                      file: compressed.pdf
+                      base64: JVBERi0xLjUKMSAwIG9iago8PCAvVHlwZSAvUGFnZSA+PgplbmRvYmoKMiAwIG9iago8PCAvVHlwZSAvT2JqU3RtIC9OIDEgL0ZpcnN0IDAgL0ZpbHRlciAvRmxhdGVEZWNvZGUgL0xlbmd0aCA1MCA+PgpzdHJlYW0KeJyzsdEPySzJSdVwzs8tKEotLk5NUQALaOo7lpZk5BdpBJcUpSbmKkB4mnZ2AMDhEaAKZW5kc3RyZWFtCmVuZG9iagp0cmFpbGVyCjw8IC9Sb290IDEgMCBSID4+CiUlRU9GCg==
+                  - run: {command: echo produced}
+                  - assert:
+                      pdf:
+                        path: compressed.pdf
+                        metadata:
+                          title: Not This Title
+      - run:
+          command: ${atago} run wrongmeta.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: "Compressed Title"

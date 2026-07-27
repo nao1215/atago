@@ -137,6 +137,9 @@ var (
 	rePageObj = regexp.MustCompile(`/Type\s*/Page(?:[^s]|$)`)
 	reCount   = regexp.MustCompile(`/Count\s+(\d+)`)
 	reStream  = regexp.MustCompile(`(?s)stream\r?\n(.*?)\r?\nendstream`)
+	// /Type /ObjStm marks a stream that holds document objects (PDF 1.5+), which
+	// is where a modern writer puts the Info dictionary.
+	reObjStm = regexp.MustCompile(`/Type\s*/ObjStm`)
 	// A metadata value is either a "(…)" literal string or a "<…>" hex string.
 	reMetaItem = regexp.MustCompile(`/(Title|Author|Subject|Keywords|Creator|Producer)\s*[(<]`)
 	// A text operand is a "(…)" literal string or a "<…>" hex string (ISO 32000
@@ -161,13 +164,24 @@ func parsePDF(data []byte) pdfDoc {
 	}
 
 	// Content-stream text: decode every stream (raw + zlib/Flate) and pull the
-	// parenthesized string literals that feed the text-showing operators.
+	// parenthesized string literals that feed the text-showing operators. The
+	// decoded streams are kept: since PDF 1.5 a writer may pack the document's
+	// objects — including the Info dictionary — into a compressed object stream,
+	// so metadata has to be looked for inside them too.
 	var text strings.Builder
-	for _, m := range reStream.FindAllSubmatch(data, -1) {
-		raw := m[1]
+	var objectStreams [][]byte
+	for _, loc := range reStream.FindAllSubmatchIndex(data, -1) {
+		raw := data[loc[2]:loc[3]]
 		decoded := raw
 		if inflated, err := inflate(raw); err == nil {
 			decoded = inflated
+			// Only a stream that declares /Type /ObjStm holds document objects.
+			// Any other decompressed stream is page content, where a literal
+			// "/Title(...)" drawn on the page would otherwise be mistaken for
+			// the document's metadata.
+			if isObjectStream(data, loc[0]) {
+				objectStreams = append(objectStreams, decoded)
+			}
 		}
 		for _, lit := range reTextOp.FindAll(decoded, -1) {
 			text.WriteString(decodePDFString(lit))
@@ -176,15 +190,48 @@ func parsePDF(data []byte) pdfDoc {
 	}
 	doc.text = strings.TrimSpace(text.String())
 
-	// Info metadata: read the parenthesized value after each known field name.
-	for _, loc := range reMetaItem.FindAllSubmatchIndex(data, -1) {
-		field := strings.ToLower(string(data[loc[2]:loc[3]]))
-		// loc[1] is just past the opening delimiter ("(" or "<") of the value.
-		if val, ok := readPDFStringOrHex(data, loc[1]-1); ok {
-			doc.metadata[field] = val
-		}
+	// Info metadata: read the value after each known field name. The raw bytes
+	// come first (a PDF 1.4-style writer leaves the Info dictionary in the
+	// clear); anything still missing is looked for in the decompressed object
+	// streams, which is where Ghostscript 10, LaTeX, and Word put it.
+	readMetadata(doc.metadata, data, false)
+	for _, decoded := range objectStreams {
+		readMetadata(doc.metadata, decoded, true)
 	}
 	return doc
+}
+
+// objStmWindow is how far back from a `stream` keyword the object's dictionary
+// is looked for. A dictionary is a short header; a window keeps the scan cheap
+// and cannot wander into the previous object's payload for any realistic PDF.
+const objStmWindow = 512
+
+// isObjectStream reports whether the stream starting at streamAt is declared as
+// an object stream by the dictionary that precedes it.
+func isObjectStream(data []byte, streamAt int) bool {
+	start := streamAt - objStmWindow
+	if start < 0 {
+		start = 0
+	}
+	return reObjStm.Match(data[start:streamAt])
+}
+
+// readMetadata pulls the known Info fields out of buf into meta. When keepFirst
+// is set, a field already found is not overwritten, so the uncompressed document
+// trailer keeps precedence over whatever a stream repeats.
+func readMetadata(meta map[string]string, buf []byte, keepFirst bool) {
+	for _, loc := range reMetaItem.FindAllSubmatchIndex(buf, -1) {
+		field := strings.ToLower(string(buf[loc[2]:loc[3]]))
+		if keepFirst {
+			if _, ok := meta[field]; ok {
+				continue
+			}
+		}
+		// loc[1] is just past the opening delimiter ("(" or "<") of the value.
+		if val, ok := readPDFStringOrHex(buf, loc[1]-1); ok {
+			meta[field] = val
+		}
+	}
 }
 
 // maxPDFStreamBytes caps how many bytes a single FlateDecode stream may inflate

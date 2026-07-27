@@ -1944,7 +1944,7 @@
           "additionalProperties": {
             "type": "string"
           },
-          "description": "Maps an Info-dictionary field (title, author, subject, keywords, creator, producer; case-insensitive) to a substring its value must contain."
+          "description": "Maps an Info-dictionary field (title, author, subject, keywords, creator, producer; case-insensitive) to a substring its value must contain. The field is read whether the producer leaves the Info dictionary in the clear or packs it into a compressed object stream (PDF 1.5+)."
         },
         "text": {
           "$ref": "#/$defs/stream",

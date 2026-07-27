@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-74 suites · 423 scenarios
+74 suites · 425 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -304,9 +304,11 @@
   - [a dir assert addresses a nested tree and child by forward-slash path](#scenario-a-dir-assert-addresses-a-nested-tree-and-child-by-forward-slash-path)
   - [equals_file compares two files addressed by forward-slash paths](#scenario-equals_file-compares-two-files-addressed-by-forward-slash-paths)
   - [a redirect path may not escape the workdir via a nested traversal](#scenario-a-redirect-path-may-not-escape-the-workdir-via-a-nested-traversal)
-- [atago self-hosting / pdf assertion](#atago-self-hosting--pdf-assertion) — 2 scenarios
+- [atago self-hosting / pdf assertion](#atago-self-hosting--pdf-assertion) — 4 scenarios
   - [pdf assertions cover page count, metadata, and text](#scenario-pdf-assertions-cover-page-count-metadata-and-text)
   - [a non-pdf file fails the pdf target](#scenario-a-non-pdf-file-fails-the-pdf-target)
+  - [metadata is found inside a compressed object stream](#scenario-metadata-is-found-inside-a-compressed-object-stream)
+  - [a wrong expectation still fails against compressed metadata](#scenario-a-wrong-expectation-still-fails-against-compressed-metadata)
 - [atago self-hosting / pty](#atago-self-hosting--pty) — 8 scenarios
   - [a pty step sees a terminal where a run step sees a pipe](#scenario-a-pty-step-sees-a-terminal-where-a-run-step-sees-a-pipe)
   - [a never-matching expect fails with the pattern in the block](#scenario-a-never-matching-expect-fails-with-the-pattern-in-the-block)
@@ -5488,6 +5490,63 @@ ${atago} version
 ```
 #### Then
 - exit code is `0`
+### Scenario: metadata is found inside a compressed object stream
+#### Given
+- Fixture file `objstm.atago.yaml` is created.
+#### Inputs
+_Fixture `objstm.atago.yaml`:_
+```text
+version: "1"
+suite: {name: objstm}
+scenarios:
+  - name: the title lives in a Flate-compressed object stream
+    steps:
+      - fixture:
+          file: compressed.pdf
+          base64: JVBERi0xLjUKMSAwIG9iago8PCAvVHlwZSAvUGFnZSA+PgplbmRvYmoKMiAwIG9iago8PCAvVHlwZSAvT2JqU3RtIC9OIDEgL0ZpcnN0IDAgL0ZpbHRlciAvRmxhdGVEZWNvZGUgL0xlbmd0aCA1MCA+PgpzdHJlYW0KeJyzsdEPySzJSdVwzs8tKEotLk5NUQALaOo7lpZk5BdpBJcUpSbmKkB4mnZ2AMDhEaAKZW5kc3RyZWFtCmVuZG9iagp0cmFpbGVyCjw8IC9Sb290IDEgMCBSID4+CiUlRU9GCg==
+      - run: {command: echo produced}
+      - assert:
+          pdf:
+            path: compressed.pdf
+            metadata:
+              title: Compressed Title
+              author: Stream Author
+```
+#### When
+```shell
+${atago} run objstm.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout contains `PASSED`
+### Scenario: a wrong expectation still fails against compressed metadata
+#### Given
+- Fixture file `wrongmeta.atago.yaml` is created.
+#### Inputs
+_Fixture `wrongmeta.atago.yaml`:_
+```text
+version: "1"
+suite: {name: wrongmeta}
+scenarios:
+  - name: the title is not what the spec claims
+    steps:
+      - fixture:
+          file: compressed.pdf
+          base64: JVBERi0xLjUKMSAwIG9iago8PCAvVHlwZSAvUGFnZSA+PgplbmRvYmoKMiAwIG9iago8PCAvVHlwZSAvT2JqU3RtIC9OIDEgL0ZpcnN0IDAgL0ZpbHRlciAvRmxhdGVEZWNvZGUgL0xlbmd0aCA1MCA+PgpzdHJlYW0KeJyzsdEPySzJSdVwzs8tKEotLk5NUQALaOo7lpZk5BdpBJcUpSbmKkB4mnZ2AMDhEaAKZW5kc3RyZWFtCmVuZG9iagp0cmFpbGVyCjw8IC9Sb290IDEgMCBSID4+CiUlRU9GCg==
+      - run: {command: echo produced}
+      - assert:
+          pdf:
+            path: compressed.pdf
+            metadata:
+              title: Not This Title
+```
+#### When
+```shell
+${atago} run wrongmeta.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `Compressed Title`
 ## atago self-hosting / pty
 Source: `test/e2e/atago/pty.atago.yaml`
 ### Scenario: a pty step sees a terminal where a run step sees a pipe
