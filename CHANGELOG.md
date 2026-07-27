@@ -9,6 +9,13 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Third-party suite for zstd: compression round trips proven byte for byte with
+  `equals_file` (including an empty file and one full of NUL bytes), the input
+  kept unless `--rm` is asked for, an existing archive never silently
+  overwritten and `-f` overriding that, `-t` integrity verification of a good
+  and a corrupt frame, a failed decompression leaving no partial output, the
+  stdin-to-stdout pipeline, and the missing-input and unknown-option failure
+  contracts.
 - Third-party suite for ImageMagick: conversion output decoded and checked as an
   image (format sniffed from the bytes, dimensions, alpha), aspect-ratio versus
   forced resize, a PNG↔PPM round trip verified twice — once by atago's pixel
