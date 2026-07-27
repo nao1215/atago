@@ -42,6 +42,13 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- The messages for a target atago cannot use now say what atago was doing.
+  A missing spec path reads `cannot access "x.atago.yaml": no such file or
+  directory` instead of repeating the path through Go's `stat` wrapper; an
+  unreadable directory reads `cannot search "/etc" for spec files: ...` instead
+  of naming a file the user never mentioned; and a directory with no specs names
+  the directory it searched and points at `atago init`.
+
 - Counted nouns in messages now agree with their number: "1 page" instead of
   "1 pages", "1 entry" instead of "1 entries", "1 line" instead of
   "1 line(s)", and `atago record` reports "1 file created" rather than

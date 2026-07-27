@@ -1129,3 +1129,43 @@ func TestRunCmd_CorruptLedgerLeftUntouchedByPlainRun(t *testing.T) {
 		t.Errorf("ledger = %q, want the unreadable bytes preserved verbatim after a green run", data)
 	}
 }
+
+// TestSpecTargets_MessagesNameWhatAtagoWasDoing pins the wording a person meets
+// when they point atago at the wrong place. A bare "stat x: no such file or
+// directory" repeats the path atago already named, and a bare "open
+// /etc/credstore: permission denied" reads as if atago wanted that file rather
+// than as a search of the directory the user named.
+func TestSpecTargets_MessagesNameWhatAtagoWasDoing(t *testing.T) {
+	t.Run("a missing target names the reason once", func(t *testing.T) {
+		var errb bytes.Buffer
+		paths, exit, ok := specTargets("atago run", []string{"no-such.atago.yaml"}, &errb)
+		if ok || paths != nil {
+			t.Fatalf("ok = %v, paths = %v, want a refusal", ok, paths)
+		}
+		if exit != ExitConfig {
+			t.Errorf("exit = %d, want %d", exit, ExitConfig)
+		}
+		got := errb.String()
+		if !strings.Contains(got, `cannot access "no-such.atago.yaml": no such file or directory`) {
+			t.Errorf("stderr = %q, want the path named once and the bare reason", got)
+		}
+		if strings.Contains(got, "stat ") {
+			t.Errorf("stderr = %q, want no syscall noise", got)
+		}
+	})
+
+	t.Run("an empty directory says how to start", func(t *testing.T) {
+		dir := t.TempDir()
+		var errb bytes.Buffer
+		if _, _, ok := specTargets("atago doc", []string{dir}, &errb); ok {
+			t.Fatal("an empty directory must be a refusal")
+		}
+		got := errb.String()
+		if !strings.Contains(got, "no *.atago.yaml") || !strings.Contains(got, dir) {
+			t.Errorf("stderr = %q, want the searched target named", got)
+		}
+		if !strings.Contains(got, "atago init") {
+			t.Errorf("stderr = %q, want a pointer to `atago init`", got)
+		}
+	})
+}

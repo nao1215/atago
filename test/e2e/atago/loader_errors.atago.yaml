@@ -242,3 +242,31 @@ scenarios:
               - "[8:22]"
               - "exit_code must be an integer"
               - "exit_code: zero"
+
+  # Pointing atago at the wrong place should say what atago was doing there.
+  - name: a missing target names the reason without syscall noise
+    steps:
+      - run:
+          command: ${atago} run no-such-spec.atago.yaml
+      - assert:
+          exit_code: 3
+          stderr:
+            contains: 'cannot access "no-such-spec.atago.yaml": no such file or directory'
+      - assert:
+          stderr:
+            not_contains: "stat no-such-spec"
+
+  - name: an empty directory says how to create a first spec
+    steps:
+      - run:
+          shell: true
+          command: mkdir specs
+      - run:
+          command: ${atago} run specs
+      - assert:
+          exit_code: 3
+          stderr:
+            contains:
+              - "no *.atago.yaml"
+              - "specs"
+              - "atago init"
