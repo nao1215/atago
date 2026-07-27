@@ -21,6 +21,7 @@ A browsable, repo-local index of atago's documentation, generated from repositor
 - [ecspresso.md](../doc/e2e/ecspresso.md)
 - [ffmpeg.md](../doc/e2e/ffmpeg.md)
 - [fzf.md](../doc/e2e/fzf.md)
+- [ghostscript.md](../doc/e2e/ghostscript.md)
 - [git.md](../doc/e2e/git.md)
 - [gitea.md](../doc/e2e/gitea.md)
 - [gotify.md](../doc/e2e/gotify.md)

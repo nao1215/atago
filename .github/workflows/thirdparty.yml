@@ -148,6 +148,11 @@ jobs:
           - name: zstd
             dir: ./test/e2e/thirdparty/zstd
             install: bash ./scripts/install_ubuntu_snapshot_packages.sh zstd
+          # Ghostscript converts PostScript to PDF and rasterizes it; the
+          # generated documents are asserted with pdf:/image:.
+          - name: ghostscript
+            dir: ./test/e2e/thirdparty/ghostscript
+            install: bash ./scripts/install_ubuntu_snapshot_packages.sh ghostscript
           # Terraform comes from the official HashiCorp release archive instead
           # of a moving apt repository. Only the builtin terraform_data
           # resource is used, so `init` downloads no providers and the suite
