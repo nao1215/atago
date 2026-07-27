@@ -7,6 +7,22 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- `changes: ignore:` drops matching paths from the observed workdir delta before
+  the categories are compared, so a path the program under test writes only
+  sometimes stops being a choice between a flaky spec and no assertion at all. A
+  delta is exhaustive in both directions, which is what makes `modified: []` a
+  proof; but a tool that starts a background service on some runs, or writes a
+  cache into the sandboxed HOME, could not be pinned: naming the path failed on
+  the runs that skipped it, and omitting the category asserted nothing. An ignored
+  path is neither an unexpected change nor evidence for an entry — an entry that
+  names an ignored path still fails — and an ignore glob that matches nothing is
+  fine, since describing what may appear is the point. The globs are doublestar
+  patterns, as in `dir: ignore:`. `atago doc` and `atago explain` name the ignored
+  globs, so a generated page does not advertise a claim the assertion no longer
+  makes. The yazi suite uses it for the state directory yazi writes on some runs.
+
 ### Changed
 
 - The scheduled third-party matrix no longer reports the runner's weather as a

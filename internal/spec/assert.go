@@ -91,6 +91,16 @@ type ChangesAssert struct {
 	Created  *StringList `yaml:"created,omitempty"`
 	Modified *StringList `yaml:"modified,omitempty"`
 	Deleted  *StringList `yaml:"deleted,omitempty"`
+	// Ignore drops matching paths from the observed delta before the categories
+	// are compared, so a path the program writes only SOMETIMES does not have to
+	// be spelled in a category that is exhaustive in both directions (#327). A
+	// tool that starts a background service on some runs, or writes a cache into
+	// the sandboxed HOME, otherwise leaves the author no way to keep the
+	// exhaustive claim: naming the path fails on the runs that do not write it,
+	// and omitting the category asserts nothing. The globs are doublestar
+	// patterns, as in DirAssert.Ignore, and an ignore entry that matches nothing
+	// is fine — describing what MAY appear is the point.
+	Ignore StringList `yaml:"ignore,omitempty"`
 }
 
 // DurationAssert bounds a step's measured wall-clock time (#31). At least one

@@ -183,6 +183,7 @@ func validateDir(add func(string, ...any), where string, d *spec.DirAssert) {
 // time, so confinement is validated in the same /-separated space.
 func validateChanges(add func(string, ...any), where string, c *spec.ChangesAssert) {
 	if c.Created == nil && c.Modified == nil && c.Deleted == nil {
+		// ignore alone asserts nothing: it only narrows what the categories see.
 		add("%s: set at least one of created/modified/deleted (use [] to assert a category changed nothing)", where)
 		return
 	}
@@ -215,6 +216,22 @@ func validateChanges(add func(string, ...any), where string, c *spec.ChangesAsse
 				}
 			}
 		}
+	}
+	for _, pat := range c.Ignore {
+		field := fmt.Sprintf("%s.ignore %q", where, pat)
+		switch {
+		case pat == "":
+			add("%s must be a non-empty workdir-relative glob", field)
+		case strings.HasPrefix(pat, "/"):
+			add("%s must be workdir-relative, not absolute", field)
+		case pathEscapesWorkdir(pat):
+			add("%s escapes the scenario workdir (no ../ traversal)", field)
+		case !doublestar.ValidatePattern(pat):
+			add("%s is not a valid glob: bad pattern syntax", field)
+		}
+	}
+	if c.Ignore != nil && len(c.Ignore) == 0 {
+		add("%s.ignore must not be empty; drop the key instead", where)
 	}
 }
 

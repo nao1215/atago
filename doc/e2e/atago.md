@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-74 suites · 438 scenarios
+74 suites · 440 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -29,7 +29,7 @@
   - [manifest surfaces the browser-runner configuration](#scenario-manifest-surfaces-the-browser-runner-configuration)
   - [an upload action without a file fails validation (exit 2)](#scenario-an-upload-action-without-a-file-fails-validation-exit-2)
   - [a download action without a click selector fails validation (exit 2)](#scenario-a-download-action-without-a-click-selector-fails-validation-exit-2)
-- [atago self-hosting / changes (workdir delta assertions)](#atago-self-hosting--changes-workdir-delta-assertions) — 19 scenarios
+- [atago self-hosting / changes (workdir delta assertions)](#atago-self-hosting--changes-workdir-delta-assertions) — 21 scenarios
   - [a generator touches exactly the files it should (POSIX)](#scenario-a-generator-touches-exactly-the-files-it-should-posix)
   - [an unexpected creation breaks the exact contract (POSIX)](#scenario-an-unexpected-creation-breaks-the-exact-contract-posix)
   - [stdout_to counts as created, and modified nothing holds (portable)](#scenario-stdout_to-counts-as-created-and-modified-nothing-holds-portable)
@@ -49,6 +49,8 @@
   - [removing a symlink is a deletion](#scenario-removing-a-symlink-is-a-deletion)
   - [a dangling symlink is still a creation](#scenario-a-dangling-symlink-is-still-a-creation)
   - [a changes entry naming a directory says what the path is](#scenario-a-changes-entry-naming-a-directory-says-what-the-path-is)
+  - [an ignored path does not break an exhaustive delta](#scenario-an-ignored-path-does-not-break-an-exhaustive-delta)
+  - [an ignored path cannot satisfy an entry that names it](#scenario-an-ignored-path-cannot-satisfy-an-entry-that-names-it)
 - [atago self-hosting / CLI scenario selection](#atago-self-hosting--cli-scenario-selection) — 9 scenarios
   - [filter selects by a name substring](#scenario-filter-selects-by-a-name-substring)
   - [filter is OR across a comma-separated list](#scenario-filter-is-or-across-a-comma-separated-list)
@@ -1294,6 +1296,59 @@ ${atago} run direntry.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `"out" exists as a directory`, `tracks only regular files and symlinks`, `assert it with dir:`
+### Scenario: an ignored path does not break an exhaustive delta
+#### Given
+- Fixture file `strict.atago.yaml` is created.
+#### Inputs
+_Fixture `strict.atago.yaml`:_
+```text
+version: "1"
+suite: {name: strict}
+scenarios:
+  - name: an unignored surprise still fails
+    steps:
+      - run: {shell: true, command: "mkdir -p cache && printf 'x' > cache/state.bin && printf 'y' > surprise.txt"}
+      - assert:
+          changes:
+            ignore: ["cache/**"]
+            created: []
+```
+#### When
+```shell
+mkdir -p cache && printf 'x' > cache/state.bin && printf 'y' > out.txt
+${atago} run strict.atago.yaml
+```
+#### Then
+- after `mkdir -p cache && printf 'x' > cache/state.bin && printf 'y' > out.txt`:
+  - exit code is `0`
+  - the step changed exactly created `out.txt`, modified nothing, deleted nothing, ignoring `cache/**`
+- after `${atago} run strict.atago.yaml`:
+  - exit code is `1`
+  - stdout contains `unexpected created file "surprise.txt"`
+### Scenario: an ignored path cannot satisfy an entry that names it
+#### Given
+- Fixture file `contradiction.atago.yaml` is created.
+#### Inputs
+_Fixture `contradiction.atago.yaml`:_
+```text
+version: "1"
+suite: {name: contradiction}
+scenarios:
+  - name: ignored and expected at once
+    steps:
+      - run: {shell: true, command: "printf 'y' > out.txt"}
+      - assert:
+          changes:
+            ignore: [out.txt]
+            created: [out.txt]
+```
+#### When
+```shell
+${atago} run contradiction.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `created entry "out.txt" matched no file the step created`
 ## atago self-hosting / CLI scenario selection
 Source: `test/e2e/atago/cli_selection.atago.yaml`
 ### Scenario: filter selects by a name substring

@@ -1713,7 +1713,7 @@ keep
 ```
 #### Then
 - exit code is `0`
-- the step changed exactly created `notes.txt`, modified nothing, deleted nothing
+- the step changed exactly created `notes.txt`, modified nothing, deleted nothing, ignoring `.atago-home/**`
 - file `notes.txt` exists
 #### Generated artifacts
 - `notes.txt`
@@ -1746,7 +1746,7 @@ old
 # interactive (pty): yazi .
 ```
 #### Then
-- the step changed exactly created `old.bak.txt`, modified nothing, deleted `old.txt`
+- the step changed exactly created `old.bak.txt`, modified nothing, deleted `old.txt`, ignoring `.atago-home/**`
 - file `old.txt` does not exist
 - file `old.bak.txt` contains `old`
 ### Scenario: yank then paste copies a file into a sibling directory
@@ -1767,7 +1767,7 @@ alpha
 ```
 #### Then
 - exit code is `0`
-- the step changed exactly created `dst/alpha.txt`, modified nothing, deleted nothing
+- the step changed exactly created `dst/alpha.txt`, modified nothing, deleted nothing, ignoring `.atago-home/**`
 - file `src/alpha.txt` contains `alpha`
 - file `dst/alpha.txt` contains `alpha`
 ### Scenario: select-all then yank copies multiple files into a sibling directory
@@ -1793,7 +1793,7 @@ b
 ```
 #### Then
 - exit code is `0`
-- the step changed exactly created `dst/a.txt`, `dst/b.txt`, modified nothing, deleted nothing
+- the step changed exactly created `dst/a.txt`, `dst/b.txt`, modified nothing, deleted nothing, ignoring `.atago-home/**`
 - file `dst/a.txt` contains `a`
 - file `dst/b.txt` contains `b`
 ### Scenario: cut then paste moves a file into a sibling directory
@@ -1814,7 +1814,7 @@ beta
 ```
 #### Then
 - exit code is `0`
-- the step changed exactly created `dst/beta.txt`, modified nothing, deleted `src/beta.txt`
+- the step changed exactly created `dst/beta.txt`, modified nothing, deleted `src/beta.txt`, ignoring `.atago-home/**`
 - file `src/beta.txt` does not exist
 - file `dst/beta.txt` contains `beta`
 ### Scenario: uppercase D permanently deletes the hovered file after confirmation
@@ -1834,7 +1834,7 @@ doomed
 ```
 #### Then
 - exit code is `0`
-- the step changed exactly created nothing, modified nothing, deleted `doomed.txt`
+- the step changed exactly created nothing, modified nothing, deleted `doomed.txt`, ignoring `.atago-home/**`
 - file `doomed.txt` does not exist
 ### Scenario: canceling permanent delete returns to the file list and keeps the file
 _only when `yazi --version` succeeds · skipped on Windows_
@@ -1872,7 +1872,7 @@ one
 ```
 #### Then
 - exit code is `0`
-- the step changed exactly created nothing, modified nothing, deleted nothing
+- the step changed exactly created nothing, modified nothing, deleted nothing, ignoring `.atago-home/**`
 ### Scenario: canceling a cut leaves nothing to paste
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -1891,7 +1891,7 @@ one
 ```
 #### Then
 - exit code is `0`
-- the step changed exactly created nothing, modified nothing, deleted nothing
+- the step changed exactly created nothing, modified nothing, deleted nothing, ignoring `.atago-home/**`
 ### Scenario: select-all then cut moves multiple files into a sibling directory
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given

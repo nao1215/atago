@@ -32,9 +32,9 @@ func checkChanges(c *spec.ChangesAssert, res *runner.Result, env Env) *CheckResu
 	d := res.Changes
 
 	var problems []string
-	checkCategory("created", c.Created, d.Created, &problems, env.Workdir)
-	checkCategory("modified", c.Modified, d.Modified, &problems, env.Workdir)
-	checkCategory("deleted", c.Deleted, d.Deleted, &problems, env.Workdir)
+	checkCategory("created", c.Created, ignorePaths(c.Ignore, d.Created), &problems, env.Workdir)
+	checkCategory("modified", c.Modified, ignorePaths(c.Ignore, d.Modified), &problems, env.Workdir)
+	checkCategory("deleted", c.Deleted, ignorePaths(c.Ignore, d.Deleted), &problems, env.Workdir)
 
 	if len(problems) == 0 {
 		return pass(desc)
@@ -46,6 +46,27 @@ func checkChanges(c *spec.ChangesAssert, res *runner.Result, env Env) *CheckResu
 		Actual:   describeChangesActual(d),
 		Hint:     strings.Join(problems, "; "),
 	}
+}
+
+// ignorePaths drops the observed paths matching any ignore glob (#327). The
+// filtering happens before the categories are compared, so an ignored path is
+// neither an unexpected observation nor something that can satisfy an entry: it
+// is simply not part of the delta the assertion is about.
+func ignorePaths(ignore spec.StringList, observed []string) []string {
+	if len(ignore) == 0 {
+		return observed
+	}
+	pats := make([]string, len(ignore))
+	for i, p := range ignore {
+		pats[i] = strings.TrimPrefix(p, "./")
+	}
+	kept := make([]string, 0, len(observed))
+	for _, obs := range observed {
+		if !matchesAny(pats, obs) {
+			kept = append(kept, obs)
+		}
+	}
+	return kept
 }
 
 // checkCategory enforces the exhaustive-set semantics for one category. A nil
