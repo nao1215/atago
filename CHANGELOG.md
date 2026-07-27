@@ -7,6 +7,15 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- A failure now names the command it was observed under. The console block and the
+  JSON report's `failures[].command` used the scenario's LAST run command, so a
+  scenario that keeps working after the failure blamed the wrong step: an
+  interactive step killed by its timeout was reported against the verification
+  command that followed it and passed. That is a diagnosis pointing the wrong way,
+  and it cost real time — the reader tunes a step that never had a problem.
+
 ### Added
 
 - `changes: ignore:` drops matching paths from the observed workdir delta before

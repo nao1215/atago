@@ -59,12 +59,11 @@ func writeDetail(b *strings.Builder, color bool, suite, specPath string, sc *eng
 	where := specSuffix(specPath)
 	switch sc.Status {
 	case engine.StatusFailed:
-		cmd := lastCommand(sc)
 		var lastRun *runner.Result
 		for _, step := range sc.Steps {
 			// Track the most recent run result BEFORE rendering this step's
 			// checks: a run step's own retry `until` checks assert against that
-			// step's result.
+			// step's result, and every failure block names THAT command.
 			if step.Run != nil {
 				lastRun = step.Run
 			}
@@ -73,7 +72,7 @@ func writeDetail(b *strings.Builder, color bool, suite, specPath string, sc *eng
 					continue
 				}
 				fmt.Fprintf(b, "\n%s %s / %s%s\n", colorize(color, cRed+cBold, "FAILED:"), suite, sc.Name, where)
-				writeCheckFailure(b, color, ck, cmd)
+				writeCheckFailure(b, color, ck, commandOf(lastRun))
 				writeFailureStreams(b, ck, lastRun)
 				// Keep console output compact: reference the durable payloads by path
 				// rather than dumping them inline (#48).
@@ -202,15 +201,17 @@ func writeSuiteSteps(b *strings.Builder, color bool, suite, label string, steps 
 	}
 }
 
-// lastCommand returns the most recent run command in a scenario, for context.
-func lastCommand(sc *engine.ScenarioResult) string {
-	cmd := ""
-	for _, step := range sc.Steps {
-		if step.Run != nil {
-			cmd = step.Run.Command
-		}
+// commandOf names the command a failure was observed under: the result the
+// failing check asserts on, not the scenario's last command. Using the last one
+// mislabeled every failure in a scenario that keeps working afterwards — an
+// interactive step that timed out was reported against the verification command
+// that followed it and passed, which sends the reader to tune a step that never
+// had a problem.
+func commandOf(res *runner.Result) string {
+	if res == nil {
+		return ""
 	}
-	return cmd
+	return res.Command
 }
 
 // specSuffix renders the spec-file annotation appended to failure headers, or
