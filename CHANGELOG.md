@@ -34,6 +34,11 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- A JSON `null` is now spelled `null` in matcher subjects and failure messages
+  instead of Go's `<nil>`. The Go-ism made a message about someone else's
+  document read as a message about atago's implementation, and left `matches`
+  with nothing writable to match a null field against; the `store` path already
+  refused to leak it.
 - A failure whose two sides differ only in invisible characters now quotes both.
   A byte-exact `equals` mismatch between `shared\n` and `shared\r\n` printed the
   same word twice, and the same happened for a trailing space or a tab against

@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-74 suites · 421 scenarios
+74 suites · 423 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -211,7 +211,7 @@
   - [a json list fails the inner spec when one listed path mismatches](#scenario-a-json-list-fails-the-inner-spec-when-one-listed-path-mismatches)
   - [a stdout json list against a JSON-producing command](#scenario-a-stdout-json-list-against-a-json-producing-command)
   - [a yaml list asserts several paths on one document](#scenario-a-yaml-list-asserts-several-paths-on-one-document)
-- [atago self-hosting / json matcher boundary values](#atago-self-hosting--json-matcher-boundary-values) — 12 scenarios
+- [atago self-hosting / json matcher boundary values](#atago-self-hosting--json-matcher-boundary-values) — 14 scenarios
   - [an array element is addressable by index](#scenario-an-array-element-is-addressable-by-index)
   - [a top-level array reports its length](#scenario-a-top-level-array-reports-its-length)
   - [an empty array has length zero](#scenario-an-empty-array-has-length-zero)
@@ -224,6 +224,8 @@
   - [a type mismatch failure distinguishes a string from a boolean](#scenario-a-type-mismatch-failure-distinguishes-a-string-from-a-boolean)
   - [a whitespace-only mismatch shows the surrounding spaces](#scenario-a-whitespace-only-mismatch-shows-the-surrounding-spaces)
   - [a numeric mismatch stays unquoted](#scenario-a-numeric-mismatch-stays-unquoted)
+  - [a null value is spelled null, not the Go zero value](#scenario-a-null-value-is-spelled-null-not-the-go-zero-value)
+  - [a failure against a null value names it as null](#scenario-a-failure-against-a-null-value-names-it-as-null)
 - [atago self-hosting / line selector](#atago-self-hosting--line-selector) — 3 scenarios
   - [line selector narrows stdout to a single 1-based line](#scenario-line-selector-narrows-stdout-to-a-single-1-based-line)
   - [a trailing newline does not add a phantom final line](#scenario-a-trailing-newline-does-not-add-a-phantom-final-line)
@@ -4246,6 +4248,35 @@ ${atago} run nums.atago.yaml
 - exit code is `1`
 - stdout contains `$.n == 1`, `$.n = 2`
 - stdout does not contain `"2"`
+### Scenario: a null value is spelled null, not the Go zero value
+#### When
+```shell
+printf '{"v": null}'
+```
+#### Then
+- stdout at `$.v` matches `/^null$/`
+### Scenario: a failure against a null value names it as null
+#### Given
+- Fixture file `nulled.atago.yaml` is created.
+#### Inputs
+_Fixture `nulled.atago.yaml`:_
+```text
+version: "1"
+suite: {name: nulled}
+scenarios:
+  - name: the field is null, the expectation is a string
+    steps:
+      - run: {shell: true, command: 'printf ''{"v": null}'''}
+      - assert: {stdout: {json: [{path: "$.v", equals: "something"}]}}
+```
+#### When
+```shell
+${atago} run nulled.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `$.v = null`
+- stdout does not contain `<nil>`
 ## atago self-hosting / line selector
 Source: `test/e2e/atago/line.atago.yaml`
 ### Scenario: line selector narrows stdout to a single 1-based line

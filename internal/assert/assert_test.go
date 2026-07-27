@@ -2315,6 +2315,34 @@ func TestCheck_JSONEquals_MismatchNamesTheDifference(t *testing.T) {
 	}
 }
 
+// TestCheck_JSON_NullRendersAsNull pins that a JSON null is spelled the way the
+// document spells it. Go prints nil as "<nil>", which turned a message about
+// someone else's JSON into a message about Go, and made `matches` impossible to
+// write against a null field. The store path already refused to leak it.
+func TestCheck_JSON_NullRendersAsNull(t *testing.T) {
+	t.Parallel()
+	res := &runner.Result{Stdout: []byte(`{"v":null}`)}
+
+	// The subject the regex sees is "null", so a spec can match on it.
+	got := Check(&spec.Assert{Stdout: &spec.StreamAssert{
+		JSON: spec.JSONChecks{{Path: "$.v", Matches: strp("^null$")}},
+	}}, res, Env{})
+	if !got.OK {
+		t.Errorf("matches ^null$ against a JSON null should pass: %s", got.Hint)
+	}
+
+	// And a failing comparison names it as null rather than as a Go value.
+	got = Check(&spec.Assert{Stdout: &spec.StreamAssert{
+		JSON: spec.JSONChecks{{Path: "$.v", Equals: "something"}},
+	}}, res, Env{})
+	if got.OK {
+		t.Fatal("a null value must not equal a string")
+	}
+	if !strings.Contains(got.Actual, "null") || strings.Contains(got.Actual, "<nil>") {
+		t.Errorf("Actual = %q, want it to spell the value null", got.Actual)
+	}
+}
+
 // TestCheck_DirExists_OnAFilePathSaysSo pins the hint for the confusing case: a
 // path that exists as a file reported a bare "exists=false", which reads as
 // "nothing is there" and sends the author looking for output that is sitting
