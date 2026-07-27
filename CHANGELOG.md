@@ -34,6 +34,11 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- A failure whose two sides differ only in invisible characters now quotes both.
+  A byte-exact `equals` mismatch between `shared\n` and `shared\r\n` printed the
+  same word twice, and the same happened for a trailing space or a tab against
+  spaces: the reader could see there was a difference but not what it was.
+  Ordinary differences keep their plain, copy-pasteable form.
 - A `file:` assertion is no longer satisfied by a directory. `exists: true`
   passed for a tool that produced a directory where a file was expected, and
   `executable: true` passed on any directory, since every directory carries the

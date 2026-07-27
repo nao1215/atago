@@ -83,11 +83,12 @@ func writeDetail(b *strings.Builder, color bool, suite, specPath string, sc *eng
 				if diff := checkDiff(ck); diff != "" {
 					fmt.Fprintf(b, "\nDiff (-expected +actual):\n%s\n", indent(colorizeDiff(color, diff)))
 				} else {
-					if ck.Expected != "" {
-						fmt.Fprintf(b, "\nExpected:\n%s\n", indent(ck.Expected))
+					expected, actual := visiblePair(ck.Expected, ck.Actual)
+					if expected != "" {
+						fmt.Fprintf(b, "\nExpected:\n%s\n", indent(expected))
 					}
-					if ck.Actual != "" {
-						fmt.Fprintf(b, "\nActual:\n%s\n", indent(ck.Actual))
+					if actual != "" {
+						fmt.Fprintf(b, "\nActual:\n%s\n", indent(actual))
 					}
 				}
 				if ck.Hint != "" {
@@ -216,11 +217,12 @@ func writeSuiteSteps(b *strings.Builder, color bool, suite, label string, steps 
 			if diff := checkDiff(ck); diff != "" {
 				fmt.Fprintf(b, "\nDiff (-expected +actual):\n%s\n", indent(colorizeDiff(color, diff)))
 			} else {
-				if ck.Expected != "" {
-					fmt.Fprintf(b, "\nExpected:\n%s\n", indent(ck.Expected))
+				expected, actual := visiblePair(ck.Expected, ck.Actual)
+				if expected != "" {
+					fmt.Fprintf(b, "\nExpected:\n%s\n", indent(expected))
 				}
-				if ck.Actual != "" {
-					fmt.Fprintf(b, "\nActual:\n%s\n", indent(ck.Actual))
+				if actual != "" {
+					fmt.Fprintf(b, "\nActual:\n%s\n", indent(actual))
 				}
 			}
 			if ck.Hint != "" {

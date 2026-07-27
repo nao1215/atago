@@ -257,3 +257,69 @@ func TestUnifiedDiff_ZeroCountHunkHeader(t *testing.T) {
 		t.Errorf("both-no-newline sides not both annotated:\n%s", got)
 	}
 }
+
+// TestVisiblePair_EscapesOnlyInvisibleDifferences pins the rendering rule for
+// the compact Expected/Actual block: when the two payloads differ only in
+// characters a terminal does not show, both are quoted so the difference is
+// readable; an ordinary difference keeps its plain, copy-pasteable form.
+func TestVisiblePair_EscapesOnlyInvisibleDifferences(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name                     string
+		expected, actual         string
+		wantExpected, wantActual string
+	}{
+		{
+			name:         "crlf against lf",
+			expected:     "shared\n",
+			actual:       "shared\r\n",
+			wantExpected: `"shared\n"`,
+			wantActual:   `"shared\r\n"`,
+		},
+		{
+			name:         "trailing spaces",
+			expected:     "value",
+			actual:       "value  ",
+			wantExpected: `"value"`,
+			wantActual:   `"value  "`,
+		},
+		{
+			name:         "tab against spaces",
+			expected:     "a\tb",
+			actual:       "a b",
+			wantExpected: `"a\tb"`,
+			wantActual:   `"a b"`,
+		},
+		{
+			name:         "a visible difference is left alone",
+			expected:     "expected text",
+			actual:       "actual text",
+			wantExpected: "expected text",
+			wantActual:   "actual text",
+		},
+		{
+			name:         "identical strings are left alone",
+			expected:     "same",
+			actual:       "same",
+			wantExpected: "same",
+			wantActual:   "same",
+		},
+		{
+			name:         "an empty side is left alone",
+			expected:     "",
+			actual:       "something",
+			wantExpected: "",
+			wantActual:   "something",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			gotExpected, gotActual := visiblePair(tt.expected, tt.actual)
+			if gotExpected != tt.wantExpected || gotActual != tt.wantActual {
+				t.Errorf("visiblePair(%q, %q) = (%q, %q), want (%q, %q)",
+					tt.expected, tt.actual, gotExpected, gotActual, tt.wantExpected, tt.wantActual)
+			}
+		})
+	}
+}

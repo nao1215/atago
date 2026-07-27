@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-74 suites · 418 scenarios
+74 suites · 421 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -137,7 +137,7 @@
   - [explain describes every matcher of a composed stream assertion](#scenario-explain-describes-every-matcher-of-a-composed-stream-assertion)
   - [explain names the line a line-scoped matcher inspects](#scenario-explain-names-the-line-a-line-scoped-matcher-inspects)
   - [explain describes file not_contains and executable matchers](#scenario-explain-describes-file-not_contains-and-executable-matchers)
-- [atago self-hosting / file equals and equals_file byte-equality (#155)](#atago-self-hosting--file-equals-and-equals_file-byte-equality-155) — 7 scenarios
+- [atago self-hosting / file equals and equals_file byte-equality (#155)](#atago-self-hosting--file-equals-and-equals_file-byte-equality-155) — 10 scenarios
   - [equals_file passes for two byte-identical files](#scenario-equals_file-passes-for-two-byte-identical-files)
   - [equals matches an inline literal byte-for-byte](#scenario-equals-matches-an-inline-literal-byte-for-byte)
   - [equals_file fails the inner spec when the two files differ by one byte](#scenario-equals_file-fails-the-inner-spec-when-the-two-files-differ-by-one-byte)
@@ -145,6 +145,9 @@
   - [a file assertion is not satisfied by a directory](#scenario-a-file-assertion-is-not-satisfied-by-a-directory)
   - [an executable assertion is not satisfied by a directory](#scenario-an-executable-assertion-is-not-satisfied-by-a-directory)
   - [a real file still satisfies both matchers](#scenario-a-real-file-still-satisfies-both-matchers)
+  - [an invisible difference is quoted in the failure output](#scenario-an-invisible-difference-is-quoted-in-the-failure-output)
+  - [a trailing space difference is quoted too](#scenario-a-trailing-space-difference-is-quoted-too)
+  - [an ordinary difference keeps its plain form](#scenario-an-ordinary-difference-keeps-its-plain-form)
 - [atago self-hosting / fixture from (copy committed testdata)](#atago-self-hosting--fixture-from-copy-committed-testdata) — 2 scenarios
   - [a committed binary blob is copied verbatim into the workdir](#scenario-a-committed-binary-blob-is-copied-verbatim-into-the-workdir)
   - [copying from a missing source errors the scenario](#scenario-copying-from-a-missing-source-errors-the-scenario)
@@ -3021,6 +3024,84 @@ ${atago} run ok.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `PASSED`
+### Scenario: an invisible difference is quoted in the failure output
+#### Given
+- Fixture file `crlf.atago.yaml` is created.
+#### Inputs
+_Fixture `crlf.atago.yaml`:_
+```text
+version: "1"
+suite: {name: crlf}
+scenarios:
+  - name: the file ends with CRLF, the expectation with LF
+    steps:
+      - fixture:
+          file: a.txt
+          base64: c2hhcmVkDQo=
+      - run: {command: echo hi}
+      - assert:
+          file:
+            path: a.txt
+            equals: "shared\n"
+```
+#### When
+```shell
+${atago} run crlf.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `"shared\n"`, `"shared\r\n"`
+### Scenario: a trailing space difference is quoted too
+#### Given
+- Fixture file `spaces.atago.yaml` is created.
+#### Inputs
+_Fixture `spaces.atago.yaml`:_
+```text
+version: "1"
+suite: {name: spaces}
+scenarios:
+  - name: the output carries trailing spaces
+    steps:
+      - run:
+          shell: true
+          command: "printf 'value  '"
+      - assert:
+          stdout:
+            equals: "value"
+```
+#### When
+```shell
+${atago} run spaces.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `"value  "`
+### Scenario: an ordinary difference keeps its plain form
+#### Given
+- Fixture file `plain.atago.yaml` is created.
+#### Inputs
+_Fixture `plain.atago.yaml`:_
+```text
+version: "1"
+suite: {name: plain}
+scenarios:
+  - name: the texts really are different
+    steps:
+      - run:
+          shell: true
+          command: "printf 'actual text'"
+      - assert:
+          stdout:
+            equals: "expected text"
+```
+#### When
+```shell
+${atago} run plain.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `expected text`, `actual text`
+- stdout does not contain `"actual text"`
 ## atago self-hosting / fixture from (copy committed testdata)
 Source: `test/e2e/atago/fixture_from.atago.yaml`
 ### Scenario: a committed binary blob is copied verbatim into the workdir

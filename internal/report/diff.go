@@ -2,6 +2,7 @@ package report
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/nao1215/atago/internal/assert"
@@ -265,4 +266,33 @@ func colorizeDiff(on bool, diff string) string {
 		}
 	}
 	return strings.Join(lines, "\n")
+}
+
+// visiblePair returns the Expected/Actual pair to print in the compact form,
+// escaping both when they differ only in characters a terminal does not show.
+// A file `equals` failure between "shared\n" and "shared\r\n" printed the same
+// two words twice — the reader could see there was a difference but not what it
+// was — and the same happens for a tab against spaces or a trailing blank.
+// Quoting is applied to BOTH sides so they stay comparable, and only when the
+// plain rendering would be indistinguishable, so the ordinary failure keeps its
+// unquoted, copy-pasteable form.
+func visiblePair(expected, actual string) (string, string) {
+	if expected == "" || actual == "" || expected == actual {
+		return expected, actual
+	}
+	if stripInvisible(expected) != stripInvisible(actual) {
+		return expected, actual
+	}
+	return strconv.Quote(expected), strconv.Quote(actual)
+}
+
+// stripInvisible removes the characters whose presence a terminal does not
+// reveal: carriage returns, tabs, and whitespace at the end of a line or of the
+// text. Two payloads that are equal after this differ only invisibly.
+func stripInvisible(s string) string {
+	lines := strings.Split(strings.ReplaceAll(s, "\r", ""), "\n")
+	for i, ln := range lines {
+		lines[i] = strings.TrimRight(strings.ReplaceAll(ln, "\t", " "), " ")
+	}
+	return strings.TrimRight(strings.Join(lines, "\n"), "\n")
 }
