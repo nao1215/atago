@@ -3,6 +3,7 @@ package spec
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/goccy/go-yaml"
@@ -328,6 +329,18 @@ type StreamAssert struct {
 // the whole list counts as a single matcher (the one-of matcher rule is
 // unchanged).
 type StringList []string
+
+// Quoted renders the list the way atago talks about it in prose: each element
+// quoted, joined with ", ". A single element therefore reads exactly like the
+// pre-list scalar form did. Assertion failures and `atago explain` both need
+// this rendering, and each used to carry its own copy.
+func (l StringList) Quoted() string {
+	parts := make([]string, len(l))
+	for i, s := range l {
+		parts[i] = strconv.Quote(s)
+	}
+	return strings.Join(parts, ", ")
+}
 
 // UnmarshalYAML accepts a scalar string or a sequence of strings. It uses the
 // interface-based decoder (not the raw-bytes form) so escapes like "\x1b" are

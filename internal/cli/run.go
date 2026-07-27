@@ -173,19 +173,9 @@ func parseRunFlags(label string, args []string, stdout, stderr io.Writer) (*runO
 		return nil, ExitConfig, true
 	}
 
-	targets := fs.Args()
-	if len(targets) == 0 {
-		targets = []string{"."}
-	}
-
-	paths, err := collectSpecFiles(targets)
-	if err != nil {
-		fmt.Fprintf(stderr, label+": %v\n", err)
-		return nil, ExitConfig, true
-	}
-	if len(paths) == 0 {
-		fmt.Fprintln(stderr, label+": no *.atago.yaml (or *.atago.yml) files found")
-		return nil, ExitConfig, true
+	paths, exitCode, ok := specTargets(label, fs.Args(), stderr)
+	if !ok {
+		return nil, exitCode, true
 	}
 
 	// --repeat and --retry-failed answer opposite questions (does it flake? /
@@ -479,6 +469,32 @@ func runSpecs(ctx context.Context, eng *engine.Engine, paths []string) ([]*engin
 // --fail-fast: a failed or errored verdict, or a security-policy violation.
 func suiteFailed(res *engine.SuiteResult) bool {
 	return res != nil && (res.Status == engine.StatusFailed || res.Status == engine.StatusError || res.SecurityViolation)
+}
+
+// specTargets resolves a subcommand's positional arguments into the spec files
+// it should act on, and reports the failures in the caller's own voice. Every
+// subcommand that takes spec paths — run, list, explain, doc, manifest — needs
+// the same three steps: default to the current directory, expand directories,
+// and refuse an empty result. Keeping them here is what makes a new
+// spec-reading subcommand behave identically without copying the messages, and
+// stops the "no spec files found" wording from drifting between commands.
+//
+// ok is false when the caller should return the accompanying exit code.
+func specTargets(label string, args []string, stderr io.Writer) (paths []string, exit int, ok bool) {
+	targets := args
+	if len(targets) == 0 {
+		targets = []string{"."}
+	}
+	paths, err := collectSpecFiles(targets)
+	if err != nil {
+		fmt.Fprintf(stderr, "%s: %v\n", label, err)
+		return nil, ExitConfig, false
+	}
+	if len(paths) == 0 {
+		fmt.Fprintf(stderr, "%s: no *.atago.yaml (or *.atago.yml) files found\n", label)
+		return nil, ExitConfig, false
+	}
+	return paths, ExitOK, true
 }
 
 // collectSpecFiles resolves run targets into a deduplicated list of spec files.
