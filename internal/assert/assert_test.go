@@ -19,6 +19,7 @@ import (
 	"github.com/nao1215/atago/internal/runner"
 	"github.com/nao1215/atago/internal/runner/mock"
 	"github.com/nao1215/atago/internal/spec"
+	"github.com/nao1215/atago/internal/spectest"
 )
 
 func intp(i int) *int         { return &i }
@@ -2423,5 +2424,26 @@ func TestCheck_DirExists_OnAFilePathSaysSo(t *testing.T) {
 	}
 	if !strings.Contains(got.Actual, "regular file") {
 		t.Errorf("Actual = %q, want it to name the kind of entry", got.Actual)
+	}
+}
+
+// TestCheckTarget_CoversEveryAssertTarget walks spec.AllAssertTargets and proves
+// the runtime has a case for each one. The switch's default reports "assertion
+// target not supported yet", which a loaded spec should never be able to reach:
+// the loader accepts a target the runtime cannot evaluate only if the two
+// switches have drifted. The Assert values are minimal, so a target legitimately
+// fails here for a missing matcher — what must not happen is the not-supported
+// hint.
+func TestCheckTarget_CoversEveryAssertTarget(t *testing.T) {
+	t.Parallel()
+	for _, target := range spec.AllAssertTargets() {
+		got := checkTarget(spectest.AssertForTarget(target), target, &runner.Result{}, Env{Workdir: t.TempDir()})
+		if got == nil {
+			t.Errorf("target %q produced no CheckResult", target)
+			continue
+		}
+		if strings.Contains(got.Hint, "not supported yet") {
+			t.Errorf("target %q fell through to the default branch: %s", target, got.Hint)
+		}
 	}
 }

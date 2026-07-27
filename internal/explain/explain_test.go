@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/nao1215/atago/internal/loader"
+	"github.com/nao1215/atago/internal/spec"
+	"github.com/nao1215/atago/internal/spectest"
 )
 
 func TestExplain(t *testing.T) {
@@ -1086,5 +1088,22 @@ scenarios:
 	out = mustExplain(t, b64Src)
 	if !strings.Contains(out, "binary stdin (base64)") {
 		t.Errorf("explain binary-stdin missing\n--- got ---\n%s", out)
+	}
+}
+
+// TestDescribeTarget_CoversEveryAssertTarget walks spec.AllAssertTargets and
+// proves `atago explain` has a case for each one. The switch's default prints the
+// bare target name, so a new target would appear in the plan as a word with no
+// statement of what it checks — the one thing explain exists to provide.
+func TestDescribeTarget_CoversEveryAssertTarget(t *testing.T) {
+	t.Parallel()
+	for _, target := range spec.AllAssertTargets() {
+		got := describeTarget(spectest.AssertForTarget(target), target)
+		if got == "" {
+			t.Errorf("target %q renders as an empty line", target)
+		}
+		if got == string(target) {
+			t.Errorf("target %q fell through to the default branch (printed as the bare name)", target)
+		}
 	}
 }

@@ -416,6 +416,21 @@ type thenGroup struct {
 	bullets   []string
 }
 
+// isActionStep reports whether a step performs an action an assertion can be
+// read against. It is the one definition of that set: writeThen counts actions
+// to decide between a flat bullet list and grouped ones, and thenGroups assigns
+// each assert to the most recent action. When the two spelled the set
+// separately, a step kind added to one of them either flattened grouped bullets
+// or grouped flat ones.
+func isActionStep(kind spec.StepKind) bool {
+	switch kind {
+	case spec.StepRun, spec.StepHTTP, spec.StepQuery, spec.StepGRPC, spec.StepCDP, spec.StepSignal:
+		return true
+	default:
+		return false
+	}
+}
+
 // thenGroups walks the steps and groups each assert under the most recent
 // action step (run/http/query/grpc/cdp). Fixture and store steps never break a
 // group: they observe nothing.
@@ -424,9 +439,11 @@ func thenGroups(sc *spec.Scenario, expand func(string) string) []thenGroup {
 	actionIdx, actionLbl := -1, ""
 	for i := range sc.Steps {
 		step := &sc.Steps[i]
-		switch step.Kind() {
-		case spec.StepRun, spec.StepHTTP, spec.StepQuery, spec.StepGRPC, spec.StepCDP, spec.StepSignal:
+		if isActionStep(step.Kind()) {
 			actionIdx, actionLbl = i, actionLabel(step, expand)
+			continue
+		}
+		switch step.Kind() {
 		case spec.StepAssert:
 			if len(groups) == 0 || groups[len(groups)-1].actionIdx != actionIdx {
 				groups = append(groups, thenGroup{actionIdx: actionIdx, action: actionLbl})
@@ -470,12 +487,9 @@ func writeThen(md *markdown.Markdown, sc *spec.Scenario, expand func(string) str
 	if len(groups) == 0 {
 		return
 	}
-	// Keep this action set in sync with thenGroups: a drift flattens grouped
-	// bullets (or vice versa) for scenarios mixing the two step kinds.
 	actions := 0
 	for i := range sc.Steps {
-		switch sc.Steps[i].Kind() {
-		case spec.StepRun, spec.StepHTTP, spec.StepQuery, spec.StepGRPC, spec.StepCDP, spec.StepSignal:
+		if isActionStep(sc.Steps[i].Kind()) {
 			actions++
 		}
 	}

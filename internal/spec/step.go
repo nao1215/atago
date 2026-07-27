@@ -96,63 +96,57 @@ const (
 	AssertChanges    AssertTarget = "changes"
 )
 
+// assertTargets is the one list of assertion target families: the name each
+// carries in a spec, in the order SetTargets reports them, paired with the
+// question "does this Assert set it?". Five layers switch on a target — the
+// loader's validation, the runtime check, the doc and explain descriptions, and
+// the JSON schema — and each of those switches is drift-tested against this
+// list, so a target cannot be half-wired: adding a field to Assert without an
+// entry here fails TestAssertTargets_CoverEveryAssertField, and a layer that
+// forgets the new target fails its own coverage test.
+var assertTargets = []struct {
+	target AssertTarget
+	set    func(*Assert) bool
+}{
+	{AssertExitCode, func(a *Assert) bool { return a.ExitCode != nil }},
+	{AssertStdout, func(a *Assert) bool { return a.Stdout != nil }},
+	{AssertStderr, func(a *Assert) bool { return a.Stderr != nil }},
+	{AssertFile, func(a *Assert) bool { return a.File != nil }},
+	{AssertStatus, func(a *Assert) bool { return a.Status != nil }},
+	{AssertHeader, func(a *Assert) bool { return a.Header != nil }},
+	{AssertBody, func(a *Assert) bool { return a.Body != nil }},
+	{AssertRows, func(a *Assert) bool { return a.Rows != nil }},
+	{AssertGRPCStatus, func(a *Assert) bool { return a.GRPCStatus != nil }},
+	{AssertMessage, func(a *Assert) bool { return a.Message != nil }},
+	{AssertValue, func(a *Assert) bool { return a.Value != nil }},
+	{AssertImage, func(a *Assert) bool { return a.Image != nil }},
+	{AssertDir, func(a *Assert) bool { return a.Dir != nil }},
+	{AssertPDF, func(a *Assert) bool { return a.PDF != nil }},
+	{AssertMock, func(a *Assert) bool { return a.Mock != nil }},
+	{AssertScreen, func(a *Assert) bool { return a.Screen != nil }},
+	{AssertDuration, func(a *Assert) bool { return a.Duration != nil }},
+	{AssertChanges, func(a *Assert) bool { return a.Changes != nil }},
+}
+
+// AllAssertTargets returns every assertion target family, in the order
+// SetTargets reports them. It exists so a layer that must handle all of them can
+// be tested against the list instead of against a reader's memory.
+func AllAssertTargets() []AssertTarget {
+	out := make([]AssertTarget, len(assertTargets))
+	for i, e := range assertTargets {
+		out[i] = e.target
+	}
+	return out
+}
+
 // SetTargets returns the assertion target families present. A valid assert has
 // exactly one.
 func (a *Assert) SetTargets() []AssertTarget {
 	var t []AssertTarget
-	if a.ExitCode != nil {
-		t = append(t, AssertExitCode)
-	}
-	if a.Stdout != nil {
-		t = append(t, AssertStdout)
-	}
-	if a.Stderr != nil {
-		t = append(t, AssertStderr)
-	}
-	if a.File != nil {
-		t = append(t, AssertFile)
-	}
-	if a.Status != nil {
-		t = append(t, AssertStatus)
-	}
-	if a.Header != nil {
-		t = append(t, AssertHeader)
-	}
-	if a.Body != nil {
-		t = append(t, AssertBody)
-	}
-	if a.Rows != nil {
-		t = append(t, AssertRows)
-	}
-	if a.GRPCStatus != nil {
-		t = append(t, AssertGRPCStatus)
-	}
-	if a.Message != nil {
-		t = append(t, AssertMessage)
-	}
-	if a.Value != nil {
-		t = append(t, AssertValue)
-	}
-	if a.Image != nil {
-		t = append(t, AssertImage)
-	}
-	if a.Dir != nil {
-		t = append(t, AssertDir)
-	}
-	if a.PDF != nil {
-		t = append(t, AssertPDF)
-	}
-	if a.Mock != nil {
-		t = append(t, AssertMock)
-	}
-	if a.Screen != nil {
-		t = append(t, AssertScreen)
-	}
-	if a.Duration != nil {
-		t = append(t, AssertDuration)
-	}
-	if a.Changes != nil {
-		t = append(t, AssertChanges)
+	for _, e := range assertTargets {
+		if e.set(a) {
+			t = append(t, e.target)
+		}
 	}
 	return t
 }
