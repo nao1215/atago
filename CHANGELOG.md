@@ -7,6 +7,25 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-07-27
+
+Two changes can turn a passing spec red, so read these first.
+
+- `changes:` now tracks symlinks. A step that plants a link, retargets one, or
+  removes one is now a creation, a modification, or a deletion. A spec that
+  wrote `created: []` for such a step passed only because the link was
+  invisible to the delta; it now fails and has to name the link.
+- `file: exists` and `file: executable` no longer accept a directory. Both were
+  satisfied by one — every directory carries the execute bit — so an assertion
+  written to catch "the tool left a directory where a file belongs" passed
+  instead of catching it. Both now fail and point at `dir:`.
+
+The rest of the release is about failure messages that name the difference
+rather than printing both sides identically, and about three new third-party
+suites — Ghostscript, zstd, and ImageMagick — that put the `pdf:` and `image:`
+matchers on the output of real programs, which is how the two `pdf:` extraction
+bugs below were found.
+
 ### Added
 
 - The git third-party suite gains a second spec covering what a script leans on:
