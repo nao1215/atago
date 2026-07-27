@@ -34,6 +34,11 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- `pdf: text:` no longer loses everything after the first stream that ends
+  without a newline. ISO 32000 recommends an EOL before `endstream` but does not
+  require one, and Ghostscript omits it, so the scan ran past the true end of a
+  stream and swallowed the objects that followed: a two-page Ghostscript PDF
+  reported only its first page's words.
 - `pdf: metadata:` now finds the Info dictionary when the producer stores it in
   a compressed object stream, which every PDF 1.5+ writer does by default —
   Ghostscript 10, LaTeX, Word. Only the raw bytes were scanned, so a metadata

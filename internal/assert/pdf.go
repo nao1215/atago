@@ -136,7 +136,11 @@ var (
 	// not match `/Type /Pages`). Whitespace between token parts is flexible.
 	rePageObj = regexp.MustCompile(`/Type\s*/Page(?:[^s]|$)`)
 	reCount   = regexp.MustCompile(`/Count\s+(\d+)`)
-	reStream  = regexp.MustCompile(`(?s)stream\r?\n(.*?)\r?\nendstream`)
+	// The EOL before `endstream` is recommended by ISO 32000 but not required,
+	// and real producers (Ghostscript) omit it. Requiring it made the scan run
+	// past the true end of a stream and swallow the following objects, so a
+	// document's later pages contributed no text at all.
+	reStream = regexp.MustCompile(`(?s)stream\r?\n(.*?)\r?\n?endstream`)
 	// /Type /ObjStm marks a stream that holds document objects (PDF 1.5+), which
 	// is where a modern writer puts the Info dictionary.
 	reObjStm = regexp.MustCompile(`/Type\s*/ObjStm`)

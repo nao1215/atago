@@ -363,3 +363,46 @@ func TestParsePDF_PageContentIsNotMetadata(t *testing.T) {
 		t.Errorf("text = %q, want the drawn text to still be extracted", doc.text)
 	}
 }
+
+// TestParsePDF_StreamWithoutTrailingNewline is a regression: ISO 32000
+// recommends an EOL before `endstream` but does not require one, and
+// Ghostscript omits it. Requiring the newline made the scan run past the true
+// end of a stream, swallow the objects that followed, and silently drop their
+// text — a two-page document reported only its first page's words.
+func TestParsePDF_StreamWithoutTrailingNewline(t *testing.T) {
+	t.Parallel()
+	deflate := func(payload string) []byte {
+		var buf bytes.Buffer
+		zw := zlib.NewWriter(&buf)
+		if _, err := zw.Write([]byte(payload)); err != nil {
+			t.Fatal(err)
+		}
+		if err := zw.Close(); err != nil {
+			t.Fatal(err)
+		}
+		return buf.Bytes()
+	}
+
+	var pdf bytes.Buffer
+	pdf.WriteString("%PDF-1.5\n")
+	pdf.WriteString("1 0 obj\n<< /Type /Page >>\nendobj\n")
+	// First page content: no EOL between the payload and `endstream`.
+	pdf.WriteString("2 0 obj\n<< /Filter /FlateDecode >>\nstream\n")
+	pdf.Write(deflate("BT (First page words) Tj ET"))
+	pdf.WriteString("endstream\nendobj\n")
+	pdf.WriteString("3 0 obj\n<< /Type /Page >>\nendobj\n")
+	pdf.WriteString("4 0 obj\n<< /Filter /FlateDecode >>\nstream\n")
+	pdf.Write(deflate("BT (Second page words) Tj ET"))
+	pdf.WriteString("\nendstream\nendobj\n")
+	pdf.WriteString("trailer\n<< /Root 1 0 R >>\n%%EOF\n")
+
+	doc := parsePDF(pdf.Bytes())
+	if doc.pages != 2 {
+		t.Errorf("pages = %d, want 2", doc.pages)
+	}
+	for _, want := range []string{"First page words", "Second page words"} {
+		if !strings.Contains(doc.text, want) {
+			t.Errorf("text = %q, want it to contain %q", doc.text, want)
+		}
+	}
+}
