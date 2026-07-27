@@ -174,6 +174,38 @@ func runRefGuard(st *store.Store, run *spec.Run, runners map[string]spec.Runner)
 // baseline before every attempt, so the recorded delta reflects only the final
 // (converged) attempt rather than the cumulative delta of all attempts (#251).
 // It is nil for the teardown path and for every non-run step kind.
+// adopt makes r the result later assertions read, and records the copy the
+// report will show. Every protocol step (run, http, query, grpc, pty, cdp) ends
+// this way, and the masked copy is what keeps a secret out of logs — a branch
+// that forgot it would leak, so the pairing lives in one place.
+func (x *scenarioRun) adopt(sr *StepResult, r *runner.Result) {
+	x.current = r
+	sr.Run = maskResult(x.masker, r)
+}
+
+// recordUntil reports a retry's `until` checks like assertions and says whether
+// the step failed. A retry that never satisfied its condition within the budget
+// is a failure, not a silent pass; run and http steps both retry this way.
+func (x *scenarioRun) recordUntil(sr *StepResult, i int, checks []*assert.CheckResult) Status {
+	if len(checks) == 0 {
+		return StatusPassed
+	}
+	x.e.recordChecks(x.masker, checks, x.rc.specPath, x.sc.Name, x.idx, i)
+	sr.Checks = append(sr.Checks, checks...)
+	if !assert.AllOK(checks) {
+		return StatusFailed
+	}
+	return StatusPassed
+}
+
+// fail reports one engine-generated check (a killed timeout, a never-matching
+// pty expect) the same way an assertion failure is reported.
+func (x *scenarioRun) fail(sr *StepResult, i int, ck *assert.CheckResult) Status {
+	x.e.recordChecks(x.masker, []*assert.CheckResult{ck}, x.rc.specPath, x.sc.Name, x.idx, i)
+	sr.Checks = append(sr.Checks, ck)
+	return StatusFailed
+}
+
 func (x *scenarioRun) execStep(ctx context.Context, steps []spec.Step, i int, step *spec.Step, beforeAttempt func()) (StepResult, Status, bool) {
 	sr := StepResult{Index: i, Kind: step.Kind()}
 	status := StatusPassed
@@ -196,23 +228,14 @@ func (x *scenarioRun) execStep(ctx context.Context, steps []spec.Step, i int, st
 			sr.ErrMsg = err.Error()
 			return sr, StatusError, isPolicyViolation(err)
 		}
-		x.current = r
 		// Assertions run against the real result (current); the copy kept for
 		// reporting is masked so secrets never reach logs/reports.
-		sr.Run = maskResult(x.masker, r)
-		// A retry's `until` condition is reported like an assertion; if it never
-		// passed within the budget, the run step fails.
-		if len(untilChecks) > 0 {
-			x.e.recordChecks(x.masker, untilChecks, x.rc.specPath, x.sc.Name, x.idx, i)
-			sr.Checks = untilChecks
-			if !assert.AllOK(untilChecks) {
-				status = StatusFailed
-			}
+		x.adopt(&sr, r)
+		if x.recordUntil(&sr, i, untilChecks) == StatusFailed {
+			status = StatusFailed
 		}
 		if ck := timeoutKillCheck(r, steps, i); ck != nil {
-			x.e.recordChecks(x.masker, []*assert.CheckResult{ck}, x.rc.specPath, x.sc.Name, x.idx, i)
-			sr.Checks = append(sr.Checks, ck)
-			status = StatusFailed
+			status = x.fail(&sr, i, ck)
 		}
 	case spec.StepAssert:
 		crs := assert.CheckAll(expandAssert(x.st, step.Assert), x.current, assert.Env{
@@ -242,16 +265,9 @@ func (x *scenarioRun) execStep(ctx context.Context, steps []spec.Step, i int, st
 			sr.ErrMsg = err.Error()
 			return sr, StatusError, secViolation
 		}
-		x.current = r
-		sr.Run = maskResult(x.masker, r)
-		// As with run retries, a never-satisfied `until` fails the step and is
-		// reported like an assertion.
-		if len(untilChecks) > 0 {
-			x.e.recordChecks(x.masker, untilChecks, x.rc.specPath, x.sc.Name, x.idx, i)
-			sr.Checks = untilChecks
-			if !assert.AllOK(untilChecks) {
-				status = StatusFailed
-			}
+		x.adopt(&sr, r)
+		if x.recordUntil(&sr, i, untilChecks) == StatusFailed {
+			status = StatusFailed
 		}
 	case spec.StepQuery:
 		r, err := x.e.runQuery(ctx, step.Query, x.st, x.rc, x.dbConns)
@@ -259,37 +275,29 @@ func (x *scenarioRun) execStep(ctx context.Context, steps []spec.Step, i int, st
 			sr.ErrMsg = err.Error()
 			return sr, StatusError, false
 		}
-		x.current = r
-		sr.Run = maskResult(x.masker, r)
+		x.adopt(&sr, r)
 	case spec.StepGRPC:
 		r, err := x.e.runGRPC(ctx, expandGRPC(x.st, step.GRPC), x.st, x.rc, x.grpcConns)
 		if err != nil {
 			sr.ErrMsg = err.Error()
 			return sr, StatusError, isPolicyViolation(err)
 		}
-		x.current = r
-		sr.Run = maskResult(x.masker, r)
+		x.adopt(&sr, r)
 	case spec.StepPTY:
 		r, ef, err := x.e.runPTY(ctx, step.PTY, x.st, x.scEnv, x.workdir)
 		if err != nil {
 			sr.ErrMsg = err.Error()
 			return sr, StatusError, false
 		}
-		x.current = r
-		sr.Run = maskResult(x.masker, r)
+		x.adopt(&sr, r)
 		if ef != nil {
 			// A never-matching expect fails like an assertion: the pattern
 			// and the transcript excerpt land in the failure block.
-			ck := ptyExpectCheck(ef)
-			x.e.recordChecks(x.masker, []*assert.CheckResult{ck}, x.rc.specPath, x.sc.Name, x.idx, i)
-			sr.Checks = []*assert.CheckResult{ck}
-			status = StatusFailed
+			status = x.fail(&sr, i, ptyExpectCheck(ef))
 		} else if ck := timeoutKillCheck(r, steps, i); ck != nil {
 			// No expect failed, so nothing else would notice that the program
 			// never exited before the session timeout killed it.
-			x.e.recordChecks(x.masker, []*assert.CheckResult{ck}, x.rc.specPath, x.sc.Name, x.idx, i)
-			sr.Checks = []*assert.CheckResult{ck}
-			status = StatusFailed
+			status = x.fail(&sr, i, ck)
 		}
 	case spec.StepCDP:
 		r, err := x.e.runCDP(ctx, expandCDP(x.st, step.CDP), x.workdir, x.st, x.rc, x.browserConns)
@@ -297,8 +305,7 @@ func (x *scenarioRun) execStep(ctx context.Context, steps []spec.Step, i int, st
 			sr.ErrMsg = err.Error()
 			return sr, StatusError, false
 		}
-		x.current = r
-		sr.Run = maskResult(x.masker, r)
+		x.adopt(&sr, r)
 	case spec.StepSignal:
 		// Handle-based signaling (#23): the target is a service atago
 		// itself started (scenario services first, then suite services),
