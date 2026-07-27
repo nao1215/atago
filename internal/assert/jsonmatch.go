@@ -12,6 +12,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/goccy/go-yaml"
+	"github.com/nao1215/atago/internal/plural"
 	"github.com/nao1215/atago/internal/spec"
 	"github.com/ohler55/ojg/jp"
 	"github.com/ohler55/ojg/oj"
@@ -351,8 +352,8 @@ func single(desc, path string, nodes []any) (any, *CheckResult) {
 		return nil, &CheckResult{
 			Desc:     desc,
 			Expected: fmt.Sprintf("a single value at %s", path),
-			Actual:   fmt.Sprintf("%d matches", len(nodes)),
-			Hint:     fmt.Sprintf("JSON path %s selected %d values; use a more specific path", path, len(nodes)),
+			Actual:   plural.Count(len(nodes), "match", "matches"),
+			Hint:     fmt.Sprintf("JSON path %s selected %s; use a more specific path", path, plural.Count(len(nodes), "value", "values")),
 		}
 	}
 }

@@ -73,27 +73,7 @@ func writeDetail(b *strings.Builder, color bool, suite, specPath string, sc *eng
 					continue
 				}
 				fmt.Fprintf(b, "\n%s %s / %s%s\n", colorize(color, cRed+cBold, "FAILED:"), suite, sc.Name, where)
-				fmt.Fprintf(b, "\nStep:\n  %s\n", ck.Desc)
-				if cmd != "" {
-					fmt.Fprintf(b, "\nCommand:\n  %s\n", cmd)
-				}
-				// Multi-line equals/snapshot failures render a unified diff
-				// (#28): the one-character difference the two raw blocks hide.
-				// Single-line failures keep the compact Expected/Actual form.
-				if diff := checkDiff(ck); diff != "" {
-					fmt.Fprintf(b, "\nDiff (-expected +actual):\n%s\n", indent(colorizeDiff(color, diff)))
-				} else {
-					expected, actual := visiblePair(ck.Expected, ck.Actual)
-					if expected != "" {
-						fmt.Fprintf(b, "\nExpected:\n%s\n", indent(expected))
-					}
-					if actual != "" {
-						fmt.Fprintf(b, "\nActual:\n%s\n", indent(actual))
-					}
-				}
-				if ck.Hint != "" {
-					fmt.Fprintf(b, "\nHint:\n  %s\n", ck.Hint)
-				}
+				writeCheckFailure(b, color, ck, cmd)
 				writeFailureStreams(b, ck, lastRun)
 				// Keep console output compact: reference the durable payloads by path
 				// rather than dumping them inline (#48).
@@ -213,21 +193,7 @@ func writeSuiteSteps(b *strings.Builder, color bool, suite, label string, steps 
 				continue
 			}
 			fmt.Fprintf(b, "\n%s %s\n", colorize(color, cRed+cBold, label), suite)
-			fmt.Fprintf(b, "\nStep:\n  %s\n", ck.Desc)
-			if diff := checkDiff(ck); diff != "" {
-				fmt.Fprintf(b, "\nDiff (-expected +actual):\n%s\n", indent(colorizeDiff(color, diff)))
-			} else {
-				expected, actual := visiblePair(ck.Expected, ck.Actual)
-				if expected != "" {
-					fmt.Fprintf(b, "\nExpected:\n%s\n", indent(expected))
-				}
-				if actual != "" {
-					fmt.Fprintf(b, "\nActual:\n%s\n", indent(actual))
-				}
-			}
-			if ck.Hint != "" {
-				fmt.Fprintf(b, "\nHint:\n  %s\n", ck.Hint)
-			}
+			writeCheckFailure(b, color, ck, "")
 		}
 		if step.ErrMsg != "" {
 			fmt.Fprintf(b, "\n%s %s\n  step %d (%s): %s\n",
@@ -305,4 +271,34 @@ func indent(s string) string {
 		lines[i] = "  " + l
 	}
 	return strings.Join(lines, "\n")
+}
+
+// writeCheckFailure renders the body every failure report shares: the step that
+// failed, the command behind it when there is one, the comparison, and the
+// hint. A scenario failure and a suite setup/teardown failure differ only in
+// their heading and in whether captured streams follow, so the body lives here
+// once — a change to how a comparison reads cannot apply to one and miss the
+// other.
+func writeCheckFailure(b *strings.Builder, color bool, ck *assert.CheckResult, cmd string) {
+	fmt.Fprintf(b, "\nStep:\n  %s\n", ck.Desc)
+	if cmd != "" {
+		fmt.Fprintf(b, "\nCommand:\n  %s\n", cmd)
+	}
+	// Multi-line equals/snapshot failures render a unified diff (#28): the
+	// one-character difference the two raw blocks hide. Single-line failures
+	// keep the compact Expected/Actual form.
+	if diff := checkDiff(ck); diff != "" {
+		fmt.Fprintf(b, "\nDiff (-expected +actual):\n%s\n", indent(colorizeDiff(color, diff)))
+	} else {
+		expected, actual := visiblePair(ck.Expected, ck.Actual)
+		if expected != "" {
+			fmt.Fprintf(b, "\nExpected:\n%s\n", indent(expected))
+		}
+		if actual != "" {
+			fmt.Fprintf(b, "\nActual:\n%s\n", indent(actual))
+		}
+	}
+	if ck.Hint != "" {
+		fmt.Fprintf(b, "\nHint:\n  %s\n", ck.Hint)
+	}
 }

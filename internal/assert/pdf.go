@@ -7,9 +7,11 @@ import (
 	"io"
 	"os"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
+	"github.com/nao1215/atago/internal/plural"
 	"github.com/nao1215/atago/internal/security"
 	"github.com/nao1215/atago/internal/spec"
 )
@@ -68,18 +70,18 @@ func checkPDFPages(p *spec.PDFAssert, doc pdfDoc) *CheckResult {
 		return &CheckResult{
 			Desc:     fmt.Sprintf("assert pdf %q page count", p.Path),
 			Expected: want,
-			Actual:   fmt.Sprintf("%d pages", n),
-			Hint:     fmt.Sprintf("PDF %q has %d pages, expected %s", p.Path, n, want),
+			Actual:   plural.Count(n, "page", "pages"),
+			Hint:     fmt.Sprintf("PDF %q has %s, expected %s", p.Path, plural.Count(n, "page", "pages"), want),
 		}
 	}
 	if p.Pages != nil && n != *p.Pages {
-		return fail(fmt.Sprintf("exactly %d pages", *p.Pages))
+		return fail("exactly " + plural.Count(*p.Pages, "page", "pages"))
 	}
 	if p.MinPages != nil && n < *p.MinPages {
-		return fail(fmt.Sprintf("at least %d pages", *p.MinPages))
+		return fail("at least " + plural.Count(*p.MinPages, "page", "pages"))
 	}
 	if p.MaxPages != nil && n > *p.MaxPages {
-		return fail(fmt.Sprintf("at most %d pages", *p.MaxPages))
+		return fail("at most " + plural.Count(*p.MaxPages, "page", "pages"))
 	}
 	return nil
 }
@@ -113,13 +115,7 @@ func sortedMetadataKeys(m map[string]string) []string {
 		keys = append(keys, k)
 	}
 	// Deterministic order so a failing metadata check is stable.
-	for i := 0; i < len(keys); i++ {
-		for j := i + 1; j < len(keys); j++ {
-			if keys[j] < keys[i] {
-				keys[i], keys[j] = keys[j], keys[i]
-			}
-		}
-	}
+	sort.Strings(keys)
 	return keys
 }
 

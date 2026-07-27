@@ -789,7 +789,7 @@ scenarios:
 `
 	out := mustExplain(t, src)
 	for _, want := range []string{
-		`dir "dist" exists, contains index.html, does not contain .DS_Store, has >= 1 entries, has <= 100 entries, matches glob *.html, (recursive), ignoring tmp, cache`,
+		`dir "dist" exists, contains index.html, does not contain .DS_Store, has >= 1 entry, has <= 100 entries, matches glob *.html, (recursive), ignoring tmp, cache`,
 		`dir "empty" does not exist`,
 		`dir "exact" has 2 entries`,
 		`dir "snap" tree matches snapshot tree.snap`,
@@ -833,7 +833,7 @@ scenarios:
 		// Metadata keys are sorted, so Author precedes Title regardless of map order.
 		`Author contains "nao", Title contains "Report"`,
 		`text contains "Summary"`,
-		`pdf "bounded.pdf" >= 1 pages, <= 10 pages`,
+		`pdf "bounded.pdf" >= 1 page, <= 10 pages`,
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("explain pdf assert missing %q\n--- got ---\n%s", want, out)

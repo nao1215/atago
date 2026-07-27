@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nao1215/atago/internal/plural"
 	"github.com/nao1215/atago/internal/record"
 	runnercmd "github.com/nao1215/atago/internal/runner/cmd"
 	"github.com/nao1215/atago/internal/snapshot"
@@ -127,8 +128,10 @@ non-goal for now — write those steps by hand.
 		return ExitInternal
 	}
 
-	fmt.Fprintf(stderr, "recorded: exit %d, %d stdout line(s), %d file(s) created\n",
-		res.ExitCode, countLines(res.Stdout), len(created))
+	fmt.Fprintf(stderr, "recorded: exit %d, %s of stdout, %s created\n",
+		res.ExitCode,
+		plural.Count(countLines(res.Stdout), "line", "lines"),
+		plural.Count(len(created), "file", "files"))
 
 	if *out == "" {
 		fmt.Fprint(stdout, string(generated))

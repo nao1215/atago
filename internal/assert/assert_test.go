@@ -1792,9 +1792,6 @@ func TestMockFilterLabelAndPlural(t *testing.T) {
 			t.Errorf("mockFilterLabel = %q, want %q", got, c.want)
 		}
 	}
-	if plural("request", 1) != "request" || plural("request", 0) != "requests" || plural("request", 2) != "requests" {
-		t.Error("plural wrong")
-	}
 	if summarizeRecords(nil) != "  (no requests recorded)" {
 		t.Error("empty summarizeRecords wrong")
 	}

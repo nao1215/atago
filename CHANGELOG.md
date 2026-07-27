@@ -40,6 +40,15 @@ and this project follows [Semantic Versioning](https://semver.org/).
   behaviors. Inputs are synthesized with `xc:` canvases, so the suite carries no
   image assets.
 
+### Changed
+
+- Counted nouns in messages now agree with their number: "1 page" instead of
+  "1 pages", "1 entry" instead of "1 entries", "1 line" instead of
+  "1 line(s)", and `atago record` reports "1 file created" rather than
+  "1 file(s) created". Three packages had spelled this three different ways;
+  they now share one helper, so a reader never has to notice which part of
+  atago wrote a sentence.
+
 ### Fixed
 
 - `pdf: text:` no longer loses everything after the first stream that ends

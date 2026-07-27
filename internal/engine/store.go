@@ -10,6 +10,7 @@ import (
 	"github.com/ohler55/ojg/jp"
 	"github.com/ohler55/ojg/oj"
 
+	"github.com/nao1215/atago/internal/plural"
 	"github.com/nao1215/atago/internal/runner"
 	"github.com/nao1215/atago/internal/security"
 	"github.com/nao1215/atago/internal/spec"
@@ -128,7 +129,7 @@ func jsonValue(data []byte, path string) (string, error) {
 	}
 	nodes := expr.Get(v)
 	if len(nodes) != 1 {
-		return "", fmt.Errorf("JSON path %q selected %d values, want exactly 1", path, len(nodes))
+		return "", fmt.Errorf("JSON path %q selected %s, want exactly 1", path, plural.Count(len(nodes), "value", "values"))
 	}
 	// Why: a JSON null selects exactly one node whose Go value is nil, and
 	// fmt.Sprint(nil) yields the literal string "<nil>". Storing that would leak

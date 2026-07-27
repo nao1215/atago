@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/nao1215/atago/internal/plural"
 	"github.com/nao1215/atago/internal/spec"
 )
 
@@ -35,6 +36,15 @@ type JSONStyle struct {
 	Length  func(int) string
 	Compare func(string, any) string
 	Default string
+}
+
+// WithPrefix returns a copy of the style that renders the path differently —
+// the only thing that separates a YAML check from a JSON one. Copying the whole
+// struct field by field to change one function meant a field added later was
+// silently dropped from the copy.
+func (s JSONStyle) WithPrefix(prefix func(string) string) JSONStyle {
+	s.Prefix = prefix
+	return s
 }
 
 func DescribeJSONChecks(list spec.JSONChecks, style JSONStyle) string {
@@ -242,13 +252,13 @@ func DescribeDir(d *spec.DirAssert, style DirStyle) string {
 		parts = append(parts, "does not contain "+style.Item(c))
 	}
 	if d.Count != nil {
-		parts = append(parts, fmt.Sprintf("has %d entries", *d.Count))
+		parts = append(parts, "has "+plural.Count(*d.Count, "entry", "entries"))
 	}
 	if d.MinCount != nil {
-		parts = append(parts, fmt.Sprintf("has >= %d entries", *d.MinCount))
+		parts = append(parts, "has >= "+plural.Count(*d.MinCount, "entry", "entries"))
 	}
 	if d.MaxCount != nil {
-		parts = append(parts, fmt.Sprintf("has <= %d entries", *d.MaxCount))
+		parts = append(parts, "has <= "+plural.Count(*d.MaxCount, "entry", "entries"))
 	}
 	if d.Glob != "" {
 		parts = append(parts, "matches glob "+style.Token(d.Glob))
@@ -278,13 +288,13 @@ type PDFStyle struct {
 func DescribePDF(p *spec.PDFAssert, style PDFStyle) string {
 	var parts []string
 	if p.Pages != nil {
-		parts = append(parts, fmt.Sprintf("%d pages", *p.Pages))
+		parts = append(parts, plural.Count(*p.Pages, "page", "pages"))
 	}
 	if p.MinPages != nil {
-		parts = append(parts, fmt.Sprintf(">= %d pages", *p.MinPages))
+		parts = append(parts, ">= "+plural.Count(*p.MinPages, "page", "pages"))
 	}
 	if p.MaxPages != nil {
-		parts = append(parts, fmt.Sprintf("<= %d pages", *p.MaxPages))
+		parts = append(parts, "<= "+plural.Count(*p.MaxPages, "page", "pages"))
 	}
 	keys := make([]string, 0, len(p.Metadata))
 	for k := range p.Metadata {
