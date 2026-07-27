@@ -16,6 +16,13 @@ suite:
     `sandbox_home` puts the home directory inside the workdir so a write there
     would show up in the same delta.
 
+# Every step takes the isolated home: it is what makes the home-directory
+# .fxrc.js scenario possible, and it keeps a developer's own ~/.fxrc.js from
+# changing what the other scenarios observe.
+defaults:
+  run:
+    sandbox_home: true
+
 # Every scenario probes for fx first so the suite skips cleanly where it is
 # absent.
 scenarios:
@@ -30,7 +37,6 @@ scenarios:
           file: untouched.json
           content: '{"keep":true}'
       - run:
-          sandbox_home: true
           command: fx config.json sortKeys save
       - assert:
           exit_code: 0
@@ -84,7 +90,6 @@ scenarios:
           file: config.json
           content: '{"a":1}'
       - run:
-          sandbox_home: true
           command: fx config.json .a
       - assert:
           exit_code: 0
@@ -103,7 +108,6 @@ scenarios:
       # is missing instead of picking a name, and the empty delta proves it did
       # not invent an output file on the way out.
       - run:
-          sandbox_home: true
           command: fx save
           stdin: '{"a":1}'
       - assert:
@@ -131,7 +135,6 @@ scenarios:
           file: link.json
           symlink: real.json
       - run:
-          sandbox_home: true
           command: fx link.json sortKeys save
       - assert:
           exit_code: 1
@@ -163,7 +166,6 @@ scenarios:
           file: data.json
           content: '{"n":21}'
       - run:
-          sandbox_home: true
           command: fx data.json .n double
       - assert:
           exit_code: 0
@@ -195,7 +197,6 @@ scenarios:
           file: data.json
           content: '{"word":"atago"}'
       - run:
-          sandbox_home: true
           command: fx data.json .word shout
       - assert:
           exit_code: 0

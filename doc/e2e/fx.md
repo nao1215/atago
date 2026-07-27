@@ -98,6 +98,8 @@ fx config.json sortKeys save
 _only when `fx --version` succeeds_
 #### Given
 - Fixture file `config.json` is created.
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### Inputs
 _Fixture `config.json`:_
 ```text
@@ -235,6 +237,8 @@ decode returns the original bytes) rather than about one recorded output.
 Source: `test/e2e/thirdparty/fx/formats.atago.yaml`
 ### Scenario: --yaml parses YAML into the JSON model
 _only when `fx --version` succeeds_
+#### Given
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### Inputs
 _stdin for `fx`:_
 ```text
@@ -251,6 +255,8 @@ fx --yaml .service.port
 - stdout equals an exact value
 ### Scenario: --toml parses TOML into the JSON model
 _only when `fx --version` succeeds_
+#### Given
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### Inputs
 _stdin for `fx`:_
 ```text
@@ -269,6 +275,7 @@ fx --toml .package.name
 _only when `fx --version` succeeds_
 #### Given
 - Fixture file `config.yaml` is created.
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### Inputs
 _Fixture `config.yaml`:_
 ```text
@@ -287,6 +294,7 @@ fx config.yaml .service.replicas
 _only when `fx --version` succeeds_
 #### Given
 - Fixture file `config.toml` is created.
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### Inputs
 _Fixture `config.toml`:_
 ```text
@@ -304,6 +312,7 @@ fx config.toml .package.name
 _only when `fx --version` succeeds_
 #### Given
 - Fixture file `CONFIG.YAML` is created.
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### Inputs
 _Fixture `CONFIG.YAML`:_
 ```text
@@ -321,6 +330,7 @@ fx CONFIG.YAML .service.name
 _only when `fx --version` succeeds_
 #### Given
 - Fixture file `payload.txt` is created.
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### Inputs
 _Fixture `payload.txt`:_
 ```text
@@ -335,6 +345,8 @@ fx payload.txt .a
 - stdout equals an exact value
 ### Scenario: --raw treats each input line as a string
 _only when `fx --version` succeeds_
+#### Given
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### Inputs
 _stdin for `fx`:_
 ```text
@@ -351,6 +363,8 @@ fx -r len
 - stdout line `2` equals an exact value
 ### Scenario: -s collects a stream of documents into one array
 _only when `fx --version` succeeds_
+#### Given
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### Inputs
 _stdin for `fx`:_
 ```text
@@ -367,6 +381,8 @@ fx -s len
 - stdout equals an exact value
 ### Scenario: -rs combines raw lines into an array of strings
 _only when `fx --version` succeeds_
+#### Given
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### Inputs
 _stdin for `fx`:_
 ```text
@@ -392,6 +408,7 @@ _expected stdout:_
 _only when `fx --version` succeeds_
 #### Given
 - Fixture file `loose.json` is created.
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### Inputs
 _Fixture `loose.json`:_
 ```text
@@ -412,6 +429,7 @@ fx loose.json .port
 _only when `fx --version` succeeds_
 #### Given
 - Fixture file `loose.json` is created.
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### Inputs
 _Fixture `loose.json`:_
 ```text
@@ -432,6 +450,7 @@ fx --strict loose.json .name
 _only when `fx --version` succeeds_
 #### Given
 - Fixture file `trailing.json` is created.
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### Inputs
 _Fixture `trailing.json`:_
 ```text
@@ -449,6 +468,8 @@ fx --strict trailing.json .name
 - stderr contains `Trailing comma is not allowed in strict mode`
 ### Scenario: --raw and --yaml together are refused
 _only when `fx --version` succeeds_
+#### Given
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### Inputs
 _stdin for `fx`:_
 ```text
@@ -464,6 +485,8 @@ fx --yaml --raw .
 - stderr contains `can't use --yaml/--toml and --raw flags together`
 ### Scenario: --yaml and --toml together are refused
 _only when `fx --version` succeeds_
+#### Given
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### Inputs
 _stdin for `fx`:_
 ```text
@@ -481,6 +504,7 @@ fx --yaml --toml .
 _only when `fx --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `secret.json` is created.
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### Inputs
 _Fixture `secret.json`:_
 ```text
@@ -497,6 +521,9 @@ fx secret.json .token toBase64 | fx -r fromBase64
 _only when `fx --version` succeeds_
 #### Given
 - Fixture file `source.json` is created.
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### Inputs
 _Fixture `source.json`:_
 ```text
@@ -524,6 +551,8 @@ fx round_trip.yaml .
 _only when `fx --version` succeeds_
 #### Given
 - Fixture file `doc.json` is created.
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### Inputs
 _Fixture `doc.json`:_
 ```text
@@ -558,6 +587,7 @@ _expected stdout:_
 _only when `fx --version` succeeds_
 #### Given
 - Fixture file `broken.yaml` is created.
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### Inputs
 _Fixture `broken.yaml`:_
 ```text
@@ -577,6 +607,7 @@ fx broken.yaml .
 _only when `fx --version` succeeds_
 #### Given
 - Fixture file `broken.toml` is created.
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### Inputs
 _Fixture `broken.toml`:_
 ```text
@@ -607,6 +638,8 @@ of what a float64 round trip would leave.
 Source: `test/e2e/thirdparty/fx/fx.atago.yaml`
 ### Scenario: version prints a semantic version
 _only when `fx --version` succeeds_
+#### Given
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### When
 ```shell
 fx --version
@@ -617,6 +650,8 @@ fx --version
 - stderr is empty
 ### Scenario: the identity reducer pretty-prints the document and keeps key order
 _only when `fx --version` succeeds_
+#### Given
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### Inputs
 _stdin for `fx`:_
 ```text
@@ -642,6 +677,7 @@ _expected stdout:_
 _only when `fx --version` succeeds_
 #### Given
 - Fixture file `user.json` is created.
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### Inputs
 _Fixture `user.json`:_
 ```text
@@ -658,6 +694,7 @@ fx user.json .profile.name
 _only when `fx --version` succeeds_
 #### Given
 - Fixture file `items.json` is created.
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### Inputs
 _Fixture `items.json`:_
 ```text
@@ -672,6 +709,8 @@ fx items.json .items len
 - stdout equals an exact value
 ### Scenario: an arrow function transforms the document
 _only when `fx --version` succeeds_
+#### Given
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### Inputs
 _stdin for `fx`:_
 ```text
@@ -695,6 +734,8 @@ _expected stdout:_
 ```
 ### Scenario: a missing key reports undefined on stderr and still exits 0
 _only when `fx --version` succeeds_
+#### Given
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### Inputs
 _stdin for `fx`:_
 ```text
@@ -710,6 +751,8 @@ fx .nope
 - stderr equals an exact value
 ### Scenario: dereferencing through a missing key is a hard error
 _only when `fx --version` succeeds_
+#### Given
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### Inputs
 _stdin for `fx`:_
 ```text
@@ -725,6 +768,9 @@ fx .a.b.c
 - stderr contains `TypeError`
 ### Scenario: exit() hands the reducer's own code to the shell
 _only when `fx --version` succeeds_
+#### Given
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### Inputs
 _stdin for `fx`:_
 ```text
@@ -746,6 +792,8 @@ fx 'exit(0)'
   - exit code is `0`
 ### Scenario: invalid JSON fails loudly and keeps stdout clean
 _only when `fx --version` succeeds_
+#### Given
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### Inputs
 _stdin for `fx`:_
 ```text
@@ -761,6 +809,8 @@ fx .
 - stderr contains `Expected colon after object key`
 ### Scenario: a missing input file fails before anything is printed
 _only when `fx --version` succeeds_
+#### Given
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### When
 ```shell
 fx no-such.json .
@@ -773,6 +823,7 @@ fx no-such.json .
 _only when `fx --version` succeeds_
 #### Given
 - Fixture file `empty.json` is created.
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### Inputs
 _stdin for `fx`:_
 ```text
@@ -788,6 +839,8 @@ fx .
 - stderr is empty
 ### Scenario: each document in a stream produces its own result
 _only when `fx --version` succeeds_
+#### Given
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### Inputs
 _stdin for `fx`:_
 ```text
@@ -804,6 +857,8 @@ fx .n
 - stdout line `2` equals an exact value
 ### Scenario: filter drops documents from a stream instead of emitting them
 _only when `fx --version` succeeds_
+#### Given
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### Inputs
 _stdin for `fx`:_
 ```text
@@ -829,6 +884,8 @@ _expected stdout:_
 _only when `fx --version` succeeds_
 #### Given
 - Fixture file `numbers.json` is created.
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### Inputs
 _Fixture `numbers.json`:_
 ```text
@@ -849,6 +906,8 @@ fx numbers.json 'x => x'
   - stdout does not contain `"exact": 1.0`
 ### Scenario: piped output carries no terminal escapes
 _only when `fx --version` succeeds_
+#### Given
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### Inputs
 _stdin for `fx`:_
 ```text
@@ -865,6 +924,7 @@ fx .
 _only when `fx --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `subdir/keep.txt` is created.
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### Inputs
 _Fixture `subdir/keep.txt`:_
 ```text
@@ -899,6 +959,7 @@ Source: `test/e2e/thirdparty/fx/tui.atago.yaml`
 _only when `fx --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `viewer.json` is created.
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### Inputs
 _Fixture `viewer.json`:_
 ```text
@@ -914,6 +975,7 @@ _Fixture `viewer.json`:_
 _only when `fx --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `viewer.json` is created.
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### Inputs
 _Fixture `viewer.json`:_
 ```text
@@ -929,6 +991,7 @@ _Fixture `viewer.json`:_
 _only when `fx --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `viewer.json` is created.
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### Inputs
 _Fixture `viewer.json`:_
 ```text
@@ -945,6 +1008,7 @@ _Fixture `viewer.json`:_
 _only when `fx --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `viewer.json` is created.
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### Inputs
 _Fixture `viewer.json`:_
 ```text
@@ -961,6 +1025,7 @@ _Fixture `viewer.json`:_
 _only when `fx --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `viewer.json` is created.
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### Inputs
 _Fixture `viewer.json`:_
 ```text
@@ -976,6 +1041,7 @@ _Fixture `viewer.json`:_
 _only when `fx --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `viewer.json` is created.
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### Inputs
 _Fixture `viewer.json`:_
 ```text
@@ -991,6 +1057,7 @@ _Fixture `viewer.json`:_
 _only when `fx --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `viewer.json` is created.
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### Inputs
 _Fixture `viewer.json`:_
 ```text
@@ -1006,6 +1073,8 @@ _Fixture `viewer.json`:_
 - rendered screen contains `viewer.json`
 ### Scenario: with a terminal and no file, fx prints its usage instead of opening the viewer
 _only when `fx --version` succeeds · skipped on Windows_
+#### Given
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### When
 ```shell
 # interactive (pty): fx

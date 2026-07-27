@@ -19,6 +19,13 @@ suite:
     terminal before its first paint, so the interesting condition is a rendered
     frame rather than a byte on the wire.
 
+# fx loads .fxrc.js from the user's home directory at startup, so every step
+# here takes an isolated home: a developer's own ~/.fxrc.js must not be able to
+# change what these scenarios observe.
+defaults:
+  run:
+    sandbox_home: true
+
 # Every scenario probes for fx first so the suite skips cleanly where it is
 # absent; the viewer is POSIX-only under the pty runner.
 scenarios:

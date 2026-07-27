@@ -14,6 +14,13 @@ suite:
     twice in a pipeline so the assertion is about a relationship (encode then
     decode returns the original bytes) rather than about one recorded output.
 
+# fx loads .fxrc.js from the user's home directory before any reducer runs, so
+# every step here takes an isolated home: a developer's own ~/.fxrc.js must not
+# be able to change what these scenarios observe.
+defaults:
+  run:
+    sandbox_home: true
+
 # Every scenario probes for fx first so the suite skips cleanly where it is
 # absent.
 scenarios:
