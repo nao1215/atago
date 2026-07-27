@@ -18,6 +18,14 @@ and this project follows [Semantic Versioning](https://semver.org/).
 - `file:` assertions using `not_contains` or `executable` rendered as "the file
   is checked" in generated docs and `explain` output, hiding what the scenario
   guarantees. Both matchers now have their own phrasing.
+- `changes:` now tracks symlinks. Only regular files were scanned, so a step
+  that planted a link — an installer wiring `bin/tool`, a release that swaps a
+  `current` pointer — passed `created: []`, reporting "nothing happened" for a
+  run that added a path. A link is compared by the target it names: planting one
+  is a creation, retargeting it is a modification, removing it is a deletion,
+  and a dangling link stays visible. Writing through a link is still a
+  modification of the target file, and the delta never resolves a link, so a
+  cycle or a target outside the workdir is not followed.
 
 ## [0.14.0] - 2026-07-26
 

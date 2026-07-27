@@ -14,10 +14,11 @@ import (
 	"sort"
 )
 
-// Snapshot maps a regular file's forward-slash path (relative to the scanned
-// root) to a hex-encoded SHA-256 of its content. Directories and symlinks are
-// not tracked: a rename is delete+create in v1, and an empty directory is not a
-// "file" the assertion reasons about.
+// Snapshot maps a tracked path (forward-slash, relative to the scanned root) to
+// a content fingerprint: a hex-encoded SHA-256 for a regular file, and a
+// symlinkPrefix-tagged target for a symlink. Directories are not tracked — an
+// empty directory is not a "file" the assertion reasons about — and a rename is
+// delete+create.
 type Snapshot map[string]string
 
 // unreadableSentinel marks a regular file that exists but could not be read
@@ -29,6 +30,16 @@ type Snapshot map[string]string
 // unreadable in the other reports as modified, because content equality cannot
 // be established across that readability boundary.
 const unreadableSentinel = "unreadable"
+
+// symlinkPrefix tags a symlink's fingerprint, which is the link target rather
+// than the content behind it. Tracking symlinks keeps `created: []` honest: a
+// step that plants a link — an installer wiring bin/tool, a tool that swaps a
+// "current" pointer — used to slip past an exhaustive changes assertion because
+// only regular files were scanned. Comparing targets (not the resolved content)
+// makes a retargeted link a modification, keeps a dangling link visible, and
+// avoids following a link out of the workdir or around a cycle. The prefix ends
+// in ':' so it can never collide with a 64-char hex digest.
+const symlinkPrefix = "symlink:"
 
 // Scan walks root and hashes every regular file, keyed by its forward-slash
 // path relative to root. It is best-effort about individual files: one that
@@ -47,12 +58,27 @@ func Scan(root string) (Snapshot, error) {
 			}
 			return nil
 		}
-		if d.IsDir() || !d.Type().IsRegular() {
+		if d.IsDir() || (!d.Type().IsRegular() && d.Type()&fs.ModeSymlink == 0) {
 			return nil
 		}
 		rel, rerr := filepath.Rel(root, path)
 		if rerr != nil {
 			return nil //nolint:nilerr // an un-relativizable path is skipped, not fatal
+		}
+		if d.Type()&fs.ModeSymlink != 0 {
+			target, lerr := os.Readlink(path)
+			if lerr != nil {
+				if os.IsNotExist(lerr) {
+					// Raced away between walk and readlink; genuinely absent.
+					return nil
+				}
+				// The link exists but its target cannot be read: keep it visible
+				// to created/deleted rather than dropping it.
+				snap[filepath.ToSlash(rel)] = symlinkPrefix + unreadableSentinel
+				return nil
+			}
+			snap[filepath.ToSlash(rel)] = symlinkPrefix + filepath.ToSlash(target)
+			return nil
 		}
 		sum, herr := hashFile(path)
 		if herr != nil {

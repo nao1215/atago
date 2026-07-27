@@ -1215,6 +1215,34 @@ scenarios:
             contains: link.txt      # reported under the name it was given
 ```
 
+A link the command itself creates is part of the workdir delta, so `changes:`
+pins it like any other path — including the negative case, where `created: []`
+proves the run planted no link at all:
+
+```yaml
+version: "1"
+suite:
+  name: install links
+
+scenarios:
+  - name: the installer links bin/tool and touches nothing else
+    skip:
+      os: windows
+    steps:
+      - run:
+          command: mytool install
+      - assert:
+          exit_code: 0
+          changes:
+            created: [bin/tool]   # the symlink itself, by the path it was given
+            modified: []
+            deleted: []
+```
+
+A symlink is compared by the target it names, never by the content behind it:
+retargeting a link is a modification, and writing through a link is a
+modification of the target file, not of the link.
+
 Full spec: [files_and_fixtures](../examples/files_and_fixtures.atago.yaml)
 
 ## Test freshness logic with fixture timestamps
