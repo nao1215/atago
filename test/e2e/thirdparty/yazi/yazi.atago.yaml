@@ -1884,6 +1884,15 @@ scenarios:
             - expect: "Rename:"
             - send: " two words"
             - send: {key: enter}
+            # Wait on the RENDERED screen, then quit. The redraw writes the new
+            # name in fragments separated by cursor moves, so the raw transcript
+            # never contains "old two words.txt" contiguously and a plain expect
+            # would hang; and without a quit key yazi outlives the session and the
+            # step fails on its timeout rather than on anything it asserted.
+            - expect_screen:
+                contains: ["old two words.txt"]
+                stable_for: 100ms
+            - send: "q"
       - assert:
           file:
             path: old two words.txt
@@ -1912,6 +1921,12 @@ scenarios:
             - expect: "Rename:"
             - send: " two words"
             - send: {key: enter}
+            # Same reason as the file case above: wait on the rendered screen for
+            # the new name, then quit so the step ends on its assertions.
+            - expect_screen:
+                contains: ["old-dir two words"]
+                stable_for: 100ms
+            - send: "q"
       - assert:
           file:
             path: old-dir two words/keep.txt
