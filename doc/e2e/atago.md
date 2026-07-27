@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-74 suites · 399 scenarios
+74 suites · 400 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -78,7 +78,7 @@
   - [record, compare green, then a mutation names the changed paths](#scenario-record-compare-green-then-a-mutation-names-the-changed-paths)
   - [recursive matchers and ignore globs walk the tree](#scenario-recursive-matchers-and-ignore-globs-walk-the-tree)
   - [combining snapshot with matchers is a load-time error](#scenario-combining-snapshot-with-matchers-is-a-load-time-error)
-- [atago self-hosting / doc](#atago-self-hosting--doc) — 7 scenarios
+- [atago self-hosting / doc](#atago-self-hosting--doc) — 8 scenarios
   - [doc generates Markdown to a file](#scenario-doc-generates-markdown-to-a-file)
   - [doc writes Markdown to stdout without --out](#scenario-doc-writes-markdown-to-stdout-without---out)
   - [doc emits a summary, table of contents, and input previews](#scenario-doc-emits-a-summary-table-of-contents-and-input-previews)
@@ -86,6 +86,7 @@
   - [doc --split-by-spec requires --out-dir](#scenario-doc---split-by-spec-requires---out-dir)
   - [doc renders suite and scenario descriptions verbatim](#scenario-doc-renders-suite-and-scenario-descriptions-verbatim)
   - [doc renders every matcher an assertion sets](#scenario-doc-renders-every-matcher-an-assertion-sets)
+  - [a spec whose matchers doc renders still runs green](#scenario-a-spec-whose-matchers-doc-renders-still-runs-green)
 - [atago self-hosting / duration assertion](#atago-self-hosting--duration-assertion) — 4 scenarios
   - [a fast step passes a generous upper bound](#scenario-a-fast-step-passes-a-generous-upper-bound)
   - [an impossible bound fails and shows the measured duration](#scenario-an-impossible-bound-fails-and-shows-the-measured-duration)
@@ -2036,16 +2037,47 @@ scenarios:
 #### When
 ```shell
 ${atago} doc matchers.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout contains `stdout contains `hello`, does not contain `goodbye``, `stdout line `2` equals an exact value`, `file `install.sh` is executable`, `file `install.sh` does not contain `rm -rf /``
+- stdout does not contain ``install.sh` is checked`
+### Scenario: a spec whose matchers doc renders still runs green
+_skipped on Windows_
+#### Given
+- Fixture file `matchers.atago.yaml` is created.
+#### Inputs
+_Fixture `matchers.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: matchers
+scenarios:
+  - name: composed stream
+    steps:
+      - run:
+          command: echo hello
+      - assert:
+          stdout:
+            contains: hello
+            not_contains: goodbye
+  - name: line scoped
+    steps:
+      - run:
+          shell: true
+          command: printf 'one\ntwo\n'
+      - assert:
+          stdout:
+            line: 2
+… (truncated, 17 more lines)
+```
+#### When
+```shell
 ${atago} run matchers.atago.yaml
 ```
 #### Then
-- after `${atago} doc matchers.atago.yaml`:
-  - exit code is `0`
-  - stdout contains `stdout contains `hello`, does not contain `goodbye``, `stdout line `2` equals an exact value`, `file `install.sh` is executable`, `file `install.sh` does not contain `rm -rf /``
-  - stdout does not contain ``install.sh` is checked`
-- after `${atago} run matchers.atago.yaml`:
-  - exit code is `0`
-  - stdout contains `3 passed`
+- exit code is `0`
+- stdout contains `3 passed`
 ## atago self-hosting / duration assertion
 Source: `test/e2e/atago/duration.atago.yaml`
 ### Scenario: a fast step passes a generous upper bound
