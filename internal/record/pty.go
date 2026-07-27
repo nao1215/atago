@@ -1,9 +1,11 @@
 package record
 
 import (
+	"encoding/base64"
 	"fmt"
 	"regexp"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/nao1215/atago/internal/buildinfo"
 	"github.com/nao1215/atago/internal/loader"
@@ -77,7 +79,10 @@ func GeneratePTY(rec PTYRecording, opts Options) ([]byte, error) {
 	b.WriteString("# prompt that preceded it. Tighten the matchers to pin what you care about.\n")
 	fmt.Fprintf(&b, "suite:\n  name: %s\n\n", yamlScalar(opts.SuiteName))
 	b.WriteString("scenarios:\n")
-	fmt.Fprintf(&b, "  - name: %s # TODO: describe the behavior\n", yamlScalar(rec.Command))
+	// scenarioLabel, not the raw command: the loader rejects a control character
+	// in a name, so a recorded command carrying a tab or a CR generated a spec
+	// that failed its own validation and told the user to report an atago bug.
+	fmt.Fprintf(&b, "  - name: %s # TODO: describe the behavior\n", yamlScalar(scenarioLabel(rec.Command)))
 	b.WriteString("    steps:\n")
 	b.WriteString("      - pty:\n")
 	if rec.Shell {
@@ -158,7 +163,20 @@ func renderSend(seg PTYSegment, secretN *int) []string {
 	// Typed text is raw: escape ${...} so the replay engine types the literal
 	// bytes the user typed instead of expanding them (the secret placeholder
 	// above is the one send that MUST stay a live reference).
-	return []string{fmt.Sprintf("            - send: %s\n", yamlDoubleQuoted(escapeVarRefs(literalSend(seg.Input))))}
+	text := escapeVarRefs(literalSend(seg.Input))
+	if !utf8.ValidString(text) {
+		// A YAML scalar carries text, and rendering these bytes as one would
+		// replace each invalid byte with U+FFFD — the replay would type three
+		// different bytes than the recording captured. !!binary keeps them
+		// exactly, the same escape hatch plain record uses for a capture that is
+		// not valid UTF-8.
+		return []string{
+			"            # not valid UTF-8 (a paste in another encoding, a keyboard macro):\n",
+			"            # base64 so the replay types the recorded bytes exactly.\n",
+			fmt.Sprintf("            - send: !!binary \"%s\"\n", base64.StdEncoding.EncodeToString([]byte(text))),
+		}
+	}
+	return []string{fmt.Sprintf("            - send: %s\n", yamlDoubleQuoted(text))}
 }
 
 // yamlDoubleQuoted renders s as a YAML double-quoted flow scalar, escaping
@@ -231,8 +249,14 @@ func stableLine(output []byte) string {
 }
 
 // longestPlainRun returns the longest run of line that contains no C0 control
-// byte (the NUL standing in for an ANSI sequence, a tab, or any other), trimmed
-// of surrounding whitespace. Each such run existed verbatim in the raw output.
+// byte (the NUL standing in for an ANSI sequence, a tab, or any other) and no
+// byte that is not valid UTF-8, trimmed of surrounding whitespace. Each such run
+// existed verbatim in the raw output, which is what lets an expect built from it
+// match the replayed transcript. A rune-by-rune scan silently turned an invalid
+// byte into U+FFFD, so a Latin-1 prompt yielded an anchor that appears nowhere in
+// the output and an expect that could never match — the session then hung until
+// its timeout. Such a byte now breaks the run, and the anchor is the longest
+// valid stretch around it.
 func longestPlainRun(line string) string {
 	best := ""
 	var cur strings.Builder
@@ -242,8 +266,10 @@ func longestPlainRun(line string) string {
 		}
 		cur.Reset()
 	}
-	for _, r := range line {
-		if r < 0x20 {
+	for i := 0; i < len(line); {
+		r, size := utf8.DecodeRuneInString(line[i:])
+		i += size
+		if r < 0x20 || (r == utf8.RuneError && size == 1) {
 			flush()
 			continue
 		}
