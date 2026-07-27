@@ -357,8 +357,11 @@ scenarios:
           from:
             stdout:
               trim: true
+      # core.autocrlf=false keeps the checkout byte-exact on Windows, where git
+      # would otherwise rewrite LF to CRLF and make the comparison below about
+      # the platform rather than about the clone.
       - run:
-          command: git clone -q origin copy
+          command: git -c core.autocrlf=false clone -q origin copy
       - assert:
           exit_code: 0
       - run:

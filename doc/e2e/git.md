@@ -471,11 +471,11 @@ git -C origin add a.txt
 git -C origin -c user.name=atago -c user.email=atago@example.com commit -q -m shared
 git -C origin rev-parse HEAD
 # capture ${origin_head} from stdout
-git clone -q origin copy
+git -c core.autocrlf=false clone -q origin copy
 git -C copy rev-parse HEAD
 ```
 #### Then
-- after `git clone -q origin copy`:
+- after `git -c core.autocrlf=false clone -q origin copy`:
   - exit code is `0`
 - after `git -C copy rev-parse HEAD`:
   - exit code is `0`
