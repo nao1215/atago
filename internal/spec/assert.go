@@ -407,6 +407,73 @@ type JSONAssert struct {
 	Gte     *float64 `yaml:"gte,omitempty"`
 	Lt      *float64 `yaml:"lt,omitempty"`
 	Lte     *float64 `yaml:"lte,omitempty"`
+
+	// EqualsSet records that the `equals` key was written, which is the only way
+	// to tell `equals: null` (assert the value IS JSON null) from an omitted key
+	// (no matcher set): both decode Equals to a nil interface (#309). It is set
+	// by UnmarshalYAML and carries no YAML key of its own; read it through
+	// HasEquals so a spec built in Go — a test, a generator — needs no extra
+	// bookkeeping.
+	EqualsSet bool `yaml:"-"`
+}
+
+// HasEquals reports whether the check sets an `equals` matcher. A non-nil value
+// counts on its own so a JSONAssert constructed in Go behaves like a decoded
+// one, and EqualsSet covers the null case, whose value is indistinguishable
+// from absence.
+func (j *JSONAssert) HasEquals() bool {
+	return j.Equals != nil || j.EqualsSet
+}
+
+// UnmarshalYAML decodes the mapping with the plain struct rules and then records
+// whether `equals` was present. It decodes strictly so an unknown key inside a
+// check is still rejected: a custom unmarshaler bypasses the loader's
+// document-wide yaml.Strict(), the same trap ExitCode and PTYSend document.
+// Presence is read from a generic map decode rather than by walking the AST so
+// an aliased or merged mapping is resolved first.
+func (j *JSONAssert) UnmarshalYAML(node ast.Node) error {
+	type plain JSONAssert // no UnmarshalYAML, so the default decode applies
+	var p plain
+	if err := yaml.NodeToValue(node, &p, yaml.Strict()); err != nil {
+		return err
+	}
+	*j = JSONAssert(p)
+	var keys map[string]any
+	if err := yaml.NodeToValue(node, &keys); err == nil {
+		_, j.EqualsSet = keys["equals"]
+	}
+	return nil
+}
+
+// MarshalYAML writes the keys in the order the struct declares them, emitting
+// `equals` whenever HasEquals reports it set. The default struct marshal drops
+// an `equals: null` (omitempty cannot see the difference), which would turn a
+// null assertion into a matcher-less check the loader then rejects — the same
+// asymmetry ExitCode.MarshalYAML exists to avoid.
+func (j JSONAssert) MarshalYAML() (any, error) {
+	out := yaml.MapSlice{{Key: "path", Value: j.Path}}
+	if j.HasEquals() {
+		out = append(out, yaml.MapItem{Key: "equals", Value: j.Equals})
+	}
+	if j.Matches != nil {
+		out = append(out, yaml.MapItem{Key: "matches", Value: *j.Matches})
+	}
+	if j.Length != nil {
+		out = append(out, yaml.MapItem{Key: "length", Value: *j.Length})
+	}
+	if j.Gt != nil {
+		out = append(out, yaml.MapItem{Key: "gt", Value: *j.Gt})
+	}
+	if j.Gte != nil {
+		out = append(out, yaml.MapItem{Key: "gte", Value: *j.Gte})
+	}
+	if j.Lt != nil {
+		out = append(out, yaml.MapItem{Key: "lt", Value: *j.Lt})
+	}
+	if j.Lte != nil {
+		out = append(out, yaml.MapItem{Key: "lte", Value: *j.Lte})
+	}
+	return out, nil
 }
 
 // JSONChecks is the argument to a `json:` (and `yaml:`) matcher (#156). It

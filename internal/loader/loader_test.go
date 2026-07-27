@@ -907,6 +907,54 @@ func TestLoadBytes_BinaryTagAccepted(t *testing.T) {
 	}
 }
 
+// TestLoadBytes_JSONEqualsNull pins the difference between `equals: null` — an
+// assertion that the selected value IS JSON null — and an omitted `equals` key,
+// which means no matcher was set (#309). Both decode the value to a nil
+// interface, so only the recorded key presence separates them.
+func TestLoadBytes_JSONEqualsNull(t *testing.T) {
+	t.Parallel()
+
+	for _, spelling := range []string{"equals: null", "equals: ~", "equals: Null"} {
+		src := specSteps("assert: {stdout: {json: {path: \"$.v\", " + spelling + "}}}")
+		s, err := LoadBytes("t.atago.yaml", []byte(src))
+		if err != nil {
+			t.Fatalf("LoadBytes(%s) error = %v, want a clean load", spelling, err)
+		}
+		checks := s.Scenarios[0].Steps[0].Assert.Stdout.JSON
+		if len(checks) != 1 {
+			t.Fatalf("%s: got %d checks, want 1", spelling, len(checks))
+		}
+		if checks[0].Equals != nil {
+			t.Errorf("%s: Equals = %#v, want a nil value (the YAML null)", spelling, checks[0].Equals)
+		}
+		if !checks[0].HasEquals() {
+			t.Errorf("%s: HasEquals() = false, want the matcher recorded as present", spelling)
+		}
+	}
+
+	// An `equals` key written with a real value keeps reporting present, and a
+	// check with no `equals` key at all is still matcher-less.
+	src := specSteps("assert: {stdout: {json: [{path: \"$.a\", equals: 1}, {path: \"$.b\", equals: null}]}}")
+	s, err := LoadBytes("t.atago.yaml", []byte(src))
+	if err != nil {
+		t.Fatalf("LoadBytes(list form) error = %v", err)
+	}
+	for i, c := range s.Scenarios[0].Steps[0].Assert.Stdout.JSON {
+		if !c.HasEquals() {
+			t.Errorf("list check %d: HasEquals() = false, want true", i)
+		}
+	}
+	mustReject(t, "json without equals", specSteps("assert: {stdout: {json: {path: \"$.v\"}}}"),
+		"must set one of equals/matches/length/gt/gte/lt/lte")
+	mustReject(t, "json equals null with a second matcher", specSteps("assert: {stdout: {json: {path: \"$.v\", equals: null, length: 1}}}"),
+		"must set exactly one of equals/matches/length/gt/gte/lt/lte")
+	// The presence check must not swallow the strict unknown-key rejection: a
+	// custom UnmarshalYAML bypasses the loader's document-wide yaml.Strict(),
+	// so a typo inside a check has to be caught by the check itself.
+	mustReject(t, "json typo'd matcher key", specSteps("assert: {stdout: {json: {path: \"$.v\", equal: null}}}"),
+		"equal")
+}
+
 // specSteps assembles a minimal one-scenario spec whose steps are the given
 // flow-style step entries (each is the text after "- " in a steps list). It
 // keeps the many one-off validation cases readable without hand-indenting YAML.

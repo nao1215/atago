@@ -245,7 +245,7 @@ func validateJSON(add func(string, ...any), where string, j *spec.JSONAssert) {
 		add("%s.path is required", where)
 	}
 	n := 0
-	if j.Equals != nil {
+	if j.HasEquals() {
 		n++
 	}
 	if j.Matches != nil {

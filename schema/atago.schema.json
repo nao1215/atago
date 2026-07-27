@@ -2454,7 +2454,9 @@
           "minLength": 1,
           "description": "JSONPath selecting the value under test (e.g. \"$.items[0].name\")."
         },
-        "equals": true,
+        "equals": {
+          "description": "Requires the selected value to equal this value, compared by JSON type (the string \"true\" does not equal the boolean true). Write null to assert the value is JSON null; omitting the key means no matcher was set."
+        },
         "matches": {
           "type": "string",
           "description": "Requires the selected value (as a string) to match this Go regular expression."

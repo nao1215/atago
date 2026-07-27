@@ -140,7 +140,7 @@ func applyJSONMatch(desc string, parsed any, j *spec.JSONAssert) *CheckResult {
 		return jsonCompare(desc, j.Path, nodes, "lt", *j.Lt)
 	case j.Lte != nil:
 		return jsonCompare(desc, j.Path, nodes, "lte", *j.Lte)
-	case j.Equals != nil:
+	case j.HasEquals():
 		return jsonEquals(desc, j.Path, nodes, j.Equals)
 	default:
 		return &CheckResult{Desc: desc, Hint: "json matcher must set equals/matches/length/gt/gte/lt/lte"}
