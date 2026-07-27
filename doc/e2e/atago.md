@@ -1,16 +1,17 @@
 # atago Behavior Specs
 ## Summary
-74 suites · 433 scenarios
+74 suites · 434 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
   - [a single-quoted argument with a space stays one argument](#scenario-a-single-quoted-argument-with-a-space-stays-one-argument)
   - [a block-scalar command splits on newlines like spaces](#scenario-a-block-scalar-command-splits-on-newlines-like-spaces)
   - [a folded-scalar command drops its trailing newline](#scenario-a-folded-scalar-command-drops-its-trailing-newline)
-- [atago self-hosting / artifacts-dir failure payloads](#atago-self-hosting--artifacts-dir-failure-payloads) — 4 scenarios
+- [atago self-hosting / artifacts-dir failure payloads](#atago-self-hosting--artifacts-dir-failure-payloads) — 5 scenarios
   - [a failing stdout equals writes expected and actual sidecars](#scenario-a-failing-stdout-equals-writes-expected-and-actual-sidecars)
   - [a passing scenario writes no failure payload](#scenario-a-passing-scenario-writes-no-failure-payload)
   - [the artifacts directory is created when it does not exist](#scenario-the-artifacts-directory-is-created-when-it-does-not-exist)
+  - [each repeat iteration keeps its own failure payloads](#scenario-each-repeat-iteration-keeps-its-own-failure-payloads)
   - [a file-content mismatch also writes a payload](#scenario-a-file-content-mismatch-also-writes-a-payload)
 - [atago self-hosting / variable expansion in assertion matcher values](#atago-self-hosting--variable-expansion-in-assertion-matcher-values) — 6 scenarios
   - [stdout.equals expands ${workdir}](#scenario-stdoutequals-expands-workdir)
@@ -618,6 +619,45 @@ ${atago} run --artifacts-dir deep/made/arts nested.atago.yaml
 #### Then
 - exit code is `1`
 - dir `deep/made/arts` exists
+### Scenario: each repeat iteration keeps its own failure payloads
+#### Given
+- Fixture file `repeated.atago.yaml` is created.
+#### Inputs
+_Fixture `repeated.atago.yaml`:_
+```text
+version: "1"
+suite: {name: repeated}
+scenarios:
+  - name: prints its own workdir
+    steps:
+      # $${workdir} escapes the OUTER expansion, so the inner run
+      # prints its own per-iteration workdir instead of a constant.
+      - run: {shell: true, command: "echo $${workdir}"}
+      - assert: {stdout: {equals: "never-this"}}
+```
+#### When
+```shell
+${atago} run --repeat 3 --artifacts-dir reparts repeated.atago.yaml
+find reparts -type d -name 'attempt-*' | sort | sed 's#.*/##'
+find reparts -name '*.actual.txt' | wc -l | tr -d ' '
+cat $(find reparts -name '*.actual.txt') | sort -u | wc -l | tr -d ' '
+```
+#### Then
+- after `${atago} run --repeat 3 --artifacts-dir reparts repeated.atago.yaml`:
+  - exit code is `1`
+- after `find reparts -type d -name 'attempt-*' | sort | sed 's#.*/##'`:
+  - exit code is `0`
+  - stdout equals an exact value
+- after `find reparts -name '*.actual.txt' | wc -l | tr -d ' '`:
+  - stdout equals an exact value
+- after `cat $(find reparts -name '*.actual.txt') | sort -u | wc -l | tr -d ' '`:
+  - stdout equals an exact value
+#### Expected output
+_expected stdout:_
+```text
+attempt-2
+attempt-3
+```
 ### Scenario: a file-content mismatch also writes a payload
 #### Given
 - Fixture file `filefail.atago.yaml` is created.

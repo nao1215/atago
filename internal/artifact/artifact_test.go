@@ -1,6 +1,7 @@
 package artifact
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -46,7 +47,8 @@ func TestSuiteTokenDeterministicAndCollisionFree(t *testing.T) {
 
 func TestFailurePathStableAndUnique(t *testing.T) {
 	t.Parallel()
-	p := FailurePath("test/e2e/atago/run.atago.yaml", "prints hello", 0, 2, "stdout", "actual", "txt")
+	run := Scenario{SpecPath: "test/e2e/atago/run.atago.yaml", Name: "prints hello"}
+	p := run.FailurePath(2, "stdout", "actual", "txt")
 	if !strings.HasSuffix(p, "step-02-stdout.actual.txt") {
 		t.Errorf("FailurePath filename = %q", p)
 	}
@@ -54,7 +56,8 @@ func TestFailurePathStableAndUnique(t *testing.T) {
 		t.Errorf("FailurePath must use forward slashes: %q", p)
 	}
 	// Distinct scenarios in the same suite never collide.
-	q := FailurePath("test/e2e/atago/run.atago.yaml", "prints hello", 1, 2, "stdout", "actual", "txt")
+	second := Scenario{SpecPath: "test/e2e/atago/run.atago.yaml", Name: "prints hello", Index: 1}
+	q := second.FailurePath(2, "stdout", "actual", "txt")
 	if p == q {
 		t.Errorf("scenario index did not disambiguate path: %q", p)
 	}
@@ -64,11 +67,12 @@ func TestFailurePathStableAndUnique(t *testing.T) {
 // never collides with a service log even when both share a declared name.
 func TestMockLogPath_DistinctFromServiceLog(t *testing.T) {
 	t.Parallel()
-	m := MockLogPath("test/e2e/atago/mock.atago.yaml", "client posts", 0, "api")
+	run := Scenario{SpecPath: "test/e2e/atago/mock.atago.yaml", Name: "client posts"}
+	m := run.MockLogPath("api")
 	if !strings.HasSuffix(m, "mock-api.log") {
 		t.Errorf("MockLogPath = %q", m)
 	}
-	s := ServiceLogPath("test/e2e/atago/mock.atago.yaml", "client posts", 0, "api")
+	s := run.ServiceLogPath("api")
 	if m == s {
 		t.Errorf("mock and service logs for the same name collided: %q", m)
 	}
@@ -76,19 +80,67 @@ func TestMockLogPath_DistinctFromServiceLog(t *testing.T) {
 
 func TestServiceLogPathStableAndUnique(t *testing.T) {
 	t.Parallel()
-	p := ServiceLogPath("test/e2e/atago/services.atago.yaml", "peer talks", 0, "api server")
+	run := Scenario{SpecPath: "test/e2e/atago/services.atago.yaml", Name: "peer talks"}
+	p := run.ServiceLogPath("api server")
 	if !strings.HasSuffix(p, "service-api-server.log") {
 		t.Errorf("ServiceLogPath = %q", p)
 	}
 	// Distinct services in the same scenario land in distinct files.
-	q := ServiceLogPath("test/e2e/atago/services.atago.yaml", "peer talks", 0, "db server")
+	q := run.ServiceLogPath("db server")
 	if p == q {
 		t.Errorf("distinct services collided: %q", p)
 	}
 	// Same scenario dir as failure sidecars.
-	fp := FailurePath("test/e2e/atago/services.atago.yaml", "peer talks", 0, 1, "stdout", "actual", "txt")
+	fp := run.FailurePath(1, "stdout", "actual", "txt")
 	if dirOf(p) != dirOf(fp) {
 		t.Errorf("service log %q not in the scenario dir of %q", p, fp)
+	}
+}
+
+// TestScenarioDir_AttemptSeparatesRepeatedExecutions pins the attempt segment: a
+// plain run keeps the path it always had, and every further --repeat iteration or
+// --retry-failed attempt writes under its own directory so one attempt's payload
+// cannot overwrite another's while a report still points at it.
+func TestScenarioDir_AttemptSeparatesRepeatedExecutions(t *testing.T) {
+	t.Parallel()
+	base := Scenario{SpecPath: "test/e2e/atago/run.atago.yaml", Name: "prints hello"}
+	// Attempt 0 (never set) and 1 (the first execution) are the same location.
+	if got, want := base.Dir(), (Scenario{SpecPath: base.SpecPath, Name: base.Name, Attempt: 1}).Dir(); got != want {
+		t.Errorf("attempt 0 dir = %q, attempt 1 dir = %q, want them identical", got, want)
+	}
+	if strings.Contains(base.Dir(), "attempt-") {
+		t.Errorf("first attempt dir = %q, want no attempt segment", base.Dir())
+	}
+
+	seen := map[string]bool{base.Dir(): true}
+	for attempt := 2; attempt <= 4; attempt++ {
+		s := base
+		s.Attempt = attempt
+		dir := s.Dir()
+		if !strings.HasSuffix(dir, fmt.Sprintf("attempt-%d", attempt)) {
+			t.Errorf("attempt %d dir = %q, want it to name the attempt", attempt, dir)
+		}
+		if !strings.HasPrefix(dir, base.Dir()+"/") {
+			t.Errorf("attempt %d dir = %q, want it under the scenario dir %q", attempt, dir, base.Dir())
+		}
+		if seen[dir] {
+			t.Errorf("attempt %d reused directory %q", attempt, dir)
+		}
+		seen[dir] = true
+	}
+
+	// Every artifact of one attempt shares that attempt's directory, so a
+	// scenario's failure payloads, service logs, and mock logs stay together.
+	third := base
+	third.Attempt = 3
+	for _, p := range []string{
+		third.FailurePath(1, "stdout", "actual", "txt"),
+		third.ServiceLogPath("api"),
+		third.MockLogPath("api"),
+	} {
+		if dirOf(p) != third.Dir() {
+			t.Errorf("%q is not in the attempt dir %q", p, third.Dir())
+		}
 	}
 }
 

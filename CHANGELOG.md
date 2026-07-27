@@ -9,6 +9,16 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- `--artifacts-dir` no longer lets one attempt of a scenario overwrite another's
+  payloads. A `--repeat` run reports the first failing iteration inline and
+  points at its sidecar files, but every iteration wrote to the same paths, so
+  the last failure overwrote the evidence the report still referenced: opening
+  the artifact showed a payload from a different iteration than the diff printed
+  beside it, and the other iterations' payloads were gone. Each attempt after the
+  first now writes under an `attempt-<N>` directory, which also keeps a
+  `--retry-failed` attempt's evidence instead of dropping it. A run with neither
+  flag writes exactly where it always did.
+
 - `json: equals: null` now asserts that a field is null instead of being
   rejected as a matcher-less check. A YAML null and an omitted `equals` key both
   decode to the same Go nil, so the loader could not tell "assert this value is

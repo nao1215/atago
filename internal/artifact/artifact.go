@@ -90,24 +90,56 @@ func StepFile(stepIndex int, kind, role, ext string) string {
 	return fmt.Sprintf("step-%02d-%s.%s.%s", stepIndex, Slug(kind), Slug(role), ext)
 }
 
-// FailurePath composes the full relative path for a failed assertion's sidecar
-// file: <suite-token>/<scenario-token>/<step-file>. It is deterministic and
-// collision-free across suites, scenarios, steps, and parallel runs.
-func FailurePath(specPath, scenario string, scenarioIdx, stepIdx int, kind, role, ext string) string {
-	return path.Join(SuiteToken(specPath), ScenarioToken(scenario, scenarioIdx), StepFile(stepIdx, kind, role, ext))
+// Scenario identifies one execution of one scenario: everything an artifact path
+// needs apart from the step itself. Holding the fields together is what keeps a
+// caller from composing a path for the wrong execution — the engine writes
+// failure payloads, service logs, and mock request logs from four different
+// places for the same run.
+type Scenario struct {
+	// SpecPath is the spec file the scenario was loaded from.
+	SpecPath string
+	// Name is the scenario name; Index disambiguates scenarios that share one
+	// (matrix rows).
+	Name  string
+	Index int
+	// Attempt counts executions of this same scenario: 1 (or 0) for a plain run,
+	// then 2, 3, ... for each further --repeat iteration or --retry-failed
+	// attempt. Every attempt after the first gets its own subdirectory, because a
+	// report describes ONE attempt inline and points at that attempt's payloads:
+	// sharing a path lets a later attempt overwrite evidence the report still
+	// references, leaving the file disagreeing with the diff printed beside it.
+	Attempt int
+}
+
+// Dir is the directory every artifact of this execution lives in:
+// <suite-token>/<scenario-token>, plus an attempt-<N> segment from the second
+// attempt on. The first attempt keeps the plain path, so a run with neither
+// --repeat nor --retry-failed writes exactly where it always has.
+func (s Scenario) Dir() string {
+	dir := path.Join(SuiteToken(s.SpecPath), ScenarioToken(s.Name, s.Index))
+	if s.Attempt > 1 {
+		dir = path.Join(dir, fmt.Sprintf("attempt-%d", s.Attempt))
+	}
+	return dir
+}
+
+// FailurePath composes the relative path for a failed assertion's sidecar file:
+// <dir>/<step-file>. It is deterministic and collision-free across suites,
+// scenarios, attempts, steps, and parallel runs.
+func (s Scenario) FailurePath(stepIdx int, kind, role, ext string) string {
+	return path.Join(s.Dir(), StepFile(stepIdx, kind, role, ext))
 }
 
 // ServiceLogPath composes the relative path for a background service's preserved
-// combined stdout/stderr log (#51): <suite-token>/<scenario-token>/service-<name>.log.
-// It shares the scenario directory with failure sidecars and is collision-free
-// across services, scenarios, suites, and parallel runs.
-func ServiceLogPath(specPath, scenario string, scenarioIdx int, serviceName string) string {
-	return path.Join(SuiteToken(specPath), ScenarioToken(scenario, scenarioIdx), "service-"+Slug(serviceName)+".log")
+// combined stdout/stderr log (#51): <dir>/service-<name>.log, sharing the
+// scenario directory with failure sidecars.
+func (s Scenario) ServiceLogPath(serviceName string) string {
+	return path.Join(s.Dir(), "service-"+Slug(serviceName)+".log")
 }
 
 // MockLogPath composes the relative path for a mock server's preserved request
-// log: <suite-token>/<scenario-token>/mock-<name>.log. The mock- prefix keeps
-// it distinct from a service log even when a mock and a service share a name.
-func MockLogPath(specPath, scenario string, scenarioIdx int, mockName string) string {
-	return path.Join(SuiteToken(specPath), ScenarioToken(scenario, scenarioIdx), "mock-"+Slug(mockName)+".log")
+// log: <dir>/mock-<name>.log. The mock- prefix keeps it distinct from a service
+// log even when a mock and a service share a name.
+func (s Scenario) MockLogPath(mockName string) string {
+	return path.Join(s.Dir(), "mock-"+Slug(mockName)+".log")
 }

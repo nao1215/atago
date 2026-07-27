@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/nao1215/atago/internal/artifact"
 	"github.com/nao1215/atago/internal/platform"
 	"github.com/nao1215/atago/internal/runner"
 	browserrunner "github.com/nao1215/atago/internal/runner/browser"
@@ -24,8 +25,13 @@ import (
 // phases share. Splitting runScenario across methods on this struct keeps each
 // phase readable while the state stays in one place.
 type scenarioRun struct {
-	e       *Engine
-	idx     int
+	e   *Engine
+	idx int
+	// attempt is which execution of this scenario this is: 1 for a plain run,
+	// counting up per --repeat iteration and --retry-failed attempt. It only
+	// separates artifact directories, so one attempt's evidence cannot overwrite
+	// another's while a report still references it.
+	attempt int
 	sc      *spec.Scenario
 	rc      runConfig
 	specDir string
@@ -52,7 +58,7 @@ type scenarioRun struct {
 // skip check, resource setup (store, mock servers, leading fixtures, services),
 // the step loop, teardown, and cleanup. It orchestrates the phases; the phases
 // themselves live in lifecycle.go and stepexec.go.
-func (e *Engine) runScenario(ctx context.Context, scenarioIdx int, sc *spec.Scenario, rc runConfig) ScenarioResult {
+func (e *Engine) runScenario(ctx context.Context, scenarioIdx int, sc *spec.Scenario, rc runConfig, attempt int) ScenarioResult {
 	if reason, skip := e.skipReason(ctx, sc); skip {
 		return ScenarioResult{Name: sc.Name, Status: StatusSkipped, SkipReason: reason}
 	}
@@ -60,6 +66,7 @@ func (e *Engine) runScenario(ctx context.Context, scenarioIdx int, sc *spec.Scen
 	x := &scenarioRun{
 		e:            e,
 		idx:          scenarioIdx,
+		attempt:      attempt,
 		sc:           sc,
 		rc:           rc,
 		specDir:      rc.specDir,
@@ -109,12 +116,18 @@ func (e *Engine) runScenario(ctx context.Context, scenarioIdx int, sc *spec.Scen
 	// readiness failure (#51). Green runs write nothing (artifact-dir + failure
 	// gated), keeping logs opt-in rather than mandatory noise.
 	if x.out.Status == StatusFailed || x.out.Status == StatusError {
-		x.e.writeServiceLogs(&x.out, x.masker, x.services, x.rc.specPath, x.sc.Name, x.idx)
-		x.e.writeMockLogs(&x.out, x.masker, x.mocks, x.rc.specPath, x.sc.Name, x.idx)
+		x.e.writeServiceLogs(&x.out, x.masker, x.services, x.artifactScope())
+		x.e.writeMockLogs(&x.out, x.masker, x.mocks, x.artifactScope())
 	}
 
 	x.out.Duration = time.Since(x.start)
 	return x.out
+}
+
+// artifactScope names where this execution's artifact files belong: the suite,
+// the scenario, and which attempt wrote them.
+func (x *scenarioRun) artifactScope() artifact.Scenario {
+	return artifact.Scenario{SpecPath: x.rc.specPath, Name: x.sc.Name, Index: x.idx, Attempt: x.attempt}
 }
 
 // skipReason reports whether a scenario should be skipped given its skip/only

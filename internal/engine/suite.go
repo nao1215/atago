@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/nao1215/atago/internal/artifact"
 	"github.com/nao1215/atago/internal/assert"
 	"github.com/nao1215/atago/internal/fixture"
 	"github.com/nao1215/atago/internal/runner"
@@ -14,6 +15,14 @@ import (
 	"github.com/nao1215/atago/internal/spec"
 	"github.com/nao1215/atago/internal/store"
 )
+
+// suiteArtifactScope names where a suite setup/teardown step's artifacts belong.
+// Those steps run once per suite rather than per scenario, so they carry the
+// phase label as their scenario name, the -1 index that marks "not a scenario",
+// and no attempt of their own.
+func suiteArtifactScope(rc runConfig, label string) artifact.Scenario {
+	return artifact.Scenario{SpecPath: rc.specPath, Name: label, Index: -1}
+}
 
 // suiteSetupLabel names the phase of a scenario error caused by a failed
 // suite.setup step, mirroring the "service setup" labeling for pre-step
@@ -136,7 +145,7 @@ func (e *Engine) runSuiteSteps(ctx context.Context, steps []spec.Step, rt *suite
 				// recordChecks masks secrets in the check payloads and writes any
 				// --artifacts-dir sidecars, exactly as the scenario path does — the
 				// suite path used to set sr.Checks raw and leak both (#243).
-				e.recordChecks(rc.masker, untilChecks, rc.specPath, label, -1, i)
+				e.recordChecks(rc.masker, untilChecks, suiteArtifactScope(rc, label), i)
 				sr.Checks = untilChecks
 				if !assert.AllOK(untilChecks) {
 					failed = true
@@ -166,7 +175,7 @@ func (e *Engine) runSuiteSteps(ctx context.Context, steps []spec.Step, rt *suite
 					return nil, false
 				},
 			})
-			e.recordChecks(rc.masker, crs, rc.specPath, label, -1, i)
+			e.recordChecks(rc.masker, crs, suiteArtifactScope(rc, label), i)
 			sr.Checks = crs
 			if !assert.AllOK(crs) {
 				failed = true

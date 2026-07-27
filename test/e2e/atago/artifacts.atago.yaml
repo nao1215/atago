@@ -72,6 +72,51 @@ scenarios:
       - assert:
           dir: {path: deep/made/arts, exists: true}
 
+  # A --repeat run executes one scenario several times, but the report describes
+  # ONE iteration inline and points at its payloads. When every iteration wrote to
+  # the same paths, the last one overwrote the evidence the report referenced, so
+  # the sidecar disagreed with the diff printed beside it. Each iteration prints
+  # its own workdir, which differs per iteration, so the payloads are distinct
+  # without any timing dependence.
+  - name: each repeat iteration keeps its own failure payloads
+    steps:
+      - fixture:
+          file: repeated.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: repeated}
+            scenarios:
+              - name: prints its own workdir
+                steps:
+                  # $${workdir} escapes the OUTER expansion, so the inner run
+                  # prints its own per-iteration workdir instead of a constant.
+                  - run: {shell: true, command: "echo $${workdir}"}
+                  - assert: {stdout: {equals: "never-this"}}
+      - run: {command: "${atago} run --repeat 3 --artifacts-dir reparts repeated.atago.yaml"}
+      - assert: {exit_code: 1}
+      # Attempts 2 and 3 each get their own directory; attempt 1 stays at the
+      # scenario directory, so a plain run is unaffected.
+      - run:
+          shell: true
+          command: "find reparts -type d -name 'attempt-*' | sort | sed 's#.*/##'"
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "attempt-2\nattempt-3"
+      # Three failing iterations leave three different actual payloads.
+      - run:
+          shell: true
+          command: "find reparts -name '*.actual.txt' | wc -l | tr -d ' '"
+      - assert:
+          stdout:
+            equals: "3"
+      - run:
+          shell: true
+          command: "cat $(find reparts -name '*.actual.txt') | sort -u | wc -l | tr -d ' '"
+      - assert:
+          stdout:
+            equals: "3"
+
   - name: a file-content mismatch also writes a payload
     steps:
       - fixture:

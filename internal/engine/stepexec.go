@@ -190,7 +190,7 @@ func (x *scenarioRun) recordUntil(sr *StepResult, i int, checks []*assert.CheckR
 	if len(checks) == 0 {
 		return StatusPassed
 	}
-	x.e.recordChecks(x.masker, checks, x.rc.specPath, x.sc.Name, x.idx, i)
+	x.e.recordChecks(x.masker, checks, x.artifactScope(), i)
 	sr.Checks = append(sr.Checks, checks...)
 	if !assert.AllOK(checks) {
 		return StatusFailed
@@ -201,7 +201,7 @@ func (x *scenarioRun) recordUntil(sr *StepResult, i int, checks []*assert.CheckR
 // fail reports one engine-generated check (a killed timeout, a never-matching
 // pty expect) the same way an assertion failure is reported.
 func (x *scenarioRun) fail(sr *StepResult, i int, ck *assert.CheckResult) Status {
-	x.e.recordChecks(x.masker, []*assert.CheckResult{ck}, x.rc.specPath, x.sc.Name, x.idx, i)
+	x.e.recordChecks(x.masker, []*assert.CheckResult{ck}, x.artifactScope(), i)
 	sr.Checks = append(sr.Checks, ck)
 	return StatusFailed
 }
@@ -246,7 +246,7 @@ func (x *scenarioRun) execStep(ctx context.Context, steps []spec.Step, i int, st
 			Scrub:           x.rc.scrubber.Apply,
 			MockRecords:     x.mockRecords,
 		})
-		x.e.recordChecks(x.masker, crs, x.rc.specPath, x.sc.Name, x.idx, i)
+		x.e.recordChecks(x.masker, crs, x.artifactScope(), i)
 		sr.Checks = crs
 		if !assert.AllOK(crs) {
 			status = StatusFailed

@@ -154,6 +154,137 @@ scenarios:
 	}
 }
 
+// TestEngine_RepeatedIterationsKeepTheirOwnArtifacts is the regression for a
+// silent lie in a --repeat report: every iteration wrote its payloads to the
+// same paths, so the last failing iteration overwrote the earlier ones while the
+// folded result kept the FIRST failing iteration's inline diff. A reviewer
+// opening the referenced sidecar saw a payload from a different iteration than
+// the one the report described. Each iteration's ${workdir} is unique, so the
+// actual stdout differs per iteration with no timing dependence.
+func TestEngine_RepeatedIterationsKeepTheirOwnArtifacts(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	const src = `
+version: "1"
+suite:
+  name: s
+scenarios:
+  - name: prints its own workdir
+    steps:
+      - run:
+          shell: true
+          command: echo ${workdir}
+      - assert:
+          stdout: {contains: NOPE}
+`
+	s, err := loader.LoadBytes("rep.atago.yaml", []byte(src))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	eng := New()
+	eng.Artifacts = artifact.NewDir(root)
+	eng.Repeat = 3
+	res := eng.Run(context.Background(), s, "rep.atago.yaml")
+	if res.Status != StatusFailed {
+		t.Fatalf("status = %s, want failed (every iteration fails)", res.Status)
+	}
+
+	cr := failedCheck(t, res)
+	var actualPath string
+	for _, a := range cr.ArtifactFiles {
+		if a.Role == "actual" {
+			actualPath = a.Path
+		}
+	}
+	if actualPath == "" {
+		t.Fatalf("no actual artifact recorded: %+v", cr.ArtifactFiles)
+	}
+	got, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(actualPath)))
+	if err != nil {
+		t.Fatalf("read artifact: %v", err)
+	}
+	// The sidecar the report points at must carry the payload the report
+	// described, not a later iteration's.
+	if strings.TrimSpace(string(got)) != strings.TrimSpace(cr.Actual) {
+		t.Errorf("artifact %s = %q, but the report's actual is %q", actualPath, got, cr.Actual)
+	}
+
+	// And no iteration's evidence is lost: three failing iterations leave three
+	// distinct payload files behind.
+	var actuals []string
+	err = filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !d.IsDir() && strings.HasSuffix(d.Name(), "stdout.actual.txt") {
+			actuals = append(actuals, p)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk artifacts: %v", err)
+	}
+	if len(actuals) != 3 {
+		t.Errorf("found %d actual payloads, want one per iteration: %v", len(actuals), actuals)
+	}
+	seen := map[string]bool{}
+	for _, p := range actuals {
+		b, err := os.ReadFile(p)
+		if err != nil {
+			t.Fatalf("read %s: %v", p, err)
+		}
+		if seen[string(b)] {
+			t.Errorf("two iterations wrote the same payload %q", b)
+		}
+		seen[string(b)] = true
+	}
+}
+
+// TestEngine_RetriedAttemptArtifactsMatchTheReport pins the same contract for
+// --retry-failed: the reported attempt is the last one, and the payload it
+// references has to be that attempt's.
+func TestEngine_RetriedAttemptArtifactsMatchTheReport(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	const src = `
+version: "1"
+suite:
+  name: s
+scenarios:
+  - name: prints its own workdir
+    steps:
+      - run:
+          shell: true
+          command: echo ${workdir}
+      - assert:
+          stdout: {contains: NOPE}
+`
+	s, err := loader.LoadBytes("retry.atago.yaml", []byte(src))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	eng := New()
+	eng.Artifacts = artifact.NewDir(root)
+	eng.RetryFailed = 2
+	res := eng.Run(context.Background(), s, "retry.atago.yaml")
+	if res.Status != StatusFailed {
+		t.Fatalf("status = %s, want failed (retries cannot help)", res.Status)
+	}
+	cr := failedCheck(t, res)
+	for _, a := range cr.ArtifactFiles {
+		if a.Role != "actual" {
+			continue
+		}
+		got, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(a.Path)))
+		if err != nil {
+			t.Fatalf("read artifact: %v", err)
+		}
+		if strings.TrimSpace(string(got)) != strings.TrimSpace(cr.Actual) {
+			t.Errorf("artifact %s = %q, but the reported attempt's actual is %q", a.Path, got, cr.Actual)
+		}
+	}
+}
+
 // failedCheck returns the first failed CheckResult across a suite result.
 func failedCheck(t *testing.T, res *SuiteResult) *assert.CheckResult {
 	t.Helper()
