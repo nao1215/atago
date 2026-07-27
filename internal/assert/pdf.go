@@ -137,6 +137,9 @@ var (
 	rePageObj = regexp.MustCompile(`/Type\s*/Page(?:[^s]|$)`)
 	reCount   = regexp.MustCompile(`/Count\s+(\d+)`)
 	reStream  = regexp.MustCompile(`(?s)stream\r?\n(.*?)\r?\nendstream`)
+	// /Type /ObjStm marks a stream that holds document objects (PDF 1.5+), which
+	// is where a modern writer puts the Info dictionary.
+	reObjStm = regexp.MustCompile(`/Type\s*/ObjStm`)
 	// A metadata value is either a "(…)" literal string or a "<…>" hex string.
 	reMetaItem = regexp.MustCompile(`/(Title|Author|Subject|Keywords|Creator|Producer)\s*[(<]`)
 	// A text operand is a "(…)" literal string or a "<…>" hex string (ISO 32000
@@ -166,13 +169,19 @@ func parsePDF(data []byte) pdfDoc {
 	// objects — including the Info dictionary — into a compressed object stream,
 	// so metadata has to be looked for inside them too.
 	var text strings.Builder
-	var decodedStreams [][]byte
-	for _, m := range reStream.FindAllSubmatch(data, -1) {
-		raw := m[1]
+	var objectStreams [][]byte
+	for _, loc := range reStream.FindAllSubmatchIndex(data, -1) {
+		raw := data[loc[2]:loc[3]]
 		decoded := raw
 		if inflated, err := inflate(raw); err == nil {
 			decoded = inflated
-			decodedStreams = append(decodedStreams, decoded)
+			// Only a stream that declares /Type /ObjStm holds document objects.
+			// Any other decompressed stream is page content, where a literal
+			// "/Title(...)" drawn on the page would otherwise be mistaken for
+			// the document's metadata.
+			if isObjectStream(data, loc[0]) {
+				objectStreams = append(objectStreams, decoded)
+			}
 		}
 		for _, lit := range reTextOp.FindAll(decoded, -1) {
 			text.WriteString(decodePDFString(lit))
@@ -186,10 +195,25 @@ func parsePDF(data []byte) pdfDoc {
 	// clear); anything still missing is looked for in the decompressed object
 	// streams, which is where Ghostscript 10, LaTeX, and Word put it.
 	readMetadata(doc.metadata, data, false)
-	for _, decoded := range decodedStreams {
+	for _, decoded := range objectStreams {
 		readMetadata(doc.metadata, decoded, true)
 	}
 	return doc
+}
+
+// objStmWindow is how far back from a `stream` keyword the object's dictionary
+// is looked for. A dictionary is a short header; a window keeps the scan cheap
+// and cannot wander into the previous object's payload for any realistic PDF.
+const objStmWindow = 512
+
+// isObjectStream reports whether the stream starting at streamAt is declared as
+// an object stream by the dictionary that precedes it.
+func isObjectStream(data []byte, streamAt int) bool {
+	start := streamAt - objStmWindow
+	if start < 0 {
+		start = 0
+	}
+	return reObjStm.Match(data[start:streamAt])
 }
 
 // readMetadata pulls the known Info fields out of buf into meta. When keepFirst

@@ -5,6 +5,7 @@ import (
 	"compress/zlib"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/nao1215/atago/internal/spec"
@@ -323,7 +324,7 @@ func TestParsePDF_UncompressedMetadataWins(t *testing.T) {
 	}
 	var pdf bytes.Buffer
 	pdf.WriteString("%PDF-1.5\n1 0 obj\n<< /Type /Page >>\nendobj\n")
-	pdf.WriteString("2 0 obj\n<< /Filter /FlateDecode >>\nstream\n")
+	pdf.WriteString("2 0 obj\n<< /Type /ObjStm /Filter /FlateDecode >>\nstream\n")
 	pdf.Write(buf.Bytes())
 	pdf.WriteString("\nendstream\nendobj\n")
 	pdf.WriteString("3 0 obj\n<< /Title (From The Trailer) >>\nendobj\ntrailer\n<< /Info 3 0 R >>\n%%EOF\n")
@@ -331,5 +332,35 @@ func TestParsePDF_UncompressedMetadataWins(t *testing.T) {
 	doc := parsePDF(pdf.Bytes())
 	if got := doc.metadata["title"]; got != "From The Trailer" {
 		t.Errorf("title = %q, want the uncompressed value", got)
+	}
+}
+
+
+// TestParsePDF_PageContentIsNotMetadata pins that only a declared object stream
+// can supply metadata: a page whose drawn text happens to contain "/Title(...)"
+// must not be mistaken for the document's Info dictionary.
+func TestParsePDF_PageContentIsNotMetadata(t *testing.T) {
+	t.Parallel()
+	payload := []byte("BT (/Title(Drawn On The Page)) Tj ET")
+	var buf bytes.Buffer
+	zw := zlib.NewWriter(&buf)
+	if _, err := zw.Write(payload); err != nil {
+		t.Fatal(err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	var pdf bytes.Buffer
+	pdf.WriteString("%PDF-1.5\n1 0 obj\n<< /Type /Page /Contents 2 0 R >>\nendobj\n")
+	pdf.WriteString("2 0 obj\n<< /Filter /FlateDecode >>\nstream\n")
+	pdf.Write(buf.Bytes())
+	pdf.WriteString("\nendstream\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF\n")
+
+	doc := parsePDF(pdf.Bytes())
+	if got, ok := doc.metadata["title"]; ok {
+		t.Errorf("title = %q, want no metadata from a page content stream", got)
+	}
+	if !strings.Contains(doc.text, "Drawn On The Page") {
+		t.Errorf("text = %q, want the drawn text to still be extracted", doc.text)
 	}
 }
