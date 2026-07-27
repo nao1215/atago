@@ -1,0 +1,271 @@
+version: "1"
+
+suite:
+  name: fx (interactive viewer, pty testbed)
+  description: |
+    Given a file and no reducer, fx stops being a filter and becomes a
+    full-screen JSON viewer: a foldable tree, a regexp search, and a cursor
+    whose position is reported as a JSON path in the status bar.
+
+    What makes it an unusual TUI to test is where it draws. fx paints the whole
+    interface on stderr and keeps stdout for the one value the user asks it to
+    print, so `fx data.json > picked.txt` is a real workflow: the UI still
+    appears on the terminal and the file receives only the selected node. The
+    scenarios below drive the viewer inside a pseudo-terminal and assert both
+    sides of that split — the rendered screen, and what the pipeline behind it
+    received.
+
+    The waits are `expect_screen`, not `expect`: fx negotiates with the
+    terminal before its first paint, so the interesting condition is a rendered
+    frame rather than a byte on the wire.
+
+# fx loads .fxrc.js from the user's home directory at startup, so every step
+# here takes an isolated home: a developer's own ~/.fxrc.js must not be able to
+# change what these scenarios observe.
+defaults:
+  run:
+    sandbox_home: true
+
+# Every scenario probes for fx first so the suite skips cleanly where it is
+# absent; the viewer is POSIX-only under the pty runner.
+scenarios:
+  - name: the viewer renders the document and quits cleanly on q
+    only:
+      command: fx --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: viewer.json
+          content: '{"name":"atago","tags":["cli","e2e"],"nested":{"deep":{"leaf":42}}}'
+      - pty:
+          command: fx viewer.json
+          cols: 80
+          rows: 24
+          timeout: 30s
+          session:
+            - expect_screen:
+                contains: '"name": "atago"'
+                stable_for: 100ms
+            # The status bar names the file being viewed.
+            - expect_screen:
+                contains: viewer.json
+            - send: "q"
+      - assert:
+          exit_code: 0
+
+  - name: esc leaves the viewer with a success code
+    only:
+      command: fx --version
+    skip:
+      os: windows
+    steps:
+      # Worth pinning next to fzf, whose Esc means "I chose nothing" and exits
+      # 130. fx is a viewer, not a chooser: leaving it is not an abort, so any
+      # `fx file.json && ...` chain keeps running.
+      - fixture:
+          file: viewer.json
+          content: '{"name":"atago"}'
+      - pty:
+          command: fx viewer.json
+          cols: 80
+          rows: 24
+          timeout: 30s
+          session:
+            - expect_screen:
+                contains: '"name": "atago"'
+                stable_for: 100ms
+            - send: {key: esc}
+      - assert:
+          exit_code: 0
+
+  - name: the interface goes to stderr, so a redirected stdout stays empty
+    only:
+      command: fx --version
+    skip:
+      os: windows
+    steps:
+      # The headline contract. stdout is redirected into a file, yet the UI
+      # still paints (proved by expect_screen) because fx writes it to stderr.
+      # Quitting without choosing anything leaves the file empty — nothing of
+      # the interface leaked into the pipeline.
+      - fixture:
+          file: viewer.json
+          content: '{"name":"atago","tags":["cli","e2e"]}'
+      - pty:
+          shell: true
+          command: fx viewer.json > picked.txt
+          cols: 80
+          rows: 24
+          timeout: 30s
+          session:
+            - expect_screen:
+                contains: '"name": "atago"'
+                stable_for: 100ms
+            - send: "q"
+      - assert:
+          exit_code: 0
+          file:
+            path: picked.txt
+            equals: ""
+
+  - name: P prints the value under the cursor to stdout
+    only:
+      command: fx --version
+    skip:
+      os: windows
+    steps:
+      # The other half of the split: move the cursor down one node — the status
+      # bar confirms it is on .name — and P writes that value, and only that
+      # value, to the redirected stdout before exiting.
+      - fixture:
+          file: viewer.json
+          content: '{"name":"atago","tags":["cli","e2e"]}'
+      - pty:
+          shell: true
+          command: fx viewer.json > picked.txt
+          cols: 80
+          rows: 24
+          timeout: 30s
+          session:
+            - expect_screen:
+                contains: '"name": "atago"'
+                stable_for: 100ms
+            - send: "j"
+            - expect_screen:
+                contains: ".name"
+            - send: "P"
+      - assert:
+          exit_code: 0
+          file:
+            path: picked.txt
+            equals: "atago\n"
+
+  - name: collapse-all folds the containers and expand-all brings them back
+    only:
+      command: fx --version
+    skip:
+      os: windows
+    steps:
+      # A state transition driven entirely through the rendered screen: the
+      # leaf value is visible, E folds every container so it is not, e unfolds
+      # them and it is again. Each expect_screen is an assertion — a fold that
+      # stopped working fails the step at that action.
+      - fixture:
+          file: viewer.json
+          content: '{"name":"atago","tags":["cli","e2e"],"nested":{"deep":{"leaf":42}}}'
+      - pty:
+          command: fx viewer.json
+          cols: 80
+          rows: 24
+          timeout: 30s
+          session:
+            - expect_screen:
+                contains: '"cli"'
+                stable_for: 100ms
+            - send: "E"
+            - expect_screen:
+                not_contains: '"cli"'
+            - expect_screen:
+                contains: '"tags"'
+            - send: "e"
+            - expect_screen:
+                contains: '"cli"'
+            - send: "q"
+      - assert:
+          exit_code: 0
+
+  - name: search moves the cursor to the match and the status bar shows its path
+    only:
+      command: fx --version
+    skip:
+      os: windows
+    steps:
+      # `/` opens a regexp search; on Enter fx jumps to the hit, reports how
+      # many it found, and names the cursor's location as a JSON path — the
+      # value a user copies out of the viewer to use in a script.
+      - fixture:
+          file: viewer.json
+          content: '{"name":"atago","tags":["cli","e2e"],"nested":{"deep":{"leaf":42}}}'
+      - pty:
+          command: fx viewer.json
+          cols: 80
+          rows: 24
+          timeout: 30s
+          session:
+            - expect_screen:
+                contains: '"name": "atago"'
+                stable_for: 100ms
+            - send: "/"
+            # Wait for the prompt to take over the bottom line before typing
+            # into it: the query is a live text input, not a burst of keys the
+            # viewer buffers.
+            - expect_screen:
+                line: 24
+                matches: "^/"
+            - send: "e2e"
+            - expect_screen:
+                line: 24
+                contains: "/e2e"
+            - send: {key: enter}
+            - expect_screen:
+                contains: "found: [1/1]"
+            - expect_screen:
+                contains: ".tags[1]"
+            - send: "q"
+      - assert:
+          exit_code: 0
+
+  - name: the rendered frame shows the tree and the status bar together
+    only:
+      command: fx --version
+    skip:
+      os: windows
+    steps:
+      # A top-level `screen:` assert needs the viewer to still be on the
+      # alternate screen, because quitting restores the (empty) primary one.
+      # So this scenario deliberately never sends q: the step timeout ends it
+      # while fx is live, and the assertions read the last frame it painted.
+      - fixture:
+          file: viewer.json
+          content: '{"name":"atago","tags":["cli","e2e"],"nested":{"deep":{"leaf":42}}}'
+      - pty:
+          command: fx viewer.json
+          cols: 80
+          rows: 24
+          timeout: 12s
+          session:
+            - expect_screen:
+                contains: '"leaf": 42'
+                stable_for: 100ms
+      - assert:
+          screen:
+            line: 1
+            contains: "{"
+      - assert:
+          screen:
+            contains: '"leaf": 42'
+      - assert:
+          screen:
+            contains: viewer.json
+
+  - name: with a terminal and no file, fx prints its usage instead of opening the viewer
+    only:
+      command: fx --version
+    skip:
+      os: windows
+    steps:
+      # The branch a run: step cannot reach. With a terminal on stdin and no
+      # arguments there is nothing to view, so fx prints usage and exits 0
+      # rather than waiting for input that will never come.
+      - pty:
+          command: fx
+          cols: 80
+          rows: 24
+          timeout: 30s
+          session:
+            - expect: "Terminal JSON viewer"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "https://fx.wtf"

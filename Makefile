@@ -108,6 +108,7 @@ docs: ## Regenerate the committed behavior docs under doc/e2e/ from the specs
 	./dist/$(APP) doc --out doc/e2e/gitea.md       ./test/e2e/thirdparty/gitea
 	./dist/$(APP) doc --out doc/e2e/jq.md          ./test/e2e/thirdparty/jq
 	./dist/$(APP) doc --out doc/e2e/fzf.md         ./test/e2e/thirdparty/fzf
+	./dist/$(APP) doc --out doc/e2e/fx.md          ./test/e2e/thirdparty/fx
 	./dist/$(APP) doc --out doc/e2e/gum.md         ./test/e2e/thirdparty/gum
 	./dist/$(APP) doc --out doc/e2e/helix.md       ./test/e2e/thirdparty/helix
 	./dist/$(APP) doc --out doc/e2e/lazygit.md     ./test/e2e/thirdparty/lazygit

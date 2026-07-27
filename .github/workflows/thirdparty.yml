@@ -58,6 +58,12 @@ jobs:
           - name: fzf
             dir: ./test/e2e/thirdparty/fzf
             install: go install github.com/junegunn/fzf@v0.74.0
+          # fx tags releases without a leading v, so the module has no semver
+          # tag to pin; the pseudo-version below is the pin, resolved once and
+          # verified by the Go checksum database like every other module here.
+          - name: fx
+            dir: ./test/e2e/thirdparty/fx
+            install: go install github.com/antonmedv/fx@v0.0.0-20260511101514-bb2c34476500
           - name: helix
             dir: ./test/e2e/thirdparty/helix
             install: |

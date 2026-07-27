@@ -20,6 +20,7 @@ A browsable, repo-local index of atago's documentation, generated from repositor
 - [coredns.md](../doc/e2e/coredns.md)
 - [ecspresso.md](../doc/e2e/ecspresso.md)
 - [ffmpeg.md](../doc/e2e/ffmpeg.md)
+- [fx.md](../doc/e2e/fx.md)
 - [fzf.md](../doc/e2e/fzf.md)
 - [ghostscript.md](../doc/e2e/ghostscript.md)
 - [git.md](../doc/e2e/git.md)

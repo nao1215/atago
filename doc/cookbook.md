@@ -1154,6 +1154,52 @@ scenarios:
 
 Full spec: [shell_and_redirect](../examples/shell_and_redirect.atago.yaml)
 
+## Test a TUI that keeps stdout clean
+
+A well-behaved interactive tool draws its interface on stderr and reserves
+stdout for the value it was asked to produce, so `mytool pick > chosen.txt`
+both shows the UI and yields a pipeable result. Both halves are one contract,
+and one pty step asserts them together: redirect stdout to a file, drive the UI
+through `expect_screen` (which reads the rendered terminal, so it still sees
+the interface), and assert on the file afterwards:
+
+```yaml
+version: "1"
+suite:
+  name: tui stdout split
+
+scenarios:
+  - name: the picker paints on stderr and prints only the choice
+    skip:
+      os: windows
+    steps:
+      # shell: true is what makes `>` a redirect; the UI keeps painting on the
+      # pty because it goes to stderr.
+      - pty:
+          shell: true
+          command: mytool pick > chosen.txt
+          cols: 80
+          rows: 24
+          session:
+            - expect_screen:
+                contains: "Select an item"
+                stable_for: 100ms
+            - send: {key: down}
+            - send: {key: enter}
+      - assert:
+          exit_code: 0
+          # Only the choice reached the pipeline: no menu, no redraws.
+          file:
+            path: chosen.txt
+            equals: "second\n"
+```
+
+Quitting without choosing is the other half of the contract — the same spec
+with `send: "q"` and `file: {path: chosen.txt, equals: ""}` proves nothing of
+the interface leaked into stdout.
+
+Full spec: [pty_stdout_split](../examples/pty_stdout_split.atago.yaml)
+
 ## Ship binary test data with fixtures
 
 `content:` carries text; `base64:` carries exact bytes; `from:` copies a real

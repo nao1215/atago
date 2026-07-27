@@ -7,6 +7,31 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Third-party E2E suite for [fx](https://fx.wtf/), the terminal JSON viewer, in
+  `test/e2e/thirdparty/fx`. fx is a filter when it is given a reducer and a
+  full-screen viewer when it is not, and both halves are pinned. The filter side
+  covers the JavaScript semantics that surprise a jq user (a missing key is
+  `undefined` on stderr with exit 0; dereferencing through it is exit 1),
+  `exit()` choosing the process's exit code, the identity path keeping number
+  literals a float64 round trip would rewrite, the YAML/TOML/raw/slurp parsers
+  and the filename-driven detection that switches them, `--strict` turning the
+  tolerated comments and trailing commas back into errors, and base64 and YAML
+  round trips. `save` is pinned with exhaustive `changes:` deltas — in-place
+  rewrite, idempotence, and the no-file and symlink refusals — alongside
+  `.fxrc.js` read from the workdir and from a sandboxed home that stays
+  unwritten. The viewer runs under the pty runner: folding, regexp search
+  reporting the cursor's JSON path, and the split that makes
+  `fx data.json > picked.txt` work, with the interface on stderr and only the
+  chosen value on stdout.
+- `examples/pty_stdout_split.atago.yaml` and a matching cookbook recipe for that
+  last pattern: an interactive tool whose UI goes to stderr while stdout carries
+  the result. One pty step with a shell redirect asserts both sides — the
+  interface through `expect_screen:`/`screen:`, and what the pipeline received
+  through a `file:` assert, including the empty file that proves nothing of the
+  UI leaked.
+
 ## [0.16.0] - 2026-07-27
 
 A minor release about output you can act on. Three failure messages were true
