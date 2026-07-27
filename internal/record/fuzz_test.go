@@ -1,6 +1,7 @@
 package record
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -158,3 +159,111 @@ func findRun(s *spec.Spec) *spec.Run {
 	}
 	return nil
 }
+
+// FuzzGeneratePTYRoundTrip drives `atago record --pty`'s session generator with
+// arbitrary transcripts. The round-trip law for an interactive recording is that
+// the generated session replays what was typed: for every input burst the
+// generated spec must carry a send whose decoded bytes are exactly the bytes the
+// recording captured (with a recorded CR rendered as the readable "\n" Enter and
+// ${...} escaped so the replay types it literally). Invariants:
+//   - GeneratePTY never errors on a recording the capture layer can produce (its
+//     own contract calls a validation failure an atago bug) and never panics;
+//   - the generated YAML reparses to one pty step;
+//   - every text send decodes back to its recorded burst, so a byte that is not
+//     valid UTF-8 survives instead of collapsing into U+FFFD;
+//   - an expect anchor is a verbatim substring of the output that preceded it,
+//     which is what lets the replay match it.
+func FuzzGeneratePTYRoundTrip(f *testing.F) {
+	f.Add("app", []byte("name: "), []byte("world\r"), []byte("done\r\n"), 0)
+	f.Add("login", []byte("caf\xe9 name: "), []byte("Andr\xe9\r"), []byte("ok\r\n"), 0)
+	f.Add("cat", []byte{0xff, 0xfe}, []byte{0x03}, []byte("\r\n"), 130)
+	f.Add("wiz", []byte("\x1b[32mProject: \x1b[0m"), []byte("demo\r"), []byte("created\r\n"), 1)
+	f.Add("sh", []byte("${VAR}> "), []byte("literal ${HOME}\r"), []byte("x"), 0)
+	f.Fuzz(func(t *testing.T, command string, before, input, after []byte, exitCode int) {
+		// Model the CLI: the recorded command line comes from argv, which cannot
+		// carry a NUL, and an empty command is not producible.
+		if command == "" || strings.ContainsRune(command, 0) {
+			t.Skip()
+		}
+		if len(input) == 0 {
+			t.Skip() // an input segment is a burst of at least one byte
+		}
+		rec := PTYRecording{
+			Command:  command,
+			Rows:     24,
+			Cols:     80,
+			ExitCode: exitCode,
+			Segments: []PTYSegment{{Output: before}, {Input: input}, {Output: after}},
+		}
+		out, err := GeneratePTY(rec, Options{SuiteName: "fz"})
+		if err != nil {
+			t.Fatalf("GeneratePTY failed for a capturable recording: %v\ncommand=%q before=%q input=%q", err, command, before, input)
+		}
+		s, err := loader.LoadBytes("recorded.atago.yaml", out)
+		if err != nil {
+			t.Fatalf("generated spec does not reparse: %v\n%s", err, out)
+		}
+		if len(s.Scenarios) != 1 || len(s.Scenarios[0].Steps) == 0 || s.Scenarios[0].Steps[0].PTY == nil {
+			t.Fatalf("generated spec has no leading pty step:\n%s", out)
+		}
+		pty := s.Scenarios[0].Steps[0].PTY
+
+		// A control-key burst is rendered as its named key instead of text; every
+		// other burst must decode back to the recorded bytes.
+		if _, named := spec.PTYKeyForSequence(string(input)); !named {
+			want := escapeVarRefs(literalSend(input))
+			var got *string
+			for _, act := range pty.Session {
+				if act.Send != nil && act.Send.Text != nil {
+					got = act.Send.Text
+				}
+			}
+			if got == nil {
+				t.Fatalf("no text send generated for input %q:\n%s", input, out)
+			}
+			if *got != want {
+				t.Fatalf("send round-trip broke: recorded %q, replayed %q\nspec:\n%s", want, *got, out)
+			}
+		}
+
+		// An expect must be a verbatim substring of the output it anchors on,
+		// after QuoteMeta is undone; otherwise the replay can never match it.
+		for _, act := range pty.Session {
+			if act.Expect == "" {
+				continue
+			}
+			literal, err := unquoteMeta(act.Expect)
+			if err != nil {
+				continue // a pattern with real regexp syntax is not an anchor
+			}
+			if !strings.Contains(string(before), literal) {
+				t.Fatalf("expect anchor %q is not a substring of the recorded output %q\nspec:\n%s", literal, before, out)
+			}
+		}
+	})
+}
+
+// unquoteMeta reverses regexp.QuoteMeta for a pattern that contains nothing but
+// escaped literals, so a fuzz case can compare an anchor against the raw
+// transcript. It reports an error for a pattern carrying unescaped regexp syntax.
+func unquoteMeta(pattern string) (string, error) {
+	var b strings.Builder
+	for i := 0; i < len(pattern); i++ {
+		c := pattern[i]
+		if c != '\\' {
+			if strings.IndexByte(`\.+*?()|[]{}^$`, c) >= 0 {
+				return "", errNotALiteral
+			}
+			b.WriteByte(c)
+			continue
+		}
+		i++
+		if i >= len(pattern) {
+			return "", errNotALiteral
+		}
+		b.WriteByte(pattern[i])
+	}
+	return b.String(), nil
+}
+
+var errNotALiteral = errors.New("pattern carries regexp syntax")

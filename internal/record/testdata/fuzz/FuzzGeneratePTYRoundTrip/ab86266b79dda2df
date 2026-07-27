@@ -1,0 +1,6 @@
+go test fuzz v1
+string("\r")
+[]byte("0")
+[]byte("0")
+[]byte("0")
+int(0)

@@ -1,8 +1,10 @@
 package record
 
 import (
+	"bytes"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/nao1215/atago/internal/loader"
 	"github.com/nao1215/atago/internal/spec"
@@ -231,6 +233,111 @@ func TestStableLine_AnchorIsRawSubstring(t *testing.T) {
 		if anchor == "" {
 			t.Errorf("stableLine(%q) = empty, want a non-empty anchor", raw)
 			continue
+		}
+		if !strings.Contains(raw, anchor) {
+			t.Errorf("stableLine(%q) = %q, which is NOT a substring of the raw transcript", raw, anchor)
+		}
+	}
+}
+
+// TestGeneratePTY_NonUTF8InputReplaysTheSameBytes is a regression for the pty
+// round-trip law: a typed burst that is not valid UTF-8 — a Latin-1 paste, a
+// keyboard macro emitting a high byte — was rendered rune by rune, so every
+// invalid byte became U+FFFD and the replay typed three different bytes than the
+// recording captured. The generated send has to reproduce the recorded bytes
+// exactly.
+func TestGeneratePTY_NonUTF8InputReplaysTheSameBytes(t *testing.T) {
+	t.Parallel()
+	raw := []byte("Andr\xe9\r")
+	rec := PTYRecording{
+		Command:  "app",
+		ExitCode: 0,
+		Segments: []PTYSegment{
+			outSeg("name: "),
+			{Input: raw},
+			outSeg("done\r\n"),
+		},
+	}
+	out, err := GeneratePTY(rec, Options{SuiteName: "s"})
+	if err != nil {
+		t.Fatalf("GeneratePTY: %v", err)
+	}
+	if bytes.ContainsRune(out, utf8.RuneError) {
+		t.Errorf("generated spec carries a replacement character:\n%s", out)
+	}
+	pty := loadGenerated(t, out)
+	if len(pty.Session) == 0 {
+		t.Fatalf("no session generated:\n%s", out)
+	}
+	var sent *string
+	for _, act := range pty.Session {
+		if act.Send != nil && act.Send.Text != nil {
+			sent = act.Send.Text
+		}
+	}
+	if sent == nil {
+		t.Fatalf("no text send in the session:\n%s", out)
+	}
+	// literalSend renders a recorded CR as the readable "\n" Enter; every other
+	// byte must survive untouched.
+	if want := "Andr\xe9\n"; *sent != want {
+		t.Errorf("send bytes = % x, want % x", *sent, want)
+	}
+}
+
+// TestGeneratePTY_ControlCharacterInCommandStillGenerates is a regression found
+// by FuzzGeneratePTYRoundTrip: the scenario name was the recorded command
+// verbatim, and the loader rejects a control character in a name, so recording a
+// command carrying a CR or a tab produced a spec that failed its own validation
+// and told the user to report an atago bug. The name is now a single-line label,
+// while the command itself stays verbatim in the pty step.
+func TestGeneratePTY_ControlCharacterInCommandStillGenerates(t *testing.T) {
+	t.Parallel()
+	for _, command := range []string{"printf 'a\rb'", "sh -c 'echo one\necho two'", "run\twith\ttabs", "\r"} {
+		rec := PTYRecording{
+			Command:  command,
+			ExitCode: 0,
+			Segments: []PTYSegment{outSeg("> "), inSeg("x\r"), outSeg("ok\r\n")},
+		}
+		out, err := GeneratePTY(rec, Options{SuiteName: "ctl"})
+		if err != nil {
+			t.Fatalf("GeneratePTY(%q): %v", command, err)
+		}
+		s, err := loader.LoadBytes("gen.atago.yaml", out)
+		if err != nil {
+			t.Fatalf("generated spec for %q does not load: %v\n%s", command, err, out)
+		}
+		name := s.Scenarios[0].Name
+		if strings.ContainsAny(name, "\t\r\n") {
+			t.Errorf("scenario name %q still carries a control character", name)
+		}
+		// The command is replayed verbatim, control bytes and all.
+		if got := s.Scenarios[0].Steps[0].PTY.Command; got != command {
+			t.Errorf("pty command = %q, want the recorded %q", got, command)
+		}
+	}
+}
+
+// TestStableLine_SkipsNonUTF8Bytes pins the anchor rule for output that is not
+// valid UTF-8: an anchor must be a verbatim substring of the raw transcript, and
+// a rune-by-rune scan turned an invalid byte into U+FFFD — producing an expect
+// regexp that could never match, so the recorded session hung until the session
+// timeout. Such a byte now breaks the run like a control byte does, and the
+// anchor is the longest valid stretch around it.
+func TestStableLine_SkipsNonUTF8Bytes(t *testing.T) {
+	t.Parallel()
+	cases := []string{
+		"caf\xe9 name: ",
+		"\xff\xfe binary noise then a real prompt: ",
+		"Se\xf1or, enter a value: ",
+	}
+	for _, raw := range cases {
+		anchor := stableLine([]byte(raw))
+		if anchor == "" {
+			continue // no valid stretch is long enough to anchor on: acceptable
+		}
+		if strings.ContainsRune(anchor, utf8.RuneError) {
+			t.Errorf("stableLine(%q) = %q, which carries a replacement character", raw, anchor)
 		}
 		if !strings.Contains(raw, anchor) {
 			t.Errorf("stableLine(%q) = %q, which is NOT a substring of the raw transcript", raw, anchor)

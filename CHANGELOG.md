@@ -9,6 +9,22 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- `atago record --pty` now replays the bytes it recorded. A typed burst that is
+  not valid UTF-8 — a paste in another encoding, a keyboard macro emitting a high
+  byte — was rendered as text, so every such byte became U+FFFD and the generated
+  send typed three different bytes than the session captured. Those bursts are now
+  emitted as `!!binary`, the same escape hatch plain `record` already uses. An
+  `expect` anchor built from output carrying such a byte was corrupted the same
+  way, producing a pattern that could never match: the recorded session hung until
+  its timeout. An anchor is now the longest stretch of the line that really exists
+  in the transcript.
+- `atago record --pty` no longer fails on a command carrying a control character.
+  The scenario name was the recorded command verbatim, and the loader rejects a
+  control character in a name, so recording `printf 'a\rb'` produced a spec that
+  failed its own validation with "this is an atago bug, please report it". The
+  name is now a single-line label, as plain `record` already did; the command
+  itself is still replayed verbatim.
+
 - An assertion no longer hangs on an entry that is not a regular file. A `dir:`
   walk fingerprinted every non-directory entry it found, and a `file:` matcher
   read its target: opening a named pipe for reading blocks until another process
