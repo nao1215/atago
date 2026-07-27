@@ -406,17 +406,6 @@ func describePDF(p *spec.PDFAssert) string {
 	return assertdesc.DescribePDF(p, explainPDFStyle)
 }
 
-// quoteList renders a contains/not_contains matcher argument. A single element
-// is rendered as %q (byte-identical to the pre-list format); a list joins its
-// quoted elements with ", ".
-func quoteList(subs spec.StringList) string {
-	parts := make([]string, len(subs))
-	for i, s := range subs {
-		parts[i] = fmt.Sprintf("%q", s)
-	}
-	return strings.Join(parts, ", ")
-}
-
 var explainJSONStyle = assertdesc.JSONStyle{
 	Prefix:  func(path string) string { return "JSON " + path },
 	Equals:  func(v any) string { return fmt.Sprintf("== %v", v) },
@@ -431,7 +420,7 @@ var explainYAMLStyle = explainJSONStyle.WithPrefix(func(path string) string {
 })
 
 var explainStreamStyle = assertdesc.StreamStyle{
-	List:      quoteList,
+	List:      spec.StringList.Quoted,
 	Regex:     func(s string) string { return fmt.Sprintf("/%s/", s) },
 	Equals:    "equals exact text",
 	NotEquals: "does not equal exact text",
@@ -444,7 +433,7 @@ var explainStreamStyle = assertdesc.StreamStyle{
 
 var explainFileStyle = assertdesc.FileStyle{
 	Path:       func(s string) string { return fmt.Sprintf("%q", s) },
-	List:       quoteList,
+	List:       spec.StringList.Quoted,
 	JSON:       explainJSONStyle,
 	Snapshot:   func(s string) string { return s },
 	Checked:    func(path string) string { return path },

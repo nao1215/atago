@@ -32,16 +32,6 @@ func firstPresent(got string, subs spec.StringList) (sub string, idx int, ok boo
 	return "", 0, false
 }
 
-// quoteList renders a StringList as a space-separated list of quoted elements,
-// e.g. `"a", "b"`, for the multi-element failure description.
-func quoteList(subs spec.StringList) string {
-	parts := make([]string, len(subs))
-	for i, s := range subs {
-		parts[i] = fmt.Sprintf("%q", s)
-	}
-	return strings.Join(parts, ", ")
-}
-
 // fileContainsDesc renders the file assertion label, mirroring containsDesc but
 // with the file path in the subject.
 func fileContainsDesc(pathLabel string, subs spec.StringList, want bool) string {
@@ -52,9 +42,9 @@ func fileContainsDesc(pathLabel string, subs spec.StringList, want bool) string 
 		return fmt.Sprintf("assert file %q does not contain %q", pathLabel, subs[0])
 	}
 	if want {
-		return fmt.Sprintf("assert file %q contains all of %s", pathLabel, quoteList(subs))
+		return fmt.Sprintf("assert file %q contains all of %s", pathLabel, subs.Quoted())
 	}
-	return fmt.Sprintf("assert file %q contains none of %s", pathLabel, quoteList(subs))
+	return fmt.Sprintf("assert file %q contains none of %s", pathLabel, subs.Quoted())
 }
 
 // elementLabel returns "" for a single-element matcher (so the failure text is

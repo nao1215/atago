@@ -54,18 +54,9 @@ func docCmd(args []string, stdout, stderr io.Writer) int {
 		return ExitConfig
 	}
 
-	targets := fs.Args()
-	if len(targets) == 0 {
-		targets = []string{"."}
-	}
-	paths, err := collectSpecFiles(targets)
-	if err != nil {
-		fmt.Fprintf(stderr, "atago doc: %v\n", err)
-		return ExitConfig
-	}
-	if len(paths) == 0 {
-		fmt.Fprintln(stderr, "atago doc: no *.atago.yaml (or *.atago.yml) files found")
-		return ExitConfig
+	paths, exitCode, ok := specTargets("atago doc", fs.Args(), stderr)
+	if !ok {
+		return exitCode
 	}
 
 	sources := make([]docgen.Source, 0, len(paths))

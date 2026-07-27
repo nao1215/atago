@@ -233,3 +233,28 @@ func TestExitCode_UnmarshalYAML(t *testing.T) {
 		}
 	})
 }
+
+// TestStringList_Quoted pins the rendering assertion failures and `atago
+// explain` share: a single element reads exactly like the pre-list scalar form,
+// and a list joins quoted elements with ", ".
+func TestStringList_Quoted(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		list StringList
+		want string
+	}{
+		{"empty", StringList{}, ""},
+		{"one element", StringList{"alpha"}, `"alpha"`},
+		{"several elements", StringList{"alpha", "beta"}, `"alpha", "beta"`},
+		{"quotes and escapes are visible", StringList{"say \"hi\"", "tab\there"}, `"say \"hi\"", "tab\there"`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := tt.list.Quoted(); got != tt.want {
+				t.Errorf("Quoted() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}

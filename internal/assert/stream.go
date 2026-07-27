@@ -234,9 +234,9 @@ func containsDesc(name string, subs spec.StringList, want bool) string {
 		return fmt.Sprintf("assert %s does not contain %q", name, subs[0])
 	}
 	if want {
-		return fmt.Sprintf("assert %s contains all of %s", name, quoteList(subs))
+		return fmt.Sprintf("assert %s contains all of %s", name, subs.Quoted())
 	}
-	return fmt.Sprintf("assert %s contains none of %s", name, quoteList(subs))
+	return fmt.Sprintf("assert %s contains none of %s", name, subs.Quoted())
 }
 
 // equalsNormalized compares ignoring at most one trailing newline per side — the

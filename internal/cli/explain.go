@@ -33,18 +33,9 @@ func explainCmd(args []string, stdout, stderr io.Writer) int {
 		return ExitConfig
 	}
 
-	targets := fs.Args()
-	if len(targets) == 0 {
-		targets = []string{"."} // parity with run/lint/doc
-	}
-	paths, err := collectSpecFiles(targets)
-	if err != nil {
-		fmt.Fprintf(stderr, "atago explain: %v\n", err)
-		return ExitConfig
-	}
-	if len(paths) == 0 {
-		fmt.Fprintln(stderr, "atago explain: no *.atago.yaml (or *.atago.yml) files found")
-		return ExitConfig
+	paths, exitCode, ok := specTargets("atago explain", fs.Args(), stderr)
+	if !ok {
+		return exitCode
 	}
 
 	exit := ExitOK
