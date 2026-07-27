@@ -1,0 +1,494 @@
+version: "1"
+
+suite:
+  name: git (branching, diffs, and failure contracts)
+  description: |
+    The second half of the git suite: the parts of git a script actually leans
+    on, driven as state transitions rather than single commands.
+
+    A branch is created, diverged, merged fast-forward, and then merged into a
+    real conflict; a stash and an `apply`ed patch are proven to restore the file
+    byte for byte; `--porcelain` and `diff --exit-code` are pinned as the
+    machine contracts they are; and each documented failure — no repository, a
+    duplicate tag, nothing staged, a conflicted merge — is pinned to its own
+    exit code with the message that explains it. Every command uses git's own
+    `-C`/`-c` flags, so no shell is involved except where a redirect is the
+    thing under test.
+scenarios:
+  # `git diff --exit-code` is git's answer to terraform's detailed exit code: it
+  # reports "is there a difference" through the status, which is what a CI gate
+  # branches on.
+  - name: diff --exit-code reports difference through the exit status
+    steps:
+      - fixture:
+          file: repo/a.txt
+          content: "one\n"
+      - run:
+          command: git init -q repo
+      - run:
+          command: git -C repo add a.txt
+      - run:
+          command: git -C repo -c user.name=atago -c user.email=atago@example.com commit -q -m first
+      - assert:
+          exit_code: 0
+      # Nothing changed since the commit: exit 0 and no diff text.
+      - run:
+          command: git -C repo diff --exit-code
+      - assert:
+          exit_code: 0
+          stdout:
+            empty: true
+      - fixture:
+          file: repo/a.txt
+          content: "one\ntwo\n"
+      # Now there is a difference: exit 1, and the patch names the file.
+      - run:
+          command: git -C repo diff --exit-code
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - "diff --git a/a.txt b/a.txt"
+              - "+two"
+
+  # --porcelain is the machine-readable status format, so its exact bytes are
+  # the contract — not a substring of the human output.
+  - name: status --porcelain spells each state exactly
+    steps:
+      - fixture:
+          file: repo/tracked.txt
+          content: "v1\n"
+      - run:
+          command: git init -q repo
+      - run:
+          command: git -C repo add tracked.txt
+      - run:
+          command: git -C repo -c user.name=atago -c user.email=atago@example.com commit -q -m first
+      - assert:
+          exit_code: 0
+      # An untracked file, a modified tracked file, and a staged addition each
+      # get their own two-letter code.
+      - fixture:
+          file: repo/tracked.txt
+          content: "v2\n"
+      - fixture:
+          file: repo/untracked.txt
+          content: "new\n"
+      - fixture:
+          file: repo/staged.txt
+          content: "staged\n"
+      - run:
+          command: git -C repo add staged.txt
+      - assert:
+          exit_code: 0
+      - run:
+          command: git -C repo status --porcelain
+      - assert:
+          exit_code: 0
+          # git orders the staged entry first; each line is pinned exactly, so a
+          # change in the two-letter status codes breaks this.
+          stdout:
+            line: 1
+            equals: "A  staged.txt"
+      - assert:
+          stdout:
+            line: 2
+            equals: " M tracked.txt"
+      - assert:
+          stdout:
+            line: 3
+            equals: "?? untracked.txt"
+
+  # A branch that only adds commits merges without a merge commit, and the two
+  # refs end up at the same object — the observable definition of fast-forward.
+  - name: a diverged branch fast-forwards into the base
+    steps:
+      - fixture:
+          file: repo/a.txt
+          content: "base\n"
+      - run:
+          command: git init -q -b main repo
+      - run:
+          command: git -C repo add a.txt
+      - run:
+          command: git -C repo -c user.name=atago -c user.email=atago@example.com commit -q -m base
+      - run:
+          command: git -C repo checkout -q -b feature
+      - assert:
+          exit_code: 0
+      - fixture:
+          file: repo/b.txt
+          content: "feature\n"
+      - run:
+          command: git -C repo add b.txt
+      - run:
+          command: git -C repo -c user.name=atago -c user.email=atago@example.com commit -q -m feature
+      - run:
+          command: git -C repo checkout -q main
+      - run:
+          command: git -C repo merge --ff-only feature
+      - assert:
+          exit_code: 0
+      # Both refs now name the same commit.
+      - run:
+          command: git -C repo rev-parse main
+      - store:
+          name: main_head
+          from:
+            stdout:
+              trim: true
+      - run:
+          command: git -C repo rev-parse feature
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: ${main_head}
+      # The merged file is present in the working tree.
+      - assert:
+          file:
+            path: repo/b.txt
+            contains: feature
+
+  # The failure half of merging: both sides edited the same line, so git stops
+  # with a conflict, marks the file, and leaves the merge in progress.
+  - name: a conflicting merge stops with markers and a non-zero status
+    steps:
+      - fixture:
+          file: repo/a.txt
+          content: "base\n"
+      - run:
+          command: git init -q -b main repo
+      - run:
+          command: git -C repo add a.txt
+      - run:
+          command: git -C repo -c user.name=atago -c user.email=atago@example.com commit -q -m base
+      - run:
+          command: git -C repo checkout -q -b other
+      - fixture:
+          file: repo/a.txt
+          content: "from other\n"
+      - run:
+          command: git -C repo add a.txt
+      - run:
+          command: git -C repo -c user.name=atago -c user.email=atago@example.com commit -q -m other
+      - run:
+          command: git -C repo checkout -q main
+      - fixture:
+          file: repo/a.txt
+          content: "from main\n"
+      - run:
+          command: git -C repo add a.txt
+      - run:
+          command: git -C repo -c user.name=atago -c user.email=atago@example.com commit -q -m main
+      - run:
+          command: git -C repo -c user.name=atago -c user.email=atago@example.com merge other
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: CONFLICT
+      # The conflict is written into the file, and status marks it unmerged.
+      - assert:
+          file:
+            path: repo/a.txt
+            contains:
+              - "<<<<<<<"
+              - "from main"
+              - "from other"
+              - ">>>>>>>"
+      - run:
+          command: git -C repo status --porcelain
+      - assert:
+          stdout:
+            contains: "UU a.txt"   # both sides modified: unmerged
+
+  # stash is a round trip: the working tree goes back to the committed state and
+  # then returns to exactly the bytes that were stashed.
+  - name: stash and pop restore the working tree byte for byte
+    # Uses cp and a shell redirect to keep a byte-exact copy, so POSIX only.
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: repo/a.txt
+          content: "committed\n"
+      - run:
+          command: git init -q repo
+      - run:
+          command: git -C repo add a.txt
+      - run:
+          command: git -C repo -c user.name=atago -c user.email=atago@example.com commit -q -m first
+      - fixture:
+          file: repo/a.txt
+          content: "work in progress\ttab and trailing space \n"
+      # Keep a copy of the exact bytes for the round-trip comparison.
+      - run:
+          shell: true
+          command: cp repo/a.txt expected.txt
+      - run:
+          command: git -C repo -c user.name=atago -c user.email=atago@example.com stash
+      - assert:
+          exit_code: 0
+      # The tree is back to the committed content.
+      - assert:
+          file:
+            path: repo/a.txt
+            equals: "committed\n"
+      - run:
+          command: git -C repo status --porcelain
+      - assert:
+          stdout:
+            empty: true
+      - run:
+          command: git -C repo stash pop
+      - assert:
+          exit_code: 0
+      - assert:
+          # Byte for byte, including the tab and the trailing space.
+          file:
+            path: repo/a.txt
+            equals_file: expected.txt
+
+  # A patch is a serialization of a change: writing one out, discarding the
+  # change, and applying it back must restore the same bytes.
+  - name: a diff applied back restores the discarded change
+    # Uses cp and a shell redirect to keep a byte-exact copy, so POSIX only.
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: repo/a.txt
+          content: "line1\n"
+      - run:
+          command: git init -q repo
+      - run:
+          command: git -C repo add a.txt
+      - run:
+          command: git -C repo -c user.name=atago -c user.email=atago@example.com commit -q -m first
+      - fixture:
+          file: repo/a.txt
+          content: "line1\nline2\n"
+      - run:
+          shell: true
+          command: cp repo/a.txt expected.txt
+      - run:
+          shell: true
+          command: git -C repo diff > change.patch
+      - assert:
+          exit_code: 0
+          file:
+            path: change.patch
+            contains: "+line2"
+      # Discard the change, then apply the patch back.
+      - run:
+          command: git -C repo checkout -- a.txt
+      - assert:
+          exit_code: 0
+          file:
+            path: repo/a.txt
+            equals: "line1\n"
+      - run:
+          command: git -C repo apply ../change.patch
+      - assert:
+          exit_code: 0
+          file:
+            path: repo/a.txt
+            equals_file: expected.txt
+
+  # .gitignore is a negative-space contract: the ignored file must stay out of
+  # the index no matter that it sits in the tree.
+  - name: an ignored file is never staged
+    steps:
+      - fixture:
+          file: repo/.gitignore
+          content: "*.log\nbuild/\n"
+      - fixture:
+          file: repo/keep.txt
+          content: "keep\n"
+      - fixture:
+          file: repo/debug.log
+          content: "noise\n"
+      - fixture:
+          file: repo/build/out.bin
+          content: "artifact\n"
+      - run:
+          command: git init -q repo
+      - run:
+          command: git -C repo add .
+      - assert:
+          exit_code: 0
+      - run:
+          command: git -C repo status --porcelain
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "A  .gitignore"
+              - "A  keep.txt"
+      - assert:
+          stdout:
+            not_contains:
+              - "debug.log"
+              - "build/out.bin"
+      # Asking git directly: the ignored path is reported as ignored.
+      - run:
+          command: git -C repo check-ignore -v debug.log
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "*.log"
+
+  # A local clone must reproduce the source history exactly, which is the one
+  # thing a version control system cannot get wrong.
+  - name: a local clone reproduces the same commit
+    steps:
+      - fixture:
+          file: origin/a.txt
+          content: "shared\n"
+      - run:
+          command: git init -q origin
+      - run:
+          command: git -C origin add a.txt
+      - run:
+          command: git -C origin -c user.name=atago -c user.email=atago@example.com commit -q -m shared
+      - run:
+          command: git -C origin rev-parse HEAD
+      - store:
+          name: origin_head
+          from:
+            stdout:
+              trim: true
+      # core.autocrlf=false keeps the checkout byte-exact on Windows, where git
+      # would otherwise rewrite LF to CRLF and make the comparison below about
+      # the platform rather than about the clone.
+      - run:
+          command: git -c core.autocrlf=false clone -q origin copy
+      - assert:
+          exit_code: 0
+      - run:
+          command: git -C copy rev-parse HEAD
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: ${origin_head}
+      - assert:
+          file:
+            path: copy/a.txt
+            equals: "shared\n"
+
+  - name: committing with nothing staged fails and creates no commit
+    steps:
+      - fixture:
+          file: repo/a.txt
+          content: "one\n"
+      - run:
+          command: git init -q repo
+      - run:
+          command: git -C repo add a.txt
+      - run:
+          command: git -C repo -c user.name=atago -c user.email=atago@example.com commit -q -m first
+      - assert:
+          exit_code: 0
+      - run:
+          command: git -C repo rev-parse HEAD
+      - store:
+          name: head_before
+          from:
+            stdout:
+              trim: true
+      # Nothing has changed since that commit.
+      - run:
+          command: git -C repo -c user.name=atago -c user.email=atago@example.com commit -m "empty"
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: "nothing to commit"
+      # The refusal left history exactly where it was.
+      - run:
+          command: git -C repo rev-parse HEAD
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: ${head_before}
+
+  - name: a duplicate tag is refused and the original is untouched
+    steps:
+      - fixture:
+          file: repo/a.txt
+          content: "one\n"
+      - run:
+          command: git init -q repo
+      - run:
+          command: git -C repo add a.txt
+      - run:
+          command: git -C repo -c user.name=atago -c user.email=atago@example.com commit -q -m first
+      - run:
+          command: git -C repo tag v1
+      - assert:
+          exit_code: 0
+      - run:
+          command: git -C repo tag v1
+      - assert:
+          exit_code: 128
+          stderr:
+            contains: already exists
+      # Exactly one tag survives, spelled exactly.
+      - run:
+          command: git -C repo tag --list
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "v1\n"
+
+  - name: git outside a repository fails with its own exit code
+    steps:
+      - run:
+          command: git status
+      - assert:
+          exit_code: 128
+          stdout:
+            empty: true
+          stderr:
+            contains: "not a git repository"
+
+  # Two commits with identical content, author, and dates must be the same
+  # object: git's identity is content-addressed, and that is what makes a clone
+  # verifiable.
+  - name: identical commits made twice hash the same
+    steps:
+      - fixture:
+          file: one/a.txt
+          content: "same bytes\n"
+      - fixture:
+          file: two/a.txt
+          content: "same bytes\n"
+      - run:
+          command: git init -q one
+      - run:
+          command: git init -q two
+      - run:
+          command: git -C one add a.txt
+      - run:
+          command: git -C two add a.txt
+      - run:
+          env:
+            GIT_AUTHOR_DATE: "2026-01-01T00:00:00Z"
+            GIT_COMMITTER_DATE: "2026-01-01T00:00:00Z"
+          command: git -C one -c user.name=atago -c user.email=atago@example.com commit -q -m same
+      - run:
+          env:
+            GIT_AUTHOR_DATE: "2026-01-01T00:00:00Z"
+            GIT_COMMITTER_DATE: "2026-01-01T00:00:00Z"
+          command: git -C two -c user.name=atago -c user.email=atago@example.com commit -q -m same
+      - run:
+          command: git -C one rev-parse HEAD
+      - store:
+          name: one_head
+          from:
+            stdout:
+              trim: true
+      - run:
+          command: git -C two rev-parse HEAD
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: ${one_head}
