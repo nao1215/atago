@@ -1,0 +1,308 @@
+version: "1"
+
+suite:
+  name: zstd (compression round trips and integrity)
+  description: |
+    [zstd](https://facebook.github.io/zstd/) compresses and decompresses files.
+    A compressor has exactly one promise worth testing: what comes back out is
+    what went in, byte for byte.
+
+    Every round trip here is checked with `equals_file`, which compares the
+    restored bytes against the original with no newline or encoding
+    normalization — including the cases that break naive tooling, an empty file
+    and a file full of NUL bytes. The rest of the suite pins the safety
+    properties around that: the input is kept unless `--rm` is asked for, an
+    existing archive is never silently overwritten, a corrupt frame is rejected
+    by both `-t` and decompression, and a failed decompression leaves no partial
+    output behind. All inputs are written by the spec, so nothing is committed.
+
+# Gate: only where zstd is installed.
+scenarios:
+  - name: compressing keeps the input and adds one archive
+    only:
+      command: zstd --version
+    steps:
+      - fixture:
+          file: payload.txt
+          content: "the quick brown fox\n"
+      - run:
+          sandbox_home: true
+          command: zstd -q payload.txt
+      - assert:
+          exit_code: 0
+          # Exhaustive: exactly one new file, the input untouched (zstd keeps it
+          # by default), and nothing written into the sandboxed HOME.
+          changes:
+            created: [payload.txt.zst]
+            modified: []
+            deleted: []
+
+  - name: a compress and decompress round trip restores the bytes exactly
+    only:
+      command: zstd --version
+    steps:
+      - fixture:
+          file: payload.txt
+          content: "line one\nline two\ttabbed\n"
+      - run:
+          command: zstd -q payload.txt -o payload.zst
+      - assert:
+          exit_code: 0
+      - run:
+          command: zstd -dq payload.zst -o restored.txt
+      - assert:
+          exit_code: 0
+          # equals_file compares runtime files byte for byte, with no newline
+          # normalization — the only comparison a compressor deserves.
+          file:
+            path: restored.txt
+            equals_file: payload.txt
+
+  - name: an empty file survives the round trip
+    only:
+      command: zstd --version
+    steps:
+      - fixture:
+          file: empty.txt
+          content: ""
+      - run:
+          command: zstd -q empty.txt -o empty.zst
+      - assert:
+          exit_code: 0
+      - run:
+          command: zstd -dq empty.zst -o restored.txt
+      - assert:
+          exit_code: 0
+          file:
+            path: restored.txt
+            equals_file: empty.txt
+
+  - name: NUL bytes and high bytes survive the round trip
+    only:
+      command: zstd --version
+    steps:
+      # Raw bytes YAML cannot carry inline: 00 01 02 ff fe 00 41 42.
+      - fixture:
+          file: binary.dat
+          base64: AAEC//4AQUI=
+      - run:
+          command: zstd -q binary.dat -o binary.zst
+      - assert:
+          exit_code: 0
+      - run:
+          command: zstd -dq binary.zst -o restored.dat
+      - assert:
+          exit_code: 0
+          file:
+            path: restored.dat
+            equals_file: binary.dat
+
+  - name: the compression level changes the archive, never the content
+    only:
+      command: zstd --version
+    steps:
+      - fixture:
+          file: payload.txt
+          content: "repeatable payload for two levels\n"
+      - run:
+          command: zstd -1 -q payload.txt -o fast.zst
+      - assert:
+          exit_code: 0
+      - run:
+          command: zstd -19 -q payload.txt -o small.zst
+      - assert:
+          exit_code: 0
+      - run:
+          command: zstd -dq fast.zst -o from-fast.txt
+      - assert:
+          exit_code: 0
+          file:
+            path: from-fast.txt
+            equals_file: payload.txt
+      - run:
+          command: zstd -dq small.zst -o from-small.txt
+      - assert:
+          exit_code: 0
+          file:
+            path: from-small.txt
+            equals_file: payload.txt
+
+  - name: --rm removes the input only after a successful compression
+    only:
+      command: zstd --version
+    steps:
+      - fixture:
+          file: payload.txt
+          content: "throwaway\n"
+      - run:
+          command: zstd -q --rm payload.txt -o payload.zst
+      - assert:
+          exit_code: 0
+          changes:
+            created: [payload.zst]
+            modified: []
+            deleted: [payload.txt]
+
+  - name: an existing archive is not overwritten
+    only:
+      command: zstd --version
+    steps:
+      - fixture:
+          file: payload.txt
+          content: "new data\n"
+      - fixture:
+          file: payload.zst
+          content: "PRECIOUS EXISTING FILE\n"
+      - run:
+          command: zstd -q payload.txt -o payload.zst
+      - assert:
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            contains: "already exists"
+          # Negative space: the refusal changed nothing on disk at all.
+          changes:
+            created: []
+            modified: []
+            deleted: []
+      - assert:
+          # The existing archive is byte for byte what it was.
+          file:
+            path: payload.zst
+            contains: "PRECIOUS EXISTING FILE"
+
+  - name: -f overwrites the archive the refusal protected
+    only:
+      command: zstd --version
+    steps:
+      - fixture:
+          file: payload.txt
+          content: "new data\n"
+      - fixture:
+          file: payload.zst
+          content: "OLD CONTENT\n"
+      - run:
+          command: zstd -q -f payload.txt -o payload.zst
+      - assert:
+          exit_code: 0
+          changes:
+            created: []
+            modified: [payload.zst]
+            deleted: []
+      - run:
+          command: zstd -dq payload.zst -o restored.txt
+      - assert:
+          exit_code: 0
+          file:
+            path: restored.txt
+            equals_file: payload.txt
+
+  - name: -t accepts a real archive and rejects a corrupt one
+    only:
+      command: zstd --version
+    steps:
+      - fixture:
+          file: payload.txt
+          content: "integrity matters\n"
+      - run:
+          command: zstd -q payload.txt -o good.zst
+      - assert:
+          exit_code: 0
+      - run:
+          command: zstd -t good.zst
+      - assert:
+          exit_code: 0
+      - fixture:
+          file: broken.zst
+          content: "this is not a zstd frame\n"
+      - run:
+          command: zstd -t broken.zst
+      - assert:
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            contains: "broken.zst"
+
+  - name: decompressing a corrupt archive leaves no output behind
+    only:
+      command: zstd --version
+    steps:
+      - fixture:
+          file: broken.zst
+          content: "this is not a zstd frame\n"
+      - run:
+          command: zstd -dq broken.zst -o restored.txt
+      - assert:
+          exit_code: 1
+          stdout:
+            empty: true
+      - assert:
+          # Atomicity: a failed decompression must not leave a partial file.
+          file:
+            path: restored.txt
+            exists: false
+
+  - name: a missing input fails and names the file
+    only:
+      command: zstd --version
+    steps:
+      - run:
+          command: zstd -q no-such-input.txt
+      - assert:
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            contains: "no-such-input.txt"
+
+  - name: an unknown option fails without producing output
+    only:
+      command: zstd --version
+    steps:
+      - fixture:
+          file: payload.txt
+          content: "data\n"
+      - run:
+          command: zstd --not-a-real-option payload.txt
+      - assert:
+          exit_code: 1
+          stderr:
+            contains: "--not-a-real-option"
+      - assert:
+          file:
+            path: payload.txt.zst
+            exists: false
+
+  - name: the stdin to stdout pipeline round trips
+    only:
+      command: zstd --version
+    steps:
+      - run:
+          shell: true
+          command: "printf 'piped payload\\n' | zstd -q | zstd -dq"
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "piped payload\n"
+
+  - name: -l reports one frame and the checksum algorithm
+    only:
+      command: zstd --version
+    steps:
+      - fixture:
+          file: payload.txt
+          content: "listed archive\n"
+      - run:
+          command: zstd -q payload.txt -o listed.zst
+      - assert:
+          exit_code: 0
+      - run:
+          command: zstd -l listed.zst
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "listed.zst"
+              - "XXH64"
