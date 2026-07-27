@@ -1484,7 +1484,7 @@ func TestWriteArtifacts(t *testing.T) {
 		ArtifactExpected: []byte("expected output"),
 		ArtifactBlobs:    []assert.ArtifactBlob{{Role: "diff", Ext: "png", Data: []byte("PNGDATA")}, {Role: "empty", Ext: "bin", Data: nil}},
 	}
-	e.writeArtifacts(cr, "t.atago.yaml", "scn", 0, 1)
+	e.writeArtifacts(cr, artifact.Scenario{SpecPath: "t.atago.yaml", Name: "scn"}, 1)
 	if len(cr.ArtifactFiles) != 3 { // actual, expected, diff (empty blob skipped)
 		t.Fatalf("ArtifactFiles = %d, want 3: %+v", len(cr.ArtifactFiles), cr.ArtifactFiles)
 	}
@@ -1496,17 +1496,17 @@ func TestWriteArtifacts(t *testing.T) {
 
 	// No-op guards.
 	passing := &assert.CheckResult{OK: true, ArtifactKind: "stdout", ArtifactActual: []byte("x")}
-	e.writeArtifacts(passing, "t.atago.yaml", "scn", 0, 0)
+	e.writeArtifacts(passing, artifact.Scenario{SpecPath: "t.atago.yaml", Name: "scn"}, 0)
 	if len(passing.ArtifactFiles) != 0 {
 		t.Error("passing check should write nothing")
 	}
 	noKind := &assert.CheckResult{OK: false, ArtifactActual: []byte("x")}
-	e.writeArtifacts(noKind, "t.atago.yaml", "scn", 0, 0)
+	e.writeArtifacts(noKind, artifact.Scenario{SpecPath: "t.atago.yaml", Name: "scn"}, 0)
 	if len(noKind.ArtifactFiles) != 0 {
 		t.Error("empty ArtifactKind should write nothing")
 	}
 	// Nil Artifacts dir: no panic, no write.
-	(&Engine{}).writeArtifacts(cr, "t.atago.yaml", "scn", 0, 0)
+	(&Engine{}).writeArtifacts(cr, artifact.Scenario{SpecPath: "t.atago.yaml", Name: "scn"}, 0)
 }
 
 // TestEngine_LeadingFixtureFailureErrorsScenario proves a leading fixture that

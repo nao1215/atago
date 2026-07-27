@@ -19,7 +19,7 @@ func (e *Engine) runScenarioWithPolicy(ctx context.Context, idx int, sc *spec.Sc
 	case e.RetryFailed > 0:
 		return e.runWithRetries(ctx, idx, sc, rc)
 	default:
-		return e.runScenario(ctx, idx, sc, rc)
+		return e.runScenario(ctx, idx, sc, rc, 1)
 	}
 }
 
@@ -46,7 +46,7 @@ func (e *Engine) runRepeated(ctx context.Context, idx int, sc *spec.Scenario, rc
 		if ctx.Err() != nil && i > 0 {
 			break // canceled mid-repeat: report what actually ran
 		}
-		run := e.runScenario(ctx, idx, sc, rc)
+		run := e.runScenario(ctx, idx, sc, rc, i+1)
 		iterations = append(iterations, run.Status)
 		total += run.Duration
 		bad := run.Status == StatusFailed || run.Status == StatusError
@@ -97,13 +97,13 @@ func (e *Engine) runRepeated(ctx context.Context, idx int, sc *spec.Scenario, rc
 // failure. Skipped scenarios return immediately (a skip gate is not
 // instability).
 func (e *Engine) runWithRetries(ctx context.Context, idx int, sc *spec.Scenario, rc runConfig) ScenarioResult {
-	run := e.runScenario(ctx, idx, sc, rc)
+	run := e.runScenario(ctx, idx, sc, rc, 1)
 	attempts := 1
 	for (run.Status == StatusFailed || run.Status == StatusError) && attempts <= e.RetryFailed {
 		if ctx.Err() != nil {
 			break
 		}
-		retry := e.runScenario(ctx, idx, sc, rc)
+		retry := e.runScenario(ctx, idx, sc, rc, attempts+1)
 		attempts++
 		if retry.Status == StatusPassed {
 			retry.Status = StatusFlaky

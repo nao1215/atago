@@ -106,7 +106,7 @@ func (x *scenarioRun) startServices(ctx context.Context) bool {
 			if proc != nil {
 				x.services = append(x.services, proc)
 			}
-			x.e.writeServiceLogs(&x.out, x.masker, x.services, x.rc.specPath, x.sc.Name, x.idx)
+			x.e.writeServiceLogs(&x.out, x.masker, x.services, x.artifactScope())
 			// The readiness error can embed the service's raw output, so mask secrets
 			// before it reaches a report (issue #12).
 			x.out.Steps = append(x.out.Steps, StepResult{Kind: spec.StepNone, Setup: true, ErrMsg: x.masker.Mask(err.Error())})
