@@ -559,3 +559,49 @@ scenarios:
 		t.Fatalf("status = %s, want passed: %+v", res.Status, res.Scenarios)
 	}
 }
+
+// TestEngine_PTY_SessionOutlivedByTheProgram covers the message a whole class of
+// broken sessions gets (#335). A pty session does not close the program: when the
+// actions run out and the program is still up, the step is killed by its timeout.
+// Reporting that as "the command timed out, raise the timeout if it is merely
+// slow" is true and useless — the session is already over, so a longer wait
+// cannot change the outcome, and the advice costs the reader the wait twice. A
+// wait that never completed is a different failure and keeps its own message.
+func TestEngine_PTY_SessionOutlivedByTheProgram(t *testing.T) {
+	skipOnWindows(t)
+	t.Parallel()
+	// cat reads forever: the session sends a line and ends without closing it.
+	res := runSpec(t, `
+version: "1"
+suite:
+  name: s
+scenarios:
+  - name: the session ends with the program still running
+    steps:
+      - pty:
+          command: cat
+          timeout: 2s
+          session:
+            - send: "hello\n"
+            - expect: "hello"
+`)
+	if res.Status != StatusFailed {
+		t.Fatalf("status = %s, want failed: %+v", res.Status, res.Scenarios)
+	}
+	checks := res.Scenarios[0].Steps[0].Checks
+	if len(checks) == 0 || checks[0].OK {
+		t.Fatalf("want a failing check, got %+v", checks)
+	}
+	ck := checks[0]
+	if !strings.Contains(ck.Actual, "still running") {
+		t.Errorf("Actual = %q, want it to say the program was still running", ck.Actual)
+	}
+	if !strings.Contains(ck.Hint, "quit key") {
+		t.Errorf("Hint = %q, want it to name the fix (send the program's quit key)", ck.Hint)
+	}
+	// The misleading advice must be gone: waiting longer cannot help once the
+	// session has run to the end.
+	if strings.Contains(ck.Hint, "raise the timeout if the command is merely slow") {
+		t.Errorf("Hint = %q, still offers a bigger timeout for a finished session", ck.Hint)
+	}
+}

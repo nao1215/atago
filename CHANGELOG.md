@@ -7,6 +7,20 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- A pty step killed because its program was still running now says that, instead
+  of offering a longer timeout that cannot help. A session does not close the
+  program: when the actions run out and it is still up, the step is killed, and
+  the old message ("the command timed out ... raise the timeout if the command is
+  merely slow") sent the reader to a knob that changes nothing, since the session
+  had already run to the end. It now reports that the session finished with the
+  program still running and names the fix — send its quit key last, and wait for
+  the screen to show the program can take it, because a dialog or prompt owns the
+  keyboard until it closes. A wait that never completed is a different failure and
+  keeps its own message naming the pattern. This is the shape that broke thirteen
+  scenarios in the lazygit suite and three in yazi.
+
 ### Fixed
 
 - A failure now names the command it was observed under. The console block and the
