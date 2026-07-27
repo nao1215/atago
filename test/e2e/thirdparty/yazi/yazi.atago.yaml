@@ -21,10 +21,11 @@ suite:
     navigation and tabs, search, and hardlinks and overwrites.
 
 # Install: see .github/workflows/thirdparty.yml for the pinned CI version.
-# Session timeout: 45s. It bounds how long a session waits for a screen, and
-# nothing else — every expect and every assertion is unchanged. 20s was enough on
-# a quiet machine but not on a loaded CI runner, where the same specs and the same
-# pinned binary alternated red and green from one scheduled run to the next.
+# Session timeout: 20s. Raising it to 45s was tried and reverted: the lazygit leg
+# went from 4 failed scenarios to 13 and from about a minute to six, because the
+# failures land on the plain `git` step that FOLLOWS the pty step. Waiting longer
+# only holds onto whatever the previous scenario left running, so the number is
+# staying where it was until that is understood.
 scenarios:
   - name: version prints a semantic version banner
     only:
@@ -149,7 +150,7 @@ scenarios:
           command: yazi ${workdir}
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -187,7 +188,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -219,7 +220,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -262,7 +263,7 @@ scenarios:
           command: yazi src
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -314,7 +315,7 @@ scenarios:
           command: yazi src
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -364,7 +365,7 @@ scenarios:
           command: yazi src
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -411,7 +412,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -448,7 +449,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -484,7 +485,7 @@ scenarios:
           command: yazi src
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -524,7 +525,7 @@ scenarios:
           command: yazi src
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -567,7 +568,7 @@ scenarios:
           command: yazi src
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -620,7 +621,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -656,7 +657,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -694,7 +695,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -738,7 +739,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -777,7 +778,7 @@ scenarios:
           command: yazi src
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -831,7 +832,7 @@ scenarios:
           command: yazi src
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -882,7 +883,7 @@ scenarios:
           command: yazi src
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -929,7 +930,7 @@ scenarios:
           command: yazi src
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -976,7 +977,7 @@ scenarios:
           command: yazi src
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -1019,7 +1020,7 @@ scenarios:
           command: yazi src
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -1065,7 +1066,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -1100,7 +1101,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -1135,7 +1136,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -1170,7 +1171,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -1205,7 +1206,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -1240,7 +1241,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -1275,7 +1276,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -1310,7 +1311,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -1343,7 +1344,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -1378,7 +1379,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -1405,7 +1406,7 @@ scenarios:
           command: yazi --chooser-file ${workdir}/chosen.txt .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -1435,7 +1436,7 @@ scenarios:
           command: yazi --chooser-file ${workdir}/chosen.txt .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -1465,7 +1466,7 @@ scenarios:
           command: yazi --chooser-file ${workdir}/chosen.txt .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -1498,7 +1499,7 @@ scenarios:
           command: yazi --chooser-file ${workdir}/chosen.txt .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -1533,7 +1534,7 @@ scenarios:
           command: yazi --chooser-file ${workdir}/chosen.txt .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -1564,7 +1565,7 @@ scenarios:
           command: yazi --cwd-file ${workdir}/cwd.txt .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -1592,7 +1593,7 @@ scenarios:
           command: yazi --cwd-file ${workdir}/cwd.txt .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -1621,7 +1622,7 @@ scenarios:
           command: yazi --cwd-file ${workdir}/cwd.txt .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -1655,7 +1656,7 @@ scenarios:
           command: yazi --cwd-file ${workdir}/cwd.txt .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -1697,7 +1698,7 @@ scenarios:
           command: yazi --cwd-file ${workdir}/cwd.txt .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -1739,7 +1740,7 @@ scenarios:
           command: yazi --cwd-file ${workdir}/cwd.txt .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -1780,7 +1781,7 @@ scenarios:
           command: yazi --cwd-file ${workdir}/cwd.txt .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -1813,7 +1814,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -1843,7 +1844,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -1873,7 +1874,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -1901,7 +1902,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -1932,7 +1933,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -1974,7 +1975,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -2016,7 +2017,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -2057,7 +2058,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -2104,7 +2105,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -2138,7 +2139,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -2172,7 +2173,7 @@ scenarios:
           command: yazi --chooser-file ${workdir}/chosen.txt .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -2213,7 +2214,7 @@ scenarios:
           command: yazi --chooser-file ${workdir}/chosen.txt .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -2251,7 +2252,7 @@ scenarios:
           command: yazi --chooser-file ${workdir}/chosen.txt .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -2286,7 +2287,7 @@ scenarios:
           command: yazi --chooser-file ${workdir}/chosen.txt .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -2322,7 +2323,7 @@ scenarios:
           command: yazi --cwd-file ${workdir}/cwd.txt .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -2367,7 +2368,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -2402,7 +2403,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -2443,7 +2444,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -2484,7 +2485,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -2525,7 +2526,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -2566,7 +2567,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -2611,7 +2612,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -2646,7 +2647,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -2682,7 +2683,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -2721,7 +2722,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -2757,7 +2758,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -2804,7 +2805,7 @@ scenarios:
           command: yazi src
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -2841,7 +2842,7 @@ scenarios:
           command: yazi src
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -2882,7 +2883,7 @@ scenarios:
           command: yazi src
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -2920,7 +2921,7 @@ scenarios:
           command: yazi src
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -2958,7 +2959,7 @@ scenarios:
           command: yazi src
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -2996,7 +2997,7 @@ scenarios:
           command: yazi src
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -3036,7 +3037,7 @@ scenarios:
           command: yazi src
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -3076,7 +3077,7 @@ scenarios:
           command: yazi --chooser-file ${workdir}/chosen.txt .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -3108,7 +3109,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -3140,7 +3141,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -3173,7 +3174,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -3205,7 +3206,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -3240,7 +3241,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -3273,7 +3274,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -3307,7 +3308,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -3341,7 +3342,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -3373,7 +3374,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -3405,7 +3406,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -3438,7 +3439,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -3470,7 +3471,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -3512,7 +3513,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -3545,7 +3546,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -3577,7 +3578,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -3610,7 +3611,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -3643,7 +3644,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -3675,7 +3676,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -3708,7 +3709,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true

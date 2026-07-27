@@ -28,7 +28,7 @@ scenarios:
           command: yazi src
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -64,7 +64,7 @@ scenarios:
           command: yazi src
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -99,7 +99,7 @@ scenarios:
           command: yazi src
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -135,7 +135,7 @@ scenarios:
           command: yazi src
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -173,7 +173,7 @@ scenarios:
           command: yazi src
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -209,7 +209,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -242,7 +242,7 @@ scenarios:
           command: yazi src
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -278,7 +278,7 @@ scenarios:
           command: yazi src
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -315,7 +315,7 @@ scenarios:
           command: yazi src
           rows: 24
           cols: 100
-          timeout: 45s
+          timeout: 20s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true

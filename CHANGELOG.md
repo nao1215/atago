@@ -32,11 +32,13 @@ and this project follows [Semantic Versioning](https://semver.org/).
   longer requested, and the update and install are retried against a mirror that
   5xxes under load. The version pin itself is unchanged: the snapshot id and the
   SHA256-verified release archives still decide what gets installed.
-- The scheduled matrix runs with `--retry-failed 1`, and the two terminal-UI
-  suites wait up to 45s for a screen instead of 20s. The same specs and the same
-  pinned binaries alternated red and green from one scheduled run to the next on
-  nothing but load. A regression still fails both attempts; a flake is absorbed
-  and reported as flaky.
+- The scheduled matrix runs with `--retry-failed 1`: a flake is re-run once in a
+  fresh workdir and reported as flaky, while a regression still fails both
+  attempts. Raising the two terminal-UI suites' timeouts from 20s to 45s was tried
+  in the same change and reverted — it made the lazygit leg worse (4 failed
+  scenarios became 13, and the suite went from about a minute to six), because the
+  failures land on the plain `git` step that follows the pty step rather than on
+  the session itself. Tracked in #330.
 
 ### Changed
 
