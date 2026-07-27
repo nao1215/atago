@@ -250,3 +250,64 @@ func TestCheckChanges_UntrackedKindHint(t *testing.T) {
 		t.Errorf("Hint for an absent path should not claim it exists: %s", plain.Hint)
 	}
 }
+
+// TestCheckChanges_Ignore covers the escape hatch for a path the program writes
+// only sometimes (#327): a state file in the sandboxed HOME, a cache, a socket
+// from a background service it starts on some runs. Without it the exhaustive
+// contract is unusable for such a tool — naming the path fails on the runs that
+// do not write it, and omitting the category asserts nothing.
+func TestCheckChanges_Ignore(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name   string
+		assert *spec.ChangesAssert
+		delta  fsdelta.Delta
+		wantOK bool
+	}{
+		{
+			name:   "an ignored creation does not break an exhaustive list",
+			assert: &spec.ChangesAssert{Ignore: spec.StringList{".atago-home/**"}, Created: list("out.txt"), Modified: list(), Deleted: list()},
+			delta:  fsdelta.Delta{Created: []string{".atago-home/.local/state/tool/.sock", "out.txt"}},
+			wantOK: true,
+		},
+		{
+			name:   "the same spec passes when the incidental path is absent",
+			assert: &spec.ChangesAssert{Ignore: spec.StringList{".atago-home/**"}, Created: list("out.txt")},
+			delta:  fsdelta.Delta{Created: []string{"out.txt"}},
+			wantOK: true,
+		},
+		{
+			name:   "ignore applies to modified and deleted too",
+			assert: &spec.ChangesAssert{Ignore: spec.StringList{"cache/**"}, Created: list(), Modified: list(), Deleted: list()},
+			delta:  fsdelta.Delta{Created: []string{"cache/a"}, Modified: []string{"cache/b"}, Deleted: []string{"cache/c"}},
+			wantOK: true,
+		},
+		{
+			name:   "a path outside the ignore globs is still unexpected",
+			assert: &spec.ChangesAssert{Ignore: spec.StringList{"cache/**"}, Created: list()},
+			delta:  fsdelta.Delta{Created: []string{"cache/a", "surprise.txt"}},
+			wantOK: false,
+		},
+		{
+			name:   "an ignored path cannot satisfy an entry that names it",
+			assert: &spec.ChangesAssert{Ignore: spec.StringList{"out.txt"}, Created: list("out.txt")},
+			delta:  fsdelta.Delta{Created: []string{"out.txt"}},
+			wantOK: false,
+		},
+		{
+			name:   "an ignore glob that matches nothing is fine",
+			assert: &spec.ChangesAssert{Ignore: spec.StringList{"never/**"}, Created: list("out.txt")},
+			delta:  fsdelta.Delta{Created: []string{"out.txt"}},
+			wantOK: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := checkChanges(tt.assert, changesResult(tt.delta), Env{})
+			if got.OK != tt.wantOK {
+				t.Errorf("OK = %v, want %v (hint: %s)", got.OK, tt.wantOK, got.Hint)
+			}
+		})
+	}
+}

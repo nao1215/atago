@@ -1872,6 +1872,12 @@
         "deleted": {
           "$ref": "#/$defs/changesEntries",
           "description": "Exhaustive list of paths the step deleted. `[]` asserts \"deleted nothing\"."
+        },
+        "ignore": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "minLength": 1},
+          "description": "Workdir-relative doublestar globs whose matches are dropped from the observed delta before the categories are compared, for a path the program writes only sometimes (a state file, a cache in the sandboxed HOME). An ignored path neither counts as an unexpected change nor satisfies an entry, and an ignore glob that matches nothing is fine."
         }
       }
     },

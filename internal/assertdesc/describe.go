@@ -356,7 +356,18 @@ func DescribeChanges(c *spec.ChangesAssert, style ChangesStyle) string {
 	if len(parts) == 0 {
 		return "nothing"
 	}
-	return strings.Join(parts, style.Join)
+	out := strings.Join(parts, style.Join)
+	if len(c.Ignore) > 0 {
+		// Named explicitly: a generated page that showed only the categories would
+		// advertise an exhaustive claim the assertion no longer makes over those
+		// paths.
+		formatted := make([]string, len(c.Ignore))
+		for i, pat := range c.Ignore {
+			formatted[i] = style.Entry(pat)
+		}
+		out += style.Join + "ignoring " + strings.Join(formatted, ", ")
+	}
+	return out
 }
 
 type MockStyle struct {

@@ -164,6 +164,7 @@ scenarios:
       - assert:
           exit_code: 0
           changes:
+            ignore: [".atago-home/**"] # yazi writes its state dir on some runs only
             created:
               - notes.txt
             modified: []
@@ -230,6 +231,7 @@ scenarios:
             - send: {key: enter}
       - assert:
           changes:
+            ignore: [".atago-home/**"] # yazi writes its state dir on some runs only
             created:
               - old.bak.txt
             modified: []
@@ -279,6 +281,7 @@ scenarios:
       - assert:
           exit_code: 0
           changes:
+            ignore: [".atago-home/**"] # yazi writes its state dir on some runs only
             created:
               - dst/alpha.txt
             modified: []
@@ -330,6 +333,7 @@ scenarios:
       - assert:
           exit_code: 0
           changes:
+            ignore: [".atago-home/**"] # yazi writes its state dir on some runs only
             created:
               - dst/a.txt
               - dst/b.txt
@@ -379,6 +383,7 @@ scenarios:
       - assert:
           exit_code: 0
           changes:
+            ignore: [".atago-home/**"] # yazi writes its state dir on some runs only
             created:
               - dst/beta.txt
             modified: []
@@ -420,6 +425,7 @@ scenarios:
       - assert:
           exit_code: 0
           changes:
+            ignore: [".atago-home/**"] # yazi writes its state dir on some runs only
             created: []
             modified: []
             deleted:
@@ -497,6 +503,7 @@ scenarios:
       - assert:
           exit_code: 0
           changes:
+            ignore: [".atago-home/**"] # yazi writes its state dir on some runs only
             created: []
             modified: []
             deleted: []
@@ -536,6 +543,7 @@ scenarios:
       - assert:
           exit_code: 0
           changes:
+            ignore: [".atago-home/**"] # yazi writes its state dir on some runs only
             created: []
             modified: []
             deleted: []

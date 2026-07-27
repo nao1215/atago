@@ -439,3 +439,64 @@ scenarios:
               - '"out" exists as a directory'
               - "tracks only regular files and symlinks"
               - "assert it with dir:"
+
+  # A tool that writes a state file only on some runs cannot be pinned by an
+  # exhaustive delta: naming the path fails on the runs that skip it, and dropping
+  # the category asserts nothing. `ignore:` drops those paths from the observed
+  # delta, so the rest of the claim stays exhaustive.
+  - name: an ignored path does not break an exhaustive delta
+    steps:
+      - run:
+          shell: true
+          command: "mkdir -p cache && printf 'x' > cache/state.bin && printf 'y' > out.txt"
+      - assert:
+          exit_code: 0
+          changes:
+            ignore: ["cache/**"]
+            created: [out.txt]
+            modified: []
+            deleted: []
+      # The same spec is still exhaustive outside the ignored globs: a second file
+      # the step did not declare fails.
+      - fixture:
+          file: strict.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: strict}
+            scenarios:
+              - name: an unignored surprise still fails
+                steps:
+                  - run: {shell: true, command: "mkdir -p cache && printf 'x' > cache/state.bin && printf 'y' > surprise.txt"}
+                  - assert:
+                      changes:
+                        ignore: ["cache/**"]
+                        created: []
+      - run: {command: "${atago} run strict.atago.yaml"}
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: 'unexpected created file "surprise.txt"'
+
+  - name: an ignored path cannot satisfy an entry that names it
+    steps:
+      # Ignoring a path removes it from the delta entirely, so it is not evidence
+      # for anything. Otherwise `ignore` would be a way to make a claim pass
+      # without the claim being true.
+      - fixture:
+          file: contradiction.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: contradiction}
+            scenarios:
+              - name: ignored and expected at once
+                steps:
+                  - run: {shell: true, command: "printf 'y' > out.txt"}
+                  - assert:
+                      changes:
+                        ignore: [out.txt]
+                        created: [out.txt]
+      - run: {command: "${atago} run contradiction.atago.yaml"}
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: 'created entry "out.txt" matched no file the step created'

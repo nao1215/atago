@@ -198,6 +198,7 @@ scenarios:
               - "assets/**/*.css"
             modified: []
             deleted: []
+            ignore: [".atago-home/**"]
 `
 	s, err := LoadBytes("sample.atago.yaml", []byte(valid))
 	if err != nil {
@@ -209,6 +210,9 @@ scenarios:
 	}
 	if ch.Modified == nil || len(*ch.Modified) != 0 {
 		t.Errorf("modified: [] should decode to a non-nil empty list (assert nothing), got %+v", ch.Modified)
+	}
+	if len(ch.Ignore) != 1 || ch.Ignore[0] != ".atago-home/**" {
+		t.Errorf("changes.ignore not decoded: %+v", ch.Ignore)
 	}
 
 	bad := []struct {
@@ -244,6 +248,31 @@ scenarios:
 		{
 			name:    "malformed glob entry",
 			src:     "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n      - assert:\n          changes:\n            created: [\"site/[unclosed\"]",
+			wantMsg: "is not a valid glob",
+		},
+		{
+			name:    "ignore alone asserts nothing",
+			src:     "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n      - assert:\n          changes:\n            ignore: [\"cache/**\"]",
+			wantMsg: "set at least one of created/modified/deleted",
+		},
+		{
+			name:    "empty ignore list",
+			src:     "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n      - assert:\n          changes:\n            created: []\n            ignore: []",
+			wantMsg: "ignore must not be empty",
+		},
+		{
+			name:    "absolute ignore glob",
+			src:     "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n      - assert:\n          changes:\n            created: []\n            ignore: [\"/var/**\"]",
+			wantMsg: "must be workdir-relative",
+		},
+		{
+			name:    "ignore glob escaping the workdir",
+			src:     "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n      - assert:\n          changes:\n            created: []\n            ignore: [\"../elsewhere/**\"]",
+			wantMsg: "escapes the scenario workdir",
+		},
+		{
+			name:    "malformed ignore glob",
+			src:     "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n      - assert:\n          changes:\n            created: []\n            ignore: [\"cache/[unclosed\"]",
 			wantMsg: "is not a valid glob",
 		},
 	}
