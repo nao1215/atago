@@ -254,6 +254,63 @@ func TestCheckImage_Conjunctive(t *testing.T) {
 	}
 }
 
+// TestCheckImage_SimilarToWorkdirBaseline covers the comparison a run produces
+// both sides of: an encoder round trip, where neither image is a committed
+// golden. The workdir was never consulted, so the assertion failed with "could
+// not read baseline image" and the round-trip check could not be written at all.
+func TestCheckImage_SimilarToWorkdirBaseline(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	specDir := t.TempDir()
+	base := makePNG(t, 12, 12, color.RGBA{9, 9, 9, 255})
+	writeImage(t, dir, "source.png", base)
+	writeImage(t, dir, "restored.png", base)
+	writeImage(t, dir, "other.png", makePNG(t, 12, 12, color.RGBA{200, 0, 0, 255}))
+
+	env := Env{Workdir: dir, SpecDir: specDir}
+
+	got := Check(&spec.Assert{Image: &spec.ImageAssert{Path: "restored.png", SimilarTo: "source.png"}}, nil, env)
+	if !got.OK {
+		t.Errorf("a baseline produced by the run should resolve in the workdir: %s", got.Hint)
+	}
+
+	// The fallback must not weaken the comparison itself.
+	got = Check(&spec.Assert{Image: &spec.ImageAssert{Path: "other.png", SimilarTo: "source.png"}}, nil, env)
+	if got.OK {
+		t.Error("a different image must still fail against a workdir baseline")
+	}
+
+	// A committed golden still wins: the spec directory is consulted first, so an
+	// unrelated workdir file of the same name cannot shadow it.
+	writeImage(t, specDir, "source.png", makePNG(t, 12, 12, color.RGBA{255, 255, 255, 255}))
+	got = Check(&spec.Assert{Image: &spec.ImageAssert{Path: "restored.png", SimilarTo: "source.png"}}, nil, env)
+	if got.OK {
+		t.Error("the committed baseline next to the spec must take precedence over the workdir file")
+	}
+}
+
+// TestCheckImage_SimilarToEscapingWorkdir pins that the workdir fallback cannot
+// be used to read an image outside the scenario directory.
+func TestCheckImage_SimilarToEscapingWorkdir(t *testing.T) {
+	t.Parallel()
+	outside := t.TempDir()
+	dir := filepath.Join(outside, "work")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	base := makePNG(t, 8, 8, color.RGBA{1, 2, 3, 255})
+	writeImage(t, dir, "out.png", base)
+	// The image sits one level above the workdir, so only a traversal reaches it.
+	writeImage(t, outside, "secret.png", base)
+
+	got := Check(&spec.Assert{
+		Image: &spec.ImageAssert{Path: "out.png", SimilarTo: "../secret.png"},
+	}, nil, Env{Workdir: dir, SpecDir: t.TempDir()})
+	if got.OK {
+		t.Error("a baseline path escaping the workdir must not resolve")
+	}
+}
+
 func TestCheckImage_SimilarToAbsolutePath(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()

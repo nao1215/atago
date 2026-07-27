@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-74 suites · 410 scenarios
+74 suites · 413 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -167,11 +167,14 @@
 - [atago self-hosting / http runner](#atago-self-hosting--http-runner) — 2 scenarios
   - [a denied host is a security policy violation (exit 6)](#scenario-a-denied-host-is-a-security-policy-violation-exit-6)
   - [an http step with an undeclared runner fails validation (exit 2)](#scenario-an-http-step-with-an-undeclared-runner-fails-validation-exit-2)
-- [atago self-hosting / image](#atago-self-hosting--image) — 4 scenarios
+- [atago self-hosting / image](#atago-self-hosting--image) — 7 scenarios
   - [format, dimension and alpha assertions pass on a PNG](#scenario-format-dimension-and-alpha-assertions-pass-on-a-png)
   - [a pixel comparison against an identical baseline passes](#scenario-a-pixel-comparison-against-an-identical-baseline-passes)
   - [a wrong dimension assertion fails with a clear diff](#scenario-a-wrong-dimension-assertion-fails-with-a-clear-diff)
   - [a failing similar_to writes visual diff artifacts](#scenario-a-failing-similar_to-writes-visual-diff-artifacts)
+  - [a similar_to baseline resolves in the scenario workdir](#scenario-a-similar_to-baseline-resolves-in-the-scenario-workdir)
+  - [a workdir baseline still fails when the images differ](#scenario-a-workdir-baseline-still-fails-when-the-images-differ)
+  - [a baseline that exists nowhere names both places it was looked for](#scenario-a-baseline-that-exists-nowhere-names-both-places-it-was-looked-for)
 - [atago self-hosting / init](#atago-self-hosting--init) — 3 scenarios
   - [init scaffolds a runnable spec](#scenario-init-scaffolds-a-runnable-spec)
   - [init emits a resolvable schema header for editor completion](#scenario-init-emits-a-resolvable-schema-header-for-editor-completion)
@@ -3472,6 +3475,98 @@ cat arts/*/*/*image.metadata.json
   - stdout at `$.diff_generated` equals `true`
 #### Generated artifacts
 - `arts`
+### Scenario: a similar_to baseline resolves in the scenario workdir
+#### Given
+- Fixture file `roundtrip.atago.yaml` is created.
+#### Inputs
+_Fixture `roundtrip.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: a copy of the output matches it pixel for pixel
+    steps:
+      - fixture:
+          file: source.png
+          base64: iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAGUlEQVR4nGJJSUlhwAaYsIoOWglAAAAA///xaAE/jf0lQAAAAABJRU5ErkJggg==
+      - run:
+          shell: true
+          command: cp source.png restored.png
+      - assert:
+          exit_code: 0
+          image:
+            path: restored.png
+            similar_to: source.png
+```
+#### When
+```shell
+${atago} run roundtrip.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout contains `PASSED`
+### Scenario: a workdir baseline still fails when the images differ
+#### Given
+- Fixture file `differ.atago.yaml` is created.
+#### Inputs
+_Fixture `differ.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: a different image is not the baseline
+    steps:
+      - fixture:
+          file: source.png
+          base64: iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAFUlEQVR4nGL5z4AATAxEcQABAAD//zRtAQqfxpGAAAAAAElFTkSuQmCC
+      - fixture:
+          file: other.png
+          base64: iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAGElEQVR4nGJhYPjPAANMDEgANwcQAAD//zJvAQo6fkx6AAAAAElFTkSuQmCC
+      - run:
+          command: echo compared
+      - assert:
+          image:
+            path: other.png
+            similar_to: source.png
+```
+#### When
+```shell
+${atago} run differ.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `FAILED`
+### Scenario: a baseline that exists nowhere names both places it was looked for
+#### Given
+- Fixture file `missing.atago.yaml` is created.
+#### Inputs
+_Fixture `missing.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: the baseline was never produced
+    steps:
+      - fixture:
+          file: out.png
+          base64: iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAFUlEQVR4nGL5z4AATAxEcQABAAD//zRtAQqfxpGAAAAAAElFTkSuQmCC
+      - run:
+          command: echo compared
+      - assert:
+          image:
+            path: out.png
+            similar_to: never-written.png
+```
+#### When
+```shell
+${atago} run missing.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `could not read baseline image`, `scenario workdir`
 ## atago self-hosting / init
 Source: `test/e2e/atago/init.atago.yaml`
 ### Scenario: init scaffolds a runnable spec

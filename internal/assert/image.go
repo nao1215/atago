@@ -22,12 +22,14 @@ import (
 	_ "golang.org/x/image/tiff"
 	_ "golang.org/x/image/webp"
 
+	"github.com/nao1215/atago/internal/security"
 	"github.com/nao1215/atago/internal/spec"
 )
 
 // checkImage evaluates an image assertion. Every constraint set on
 // the assertion must hold. Relative paths resolve against the scenario workdir;
-// a relative similar_to baseline resolves against the spec file's directory.
+// a relative similar_to baseline resolves against the spec file's directory,
+// falling back to the scenario workdir when no committed baseline is there.
 func checkImage(im *spec.ImageAssert, env Env) *CheckResult {
 	path := im.Path
 	if !filepath.IsAbs(path) {
@@ -182,6 +184,38 @@ func checkImageAlpha(im *spec.ImageAssert, img image.Image) *CheckResult {
 	}
 }
 
+// readBaselineImage loads the baseline a `similar_to` comparison runs against.
+// A committed golden lives next to the spec, so the spec directory is tried
+// first and that stays the meaning of an existing baseline path. When no such
+// file exists, the scenario workdir is tried too: comparing two images the run
+// itself produced — the round trip of an encoder, the before and after of an
+// in-place edit — is the other half of what pixel comparison is for, and it was
+// impossible to express because the workdir was never consulted. An absolute
+// path is used verbatim.
+func readBaselineImage(baseline string, env Env) ([]byte, error) {
+	if filepath.IsAbs(baseline) {
+		return os.ReadFile(baseline) //nolint:gosec // path is the user-declared baseline
+	}
+	specPath := filepath.Join(env.SpecDir, baseline)
+	data, err := os.ReadFile(specPath) //nolint:gosec // path is the user-declared baseline
+	if err == nil || env.Workdir == "" {
+		return data, err
+	}
+	// The workdir fallback is confined to the workdir the same way every other
+	// runtime path is, so a baseline cannot reach outside the scenario.
+	workPath, resolveErr := security.ResolveWorkdirPath("assert.image.similar_to", env.Workdir, baseline)
+	if resolveErr != nil {
+		return nil, resolveErr
+	}
+	workData, workErr := os.ReadFile(workPath) //nolint:gosec // path is confined to the workdir
+	if workErr != nil {
+		// Report the spec-directory miss: a committed baseline is the common
+		// case, and its path is the one the author most likely mistyped.
+		return nil, err
+	}
+	return workData, nil
+}
+
 // checkImageSimilarTo decodes both the asserted image and the baseline and
 // compares their pixels. The normalized mean per-pixel difference must be at or
 // below MaxDiff (default 0, an exact match). On failure it attaches review
@@ -212,18 +246,15 @@ func checkImageSimilarTo(im *spec.ImageAssert, data []byte, env Env) *CheckResul
 	meta.ActualFormat = detectImageFormat(data)
 	meta.ActualDimensions = dimStr(got)
 
-	basePath := im.SimilarTo
-	if !filepath.IsAbs(basePath) {
-		basePath = filepath.Join(env.SpecDir, im.SimilarTo)
-	}
-	baseData, err := os.ReadFile(basePath) //nolint:gosec // path is the user-declared baseline
+	baseData, err := readBaselineImage(im.SimilarTo, env)
 	if err != nil {
 		meta.Reason = "baseline image could not be read"
 		cr := &CheckResult{
 			Desc:     desc,
 			Expected: fmt.Sprintf("readable baseline image %q", im.SimilarTo),
 			Actual:   err.Error(),
-			Hint:     fmt.Sprintf("could not read baseline image %q", im.SimilarTo),
+			Hint: fmt.Sprintf("could not read baseline image %q; looked for a committed baseline next to the spec and for a file of that name in the scenario workdir",
+				im.SimilarTo),
 		}
 		return attachImageArtifacts(cr, meta, data, nil)
 	}
