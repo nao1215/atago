@@ -101,9 +101,13 @@ scenarios:
     only:
       command: zstd --version
     steps:
-      - fixture:
-          file: payload.txt
-          content: "repeatable payload for two levels\n"
+      # A few thousand varied lines: small enough to stay fast, varied enough
+      # that -1 and -19 really do produce different archives.
+      - run:
+          shell: true
+          command: "seq 1 4000 | sed 's/$/ alpha beta gamma delta/' > payload.txt"
+      - assert:
+          exit_code: 0
       - run:
           command: zstd -1 -q payload.txt -o fast.zst
       - assert:
@@ -112,6 +116,12 @@ scenarios:
           command: zstd -19 -q payload.txt -o small.zst
       - assert:
           exit_code: 0
+      # The levels are not decorative: the archives themselves differ.
+      - run:
+          command: cmp -s fast.zst small.zst
+      - assert:
+          exit_code: 1
+      # And both restore the identical original.
       - run:
           command: zstd -dq fast.zst -o from-fast.txt
       - assert:
@@ -153,15 +163,18 @@ scenarios:
       - fixture:
           file: payload.zst
           content: "PRECIOUS EXISTING FILE\n"
+      # --rm is asked for as well: a refused compression must not delete the
+      # input it never compressed.
       - run:
-          command: zstd -q payload.txt -o payload.zst
+          command: zstd -q --rm payload.txt -o payload.zst
       - assert:
           exit_code: 1
           stdout:
             empty: true
           stderr:
             contains: "already exists"
-          # Negative space: the refusal changed nothing on disk at all.
+          # Negative space: the refusal changed nothing on disk at all — the
+          # input is still there despite --rm.
           changes:
             created: []
             modified: []
@@ -240,6 +253,41 @@ scenarios:
             empty: true
       - assert:
           # Atomicity: a failed decompression must not leave a partial file.
+          file:
+            path: restored.txt
+            exists: false
+
+  # The harder half of the same contract: a real frame cut short. Decompression
+  # gets far enough to have written most of the output before the input runs
+  # out, so "no partial file" is a cleanup guarantee, not an early rejection.
+  - name: a truncated frame fails after decompression has started and leaves nothing
+    only:
+      command: zstd --version
+    steps:
+      - run:
+          shell: true
+          command: "seq 1 4000 | sed 's/$/ alpha beta gamma delta/' > payload.txt"
+      - assert:
+          exit_code: 0
+      - run:
+          command: zstd -19 -q payload.txt -o whole.zst
+      - assert:
+          exit_code: 0
+      # Keep all but the last bytes of a valid archive.
+      - run:
+          shell: true
+          command: "head -c 1000 whole.zst > truncated.zst"
+      - assert:
+          exit_code: 0
+      - run:
+          command: zstd -dq truncated.zst -o restored.txt
+      - assert:
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            contains: "truncated.zst"
+      - assert:
           file:
             path: restored.txt
             exists: false

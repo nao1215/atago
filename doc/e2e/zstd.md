@@ -1,8 +1,8 @@
 # atago Behavior Specs
 ## Summary
-1 suite · 14 scenarios
+1 suite · 15 scenarios
 ## Contents
-- [zstd (compression round trips and integrity)](#zstd-compression-round-trips-and-integrity) — 14 scenarios
+- [zstd (compression round trips and integrity)](#zstd-compression-round-trips-and-integrity) — 15 scenarios
   - [compressing keeps the input and adds one archive](#scenario-compressing-keeps-the-input-and-adds-one-archive)
   - [a compress and decompress round trip restores the bytes exactly](#scenario-a-compress-and-decompress-round-trip-restores-the-bytes-exactly)
   - [an empty file survives the round trip](#scenario-an-empty-file-survives-the-round-trip)
@@ -13,6 +13,7 @@
   - [-f overwrites the archive the refusal protected](#scenario--f-overwrites-the-archive-the-refusal-protected)
   - [-t accepts a real archive and rejects a corrupt one](#scenario--t-accepts-a-real-archive-and-rejects-a-corrupt-one)
   - [decompressing a corrupt archive leaves no output behind](#scenario-decompressing-a-corrupt-archive-leaves-no-output-behind)
+  - [a truncated frame fails after decompression has started and leaves nothing](#scenario-a-truncated-frame-fails-after-decompression-has-started-and-leaves-nothing)
   - [a missing input fails and names the file](#scenario-a-missing-input-fails-and-names-the-file)
   - [an unknown option fails without producing output](#scenario-an-unknown-option-fails-without-producing-output)
   - [the stdin to stdout pipeline round trips](#scenario-the-stdin-to-stdout-pipeline-round-trips)
@@ -102,25 +103,24 @@ zstd -dq binary.zst -o restored.dat
   - file `restored.dat` is byte-identical to `binary.dat`
 ### Scenario: the compression level changes the archive, never the content
 _only when `zstd --version` succeeds_
-#### Given
-- Fixture file `payload.txt` is created.
-#### Inputs
-_Fixture `payload.txt`:_
-```text
-repeatable payload for two levels
-```
 #### When
 ```shell
+seq 1 4000 | sed 's/$/ alpha beta gamma delta/' > payload.txt
 zstd -1 -q payload.txt -o fast.zst
 zstd -19 -q payload.txt -o small.zst
+cmp -s fast.zst small.zst
 zstd -dq fast.zst -o from-fast.txt
 zstd -dq small.zst -o from-small.txt
 ```
 #### Then
+- after `seq 1 4000 | sed 's/$/ alpha beta gamma delta/' > payload.txt`:
+  - exit code is `0`
 - after `zstd -1 -q payload.txt -o fast.zst`:
   - exit code is `0`
 - after `zstd -19 -q payload.txt -o small.zst`:
   - exit code is `0`
+- after `cmp -s fast.zst small.zst`:
+  - exit code is `1`
 - after `zstd -dq fast.zst -o from-fast.txt`:
   - exit code is `0`
   - file `from-fast.txt` is byte-identical to `payload.txt`
@@ -159,7 +159,7 @@ PRECIOUS EXISTING FILE
 ```
 #### When
 ```shell
-zstd -q payload.txt -o payload.zst
+zstd -q --rm payload.txt -o payload.zst
 ```
 #### Then
 - exit code is `1`
@@ -239,6 +239,27 @@ zstd -dq broken.zst -o restored.txt
 - exit code is `1`
 - stdout is empty
 - file `restored.txt` does not exist
+### Scenario: a truncated frame fails after decompression has started and leaves nothing
+_only when `zstd --version` succeeds_
+#### When
+```shell
+seq 1 4000 | sed 's/$/ alpha beta gamma delta/' > payload.txt
+zstd -19 -q payload.txt -o whole.zst
+head -c 1000 whole.zst > truncated.zst
+zstd -dq truncated.zst -o restored.txt
+```
+#### Then
+- after `seq 1 4000 | sed 's/$/ alpha beta gamma delta/' > payload.txt`:
+  - exit code is `0`
+- after `zstd -19 -q payload.txt -o whole.zst`:
+  - exit code is `0`
+- after `head -c 1000 whole.zst > truncated.zst`:
+  - exit code is `0`
+- after `zstd -dq truncated.zst -o restored.txt`:
+  - exit code is `1`
+  - stdout is empty
+  - stderr contains `truncated.zst`
+  - file `restored.txt` does not exist
 ### Scenario: a missing input fails and names the file
 _only when `zstd --version` succeeds_
 #### When
