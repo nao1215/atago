@@ -109,7 +109,7 @@ You don't write the first spec — your tool does. `atago record -- <command>` r
 
 ```shell
 $ atago record --out mytool.atago.yaml -- mytool convert input.txt
-recorded: exit 0, 2 stdout line(s), 1 file(s) created
+recorded: exit 0, 2 lines of stdout, 1 file created
 wrote mytool.atago.yaml
 $ atago run mytool.atago.yaml
 .
