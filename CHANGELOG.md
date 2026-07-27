@@ -18,6 +18,14 @@ and this project follows [Semantic Versioning](https://semver.org/).
 - `file:` assertions using `not_contains` or `executable` rendered as "the file
   is checked" in generated docs and `explain` output, hiding what the scenario
   guarantees. Both matchers now have their own phrasing.
+- A failing `json: equals` now names the difference. Both sides were rendered
+  bare, so a type or whitespace mismatch printed the same text twice — the
+  boolean `true` against the string `"true"` read as "expected true, got true",
+  and `" x "` against `"x"` hid the spaces. Strings are quoted and `null` is
+  named; numbers and booleans stay bare.
+- A `dir:` assertion on a path that holds a file reported a bare
+  `exists=false`, which reads as "nothing is there". It now says the path
+  exists as a regular file (or symlink, socket, …) and points at `file:`.
 - `changes:` now tracks symlinks. Only regular files were scanned, so a step
   that planted a link — an installer wiring `bin/tool`, a release that swaps a
   `current` pointer — passed `created: []`, reporting "nothing happened" for a

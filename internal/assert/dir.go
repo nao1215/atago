@@ -78,11 +78,20 @@ func checkDirExists(d *spec.DirAssert, info os.FileInfo, statErr error) *CheckRe
 	if exists == *d.Exists {
 		return nil
 	}
+	// A path that exists but is not a directory is the confusing case: a bare
+	// "exists=false" reads as "nothing is there" and sends the author looking for
+	// a missing output that is in fact sitting right where they asked, as a file.
+	actual := fmt.Sprintf("exists=%t", exists)
+	hint := fmt.Sprintf("expected directory %q to %s", d.Path, existence(*d.Exists))
+	if statErr == nil && !info.IsDir() {
+		actual = fmt.Sprintf("exists=%t (%q is a %s, not a directory)", exists, d.Path, fileKind(info))
+		hint = fmt.Sprintf("%q exists but is a %s; use a file: assertion for it", d.Path, fileKind(info))
+	}
 	return &CheckResult{
 		Desc:     desc,
 		Expected: fmt.Sprintf("directory %q exists=%t", d.Path, *d.Exists),
-		Actual:   fmt.Sprintf("exists=%t", exists),
-		Hint:     fmt.Sprintf("expected directory %q to %s", d.Path, existence(*d.Exists)),
+		Actual:   actual,
+		Hint:     hint,
 	}
 }
 
@@ -242,8 +251,28 @@ func dirStatActual(info os.FileInfo, err error) string {
 	case err != nil:
 		return err.Error()
 	case !info.IsDir():
-		return "not a directory"
+		return "not a directory (" + fileKind(info) + ")"
 	default:
 		return "directory"
+	}
+}
+
+// fileKind names what a non-directory path actually is, so a failure can say
+// "regular file" instead of leaving the author to guess why a directory
+// assertion reports the path as absent.
+func fileKind(info os.FileInfo) string {
+	switch mode := info.Mode(); {
+	case mode.IsRegular():
+		return "regular file"
+	case mode&os.ModeSymlink != 0:
+		return "symlink"
+	case mode&os.ModeNamedPipe != 0:
+		return "named pipe"
+	case mode&os.ModeSocket != 0:
+		return "socket"
+	case mode&os.ModeDevice != 0:
+		return "device"
+	default:
+		return "non-directory entry"
 	}
 }

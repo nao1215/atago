@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-74 suites · 406 scenarios
+74 suites · 410 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -73,13 +73,14 @@
   - [an unsupported defaults field is a load-time error (exit 2)](#scenario-an-unsupported-defaults-field-is-a-load-time-error-exit-2)
   - [defaults.run.env merges per key and a step env wins the collisions](#scenario-defaultsrunenv-merges-per-key-and-a-step-env-wins-the-collisions)
   - [a step opts out of defaults.run.shell with an explicit shell false](#scenario-a-step-opts-out-of-defaultsrunshell-with-an-explicit-shell-false)
-- [atago self-hosting / dir assertion](#atago-self-hosting--dir-assertion) — 6 scenarios
+- [atago self-hosting / dir assertion](#atago-self-hosting--dir-assertion) — 7 scenarios
   - [directory/tree assertions cover a multi-file generator](#scenario-directorytree-assertions-cover-a-multi-file-generator)
   - [a missing directory can be asserted absent](#scenario-a-missing-directory-can-be-asserted-absent)
   - [a dangling symlink is a present directory entry (membership uses Lstat)](#scenario-a-dangling-symlink-is-a-present-directory-entry-membership-uses-lstat)
   - [a failed dir assert lists what the directory actually holds](#scenario-a-failed-dir-assert-lists-what-the-directory-actually-holds)
   - [a failed count assert lists the entries it counted](#scenario-a-failed-count-assert-lists-the-entries-it-counted)
   - [a failed recursive assert lists the walked tree](#scenario-a-failed-recursive-assert-lists-the-walked-tree)
+  - [a dir assertion on a file path says the path is a file](#scenario-a-dir-assertion-on-a-file-path-says-the-path-is-a-file)
 - [atago self-hosting / recursive dir asserts + tree snapshots](#atago-self-hosting--recursive-dir-asserts--tree-snapshots) — 3 scenarios
   - [record, compare green, then a mutation names the changed paths](#scenario-record-compare-green-then-a-mutation-names-the-changed-paths)
   - [recursive matchers and ignore globs walk the tree](#scenario-recursive-matchers-and-ignore-globs-walk-the-tree)
@@ -201,7 +202,7 @@
   - [a json list fails the inner spec when one listed path mismatches](#scenario-a-json-list-fails-the-inner-spec-when-one-listed-path-mismatches)
   - [a stdout json list against a JSON-producing command](#scenario-a-stdout-json-list-against-a-json-producing-command)
   - [a yaml list asserts several paths on one document](#scenario-a-yaml-list-asserts-several-paths-on-one-document)
-- [atago self-hosting / json matcher boundary values](#atago-self-hosting--json-matcher-boundary-values) — 9 scenarios
+- [atago self-hosting / json matcher boundary values](#atago-self-hosting--json-matcher-boundary-values) — 12 scenarios
   - [an array element is addressable by index](#scenario-an-array-element-is-addressable-by-index)
   - [a top-level array reports its length](#scenario-a-top-level-array-reports-its-length)
   - [an empty array has length zero](#scenario-an-empty-array-has-length-zero)
@@ -211,6 +212,9 @@
   - [a string carrying a quote compares equal](#scenario-a-string-carrying-a-quote-compares-equal)
   - [a deeply nested path resolves](#scenario-a-deeply-nested-path-resolves)
   - [a path that selects nothing fails with a clear message](#scenario-a-path-that-selects-nothing-fails-with-a-clear-message)
+  - [a type mismatch failure distinguishes a string from a boolean](#scenario-a-type-mismatch-failure-distinguishes-a-string-from-a-boolean)
+  - [a whitespace-only mismatch shows the surrounding spaces](#scenario-a-whitespace-only-mismatch-shows-the-surrounding-spaces)
+  - [a numeric mismatch stays unquoted](#scenario-a-numeric-mismatch-stays-unquoted)
 - [atago self-hosting / line selector](#atago-self-hosting--line-selector) — 3 scenarios
   - [line selector narrows stdout to a single 1-based line](#scenario-line-selector-narrows-stdout-to-a-single-1-based-line)
   - [a trailing newline does not add a phantom final line](#scenario-a-trailing-newline-does-not-add-a-phantom-final-line)
@@ -1835,6 +1839,31 @@ ${atago} run walked.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `assets/app.css`, `index.html`
+### Scenario: a dir assertion on a file path says the path is a file
+#### Given
+- Fixture file `mistaken.atago.yaml` is created.
+#### Inputs
+_Fixture `mistaken.atago.yaml`:_
+```text
+version: "1"
+suite: {name: mistaken}
+scenarios:
+  - name: out is a file, not a directory
+    steps:
+      - fixture: {file: out, content: "report\n"}
+      - run: {command: echo built}
+      - assert:
+          dir:
+            path: out
+            exists: true
+```
+#### When
+```shell
+${atago} run mistaken.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `exists but is a regular file`, `use a file: assertion`
 ## atago self-hosting / recursive dir asserts + tree snapshots
 Source: `test/e2e/atago/dir_tree.atago.yaml`
 ### Scenario: record, compare green, then a mutation names the changed paths
@@ -3896,6 +3925,70 @@ ${atago} run nopath.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `selected no value`
+### Scenario: a type mismatch failure distinguishes a string from a boolean
+#### Given
+- Fixture file `typed.atago.yaml` is created.
+#### Inputs
+_Fixture `typed.atago.yaml`:_
+```text
+version: "1"
+suite: {name: typed}
+scenarios:
+  - name: string spelling of a boolean
+    steps:
+      - run: {shell: true, command: 'printf ''{"b":true}'''}
+      - assert: {stdout: {json: [{path: "$.b", equals: "true"}]}}
+```
+#### When
+```shell
+${atago} run typed.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `$.b == "true"`, `$.b = true`
+### Scenario: a whitespace-only mismatch shows the surrounding spaces
+#### Given
+- Fixture file `spaced.atago.yaml` is created.
+#### Inputs
+_Fixture `spaced.atago.yaml`:_
+```text
+version: "1"
+suite: {name: spaced}
+scenarios:
+  - name: padded value
+    steps:
+      - run: {shell: true, command: 'printf ''{"v":" x "}'''}
+      - assert: {stdout: {json: [{path: "$.v", equals: "x"}]}}
+```
+#### When
+```shell
+${atago} run spaced.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `$.v = " x "`
+### Scenario: a numeric mismatch stays unquoted
+#### Given
+- Fixture file `nums.atago.yaml` is created.
+#### Inputs
+_Fixture `nums.atago.yaml`:_
+```text
+version: "1"
+suite: {name: nums}
+scenarios:
+  - name: off by one
+    steps:
+      - run: {shell: true, command: 'printf ''{"n":2}'''}
+      - assert: {stdout: {json: [{path: "$.n", equals: 1}]}}
+```
+#### When
+```shell
+${atago} run nums.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `$.n == 1`, `$.n = 2`
+- stdout does not contain `"2"`
 ## atago self-hosting / line selector
 Source: `test/e2e/atago/line.atago.yaml`
 ### Scenario: line selector narrows stdout to a single 1-based line
