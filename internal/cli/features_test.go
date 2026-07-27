@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -1146,11 +1147,15 @@ func TestSpecTargets_MessagesNameWhatAtagoWasDoing(t *testing.T) {
 			t.Errorf("exit = %d, want %d", exit, ExitConfig)
 		}
 		got := errb.String()
-		if !strings.Contains(got, `cannot access "no-such.atago.yaml": no such file or directory`) {
-			t.Errorf("stderr = %q, want the path named once and the bare reason", got)
+		// The reason itself is the OS's ("no such file or directory" on POSIX,
+		// "The system cannot find the file specified." on Windows); what atago
+		// controls is that the path is named once, in quotes, with no syscall
+		// wrapper repeating it.
+		if !strings.Contains(got, `cannot access "no-such.atago.yaml": `) {
+			t.Errorf("stderr = %q, want the quoted path followed by the reason", got)
 		}
-		if strings.Contains(got, "stat ") {
-			t.Errorf("stderr = %q, want no syscall noise", got)
+		if strings.Contains(got, "stat ") || strings.Count(got, "no-such.atago.yaml") != 1 {
+			t.Errorf("stderr = %q, want the path exactly once and no syscall noise", got)
 		}
 	})
 
@@ -1161,7 +1166,9 @@ func TestSpecTargets_MessagesNameWhatAtagoWasDoing(t *testing.T) {
 			t.Fatal("an empty directory must be a refusal")
 		}
 		got := errb.String()
-		if !strings.Contains(got, "no *.atago.yaml") || !strings.Contains(got, dir) {
+		// The target is quoted, so a Windows path appears with escaped
+		// separators — compare against the quoted form rather than the raw one.
+		if !strings.Contains(got, "no *.atago.yaml") || !strings.Contains(got, strconv.Quote(dir)) {
 			t.Errorf("stderr = %q, want the searched target named", got)
 		}
 		if !strings.Contains(got, "atago init") {

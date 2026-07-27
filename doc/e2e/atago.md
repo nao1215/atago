@@ -4791,7 +4791,7 @@ ${atago} run no-such-spec.atago.yaml
 ```
 #### Then
 - exit code is `3`
-- stderr contains `cannot access "no-such-spec.atago.yaml": no such file or directory`
+- stderr contains `cannot access "no-such-spec.atago.yaml": `
 - stderr does not contain `stat no-such-spec`
 ### Scenario: an empty directory says how to create a first spec
 #### When

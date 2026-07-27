@@ -250,8 +250,10 @@ scenarios:
           command: ${atago} run no-such-spec.atago.yaml
       - assert:
           exit_code: 3
+          # The reason is the OS's own wording, so only the shape atago controls
+          # is pinned: the quoted path, once, with no syscall wrapper repeating it.
           stderr:
-            contains: 'cannot access "no-such-spec.atago.yaml": no such file or directory'
+            contains: 'cannot access "no-such-spec.atago.yaml": '
       - assert:
           stderr:
             not_contains: "stat no-such-spec"
