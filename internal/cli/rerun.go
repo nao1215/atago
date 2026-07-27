@@ -299,18 +299,63 @@ func applyRerunSelection(label string, stderr io.Writer, paths []string, eng *en
 // so a write error is a warning, not a fatal exit; an UNREADABLE ledger is
 // never overwritten, so recorded failures a newer atago wrote survive a plain
 // run by an older one.
-func updateRerunLedger(label string, stderr io.Writer, results []*engine.SuiteResult, ranScenarios int) {
-	prior, perr := loadRerunState()
-	if perr != nil {
-		fmt.Fprintf(stderr, label+": cannot read %s; leaving it untouched: %v\n", rerunStatePath(), perr)
+// warnUnmatchedRerunEntries reports recorded failures that this --rerun-failed
+// run did not execute, which happens when a scenario was renamed or deleted
+// while still broken. The ledger keeps those entries, but silence is the wrong
+// answer: a rerun that shows "1 scenario" where two were recorded reads as
+// "the other one is fixed". The all-gone case is handled by the caller (it
+// verified nothing and exits non-zero); a partial mismatch stays a warning
+// because the entry survives for the next rerun.
+func warnUnmatchedRerunEntries(label string, stderr io.Writer, results []*engine.SuiteResult) {
+	prior, err := loadRerunState()
+	if err != nil || len(prior.Failed) == 0 {
 		return
 	}
-	executed := make(map[string]bool, ranScenarios)
+	executed := executedScenarioIDs(results)
+	var unmatched []failedEntry
+	for _, e := range prior.Failed {
+		if !executed[canonicalScenarioID(e.SpecPath, e.Scenario)] {
+			unmatched = append(unmatched, e)
+		}
+	}
+	if len(unmatched) == 0 {
+		return
+	}
+	names := make([]string, 0, len(unmatched))
+	for _, e := range unmatched {
+		names = append(names, fmt.Sprintf("%s / %s", e.SpecPath, e.Scenario))
+	}
+	sort.Strings(names)
+	fmt.Fprintf(stderr, "%s: warning: %s did not match the current specs (renamed or removed?) and was not rerun: %s; kept in %s for the next --rerun-failed\n",
+		label, pluralScenarios(len(unmatched)), strings.Join(names, ", "), rerunStatePath())
+}
+
+// pluralScenarios renders a recorded-failure count with the right noun.
+func pluralScenarios(n int) string {
+	if n == 1 {
+		return "1 recorded failing scenario"
+	}
+	return fmt.Sprintf("%d recorded failing scenarios", n)
+}
+
+// executedScenarioIDs is the set of scenarios a run actually executed.
+func executedScenarioIDs(results []*engine.SuiteResult) map[string]bool {
+	executed := map[string]bool{}
 	for _, r := range results {
 		for _, sc := range r.Scenarios {
 			executed[canonicalScenarioID(r.SpecPath, sc.Name)] = true
 		}
 	}
+	return executed
+}
+
+func updateRerunLedger(label string, stderr io.Writer, results []*engine.SuiteResult) {
+	prior, perr := loadRerunState()
+	if perr != nil {
+		fmt.Fprintf(stderr, label+": cannot read %s; leaving it untouched: %v\n", rerunStatePath(), perr)
+		return
+	}
+	executed := executedScenarioIDs(results)
 	var preserved []failedEntry
 	for _, e := range prior.Failed {
 		if !executed[canonicalScenarioID(e.SpecPath, e.Scenario)] {

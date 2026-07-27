@@ -20,6 +20,12 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- `--rerun-failed` now names the recorded failures it could not run. When a
+  scenario was renamed or deleted while still broken, the rerun quietly reported
+  fewer scenarios than were recorded, which reads as "the rest are fixed" — the
+  all-gone case already warned, but the partial case, where the miscount is
+  easiest to miss, did not. The entries are still kept in the ledger for the
+  next rerun.
 - `image: similar_to` now falls back to the scenario workdir when no committed
   baseline sits next to the spec. Comparing two images the run itself produced —
   the two ends of an encoder round trip, the before and after of an in-place

@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
+	"sort"
 	"strings"
 	"testing"
 
@@ -451,6 +453,84 @@ func TestRerunFailed_NoMatchKeepsStateAndWarns(t *testing.T) {
 		}
 		if len(st.Failed) != 1 || st.Failed[0].Scenario != "fails" {
 			t.Errorf("recorded failures = %+v, want the original 'fails' preserved", st.Failed)
+		}
+	})
+}
+
+// TestRerunFailed_PartialMatchWarnsAboutTheRest covers the quiet half of the
+// case above: when only SOME recorded failures still exist, the rerun reports
+// fewer scenarios than were recorded, which reads as "the others are fixed".
+// The unmatched entries survive in the ledger, so the run must say which ones
+// it did not verify.
+func TestRerunFailed_PartialMatchWarnsAboutTheRest(t *testing.T) {
+	const spec = `version: "1"
+suite:
+  name: rerun
+scenarios:
+  - name: fails
+    steps:
+      - run: {shell: true, command: "exit 1"}
+      - assert: {exit_code: 0}
+  - name: also-fails
+    steps:
+      - run: {shell: true, command: "exit 1"}
+      - assert: {exit_code: 0}
+`
+	dir := t.TempDir()
+	writeSpec(t, dir, "s.atago.yaml", spec)
+	withWorkdir(t, dir, func() {
+		var out, errb bytes.Buffer
+		if got := Main([]string{"run", "."}, &out, &errb); got != ExitFailures {
+			t.Fatalf("first run exit = %d, want %d (stderr=%s)", got, ExitFailures, errb.String())
+		}
+		// One of the two recorded failures is renamed while still broken.
+		writeSpec(t, dir, "s.atago.yaml", strings.ReplaceAll(spec, "name: fails\n", "name: fails-renamed\n"))
+
+		out.Reset()
+		errb.Reset()
+		if got := Main([]string{"run", "--rerun-failed", "."}, &out, &errb); got != ExitFailures {
+			t.Fatalf("rerun exit = %d, want %d (stderr=%s)", got, ExitFailures, errb.String())
+		}
+		if !strings.Contains(errb.String(), "1 recorded failing scenario did not match") {
+			t.Errorf("stderr = %q, want a warning naming the unmatched recorded failure", errb.String())
+		}
+		if !strings.Contains(errb.String(), "s.atago.yaml / fails") {
+			t.Errorf("stderr = %q, want the unmatched scenario named", errb.String())
+		}
+		// The unmatched entry is still recorded for the next rerun.
+		st, err := loadRerunState()
+		if err != nil {
+			t.Fatalf("rerun state unreadable: %v", err)
+		}
+		var names []string
+		for _, e := range st.Failed {
+			names = append(names, e.Scenario)
+		}
+		sort.Strings(names)
+		want := []string{"also-fails", "fails"}
+		if !reflect.DeepEqual(names, want) {
+			t.Errorf("recorded failures = %v, want %v", names, want)
+		}
+	})
+}
+
+// TestRerunFailed_FullMatchIsQuiet pins that the warning is about a real
+// mismatch: when every recorded failure still exists, nothing extra is printed.
+func TestRerunFailed_FullMatchIsQuiet(t *testing.T) {
+	dir := t.TempDir()
+	writeSpec(t, dir, "s.atago.yaml", twoScenarioSpec)
+	withWorkdir(t, dir, func() {
+		var out, errb bytes.Buffer
+		if got := Main([]string{"run", "."}, &out, &errb); got != ExitFailures {
+			t.Fatalf("first run exit = %d, want %d (stderr=%s)", got, ExitFailures, errb.String())
+		}
+		out.Reset()
+		errb.Reset()
+		if got := Main([]string{"run", "--rerun-failed", "."}, &out, &errb); got != ExitFailures {
+			t.Fatalf("rerun exit = %d, want %d (stderr=%s)", got, ExitFailures, errb.String())
+		}
+		if strings.Contains(errb.String(), "did not match the current specs") {
+			t.Errorf("stderr = %q, want no mismatch warning when every recorded failure ran", errb.String())
 		}
 	})
 }

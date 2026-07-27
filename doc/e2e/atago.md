@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-74 suites · 413 scenarios
+74 suites · 415 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -346,10 +346,12 @@
   - [TAP report is a numbered TAP 13 stream with ok / not ok points](#scenario-tap-report-is-a-numbered-tap-13-stream-with-ok--not-ok-points)
   - [failure artifacts are written and referenced in the JSON report](#scenario-failure-artifacts-are-written-and-referenced-in-the-json-report)
   - [a multi-line snapshot failure renders a unified diff with hunks](#scenario-a-multi-line-snapshot-failure-renders-a-unified-diff-with-hunks)
-- [atago self-hosting / rerun-failed](#atago-self-hosting--rerun-failed) — 3 scenarios
+- [atago self-hosting / rerun-failed](#atago-self-hosting--rerun-failed) — 5 scenarios
   - [a failing run is recorded and rerun-failed selects only it](#scenario-a-failing-run-is-recorded-and-rerun-failed-selects-only-it)
   - [rerun-failed with nothing recorded is a no-op success](#scenario-rerun-failed-with-nothing-recorded-is-a-no-op-success)
   - [rerun-failed with a filter preserves the still-failing scenarios it did not run](#scenario-rerun-failed-with-a-filter-preserves-the-still-failing-scenarios-it-did-not-run)
+  - [rerun-failed names the recorded failures that no longer match](#scenario-rerun-failed-names-the-recorded-failures-that-no-longer-match)
+  - [rerun-failed stays quiet when every recorded failure still exists](#scenario-rerun-failed-stays-quiet-when-every-recorded-failure-still-exists)
 - [atago self-hosting / retry until](#atago-self-hosting--retry-until) — 3 scenarios
   - [retry polls until the condition becomes true](#scenario-retry-polls-until-the-condition-becomes-true)
   - [retry fails the inner spec when until never holds](#scenario-retry-fails-the-inner-spec-when-until-never-holds)
@@ -6248,6 +6250,83 @@ ${atago} run --rerun-failed --filter red-a two.atago.yaml
 - after `${atago} run --rerun-failed --filter red-a two.atago.yaml`:
   - exit code is `1`
   - file `.atago/last-failed.json` contains `red-a`, `red-b`
+### Scenario: rerun-failed names the recorded failures that no longer match
+#### Given
+- Fixture file `two.atago.yaml` is created.
+- Fixture file `two.atago.yaml` is created.
+#### Inputs
+_Fixture `two.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: two
+scenarios:
+  - name: red-a
+    steps:
+      - run: {shell: true, command: "exit 1"}
+      - assert: {exit_code: 0}
+  - name: red-b
+    steps:
+      - run: {shell: true, command: "exit 1"}
+      - assert: {exit_code: 0}
+```
+_Fixture `two.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: two
+scenarios:
+  - name: red-a-renamed
+    steps:
+      - run: {shell: true, command: "exit 1"}
+      - assert: {exit_code: 0}
+  - name: red-b
+    steps:
+      - run: {shell: true, command: "exit 1"}
+      - assert: {exit_code: 0}
+```
+#### When
+```shell
+${atago} run two.atago.yaml
+${atago} run --rerun-failed two.atago.yaml
+```
+#### Then
+- after `${atago} run two.atago.yaml`:
+  - exit code is `1`
+- after `${atago} run --rerun-failed two.atago.yaml`:
+  - exit code is `1`
+  - stderr contains `1 recorded failing scenario did not match`, `red-a`
+  - file `.atago/last-failed.json` contains `red-a`, `red-b`
+### Scenario: rerun-failed stays quiet when every recorded failure still exists
+#### Given
+- Fixture file `two.atago.yaml` is created.
+#### Inputs
+_Fixture `two.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: two
+scenarios:
+  - name: red-a
+    steps:
+      - run: {shell: true, command: "exit 1"}
+      - assert: {exit_code: 0}
+  - name: red-b
+    steps:
+      - run: {shell: true, command: "exit 1"}
+      - assert: {exit_code: 0}
+```
+#### When
+```shell
+${atago} run two.atago.yaml
+${atago} run --rerun-failed two.atago.yaml
+```
+#### Then
+- after `${atago} run two.atago.yaml`:
+  - exit code is `1`
+- after `${atago} run --rerun-failed two.atago.yaml`:
+  - exit code is `1`
+  - stderr does not contain `did not match the current specs`
 ## atago self-hosting / retry until
 Source: `test/e2e/atago/retry.atago.yaml`
 ### Scenario: retry polls until the condition becomes true

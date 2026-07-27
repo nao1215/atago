@@ -315,7 +315,14 @@ func finishRun(opts *runOptions, suiteResults []*engine.SuiteResult, loadErrs []
 	// and when a --rerun-failed matched nothing (its unmapped failures must
 	// survive).
 	if len(results) > 0 && !rerunMatchedNothing {
-		updateRerunLedger(opts.label, opts.stderr, results, ranScenarios)
+		// A --rerun-failed that matched only SOME of the recorded failures is the
+		// quiet version of the case above: the run reports fewer scenarios than
+		// were recorded, which reads as "the others are fixed". Say so before the
+		// ledger is rewritten, while the prior entries are still readable.
+		if opts.rerunFailed && !opts.selectionActive() {
+			warnUnmatchedRerunEntries(opts.label, opts.stderr, results)
+		}
+		updateRerunLedger(opts.label, opts.stderr, results)
 	}
 
 	// Every spec failed to load, or an interrupt skipped every suite before it
