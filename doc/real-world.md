@@ -22,7 +22,7 @@ Third-party programs ([test/e2e/thirdparty/](../test/e2e/thirdparty/)). atago ru
 
 | Program | Feature | License | Specs | Docs |
 |---------|---------|---------|-------|------|
-| [git](https://git-scm.com/) | Version control — runs in CI on all three OSes. | GPL-2.0 | [specs](../test/e2e/thirdparty/git) | [docs](e2e/git.md) |
+| [git](https://git-scm.com/) | Version control — runs in CI on all three OSes: init/add/commit and status, plus `diff --exit-code` as a status contract, exact `--porcelain` codes, a fast-forward merge and a real conflict, stash and patch round trips proven byte for byte, `.gitignore` keeping a file out of the index, a local clone reproducing the same commit, and the documented failures (no repository, duplicate tag, nothing staged). | GPL-2.0 | [specs](../test/e2e/thirdparty/git) | [docs](e2e/git.md) |
 | [jq](https://jqlang.org/) | JSON processor: stdin-driven filters, --arg injection, and its documented exit-code contract (1 for -e false, 3 for a bad program, parse failures). | MIT | [specs](../test/e2e/thirdparty/jq) | [docs](e2e/jq.md) |
 | [fzf](https://github.com/junegunn/fzf) | Interactive fuzzy finder driven inside a real pseudo-terminal: expect/send sessions type queries, multi-select, and abort (exit 130); --filter pins the non-TTY contract. | MIT | [specs](../test/e2e/thirdparty/fzf) | [docs](e2e/fzf.md) |
 | [gum](https://github.com/charmbracelet/gum) | Shell-script UI toolkit: non-interactive stdout contracts (`version-check`, `join`, `table`, `log`) plus TTY prompts and pickers (`choose`, `filter`, `confirm`, `input`, `file`, `pager`) driven over a real terminal. | MIT | [specs](../test/e2e/thirdparty/gum) | [docs](e2e/gum.md) |

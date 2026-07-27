@@ -9,6 +9,13 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- The git third-party suite gains a second spec covering what a script leans on:
+  `diff --exit-code` as a status contract, the exact `--porcelain` status codes,
+  a fast-forward merge and a real conflict, stash and patch round trips proven
+  byte for byte, `.gitignore` keeping a file out of the index, a local clone
+  reproducing the same commit, content-addressed identity for two identical
+  commits, and the documented failures (no repository, duplicate tag, nothing
+  staged) with their own exit codes.
 - Third-party suite for zstd: compression round trips proven byte for byte with
   `equals_file` (including an empty file and one full of NUL bytes), the input
   kept unless `--rm` is asked for, an existing archive never silently
