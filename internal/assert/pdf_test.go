@@ -335,7 +335,6 @@ func TestParsePDF_UncompressedMetadataWins(t *testing.T) {
 	}
 }
 
-
 // TestParsePDF_PageContentIsNotMetadata pins that only a declared object stream
 // can supply metadata: a page whose drawn text happens to contain "/Title(...)"
 // must not be mistaken for the document's Info dictionary.
