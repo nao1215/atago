@@ -30,6 +30,7 @@ A browsable, repo-local index of atago's documentation, generated from repositor
 - [helix.md](../doc/e2e/helix.md)
 - [htop.md](../doc/e2e/htop.md)
 - [hugo.md](../doc/e2e/hugo.md)
+- [imagemagick.md](../doc/e2e/imagemagick.md)
 - [iso8583tool.md](../doc/e2e/iso8583tool.md)
 - [jose.md](../doc/e2e/jose.md)
 - [jq.md](../doc/e2e/jq.md)

@@ -123,6 +123,7 @@ docs: ## Regenerate the committed behavior docs under doc/e2e/ from the specs
 	./dist/$(APP) doc --out doc/e2e/ssh-keygen.md  ./test/e2e/thirdparty/ssh-keygen
 	./dist/$(APP) doc --out doc/e2e/ffmpeg.md      ./test/e2e/thirdparty/ffmpeg
 	./dist/$(APP) doc --out doc/e2e/pandoc.md      ./test/e2e/thirdparty/pandoc
+	./dist/$(APP) doc --out doc/e2e/imagemagick.md ./test/e2e/thirdparty/imagemagick
 	./dist/$(APP) doc --out doc/e2e/terraform.md   ./test/e2e/thirdparty/terraform
 	./dist/$(APP) doc --out doc/e2e/age.md         ./test/e2e/thirdparty/age
 	./dist/$(APP) doc --out doc/e2e/sops.md        ./test/e2e/thirdparty/sops
