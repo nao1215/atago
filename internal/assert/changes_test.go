@@ -1,6 +1,8 @@
 package assert
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -145,7 +147,7 @@ func TestCheckChanges(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := checkChanges(tt.assert, changesResult(tt.delta))
+			got := checkChanges(tt.assert, changesResult(tt.delta), Env{})
 			if got.OK != tt.wantOK {
 				t.Errorf("checkChanges OK = %v, want %v (hint: %s)", got.OK, tt.wantOK, got.Hint)
 			}
@@ -161,6 +163,7 @@ func TestCheckChanges_GlobMetaHint(t *testing.T) {
 	got := checkChanges(
 		&spec.ChangesAssert{Created: list("weird[1].txt")},
 		changesResult(fsdelta.Delta{Created: []string{"weird[1].txt"}}),
+		Env{},
 	)
 	if got.OK {
 		t.Fatal("an unescaped [ never matches the literal filename, so it should fail")
@@ -180,6 +183,7 @@ func TestCheckChanges_GlobBraceHint(t *testing.T) {
 	got := checkChanges(
 		&spec.ChangesAssert{Created: list("a{1}.txt")},
 		changesResult(fsdelta.Delta{Created: []string{"a{1}.txt"}}),
+		Env{},
 	)
 	if got.OK {
 		t.Fatal("an unescaped { never matches the literal filename, so it should fail")
@@ -194,11 +198,55 @@ func TestCheckChanges_GlobBraceHint(t *testing.T) {
 // is reported rather than silently passing.
 func TestCheckChanges_NoDelta(t *testing.T) {
 	t.Parallel()
-	got := checkChanges(&spec.ChangesAssert{Created: list("x")}, &runner.Result{})
+	got := checkChanges(&spec.ChangesAssert{Created: list("x")}, &runner.Result{}, Env{})
 	if got.OK {
 		t.Error("checkChanges with nil delta should not pass")
 	}
-	if got = checkChanges(&spec.ChangesAssert{Created: list("x")}, nil); got.OK {
+	if got = checkChanges(&spec.ChangesAssert{Created: list("x")}, nil, Env{}); got.OK {
 		t.Error("checkChanges with nil result should not pass")
+	}
+}
+
+// TestCheckChanges_UntrackedKindHint covers the other way an unmatched entry
+// reads as a lie: the path is right there in the workdir, but as something a
+// delta does not track. fsdelta scans regular files and symlinks, so a directory
+// a generator created is invisible to created/modified/deleted, and "matched no
+// file the step created" reads as "the tool never made it".
+func TestCheckChanges_UntrackedKindHint(t *testing.T) {
+	t.Parallel()
+	wd := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(wd, "out"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	got := checkChanges(
+		&spec.ChangesAssert{Created: list("out")},
+		changesResult(fsdelta.Delta{}),
+		Env{Workdir: wd},
+	)
+	if got.OK {
+		t.Fatal("a directory is not tracked by the delta, so the entry should fail")
+	}
+	for _, want := range []string{
+		`"out" exists as a directory`,
+		"tracks only regular files and symlinks",
+		"assert it with dir:",
+	} {
+		if !strings.Contains(got.Hint, want) {
+			t.Errorf("Hint should say what the path is.\n got: %s\nwant substring: %s", got.Hint, want)
+		}
+	}
+
+	// An entry naming nothing at all keeps the plain message: there is no kind to
+	// report, and inventing one would be worse than saying less.
+	plain := checkChanges(
+		&spec.ChangesAssert{Created: list("never-created.txt")},
+		changesResult(fsdelta.Delta{}),
+		Env{Workdir: wd},
+	)
+	if plain.OK {
+		t.Fatal("an absent path should fail")
+	}
+	if strings.Contains(plain.Hint, "exists as") {
+		t.Errorf("Hint for an absent path should not claim it exists: %s", plain.Hint)
 	}
 }

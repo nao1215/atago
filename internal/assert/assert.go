@@ -189,7 +189,7 @@ func checkTarget(a *spec.Assert, target spec.AssertTarget, res *runner.Result, e
 	case spec.AssertDuration:
 		return checkDuration(a.Duration, res)
 	case spec.AssertChanges:
-		return checkChanges(a.Changes, res)
+		return checkChanges(a.Changes, res, env)
 	default:
 		return &CheckResult{Desc: string(target), Hint: "assertion target not supported yet"}
 	}

@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-74 suites · 436 scenarios
+74 suites · 438 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -29,7 +29,7 @@
   - [manifest surfaces the browser-runner configuration](#scenario-manifest-surfaces-the-browser-runner-configuration)
   - [an upload action without a file fails validation (exit 2)](#scenario-an-upload-action-without-a-file-fails-validation-exit-2)
   - [a download action without a click selector fails validation (exit 2)](#scenario-a-download-action-without-a-click-selector-fails-validation-exit-2)
-- [atago self-hosting / changes (workdir delta assertions)](#atago-self-hosting--changes-workdir-delta-assertions) — 18 scenarios
+- [atago self-hosting / changes (workdir delta assertions)](#atago-self-hosting--changes-workdir-delta-assertions) — 19 scenarios
   - [a generator touches exactly the files it should (POSIX)](#scenario-a-generator-touches-exactly-the-files-it-should-posix)
   - [an unexpected creation breaks the exact contract (POSIX)](#scenario-an-unexpected-creation-breaks-the-exact-contract-posix)
   - [stdout_to counts as created, and modified nothing holds (portable)](#scenario-stdout_to-counts-as-created-and-modified-nothing-holds-portable)
@@ -48,6 +48,7 @@
   - [writing through a symlink modifies the target only](#scenario-writing-through-a-symlink-modifies-the-target-only)
   - [removing a symlink is a deletion](#scenario-removing-a-symlink-is-a-deletion)
   - [a dangling symlink is still a creation](#scenario-a-dangling-symlink-is-still-a-creation)
+  - [a changes entry naming a directory says what the path is](#scenario-a-changes-entry-naming-a-directory-says-what-the-path-is)
 - [atago self-hosting / CLI scenario selection](#atago-self-hosting--cli-scenario-selection) — 9 scenarios
   - [filter selects by a name substring](#scenario-filter-selects-by-a-name-substring)
   - [filter is OR across a comma-separated list](#scenario-filter-is-or-across-a-comma-separated-list)
@@ -398,7 +399,7 @@
   - [--filter runs only matching scenarios](#scenario---filter-runs-only-matching-scenarios)
   - [--filter selects multiple scenarios with OR (comma and repeated)](#scenario---filter-selects-multiple-scenarios-with-or-comma-and-repeated)
   - [--skip-tag drops tagged scenarios](#scenario---skip-tag-drops-tagged-scenarios)
-- [atago self-hosting / background services](#atago-self-hosting--background-services) — 7 scenarios
+- [atago self-hosting / background services](#atago-self-hosting--background-services) — 8 scenarios
   - [file readiness captures a dynamic value into a variable](#scenario-file-readiness-captures-a-dynamic-value-into-a-variable)
   - [log readiness waits for a line on the service output](#scenario-log-readiness-waits-for-a-line-on-the-service-output)
   - [delay readiness waits a fixed duration](#scenario-delay-readiness-waits-a-fixed-duration)
@@ -406,6 +407,7 @@
   - [a readiness failure preserves the service log as an artifact](#scenario-a-readiness-failure-preserves-the-service-log-as-an-artifact)
   - [a step failure after the service is ready preserves the service log](#scenario-a-step-failure-after-the-service-is-ready-preserves-the-service-log)
   - [a green run with a healthy service writes no service log](#scenario-a-green-run-with-a-healthy-service-writes-no-service-log)
+  - [a service that dies before readiness names its exit status](#scenario-a-service-that-dies-before-readiness-names-its-exit-status)
 - [atago self-hosting / harness shell is not shadowed by the program PATH](#atago-self-hosting--harness-shell-is-not-shadowed-by-the-program-path) — 2 scenarios
   - [a PATH-resident fake sh does not hijack shell:true](#scenario-a-path-resident-fake-sh-does-not-hijack-shelltrue)
   - [ATAGO_SHELL overrides the shell used for shell:true](#scenario-atago_shell-overrides-the-shell-used-for-shelltrue)
@@ -1269,6 +1271,29 @@ ln -s no/such/target dangling
 #### Then
 - exit code is `0`
 - the step changed exactly created `dangling`, modified nothing, deleted nothing
+### Scenario: a changes entry naming a directory says what the path is
+#### Given
+- Fixture file `direntry.atago.yaml` is created.
+#### Inputs
+_Fixture `direntry.atago.yaml`:_
+```text
+version: "1"
+suite: {name: direntry}
+scenarios:
+  - name: the generator made a directory
+    steps:
+      - run: {shell: true, command: "mkdir out"}
+      - assert:
+          changes:
+            created: [out]
+```
+#### When
+```shell
+${atago} run direntry.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `"out" exists as a directory`, `tracks only regular files and symlinks`, `assert it with dir:`
 ## atago self-hosting / CLI scenario selection
 Source: `test/e2e/atago/cli_selection.atago.yaml`
 ### Scenario: filter selects by a name substring
@@ -7487,6 +7512,36 @@ ls arts 2>/dev/null | wc -l | tr -d " "
   - exit code is `0`
 - after `ls arts 2>/dev/null | wc -l | tr -d " "`:
   - stdout equals an exact value
+### Scenario: a service that dies before readiness names its exit status
+_skipped on Windows_
+#### Given
+- Fixture file `crasher.atago.yaml` is created.
+#### Inputs
+_Fixture `crasher.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: service exits with a status
+    services:
+      - name: dies
+        shell: true
+        command: 'echo starting; exit 3'
+        ready:
+          log: never-appears
+          timeout: 2s
+    steps:
+      - run:
+          command: echo unreached
+```
+#### When
+```shell
+${atago} run crasher.atago.yaml
+```
+#### Then
+- exit code is `4`
+- stdout contains `service exited before it became ready (exit status 3)`, `starting`
 ## atago self-hosting / harness shell is not shadowed by the program PATH
 Source: `test/e2e/atago/shell_path.atago.yaml`
 ### Scenario: a PATH-resident fake sh does not hijack shell:true

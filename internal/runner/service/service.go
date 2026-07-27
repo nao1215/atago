@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"os/exec"
 	"regexp"
 	"strings"
 	"sync"
@@ -24,8 +25,27 @@ import (
 
 // errExitedEarly is the readiness failure when the service process exits before
 // its probe (delay/file/port/log) succeeds. Shared so every wait path words it
-// identically.
+// identically; exitedEarly wraps it with how the process ended.
 var errExitedEarly = errors.New("service exited before it became ready")
+
+// exitedEarly is the error a readiness wait returns when the process is gone. It
+// names the exit status, which is the first thing an author needs: a service that
+// died with status 127 is a missing binary and one that died with 1 is a config
+// error, and the two are indistinguishable from "it exited" alone. Callers must
+// only use it after p.done has fired, which is what orders the read of waitErr.
+func (p *Proc) exitedEarly() error {
+	var ee *exec.ExitError
+	switch {
+	case p.waitErr == nil:
+		return fmt.Errorf("%w (exit status 0)", errExitedEarly)
+	case errors.As(p.waitErr, &ee):
+		// ExitError renders "exit status 3", or "signal: killed" when a signal
+		// ended it.
+		return fmt.Errorf("%w (%w)", errExitedEarly, ee)
+	default:
+		return fmt.Errorf("%w (%w)", errExitedEarly, p.waitErr)
+	}
+}
 
 // defaultReadyTimeout bounds a readiness probe when the spec omits one.
 const defaultReadyTimeout = 5 * time.Second
@@ -46,6 +66,10 @@ type Proc struct {
 	c    *processCmd
 	out  *syncBuffer
 	done chan struct{}
+	// waitErr is what Wait returned, written before done is closed and read only
+	// after done is received from, so the channel's close orders the two. It lets
+	// a readiness failure say HOW the process ended instead of only that it did.
+	waitErr error
 }
 
 // Name returns the service's declared name.
@@ -93,7 +117,7 @@ func Start(ctx context.Context, svc *spec.Service, workdir string) (*Proc, strin
 
 	p := &Proc{name: svc.Name, c: pc, out: out, done: make(chan struct{})}
 	go func() {
-		_ = pc.cmd.Wait()
+		p.waitErr = pc.cmd.Wait()
 		close(p.done)
 	}()
 
@@ -204,7 +228,7 @@ func (p *Proc) waitReady(ctx context.Context, r *spec.Ready, workdir string) (st
 			// how the file/port/log probes detect an early exit via p.done. Without
 			// this, a command that crashes (e.g. `exit 3`) during the delay was
 			// reported READY and the scenario ran against a dead peer.
-			return "", errExitedEarly
+			return "", p.exitedEarly()
 		case <-time.After(wait):
 			if cappedByTimeout {
 				return "", fmt.Errorf("timed out after %s waiting for readiness (ready.delay %s exceeds ready.timeout)", timeout, r.Delay)
@@ -213,7 +237,7 @@ func (p *Proc) waitReady(ctx context.Context, r *spec.Ready, workdir string) (st
 			// same instant; check once more so a crash at the boundary is not missed.
 			select {
 			case <-p.done:
-				return "", errExitedEarly
+				return "", p.exitedEarly()
 			default:
 				return "", nil
 			}
@@ -314,7 +338,7 @@ func (p *Proc) poll(ctx context.Context, timeout time.Duration, check func() boo
 			if check() {
 				return nil
 			}
-			return errExitedEarly
+			return p.exitedEarly()
 		case <-deadlineC:
 			return fmt.Errorf("timed out after %s waiting for readiness", timeout)
 		case <-ctx.Done():

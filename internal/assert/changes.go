@@ -2,11 +2,14 @@ package assert
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
 	"github.com/bmatcuk/doublestar/v4"
 	"github.com/nao1215/atago/internal/fsdelta"
+	"github.com/nao1215/atago/internal/fskind"
 	"github.com/nao1215/atago/internal/runner"
 	"github.com/nao1215/atago/internal/spec"
 )
@@ -18,7 +21,7 @@ import (
 // observed path — so `modified: []` asserts "modified nothing". An omitted
 // (nil) field is unconstrained. Paths are compared with forward slashes, so the
 // same spec passes on Windows.
-func checkChanges(c *spec.ChangesAssert, res *runner.Result) *CheckResult {
+func checkChanges(c *spec.ChangesAssert, res *runner.Result, env Env) *CheckResult {
 	desc := "assert changes"
 	if res == nil || res.Changes == nil {
 		return &CheckResult{
@@ -29,9 +32,9 @@ func checkChanges(c *spec.ChangesAssert, res *runner.Result) *CheckResult {
 	d := res.Changes
 
 	var problems []string
-	checkCategory("created", c.Created, d.Created, &problems)
-	checkCategory("modified", c.Modified, d.Modified, &problems)
-	checkCategory("deleted", c.Deleted, d.Deleted, &problems)
+	checkCategory("created", c.Created, d.Created, &problems, env.Workdir)
+	checkCategory("modified", c.Modified, d.Modified, &problems, env.Workdir)
+	checkCategory("deleted", c.Deleted, d.Deleted, &problems, env.Workdir)
 
 	if len(problems) == 0 {
 		return pass(desc)
@@ -48,7 +51,7 @@ func checkChanges(c *spec.ChangesAssert, res *runner.Result) *CheckResult {
 // checkCategory enforces the exhaustive-set semantics for one category. A nil
 // entries pointer leaves the category unconstrained; a non-nil (possibly empty)
 // list requires an exact, bidirectional cover.
-func checkCategory(name string, entries *spec.StringList, observed []string, problems *[]string) {
+func checkCategory(name string, entries *spec.StringList, observed []string, problems *[]string, workdir string) {
 	if entries == nil {
 		return
 	}
@@ -69,10 +72,38 @@ func checkCategory(name string, entries *spec.StringList, observed []string, pro
 			msg := fmt.Sprintf("%s entry %q matched no file the step %s", name, pat, name)
 			if note := globMetaNote(pat); note != "" {
 				msg += "; " + note
+			} else if note := untrackedKindNote(workdir, pat); note != "" {
+				msg += "; " + note
 			}
 			*problems = append(*problems, msg)
 		}
 	}
+}
+
+// untrackedKindNote explains the other baffling case: the named path IS in the
+// workdir, but as something a delta does not track. fsdelta scans regular files
+// and symlinks, so a directory a generator created — or a named pipe or socket a
+// program left behind — is invisible to created/modified/deleted, and the failure
+// otherwise reads as "the tool never made it" while the author can see it right
+// there. Returns "" when the path is absent, is tracked, or the entry is a glob
+// (globMetaNote covers that case).
+func untrackedKindNote(workdir, pat string) string {
+	if workdir == "" {
+		return ""
+	}
+	info, err := os.Lstat(filepath.Join(workdir, filepath.FromSlash(pat)))
+	if err != nil {
+		return ""
+	}
+	mode := info.Mode()
+	if mode.IsRegular() || mode&os.ModeSymlink != 0 {
+		return ""
+	}
+	note := fmt.Sprintf("note: %q exists as a %s, and a workdir delta tracks only regular files and symlinks", pat, fskind.Name(mode))
+	if mode.IsDir() {
+		note += "; name the files inside it, or assert it with dir:"
+	}
+	return note
 }
 
 // globMetaNote explains a common footgun: a changes entry is a doublestar glob,
