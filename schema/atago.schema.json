@@ -2234,7 +2234,7 @@
         },
         "exists": {
           "type": "boolean",
-          "description": "Asserts the file exists (`true`) or is absent (`false`)."
+          "description": "Asserts the file exists (`true`) or is absent (`false`). A directory at that path is not a file: it fails either way and points at the `dir:` assertion."
         },
         "contains": {
           "$ref": "#/$defs/stringOrList",
@@ -2246,7 +2246,7 @@
         },
         "executable": {
           "type": "boolean",
-          "description": "Asserts whether the file has an executable bit set (POSIX)."
+          "description": "Asserts whether the file has an executable bit set (POSIX). A directory fails: every directory carries the execute bit, which means \"can be entered\", not \"is a program\"."
         },
         "equals": {
           "type": "string",

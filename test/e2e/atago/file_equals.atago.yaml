@@ -89,3 +89,83 @@ scenarios:
           exit_code: 1
           stdout:
             contains: "not byte-identical"
+
+  # A directory is not a file. Both of these used to pass: `exists: true`
+  # because stat succeeds on a directory, and `executable: true` because every
+  # directory carries the execute bit — so a tool that produced a directory
+  # where a file was expected satisfied the assertion meant to catch that.
+  - name: a file assertion is not satisfied by a directory
+    steps:
+      - fixture:
+          file: mistaken.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: mistaken}
+            scenarios:
+              - name: out is a directory, not the expected file
+                steps:
+                  - run: {shell: true, command: "mkdir out"}
+                  - assert:
+                      file:
+                        path: out
+                        exists: true
+      - run:
+          command: ${atago} run mistaken.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - "exists but is a directory"
+              - "use a dir: assertion"
+
+  - name: an executable assertion is not satisfied by a directory
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: execdir.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: execdir}
+            scenarios:
+              - name: a directory is not an executable
+                steps:
+                  - run: {shell: true, command: "mkdir bin"}
+                  - assert:
+                      file:
+                        path: bin
+                        executable: true
+      - run:
+          command: ${atago} run execdir.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: "is a directory, not an executable file"
+
+  - name: a real file still satisfies both matchers
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: ok.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: ok}
+            scenarios:
+              - name: a real executable file
+                steps:
+                  - fixture:
+                      file: tool.sh
+                      content: "#!/bin/sh\n"
+                      mode: "0755"
+                  - run: {command: echo hi}
+                  - assert:
+                      file: {path: tool.sh, exists: true}
+                  - assert:
+                      file: {path: tool.sh, executable: true}
+      - run:
+          command: ${atago} run ok.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: PASSED

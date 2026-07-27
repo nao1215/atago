@@ -126,7 +126,7 @@ scenarios:
             contains: "\"artifacts\""
       # The actual, baseline, and a deterministic diff heatmap are all preserved.
       - assert:
-          file:
+          dir:
             path: arts
             exists: true
       - run:

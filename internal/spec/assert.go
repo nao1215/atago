@@ -355,15 +355,20 @@ func (l *StringList) UnmarshalYAML(unmarshal func(any) error) error {
 // the point is to prove two files are byte-identical (matching the `dir`
 // snapshot hashing semantics), which `cmp` cannot express portably.
 type FileAssert struct {
-	Path        string     `yaml:"path"`
+	Path string `yaml:"path"`
+	// Exists asserts a FILE is (or is not) at the path. A directory there fails
+	// either way and points at DirAssert: counting one as a file let a tool that
+	// produced a directory satisfy the assertion meant to catch exactly that.
 	Exists      *bool      `yaml:"exists,omitempty"`
 	Contains    StringList `yaml:"contains,omitempty"`
 	NotContains StringList `yaml:"not_contains,omitempty"`
-	Executable  *bool      `yaml:"executable,omitempty"`
-	Equals      *string    `yaml:"equals,omitempty"`
-	EqualsFile  *string    `yaml:"equals_file,omitempty"`
-	JSON        JSONChecks `yaml:"json,omitempty"`
-	Snapshot    string     `yaml:"snapshot,omitempty"`
+	// Executable asserts the POSIX execute bit. A directory fails: every
+	// directory has that bit, and it means "can be entered", not "is a program".
+	Executable *bool      `yaml:"executable,omitempty"`
+	Equals     *string    `yaml:"equals,omitempty"`
+	EqualsFile *string    `yaml:"equals_file,omitempty"`
+	JSON       JSONChecks `yaml:"json,omitempty"`
+	Snapshot   string     `yaml:"snapshot,omitempty"`
 
 	// Text is a store-only selector (#158): when true, `store` captures the
 	// whole file content verbatim instead of extracting a value via a json path.
