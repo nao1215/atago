@@ -1,0 +1,207 @@
+version: "1"
+
+suite:
+  name: fx (side effects on disk)
+  description: |
+    A JSON viewer sounds like a read-only program, and mostly it is — which is
+    exactly why the places where fx writes deserve an exhaustive delta rather
+    than a per-file check.
+
+    Two of them exist. `save` rewrites the file fx was given, in place, and
+    refuses to do so when there is no file or when the path is a symlink. And
+    before any reducer runs, fx loads `.fxrc.js` from the working directory and
+    from the user's home, so a stray file in either place changes what a
+    reducer means. `changes:` states the whole picture in one assertion —
+    what was written and, just as importantly, that nothing else was — and
+    `sandbox_home` puts the home directory inside the workdir so a write there
+    would show up in the same delta.
+
+# Every scenario probes for fx first so the suite skips cleanly where it is
+# absent.
+scenarios:
+  - name: save rewrites the file it was given and touches nothing else
+    only:
+      command: fx --version
+    steps:
+      - fixture:
+          file: config.json
+          content: '{"b":2,"a":1}'
+      - fixture:
+          file: untouched.json
+          content: '{"keep":true}'
+      - run:
+          sandbox_home: true
+          command: fx config.json sortKeys save
+      - assert:
+          exit_code: 0
+          changes:
+            created: []
+            modified:
+              - config.json
+            deleted: []
+      - assert:
+          file:
+            path: config.json
+            equals: |
+              {
+                "a": 1,
+                "b": 2
+              }
+
+  - name: running the same normalization twice changes nothing the second time
+    only:
+      command: fx --version
+    steps:
+      # save writes unconditionally, so idempotence is a property of the
+      # rendering, not of a guard inside fx: the second run produces the same
+      # bytes and the content-based delta comes back empty.
+      - fixture:
+          file: config.json
+          content: '{"b":2,"a":1}'
+      - run:
+          command: fx config.json sortKeys save
+      - assert:
+          exit_code: 0
+          changes:
+            modified:
+              - config.json
+      - run:
+          command: fx config.json sortKeys save
+      - assert:
+          exit_code: 0
+          changes:
+            created: []
+            modified: []
+            deleted: []
+
+  - name: a reducer that only reads leaves the workdir alone
+    only:
+      command: fx --version
+    steps:
+      # The negative space around save: selecting a value is not a write, so
+      # the delta is empty in all three directions.
+      - fixture:
+          file: config.json
+          content: '{"a":1}'
+      - run:
+          sandbox_home: true
+          command: fx config.json .a
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "1"
+          changes:
+            created: []
+            modified: []
+            deleted: []
+
+  - name: save without a file argument fails and writes nothing
+    only:
+      command: fx --version
+    steps:
+      # Reading from stdin there is no file to save to. fx says which argument
+      # is missing instead of picking a name, and the empty delta proves it did
+      # not invent an output file on the way out.
+      - run:
+          sandbox_home: true
+          command: fx save
+          stdin: '{"a":1}'
+      - assert:
+          exit_code: 1
+          stderr:
+            contains: "specify a file as the first argument"
+          changes:
+            created: []
+            modified: []
+            deleted: []
+
+  - name: save refuses to write through a symlink and leaves the target intact
+    only:
+      command: fx --version
+    skip:
+      os: windows
+    steps:
+      # Following the link would rewrite a file the user never named. fx
+      # refuses, and the assertion checks the refusal where it matters: the
+      # target file still holds its original bytes.
+      - fixture:
+          file: real.json
+          content: '{"b":2,"a":1}'
+      - fixture:
+          file: link.json
+          symlink: real.json
+      - run:
+          sandbox_home: true
+          command: fx link.json sortKeys save
+      - assert:
+          exit_code: 1
+          stderr:
+            contains: "cannot save to a symbolic link"
+          changes:
+            created: []
+            modified: []
+            deleted: []
+      - assert:
+          file:
+            path: real.json
+            equals: '{"b":2,"a":1}'
+
+  - name: a .fxrc.js in the working directory adds a function reducers can call
+    only:
+      command: fx --version
+    steps:
+      # fx's extension point: any function defined in .fxrc.js becomes callable
+      # as a reducer. That also means a file dropped into a repository changes
+      # what `fx data.json double` does, which is worth knowing about.
+      - fixture:
+          file: .fxrc.js
+          content: |
+            function double(x) {
+              return x * 2
+            }
+      - fixture:
+          file: data.json
+          content: '{"n":21}'
+      - run:
+          sandbox_home: true
+          command: fx data.json .n double
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "42"
+          changes:
+            created: []
+            modified: []
+            deleted: []
+
+  - name: a .fxrc.js in the home directory is loaded too, and fx writes nothing there
+    only:
+      command: fx --version
+    skip:
+      os: windows
+    steps:
+      # sandbox_home moves the home directory to .atago-home inside the
+      # workdir, which does two things at once: the fixture below IS the user's
+      # ~/.fxrc.js for this run, and any file fx wrote under the home directory
+      # would land in the workdir delta. The delta is empty, so fx read the
+      # config and left no cache or state behind.
+      - fixture:
+          file: .atago-home/.fxrc.js
+          content: |
+            function shout(x) {
+              return String(x).toUpperCase()
+            }
+      - fixture:
+          file: data.json
+          content: '{"word":"atago"}'
+      - run:
+          sandbox_home: true
+          command: fx data.json .word shout
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: ATAGO
+          changes:
+            created: []
+            modified: []
+            deleted: []

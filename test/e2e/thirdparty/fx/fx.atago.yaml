@@ -1,0 +1,311 @@
+version: "1"
+
+suite:
+  name: fx (third-party CLI, JSON reducer contract)
+  description: |
+    [fx](https://fx.wtf/) is two programs wearing one name. Hand it a reducer
+    and it behaves like a filter — JSON in, a value out, an exit code for the
+    shell. Hand it nothing and it opens a full-screen viewer instead. This file
+    pins the filter half; the viewer lives in tui.atago.yaml and the parser
+    flags in formats.atago.yaml.
+
+    The filter contract is worth pinning precisely because it is not the one a
+    jq user expects. A reducer is JavaScript, not a query language, so an
+    absent key is `undefined` rather than an error: fx reports it on stderr and
+    still exits 0, while dereferencing THROUGH that undefined is a hard exit 1.
+    Strings print unquoted, `exit()` lets the reducer choose the process's exit
+    code, and the identity path hands back the original number literals instead
+    of what a float64 round trip would leave.
+
+# Every scenario probes for fx first so the suite skips cleanly where it is
+# absent.
+scenarios:
+  - name: version prints a semantic version
+    only:
+      command: fx --version
+    steps:
+      - run:
+          command: fx --version
+      - assert:
+          exit_code: 0
+          stdout:
+            matches: "^[0-9]+\\.[0-9]+\\.[0-9]+"
+          stderr:
+            empty: true
+
+  - name: the identity reducer pretty-prints the document and keeps key order
+    only:
+      command: fx --version
+    steps:
+      # Key order is a contract here: fx re-prints the parsed document rather
+      # than re-serializing a map, so "b" stays before "a".
+      - run:
+          command: fx .
+          stdin: '{"b":2,"a":1}'
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |-
+              {
+                "b": 2,
+                "a": 1
+              }
+          stderr:
+            empty: true
+
+  - name: a dotted path selects a nested value and prints strings unquoted
+    only:
+      command: fx --version
+    steps:
+      - fixture:
+          file: user.json
+          content: '{"profile":{"name":"alice","admin":true}}'
+      - run:
+          command: fx user.json .profile.name
+      - assert:
+          exit_code: 0
+          # Not "alice" with quotes: a string result is written raw, so the
+          # output drops straight into a shell variable.
+          stdout:
+            equals: alice
+
+  - name: reducers compose left to right
+    only:
+      command: fx --version
+    steps:
+      # Each extra argument is another reducer applied to the previous result,
+      # so `.items len` is "select the array, then take its length".
+      - fixture:
+          file: items.json
+          content: '{"items":["a","b","c"]}'
+      - run:
+          command: fx items.json .items len
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "3"
+
+  - name: an arrow function transforms the document
+    only:
+      command: fx --version
+    steps:
+      - run:
+          command: fx '.nums.map(n => n * 2)'
+          stdin: '{"nums":[1,2,3]}'
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |-
+              [
+                2,
+                4,
+                6
+              ]
+
+  - name: a missing key reports undefined on stderr and still exits 0
+    only:
+      command: fx --version
+    steps:
+      # The contract a jq user gets wrong: `.nope` is not an error. fx writes
+      # the word undefined to stderr, leaves stdout empty, and succeeds — so a
+      # pipeline that only checks $? sees nothing wrong. Pinning it here means
+      # a change in that behavior cannot pass unnoticed.
+      - run:
+          command: fx .nope
+          stdin: '{"a":1}'
+      - assert:
+          exit_code: 0
+          stdout:
+            empty: true
+          stderr:
+            equals: undefined
+
+  - name: dereferencing through a missing key is a hard error
+    only:
+      command: fx --version
+    steps:
+      # One level deeper than the scenario above and the same input turns into
+      # exit 1: `.a.b` is undefined, and `.c` on undefined throws.
+      - run:
+          command: fx .a.b.c
+          stdin: '{"a":1}'
+      - assert:
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            contains: "TypeError"
+
+  - name: exit() hands the reducer's own code to the shell
+    only:
+      command: fx --version
+    steps:
+      # fx reducers can end the process deliberately, which is how a script
+      # turns a JSON predicate into an exit status.
+      - run:
+          command: fx 'exit(3)'
+          stdin: "{}"
+      - assert:
+          exit_code: 3
+      - run:
+          command: fx 'exit(0)'
+          stdin: "{}"
+      - assert:
+          exit_code: 0
+
+  - name: invalid JSON fails loudly and keeps stdout clean
+    only:
+      command: fx --version
+    steps:
+      - run:
+          command: fx .
+          stdin: '{"bad"'
+      - assert:
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            contains: "Expected colon after object key"
+
+  - name: a missing input file fails before anything is printed
+    only:
+      command: fx --version
+    steps:
+      - run:
+          command: fx no-such.json .
+      - assert:
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            contains: "no-such.json"
+
+  - name: empty input succeeds with no output at all
+    only:
+      command: fx --version
+    steps:
+      # The zero-document boundary: nothing to reduce is not an error. The
+      # input has to be a real (empty) file rather than an absent stdin,
+      # because fx decides between filter and viewer mode by looking at what
+      # stdin is — with no input attached it would read `.` as a file name.
+      - fixture:
+          file: empty.json
+          content: ""
+      - run:
+          command: fx .
+          stdin:
+            file: empty.json
+      - assert:
+          exit_code: 0
+          stdout:
+            empty: true
+          stderr:
+            empty: true
+
+  - name: each document in a stream produces its own result
+    only:
+      command: fx --version
+    steps:
+      - run:
+          command: fx .n
+          stdin: |
+            {"n":1}
+            {"n":2}
+      - assert:
+          exit_code: 0
+          stdout:
+            line: 1
+            equals: "1"
+      - assert:
+          stdout:
+            line: 2
+            equals: "2"
+
+  - name: filter drops documents from a stream instead of emitting them
+    only:
+      command: fx --version
+    steps:
+      # The stream counterpart of the scenario above: three documents in, one
+      # out. `filter` returns a skip sentinel for the others, so they are not
+      # printed as null or undefined.
+      - run:
+          command: fx 'filter(x => x.n > 2)'
+          stdin: |
+            {"n":1}
+            {"n":2}
+            {"n":3}
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |-
+              {
+                "n": 3
+              }
+
+  - name: the identity path keeps number literals JavaScript would rewrite
+    only:
+      command: fx --version
+    steps:
+      # A differential pair on one input. The identity path prints the literals
+      # the parser saw, so 1.0 survives; routing the same document through a
+      # JavaScript function normalizes it to 1. The 20-digit integer survives
+      # both, which is what makes 1.0 the interesting case rather than a
+      # general "fx loses precision" story.
+      - fixture:
+          file: numbers.json
+          content: '{"exact":1.0,"big":10000000000000000001}'
+      - run:
+          command: fx numbers.json .
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - '"exact": 1.0'
+              - '"big": 10000000000000000001'
+      - run:
+          command: fx numbers.json 'x => x'
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - '"exact": 1'
+              - '"big": 10000000000000000001'
+      - assert:
+          stdout:
+            not_contains: '"exact": 1.0'
+
+  - name: piped output carries no terminal escapes
+    only:
+      command: fx --version
+    steps:
+      # fx colors its output for a terminal. Redirected into a file — which is
+      # what a pipeline gets — the bytes must stay plain, or every downstream
+      # parser breaks.
+      - run:
+          command: fx .
+          stdin: '{"a":"text","b":42,"c":null}'
+      - assert:
+          exit_code: 0
+          stdout:
+            not_matches: "\\x1b\\["
+
+  - name: a directory given as input fails without writing to stdout
+    only:
+      command: fx --version
+    skip:
+      os: windows
+    steps:
+      # Reading a directory is a failure fx does not handle gracefully — today
+      # it aborts with a Go runtime panic rather than a diagnostic. The
+      # assertion pins only the part of the contract that a fix would keep: the
+      # command fails, and stdout stays clean for the pipeline behind it.
+      - fixture:
+          file: subdir/keep.txt
+          content: "placeholder\n"
+      - run:
+          command: fx subdir .
+      - assert:
+          exit_code:
+            not: 0
+          stdout:
+            empty: true

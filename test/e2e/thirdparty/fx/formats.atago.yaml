@@ -1,0 +1,389 @@
+version: "1"
+
+suite:
+  name: fx (input formats, strictness, round trips)
+  description: |
+    fx accepts more than JSON, and how it decides what it is holding is a
+    contract of its own: `--yaml` and `--toml` switch parsers explicitly, but a
+    file argument ending in .yaml, .yml or .toml switches them implicitly, and
+    the two flags are mutually exclusive with each other and with `--raw`.
+
+    Strictness is the other half. By default fx reads JSON the way a human
+    writes it — comments and trailing commas included — and `--strict` turns
+    exactly those tolerances back into errors. The round-trip scenarios use fx
+    twice in a pipeline so the assertion is about a relationship (encode then
+    decode returns the original bytes) rather than about one recorded output.
+
+# Every scenario probes for fx first so the suite skips cleanly where it is
+# absent.
+scenarios:
+  - name: --yaml parses YAML into the JSON model
+    only:
+      command: fx --version
+    steps:
+      - run:
+          command: fx --yaml .service.port
+          stdin: |
+            service:
+              name: api
+              port: 8080
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "8080"
+
+  - name: --toml parses TOML into the JSON model
+    only:
+      command: fx --version
+    steps:
+      - run:
+          command: fx --toml .package.name
+          stdin: |
+            [package]
+            name = "atago"
+            version = "1.2.3"
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: atago
+
+  - name: a .yaml file argument switches parsers with no flag at all
+    only:
+      command: fx --version
+    steps:
+      # The implicit branch: fx picks the parser from the file name, so the
+      # same command line works for JSON and YAML inputs.
+      - fixture:
+          file: config.yaml
+          content: |
+            service:
+              name: api
+              replicas: 3
+      - run:
+          command: fx config.yaml .service.replicas
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "3"
+
+  - name: a .toml file argument does the same
+    only:
+      command: fx --version
+    steps:
+      - fixture:
+          file: config.toml
+          content: |
+            [package]
+            name = "atago"
+      - run:
+          command: fx config.toml .package.name
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: atago
+
+  - name: extension detection ignores case
+    only:
+      command: fx --version
+    steps:
+      # The boundary of the rule above: .YAML is matched case-insensitively,
+      # which matters on any checkout that came from a case-preserving archive.
+      - fixture:
+          file: CONFIG.YAML
+          content: |
+            service:
+              name: api
+      - run:
+          command: fx CONFIG.YAML .service.name
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: api
+
+  - name: an unknown extension stays on the JSON parser
+    only:
+      command: fx --version
+    steps:
+      # The negative side of extension detection: only the three suffixes flip
+      # the parser, so a JSON document in a .txt file still reads as JSON.
+      - fixture:
+          file: payload.txt
+          content: '{"a":1}'
+      - run:
+          command: fx payload.txt .a
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "1"
+
+  - name: --raw treats each input line as a string
+    only:
+      command: fx --version
+    steps:
+      # Without --raw these two lines are not valid JSON at all; with it they
+      # are two string documents, and the reducer runs once per line.
+      - run:
+          command: fx -r len
+          stdin: |
+            hello
+            hi
+      - assert:
+          exit_code: 0
+          stdout:
+            line: 1
+            equals: "5"
+      - assert:
+          stdout:
+            line: 2
+            equals: "2"
+
+  - name: -s collects a stream of documents into one array
+    only:
+      command: fx --version
+    steps:
+      # Slurp turns N documents into 1: the reducer sees an array, so `len`
+      # counts documents rather than running once per document.
+      - run:
+          command: fx -s len
+          stdin: |
+            {"n":1}
+            {"n":2}
+            {"n":3}
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "3"
+
+  - name: -rs combines raw lines into an array of strings
+    only:
+      command: fx --version
+    steps:
+      # The composed form: raw parsing plus slurp, spelled as one flag.
+      - run:
+          command: fx -rs .
+          stdin: |
+            alpha
+            beta
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |-
+              [
+                "alpha",
+                "beta"
+              ]
+
+  - name: the default parser accepts comments and a trailing comma
+    only:
+      command: fx --version
+    steps:
+      # fx reads the JSON people actually write, which is why the --strict
+      # scenarios below exist as the opposite contract.
+      - fixture:
+          file: loose.json
+          content: |
+            {
+              // the service this config belongs to
+              "name": "api",
+              "port": 8080,
+            }
+      - run:
+          command: fx loose.json .port
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "8080"
+
+  - name: --strict rejects a comment
+    only:
+      command: fx --version
+    steps:
+      - fixture:
+          file: loose.json
+          content: |
+            {
+              // the service this config belongs to
+              "name": "api"
+            }
+      - run:
+          command: fx --strict loose.json .name
+      - assert:
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            contains: "Comments are not allowed in strict mode"
+
+  - name: --strict rejects a trailing comma
+    only:
+      command: fx --version
+    steps:
+      - fixture:
+          file: trailing.json
+          content: |
+            {
+              "name": "api",
+            }
+      - run:
+          command: fx --strict trailing.json .name
+      - assert:
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            contains: "Trailing comma is not allowed in strict mode"
+
+  - name: --raw and --yaml together are refused
+    only:
+      command: fx --version
+    steps:
+      # Mutually exclusive parsers: fx says so and exits 1 instead of silently
+      # letting one flag win.
+      - run:
+          command: fx --yaml --raw .
+          stdin: "a: 1\n"
+      - assert:
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            contains: "can't use --yaml/--toml and --raw flags together"
+
+  - name: --yaml and --toml together are refused
+    only:
+      command: fx --version
+    steps:
+      - run:
+          command: fx --yaml --toml .
+          stdin: "a: 1\n"
+      - assert:
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            contains: "can't use both --yaml and --toml flags together"
+
+  - name: base64 encoding round-trips through a second fx
+    only:
+      command: fx --version
+    skip:
+      os: windows
+    steps:
+      # A metamorphic pair rather than a recorded output: encode with one fx,
+      # decode with another reading the encoded line as raw text, and the value
+      # that comes back must be the one that went in.
+      - fixture:
+          file: secret.json
+          content: '{"token":"s3cr3t value"}'
+      - run:
+          shell: true
+          command: fx secret.json .token toBase64 | fx -r fromBase64
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "s3cr3t value"
+
+  - name: a document survives a JSON to YAML to JSON round trip byte for byte
+    only:
+      command: fx --version
+    steps:
+      # YAML.stringify writes the document out as YAML; feeding that back gets
+      # the extension-detection path (round_trip.yaml) and must reproduce the
+      # original rendering exactly, which `equals_file` states without naming
+      # any of the bytes.
+      - fixture:
+          file: source.json
+          content: '{"name":"atago","nums":[1,2,3],"nested":{"leaf":true}}'
+      - run:
+          command: fx source.json .
+          stdout_to: before.txt
+      - assert:
+          exit_code: 0
+      - run:
+          command: fx source.json YAML.stringify
+          stdout_to: round_trip.yaml
+      - assert:
+          exit_code: 0
+      - run:
+          command: fx round_trip.yaml .
+          stdout_to: after.txt
+      - assert:
+          exit_code: 0
+          file:
+            path: after.txt
+            equals_file: before.txt
+
+  - name: --no-inline expands the containers the default output packs onto one line
+    only:
+      command: fx --version
+    steps:
+      # Two renderings of one document. By default a short array of scalars is
+      # inlined; --no-inline is the machine-friendly opposite, one value per
+      # line, and the pair pins that the flag changes formatting only.
+      - fixture:
+          file: doc.json
+          content: '{"nums":[1,2],"nested":{"leaf":1}}'
+      - run:
+          command: fx doc.json .
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: '"nums": [ 1, 2 ]'
+      - run:
+          command: fx --no-inline doc.json .
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |-
+              {
+                "nums": [
+                  1,
+                  2
+                ],
+                "nested": {
+                  "leaf": 1
+                }
+              }
+
+  - name: malformed YAML fails with a diagnostic that points at the line
+    only:
+      command: fx --version
+    steps:
+      # The diagnostic is good — it quotes the offending line and marks the
+      # column — but fx prints it on stdout rather than stderr, so a pipeline
+      # reading `fx --yaml` receives the error text as if it were data. Every
+      # other failure in this suite keeps stdout clean; this one is the
+      # exception, and the assertion records it as it is rather than as it
+      # ought to be.
+      - fixture:
+          file: broken.yaml
+          content: |
+            service:
+             name: api
+              port: 8080
+      - run:
+          command: fx broken.yaml .
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: "mapping value is not allowed"
+          stderr:
+            empty: true
+
+  - name: malformed TOML fails without writing to stdout
+    only:
+      command: fx --version
+    steps:
+      # Unlike the YAML branch above, fx has no diagnostic for a broken TOML
+      # document today — it aborts with a Go runtime panic. The assertion pins
+      # only what a fix would keep true: a non-zero exit and a clean stdout.
+      - fixture:
+          file: broken.toml
+          content: "a = \n"
+      - run:
+          command: fx broken.toml .
+      - assert:
+          exit_code:
+            not: 0
+          stdout:
+            empty: true
