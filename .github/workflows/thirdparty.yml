@@ -319,4 +319,11 @@ jobs:
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
       - name: Run the ${{ matrix.program.name }} suite
-        run: ./dist/atago run "${{ matrix.program.dir }}"
+        # --retry-failed 1 re-runs a failed scenario once, in a fresh workdir and
+        # a fresh sandboxed HOME, and reports a recovery as flaky rather than
+        # green-washing it. This matrix drives real terminal UIs against a shared
+        # runner, where a scheduled run alternated red and green for weeks on
+        # nothing but load: the TUI suites timed out waiting for a screen that
+        # arrives promptly on a quiet machine. A regression still fails both
+        # attempts; only a flake is absorbed, and the report names it.
+        run: ./dist/atago run --retry-failed 1 "${{ matrix.program.dir }}"

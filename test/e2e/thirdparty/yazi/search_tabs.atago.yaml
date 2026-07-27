@@ -27,7 +27,7 @@ scenarios:
           command: yazi --chooser-file ${workdir}/chosen.txt .
           rows: 24
           cols: 100
-          timeout: 20s
+          timeout: 45s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -54,7 +54,7 @@ scenarios:
           command: yazi .
           rows: 24
           cols: 100
-          timeout: 20s
+          timeout: 45s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -77,7 +77,7 @@ scenarios:
           command: yazi --cwd-file ${workdir}/cwd.txt .
           rows: 24
           cols: 100
-          timeout: 20s
+          timeout: 45s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
@@ -102,7 +102,7 @@ scenarios:
           shell: true
           rows: 24
           cols: 100
-          timeout: 20s
+          timeout: 45s
           clear_env: true
           pass_env: [PATH]
           sandbox_home: true
