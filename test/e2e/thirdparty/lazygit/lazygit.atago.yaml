@@ -105,6 +105,9 @@ scenarios:
           pass_env: [PATH]
           session:
             - expect: "not a valid git repository"
+            # Quit so the step ends on its assertions: lazygit outlives the session
+            # otherwise, and the pty step fails on its timeout instead.
+            - send: "q"
       - run:
           command: git -C repo status --porcelain
       - assert:
@@ -391,6 +394,9 @@ scenarios:
             - send: " "
             - expect: "Staged changes"
             - send: "C"
+            # Quit so the step ends on its assertions: lazygit outlives the session
+            # otherwise, and the pty step fails on its timeout instead.
+            - send: "q"
       - run:
           command: git -C repo log --oneline -1
       - assert:
@@ -446,6 +452,9 @@ scenarios:
           session:
             - expect: "Staged changes"
             - send: "C"
+            # Quit so the step ends on its assertions: lazygit outlives the session
+            # otherwise, and the pty step fails on its timeout instead.
+            - send: "q"
       - run:
           command: git -C repo status --porcelain
       - assert:
@@ -497,6 +506,12 @@ scenarios:
             - send: "d"
             - expect: "Discard changes"
             - send: {key: esc}
+            # The dialog owns the keyboard until it is gone: a `q` sent right after
+            # esc dismisses the dialog instead of quitting, and lazygit outlives the
+            # session. Wait for the screen to prove the dialog closed.
+            - expect_screen:
+                not_contains: ["Discard changes"]
+                stable_for: 100ms
             - send: "q"
       - run:
           command: git -C repo diff -- a.txt
@@ -543,6 +558,9 @@ scenarios:
             - send: "d"
             - expect: "Discard changes"
             - send: {key: enter}
+            # Quit so the step ends on its assertions: lazygit outlives the session
+            # otherwise, and the pty step fails on its timeout instead.
+            - send: "q"
       - run:
           command: git -C repo diff -- a.txt
       - assert:
@@ -590,6 +608,9 @@ scenarios:
             - send: "d"
             - expect: "Discard changes"
             - send: {key: enter}
+            # Quit so the step ends on its assertions: lazygit outlives the session
+            # otherwise, and the pty step fails on its timeout instead.
+            - send: "q"
       - run:
           command: git -C repo diff -- a.txt
       - assert:
@@ -639,6 +660,9 @@ scenarios:
             - expect: "New branch name"
             - send: "feature-one"
             - send: {key: enter}
+            # Quit so the step ends on its assertions: lazygit outlives the session
+            # otherwise, and the pty step fails on its timeout instead.
+            - send: "q"
       - run:
           command: git -C repo branch --show-current
       - assert:
@@ -682,6 +706,9 @@ scenarios:
             - expect: "New branch name"
             - send: "feature/two"
             - send: {key: enter}
+            # Quit so the step ends on its assertions: lazygit outlives the session
+            # otherwise, and the pty step fails on its timeout instead.
+            - send: "q"
       - run:
           command: git -C repo branch --show-current
       - assert:
@@ -724,6 +751,12 @@ scenarios:
             - send: "n"
             - expect: "New branch name"
             - send: {key: esc}
+            # The dialog owns the keyboard until it is gone: a `q` sent right after
+            # esc dismisses the dialog instead of quitting, and lazygit outlives the
+            # session. Wait for the screen to prove the dialog closed.
+            - expect_screen:
+                not_contains: ["New branch name"]
+                stable_for: 100ms
             - send: "q"
       - run:
           command: git -C repo branch --show-current
@@ -768,6 +801,14 @@ scenarios:
             - send: {key: down}
             - expect: "feature-one"
             - send: " "
+            # Wait for the checkout to land on the screen before quitting: a `q`
+            # sent while lazygit is still switching branches leaves it running, and
+            # the step then fails on its timeout instead of on the branch it
+            # asserts.
+            - expect_screen:
+                contains: ["feature-one"]
+                stable_for: 200ms
+            - send: "q"
       - run:
           command: git -C repo branch --show-current
       - assert:
@@ -814,6 +855,9 @@ scenarios:
             - expect: "Stash changes"
             - send: "probe stash"
             - send: {key: enter}
+            # Quit so the step ends on its assertions: lazygit outlives the session
+            # otherwise, and the pty step fails on its timeout instead.
+            - send: "q"
       - run:
           command: git -C repo stash list
       - assert:
@@ -867,6 +911,12 @@ scenarios:
             - send: "s"
             - expect: "Stash changes"
             - send: {key: esc}
+            # The dialog owns the keyboard until it is gone: a `q` sent right after
+            # esc dismisses the dialog instead of quitting, and lazygit outlives the
+            # session. Wait for the screen to prove the dialog closed.
+            - expect_screen:
+                not_contains: ["Stash changes"]
+                stable_for: 100ms
             - send: "q"
       - run:
           command: git -C repo stash list
@@ -921,6 +971,9 @@ scenarios:
             - send: "g"
             - expect: "Stash pop"
             - send: {key: enter}
+            # Quit so the step ends on its assertions: lazygit outlives the session
+            # otherwise, and the pty step fails on its timeout instead.
+            - send: "q"
       - run:
           command: git -C repo stash list
       - assert:
@@ -974,6 +1027,12 @@ scenarios:
             - send: "g"
             - expect: "Stash pop"
             - send: {key: esc}
+            # The dialog owns the keyboard until it is gone: a `q` sent right after
+            # esc dismisses the dialog instead of quitting, and lazygit outlives the
+            # session. Wait for the screen to prove the dialog closed.
+            - expect_screen:
+                not_contains: ["Stash pop"]
+                stable_for: 100ms
             - send: "q"
       - run:
           command: git -C repo stash list
