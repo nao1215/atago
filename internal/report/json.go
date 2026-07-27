@@ -207,8 +207,14 @@ func teardownFailuresOf(sc *engine.ScenarioResult) []jsonFailure {
 
 func failuresOf(sc *engine.ScenarioResult) []jsonFailure {
 	var fs []jsonFailure
-	cmd := lastCommand(sc)
+	// The command a failure is reported under is the one the failing check
+	// asserts on, tracked as the steps are walked; the scenario's last command
+	// belongs to whatever ran after the failure.
+	cmd := ""
 	for _, step := range sc.Steps {
+		if step.Run != nil {
+			cmd = step.Run.Command
+		}
 		for _, ck := range step.Checks {
 			if ck == nil || ck.OK {
 				continue

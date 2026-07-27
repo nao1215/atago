@@ -1030,6 +1030,59 @@ func TestConsole_FailedScenarioShowsCommand(t *testing.T) {
 	}
 }
 
+// TestFailureNamesTheCommandItRanUnder is a regression: the command shown beside
+// a failure was the scenario's LAST run command, not the one the failing check
+// asserts on. A scenario whose interactive step times out and is followed by a
+// verification command reported that later, passing command as the failing one,
+// which is a diagnosis sent in the wrong direction — the reader tunes the
+// timeout of a step that never had a problem. Both the console block and the JSON
+// report's failures[].command must name the step's own command.
+func TestFailureNamesTheCommandItRanUnder(t *testing.T) {
+	t.Parallel()
+	res := &engine.SuiteResult{
+		Suite:  "attrib",
+		Status: engine.StatusFailed,
+		Scenarios: []engine.ScenarioResult{
+			{Name: "tui then verify", Status: engine.StatusFailed, Steps: []engine.StepResult{
+				// The failing step: an interactive program that never exited. Its
+				// check lives on the step itself, like a timeout kill does.
+				{Kind: "pty", Run: &runner.Result{Command: "tui --interactive", ExitCode: -1}, Checks: []*assert.CheckResult{{
+					OK: false, Desc: "run completes before its timeout",
+					Expected: "the command to exit on its own", Actual: "the command timed out after 20s and was killed",
+				}}},
+				// A later command that ran fine and asserts fine.
+				{Kind: "run", Run: &runner.Result{Command: "verify --after"}},
+				{Kind: "assert", Checks: []*assert.CheckResult{{OK: true, Desc: "assert exit_code is 0"}}},
+			}},
+		},
+	}
+	out := render(t, FormatConsole, res)
+	if !strings.Contains(out, "Command:\n  tui --interactive") {
+		t.Errorf("console failure should name the step's own command:\n%s", out)
+	}
+	if strings.Contains(out, "verify --after") {
+		t.Errorf("console failure names a later, passing command:\n%s", out)
+	}
+
+	var doc struct {
+		Suites []struct {
+			Failures []struct {
+				Step    string `json:"step"`
+				Command string `json:"command"`
+			} `json:"failures"`
+		} `json:"suites"`
+	}
+	if err := json.Unmarshal([]byte(render(t, FormatJSON, res)), &doc); err != nil {
+		t.Fatalf("json report invalid: %v", err)
+	}
+	if len(doc.Suites) != 1 || len(doc.Suites[0].Failures) != 1 {
+		t.Fatalf("expected one failure, got %+v", doc.Suites)
+	}
+	if got := doc.Suites[0].Failures[0].Command; got != "tui --interactive" {
+		t.Errorf("json failures[].command = %q, want the failing step's own command", got)
+	}
+}
+
 // TestSuiteFailurePoints_GenericFallback proves the runtime-creation path (a
 // suite that errored without scenarios AND without any recorded suite.setup
 // detail) still synthesizes one generic failure point so the failure is never

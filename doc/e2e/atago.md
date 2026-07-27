@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-74 suites · 440 scenarios
+74 suites · 441 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -364,12 +364,13 @@
   - [console report prints the same counts in its summary line](#scenario-console-report-prints-the-same-counts-in-its-summary-line)
   - [an all-passing run reports a zero-failure suite and exits zero](#scenario-an-all-passing-run-reports-a-zero-failure-suite-and-exits-zero)
   - [an errored step is counted as an error, not a failure, across formats](#scenario-an-errored-step-is-counted-as-an-error-not-a-failure-across-formats)
-- [atago self-hosting / reports](#atago-self-hosting--reports) — 5 scenarios
+- [atago self-hosting / reports](#atago-self-hosting--reports) — 6 scenarios
   - [JUnit report is XML with a testsuite and testcase](#scenario-junit-report-is-xml-with-a-testsuite-and-testcase)
   - [GitHub Actions annotations are emitted on failure](#scenario-github-actions-annotations-are-emitted-on-failure)
   - [TAP report is a numbered TAP 13 stream with ok / not ok points](#scenario-tap-report-is-a-numbered-tap-13-stream-with-ok--not-ok-points)
   - [failure artifacts are written and referenced in the JSON report](#scenario-failure-artifacts-are-written-and-referenced-in-the-json-report)
   - [a multi-line snapshot failure renders a unified diff with hunks](#scenario-a-multi-line-snapshot-failure-renders-a-unified-diff-with-hunks)
+  - [a failure names the command it was observed under](#scenario-a-failure-names-the-command-it-was-observed-under)
 - [atago self-hosting / rerun-failed](#atago-self-hosting--rerun-failed) — 5 scenarios
   - [a failing run is recorded and rerun-failed selects only it](#scenario-a-failing-run-is-recorded-and-rerun-failed-selects-only-it)
   - [rerun-failed with nothing recorded is a no-op success](#scenario-rerun-failed-with-nothing-recorded-is-a-no-op-success)
@@ -6756,6 +6757,35 @@ ${atago} run --report json diffspec.atago.yaml; true
   - stdout contains `Diff (-expected +actual):`, `--- snapshot (golden)`, `-beta`, `+BETA`, `snaps/out.txt`
 - after `${atago} run --report json diffspec.atago.yaml; true`:
   - stdout contains `"diff":`
+### Scenario: a failure names the command it was observed under
+#### Given
+- Fixture file `attrib.atago.yaml` is created.
+#### Inputs
+_Fixture `attrib.atago.yaml`:_
+```text
+version: "1"
+suite: {name: attrib}
+scenarios:
+  - name: the first command fails and a later one passes
+    steps:
+      - run: {shell: true, command: "printf 'early\n'; exit 3"}
+      - assert: {exit_code: 0}
+      - run: {shell: true, command: "printf 'later-and-fine\n'"}
+      - assert: {exit_code: 0}
+```
+#### When
+```shell
+${atago} run attrib.atago.yaml
+${atago} run --report json attrib.atago.yaml
+```
+#### Then
+- after `${atago} run attrib.atago.yaml`:
+  - exit code is `1`
+  - stdout contains `printf 'early`
+  - stdout does not contain `later-and-fine`
+- after `${atago} run --report json attrib.atago.yaml`:
+  - exit code is `1`
+  - stdout at `$.suites[0].failures[0].command` matches `/early/`
 ## atago self-hosting / rerun-failed
 Source: `test/e2e/atago/rerun.atago.yaml`
 ### Scenario: a failing run is recorded and rerun-failed selects only it

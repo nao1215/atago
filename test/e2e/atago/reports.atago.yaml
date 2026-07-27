@@ -183,3 +183,39 @@ scenarios:
       - assert:
           stdout:
             contains: '"diff":'
+
+  # A failure block names the command the failing check asserts on. Naming the
+  # scenario's LAST command instead sent the reader to a step that had no problem:
+  # an interactive step that times out is followed by a verification command that
+  # runs fine, and the report blamed that one.
+  - name: a failure names the command it was observed under
+    steps:
+      - fixture:
+          file: attrib.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: attrib}
+            scenarios:
+              - name: the first command fails and a later one passes
+                steps:
+                  - run: {shell: true, command: "printf 'early\n'; exit 3"}
+                  - assert: {exit_code: 0}
+                  - run: {shell: true, command: "printf 'later-and-fine\n'"}
+                  - assert: {exit_code: 0}
+      - run: {command: "${atago} run attrib.atago.yaml"}
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - "printf 'early"
+      - assert:
+          # The later, passing command must not appear in the failure block at all.
+          stdout:
+            not_contains: "later-and-fine"
+      - run: {command: "${atago} run --report json attrib.atago.yaml"}
+      - assert:
+          exit_code: 1
+          stdout:
+            json:
+              - path: "$.suites[0].failures[0].command"
+                matches: "early"
