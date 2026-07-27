@@ -10,6 +10,7 @@ import (
 
 	"github.com/nao1215/atago/internal/loader"
 	"github.com/nao1215/atago/internal/manifest"
+	"github.com/nao1215/atago/internal/spec"
 )
 
 // loadSchema compiles the published JSON Schema.
@@ -581,5 +582,70 @@ func TestReportExample_Conforms(t *testing.T) {
 	s := compileSchema(t, "schema/report.schema.json")
 	if err := s.Validate(readJSONAny(t, "schema/examples/report.example.json")); err != nil {
 		t.Errorf("report example does not conform to schema:\n%v", err)
+	}
+}
+
+// TestSchema_AssertTargetsAreAllDeclared is the last of the assert-target
+// coverage guards: the published schema is what an editor validates a spec
+// against, so a target the runtime accepts but the schema omits makes a correct
+// spec light up red in the author's editor — and one listed in `properties` but
+// missing from `anyOf` would be accepted only in combination with another target.
+// Both halves are derived from spec.AllAssertTargets rather than restated here.
+func TestSchema_AssertTargetsAreAllDeclared(t *testing.T) {
+	t.Parallel()
+	raw, err := os.ReadFile("schema/atago.schema.json")
+	if err != nil {
+		t.Fatalf("read schema: %v", err)
+	}
+	// Navigated as a generic document rather than decoded into structs: the keys
+	// are JSON Schema's own ($defs, anyOf), not names atago chose.
+	var doc map[string]any
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		t.Fatalf("decode schema: %v", err)
+	}
+	defs, ok := doc["$defs"].(map[string]any)
+	if !ok {
+		t.Fatal("schema has no $defs object")
+	}
+	assertDef, ok := defs["assert"].(map[string]any)
+	if !ok {
+		t.Fatal("schema has no $defs/assert object")
+	}
+	properties, ok := assertDef["properties"].(map[string]any)
+	if !ok {
+		t.Fatal("$defs/assert has no properties object")
+	}
+	alternatives, ok := assertDef["anyOf"].([]any)
+	if !ok {
+		t.Fatal("$defs/assert has no anyOf list")
+	}
+	required := map[string]bool{}
+	for _, alt := range alternatives {
+		m, ok := alt.(map[string]any)
+		if !ok {
+			continue
+		}
+		names, ok := m["required"].([]any)
+		if !ok {
+			continue
+		}
+		for _, n := range names {
+			if s, ok := n.(string); ok {
+				required[s] = true
+			}
+		}
+	}
+	for _, target := range spec.AllAssertTargets() {
+		if _, ok := properties[string(target)]; !ok {
+			t.Errorf("assert target %q has no property in $defs/assert; an editor would reject a valid spec", target)
+		}
+		if !required[string(target)] {
+			t.Errorf("assert target %q is not one of the anyOf alternatives; a spec setting only it would fail validation", target)
+		}
+	}
+	for key := range properties {
+		if !required[key] {
+			t.Errorf("$defs/assert declares %q but no anyOf alternative requires it", key)
+		}
 	}
 }

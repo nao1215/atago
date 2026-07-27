@@ -7,6 +7,18 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- Adding an assertion target is now guarded instead of remembered. Five layers
+  dispatch on a target — the loader's validation, the runtime check, `atago doc`,
+  `atago explain`, and the published JSON Schema — and each had its own switch
+  whose default silently degraded: doc and explain rendered the bare target name
+  as a sentence, and the schema would have made a valid spec light up red in an
+  editor. `spec.AllAssertTargets` now derives the list from one table, a test
+  proves that table matches the fields on `Assert`, and each layer has a coverage
+  test that walks the list. A half-wired target fails a test rather than shipping
+  a weaker document.
+
 ### Added
 
 - Third-party suite for Info-ZIP `zip` and `unzip`, the first real-world coverage
