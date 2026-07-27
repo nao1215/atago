@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-74 suites · 441 scenarios
+74 suites · 443 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -484,7 +484,7 @@
   - [a failing setup errors every scenario and none runs (exit 4)](#scenario-a-failing-setup-errors-every-scenario-and-none-runs-exit-4)
   - [a suite service starts once and its store reaches every scenario](#scenario-a-suite-service-starts-once-and-its-store-reaches-every-scenario)
   - [a failing suite teardown is loud but does not flip the verdict](#scenario-a-failing-suite-teardown-is-loud-but-does-not-flip-the-verdict)
-- [atago self-hosting / step timeouts (suite default + escape hatch)](#atago-self-hosting--step-timeouts-suite-default--escape-hatch) — 8 scenarios
+- [atago self-hosting / step timeouts (suite default + escape hatch)](#atago-self-hosting--step-timeouts-suite-default--escape-hatch) — 10 scenarios
   - [suite.timeout kills a hanging step and the hint names it](#scenario-suitetimeout-kills-a-hanging-step-and-the-hint-names-it)
   - [a step timeout beats the suite timeout and the hint says run.timeout](#scenario-a-step-timeout-beats-the-suite-timeout-and-the-hint-says-runtimeout)
   - [timeout zero disables a short suite bound](#scenario-timeout-zero-disables-a-short-suite-bound)
@@ -493,6 +493,8 @@
   - [an assert on the killed result keeps the timeout observable](#scenario-an-assert-on-the-killed-result-keeps-the-timeout-observable)
   - [timeout zero keeps an unasserted step green](#scenario-timeout-zero-keeps-an-unasserted-step-green)
   - [an invalid suite.timeout is a load-time error](#scenario-an-invalid-suitetimeout-is-a-load-time-error)
+  - [a session outlived by its program says so instead of blaming the clock](#scenario-a-session-outlived-by-its-program-says-so-instead-of-blaming-the-clock)
+  - [an expect that never matches still reports the pattern, not the quit advice](#scenario-an-expect-that-never-matches-still-reports-the-pattern-not-the-quit-advice)
 - [atago self-hosting / tui](#atago-self-hosting--tui) — 4 scenarios
   - [a pty step exports a usable TERM by default](#scenario-a-pty-step-exports-a-usable-term-by-default)
   - [an explicit TERM overrides the default](#scenario-an-explicit-term-overrides-the-default)
@@ -8989,6 +8991,59 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `suite.timeout`
+### Scenario: a session outlived by its program says so instead of blaming the clock
+_skipped on Windows_
+#### Given
+- Fixture file `outlived.atago.yaml` is created.
+#### Inputs
+_Fixture `outlived.atago.yaml`:_
+```text
+version: "1"
+suite: {name: outlived}
+scenarios:
+  - name: the session ends with cat still reading
+    steps:
+      - pty:
+          command: cat
+          timeout: 2s
+          session:
+            - send: "hello\n"
+            - expect: "hello"
+```
+#### When
+```shell
+${atago} run outlived.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `the program was still running`, `send its quit key as the last action`
+- stdout does not contain `raise the timeout if the command is merely slow`
+### Scenario: an expect that never matches still reports the pattern, not the quit advice
+_skipped on Windows_
+#### Given
+- Fixture file `nomatch.atago.yaml` is created.
+#### Inputs
+_Fixture `nomatch.atago.yaml`:_
+```text
+version: "1"
+suite: {name: nomatch}
+scenarios:
+  - name: the prompt never appears
+    steps:
+      - pty:
+          command: cat
+          timeout: 2s
+          session:
+            - expect: "never-going-to-appear"
+```
+#### When
+```shell
+${atago} run nomatch.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `never-going-to-appear`, `never appeared in the terminal transcript`
+- stdout does not contain `send its quit key`
 ## atago self-hosting / tui
 Source: `test/e2e/atago/tui.atago.yaml`
 ### Scenario: a pty step exports a usable TERM by default

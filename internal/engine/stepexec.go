@@ -77,6 +77,22 @@ func timeoutKillCheck(res *runner.Result, steps []spec.Step, i int) *assert.Chec
 		source = "run.timeout"
 	}
 	elapsed := res.Duration.Round(time.Millisecond)
+	if i < len(steps) && steps[i].Kind() == spec.StepPTY {
+		// A pty step that gets here ran its whole session: a wait that never
+		// completed is reported as its own expect failure instead (see
+		// ptyExpectCheck), so reaching this point means the actions all went out
+		// and the program stayed up. Saying "the command timed out" and offering a
+		// bigger timeout is true and useless — the session is already over, so
+		// waiting longer cannot change anything, and the reader who takes that
+		// advice loses the time twice.
+		return &assert.CheckResult{
+			Target:   string(spec.AssertExitCode),
+			Desc:     "pty session leaves the program exited",
+			Expected: "the program to exit once the session ends",
+			Actual:   fmt.Sprintf("the session finished its actions and the program was still running %s later, so it was killed", elapsed),
+			Hint:     "a pty session does not close the program: send its quit key as the last action, and wait for the screen to show the program can take it (a dialog or prompt owns the keyboard until it closes). Raising the timeout does not help here, because the session already ran to the end",
+		}
+	}
 	return &assert.CheckResult{
 		Target:   string(spec.AssertExitCode),
 		Desc:     "run completes before its timeout",

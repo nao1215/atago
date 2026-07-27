@@ -228,3 +228,70 @@ scenarios:
           exit_code: 2
           stderr:
             contains: "suite.timeout"
+
+  # A pty session does not close the program. When the actions run out and the
+  # program is still up, the step is killed — and telling the reader to raise the
+  # timeout is advice that cannot work, because the session already ran to the end.
+  # This is the shape that broke thirteen lazygit scenarios and three yazi ones.
+  - name: a session outlived by its program says so instead of blaming the clock
+    skip: {os: windows}
+    steps:
+      - fixture:
+          file: outlived.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: outlived}
+            scenarios:
+              - name: the session ends with cat still reading
+                steps:
+                  - pty:
+                      command: cat
+                      timeout: 2s
+                      session:
+                        - send: "hello\n"
+                        - expect: "hello"
+      - run:
+          command: ${atago} run outlived.atago.yaml
+          timeout: 30s
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - "the program was still running"
+              - "send its quit key as the last action"
+      - assert:
+          # The advice that cannot help is gone.
+          stdout:
+            not_contains: "raise the timeout if the command is merely slow"
+
+  - name: an expect that never matches still reports the pattern, not the quit advice
+    skip: {os: windows}
+    steps:
+      # The other half of the contract: a wait that never completed is a real
+      # timeout, where a longer budget can be the answer, and it keeps its own
+      # message naming the pattern.
+      - fixture:
+          file: nomatch.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: nomatch}
+            scenarios:
+              - name: the prompt never appears
+                steps:
+                  - pty:
+                      command: cat
+                      timeout: 2s
+                      session:
+                        - expect: "never-going-to-appear"
+      - run:
+          command: ${atago} run nomatch.atago.yaml
+          timeout: 30s
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - "never-going-to-appear"
+              - "never appeared in the terminal transcript"
+      - assert:
+          stdout:
+            not_contains: "send its quit key"
