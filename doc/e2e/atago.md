@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-74 suites · 425 scenarios
+74 suites · 426 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -304,11 +304,12 @@
   - [a dir assert addresses a nested tree and child by forward-slash path](#scenario-a-dir-assert-addresses-a-nested-tree-and-child-by-forward-slash-path)
   - [equals_file compares two files addressed by forward-slash paths](#scenario-equals_file-compares-two-files-addressed-by-forward-slash-paths)
   - [a redirect path may not escape the workdir via a nested traversal](#scenario-a-redirect-path-may-not-escape-the-workdir-via-a-nested-traversal)
-- [atago self-hosting / pdf assertion](#atago-self-hosting--pdf-assertion) — 4 scenarios
+- [atago self-hosting / pdf assertion](#atago-self-hosting--pdf-assertion) — 5 scenarios
   - [pdf assertions cover page count, metadata, and text](#scenario-pdf-assertions-cover-page-count-metadata-and-text)
   - [a non-pdf file fails the pdf target](#scenario-a-non-pdf-file-fails-the-pdf-target)
   - [metadata is found inside a compressed object stream](#scenario-metadata-is-found-inside-a-compressed-object-stream)
   - [a wrong expectation still fails against compressed metadata](#scenario-a-wrong-expectation-still-fails-against-compressed-metadata)
+  - [a stream that ends without a newline does not swallow the next object](#scenario-a-stream-that-ends-without-a-newline-does-not-swallow-the-next-object)
 - [atago self-hosting / pty](#atago-self-hosting--pty) — 8 scenarios
   - [a pty step sees a terminal where a run step sees a pipe](#scenario-a-pty-step-sees-a-terminal-where-a-run-step-sees-a-pipe)
   - [a never-matching expect fails with the pattern in the block](#scenario-a-never-matching-expect-fails-with-the-pattern-in-the-block)
@@ -5547,6 +5548,39 @@ ${atago} run wrongmeta.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `Compressed Title`
+### Scenario: a stream that ends without a newline does not swallow the next object
+#### Given
+- Fixture file `nonewline.atago.yaml` is created.
+#### Inputs
+_Fixture `nonewline.atago.yaml`:_
+```text
+version: "1"
+suite: {name: nonewline}
+scenarios:
+  - name: both pages contribute their text
+    steps:
+      - fixture:
+          file: two-pages.pdf
+          base64: JVBERi0xLjUKMSAwIG9iago8PCAvVHlwZSAvUGFnZSA+PgplbmRvYmoKMiAwIG9iago8PCAvRmlsdGVyIC9GbGF0ZURlY29kZSA+PgpzdHJlYW0KeJxzClHQcMssKi5RKEhMT1Uozy9KKdZUCMlScA0BAHn8CLNlbmRzdHJlYW0KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgPj4KZW5kb2JqCjQgMCBvYmoKPDwgL0ZpbHRlciAvRmxhdGVEZWNvZGUgPj4Kc3RyZWFtCniccwpR0AhOTc7PS1EoSExPVSjPL0op1lQIyVJwDQEAgxUJBwplbmRzdHJlYW0KZW5kb2JqCnRyYWlsZXIKPDwgL1Jvb3QgMSAwIFIgPj4KJSVFT0YK
+      - run: {command: echo produced}
+      - assert:
+          pdf:
+            path: two-pages.pdf
+            pages: 2
+      - assert:
+          pdf:
+            path: two-pages.pdf
+            text:
+              contains: ["First 
+… (truncated)
+```
+#### When
+```shell
+${atago} run nonewline.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout contains `PASSED`
 ## atago self-hosting / pty
 Source: `test/e2e/atago/pty.atago.yaml`
 ### Scenario: a pty step sees a terminal where a run step sees a pipe

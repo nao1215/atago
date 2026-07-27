@@ -114,3 +114,37 @@ scenarios:
           exit_code: 1
           stdout:
             contains: "Compressed Title"
+
+  # ISO 32000 recommends an EOL before `endstream` but does not require one, and
+  # Ghostscript omits it. Requiring it made the scan run past the true end of a
+  # stream and swallow the objects that followed, so a document reported only
+  # its first page's words while the later pages contributed nothing.
+  - name: a stream that ends without a newline does not swallow the next object
+    steps:
+      - fixture:
+          file: nonewline.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: nonewline}
+            scenarios:
+              - name: both pages contribute their text
+                steps:
+                  - fixture:
+                      file: two-pages.pdf
+                      base64: JVBERi0xLjUKMSAwIG9iago8PCAvVHlwZSAvUGFnZSA+PgplbmRvYmoKMiAwIG9iago8PCAvRmlsdGVyIC9GbGF0ZURlY29kZSA+PgpzdHJlYW0KeJxzClHQcMssKi5RKEhMT1Uozy9KKdZUCMlScA0BAHn8CLNlbmRzdHJlYW0KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgPj4KZW5kb2JqCjQgMCBvYmoKPDwgL0ZpbHRlciAvRmxhdGVEZWNvZGUgPj4Kc3RyZWFtCniccwpR0AhOTc7PS1EoSExPVSjPL0op1lQIyVJwDQEAgxUJBwplbmRzdHJlYW0KZW5kb2JqCnRyYWlsZXIKPDwgL1Jvb3QgMSAwIFIgPj4KJSVFT0YK
+                  - run: {command: echo produced}
+                  - assert:
+                      pdf:
+                        path: two-pages.pdf
+                        pages: 2
+                  - assert:
+                      pdf:
+                        path: two-pages.pdf
+                        text:
+                          contains: ["First page words", "Second page words"]
+      - run:
+          command: ${atago} run nonewline.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: PASSED
