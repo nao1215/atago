@@ -27,6 +27,12 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- A `file:` assertion is no longer satisfied by a directory. `exists: true`
+  passed for a tool that produced a directory where a file was expected, and
+  `executable: true` passed on any directory, since every directory carries the
+  execute bit — two false passes in exactly the case the assertion exists to
+  catch. Both now fail and say the path is a directory, pointing at `dir:`.
+  atago's own image suite had one of these sloppy assertions, now corrected.
 - `--rerun-failed` now names the recorded failures it could not run. When a
   scenario was renamed or deleted while still broken, the rerun quietly reported
   fewer scenarios than were recorded, which reads as "the rest are fixed" — the

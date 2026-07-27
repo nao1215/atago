@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-74 suites · 415 scenarios
+74 suites · 418 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -137,11 +137,14 @@
   - [explain describes every matcher of a composed stream assertion](#scenario-explain-describes-every-matcher-of-a-composed-stream-assertion)
   - [explain names the line a line-scoped matcher inspects](#scenario-explain-names-the-line-a-line-scoped-matcher-inspects)
   - [explain describes file not_contains and executable matchers](#scenario-explain-describes-file-not_contains-and-executable-matchers)
-- [atago self-hosting / file equals and equals_file byte-equality (#155)](#atago-self-hosting--file-equals-and-equals_file-byte-equality-155) — 4 scenarios
+- [atago self-hosting / file equals and equals_file byte-equality (#155)](#atago-self-hosting--file-equals-and-equals_file-byte-equality-155) — 7 scenarios
   - [equals_file passes for two byte-identical files](#scenario-equals_file-passes-for-two-byte-identical-files)
   - [equals matches an inline literal byte-for-byte](#scenario-equals-matches-an-inline-literal-byte-for-byte)
   - [equals_file fails the inner spec when the two files differ by one byte](#scenario-equals_file-fails-the-inner-spec-when-the-two-files-differ-by-one-byte)
   - [equals_file is byte-exact — a CRLF vs LF difference fails](#scenario-equals_file-is-byte-exact--a-crlf-vs-lf-difference-fails)
+  - [a file assertion is not satisfied by a directory](#scenario-a-file-assertion-is-not-satisfied-by-a-directory)
+  - [an executable assertion is not satisfied by a directory](#scenario-an-executable-assertion-is-not-satisfied-by-a-directory)
+  - [a real file still satisfies both matchers](#scenario-a-real-file-still-satisfies-both-matchers)
 - [atago self-hosting / fixture from (copy committed testdata)](#atago-self-hosting--fixture-from-copy-committed-testdata) — 2 scenarios
   - [a committed binary blob is copied verbatim into the workdir](#scenario-a-committed-binary-blob-is-copied-verbatim-into-the-workdir)
   - [copying from a missing source errors the scenario](#scenario-copying-from-a-missing-source-errors-the-scenario)
@@ -2940,6 +2943,84 @@ ${atago} run crlf.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `not byte-identical`
+### Scenario: a file assertion is not satisfied by a directory
+#### Given
+- Fixture file `mistaken.atago.yaml` is created.
+#### Inputs
+_Fixture `mistaken.atago.yaml`:_
+```text
+version: "1"
+suite: {name: mistaken}
+scenarios:
+  - name: out is a directory, not the expected file
+    steps:
+      - run: {shell: true, command: "mkdir out"}
+      - assert:
+          file:
+            path: out
+            exists: true
+```
+#### When
+```shell
+${atago} run mistaken.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `exists but is a directory`, `use a dir: assertion`
+### Scenario: an executable assertion is not satisfied by a directory
+_skipped on Windows_
+#### Given
+- Fixture file `execdir.atago.yaml` is created.
+#### Inputs
+_Fixture `execdir.atago.yaml`:_
+```text
+version: "1"
+suite: {name: execdir}
+scenarios:
+  - name: a directory is not an executable
+    steps:
+      - run: {shell: true, command: "mkdir bin"}
+      - assert:
+          file:
+            path: bin
+            executable: true
+```
+#### When
+```shell
+${atago} run execdir.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `is a directory, not an executable file`
+### Scenario: a real file still satisfies both matchers
+_skipped on Windows_
+#### Given
+- Fixture file `ok.atago.yaml` is created.
+#### Inputs
+_Fixture `ok.atago.yaml`:_
+```text
+version: "1"
+suite: {name: ok}
+scenarios:
+  - name: a real executable file
+    steps:
+      - fixture:
+          file: tool.sh
+          content: "#!/bin/sh\n"
+          mode: "0755"
+      - run: {command: echo hi}
+      - assert:
+          file: {path: tool.sh, exists: true}
+      - assert:
+          file: {path: tool.sh, executable: true}
+```
+#### When
+```shell
+${atago} run ok.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout contains `PASSED`
 ## atago self-hosting / fixture from (copy committed testdata)
 Source: `test/e2e/atago/fixture_from.atago.yaml`
 ### Scenario: a committed binary blob is copied verbatim into the workdir
@@ -3468,15 +3549,13 @@ cat arts/*/*/*image.metadata.json
 - after `${atago} run --report json --artifacts-dir arts diff.atago.yaml`:
   - exit code is `1`
   - stdout contains `"artifacts"`
-  - file `arts` exists
+  - dir `arts` exists
 - after `ls arts/*/*/`:
   - exit code is `0`
   - stdout contains `image.actual.png`, `image.baseline.png`, `image.diff.png`, `image.metadata.json`
 - after `cat arts/*/*/*image.metadata.json`:
   - exit code is `0`
   - stdout at `$.diff_generated` equals `true`
-#### Generated artifacts
-- `arts`
 ### Scenario: a similar_to baseline resolves in the scenario workdir
 #### Given
 - Fixture file `roundtrip.atago.yaml` is created.

@@ -44,7 +44,7 @@ func checkFile(f *spec.FileAssert, env Env) (out *CheckResult) {
 	switch {
 	case f.Exists != nil:
 		desc := fmt.Sprintf("assert file %q exists: %t", f.Path, *f.Exists)
-		_, err := os.Stat(path)
+		info, err := os.Stat(path)
 		// Only a genuine "not exist" result participates in exists:true/false.
 		// Permission, I/O, and other stat failures are surfaced as an error so
 		// users do not debug a "missing file" that is really unreadable (#39).
@@ -54,6 +54,17 @@ func checkFile(f *spec.FileAssert, env Env) (out *CheckResult) {
 				Expected: fmt.Sprintf("stat-able file %q", f.Path),
 				Actual:   err.Error(),
 				Hint:     fmt.Sprintf("could not stat file %q: %v", f.Path, err),
+			}
+		}
+		// A directory is not the file this assertion is about. Counting it as one
+		// made `exists: true` pass for a tool that produced a directory where a
+		// file was expected — the assertion's whole job is to catch that.
+		if err == nil && info.IsDir() {
+			return &CheckResult{
+				Desc:     desc,
+				Expected: fmt.Sprintf("file %q exists=%t", f.Path, *f.Exists),
+				Actual:   fmt.Sprintf("%q is a directory", f.Path),
+				Hint:     fmt.Sprintf("%q exists but is a directory, not a file; use a dir: assertion for it", f.Path),
 			}
 		}
 		exists := err == nil
@@ -109,8 +120,19 @@ func checkFile(f *spec.FileAssert, env Env) (out *CheckResult) {
 				Hint:     fmt.Sprintf("could not stat file %q", f.Path),
 			}
 		}
-		isExec := info.Mode().Perm()&0o111 != 0
 		desc := fmt.Sprintf("assert file %q executable: %t", f.Path, *f.Executable)
+		// Every directory carries the execute bit, so reading it as "this is an
+		// executable" turned a tool that produced a directory into a passing
+		// executable check.
+		if info.IsDir() {
+			return &CheckResult{
+				Desc:     desc,
+				Expected: fmt.Sprintf("file %q executable=%t", f.Path, *f.Executable),
+				Actual:   fmt.Sprintf("%q is a directory", f.Path),
+				Hint:     fmt.Sprintf("%q is a directory, not an executable file; a directory's execute bit means it can be entered", f.Path),
+			}
+		}
+		isExec := info.Mode().Perm()&0o111 != 0
 		if isExec == *f.Executable {
 			return pass(desc)
 		}

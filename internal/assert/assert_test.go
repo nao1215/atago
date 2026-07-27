@@ -1571,6 +1571,43 @@ func TestCheckFile_Executable(t *testing.T) {
 	}
 }
 
+// TestCheckFile_DirectoryIsNotAFile pins that a directory never satisfies a
+// file assertion. `exists: true` used to pass for a tool that produced a
+// directory where a file was expected, and `executable: true` used to pass on
+// any directory, since every directory carries the execute bit — two false
+// passes in exactly the case the assertion exists to catch.
+func TestCheckFile_DirectoryIsNotAFile(t *testing.T) {
+	t.Parallel()
+	wd := t.TempDir()
+	if err := os.Mkdir(filepath.Join(wd, "out"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	cr := checkFileOK(t, wd, &spec.FileAssert{Path: "out", Exists: boolp(true)})
+	if cr.OK {
+		t.Error("exists:true on a directory must fail")
+	}
+	if !strings.Contains(cr.Hint, "is a directory") {
+		t.Errorf("Hint = %q, want it to say the path is a directory", cr.Hint)
+	}
+
+	cr = checkFileOK(t, wd, &spec.FileAssert{Path: "out", Executable: boolp(true)})
+	if cr.OK {
+		t.Error("executable:true on a directory must fail")
+	}
+	if !strings.Contains(cr.Hint, "is a directory") {
+		t.Errorf("Hint = %q, want it to say the path is a directory", cr.Hint)
+	}
+
+	// A real file is unaffected.
+	if err := os.WriteFile(filepath.Join(wd, "real.txt"), []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if cr := checkFileOK(t, wd, &spec.FileAssert{Path: "real.txt", Exists: boolp(true)}); !cr.OK {
+		t.Errorf("exists:true on a regular file must still pass: %+v", cr)
+	}
+}
+
 func TestExistenceAndExecutabilityWords(t *testing.T) {
 	t.Parallel()
 	if existence(true) != "exist" || existence(false) != "not exist" {
