@@ -7,6 +7,17 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Third-party suite for ImageMagick: conversion output decoded and checked as an
+  image (format sniffed from the bytes, dimensions, alpha), aspect-ratio versus
+  forced resize, a PNG↔PPM round trip verified twice — once by atago's pixel
+  comparison and once by `magick compare -metric AE` as an independent oracle —
+  metadata stripping that leaves the picture untouched, the `identify` JSON
+  contract, and the missing-input, corrupt-input, and unknown-extension
+  behaviors. Inputs are synthesized with `xc:` canvases, so the suite carries no
+  image assets.
+
 ### Fixed
 
 - `image: similar_to` now falls back to the scenario workdir when no committed

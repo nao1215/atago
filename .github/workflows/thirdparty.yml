@@ -139,6 +139,11 @@ jobs:
           - name: pandoc
             dir: ./test/e2e/thirdparty/pandoc
             install: bash ./scripts/install_ubuntu_snapshot_packages.sh pandoc
+          # ImageMagick 7 (magick, and `magick compare` as the oracle) converts
+          # and inspects images; inputs are synthesized with xc: canvases.
+          - name: imagemagick
+            dir: ./test/e2e/thirdparty/imagemagick
+            install: bash ./scripts/install_ubuntu_snapshot_packages.sh imagemagick
           # Terraform comes from the official HashiCorp release archive instead
           # of a moving apt repository. Only the builtin terraform_data
           # resource is used, so `init` downloads no providers and the suite
