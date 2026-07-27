@@ -2380,7 +2380,7 @@
         "similar_to": {
           "type": "string",
           "minLength": 1,
-          "description": "Baseline image to compare decoded pixels against. A relative path resolves against the spec file's directory; both images must share dimensions."
+          "description": "Baseline image to compare decoded pixels against. A relative path resolves against the spec file's directory (a committed golden), falling back to the scenario workdir when no such file is there — which is how two images the run itself produced, such as the two ends of an encoder round trip, are compared. Both images must share dimensions."
         },
         "max_diff": {
           "type": "number",

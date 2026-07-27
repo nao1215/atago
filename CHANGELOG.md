@@ -9,6 +9,14 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- `image: similar_to` now falls back to the scenario workdir when no committed
+  baseline sits next to the spec. Comparing two images the run itself produced —
+  the two ends of an encoder round trip, the before and after of an in-place
+  edit — failed with "could not read baseline image" unless the spec spelled out
+  `${workdir}/...`. A committed golden still wins, so no existing baseline
+  changes meaning, and the workdir path is confined to the scenario like every
+  other runtime path. The failure message now names both places it looked.
+
 - `atago doc` and `atago explain` now describe every matcher an assertion sets
   instead of the first one. A stream assertion that combines `contains` with
   `not_contains`, `matches`, or `not_matches` enforces all of them at run time,
