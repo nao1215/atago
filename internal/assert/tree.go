@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/nao1215/atago/internal/fskind"
 	"github.com/nao1215/atago/internal/spec"
 )
 
@@ -33,7 +34,8 @@ func (e treeEntry) manifestLine() string {
 	case "link":
 		return "link " + escapeManifestField(e.rel) + " -> " + escapeManifestField(e.target)
 	default:
-		return "dir " + escapeManifestField(e.rel)
+		// dir, and the kinds that carry no content: fifo, socket, device.
+		return e.kind + " " + escapeManifestField(e.rel)
 	}
 }
 
@@ -60,7 +62,8 @@ func escapeManifestField(s string) string {
 // walkTree walks dirPath depth-first and returns every entry (root excluded)
 // with /-separated relative paths, sorted, so manifests are deterministic
 // across platforms. Symlinks are recorded, never traversed; an ignored
-// directory prunes its whole subtree.
+// directory prunes its whole subtree; an entry that is not a regular file is
+// recorded by kind and never opened.
 func walkTree(dirPath string, ignore []string) ([]treeEntry, error) {
 	var out []treeEntry
 	err := filepath.WalkDir(dirPath, func(p string, d fs.DirEntry, err error) error {
@@ -86,12 +89,18 @@ func walkTree(dirPath string, ignore []string) ([]treeEntry, error) {
 			out = append(out, treeEntry{rel: rel, kind: "link", target: filepath.ToSlash(target)})
 		case d.IsDir():
 			out = append(out, treeEntry{rel: rel, kind: "dir"})
-		default:
+		case d.Type().IsRegular():
 			h, herr := hashFile(p)
 			if herr != nil {
 				return herr
 			}
 			out = append(out, treeEntry{rel: rel, kind: "file", hash: h})
+		default:
+			// A named pipe, socket, or device node is a directory entry like any
+			// other, but it has no bytes to fingerprint — and opening a pipe for
+			// reading blocks until another process writes to it, which no step
+			// timeout covers. Record what it is; never open it.
+			out = append(out, treeEntry{rel: rel, kind: fskind.Token(d.Type())})
 		}
 		return nil
 	})
@@ -273,31 +282,29 @@ func checkDirSnapshot(d *spec.DirAssert, dirPath string, env Env) *CheckResult {
 // lists. A path present in both with a different line (hash or kind) counts
 // as changed.
 func manifestDiff(expected, actual string) string {
-	// Parse by the known line grammar (dir/file/link), not a whitespace
-	// split: relative paths may contain spaces.
+	// Parse by the line grammar ("<kind> <path>" plus a per-kind suffix), not a
+	// whitespace split: relative paths may contain spaces.
 	parse := func(text string) map[string]string {
 		m := map[string]string{}
 		for _, line := range strings.Split(strings.TrimRight(text, "\n"), "\n") {
-			var p string
-			switch {
-			case strings.HasPrefix(line, "dir "):
-				p = strings.TrimPrefix(line, "dir ")
-			case strings.HasPrefix(line, "file "):
-				rest := strings.TrimPrefix(line, "file ")
+			kind, rest, ok := strings.Cut(line, " ")
+			if !ok {
+				continue
+			}
+			switch kind {
+			case "file":
 				if i := strings.LastIndex(rest, " sha256:"); i >= 0 {
 					rest = rest[:i]
 				}
-				p = rest
-			case strings.HasPrefix(line, "link "):
-				rest := strings.TrimPrefix(line, "link ")
+			case "link":
 				if i := strings.Index(rest, " -> "); i >= 0 {
 					rest = rest[:i]
 				}
-				p = rest
+			case "dir", "fifo", "socket", "device", "irregular":
 			default:
 				continue
 			}
-			m[p] = line
+			m[rest] = line
 		}
 		return m
 	}

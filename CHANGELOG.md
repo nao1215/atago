@@ -9,6 +9,18 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- An assertion no longer hangs on an entry that is not a regular file. A `dir:`
+  walk fingerprinted every non-directory entry it found, and a `file:` matcher
+  read its target: opening a named pipe for reading blocks until another process
+  writes to it, and nothing bounds the assertion phase — a step timeout covers
+  the command, not the checks — so a program under test that left a `mkfifo` pipe
+  (or a socket, or a device node) where a file was expected froze the run until
+  the CI job was killed, instead of failing it in milliseconds. A `dir:` tree now
+  records such an entry by kind and never opens it: it stays a present path for
+  `contains`, is not one of the regular files `count` counts, and appears in a
+  tree snapshot as `fifo <path>` rather than a content hash. A `file:` matcher
+  fails saying the path is a named pipe, not a regular file.
+
 - `--artifacts-dir` no longer lets one attempt of a scenario overwrite another's
   payloads. A `--repeat` run reports the first failing iteration inline and
   points at its sidecar files, but every iteration wrote to the same paths, so

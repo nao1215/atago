@@ -2,10 +2,12 @@ package assert
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nao1215/atago/internal/spec"
 )
@@ -87,6 +89,95 @@ func TestWalkTree_SymlinkRecordedNotTraversed(t *testing.T) {
 	}
 	if strings.Contains(joined, "alias/f.txt") {
 		t.Errorf("symlink was traversed:\n%s", joined)
+	}
+}
+
+// mkfifo creates a named pipe at p, skipping the test where that is not
+// available. It is how the tree tests get a directory entry that is neither a
+// regular file, a directory, nor a symlink.
+func mkfifo(t *testing.T, p string) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("no named pipes in the filesystem namespace on Windows")
+	}
+	bin, err := exec.LookPath("mkfifo")
+	if err != nil {
+		t.Skip("mkfifo not available")
+	}
+	if out, err := exec.CommandContext(t.Context(), bin, p).CombinedOutput(); err != nil {
+		t.Skipf("mkfifo %s: %v (%s)", p, err, out)
+	}
+}
+
+// TestWalkTree_DoesNotOpenANamedPipe is the hang regression: the walk hashed
+// every non-directory entry, and opening a named pipe for reading blocks until
+// something writes to it. A program under test that leaves a pipe in the workdir
+// froze the assertion — forever, since no step timeout covers the assert phase —
+// so a suite that should fail in milliseconds burned the whole CI job. The pipe
+// is still reported as a directory entry, like a dangling symlink is; it is just
+// never opened.
+func TestWalkTree_DoesNotOpenANamedPipe(t *testing.T) {
+	t.Parallel()
+	wd := t.TempDir()
+	if err := os.WriteFile(filepath.Join(wd, "real.txt"), []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	mkfifo(t, filepath.Join(wd, "pipe"))
+
+	type result struct {
+		entries []treeEntry
+		err     error
+	}
+	done := make(chan result, 1)
+	go func() {
+		entries, err := walkTree(wd, nil)
+		done <- result{entries, err}
+	}()
+	var got result
+	select {
+	case got = <-done:
+	case <-time.After(15 * time.Second):
+		t.Fatal("walkTree blocked on a named pipe; it must never open a non-regular file")
+	}
+	if got.err != nil {
+		t.Fatalf("walkTree: %v", got.err)
+	}
+
+	var pipe *treeEntry
+	for i := range got.entries {
+		if got.entries[i].rel == "pipe" {
+			pipe = &got.entries[i]
+		}
+	}
+	if pipe == nil {
+		t.Fatalf("the pipe is missing from the walk: %+v", got.entries)
+	}
+	if pipe.kind == "file" {
+		t.Errorf("pipe recorded as a regular file: %+v", *pipe)
+	}
+	if pipe.hash != "" {
+		t.Errorf("pipe was hashed: %+v", *pipe)
+	}
+	if line := pipe.manifestLine(); !strings.Contains(line, "pipe") || strings.Contains(line, "sha256:") {
+		t.Errorf("manifest line = %q, want it to name the entry without a hash", line)
+	}
+}
+
+// TestCheckDir_RecursiveOverAPipeStillMatches proves the matchers keep working
+// with an unopenable entry in the tree: the pipe is a present path, and the
+// file-only count does not count it.
+func TestCheckDir_RecursiveOverAPipeStillMatches(t *testing.T) {
+	t.Parallel()
+	wd := t.TempDir()
+	if err := os.WriteFile(filepath.Join(wd, "real.txt"), []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	mkfifo(t, filepath.Join(wd, "pipe"))
+
+	one := 1
+	d := &spec.DirAssert{Path: ".", Recursive: true, Contains: spec.StringList{"pipe", "real.txt"}, Count: &one}
+	if cr := checkDirRecursive(d, wd); cr != nil {
+		t.Errorf("recursive matchers over a tree holding a pipe failed: %s / %s", cr.Hint, cr.Actual)
 	}
 }
 

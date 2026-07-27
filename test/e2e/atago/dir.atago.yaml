@@ -162,3 +162,71 @@ scenarios:
             contains:
               - 'exists but is a regular file'
               - 'use a file: assertion'
+
+  # A program under test can leave an entry that is not a regular file — a named
+  # pipe from a `mkfifo`, a socket from a daemon. Hashing it meant opening it, and
+  # opening a pipe for reading blocks until something writes to it, which no step
+  # timeout covers: the run hung instead of finishing in milliseconds. The pipe is
+  # a directory entry like any other; it is simply never opened.
+  - name: a named pipe in the tree does not block the walk
+    skip: {os: windows}
+    steps:
+      - run:
+          shell: true
+          command: "mkdir out && mkfifo out/pipe && printf 'x' > out/real.txt"
+      - assert:
+          dir:
+            path: out
+            recursive: true
+            contains: [pipe, real.txt]
+            # Counts are over regular files, so the pipe is not one of them.
+            count: 1
+      # The tree snapshot records what the entry is instead of a content hash.
+      # A nested spec keeps the written golden inside the scenario workdir.
+      - fixture:
+          file: treespec.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: treesnap}
+            scenarios:
+              - name: snapshot a tree holding a pipe
+                steps:
+                  - run: {shell: true, command: "mkdir out && mkfifo out/pipe && printf 'x' > out/real.txt"}
+                  - assert: {dir: {path: out, snapshot: pipe_tree}}
+      - run:
+          command: ${atago} run --update-snapshots treespec.atago.yaml
+      - assert: {exit_code: 0}
+      - run:
+          shell: true
+          command: "cat pipe_tree"
+      - assert:
+          stdout:
+            contains:
+              - "fifo pipe"
+              - "file real.txt sha256:"
+      # And the written golden verifies on a second run: update then check is
+      # idempotent for a tree that holds an unopenable entry.
+      - run:
+          command: ${atago} run treespec.atago.yaml
+      - assert: {exit_code: 0}
+
+  - name: a file assertion on a named pipe fails instead of hanging
+    skip: {os: windows}
+    steps:
+      - fixture:
+          file: piped.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: piped}
+            scenarios:
+              - name: the tool left a pipe where a file was expected
+                steps:
+                  - run: {shell: true, command: "mkfifo out.txt"}
+                  - assert: {file: {path: out.txt, equals: "data"}}
+      - run:
+          command: ${atago} run piped.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - "is a named pipe, not a regular file"
