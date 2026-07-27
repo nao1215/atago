@@ -1123,7 +1123,7 @@ inside
 # interactive (pty): yazi --cwd-file ${workdir}/cwd.txt .
 ```
 #### Then
-- file `cwd.txt` is checked
+- file `cwd.txt` does not contain `/sub`
 ### Scenario: right arrow enters a spaced directory before choosing a file
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -2453,7 +2453,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 ```
 #### Then
 - exit code is `0`
-- file `cwd.txt` is checked
+- file `cwd.txt` does not contain `a-dir`
 ### Scenario: tabs preserve per-tab cwd and q writes the active tab cwd
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given

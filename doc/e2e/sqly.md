@@ -691,9 +691,9 @@ sqly user.csv
 ```
 #### Then
 - exit code is `0`
-- stdout equals an exact value
-- stdout equals an exact value
-- stdout equals an exact value
+- stdout line `1` equals an exact value
+- stdout line `2` equals an exact value
+- stdout line `3` equals an exact value
 - stderr contains `Change output mode`
 ### Scenario: runs a multiline WITH (CTE) query
 #### Given
@@ -928,7 +928,7 @@ sqly u.csv
 - exit code is `1`
 - stdout contains `affected`
 - stderr does not contain `Saved`
-- file `u.csv` is checked
+- file `u.csv` does not contain `BROKEN`
 ### Scenario: does not run .dump after an earlier failure
 #### Given
 - Fixture file `u.csv` is created.
@@ -1321,7 +1321,7 @@ sqly --csv --sql "SELECT user_name, position FROM user INNER JOIN identifier ON 
 ```
 #### Then
 - exit code is `0`
-- stdout equals an exact value
+- stdout line `1` equals an exact value
 - stdout contains `booker12`
 ### Scenario: writes JSON results to the given path with --output
 #### Given
@@ -1355,7 +1355,7 @@ sqly --sql "SELECT user_name FROM user ORDER BY identifier LIMIT 1" user.csv --c
 ```
 #### Then
 - exit code is `0`
-- stdout equals an exact value
+- stdout line `1` equals an exact value
 - stdout contains `booker12`
 ### Scenario: fails fast on an unknown flag after the file path
 #### Given
@@ -1594,7 +1594,7 @@ sqly --compare --compare-format text zebra.csv ant.csv
 ```
 #### Then
 - exit code is `0`
-- stdout equals an exact value
+- stdout line `1` equals an exact value
 ### Scenario: reverses left and right when the inputs are swapped
 #### Given
 - Fixture file `zebra.csv` is created.
@@ -1616,7 +1616,7 @@ sqly --compare --compare-format text ant.csv zebra.csv
 ```
 #### Then
 - exit code is `0`
-- stdout equals an exact value
+- stdout line `1` equals an exact value
 ### Scenario: keeps the keyed diff correct on a larger input
 #### Given
 - Fixture file `big1.csv` is created.
@@ -1697,7 +1697,7 @@ sqly --csv --sql "SELECT p.name, p.price, s.quantity, ROUND(p.price * s.quantity
 ```
 #### Then
 - exit code is `0`
-- stdout equals an exact value
+- stdout line `1` equals an exact value
 - stdout contains `Laptop`, `2999.97`
 ## sqly empty command arguments
 Source: `test/e2e/tools/sqly/empty_args.atago.yaml`
@@ -1723,7 +1723,7 @@ sqly u.csv
 - exit code is `1`
 - stdout contains `affected`
 - stderr contains `.save requires`
-- file `u.csv` is checked
+- file `u.csv` does not contain `EMPTY`
 ### Scenario: rejects .dump with an empty destination
 #### Given
 - Fixture file `user.csv` is created.
@@ -1777,7 +1777,7 @@ sqly --excel --output out.xlsx --sql "SELECT * FROM user LIMIT 1" user.csv
 - exit code is `0`
 - stderr contains `output mode=excel`
 - file `out.xlsx` exists
-- file `out.xlsx` is checked
+- file `out.xlsx` is not executable
 #### Generated artifacts
 - `out.xlsx`
 ### Scenario: writes a non-executable .xlsx with the .dump command
@@ -1802,7 +1802,7 @@ sqly user.csv
 - exit code is `0`
 - stderr contains `mode=excel`
 - file `dump.xlsx` exists
-- file `dump.xlsx` is checked
+- file `dump.xlsx` is not executable
 #### Generated artifacts
 - `dump.xlsx`
 ## sqly export format inference
@@ -1843,7 +1843,7 @@ sqly --sql "SELECT user_name FROM user ORDER BY identifier LIMIT 1" user.csv --o
 - exit code is `0`
 - stderr contains `output mode=ndjson`
 - file `result.ndjson.gz` exists
-- file `result.ndjson.gz` is checked
+- file `result.ndjson.gz` does not contain `booker12`
 #### Generated artifacts
 - `result.ndjson.gz`
 ### Scenario: re-imports a gzip-compressed csv it wrote
@@ -1864,8 +1864,8 @@ sqly --csv --sql "SELECT user_name FROM result LIMIT 1" result.csv.gz
 #### Then
 - after `sqly --csv --sql "SELECT user_name FROM result LIMIT 1" result.csv.gz`:
   - exit code is `0`
-  - stdout equals an exact value
-  - stdout equals an exact value
+  - stdout line `1` equals an exact value
+  - stdout line `2` equals an exact value
 ### Scenario: writes the CSV fallback to an unknown extension path without rewriting it
 #### Given
 - Fixture file `user.csv` is created.
@@ -2404,7 +2404,7 @@ sqly --json user.csv
 ```
 #### Then
 - exit code is `0`
-- stdout equals an exact value
+- stdout line `1` equals an exact value
 ### Scenario: .import imports a quoted path containing a space as one argument
 #### Given
 - Fixture file `sqly_e2e space.csv` is created.
@@ -2467,7 +2467,7 @@ sqly user.csv
 - exit code is `0`
 - stderr contains `mode=tsv`
 - file `out.tsv` contains `user_name	identifier`
-- file `out.tsv` is checked
+- file `out.tsv` does not contain `user_name,identifier`
 ## sqly hermetic environment
 Source: `test/e2e/tools/sqly/hermetic.atago.yaml`
 ### Scenario: runs with HOME inside the sandbox
@@ -2584,7 +2584,7 @@ sqly --inspect user.csv
 #### Then
 - after `sqly --inspect user.csv`:
   - exit code is `0`
-  - stdout equals an exact value
+  - stdout line `1` equals an exact value
   - stdout contains `"name": "user"`
 ### Scenario: runs batch mode and warns when a history write fails after startup
 #### Given
@@ -2817,7 +2817,7 @@ sqly --inspect user.csv
 ```
 #### Then
 - exit code is `0`
-- stdout equals an exact value
+- stdout line `1` equals an exact value
 - stdout contains `"name": "user"`, `"row_count": 3`, `"user_name"`
 ### Scenario: maps every table from a multi-table ACH file to its source
 #### Given
@@ -2850,7 +2850,7 @@ sqly --inspect ins
 ```
 #### Then
 - exit code is `0`
-- stdout equals an exact value
+- stdout line `1` equals an exact value
 - stdout contains `"name": "a"`, `"name": "b"`
 - stderr does not contain `Successfully imported`
 ### Scenario: fails with a clear error when no input is given
@@ -3007,7 +3007,7 @@ sqly --csv --sql "SELECT user_name FROM user" user.csv
 ```
 #### Then
 - after `sqly --csv --sql "SELECT COUNT(*) AS c FROM user" user.csv`:
-  - stdout equals an exact value
+  - stdout line `2` equals an exact value
 - after `sqly --csv --sql "SELECT user_name FROM user" user.csv`:
   - stdout contains `booker12`, `jenkins46`, `grey07`
 ### Scenario: WHERE 1=1 returns all rows and WHERE 1=0 returns none
@@ -3028,7 +3028,7 @@ sqly --json --sql "SELECT user_name FROM user WHERE 1=0" user.csv
 ```
 #### Then
 - after `sqly --csv --sql "SELECT COUNT(*) AS c FROM user WHERE 1=1" user.csv`:
-  - stdout equals an exact value
+  - stdout line `2` equals an exact value
 - after `sqly --json --sql "SELECT user_name FROM user WHERE 1=0" user.csv`:
   - stdout equals an exact value
 ### Scenario: ORDER BY preserves the row multiset
@@ -3048,7 +3048,7 @@ sqly --csv --sql "SELECT user_name FROM user ORDER BY user_name DESC" user.csv
 ```
 #### Then
 - exit code is `0`
-- stdout equals an exact value
+- stdout line `2` equals an exact value
 - stdout contains `grey07`, `booker12`
 ### Scenario: csv and ndjson yield the same rows
 #### Given
@@ -3066,8 +3066,8 @@ grey07,3
 sqly --ndjson --sql "SELECT user_name FROM user ORDER BY identifier" user.csv
 ```
 #### Then
-- stdout equals an exact value
-- stdout equals an exact value
+- stdout line `1` equals an exact value
+- stdout line `3` equals an exact value
 ### Scenario: CSV dump reimported yields identical data
 #### Given
 - Fixture file `user.csv` is created.
@@ -3091,9 +3091,9 @@ sqly --csv --sql "SELECT * FROM rt ORDER BY identifier" rt.csv
 #### Then
 - after `sqly --csv --sql "SELECT * FROM rt ORDER BY identifier" rt.csv`:
   - exit code is `0`
-  - stdout equals an exact value
-  - stdout equals an exact value
-  - stdout equals an exact value
+  - stdout line `1` equals an exact value
+  - stdout line `2` equals an exact value
+  - stdout line `4` equals an exact value
 ## sqly .mode banner routing
 Source: `test/e2e/tools/sqly/mode_banner.atago.yaml`
 ### Scenario: keeps stdout pure JSON after .mode json
@@ -3116,7 +3116,7 @@ sqly user.csv
 ```
 #### Then
 - exit code is `0`
-- stdout equals an exact value
+- stdout line `1` equals an exact value
 - stdout does not contain `Change output mode`
 - stderr contains `Change output mode from table to json`
 ### Scenario: keeps stdout pure NDJSON after .mode ndjson
@@ -3139,7 +3139,7 @@ sqly user.csv
 ```
 #### Then
 - exit code is `0`
-- stdout equals an exact value
+- stdout line `1` equals an exact value
 - stdout does not contain `Change output mode`
 - stderr contains `Change output mode from table to ndjson`
 ### Scenario: reports the typed mode by name and emits typed output after .mode json-typed
@@ -3184,7 +3184,7 @@ sqly --json --sql "SELECT user_name, identifier FROM user ORDER BY identifier LI
 ```
 #### Then
 - exit code is `0`
-- stdout equals an exact value
+- stdout line `1` equals an exact value
 - stdout contains `{"user_name":"booker12","identifier":"1"}`
 - stdout contains `{"user_name":"jenkins46","identifier":"2"}`
 ### Scenario: --json prints [] for an empty result
@@ -3220,8 +3220,8 @@ sqly --ndjson --sql "SELECT user_name, identifier FROM user ORDER BY identifier 
 ```
 #### Then
 - exit code is `0`
-- stdout equals an exact value
-- stdout equals an exact value
+- stdout line `1` equals an exact value
+- stdout line `2` equals an exact value
 ### Scenario: --ndjson prints nothing for an empty result
 #### Given
 - Fixture file `user.csv` is created.
@@ -3254,8 +3254,8 @@ sqly --csv --sql "SELECT user_name, identifier FROM user ORDER BY identifier LIM
 ```
 #### Then
 - exit code is `0`
-- stdout equals an exact value
-- stdout equals an exact value
+- stdout line `1` equals an exact value
+- stdout line `2` equals an exact value
 ## sqly --output requires --sql
 Source: `test/e2e/tools/sqly/output_requires_sql.atago.yaml`
 ### Scenario: rejects --output with no query
@@ -3394,7 +3394,7 @@ sqly --csv --sql "SELECT COUNT(*) AS c FROM user" user.parquet
   - file `user.parquet` exists
 - after `sqly --csv --sql "SELECT COUNT(*) AS c FROM user" user.parquet`:
   - exit code is `0`
-  - stdout equals an exact value
+  - stdout line `2` equals an exact value
 #### Generated artifacts
 - `user.parquet`
 ### Scenario: appends the .parquet extension
@@ -3500,7 +3500,7 @@ sqly --csv --sql "SELECT COUNT(*) AS c FROM user" a/b/c/d/e/f/g/h/i/j/k/user.csv
 ```
 #### Then
 - exit code is `0`
-- stdout equals an exact value
+- stdout line `2` equals an exact value
 ### Scenario: imports a file whose name literally contains ..%2f
 #### Given
 - Fixture file `..%2fuser.csv` is created.
@@ -3798,7 +3798,7 @@ sqly --csv --sql "SELECT user_name FROM user ORDER BY identifier LIMIT 1" user.c
 ```
 #### Then
 - exit code is `0`
-- stdout equals an exact value
+- stdout line `2` equals an exact value
 ### Scenario: queries a Parquet file
 #### Given
 - Fixture file `products.parquet` is created.
@@ -3808,7 +3808,7 @@ sqly --csv --sql "SELECT name FROM products ORDER BY CAST(price AS REAL) DESC LI
 ```
 #### Then
 - exit code is `0`
-- stdout equals an exact value
+- stdout line `2` equals an exact value
 ### Scenario: joins a compressed CSV with a plain CSV
 #### Given
 - Fixture file `user.csv.gz` is created.
@@ -3844,9 +3844,9 @@ smith79,3,Jamie,Smith
 sqly --csv --sql "SELECT user_name, identifier FROM user LIMIT 2" user.csv
 ```
 #### Then
-- stdout equals an exact value
-- stdout equals an exact value
-- stdout equals an exact value
+- stdout line `1` equals an exact value
+- stdout line `2` equals an exact value
+- stdout line `3` equals an exact value
 ### Scenario: renders JSON with --json
 #### Given
 - Fixture file `user.csv` is created.
@@ -3880,8 +3880,8 @@ smith79,3,Jamie,Smith
 sqly --ndjson --sql "SELECT user_name, identifier FROM user LIMIT 2" user.csv
 ```
 #### Then
-- stdout equals an exact value
-- stdout equals an exact value
+- stdout line `1` equals an exact value
+- stdout line `2` equals an exact value
 ### Scenario: renders a markdown table with --markdown
 #### Given
 - Fixture file `user.csv` is created.
@@ -3898,7 +3898,7 @@ smith79,3,Jamie,Smith
 sqly --markdown --sql "SELECT user_name, identifier FROM user LIMIT 2" user.csv
 ```
 #### Then
-- stdout equals an exact value
+- stdout line `1` equals an exact value
 - stdout contains `| booker12 | 1 |`
 ### Scenario: renders LTSV with --ltsv
 #### Given
@@ -3916,7 +3916,7 @@ smith79,3,Jamie,Smith
 sqly --ltsv --sql "SELECT user_name, identifier FROM user LIMIT 1" user.csv
 ```
 #### Then
-- stdout equals an exact value
+- stdout line `1` equals an exact value
 ### Scenario: writes CSV to the path given by --output
 #### Given
 - Fixture file `user.csv` is created.
@@ -4125,7 +4125,7 @@ sqly --sql "UPDATE user SET first_name = 'Rachelle' WHERE identifier = 1" --save
 - exit code is `0`
 - stdout contains `affected`
 - stderr contains `Saved user to`
-- file `user.csv` is checked
+- file `user.csv` does not contain `Rachelle`
 - file `out/user.csv` contains `Rachelle`
 ### Scenario: rejects --save without --force
 #### Given
@@ -4145,7 +4145,7 @@ sqly --sql "UPDATE user SET identifier = identifier + 100" --save user.csv
 #### Then
 - exit code is `1`
 - stderr contains `force`
-- file `user.csv` is checked
+- file `user.csv` does not contain `101`
 ### Scenario: rejects a schema-changing statement under --save-dir before writing anything
 #### Given
 - Fixture file `user.csv` is created.
@@ -4389,7 +4389,7 @@ sqly --sql "UPDATE u SET first_name = 'CHANGED' WHERE identifier = 1" u.csv --sa
 - exit code is `0`
 - stdout contains `affected`
 - stderr contains `Saved u to`
-- file `u.csv` is checked
+- file `u.csv` does not contain `CHANGED`
 - file `out/u.csv` contains `CHANGED`
 ### Scenario: refuses --save without --force
 #### Given
@@ -4408,7 +4408,7 @@ sqly --sql "UPDATE u SET first_name = 'X'" u.csv --save
 #### Then
 - exit code is `1`
 - stderr contains `--force`
-- file `u.csv` is checked
+- file `u.csv` does not contain `X,`
 ### Scenario: overwrites the source in place with --save --force
 #### Given
 - Fixture file `u.csv` is created.
@@ -4445,7 +4445,7 @@ sqly --csv --sql "SELECT COUNT(*) AS c FROM u" u.csv
 #### Then
 - after `sqly --csv --sql "SELECT COUNT(*) AS c FROM u" u.csv`:
   - exit code is `0`
-  - stdout equals an exact value
+  - stdout line `2` equals an exact value
 ### Scenario: preserves gzip compression on in-place save
 #### Given
 - Fixture file `c.csv.gz` is created.
@@ -4457,7 +4457,7 @@ sqly --csv --sql "SELECT first_name FROM c WHERE identifier = 1" c.csv.gz
 #### Then
 - after `sqly --csv --sql "SELECT first_name FROM c WHERE identifier = 1" c.csv.gz`:
   - exit code is `0`
-  - stdout equals an exact value
+  - stdout line `2` equals an exact value
 ### Scenario: saves via the .save command in batch mode
 #### Given
 - Fixture file `u.csv` is created.
@@ -5097,9 +5097,9 @@ sqly --stdin csv --csv --sql "SELECT name FROM stdin ORDER BY id"
 ```
 #### Then
 - exit code is `0`
-- stdout equals an exact value
-- stdout equals an exact value
-- stdout equals an exact value
+- stdout line `1` equals an exact value
+- stdout line `2` equals an exact value
+- stdout line `3` equals an exact value
 ### Scenario: queries piped TSV data
 #### Inputs
 _stdin for `sqly`:_
@@ -5721,7 +5721,7 @@ sqly --csv --sql "SELECT 'a,b' AS c"
 ```
 #### Then
 - exit code is `0`
-- stdout equals an exact value
+- stdout line `2` equals an exact value
 ### Scenario: quotes a CSV value containing a double quote
 #### When
 ```shell
@@ -5729,7 +5729,7 @@ sqly --csv --sql "SELECT 'a' || char(34) || 'b' AS c"
 ```
 #### Then
 - exit code is `0`
-- stdout equals an exact value
+- stdout line `2` equals an exact value
 ### Scenario: rejects an LTSV value containing a tab
 #### When
 ```shell
@@ -5769,7 +5769,7 @@ sqly --csv --sql "/* note */ SELECT 1 AS x"
 ```
 #### Then
 - exit code is `0`
-- stdout equals an exact value
+- stdout line `2` equals an exact value
 ### Scenario: accepts PRAGMA in direct --sql
 #### Given
 - Fixture file `user.csv` is created.
@@ -5904,7 +5904,7 @@ sqly --csv --sql "SELECT COUNT(*) AS n FROM empty" empty.json
 ```
 #### Then
 - exit code is `0`
-- stdout equals an exact value
+- stdout line `2` equals an exact value
 ### Scenario: imports an empty JSONL file as a zero-row table
 #### Given
 - Fixture file `empty.jsonl` is created.
@@ -5914,7 +5914,7 @@ sqly --csv --sql "SELECT COUNT(*) AS n FROM empty" empty.jsonl
 ```
 #### Then
 - exit code is `0`
-- stdout equals an exact value
+- stdout line `2` equals an exact value
 ### Scenario: rejects an --output path ending with a slash
 #### Given
 - Fixture file `user.csv` is created.
@@ -6430,7 +6430,7 @@ sqly --csv --sql "SELECT COUNT(*) AS c FROM stdin" /dev/stdin
 ```
 #### Then
 - exit code is `0`
-- stdout equals an exact value
+- stdout line `2` equals an exact value
 ### Scenario: imports /proc/self/fd/0 as CSV
 _only on Linux_
 #### Inputs
@@ -6447,7 +6447,7 @@ sqly --csv --sql "SELECT COUNT(*) AS c FROM sheet_0" /proc/self/fd/0
 ```
 #### Then
 - exit code is `0`
-- stdout equals an exact value
+- stdout line `2` equals an exact value
 ### Scenario: rejects --output to a multi-compressed ACH destination
 #### Given
 - Fixture file `user.csv` is created.

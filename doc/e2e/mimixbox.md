@@ -2085,8 +2085,8 @@ ar rc lib.a a.txt b.txt && ar t lib.a
 ```
 #### Then
 - exit code is `0`
-- stdout equals an exact value
-- stdout equals an exact value
+- stdout line `1` equals an exact value
+- stdout line `2` equals an exact value
 ### Scenario: extracts a member
 #### Given
 - Fixture file `a.txt` is created.
@@ -2457,8 +2457,8 @@ rpm -qpl sample.rpm
 ```
 #### Then
 - exit code is `0`
-- stdout equals an exact value
-- stdout equals an exact value
+- stdout line `1` equals an exact value
+- stdout line `2` equals an exact value
 ### Scenario: extracts the payload with rpm2cpio
 #### Given
 - Fixture file `sample.rpm` is created.
@@ -3802,7 +3802,7 @@ diff a b
 ```
 #### Then
 - exit code is `1`
-- stdout equals an exact value
+- stdout line `1` equals an exact value
 ### Scenario: is silent and succeeds for identical files
 #### Given
 - Fixture file `a` is created.
@@ -4002,8 +4002,8 @@ printf '1\n2\n3\n' | sed '2d'
 ```
 #### Then
 - exit code is `0`
-- stdout equals an exact value
-- stdout equals an exact value
+- stdout line `1` equals an exact value
+- stdout line `2` equals an exact value
 ### Scenario: prints a single line with -n
 #### When
 ```shell
@@ -4265,7 +4265,7 @@ xz --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: xz/`
+- stdout line `1` matches `/^Usage: xz/`
 - stdout contains `Examples:`, `Exit status:`, `  xz `
 ### Scenario: unxz --help exposes the documented sections
 #### When
@@ -4274,7 +4274,7 @@ unxz --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: unxz/`
+- stdout line `1` matches `/^Usage: unxz/`
 - stdout contains `Examples:`, `Exit status:`, `  unxz `
 ### Scenario: xzcat --help exposes the documented sections
 #### When
@@ -4283,7 +4283,7 @@ xzcat --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: xzcat/`
+- stdout line `1` matches `/^Usage: xzcat/`
 - stdout contains `Examples:`, `Exit status:`, `  xzcat `
 ### Scenario: lzma --help exposes the documented sections
 #### When
@@ -4292,7 +4292,7 @@ lzma --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: lzma/`
+- stdout line `1` matches `/^Usage: lzma/`
 - stdout contains `Examples:`, `Exit status:`, `  lzma `
 ### Scenario: unlzma --help exposes the documented sections
 #### When
@@ -4301,7 +4301,7 @@ unlzma --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: unlzma/`
+- stdout line `1` matches `/^Usage: unlzma/`
 - stdout contains `Examples:`, `Exit status:`, `  unlzma `
 ### Scenario: lzcat --help exposes the documented sections
 #### When
@@ -4310,7 +4310,7 @@ lzcat --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: lzcat/`
+- stdout line `1` matches `/^Usage: lzcat/`
 - stdout contains `Examples:`, `Exit status:`, `  lzcat `
 ### Scenario: lzop --help exposes the documented sections
 #### When
@@ -4319,7 +4319,7 @@ lzop --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: lzop/`
+- stdout line `1` matches `/^Usage: lzop/`
 - stdout contains `Examples:`, `Exit status:`, `  lzop `
 ### Scenario: unlzop --help exposes the documented sections
 #### When
@@ -4328,7 +4328,7 @@ unlzop --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: unlzop/`
+- stdout line `1` matches `/^Usage: unlzop/`
 - stdout contains `Examples:`, `Exit status:`, `  unlzop `
 ### Scenario: lzopcat --help exposes the documented sections
 #### When
@@ -4337,7 +4337,7 @@ lzopcat --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: lzopcat/`
+- stdout line `1` matches `/^Usage: lzopcat/`
 - stdout contains `Examples:`, `Exit status:`, `  lzopcat `
 ### Scenario: zcat --help exposes the documented sections
 #### When
@@ -4346,7 +4346,7 @@ zcat --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: zcat/`
+- stdout line `1` matches `/^Usage: zcat/`
 - stdout contains `Examples:`, `Exit status:`, `  zcat `
 ### Scenario: bzcat --help exposes the documented sections
 #### When
@@ -4355,7 +4355,7 @@ bzcat --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: bzcat/`
+- stdout line `1` matches `/^Usage: bzcat/`
 - stdout contains `Examples:`, `Exit status:`, `  bzcat `
 ### Scenario: unit --help exposes the documented sections
 #### When
@@ -4364,7 +4364,7 @@ unit --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: unit/`
+- stdout line `1` matches `/^Usage: unit/`
 - stdout contains `Examples:`, `Exit status:`, `  unit `
 ## mimixbox --help exit-status contract
 Source: `test/e2e/tools/mimixbox/embedded/help_exit_status.atago.yaml`
@@ -4375,7 +4375,7 @@ ash --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: ash/`
+- stdout line `1` matches `/^Usage: ash/`
 - stdout contains `Exit status:`
 ### Scenario: bash --help exposes the documented sections
 #### When
@@ -4384,7 +4384,7 @@ bash --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: bash/`
+- stdout line `1` matches `/^Usage: bash/`
 - stdout contains `Exit status:`
 ### Scenario: bc --help exposes the documented sections
 #### When
@@ -4393,7 +4393,7 @@ bc --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: bc/`
+- stdout line `1` matches `/^Usage: bc/`
 - stdout contains `Exit status:`
 ### Scenario: busybox --help exposes the documented sections
 #### When
@@ -4402,7 +4402,7 @@ busybox --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: busybox/`
+- stdout line `1` matches `/^Usage: busybox/`
 - stdout contains `Exit status:`
 ### Scenario: cttyhack --help exposes the documented sections
 #### When
@@ -4411,7 +4411,7 @@ cttyhack --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: cttyhack/`
+- stdout line `1` matches `/^Usage: cttyhack/`
 - stdout contains `Exit status:`
 ### Scenario: dc --help exposes the documented sections
 #### When
@@ -4420,7 +4420,7 @@ dc --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: dc/`
+- stdout line `1` matches `/^Usage: dc/`
 - stdout contains `Exit status:`
 ### Scenario: ed --help exposes the documented sections
 #### When
@@ -4429,7 +4429,7 @@ ed --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: ed/`
+- stdout line `1` matches `/^Usage: ed/`
 - stdout contains `Exit status:`
 ### Scenario: hd --help exposes the documented sections
 #### When
@@ -4438,7 +4438,7 @@ hd --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: hd/`
+- stdout line `1` matches `/^Usage: hd/`
 - stdout contains `Exit status:`
 ### Scenario: hexdump --help exposes the documented sections
 #### When
@@ -4447,7 +4447,7 @@ hexdump --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: hexdump/`
+- stdout line `1` matches `/^Usage: hexdump/`
 - stdout contains `Exit status:`
 ### Scenario: hush --help exposes the documented sections
 #### When
@@ -4456,7 +4456,7 @@ hush --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: hush/`
+- stdout line `1` matches `/^Usage: hush/`
 - stdout contains `Exit status:`
 ### Scenario: iostat --help exposes the documented sections
 #### When
@@ -4465,7 +4465,7 @@ iostat --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: iostat/`
+- stdout line `1` matches `/^Usage: iostat/`
 - stdout contains `Exit status:`
 ### Scenario: ipcs --help exposes the documented sections
 #### When
@@ -4474,7 +4474,7 @@ ipcs --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: ipcs/`
+- stdout line `1` matches `/^Usage: ipcs/`
 - stdout contains `Exit status:`
 ### Scenario: last --help exposes the documented sections
 #### When
@@ -4483,7 +4483,7 @@ last --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: last/`
+- stdout line `1` matches `/^Usage: last/`
 - stdout contains `Exit status:`
 ### Scenario: less --help exposes the documented sections
 #### When
@@ -4492,7 +4492,7 @@ less --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: less/`
+- stdout line `1` matches `/^Usage: less/`
 - stdout contains `Exit status:`
 ### Scenario: lsblk --help exposes the documented sections
 #### When
@@ -4501,7 +4501,7 @@ lsblk --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: lsblk/`
+- stdout line `1` matches `/^Usage: lsblk/`
 - stdout contains `Exit status:`
 ### Scenario: lspci --help exposes the documented sections
 #### When
@@ -4510,7 +4510,7 @@ lspci --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: lspci/`
+- stdout line `1` matches `/^Usage: lspci/`
 - stdout contains `Exit status:`
 ### Scenario: lsusb --help exposes the documented sections
 #### When
@@ -4519,7 +4519,7 @@ lsusb --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: lsusb/`
+- stdout line `1` matches `/^Usage: lsusb/`
 - stdout contains `Exit status:`
 ### Scenario: mbsh --help exposes the documented sections
 #### When
@@ -4528,7 +4528,7 @@ mbsh --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: mbsh/`
+- stdout line `1` matches `/^Usage: mbsh/`
 - stdout contains `Exit status:`
 ### Scenario: minips --help exposes the documented sections
 #### When
@@ -4537,7 +4537,7 @@ minips --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: minips/`
+- stdout line `1` matches `/^Usage: minips/`
 - stdout contains `Exit status:`
 ### Scenario: more --help exposes the documented sections
 #### When
@@ -4546,7 +4546,7 @@ more --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: more/`
+- stdout line `1` matches `/^Usage: more/`
 - stdout contains `Exit status:`
 ### Scenario: mpstat --help exposes the documented sections
 #### When
@@ -4555,7 +4555,7 @@ mpstat --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: mpstat/`
+- stdout line `1` matches `/^Usage: mpstat/`
 - stdout contains `Exit status:`
 ### Scenario: nmeter --help exposes the documented sections
 #### When
@@ -4564,7 +4564,7 @@ nmeter --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: nmeter/`
+- stdout line `1` matches `/^Usage: nmeter/`
 - stdout contains `Exit status:`
 ### Scenario: pipe_progress --help exposes the documented sections
 #### When
@@ -4573,7 +4573,7 @@ pipe_progress --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: pipe_progress/`
+- stdout line `1` matches `/^Usage: pipe_progress/`
 - stdout contains `Exit status:`
 ### Scenario: powertop --help exposes the documented sections
 #### When
@@ -4582,7 +4582,7 @@ powertop --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: powertop/`
+- stdout line `1` matches `/^Usage: powertop/`
 - stdout contains `Exit status:`
 ### Scenario: ps --help exposes the documented sections
 #### When
@@ -4591,7 +4591,7 @@ ps --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: ps/`
+- stdout line `1` matches `/^Usage: ps/`
 - stdout contains `Exit status:`
 ### Scenario: pstree --help exposes the documented sections
 #### When
@@ -4600,7 +4600,7 @@ pstree --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: pstree/`
+- stdout line `1` matches `/^Usage: pstree/`
 - stdout contains `Exit status:`
 ### Scenario: sh --help exposes the documented sections
 #### When
@@ -4609,7 +4609,7 @@ sh --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: sh/`
+- stdout line `1` matches `/^Usage: sh/`
 - stdout contains `Exit status:`
 ### Scenario: smemcap --help exposes the documented sections
 #### When
@@ -4618,7 +4618,7 @@ smemcap --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: smemcap/`
+- stdout line `1` matches `/^Usage: smemcap/`
 - stdout contains `Exit status:`
 ### Scenario: top --help exposes the documented sections
 #### When
@@ -4627,7 +4627,7 @@ top --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: top/`
+- stdout line `1` matches `/^Usage: top/`
 - stdout contains `Exit status:`
 ### Scenario: uptime --help exposes the documented sections
 #### When
@@ -4636,7 +4636,7 @@ uptime --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: uptime/`
+- stdout line `1` matches `/^Usage: uptime/`
 - stdout contains `Exit status:`
 ### Scenario: users --help exposes the documented sections
 #### When
@@ -4645,7 +4645,7 @@ users --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: users/`
+- stdout line `1` matches `/^Usage: users/`
 - stdout contains `Exit status:`
 ### Scenario: uudecode --help exposes the documented sections
 #### When
@@ -4654,7 +4654,7 @@ uudecode --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: uudecode/`
+- stdout line `1` matches `/^Usage: uudecode/`
 - stdout contains `Exit status:`
 ### Scenario: uuencode --help exposes the documented sections
 #### When
@@ -4663,7 +4663,7 @@ uuencode --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: uuencode/`
+- stdout line `1` matches `/^Usage: uuencode/`
 - stdout contains `Exit status:`
 ### Scenario: vi --help exposes the documented sections
 #### When
@@ -4672,7 +4672,7 @@ vi --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: vi/`
+- stdout line `1` matches `/^Usage: vi/`
 - stdout contains `Exit status:`
 ### Scenario: vmstat --help exposes the documented sections
 #### When
@@ -4681,7 +4681,7 @@ vmstat --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: vmstat/`
+- stdout line `1` matches `/^Usage: vmstat/`
 - stdout contains `Exit status:`
 ### Scenario: w --help exposes the documented sections
 #### When
@@ -4690,7 +4690,7 @@ w --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: w/`
+- stdout line `1` matches `/^Usage: w/`
 - stdout contains `Exit status:`
 ### Scenario: wall --help exposes the documented sections
 #### When
@@ -4699,7 +4699,7 @@ wall --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: wall/`
+- stdout line `1` matches `/^Usage: wall/`
 - stdout contains `Exit status:`
 ## mimixbox embedded --help helpers
 Source: `test/e2e/tools/mimixbox/embedded/help_helpers_embedded.atago.yaml`
@@ -4808,7 +4808,7 @@ acpid --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: acpid/`
+- stdout line `1` matches `/^Usage: acpid/`
 - stdout contains `Notes:`
 ### Scenario: brctl --help exposes the documented sections
 #### When
@@ -4817,7 +4817,7 @@ brctl --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: brctl/`
+- stdout line `1` matches `/^Usage: brctl/`
 - stdout contains `Notes:`
 ### Scenario: crond --help exposes the documented sections
 #### When
@@ -4826,7 +4826,7 @@ crond --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: crond/`
+- stdout line `1` matches `/^Usage: crond/`
 - stdout contains `Notes:`
 ### Scenario: ifenslave --help exposes the documented sections
 #### When
@@ -4835,7 +4835,7 @@ ifenslave --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: ifenslave/`
+- stdout line `1` matches `/^Usage: ifenslave/`
 - stdout contains `Notes:`
 ### Scenario: mkfs.reiser --help exposes the documented sections
 #### When
@@ -4844,7 +4844,7 @@ mkfs.reiser --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: mkfs\.reiser/`
+- stdout line `1` matches `/^Usage: mkfs\.reiser/`
 - stdout contains `Notes:`
 ### Scenario: nbd-client --help exposes the documented sections
 #### When
@@ -4853,7 +4853,7 @@ nbd-client --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: nbd\-client/`
+- stdout line `1` matches `/^Usage: nbd\-client/`
 - stdout contains `Notes:`
 ### Scenario: ssl_server --help exposes the documented sections
 #### When
@@ -4862,7 +4862,7 @@ ssl_server --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: ssl_server/`
+- stdout line `1` matches `/^Usage: ssl_server/`
 - stdout contains `Notes:`
 ### Scenario: tunctl --help exposes the documented sections
 #### When
@@ -4871,7 +4871,7 @@ tunctl --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: tunctl/`
+- stdout line `1` matches `/^Usage: tunctl/`
 - stdout contains `Notes:`
 ### Scenario: vconfig --help exposes the documented sections
 #### When
@@ -4880,7 +4880,7 @@ vconfig --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: vconfig/`
+- stdout line `1` matches `/^Usage: vconfig/`
 - stdout contains `Notes:`
 ### Scenario: zcip --help exposes the documented sections
 #### When
@@ -4889,7 +4889,7 @@ zcip --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: zcip/`
+- stdout line `1` matches `/^Usage: zcip/`
 - stdout contains `Notes:`
 ### Scenario: [ --help exposes the documented sections
 #### When
@@ -4898,7 +4898,7 @@ env [ --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: \[/`
+- stdout line `1` matches `/^Usage: \[/`
 - stdout contains `Notes:`
 ### Scenario: [[ --help exposes the documented sections
 #### When
@@ -4907,7 +4907,7 @@ env [[ --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: \[\[/`
+- stdout line `1` matches `/^Usage: \[\[/`
 - stdout contains `Notes:`
 ## mimixbox structured --help sections
 Source: `test/e2e/tools/mimixbox/embedded/help_structured_sections.atago.yaml`
@@ -4918,7 +4918,7 @@ ln --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: ln/`
+- stdout line `1` matches `/^Usage: ln/`
 - stdout contains `Examples:`, `Exit status:`, `  ln `
 ### Scenario: log-collect --help exposes the documented sections
 #### When
@@ -4927,7 +4927,7 @@ log-collect --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: log\-collect/`
+- stdout line `1` matches `/^Usage: log\-collect/`
 - stdout contains `Examples:`, `Exit status:`, `  log-collect `
 ### Scenario: logname --help exposes the documented sections
 #### When
@@ -4936,7 +4936,7 @@ logname --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: logname/`
+- stdout line `1` matches `/^Usage: logname/`
 - stdout contains `Examples:`, `Exit status:`, `  logname `
 ### Scenario: md5sum --help exposes the documented sections
 #### When
@@ -4945,7 +4945,7 @@ md5sum --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: md5sum/`
+- stdout line `1` matches `/^Usage: md5sum/`
 - stdout contains `Examples:`, `Exit status:`, `  md5sum `
 ### Scenario: mkdir --help exposes the documented sections
 #### When
@@ -4954,7 +4954,7 @@ mkdir --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: mkdir/`
+- stdout line `1` matches `/^Usage: mkdir/`
 - stdout contains `Examples:`, `Exit status:`, `  mkdir `
 ### Scenario: mkfifo --help exposes the documented sections
 #### When
@@ -4963,7 +4963,7 @@ mkfifo --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: mkfifo/`
+- stdout line `1` matches `/^Usage: mkfifo/`
 - stdout contains `Examples:`, `Exit status:`, `  mkfifo `
 ### Scenario: mknod --help exposes the documented sections
 #### When
@@ -4972,7 +4972,7 @@ mknod --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: mknod/`
+- stdout line `1` matches `/^Usage: mknod/`
 - stdout contains `Examples:`, `Exit status:`, `  mknod `
 ### Scenario: mktemp --help exposes the documented sections
 #### When
@@ -4981,7 +4981,7 @@ mktemp --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: mktemp/`
+- stdout line `1` matches `/^Usage: mktemp/`
 - stdout contains `Examples:`, `Exit status:`, `  mktemp `
 ### Scenario: mountpoint --help exposes the documented sections
 #### When
@@ -4990,7 +4990,7 @@ mountpoint --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: mountpoint/`
+- stdout line `1` matches `/^Usage: mountpoint/`
 - stdout contains `Examples:`, `Exit status:`, `  mountpoint `
 ### Scenario: mv --help exposes the documented sections
 #### When
@@ -4999,7 +4999,7 @@ mv --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: mv/`
+- stdout line `1` matches `/^Usage: mv/`
 - stdout contains `Examples:`, `Exit status:`, `  mv `
 ### Scenario: nc --help exposes the documented sections
 #### When
@@ -5008,7 +5008,7 @@ nc --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: nc/`
+- stdout line `1` matches `/^Usage: nc/`
 - stdout contains `Examples:`, `Exit status:`, `  nc `
 ### Scenario: netcat --help exposes the documented sections
 #### When
@@ -5017,7 +5017,7 @@ netcat --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: netcat/`
+- stdout line `1` matches `/^Usage: netcat/`
 - stdout contains `Examples:`, `Exit status:`, `  netcat `
 ### Scenario: nl --help exposes the documented sections
 #### When
@@ -5026,7 +5026,7 @@ nl --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: nl/`
+- stdout line `1` matches `/^Usage: nl/`
 - stdout contains `Examples:`, `Exit status:`, `  nl `
 ### Scenario: nohup --help exposes the documented sections
 #### When
@@ -5035,7 +5035,7 @@ nohup --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: nohup/`
+- stdout line `1` matches `/^Usage: nohup/`
 - stdout contains `Examples:`, `Exit status:`, `  nohup `
 ### Scenario: nproc --help exposes the documented sections
 #### When
@@ -5044,7 +5044,7 @@ nproc --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: nproc/`
+- stdout line `1` matches `/^Usage: nproc/`
 - stdout contains `Examples:`, `Exit status:`, `  nproc `
 ### Scenario: nyancat --help exposes the documented sections
 #### When
@@ -5053,7 +5053,7 @@ nyancat --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: nyancat/`
+- stdout line `1` matches `/^Usage: nyancat/`
 - stdout contains `Examples:`, `Exit status:`, `  nyancat `
 ### Scenario: od --help exposes the documented sections
 #### When
@@ -5062,7 +5062,7 @@ od --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: od/`
+- stdout line `1` matches `/^Usage: od/`
 - stdout contains `Examples:`, `Exit status:`, `  od `
 ### Scenario: paste --help exposes the documented sections
 #### When
@@ -5071,7 +5071,7 @@ paste --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: paste/`
+- stdout line `1` matches `/^Usage: paste/`
 - stdout contains `Examples:`, `Exit status:`, `  paste `
 ### Scenario: patch --help exposes the documented sections
 #### When
@@ -5080,7 +5080,7 @@ patch --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: patch/`
+- stdout line `1` matches `/^Usage: patch/`
 - stdout contains `Examples:`, `Exit status:`, `  patch `
 ### Scenario: path --help exposes the documented sections
 #### When
@@ -5089,7 +5089,7 @@ path --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: path/`
+- stdout line `1` matches `/^Usage: path/`
 - stdout contains `Examples:`, `Exit status:`, `  path `
 ### Scenario: pidof --help exposes the documented sections
 #### When
@@ -5098,7 +5098,7 @@ pidof --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: pidof/`
+- stdout line `1` matches `/^Usage: pidof/`
 - stdout contains `Examples:`, `Exit status:`, `  pidof `
 ### Scenario: ping --help exposes the documented sections
 #### When
@@ -5107,7 +5107,7 @@ ping --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: ping/`
+- stdout line `1` matches `/^Usage: ping/`
 - stdout contains `Examples:`, `Exit status:`, `  ping `
 ### Scenario: posixer --help exposes the documented sections
 #### When
@@ -5116,7 +5116,7 @@ posixer --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: posixer/`
+- stdout line `1` matches `/^Usage: posixer/`
 - stdout contains `Examples:`, `Exit status:`, `  posixer `
 ### Scenario: poweroff --help exposes the documented sections
 #### When
@@ -5125,7 +5125,7 @@ poweroff --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: poweroff/`
+- stdout line `1` matches `/^Usage: poweroff/`
 - stdout contains `Examples:`, `Exit status:`, `  poweroff `
 ### Scenario: printenv --help exposes the documented sections
 #### When
@@ -5134,7 +5134,7 @@ printenv --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: printenv/`
+- stdout line `1` matches `/^Usage: printenv/`
 - stdout contains `Examples:`, `Exit status:`, `  printenv `
 ### Scenario: pwcrack --help exposes the documented sections
 #### When
@@ -5143,7 +5143,7 @@ pwcrack --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: pwcrack/`
+- stdout line `1` matches `/^Usage: pwcrack/`
 - stdout contains `Examples:`, `Exit status:`, `  pwcrack `
 ### Scenario: pwgen --help exposes the documented sections
 #### When
@@ -5152,7 +5152,7 @@ pwgen --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: pwgen/`
+- stdout line `1` matches `/^Usage: pwgen/`
 - stdout contains `Examples:`, `Exit status:`, `  pwgen `
 ### Scenario: pwscore --help exposes the documented sections
 #### When
@@ -5161,7 +5161,7 @@ pwscore --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: pwscore/`
+- stdout line `1` matches `/^Usage: pwscore/`
 - stdout contains `Examples:`, `Exit status:`, `  pwscore `
 ### Scenario: readlink --help exposes the documented sections
 #### When
@@ -5170,7 +5170,7 @@ readlink --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: readlink/`
+- stdout line `1` matches `/^Usage: readlink/`
 - stdout contains `Examples:`, `Exit status:`, `  readlink `
 ### Scenario: realpath --help exposes the documented sections
 #### When
@@ -5179,7 +5179,7 @@ realpath --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: realpath/`
+- stdout line `1` matches `/^Usage: realpath/`
 - stdout contains `Examples:`, `Exit status:`, `  realpath `
 ### Scenario: reboot --help exposes the documented sections
 #### When
@@ -5188,7 +5188,7 @@ reboot --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: reboot/`
+- stdout line `1` matches `/^Usage: reboot/`
 - stdout contains `Examples:`, `Exit status:`, `  reboot `
 ### Scenario: remove-shell --help exposes the documented sections
 #### When
@@ -5197,7 +5197,7 @@ remove-shell --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: remove\-shell/`
+- stdout line `1` matches `/^Usage: remove\-shell/`
 - stdout contains `Examples:`, `Exit status:`, `  remove-shell `
 ### Scenario: reset --help exposes the documented sections
 #### When
@@ -5206,7 +5206,7 @@ reset --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: reset/`
+- stdout line `1` matches `/^Usage: reset/`
 - stdout contains `Examples:`, `Exit status:`, `  reset `
 ### Scenario: resize --help exposes the documented sections
 #### When
@@ -5215,7 +5215,7 @@ resize --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: resize/`
+- stdout line `1` matches `/^Usage: resize/`
 - stdout contains `Examples:`, `Exit status:`, `  resize `
 ### Scenario: rev --help exposes the documented sections
 #### When
@@ -5224,7 +5224,7 @@ rev --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: rev/`
+- stdout line `1` matches `/^Usage: rev/`
 - stdout contains `Examples:`, `Exit status:`, `  rev `
 ### Scenario: rm --help exposes the documented sections
 #### When
@@ -5233,7 +5233,7 @@ rm --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: rm/`
+- stdout line `1` matches `/^Usage: rm/`
 - stdout contains `Examples:`, `Exit status:`, `  rm `
 ### Scenario: rmdir --help exposes the documented sections
 #### When
@@ -5242,7 +5242,7 @@ rmdir --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: rmdir/`
+- stdout line `1` matches `/^Usage: rmdir/`
 - stdout contains `Examples:`, `Exit status:`, `  rmdir `
 ### Scenario: rpm --help exposes the documented sections
 #### When
@@ -5251,7 +5251,7 @@ rpm --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: rpm/`
+- stdout line `1` matches `/^Usage: rpm/`
 - stdout contains `Examples:`, `Exit status:`, `  rpm `
 ### Scenario: rpm2cpio --help exposes the documented sections
 #### When
@@ -5260,7 +5260,7 @@ rpm2cpio --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: rpm2cpio/`
+- stdout line `1` matches `/^Usage: rpm2cpio/`
 - stdout contains `Examples:`, `Exit status:`, `  rpm2cpio `
 ### Scenario: sddf --help exposes the documented sections
 #### When
@@ -5269,7 +5269,7 @@ sddf --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: sddf/`
+- stdout line `1` matches `/^Usage: sddf/`
 - stdout contains `Examples:`, `Exit status:`, `  sddf `
 ### Scenario: sed --help exposes the documented sections
 #### When
@@ -5278,7 +5278,7 @@ sed --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: sed/`
+- stdout line `1` matches `/^Usage: sed/`
 - stdout contains `Examples:`, `Exit status:`, `  sed `
 ### Scenario: seq --help exposes the documented sections
 #### When
@@ -5287,7 +5287,7 @@ seq --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: seq/`
+- stdout line `1` matches `/^Usage: seq/`
 - stdout contains `Examples:`, `Exit status:`, `  seq `
 ### Scenario: serial --help exposes the documented sections
 #### When
@@ -5296,7 +5296,7 @@ serial --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: serial/`
+- stdout line `1` matches `/^Usage: serial/`
 - stdout contains `Examples:`, `Exit status:`, `  serial `
 ### Scenario: sha1sum --help exposes the documented sections
 #### When
@@ -5305,7 +5305,7 @@ sha1sum --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: sha1sum/`
+- stdout line `1` matches `/^Usage: sha1sum/`
 - stdout contains `Examples:`, `Exit status:`, `  sha1sum `
 ### Scenario: sha256sum --help exposes the documented sections
 #### When
@@ -5314,7 +5314,7 @@ sha256sum --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: sha256sum/`
+- stdout line `1` matches `/^Usage: sha256sum/`
 - stdout contains `Examples:`, `Exit status:`, `  sha256sum `
 ### Scenario: sha384sum --help exposes the documented sections
 #### When
@@ -5323,7 +5323,7 @@ sha384sum --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: sha384sum/`
+- stdout line `1` matches `/^Usage: sha384sum/`
 - stdout contains `Examples:`, `Exit status:`, `  sha384sum `
 ### Scenario: sha3sum --help exposes the documented sections
 #### When
@@ -5332,7 +5332,7 @@ sha3sum --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: sha3sum/`
+- stdout line `1` matches `/^Usage: sha3sum/`
 - stdout contains `Examples:`, `Exit status:`, `  sha3sum `
 ### Scenario: sha512sum --help exposes the documented sections
 #### When
@@ -5341,7 +5341,7 @@ sha512sum --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: sha512sum/`
+- stdout line `1` matches `/^Usage: sha512sum/`
 - stdout contains `Examples:`, `Exit status:`, `  sha512sum `
 ### Scenario: shred --help exposes the documented sections
 #### When
@@ -5350,7 +5350,7 @@ shred --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: shred/`
+- stdout line `1` matches `/^Usage: shred/`
 - stdout contains `Examples:`, `Exit status:`, `  shred `
 ### Scenario: shuf --help exposes the documented sections
 #### When
@@ -5359,7 +5359,7 @@ shuf --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: shuf/`
+- stdout line `1` matches `/^Usage: shuf/`
 - stdout contains `Examples:`, `Exit status:`, `  shuf `
 ### Scenario: sl --help exposes the documented sections
 #### When
@@ -5368,7 +5368,7 @@ sl --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: sl/`
+- stdout line `1` matches `/^Usage: sl/`
 - stdout contains `Examples:`, `Exit status:`, `  sl `
 ### Scenario: sleep --help exposes the documented sections
 #### When
@@ -5377,7 +5377,7 @@ sleep --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: sleep/`
+- stdout line `1` matches `/^Usage: sleep/`
 - stdout contains `Examples:`, `Exit status:`, `  sleep `
 ### Scenario: sort --help exposes the documented sections
 #### When
@@ -5386,7 +5386,7 @@ sort --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: sort/`
+- stdout line `1` matches `/^Usage: sort/`
 - stdout contains `Examples:`, `Exit status:`, `  sort `
 ### Scenario: speaker --help exposes the documented sections
 #### When
@@ -5395,7 +5395,7 @@ speaker --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: speaker/`
+- stdout line `1` matches `/^Usage: speaker/`
 - stdout contains `Examples:`, `Exit status:`, `  speaker `
 ### Scenario: split --help exposes the documented sections
 #### When
@@ -5404,7 +5404,7 @@ split --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: split/`
+- stdout line `1` matches `/^Usage: split/`
 - stdout contains `Examples:`, `Exit status:`, `  split `
 ### Scenario: stat --help exposes the documented sections
 #### When
@@ -5413,7 +5413,7 @@ stat --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: stat/`
+- stdout line `1` matches `/^Usage: stat/`
 - stdout contains `Examples:`, `Exit status:`, `  stat `
 ### Scenario: strings --help exposes the documented sections
 #### When
@@ -5422,7 +5422,7 @@ strings --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: strings/`
+- stdout line `1` matches `/^Usage: strings/`
 - stdout contains `Examples:`, `Exit status:`, `  strings `
 ### Scenario: sync --help exposes the documented sections
 #### When
@@ -5431,7 +5431,7 @@ sync --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: sync/`
+- stdout line `1` matches `/^Usage: sync/`
 - stdout contains `Examples:`, `Exit status:`, `  sync `
 ### Scenario: tac --help exposes the documented sections
 #### When
@@ -5440,7 +5440,7 @@ tac --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: tac/`
+- stdout line `1` matches `/^Usage: tac/`
 - stdout contains `Examples:`, `Exit status:`, `  tac `
 ### Scenario: tar --help exposes the documented sections
 #### When
@@ -5449,7 +5449,7 @@ tar --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: tar/`
+- stdout line `1` matches `/^Usage: tar/`
 - stdout contains `Examples:`, `Exit status:`, `  tar `
 ### Scenario: tee --help exposes the documented sections
 #### When
@@ -5458,7 +5458,7 @@ tee --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: tee/`
+- stdout line `1` matches `/^Usage: tee/`
 - stdout contains `Examples:`, `Exit status:`, `  tee `
 ### Scenario: timeout --help exposes the documented sections
 #### When
@@ -5467,7 +5467,7 @@ timeout --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: timeout/`
+- stdout line `1` matches `/^Usage: timeout/`
 - stdout contains `Examples:`, `Exit status:`, `  timeout `
 ### Scenario: touch --help exposes the documented sections
 #### When
@@ -5476,7 +5476,7 @@ touch --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: touch/`
+- stdout line `1` matches `/^Usage: touch/`
 - stdout contains `Examples:`, `Exit status:`, `  touch `
 ### Scenario: tr --help exposes the documented sections
 #### When
@@ -5485,7 +5485,7 @@ tr --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: tr/`
+- stdout line `1` matches `/^Usage: tr/`
 - stdout contains `Examples:`, `Exit status:`, `  tr `
 ### Scenario: truncate --help exposes the documented sections
 #### When
@@ -5494,7 +5494,7 @@ truncate --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: truncate/`
+- stdout line `1` matches `/^Usage: truncate/`
 - stdout contains `Examples:`, `Exit status:`, `  truncate `
 ### Scenario: tty --help exposes the documented sections
 #### When
@@ -5503,7 +5503,7 @@ tty --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: tty/`
+- stdout line `1` matches `/^Usage: tty/`
 - stdout contains `Examples:`, `Exit status:`, `  tty `
 ### Scenario: uname --help exposes the documented sections
 #### When
@@ -5512,7 +5512,7 @@ uname --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: uname/`
+- stdout line `1` matches `/^Usage: uname/`
 - stdout contains `Examples:`, `Exit status:`, `  uname `
 ### Scenario: uncompress --help exposes the documented sections
 #### When
@@ -5521,7 +5521,7 @@ uncompress --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: uncompress/`
+- stdout line `1` matches `/^Usage: uncompress/`
 - stdout contains `Examples:`, `Exit status:`, `  uncompress `
 ### Scenario: unexpand --help exposes the documented sections
 #### When
@@ -5530,7 +5530,7 @@ unexpand --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: unexpand/`
+- stdout line `1` matches `/^Usage: unexpand/`
 - stdout contains `Examples:`, `Exit status:`, `  unexpand `
 ### Scenario: uniq --help exposes the documented sections
 #### When
@@ -5539,7 +5539,7 @@ uniq --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: uniq/`
+- stdout line `1` matches `/^Usage: uniq/`
 - stdout contains `Examples:`, `Exit status:`, `  uniq `
 ### Scenario: unix2dos --help exposes the documented sections
 #### When
@@ -5548,7 +5548,7 @@ unix2dos --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: unix2dos/`
+- stdout line `1` matches `/^Usage: unix2dos/`
 - stdout contains `Examples:`, `Exit status:`, `  unix2dos `
 ### Scenario: unlink --help exposes the documented sections
 #### When
@@ -5557,7 +5557,7 @@ unlink --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: unlink/`
+- stdout line `1` matches `/^Usage: unlink/`
 - stdout contains `Examples:`, `Exit status:`, `  unlink `
 ### Scenario: unshadow --help exposes the documented sections
 #### When
@@ -5566,7 +5566,7 @@ unshadow --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: unshadow/`
+- stdout line `1` matches `/^Usage: unshadow/`
 - stdout contains `Examples:`, `Exit status:`, `  unshadow `
 ### Scenario: unzip --help exposes the documented sections
 #### When
@@ -5575,7 +5575,7 @@ unzip --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: unzip/`
+- stdout line `1` matches `/^Usage: unzip/`
 - stdout contains `Examples:`, `Exit status:`, `  unzip `
 ### Scenario: uuidgen --help exposes the documented sections
 #### When
@@ -5584,7 +5584,7 @@ uuidgen --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: uuidgen/`
+- stdout line `1` matches `/^Usage: uuidgen/`
 - stdout contains `Examples:`, `Exit status:`, `  uuidgen `
 ### Scenario: valid-shell --help exposes the documented sections
 #### When
@@ -5593,7 +5593,7 @@ valid-shell --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: valid\-shell/`
+- stdout line `1` matches `/^Usage: valid\-shell/`
 - stdout contains `Examples:`, `Exit status:`, `  valid-shell `
 ### Scenario: watch --help exposes the documented sections
 #### When
@@ -5602,7 +5602,7 @@ watch --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: watch/`
+- stdout line `1` matches `/^Usage: watch/`
 - stdout contains `Examples:`, `Exit status:`, `  watch `
 ### Scenario: wc --help exposes the documented sections
 #### When
@@ -5611,7 +5611,7 @@ wc --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: wc/`
+- stdout line `1` matches `/^Usage: wc/`
 - stdout contains `Examples:`, `Exit status:`, `  wc `
 ### Scenario: which --help exposes the documented sections
 #### When
@@ -5620,7 +5620,7 @@ which --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: which/`
+- stdout line `1` matches `/^Usage: which/`
 - stdout contains `Examples:`, `Exit status:`, `  which `
 ### Scenario: who --help exposes the documented sections
 #### When
@@ -5629,7 +5629,7 @@ who --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: who/`
+- stdout line `1` matches `/^Usage: who/`
 - stdout contains `Examples:`, `Exit status:`, `  who `
 ### Scenario: whoami --help exposes the documented sections
 #### When
@@ -5638,7 +5638,7 @@ whoami --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: whoami/`
+- stdout line `1` matches `/^Usage: whoami/`
 - stdout contains `Examples:`, `Exit status:`, `  whoami `
 ### Scenario: whris --help exposes the documented sections
 #### When
@@ -5647,7 +5647,7 @@ whris --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: whris/`
+- stdout line `1` matches `/^Usage: whris/`
 - stdout contains `Examples:`, `Exit status:`, `  whris `
 ### Scenario: xargs --help exposes the documented sections
 #### When
@@ -5656,7 +5656,7 @@ xargs --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: xargs/`
+- stdout line `1` matches `/^Usage: xargs/`
 - stdout contains `Examples:`, `Exit status:`, `  xargs `
 ### Scenario: xxd --help exposes the documented sections
 #### When
@@ -5665,7 +5665,7 @@ xxd --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: xxd/`
+- stdout line `1` matches `/^Usage: xxd/`
 - stdout contains `Examples:`, `Exit status:`, `  xxd `
 ### Scenario: yes --help exposes the documented sections
 #### When
@@ -5674,7 +5674,7 @@ yes --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: yes/`
+- stdout line `1` matches `/^Usage: yes/`
 - stdout contains `Examples:`, `Exit status:`, `  yes `
 ### Scenario: zip --help exposes the documented sections
 #### When
@@ -5683,7 +5683,7 @@ zip --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: zip/`
+- stdout line `1` matches `/^Usage: zip/`
 - stdout contains `Examples:`, `Exit status:`, `  zip `
 ### Scenario: zip-pwcrack --help exposes the documented sections
 #### When
@@ -5692,7 +5692,7 @@ zip-pwcrack --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: zip\-pwcrack/`
+- stdout line `1` matches `/^Usage: zip\-pwcrack/`
 - stdout contains `Examples:`, `Exit status:`, `  zip-pwcrack `
 ### Scenario: true --help exposes the documented sections
 #### When
@@ -5701,7 +5701,7 @@ env true --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: true/`
+- stdout line `1` matches `/^Usage: true/`
 - stdout contains `Examples:`, `Exit status:`, `  true `
 ### Scenario: test --help exposes the documented sections
 #### When
@@ -5710,7 +5710,7 @@ env test --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: test/`
+- stdout line `1` matches `/^Usage: test/`
 - stdout contains `Examples:`, `Exit status:`, `  test `
 ### Scenario: printf --help exposes the documented sections
 #### When
@@ -5719,7 +5719,7 @@ env printf --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: printf/`
+- stdout line `1` matches `/^Usage: printf/`
 - stdout contains `Examples:`, `Exit status:`, `  printf `
 ### Scenario: pwd --help exposes the documented sections
 #### When
@@ -5728,7 +5728,7 @@ env pwd --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: pwd/`
+- stdout line `1` matches `/^Usage: pwd/`
 - stdout contains `Examples:`, `Exit status:`, `  pwd `
 ## mimixbox structured --help sections (2)
 Source: `test/e2e/tools/mimixbox/embedded/help_structured_sections_2.atago.yaml`
@@ -5739,7 +5739,7 @@ add-shell --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: add\-shell/`
+- stdout line `1` matches `/^Usage: add\-shell/`
 - stdout contains `Examples:`, `Exit status:`, `  add-shell `
 ### Scenario: ar --help exposes the documented sections
 #### When
@@ -5748,7 +5748,7 @@ ar --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: ar/`
+- stdout line `1` matches `/^Usage: ar/`
 - stdout contains `Examples:`, `Exit status:`, `  ar `
 ### Scenario: arch --help exposes the documented sections
 #### When
@@ -5757,7 +5757,7 @@ arch --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: arch/`
+- stdout line `1` matches `/^Usage: arch/`
 - stdout contains `Examples:`, `Exit status:`, `  arch `
 ### Scenario: awk --help exposes the documented sections
 #### When
@@ -5766,7 +5766,7 @@ awk --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: awk/`
+- stdout line `1` matches `/^Usage: awk/`
 - stdout contains `Examples:`, `Exit status:`, `  awk `
 ### Scenario: banner --help exposes the documented sections
 #### When
@@ -5775,7 +5775,7 @@ banner --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: banner/`
+- stdout line `1` matches `/^Usage: banner/`
 - stdout contains `Examples:`, `Exit status:`, `  banner `
 ### Scenario: base32 --help exposes the documented sections
 #### When
@@ -5784,7 +5784,7 @@ base32 --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: base32/`
+- stdout line `1` matches `/^Usage: base32/`
 - stdout contains `Examples:`, `Exit status:`, `  base32 `
 ### Scenario: base64 --help exposes the documented sections
 #### When
@@ -5793,7 +5793,7 @@ base64 --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: base64/`
+- stdout line `1` matches `/^Usage: base64/`
 - stdout contains `Examples:`, `Exit status:`, `  base64 `
 ### Scenario: basename --help exposes the documented sections
 #### When
@@ -5802,7 +5802,7 @@ basename --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: basename/`
+- stdout line `1` matches `/^Usage: basename/`
 - stdout contains `Examples:`, `Exit status:`, `  basename `
 ### Scenario: bunzip2 --help exposes the documented sections
 #### When
@@ -5811,7 +5811,7 @@ bunzip2 --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: bunzip2/`
+- stdout line `1` matches `/^Usage: bunzip2/`
 - stdout contains `Examples:`, `Exit status:`, `  bunzip2 `
 ### Scenario: cal --help exposes the documented sections
 #### When
@@ -5820,7 +5820,7 @@ cal --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: cal/`
+- stdout line `1` matches `/^Usage: cal/`
 - stdout contains `Examples:`, `Exit status:`, `  cal `
 ### Scenario: cat --help exposes the documented sections
 #### When
@@ -5829,7 +5829,7 @@ cat --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: cat/`
+- stdout line `1` matches `/^Usage: cat/`
 - stdout contains `Examples:`, `Exit status:`, `  cat `
 ### Scenario: chgrp --help exposes the documented sections
 #### When
@@ -5838,7 +5838,7 @@ chgrp --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: chgrp/`
+- stdout line `1` matches `/^Usage: chgrp/`
 - stdout contains `Examples:`, `Exit status:`, `  chgrp `
 ### Scenario: chmod --help exposes the documented sections
 #### When
@@ -5847,7 +5847,7 @@ chmod --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: chmod/`
+- stdout line `1` matches `/^Usage: chmod/`
 - stdout contains `Examples:`, `Exit status:`, `  chmod `
 ### Scenario: chown --help exposes the documented sections
 #### When
@@ -5856,7 +5856,7 @@ chown --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: chown/`
+- stdout line `1` matches `/^Usage: chown/`
 - stdout contains `Examples:`, `Exit status:`, `  chown `
 ### Scenario: cksum --help exposes the documented sections
 #### When
@@ -5865,7 +5865,7 @@ cksum --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: cksum/`
+- stdout line `1` matches `/^Usage: cksum/`
 - stdout contains `Examples:`, `Exit status:`, `  cksum `
 ### Scenario: clear --help exposes the documented sections
 #### When
@@ -5874,7 +5874,7 @@ clear --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: clear/`
+- stdout line `1` matches `/^Usage: clear/`
 - stdout contains `Examples:`, `Exit status:`, `  clear `
 ### Scenario: cmatrix --help exposes the documented sections
 #### When
@@ -5883,7 +5883,7 @@ cmatrix --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: cmatrix/`
+- stdout line `1` matches `/^Usage: cmatrix/`
 - stdout contains `Examples:`, `Exit status:`, `  cmatrix `
 ### Scenario: cmp --help exposes the documented sections
 #### When
@@ -5892,7 +5892,7 @@ cmp --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: cmp/`
+- stdout line `1` matches `/^Usage: cmp/`
 - stdout contains `Examples:`, `Exit status:`, `  cmp `
 ### Scenario: comm --help exposes the documented sections
 #### When
@@ -5901,7 +5901,7 @@ comm --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: comm/`
+- stdout line `1` matches `/^Usage: comm/`
 - stdout contains `Examples:`, `Exit status:`, `  comm `
 ### Scenario: compress --help exposes the documented sections
 #### When
@@ -5910,7 +5910,7 @@ compress --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: compress/`
+- stdout line `1` matches `/^Usage: compress/`
 - stdout contains `Examples:`, `Exit status:`, `  compress `
 ### Scenario: cowsay --help exposes the documented sections
 #### When
@@ -5919,7 +5919,7 @@ cowsay --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: cowsay/`
+- stdout line `1` matches `/^Usage: cowsay/`
 - stdout contains `Examples:`, `Exit status:`, `  cowsay `
 ### Scenario: cowthink --help exposes the documented sections
 #### When
@@ -5928,7 +5928,7 @@ cowthink --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: cowthink/`
+- stdout line `1` matches `/^Usage: cowthink/`
 - stdout contains `Examples:`, `Exit status:`, `  cowthink `
 ### Scenario: cpio --help exposes the documented sections
 #### When
@@ -5937,7 +5937,7 @@ cpio --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: cpio/`
+- stdout line `1` matches `/^Usage: cpio/`
 - stdout contains `Examples:`, `Exit status:`, `  cpio `
 ### Scenario: cut --help exposes the documented sections
 #### When
@@ -5946,7 +5946,7 @@ cut --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: cut/`
+- stdout line `1` matches `/^Usage: cut/`
 - stdout contains `Examples:`, `Exit status:`, `  cut `
 ### Scenario: date --help exposes the documented sections
 #### When
@@ -5955,7 +5955,7 @@ date --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: date/`
+- stdout line `1` matches `/^Usage: date/`
 - stdout contains `Examples:`, `Exit status:`, `  date `
 ### Scenario: dd --help exposes the documented sections
 #### When
@@ -5964,7 +5964,7 @@ dd --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: dd/`
+- stdout line `1` matches `/^Usage: dd/`
 - stdout contains `Examples:`, `Exit status:`, `  dd `
 ### Scenario: df --help exposes the documented sections
 #### When
@@ -5973,7 +5973,7 @@ df --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: df/`
+- stdout line `1` matches `/^Usage: df/`
 - stdout contains `Examples:`, `Exit status:`, `  df `
 ### Scenario: diff --help exposes the documented sections
 #### When
@@ -5982,7 +5982,7 @@ diff --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: diff/`
+- stdout line `1` matches `/^Usage: diff/`
 - stdout contains `Examples:`, `Exit status:`, `  diff `
 ### Scenario: dirname --help exposes the documented sections
 #### When
@@ -5991,7 +5991,7 @@ dirname --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: dirname/`
+- stdout line `1` matches `/^Usage: dirname/`
 - stdout contains `Examples:`, `Exit status:`, `  dirname `
 ### Scenario: dos2unix --help exposes the documented sections
 #### When
@@ -6000,7 +6000,7 @@ dos2unix --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: dos2unix/`
+- stdout line `1` matches `/^Usage: dos2unix/`
 - stdout contains `Examples:`, `Exit status:`, `  dos2unix `
 ### Scenario: du --help exposes the documented sections
 #### When
@@ -6009,7 +6009,7 @@ du --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: du/`
+- stdout line `1` matches `/^Usage: du/`
 - stdout contains `Examples:`, `Exit status:`, `  du `
 ### Scenario: egrep --help exposes the documented sections
 #### When
@@ -6018,7 +6018,7 @@ egrep --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: egrep/`
+- stdout line `1` matches `/^Usage: egrep/`
 - stdout contains `Examples:`, `Exit status:`, `  egrep `
 ### Scenario: env --help exposes the documented sections
 #### When
@@ -6027,7 +6027,7 @@ env --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: env/`
+- stdout line `1` matches `/^Usage: env/`
 - stdout contains `Examples:`, `Exit status:`, `  env `
 ### Scenario: expand --help exposes the documented sections
 #### When
@@ -6036,7 +6036,7 @@ expand --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: expand/`
+- stdout line `1` matches `/^Usage: expand/`
 - stdout contains `Examples:`, `Exit status:`, `  expand `
 ### Scenario: expr --help exposes the documented sections
 #### When
@@ -6045,7 +6045,7 @@ expr --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: expr/`
+- stdout line `1` matches `/^Usage: expr/`
 - stdout contains `Examples:`, `Exit status:`, `  expr `
 ### Scenario: fakemovie --help exposes the documented sections
 #### When
@@ -6054,7 +6054,7 @@ fakemovie --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: fakemovie/`
+- stdout line `1` matches `/^Usage: fakemovie/`
 - stdout contains `Examples:`, `Exit status:`, `  fakemovie `
 ### Scenario: fgrep --help exposes the documented sections
 #### When
@@ -6063,7 +6063,7 @@ fgrep --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: fgrep/`
+- stdout line `1` matches `/^Usage: fgrep/`
 - stdout contains `Examples:`, `Exit status:`, `  fgrep `
 ### Scenario: fmt --help exposes the documented sections
 #### When
@@ -6072,7 +6072,7 @@ fmt --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: fmt/`
+- stdout line `1` matches `/^Usage: fmt/`
 - stdout contains `Examples:`, `Exit status:`, `  fmt `
 ### Scenario: fold --help exposes the documented sections
 #### When
@@ -6081,7 +6081,7 @@ fold --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: fold/`
+- stdout line `1` matches `/^Usage: fold/`
 - stdout contains `Examples:`, `Exit status:`, `  fold `
 ### Scenario: fortune --help exposes the documented sections
 #### When
@@ -6090,7 +6090,7 @@ fortune --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: fortune/`
+- stdout line `1` matches `/^Usage: fortune/`
 - stdout contains `Examples:`, `Exit status:`, `  fortune `
 ### Scenario: free --help exposes the documented sections
 #### When
@@ -6099,7 +6099,7 @@ free --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: free/`
+- stdout line `1` matches `/^Usage: free/`
 - stdout contains `Examples:`, `Exit status:`, `  free `
 ### Scenario: ghrdc --help exposes the documented sections
 #### When
@@ -6108,7 +6108,7 @@ ghrdc --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: ghrdc/`
+- stdout line `1` matches `/^Usage: ghrdc/`
 - stdout contains `Examples:`, `Exit status:`, `  ghrdc `
 ### Scenario: grep --help exposes the documented sections
 #### When
@@ -6117,7 +6117,7 @@ grep --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: grep/`
+- stdout line `1` matches `/^Usage: grep/`
 - stdout contains `Examples:`, `Exit status:`, `  grep `
 ### Scenario: groups --help exposes the documented sections
 #### When
@@ -6126,7 +6126,7 @@ groups --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: groups/`
+- stdout line `1` matches `/^Usage: groups/`
 - stdout contains `Examples:`, `Exit status:`, `  groups `
 ### Scenario: gunzip --help exposes the documented sections
 #### When
@@ -6135,7 +6135,7 @@ gunzip --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: gunzip/`
+- stdout line `1` matches `/^Usage: gunzip/`
 - stdout contains `Examples:`, `Exit status:`, `  gunzip `
 ### Scenario: gzip --help exposes the documented sections
 #### When
@@ -6144,7 +6144,7 @@ gzip --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: gzip/`
+- stdout line `1` matches `/^Usage: gzip/`
 - stdout contains `Examples:`, `Exit status:`, `  gzip `
 ### Scenario: halt --help exposes the documented sections
 #### When
@@ -6153,7 +6153,7 @@ halt --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: halt/`
+- stdout line `1` matches `/^Usage: halt/`
 - stdout contains `Examples:`, `Exit status:`, `  halt `
 ### Scenario: head --help exposes the documented sections
 #### When
@@ -6162,7 +6162,7 @@ head --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: head/`
+- stdout line `1` matches `/^Usage: head/`
 - stdout contains `Examples:`, `Exit status:`, `  head `
 ### Scenario: hostid --help exposes the documented sections
 #### When
@@ -6171,7 +6171,7 @@ hostid --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: hostid/`
+- stdout line `1` matches `/^Usage: hostid/`
 - stdout contains `Examples:`, `Exit status:`, `  hostid `
 ### Scenario: hostname --help exposes the documented sections
 #### When
@@ -6180,7 +6180,7 @@ hostname --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: hostname/`
+- stdout line `1` matches `/^Usage: hostname/`
 - stdout contains `Examples:`, `Exit status:`, `  hostname `
 ### Scenario: http-status-code --help exposes the documented sections
 #### When
@@ -6189,7 +6189,7 @@ http-status-code --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: http\-status\-code/`
+- stdout line `1` matches `/^Usage: http\-status\-code/`
 - stdout contains `Examples:`, `Exit status:`, `  http-status-code `
 ### Scenario: id --help exposes the documented sections
 #### When
@@ -6198,7 +6198,7 @@ id --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: id/`
+- stdout line `1` matches `/^Usage: id/`
 - stdout contains `Examples:`, `Exit status:`, `  id `
 ### Scenario: install --help exposes the documented sections
 #### When
@@ -6207,7 +6207,7 @@ install --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: install/`
+- stdout line `1` matches `/^Usage: install/`
 - stdout contains `Examples:`, `Exit status:`, `  install `
 ### Scenario: ischroot --help exposes the documented sections
 #### When
@@ -6216,7 +6216,7 @@ ischroot --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: ischroot/`
+- stdout line `1` matches `/^Usage: ischroot/`
 - stdout contains `Examples:`, `Exit status:`, `  ischroot `
 ### Scenario: killall --help exposes the documented sections
 #### When
@@ -6225,7 +6225,7 @@ killall --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: killall/`
+- stdout line `1` matches `/^Usage: killall/`
 - stdout contains `Examples:`, `Exit status:`, `  killall `
 ### Scenario: lifegame --help exposes the documented sections
 #### When
@@ -6234,7 +6234,7 @@ lifegame --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: lifegame/`
+- stdout line `1` matches `/^Usage: lifegame/`
 - stdout contains `Examples:`, `Exit status:`, `  lifegame `
 ### Scenario: link --help exposes the documented sections
 #### When
@@ -6243,7 +6243,7 @@ link --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: link/`
+- stdout line `1` matches `/^Usage: link/`
 - stdout contains `Examples:`, `Exit status:`, `  link `
 ### Scenario: echo --help exposes the documented sections
 #### When
@@ -6252,7 +6252,7 @@ env echo --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: echo/`
+- stdout line `1` matches `/^Usage: echo/`
 - stdout contains `Examples:`, `Exit status:`, `  echo `
 ### Scenario: false --help exposes the documented sections
 #### When
@@ -6261,7 +6261,7 @@ env false --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: false/`
+- stdout line `1` matches `/^Usage: false/`
 - stdout contains `Examples:`, `Exit status:`, `  false `
 ### Scenario: kill --help exposes the documented sections
 #### When
@@ -6270,7 +6270,7 @@ env kill --help
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^Usage: kill/`
+- stdout line `1` matches `/^Usage: kill/`
 - stdout contains `Examples:`, `Exit status:`, `  kill `
 ## mimixbox i2cdetect
 Source: `test/e2e/tools/mimixbox/embedded/i2cdetect.atago.yaml`
@@ -7518,7 +7518,7 @@ ls --sort=size ${workdir}/ls_gnu
 #### Then
 - after `ls --sort=size ${workdir}/ls_gnu`:
   - exit code is `0`
-  - stdout equals an exact value
+  - stdout line `1` equals an exact value
 ### Scenario: lists directories first with --group-directories-first
 #### When
 ```shell
@@ -7536,7 +7536,7 @@ ls --group-directories-first ${workdir}/ls_gnu
 #### Then
 - after `ls --group-directories-first ${workdir}/ls_gnu`:
   - exit code is `0`
-  - stdout equals an exact value
+  - stdout line `1` equals an exact value
 ### Scenario: drops matches with --ignore
 #### When
 ```shell
@@ -8756,7 +8756,7 @@ grep -A1 MATCH ${workdir}/grep_gnu/groups.txt
 ```
 #### Then
 - exit code is `0`
-- stdout equals an exact value
+- stdout line `3` equals an exact value
 ### Scenario: searches only included files with --include
 #### When
 ```shell
@@ -9360,8 +9360,8 @@ init -t inittab
 ```
 #### Then
 - exit code is `0`
-- stdout equals an exact value
-- stdout equals an exact value
+- stdout line `1` equals an exact value
+- stdout line `2` equals an exact value
 ### Scenario: fails on a missing inittab
 #### When
 ```shell
@@ -9515,8 +9515,8 @@ run-parts parts
 ```
 #### Then
 - exit code is `0`
-- stdout equals an exact value
-- stdout equals an exact value
+- stdout line `1` equals an exact value
+- stdout line `2` equals an exact value
 ### Scenario: requires a directory
 #### When
 ```shell
@@ -9532,7 +9532,7 @@ Source: `test/e2e/tools/mimixbox/loginutils/runlevel.atago.yaml`
 runlevel
 ```
 #### Then
-- stdout matches `/.+/`
+- stdout line `1` matches `/.+/`
 ## mimixbox start-stop-daemon
 Source: `test/e2e/tools/mimixbox/loginutils/start-stop-daemon.atago.yaml`
 ### Scenario: describes itself with --help
@@ -10975,8 +10975,8 @@ logread sys.log
 ```
 #### Then
 - exit code is `0`
-- stdout equals an exact value
-- stdout equals an exact value
+- stdout line `1` equals an exact value
+- stdout line `2` equals an exact value
 ### Scenario: fails when no readable log is found
 #### When
 ```shell
@@ -11012,8 +11012,8 @@ lsof -p $$
 ```
 #### Then
 - exit code is `0`
-- stdout contains `COMMAND`
-- stdout contains `NAME`
+- stdout line `1` contains `COMMAND`
+- stdout line `1` contains `NAME`
 ## mimixbox minips
 Source: `test/e2e/tools/mimixbox/procps/minips.atago.yaml`
 ### Scenario: prints the PID/USER/COMMAND header
@@ -11023,7 +11023,7 @@ minips
 ```
 #### Then
 - exit code is `0`
-- stdout contains `COMMAND`
+- stdout line `1` contains `COMMAND`
 ### Scenario: lists processes
 #### When
 ```shell
@@ -11139,7 +11139,7 @@ ps
 ```
 #### Then
 - exit code is `0`
-- stdout equals an exact value
+- stdout line `1` equals an exact value
 ### Scenario: lists running processes
 #### When
 ```shell
@@ -11227,7 +11227,7 @@ top -bn1
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^top -/`
+- stdout line `1` matches `/^top -/`
 ### Scenario: prints the tasks line
 #### When
 ```shell
@@ -11290,7 +11290,7 @@ vmstat
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^[ 0-9]+$/`
+- stdout line `3` matches `/^[ 0-9]+$/`
 ## mimixbox chpst
 Source: `test/e2e/tools/mimixbox/runit/chpst.atago.yaml`
 ### Scenario: loads an environment directory
@@ -11483,8 +11483,8 @@ cat log/current
 ```
 #### Then
 - exit code is `0`
-- stdout equals an exact value
-- stdout equals an exact value
+- stdout line `1` equals an exact value
+- stdout line `2` equals an exact value
 ### Scenario: requires a directory
 #### Inputs
 _stdin for `svlogd`:_
@@ -12484,13 +12484,13 @@ df --output=source,fstype,size,used,avail,pcent,target
 ```
 #### Then
 - exit code is `0`
-- stdout contains `Filesystem`
-- stdout contains `Type`
-- stdout contains `Size`
-- stdout contains `Used`
-- stdout contains `Avail`
-- stdout contains `Use%`
-- stdout contains `Mounted on`
+- stdout line `1` contains `Filesystem`
+- stdout line `1` contains `Type`
+- stdout line `1` contains `Size`
+- stdout line `1` contains `Used`
+- stdout line `1` contains `Avail`
+- stdout line `1` contains `Use%`
+- stdout line `1` contains `Mounted on`
 ### Scenario: --output honors a reordered field list
 #### When
 ```shell
@@ -12498,7 +12498,7 @@ df --output=target,source
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/Mounted on.*Filesystem.*/`
+- stdout line `1` matches `/Mounted on.*Filesystem.*/`
 ### Scenario: --output rejects an unknown field
 #### When
 ```shell
@@ -12530,7 +12530,7 @@ df --type=tmpfs --output=fstype,target
 ```
 #### Then
 - exit code is `0`
-- stdout contains `Type`
+- stdout line `1` contains `Type`
 ### Scenario: --type is repeatable
 #### When
 ```shell
@@ -12538,7 +12538,7 @@ df -t tmpfs -t ext4 --output=fstype
 ```
 #### Then
 - exit code is `0`
-- stdout contains `Type`
+- stdout line `1` contains `Type`
 ### Scenario: --block-size labels the block-size in the classic header
 #### When
 ```shell
@@ -12546,7 +12546,7 @@ df --block-size=1M
 ```
 #### Then
 - exit code is `0`
-- stdout contains `1048576-blocks`
+- stdout line `1` contains `1048576-blocks`
 ### Scenario: --block-size rejects an invalid size
 #### When
 ```shell
@@ -12671,8 +12671,8 @@ mkdir -p sub/deep && head -c 1000 /dev/zero > a.txt && head -c 2000 /dev/zero > 
 ```
 #### Then
 - exit code is `0`
-- stdout equals an exact value
-- stdout equals an exact value
+- stdout line `1` equals an exact value
+- stdout line `2` equals an exact value
 ### Scenario: prints only the operand total with --max-depth=0
 #### When
 ```shell
@@ -13396,7 +13396,7 @@ mimixbox --list --filter=cat
 #### Then
 - exit code is `0`
 - stdout contains `cat`
-- stdout contains `cat`
+- stdout line `1` contains `cat`
 ### Scenario: --list --subsystem=textutils includes cat and excludes ls
 #### When
 ```shell
@@ -13813,7 +13813,7 @@ printf --help
 #### Then
 - exit code is `0`
 - stdout contains `Examples:`
-- stdout matches `/^Usage: printf/`
+- stdout line `1` matches `/^Usage: printf/`
 ### Scenario: prints the version banner for a leading --version
 #### When
 ```shell
@@ -15203,10 +15203,10 @@ comm --output-delimiter=, ${workdir}/comm_gnu/a.txt ${workdir}/comm_gnu/b.txt
 ```
 #### Then
 - exit code is `0`
-- stdout equals an exact value
-- stdout equals an exact value
-- stdout equals an exact value
-- stdout equals an exact value
+- stdout line `1` equals an exact value
+- stdout line `2` equals an exact value
+- stdout line `3` equals an exact value
+- stdout line `4` equals an exact value
 ### Scenario: read and write NUL-terminated records with -z
 #### Given
 - Fixture file `comm_gnu/za.txt` is created.

@@ -443,6 +443,7 @@ var explainStreamStyle = assertdesc.StreamStyle{
 	JSON:      explainJSONStyle,
 	YAML:      explainYAMLStyle,
 	Snapshot:  func(s string) string { return s },
+	Line:      func(n int) string { return fmt.Sprintf("line %d", n) },
 	NoMatcher: "(no matcher)",
 }
 

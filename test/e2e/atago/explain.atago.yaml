@@ -31,3 +31,126 @@ scenarios:
               - "Scenario: list as json"
               - "Commands:"
               - "Network policy:"
+
+  # explain must describe every matcher an assertion sets. The text matchers
+  # compose at run time, so summarizing only the first one advertises a weaker
+  # contract than the run enforces.
+  - name: explain describes every matcher of a composed stream assertion
+    steps:
+      - fixture:
+          file: composed.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: composed
+            scenarios:
+              - name: guards both directions
+                steps:
+                  - run:
+                      command: echo hello
+                  - assert:
+                      stdout:
+                        contains: hello
+                        not_contains: goodbye
+                        matches: "^hel"
+      - run:
+          command: ${atago} explain composed.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: 'stdout contains "hello", does not contain "goodbye", matches /^hel/'
+      # The composed assertion really is enforced: dropping the forbidden text
+      # into stdout fails the run.
+      - fixture:
+          file: broken.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: composed
+            scenarios:
+              - name: guards both directions
+                steps:
+                  - run:
+                      shell: true
+                      command: printf 'hello goodbye\n'
+                  - assert:
+                      stdout:
+                        contains: hello
+                        not_contains: goodbye
+      - run:
+          command: ${atago} run broken.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: does not contain
+
+  # A line: selector narrows what every matcher sees, so explain has to say
+  # which line is under test instead of implying the whole stream.
+  - name: explain names the line a line-scoped matcher inspects
+    steps:
+      - fixture:
+          file: lined.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: lined
+            scenarios:
+              - name: second line only
+                steps:
+                  - run:
+                      shell: true
+                      command: printf 'one\ntwo\n'
+                  - assert:
+                      stdout:
+                        line: 2
+                        equals: two
+      - run:
+          command: ${atago} explain lined.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "stdout line 2 equals exact text"
+
+  # not_contains and executable are ordinary file matchers: explain used to
+  # report the bare path, which reads as "the file is checked" and hides what
+  # the scenario actually guarantees.
+  - name: explain describes file not_contains and executable matchers
+    steps:
+      - fixture:
+          file: filematch.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: filematch
+            scenarios:
+              - name: no secret leaked
+                steps:
+                  - fixture:
+                      file: out.txt
+                      content: "public\n"
+                  - run:
+                      command: echo hi
+                  - assert:
+                      file:
+                        path: out.txt
+                        not_contains: "secret-token"
+              - name: installer stays executable
+                steps:
+                  - fixture:
+                      file: install.sh
+                      content: "#!/bin/sh\n"
+                      mode: "0755"
+                  - run:
+                      command: echo hi
+                  - assert:
+                      file:
+                        path: install.sh
+                        executable: true
+      - run:
+          command: ${atago} explain filematch.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - 'file "out.txt" does not contain "secret-token"'
+              - 'file "install.sh" is executable'

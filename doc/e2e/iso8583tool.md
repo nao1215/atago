@@ -498,7 +498,7 @@ iso8583tool view $ISO_EXAMPLES/basei/0110-auth-response.hex --no-color
 ```
 #### Then
 - exit code is `0`
-- stdout is not empty
+- stdout line `1` is not empty
 - stdout contains `Processing Code`
 - stdout matches `/F3.*: 000000/`
 ### Scenario: matches the filtered view for F4
@@ -2467,8 +2467,8 @@ iso8583tool redact $ISO_EXAMPLES/basei/0100-auth-request.hex --format text --col
 ```
 #### Then
 - exit code is `0`
-- stdout contains `MTI:`
-- stdout contains `F2 =`
+- stdout line `1` contains `MTI:`
+- stdout line `2` contains `F2 =`
 ### Scenario: reads from stdin for a Slack-safe pipe
 #### When
 ```shell

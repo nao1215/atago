@@ -190,7 +190,7 @@ aqua --config aqua.yaml exec -- mytool
 #### Then
 - after `aqua --config aqua.yaml install`:
   - exit code is `0`
-  - file `.aqua/pkgs/http/127.0.0.1:18595/mytool/mytool` is checked
+  - file `.aqua/pkgs/http/127.0.0.1:18595/mytool/mytool` is executable
 - after `aqua --config aqua.yaml which mytool`:
   - exit code is `0`
   - stdout contains `.aqua/pkgs/http/127.0.0.1:18595/mytool/mytool`

@@ -83,7 +83,7 @@ _only when `fzf --version` succeeds · skipped on Windows_
 #### Then
 - exit code is `0`
 - file `pick.txt` contains `cherry`
-- file `pick.txt` is checked
+- file `pick.txt` does not contain `banana`
 ### Scenario: multi-select accepts several lines at once
 _only when `fzf --version` succeeds · skipped on Windows_
 #### When

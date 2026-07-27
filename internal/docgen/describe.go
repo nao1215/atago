@@ -48,6 +48,7 @@ var docgenStreamStyle = assertdesc.StreamStyle{
 	JSON:      docgenJSONStyle,
 	YAML:      docgenYAMLStyle,
 	Snapshot:  markdown.Code,
+	Line:      func(n int) string { return "line " + markdown.Code(fmt.Sprint(n)) },
 	NoMatcher: "is checked",
 }
 
