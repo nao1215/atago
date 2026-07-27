@@ -2040,8 +2040,8 @@ ${atago} doc matchers.atago.yaml
 ```
 #### Then
 - exit code is `0`
-- stdout contains `stdout contains `hello`, does not contain `goodbye``, `stdout line `2` equals an exact value`, `file `install.sh` is executable`, `file `install.sh` does not contain `rm -rf /``
-- stdout does not contain ``install.sh` is checked`
+- stdout contains `stdout contains `, `, does not contain `, `stdout line `, ` equals an exact value`, ` is executable`, ` does not contain `
+- stdout does not contain ` is checked`
 ### Scenario: a spec whose matchers doc renders still runs green
 _skipped on Windows_
 #### Given

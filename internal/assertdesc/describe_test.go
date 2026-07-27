@@ -134,6 +134,11 @@ func TestDescribeStreamComposedMatchers(t *testing.T) {
 			s:    &spec.StreamAssert{},
 			want: "(no matcher)",
 		},
+		{
+			name: "line selector survives a matcher-less assertion",
+			s:    &spec.StreamAssert{Line: intptr(4)},
+			want: "line 4 (no matcher)",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

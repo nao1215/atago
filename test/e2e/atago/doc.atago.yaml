@@ -243,14 +243,19 @@ scenarios:
       - assert:
           exit_code: 0
           stdout:
+            # The needles avoid the backticks the page puts around each matcher
+            # argument: a needle carrying them would land inside a code span in
+            # this suite's own generated page and render as a malformed one.
             contains:
-              - "stdout contains `hello`, does not contain `goodbye`"
-              - "stdout line `2` equals an exact value"
-              - "file `install.sh` is executable"
-              - "file `install.sh` does not contain `rm -rf /`"
+              - "stdout contains "
+              - ", does not contain "
+              - "stdout line "
+              - " equals an exact value"
+              - " is executable"
+              - " does not contain "
       - assert:
           stdout:
-            not_contains: "`install.sh` is checked"
+            not_contains: " is checked"
 
   # The documented spec is the one that runs: it still passes as written. The
   # executable matcher needs a POSIX exec bit, so this half is POSIX-only while

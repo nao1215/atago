@@ -119,10 +119,12 @@ func DescribeStream(s *spec.StreamAssert, style StreamStyle) string {
 	if s.Snapshot != "" {
 		parts = append(parts, "matches snapshot "+style.Snapshot(s.Snapshot))
 	}
-	if len(parts) == 0 {
-		return style.NoMatcher
+	desc := style.NoMatcher
+	if len(parts) > 0 {
+		desc = strings.Join(parts, ", ")
 	}
-	desc := strings.Join(parts, ", ")
+	// The line scope is part of what the assertion looks at, so it is named even
+	// when no matcher survived — the reader still learns which line is in play.
 	if s.Line != nil && style.Line != nil {
 		return style.Line(*s.Line) + " " + desc
 	}
