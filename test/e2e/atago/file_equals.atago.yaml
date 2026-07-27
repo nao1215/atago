@@ -169,3 +169,85 @@ scenarios:
           exit_code: 0
           stdout:
             contains: PASSED
+
+  # A byte-exact comparison that fails on a carriage return printed the same two
+  # words twice: the reader could see there was a difference but not what it
+  # was. When the two sides differ only in characters a terminal does not show,
+  # both are quoted.
+  - name: an invisible difference is quoted in the failure output
+    steps:
+      - fixture:
+          file: crlf.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: crlf}
+            scenarios:
+              - name: the file ends with CRLF, the expectation with LF
+                steps:
+                  - fixture:
+                      file: a.txt
+                      base64: c2hhcmVkDQo=
+                  - run: {command: echo hi}
+                  - assert:
+                      file:
+                        path: a.txt
+                        equals: "shared\n"
+      - run:
+          command: ${atago} run crlf.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - '"shared\n"'
+              - '"shared\r\n"'
+
+  - name: a trailing space difference is quoted too
+    steps:
+      - fixture:
+          file: spaces.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: spaces}
+            scenarios:
+              - name: the output carries trailing spaces
+                steps:
+                  - run:
+                      shell: true
+                      command: "printf 'value  '"
+                  - assert:
+                      stdout:
+                        equals: "value"
+      - run:
+          command: ${atago} run spaces.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: '"value  "'
+
+  - name: an ordinary difference keeps its plain form
+    steps:
+      - fixture:
+          file: plain.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: plain}
+            scenarios:
+              - name: the texts really are different
+                steps:
+                  - run:
+                      shell: true
+                      command: "printf 'actual text'"
+                  - assert:
+                      stdout:
+                        equals: "expected text"
+      - run:
+          command: ${atago} run plain.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - "expected text"
+              - "actual text"
+      - assert:
+          stdout:
+            not_contains: '"actual text"'

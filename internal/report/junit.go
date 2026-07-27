@@ -161,11 +161,12 @@ func detailText(sc *engine.ScenarioResult) string {
 			if diff := checkDiff(ck); diff != "" {
 				fmt.Fprintf(&b, "Diff (-expected +actual):\n%s\n", diff)
 			} else {
-				if ck.Expected != "" {
-					fmt.Fprintf(&b, "Expected: %s\n", ck.Expected)
+				expected, actual := visiblePair(ck.Expected, ck.Actual)
+				if expected != "" {
+					fmt.Fprintf(&b, "Expected: %s\n", expected)
 				}
-				if ck.Actual != "" {
-					fmt.Fprintf(&b, "Actual: %s\n", ck.Actual)
+				if actual != "" {
+					fmt.Fprintf(&b, "Actual: %s\n", actual)
 				}
 			}
 			if ck.Hint != "" {
