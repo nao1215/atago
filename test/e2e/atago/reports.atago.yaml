@@ -219,3 +219,26 @@ scenarios:
             json:
               - path: "$.suites[0].failures[0].command"
                 matches: "early"
+
+  # A check that observed nothing must say it observed nothing. The console block
+  # prints an Actual: section only for a non-empty value, so an empty stream used
+  # to render with the section missing altogether — the same shape as a report
+  # that never recorded what it saw. Reading a CI failure then depended on
+  # knowing that the omission itself meant "empty" (#339).
+  - name: a failure against an empty stream reports the stream as empty
+    steps:
+      - fixture:
+          file: silent.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: silent}
+            scenarios:
+              - name: a command that prints nothing is asserted to have printed
+                steps:
+                  - run: {shell: true, command: "exit 0"}
+                  - assert: {stdout: {contains: "PASSED"}}
+      - run: {command: "${atago} run silent.atago.yaml"}
+      - assert:
+          exit_code: 1
+          stdout:
+            matches: "Actual:\n  \\(empty\\)"

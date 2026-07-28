@@ -13,6 +13,7 @@ import (
 	"github.com/nao1215/atago/internal/assert"
 	"github.com/nao1215/atago/internal/engine"
 	"github.com/nao1215/atago/internal/runner"
+	"github.com/nao1215/atago/internal/spec"
 )
 
 func sampleResults() []*engine.SuiteResult {
@@ -45,6 +46,40 @@ func TestRender_Console(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Errorf("console output missing %q\n%s", want, out)
 		}
+	}
+}
+
+// TestRender_Console_EmptyCaptureIsVisible walks the whole path a #339-shaped
+// failure takes — a command that exited 0 with nothing on stdout, a `contains`
+// assertion over it, the console block — and pins that the block states the
+// stream was empty. The Actual: section is printed only for a non-empty value,
+// so before this the report simply had no Actual: at all and a reader had to
+// know that the omission meant "empty" to tell an empty capture from a value
+// the report never recorded.
+func TestRender_Console_EmptyCaptureIsVisible(t *testing.T) {
+	t.Parallel()
+	silent := &runner.Result{Command: "atago run nonewline.atago.yaml", ExitCode: 0}
+	ck := assert.Check(&spec.Assert{Stdout: &spec.StreamAssert{Contains: spec.StringList{"PASSED"}}}, silent, assert.Env{})
+	if ck.OK {
+		t.Fatalf("expected the contains assertion to fail against empty stdout, got %+v", ck)
+	}
+	results := []*engine.SuiteResult{{
+		Suite:  "s",
+		Status: engine.StatusFailed,
+		Scenarios: []engine.ScenarioResult{{
+			Name:   "a nested run reports what it printed",
+			Status: engine.StatusFailed,
+			Steps:  []engine.StepResult{{Kind: "assert", Run: silent, Checks: []*assert.CheckResult{ck}}},
+		}},
+	}}
+
+	var b bytes.Buffer
+	if err := Render(&b, FormatConsole, results); err != nil {
+		t.Fatal(err)
+	}
+	out := b.String()
+	if !strings.Contains(out, "Actual:\n  (empty)") {
+		t.Errorf("console output does not say the stream was empty:\n%s", out)
 	}
 }
 
