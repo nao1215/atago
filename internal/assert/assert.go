@@ -157,9 +157,11 @@ func checkTarget(a *spec.Assert, target spec.AssertTarget, res *runner.Result, e
 	case spec.AssertExitCode:
 		return checkExitCode(a.ExitCode, res)
 	case spec.AssertStdout:
-		return checkStream("stdout", a.Stdout, streamBytes(res, "stdout"), res != nil, env)
+		return withCounterpartHint("stdout", a.Stdout, res, env,
+			checkStream("stdout", a.Stdout, streamBytes(res, "stdout"), res != nil, env))
 	case spec.AssertStderr:
-		return checkStream("stderr", a.Stderr, streamBytes(res, "stderr"), res != nil, env)
+		return withCounterpartHint("stderr", a.Stderr, res, env,
+			checkStream("stderr", a.Stderr, streamBytes(res, "stderr"), res != nil, env))
 	case spec.AssertFile:
 		return checkFile(a.File, env)
 	case spec.AssertStatus:
@@ -193,6 +195,70 @@ func checkTarget(a *spec.Assert, target spec.AssertTarget, res *runner.Result, e
 	default:
 		return &CheckResult{Desc: string(target), Hint: "assertion target not supported yet"}
 	}
+}
+
+// withCounterpartHint appends a suggestion to a failed stdout/stderr check when
+// the OTHER stream satisfies the very same assertion (#347). Asserting `stdout:`
+// on text a CLI actually prints to `stderr` is the most common mistake in CLI
+// end-to-end testing, and atago holds both streams while it reports the failure
+// — the answer used to sit in `--verbose` output the reader had to go find,
+// costing a round trip per occurrence in CI.
+//
+// It is a post-pass on the returned result, so checkStream stays unaware of
+// streams it does not own. It never changes the verdict, and it exists only for
+// the stdout/stderr pair: body/rows/message/value have no counterpart and the
+// code must not pretend otherwise.
+func withCounterpartHint(name string, s *spec.StreamAssert, res *runner.Result, env Env, out *CheckResult) *CheckResult {
+	if out == nil || out.OK || s == nil || res == nil || !canSuggestCounterpart(s) {
+		return out
+	}
+	other := "stderr"
+	if name == "stderr" {
+		other = "stdout"
+	}
+	// Re-run the SAME assertion through the SAME code path against the other
+	// stream. Anything less would have to re-derive CRLF folding and the `line:`
+	// selector, and a suggestion that is wrong on Windows — or wrong for a
+	// line-scoped assert — is worse than no suggestion at all. A `line:` that the
+	// counterpart does not have therefore simply fails to satisfy the assertion,
+	// and no suggestion is made.
+	if !checkStream(other, s, streamBytes(res, other), true, env).OK {
+		return out
+	}
+	suggestion := fmt.Sprintf("%s satisfies this assertion (assert `%s:` instead?)", other, other)
+	if out.Hint == "" {
+		out.Hint = suggestion
+	} else {
+		out.Hint += " — but " + suggestion
+	}
+	return out
+}
+
+// canSuggestCounterpart reports whether every matcher set on s is one whose
+// success against the other stream is evidence the author named the wrong one.
+//
+// Only the positive text matchers qualify. A negative matcher proves nothing: a
+// needle being absent from stderr too is not a reason to assert stderr. `empty`
+// is trivially satisfied by any silent stream and would fire constantly. `json`
+// and `yaml` compare a parsed document, where "the other stream also parses"
+// says little. `snapshot` is excluded for a second reason as well: re-running it
+// would compare against — and under --update-snapshots write — a golden file.
+//
+// Every set matcher must qualify, so a mixed assert (contains + not_contains)
+// stays silent rather than suggesting on the strength of half of it.
+func canSuggestCounterpart(s *spec.StreamAssert) bool {
+	set := s.SetMatchers()
+	if len(set) == 0 {
+		return false
+	}
+	for _, m := range set {
+		switch m {
+		case "contains", "matches", "equals":
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 func streamBytes(res *runner.Result, which string) []byte {

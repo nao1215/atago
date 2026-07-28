@@ -260,3 +260,24 @@ scenarios:
           exit_code: 1
           stdout:
             matches: "Stdout/Stderr:\n  \\(empty\\)"
+
+  # Asserting the wrong stream is the most common mistake in CLI E2E testing,
+  # and atago holds both streams when it reports the failure. The hint names the
+  # counterpart rather than leaving the reader to re-run with --verbose (#347).
+  - name: a stdout failure points at stderr when the text is there
+    steps:
+      - fixture:
+          file: wrongstream.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: wrongstream}
+            scenarios:
+              - name: assert stdout when the tool prints to stderr
+                steps:
+                  - run: {shell: true, command: "printf 'boom: no such file\n' 1>&2; exit 1"}
+                  - assert: {stdout: {contains: "boom"}}
+      - run: {command: "${atago} run wrongstream.atago.yaml"}
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: "stderr satisfies this assertion (assert `stderr:` instead?)"

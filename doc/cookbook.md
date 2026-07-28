@@ -198,6 +198,11 @@ scenarios:
             exists: false
 ```
 
+Getting the stream wrong is easy — plenty of CLIs print their errors to stdout,
+and plenty print progress to stderr. If an assertion fails on one stream while
+the other holds exactly the text you asked for, atago says so in the hint and
+suggests the swap, so you do not have to re-run with `--verbose` to find out.
+
 Full spec: [run_and_assert](../examples/run_and_assert.atago.yaml)
 
 ## Feed stdin to a filter CLI
