@@ -1,0 +1,22 @@
+{
+    "version": "0.17.0",
+    "architecture": {
+        "64bit": {
+            "url": "https://github.com/nao1215/atago/releases/download/v0.17.0/atago_0.17.0_windows_amd64.zip",
+            "bin": [
+                "atago.exe"
+            ],
+            "hash": "e30447611d6a1d1bc7d06ba5d9bf5fe12dc216006aa184869ca3d0e0bc0014b1"
+        },
+        "arm64": {
+            "url": "https://github.com/nao1215/atago/releases/download/v0.17.0/atago_0.17.0_windows_arm64.zip",
+            "bin": [
+                "atago.exe"
+            ],
+            "hash": "eaef1d1ba3b8cb35ab5e582c23b583dff2ff4f1b23c994f6fa62b91ce51d9cea"
+        }
+    },
+    "homepage": "https://github.com/nao1215/atago",
+    "license": "MIT",
+    "description": "Tests CLI behavior from plain YAML: exit codes, output, files, snapshots, and interactive terminals (PTY/TUI)"
+}
