@@ -240,6 +240,18 @@ func writeFailureStreams(b *strings.Builder, ck *assert.CheckResult, run *runner
 		stream, label = run.Stdout, "Stdout"
 	}
 	if len(stream) == 0 {
+		// The command exited non-zero without printing a word. That is a notable
+		// fact about the program under test — arguably the most notable one in
+		// this report — and the block used to stay quiet about it, which is what
+		// a reader also sees when there is no rule at all (#346). Say it instead,
+		// in the one spelling internal/assert already uses.
+		//
+		// Only for a result family that HAS these streams: an HTTP response or a
+		// DB query has no stdout, so "(empty)" there would describe a stream that
+		// does not exist rather than one that was silent.
+		if hasProcessStreams(run) {
+			fmt.Fprintf(b, "\nStdout/Stderr:\n  %s\n", assert.EmptyExcerpt)
+		}
 		return
 	}
 	tail, kept, total := tailLines(stream, failureStreamTail)
@@ -248,6 +260,15 @@ func writeFailureStreams(b *strings.Builder, ck *assert.CheckResult, run *runner
 		return
 	}
 	fmt.Fprintf(b, "\n%s:\n%s\n", label, indent(tail))
+}
+
+// hasProcessStreams reports whether a Result belongs to a family that has
+// stdout/stderr at all — a process run or a pty session. An HTTP, DB, gRPC, or
+// CDP result has its own observable surface (body, rows, message, value) and
+// leaves Stdout/Stderr permanently nil, so describing them as "(empty)" would
+// name a stream that does not exist rather than one that was silent (#346).
+func hasProcessStreams(run *runner.Result) bool {
+	return !run.IsHTTP && !run.IsDB && !run.IsGRPC && !run.IsCDP
 }
 
 // tailLines returns the last n lines of buf (sans trailing newline), how many

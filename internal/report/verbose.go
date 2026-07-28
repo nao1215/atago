@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/nao1215/atago/internal/assert"
 	"github.com/nao1215/atago/internal/engine"
 )
 
@@ -48,11 +49,16 @@ func (v *Verbose) Scenario(res engine.ScenarioResult) {
 		fmt.Fprintf(&b, "    skipped: %s\n", res.SkipReason)
 	}
 
+	// A trace of a scenario that did not pass is a trace the reader opened to
+	// find something, so its empty streams are stated rather than omitted (#346).
+	// See writeStream for why the split exists at all.
+	interesting := res.Status == engine.StatusFailed || res.Status == engine.StatusError
+
 	for i := range res.Steps {
-		v.writeStep(&b, "", &res.Steps[i])
+		v.writeStep(&b, "", &res.Steps[i], interesting)
 	}
 	for i := range res.Teardown {
-		v.writeStep(&b, "teardown ", &res.Teardown[i])
+		v.writeStep(&b, "teardown ", &res.Teardown[i], interesting)
 	}
 
 	v.mu.Lock()
@@ -63,7 +69,13 @@ func (v *Verbose) Scenario(res engine.ScenarioResult) {
 // writeStep renders one step: its label line, the executed command and outcome
 // for run-family steps, captured output, any execution error, and one verdict
 // line per assertion check.
-func (v *Verbose) writeStep(b *strings.Builder, phase string, sr *engine.StepResult) {
+//
+// scenarioFailed carries down the scenario's own verdict: a step that failed or
+// errored is one the reader came to look at, and so is every step of a scenario
+// that did not pass — the failing assert step carries no Result of its own, so
+// the silent command's own step is where the stream has to be stated (#346).
+func (v *Verbose) writeStep(b *strings.Builder, phase string, sr *engine.StepResult, scenarioFailed bool) {
+	stateEmpty := scenarioFailed || sr.ErrMsg != "" || !assert.AllOK(sr.Checks)
 	label := string(sr.Kind)
 	if sr.Setup {
 		label = setupPhaseLabelFor(*sr)
@@ -83,18 +95,18 @@ func (v *Verbose) writeStep(b *strings.Builder, phase string, sr *engine.StepRes
 		switch {
 		case sr.Run.IsHTTP:
 			fmt.Fprintf(b, "      status %d\n", sr.Run.StatusCode)
-			writeStream(b, "body", sr.Run.Body)
+			writeStream(b, "body", sr.Run.Body, stateEmpty)
 		case sr.Run.IsDB:
-			writeStream(b, "rows", sr.Run.RowsJSON)
+			writeStream(b, "rows", sr.Run.RowsJSON, stateEmpty)
 		case sr.Run.IsGRPC:
 			fmt.Fprintf(b, "      grpc status %d\n", sr.Run.GRPCStatus)
-			writeStream(b, "message", sr.Run.MessageJSON)
+			writeStream(b, "message", sr.Run.MessageJSON, stateEmpty)
 		case sr.Run.IsCDP:
-			writeStream(b, "value", sr.Run.CDPValue)
+			writeStream(b, "value", sr.Run.CDPValue, stateEmpty)
 		default:
 			fmt.Fprintf(b, "      exit %d\n", sr.Run.ExitCode)
-			writeStream(b, "stdout", sr.Run.Stdout)
-			writeStream(b, "stderr", sr.Run.Stderr)
+			writeStream(b, "stdout", sr.Run.Stdout, stateEmpty)
+			writeStream(b, "stderr", sr.Run.Stderr, stateEmpty)
 		}
 	}
 	if sr.ErrMsg != "" {
@@ -113,9 +125,21 @@ func (v *Verbose) writeStep(b *strings.Builder, phase string, sr *engine.StepRes
 }
 
 // writeStream renders one captured stream as an indented block, excerpted at
-// the shared limit. Empty streams are omitted to keep traces compact.
-func writeStream(b *strings.Builder, name string, data []byte) {
+// the shared limit.
+//
+// An empty stream is omitted when stateEmpty is false and stated as (empty)
+// when it is true. The split is deliberate (#346): compactness is a real
+// argument for a 300-step green trace, where an empty stream is not what the
+// reader is scanning for, and no argument at all for the step they opened the
+// trace to read — there, an omitted block makes a command that printed nothing
+// indistinguishable from one whose capture was lost. The rule applies to every
+// result family, not just stdout/stderr: an HTTP 204 with an empty body carries
+// exactly the same ambiguity.
+func writeStream(b *strings.Builder, name string, data []byte, stateEmpty bool) {
 	if len(data) == 0 {
+		if stateEmpty {
+			fmt.Fprintf(b, "      %s |\n        %s\n", name, assert.EmptyExcerpt)
+		}
 		return
 	}
 	s := string(data)
