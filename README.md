@@ -76,6 +76,13 @@ On macOS, Homebrew works too:
 brew install --cask nao1215/tap/atago
 ```
 
+On Windows, [Scoop](https://scoop.sh/) installs it from this repository's own bucket:
+
+```shell
+scoop bucket add nao1215 https://github.com/nao1215/atago
+scoop install nao1215/atago
+```
+
 On Arch Linux, install the [`atago-bin`](https://aur.archlinux.org/packages/atago-bin) package from the AUR:
 
 ```shell
