@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/nao1215/atago/internal/assert"
@@ -72,8 +74,17 @@ func driveSession(ctx context.Context, p *spec.PTY, proc ptyProcess) (*runner.Re
 	// Transcript accumulator: one goroutine drains the master so the child never
 	// blocks on a full terminal buffer. Reads end when the child exits (EOF/EIO)
 	// or the master is closed.
+	//
+	// readErr holds the error that ended the loop when it is NOT one of those
+	// ends (#345). Every error used to end the loop the same way, so a transcript
+	// lost to a real read failure left exactly the state a completed session
+	// leaves — and every expect_screen/screen/transcript assertion afterwards ran
+	// against a partial transcript atago believed was whole. finish reads it and
+	// refuses to hand back a Result at all, the same call the cmd runner makes
+	// for a cut-short capture (#343).
 	var mu sync.Mutex
 	var transcript []byte
+	var readErr error
 	readDone := make(chan struct{})
 	go func() {
 		defer close(readDone)
@@ -86,9 +97,20 @@ func driveSession(ctx context.Context, p *spec.PTY, proc ptyProcess) (*runner.Re
 				mu.Unlock()
 				queries.consume(buf[:n])
 			}
-			if rerr != nil {
-				return
+			if rerr == nil {
+				continue
 			}
+			// An interrupted read is not an end: resume it, or a signal
+			// arriving mid-read truncates the transcript.
+			if errors.Is(rerr, syscall.EINTR) {
+				continue
+			}
+			if !isSessionEnd(rerr) {
+				mu.Lock()
+				readErr = rerr
+				mu.Unlock()
+			}
+			return
 		}
 	}()
 	snapshot := func() []byte {
@@ -152,6 +174,25 @@ func driveSession(ctx context.Context, p *spec.PTY, proc ptyProcess) (*runner.Re
 		proc.closeTerm()
 		<-readDone
 		tr := snapshot()
+		// A transcript atago knows is incomplete must not become a Result: an
+		// expect_screen compared against missing bytes is a confidently wrong
+		// verdict, and it would read as the spec's fault rather than atago's. So
+		// this outranks even a pending ExpectFailure — that expect may have failed
+		// only because the bytes never arrived.
+		//
+		// Every caller of finish has already reaped the child (the session loop
+		// receives proc.exit; abort and failHard kill and wait), so an end-of-
+		// session read error accepted here is by construction one that arrived
+		// after the child exited. That is why the reader can classify on the error
+		// alone without racing the exit.
+		mu.Lock()
+		rerr := readErr
+		mu.Unlock()
+		if rerr != nil {
+			return nil, nil, fmt.Errorf(
+				"pty %q: the terminal transcript is incomplete — reading the terminal failed after %d bytes: %w",
+				p.Command, len(tr), rerr)
+		}
 		res := &runner.Result{
 			Command:  p.Command,
 			Stdout:   tr,
@@ -342,6 +383,29 @@ func driveSession(ctx context.Context, p *spec.PTY, proc ptyProcess) (*runner.Re
 		}
 		return abort(nil)
 	}
+}
+
+// isSessionEnd reports whether a terminal read error is how a session ends
+// rather than how a transcript is lost (#345).
+//
+// Three things end a pty session normally. io.EOF is the generic one. syscall.EIO
+// is what a POSIX master returns once the last slave handle is gone — the child
+// exited — and on Windows conpty.Read maps the equivalent ConPTY conditions
+// (ERROR_BROKEN_PIPE, ERROR_HANDLE_EOF, ERROR_PIPE_NOT_CONNECTED) to io.EOF, so
+// this list stays platform-neutral. fs.ErrClosed covers atago's own
+// proc.closeTerm: finish closes the master and then waits for the drain
+// goroutine, whose pending read fails precisely because of that close.
+//
+// Everything else is a read that failed for a reason atago did not cause and
+// cannot account for, which means the transcript is short by an unknown amount.
+// The service runner already holds this line — its syncBuffer prefixes a
+// truncated log with how many bytes it dropped — and truncation must not be
+// silent in the runner whose whole output is one accumulated stream.
+func isSessionEnd(err error) bool {
+	return errors.Is(err, io.EOF) ||
+		errors.Is(err, syscall.EIO) ||
+		errors.Is(err, fs.ErrClosed) ||
+		errors.Is(err, io.ErrClosedPipe)
 }
 
 func sessionWaitContext(parent context.Context, timeout string) (context.Context, context.CancelFunc) {

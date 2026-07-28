@@ -605,3 +605,67 @@ scenarios:
 		t.Errorf("Hint = %q, still offers a bigger timeout for a finished session", ck.Hint)
 	}
 }
+
+// TestEngine_PTY_ErroredStepIsNotAFailedAssertion pins the routing a lost
+// transcript depends on (#345): the engine gives a pty step's hard error and its
+// expect failure two DIFFERENT verdicts, and the reports treat them differently.
+// An error is StatusError carrying an ErrMsg and no checks — nothing was
+// asserted, because atago could not observe the session. A never-matching expect
+// is StatusFailed carrying a failing check. A transcript atago knows is
+// incomplete takes the first path, so it can never be reported as the spec's
+// assertion being wrong about output that never arrived.
+func TestEngine_PTY_ErroredStepIsNotAFailedAssertion(t *testing.T) {
+	skipOnWindows(t)
+	t.Parallel()
+
+	// An execution error: the send never resolves, so the session cannot run.
+	errored := runSpec(t, `
+version: "1"
+suite:
+  name: verdicts
+scenarios:
+  - name: the step could not run
+    steps:
+      - pty:
+          command: cat
+          timeout: 10s
+          session:
+            - send: "${no_such_var}\n"
+`)
+	if errored.Status != StatusError {
+		t.Fatalf("status = %s, want error: %+v", errored.Status, errored.Scenarios)
+	}
+	step := errored.Scenarios[0].Steps[0]
+	if step.ErrMsg == "" {
+		t.Error("an errored pty step must carry an ErrMsg")
+	}
+	if len(step.Checks) != 0 {
+		t.Errorf("an errored pty step must assert nothing, got %+v", step.Checks)
+	}
+
+	// A failed assertion: the session ran and observed everything; the expect
+	// simply never matched.
+	failed := runSpec(t, `
+version: "1"
+suite:
+  name: verdicts
+scenarios:
+  - name: the step ran and the expect did not match
+    steps:
+      - pty:
+          command: cat
+          timeout: 2s
+          session:
+            - expect: "never-going-to-appear"
+`)
+	if failed.Status != StatusFailed {
+		t.Fatalf("status = %s, want failed: %+v", failed.Status, failed.Scenarios)
+	}
+	fstep := failed.Scenarios[0].Steps[0]
+	if fstep.ErrMsg != "" {
+		t.Errorf("a failed expect must not be reported as an execution error: %q", fstep.ErrMsg)
+	}
+	if len(fstep.Checks) == 0 || fstep.Checks[0].OK {
+		t.Fatalf("want a failing expect check, got %+v", fstep.Checks)
+	}
+}
