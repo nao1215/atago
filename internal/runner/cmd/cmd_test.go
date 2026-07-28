@@ -853,12 +853,19 @@ func TestHelperProcess(t *testing.T) {
 		// process exits — the one signal that tells a lost stream apart from a
 		// silent one (#344). Nothing is printed, so the captured stdout is
 		// empty for the same reason #339's was.
+		//
+		// os.Exit rather than returning: with stdout closed, the testing
+		// package's own shutdown (its result line, and the coverage writer
+		// under `go test -cover`) has nowhere to write and fails the binary
+		// with exit 2, which has nothing to do with what is under test.
 		_ = os.Stdout.Close()
 		time.Sleep(300 * time.Millisecond)
+		os.Exit(0)
 	case "write-then-close-stdout-early":
 		fmt.Println("produced")
 		_ = os.Stdout.Close()
 		time.Sleep(300 * time.Millisecond)
+		os.Exit(0)
 	case "lingering-writer":
 		fmt.Println("produced")
 		child := exec.CommandContext(context.Background(), os.Args[0], "-test.run=TestHelperProcess")
