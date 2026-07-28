@@ -32,6 +32,24 @@ type Result struct {
 	// knob to adjust (#17). Empty when TimedOut is false.
 	TimeoutSource string
 
+	// EarlyEOF records, per stream name ("stdout" / "stderr"), how far ahead of
+	// the command's own exit that stream reached end-of-file.
+	//
+	// atago creates the capture pipes itself and closes the parent's copy of each
+	// write end immediately after Start, so from that moment the child process is
+	// their only holder: EOF on the read end cannot arrive before the child exits
+	// — unless the child closed its own stdout, or never had atago's pipe at all.
+	// That distance is the one piece of evidence separating "the command printed
+	// nothing" from "the command's output went somewhere else", which #339 spent a
+	// day being unreadable for.
+	//
+	// An entry exists only when the gap is large enough to be meaningful (see the
+	// cmd runner's margin), so an ordinary command carries none and the map is
+	// nil. Closing stdout early is legal — a daemonizing tool does it — so this is
+	// only ever a hint on a failure that already happened, never a failure of its
+	// own (#344).
+	EarlyEOF map[string]time.Duration
+
 	// HTTP fields, set only by the http runner (IsHTTP reports which family is
 	// populated, since a zero StatusCode is indistinguishable from "no response").
 	IsHTTP     bool

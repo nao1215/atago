@@ -157,11 +157,16 @@ func checkTarget(a *spec.Assert, target spec.AssertTarget, res *runner.Result, e
 	case spec.AssertExitCode:
 		return checkExitCode(a.ExitCode, res)
 	case spec.AssertStdout:
-		return withCounterpartHint("stdout", a.Stdout, res, env,
-			checkStream("stdout", a.Stdout, streamBytes(res, "stdout"), res != nil, env))
+		// Two independent post-passes over a failing stream check, applied in the
+		// order they read best: where the text actually is (#347), then why this
+		// stream may be short (#344).
+		return withEarlyEOFHint("stdout", res,
+			withCounterpartHint("stdout", a.Stdout, res, env,
+				checkStream("stdout", a.Stdout, streamBytes(res, "stdout"), res != nil, env)))
 	case spec.AssertStderr:
-		return withCounterpartHint("stderr", a.Stderr, res, env,
-			checkStream("stderr", a.Stderr, streamBytes(res, "stderr"), res != nil, env))
+		return withEarlyEOFHint("stderr", res,
+			withCounterpartHint("stderr", a.Stderr, res, env,
+				checkStream("stderr", a.Stderr, streamBytes(res, "stderr"), res != nil, env)))
 	case spec.AssertFile:
 		return checkFile(a.File, env)
 	case spec.AssertStatus:
@@ -230,6 +235,38 @@ func withCounterpartHint(name string, s *spec.StreamAssert, res *runner.Result, 
 		out.Hint = suggestion
 	} else {
 		out.Hint += " — but " + suggestion
+	}
+	return out
+}
+
+// withEarlyEOFHint appends the one fact a failing stream check cannot derive for
+// itself: that the stream ended before the command did (#344).
+//
+// The cmd runner closes the parent's copy of each capture pipe's write end right
+// after Start, so the child is its only holder and EOF cannot arrive first —
+// unless the child closed its own stdout, or never had atago's pipe at all. A
+// report that says only "the substring was not present in stdout" leaves those
+// indistinguishable from a command that printed nothing, which is exactly what
+// made #339 unreadable.
+//
+// It is a hint on an existing failure, never a failure of its own: closing stdout
+// early is legal (a daemonizing tool does it), so a step that asserts nothing
+// about the stream must stay green. Results with no observation — every ordinary
+// command, and every non-process result family — grow no note.
+func withEarlyEOFHint(name string, res *runner.Result, out *CheckResult) *CheckResult {
+	if out == nil || out.OK || res == nil {
+		return out
+	}
+	d, ok := res.EarlyEOF[name]
+	if !ok {
+		return out
+	}
+	note := fmt.Sprintf("%s ended %s before the command exited — its %s was closed, or was never connected to atago's pipe",
+		name, d.Round(time.Millisecond), name)
+	if out.Hint == "" {
+		out.Hint = note
+	} else {
+		out.Hint += " — " + note
 	}
 	return out
 }
