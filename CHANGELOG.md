@@ -7,8 +7,26 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-07-28
+
+A minor release about reach, and about failures that describe themselves.
+Windows was the one platform CI has always tested and no package manager could
+install from; atago now ships a Scoop bucket, and every tagged release builds
+winget manifests ready to submit. The rest continues what v0.16.0 started: an
+assertion that observed nothing, and a run whose output capture died before its
+process did, now say so instead of leaving the reader to infer it.
+
 ### Added
 
+- Scoop distribution for Windows. `scoop bucket add nao1215
+  https://github.com/nao1215/atago`, then `scoop install nao1215/atago`. The
+  bucket is this repository's own [`bucket/`](bucket/) directory — Scoop accepts
+  any git repository with one — so the manifest is published by the release
+  job's built-in token, with no second repository and no second credential to
+  keep alive. Each tagged release also writes winget manifests for
+  `nao1215.atago` under `dist/`; putting them in the winget catalog takes a pull
+  request to microsoft/winget-pkgs and stays a manual step against a published
+  tag.
 - Third-party E2E suite for [fx](https://fx.wtf/), the terminal JSON viewer, in
   `test/e2e/thirdparty/fx`. fx is a filter when it is given a reducer and a
   full-screen viewer when it is not, and both halves are pinned. The filter side
