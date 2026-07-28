@@ -3,6 +3,7 @@ package report
 import (
 	"fmt"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -268,6 +269,27 @@ func indent(s string) string {
 	return strings.Join(lines, "\n")
 }
 
+// oneLineCommand renders a command for a surface where it shares a line with
+// other text — the verbose trace's step line — so a newline in it can never
+// split that line. A raw newline there is ambiguous with the start of the next
+// step, and a grep for a step in a CI log stops matching at it (#348).
+//
+// A command with no embedded newline is returned untouched: that is nearly
+// every command, and this text is what users grep for, so the common case must
+// stay byte-identical. Only a multi-line command is quoted, and strconv.Quote is
+// the escaping chosen because `\n` is the same escape the spec author typed in
+// the YAML — the trace then reads recognizably like the source, and like the
+// failure block's indented rendering of the same command. A trailing newline (a
+// `>` block scalar carries one) is dropped first: it says nothing about the
+// command, and quoting it would show a `\n` the author did not write.
+func oneLineCommand(cmd string) string {
+	cmd = strings.TrimRight(cmd, "\r\n")
+	if !strings.ContainsAny(cmd, "\r\n") {
+		return cmd
+	}
+	return strconv.Quote(cmd)
+}
+
 // writeCheckFailure renders the body every failure report shares: the step that
 // failed, the command behind it when there is one, the comparison, and the
 // hint. A scenario failure and a suite setup/teardown failure differ only in
@@ -277,7 +299,12 @@ func indent(s string) string {
 func writeCheckFailure(b *strings.Builder, color bool, ck *assert.CheckResult, cmd string) {
 	fmt.Fprintf(b, "\nStep:\n  %s\n", ck.Desc)
 	if cmd != "" {
-		fmt.Fprintf(b, "\nCommand:\n  %s\n", cmd)
+		// Through indent(), like every other multi-line value in this block: a
+		// command carrying a newline (a YAML block scalar, a `shell: true` script)
+		// used to drop its continuation lines to column 0 (#348). indent() also
+		// trims the trailing newline a `>` block scalar leaves, so the section
+		// never ends in a dangling blank line.
+		fmt.Fprintf(b, "\nCommand:\n%s\n", indent(cmd))
 	}
 	// Multi-line equals/snapshot failures render a unified diff (#28): the
 	// one-character difference the two raw blocks hide. Single-line failures
