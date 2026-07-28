@@ -47,24 +47,15 @@ func writeGHA(w io.Writer, results []*engine.SuiteResult) error {
 			// not-ok points tap emits for the same run — so the ::notice:: summary
 			// agrees with the ::error:: annotations just written above instead of
 			// reading an all-zero, all-green line.
-			agg.Errored += len(pts)
+			agg = agg.Add(engine.Counts{Errored: len(pts)})
 			total += len(pts)
 		}
-		c := res.Counts()
-		agg.Passed += c.Passed
-		agg.Failed += c.Failed
-		agg.Errored += c.Errored
-		agg.Skipped += c.Skipped
-		agg.Flaky += c.Flaky
+		agg = agg.Add(res.Counts())
 		total += len(res.Scenarios)
-	}
-	flaky := ""
-	if agg.Flaky > 0 {
-		flaky = fmt.Sprintf(", %d flaky", agg.Flaky)
 	}
 	fmt.Fprintf(&b, "::notice title=atago::%s\n", ghaEscapeData(fmt.Sprintf(
 		"%d scenarios: %d passed, %d failed, %d errored, %d skipped%s",
-		total, agg.Passed, agg.Failed, agg.Errored, agg.Skipped, flaky)))
+		total, agg.Passed, agg.Failed, agg.Errored, agg.Skipped, flakySuffix(agg))))
 	_, err := io.WriteString(w, b.String())
 	return err
 }

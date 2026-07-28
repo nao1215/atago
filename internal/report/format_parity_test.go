@@ -175,6 +175,21 @@ func TestRender_CrossFormatCountParity(t *testing.T) {
 			t.Errorf("gha missing warning annotation for the flaky scenario:\n%s", out)
 		}
 	})
+
+	// The console summary and the gha notice aggregate the same five counters.
+	// They used to do it with two hand-rolled copies of the same additions and
+	// two hand-rolled copies of the ", N flaky" suffix, so this subtest asserts
+	// the two lines carry the same numbers and the same wording for them.
+	t.Run("console and gha agree on the tally", func(t *testing.T) {
+		t.Parallel()
+		wantTally := "5 scenarios: 1 passed, 1 failed, 1 errored, 1 skipped, 1 flaky"
+		if out := render(t, FormatConsole, res); !strings.Contains(out, wantTally) {
+			t.Errorf("console summary missing %q:\n%s", wantTally, out)
+		}
+		if out := render(t, FormatGHA, res); !strings.Contains(out, wantTally) {
+			t.Errorf("gha notice missing %q:\n%s", wantTally, out)
+		}
+	})
 }
 
 // TestRender_CrossFormatCountParity_SetupErrored pins the format-cross count

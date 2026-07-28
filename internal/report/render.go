@@ -23,6 +23,18 @@ func flakyMessage(sc *engine.ScenarioResult) string {
 	return fmt.Sprintf("flaky: passed after %d attempts", sc.Attempts)
 }
 
+// flakySuffix renders the ", N flaky" tail of a summary tally. Flaky scenarios
+// (#29) are green for the verdict but never hidden, and the suffix appears only
+// when non-zero so steady-state output is unchanged. Console and gha share this
+// for the same reason they share flakyMessage: the wording must not drift
+// between two lines describing the same run.
+func flakySuffix(c engine.Counts) string {
+	if c.Flaky == 0 {
+		return ""
+	}
+	return fmt.Sprintf(", %d flaky", c.Flaky)
+}
+
 // Option configures an optional aspect of a Render call. It keeps the common
 // three-argument form unchanged while letting callers pass extra run-level
 // context (e.g. spec-load failures) without a signature churn.
@@ -67,7 +79,7 @@ func Render(w io.Writer, f Format, results []*engine.SuiteResult, opts ...Option
 	case FormatConsole:
 		var b strings.Builder
 		color := isTTY(w)
-		var agg engine.Counts
+		agg := engine.SumCounts(results)
 		var total int
 		var dur time.Duration
 		hardFail := false
@@ -78,12 +90,6 @@ func Render(w io.Writer, f Format, results []*engine.SuiteResult, opts ...Option
 			writeSuiteDetail(&b, color, res)
 			writeRepeatRates(&b, color, res)
 			writeFlaky(&b, color, res)
-			c := res.Counts()
-			agg.Passed += c.Passed
-			agg.Failed += c.Failed
-			agg.Errored += c.Errored
-			agg.Skipped += c.Skipped
-			agg.Flaky += c.Flaky
 			total += len(res.Scenarios)
 			dur += res.Duration
 			// A suite that errored before producing any scenario row (#7) has

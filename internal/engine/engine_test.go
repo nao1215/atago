@@ -1328,6 +1328,46 @@ func TestSuiteResultCounts(t *testing.T) {
 	}
 }
 
+// TestCountsAdd proves Add folds every field, including Flaky. Report formats
+// aggregate per-suite counts through it, so a field this method forgot would
+// make a summary line disagree with the rows above it.
+func TestCountsAdd(t *testing.T) {
+	t.Parallel()
+	a := Counts{Passed: 1, Failed: 2, Skipped: 3, Errored: 4, Flaky: 5}
+	b := Counts{Passed: 10, Failed: 20, Skipped: 30, Errored: 40, Flaky: 50}
+	if got := a.Add(b); got != (Counts{Passed: 11, Failed: 22, Skipped: 33, Errored: 44, Flaky: 55}) {
+		t.Errorf("a.Add(b) = %+v", got)
+	}
+	// Adding the zero value must change nothing, in either direction.
+	if got := a.Add(Counts{}); got != a {
+		t.Errorf("a.Add(zero) = %+v, want %+v", got, a)
+	}
+	if got := (Counts{}).Add(a); got != a {
+		t.Errorf("zero.Add(a) = %+v, want %+v", got, a)
+	}
+}
+
+// TestSumCounts covers the aggregation the report formats used to open-code,
+// including the empty-slice bootstrap that must yield the zero value rather
+// than anything derived from the first element.
+func TestSumCounts(t *testing.T) {
+	t.Parallel()
+	if got := SumCounts(nil); got != (Counts{}) {
+		t.Errorf("SumCounts(nil) = %+v, want zero", got)
+	}
+	if got := SumCounts([]*SuiteResult{}); got != (Counts{}) {
+		t.Errorf("SumCounts(empty) = %+v, want zero", got)
+	}
+	results := []*SuiteResult{
+		{Scenarios: []ScenarioResult{{Status: StatusPassed}, {Status: StatusFailed}}},
+		{Scenarios: []ScenarioResult{{Status: StatusSkipped}, {Status: StatusError}, {Status: StatusFlaky}}},
+		{}, // a suite that produced no scenario row contributes nothing
+	}
+	if got := SumCounts(results); got != (Counts{Passed: 1, Failed: 1, Skipped: 1, Errored: 1, Flaky: 1}) {
+		t.Errorf("SumCounts = %+v", got)
+	}
+}
+
 // TestScenarioID proves the identity key is stable and distinguishes same-named
 // scenarios across different spec paths (the --rerun-failed / --select key).
 func TestScenarioID(t *testing.T) {
