@@ -209,21 +209,8 @@ func writeRedirects(run *spec.Run, workdir, stdout, stderr string) error {
 		if r.path == "" {
 			continue
 		}
-		abs, err := security.ResolveWorkdirPath(r.field, workdir, r.path)
-		if err != nil {
+		if _, err := security.WriteWorkdirFile(r.field, workdir, r.path, []byte(r.data)); err != nil {
 			return err
-		}
-		// Create the parent directory so a redirect to a nested path (stdout_to:
-		// logs/out.txt) works without a prior mkdir step, mirroring the fixture
-		// writer. The parent is inside the workdir (ResolveWorkdirPath confined it),
-		// so this creates only scenario-local directories.
-		if err := os.MkdirAll(filepath.Dir(abs), 0o750); err != nil {
-			return fmt.Errorf("%s: %w", r.field, err)
-		}
-		// The program under test may have planted a symlink at the redirect target
-		// pointing outside the workdir; write without following it (issue #16).
-		if err := security.WriteFileNoFollow(abs, []byte(r.data), 0o644); err != nil {
-			return fmt.Errorf("%s: %w", r.field, err)
 		}
 	}
 	return nil

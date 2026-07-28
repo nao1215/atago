@@ -289,3 +289,109 @@ func TestResolveWorkdirPath_ForwardSlashRelative(t *testing.T) {
 		t.Errorf("resolved path %q is not within root %q", got, root)
 	}
 }
+
+// TestWriteWorkdirFile covers the confined-write helper the four
+// workdir-scoped features share (#349): stdout_to/stderr_to, http.body_to,
+// fixtures, and (via WriteConfinedFile) snapshots and CDP screenshots. Each of
+// them used to open-code resolve → MkdirAll → WriteFileNoFollow, and the file
+// mode had already drifted between them.
+func TestWriteWorkdirFile(t *testing.T) {
+	t.Parallel()
+
+	t.Run("creates parent directories", func(t *testing.T) {
+		t.Parallel()
+		root := t.TempDir()
+		dest, err := WriteWorkdirFile("run.stdout_to", root, filepath.Join("logs", "deep", "out.txt"), []byte("produced"))
+		if err != nil {
+			t.Fatalf("WriteWorkdirFile: %v", err)
+		}
+		if want := filepath.Join(root, "logs", "deep", "out.txt"); dest != want {
+			t.Errorf("dest = %q, want %q", dest, want)
+		}
+		got, err := os.ReadFile(dest)
+		if err != nil || string(got) != "produced" {
+			t.Fatalf("read back = %q, %v", got, err)
+		}
+	})
+
+	t.Run("rejects an escape and names the field", func(t *testing.T) {
+		t.Parallel()
+		root := t.TempDir()
+		for _, rel := range []string{
+			filepath.Join("sub", "..", "..", "escape.txt"),
+			filepath.Join(t.TempDir(), "absolute-outside.txt"),
+		} {
+			_, err := WriteWorkdirFile("http.body_to", root, rel, []byte("x"))
+			if err == nil {
+				t.Fatalf("WriteWorkdirFile(%q) succeeded; want a containment error", rel)
+			}
+			if !strings.Contains(err.Error(), "http.body_to") {
+				t.Errorf("error does not name the field: %v", err)
+			}
+			if !strings.Contains(err.Error(), "escapes the scenario workdir") {
+				t.Errorf("error does not say what went wrong: %v", err)
+			}
+		}
+	})
+
+	t.Run("refuses to write through a planted leaf symlink", func(t *testing.T) {
+		if runtime.GOOS == "windows" {
+			t.Skip("symlink creation is not reliably available on Windows CI")
+		}
+		t.Parallel()
+		root := t.TempDir()
+		victim := filepath.Join(t.TempDir(), "victim.txt")
+		if err := os.WriteFile(victim, []byte("original"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink(victim, filepath.Join(root, "redirect.txt")); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := WriteWorkdirFile("run.stdout_to", root, "redirect.txt", []byte("pwned")); err == nil {
+			t.Fatal("wrote through the planted symlink; want error")
+		}
+		if got, _ := os.ReadFile(victim); string(got) != "original" {
+			t.Errorf("host file was modified through the symlink: %q", got)
+		}
+	})
+
+	// One mode for every confined write. stdout_to used to be the odd one out at
+	// 0o644 (#349); pin the agreed mode so it cannot drift back unnoticed.
+	t.Run("uses the confined file mode", func(t *testing.T) {
+		if runtime.GOOS == "windows" {
+			t.Skip("Windows does not honor POSIX permission bits")
+		}
+		t.Parallel()
+		root := t.TempDir()
+		dest, err := WriteWorkdirFile("run.stdout_to", root, "out.txt", []byte("x"))
+		if err != nil {
+			t.Fatalf("WriteWorkdirFile: %v", err)
+		}
+		fi, err := os.Stat(dest)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := fi.Mode().Perm(); got != confinedFileMode {
+			t.Errorf("mode = %04o, want %04o", got, confinedFileMode)
+		}
+	})
+}
+
+// TestWriteConfinedFile is the resolved-path form used by snapshot writes, which
+// resolve against the spec directory rather than the workdir, and by CDP
+// screenshots, which resolve when the task is built and write after the run.
+func TestWriteConfinedFile(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	dest := filepath.Join(root, "golden", "out.snap")
+	if err := WriteConfinedFile(dest, []byte("v1")); err != nil {
+		t.Fatalf("first write: %v", err)
+	}
+	if err := WriteConfinedFile(dest, []byte("v2")); err != nil {
+		t.Fatalf("overwrite: %v", err)
+	}
+	got, err := os.ReadFile(dest)
+	if err != nil || string(got) != "v2" {
+		t.Fatalf("read back = %q, %v; want %q", got, err, "v2")
+	}
+}

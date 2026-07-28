@@ -9,7 +9,6 @@ package snapshot
 import (
 	"errors"
 	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -196,10 +195,10 @@ func Compare(path string, actual []byte, opt Options) (ok bool, expected, actual
 
 // Update writes the normalized actual output to path, creating parent dirs.
 func Update(path string, actual []byte, opt Options) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
-		return err
-	}
-	// The program under test may have planted a symlink at the snapshot target
-	// pointing outside the spec directory; write without following it (issue #16).
-	return security.WriteFileNoFollow(path, Normalize(actual, opt), 0o600)
+	// path is resolved against the SPEC directory (security.ResolveSpecPath), not
+	// the scenario workdir, so this takes the resolved-path form of the confined
+	// write rather than the workdir-shaped one. The rest of the policy — create
+	// parents, refuse a symlink the program under test may have planted at the
+	// target (issue #16), one file mode — is the same.
+	return security.WriteConfinedFile(path, Normalize(actual, opt))
 }

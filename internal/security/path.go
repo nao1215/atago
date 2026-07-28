@@ -49,6 +49,47 @@ func resolveInRoot(field, rootLabel, root, p string) (string, error) {
 	return dest, nil
 }
 
+// confinedFileMode is the mode of every file atago writes on a spec's behalf
+// inside a containment root — run.stdout_to/stderr_to, http.body_to, fixtures,
+// snapshots, CDP screenshots. These land in a private scenario workdir (a
+// per-run temp directory) or next to the spec, so nothing is gained by making
+// them group- or world-readable; one mode across every site is one fewer thing
+// to diverge. run.stdout_to used to write 0o644 for no documented reason (#349).
+const confinedFileMode = 0o600
+
+// WriteConfinedFile creates dest's parent directories and writes data there
+// without following a symlink planted at the leaf. dest must already be
+// containment-checked by ResolveWorkdirPath or ResolveSpecPath — this helper
+// enforces the rest of the policy (create parents, never follow the leaf, one
+// file mode) that every confined write used to spell out for itself.
+//
+// Parent creation means a spec can name a nested destination (stdout_to:
+// logs/out.txt) without a prior mkdir step; the parent is inside the containment
+// root, so only root-local directories are ever created.
+func WriteConfinedFile(dest string, data []byte) error {
+	if err := os.MkdirAll(filepath.Dir(dest), 0o750); err != nil {
+		return err
+	}
+	// The program under test may have planted a symlink at dest pointing outside
+	// the containment root; write without following it (issue #16).
+	return WriteFileNoFollow(dest, data, confinedFileMode)
+}
+
+// WriteWorkdirFile resolves rel against the scenario workdir and writes data
+// there, confined to the workdir. field names the spec field so both the
+// containment error and the write error say which key produced them. It returns
+// the absolute destination, which callers put in the Result or log.
+func WriteWorkdirFile(field, workdir, rel string, data []byte) (string, error) {
+	dest, err := ResolveWorkdirPath(field, workdir, rel)
+	if err != nil {
+		return "", err
+	}
+	if err := WriteConfinedFile(dest, data); err != nil {
+		return "", fmt.Errorf("%s: %w", field, err)
+	}
+	return dest, nil
+}
+
 // ReadFileNoFollow reads path but refuses to follow a symlink planted at the
 // leaf. Lexical containment (ResolveWorkdirPath/ResolveSpecPath) proves path is
 // inside its root, but the untrusted program under test may have replaced the

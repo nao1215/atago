@@ -22,7 +22,7 @@ import (
 // A `symlink` fixture creates a symbolic link instead of a regular file. Optional
 // `mode` (octal) and `mtime` (RFC3339) are applied after writing.
 func Write(f *spec.Fixture, workdir, specDir string) error {
-	dest, err := safeJoin(workdir, f.File)
+	dest, err := security.ResolveWorkdirPath("fixture path", workdir, f.File)
 	if err != nil {
 		return err
 	}
@@ -48,7 +48,7 @@ func Write(f *spec.Fixture, workdir, specDir string) error {
 	// existing file in place — e.g. chmod a file a previous step created — rather
 	// than truncating it. This lets a spec make a tool-created file read-only.
 	if f.Content == "" && f.Base64 == "" && f.From == "" && (f.Mode != "" || f.Mtime != "") {
-		// dest is lexically inside the workdir (safeJoin), but the untrusted
+		// dest is lexically inside the workdir (ResolveWorkdirPath), but the untrusted
 		// program under test may have replaced it with a symlink pointing outside
 		// — and chmod/chtimes FOLLOW symlinks, so applying mode/mtime here would
 		// escape containment and re-permission a host file. Reject an existing
@@ -84,10 +84,11 @@ func Write(f *spec.Fixture, workdir, specDir string) error {
 		data = []byte(f.Content)
 	}
 
-	// dest is contained within workdir by safeJoin above (cannot escape) — but the
-	// untrusted program under test may have planted a symlink at dest pointing
-	// outside the workdir; writing must not follow it (TOCTOU, issue #16).
-	if err := security.WriteFileNoFollow(dest, data, 0o600); err != nil {
+	// dest is contained within workdir by ResolveWorkdirPath above (cannot
+	// escape) — WriteConfinedFile handles the rest of the policy: the untrusted
+	// program under test may have planted a symlink at dest pointing outside the
+	// workdir, and writing must not follow it (TOCTOU, issue #16).
+	if err := security.WriteConfinedFile(dest, data); err != nil {
 		return fmt.Errorf("fixture %q: %w", f.File, err)
 	}
 	if err := applyMode(f, dest); err != nil {
@@ -145,12 +146,4 @@ func checkSymlinkTarget(workdir, dest, target string) error {
 		return fmt.Errorf("symlink target %q escapes the scenario workdir", target)
 	}
 	return nil
-}
-
-// safeJoin joins rel onto base and ensures the result stays within base, so a
-// fixture cannot write outside the scenario workdir. It shares
-// the workdir-containment policy used by file/store/service/browser/snapshot
-// paths so every path-taking feature enforces the same rule.
-func safeJoin(base, rel string) (string, error) {
-	return security.ResolveWorkdirPath("fixture path", base, rel)
 }
