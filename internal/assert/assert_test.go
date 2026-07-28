@@ -2653,3 +2653,65 @@ func TestCheckStream_WrongStreamHint(t *testing.T) {
 		}
 	})
 }
+
+// TestCheckStream_EarlyEOFHint covers #344's reporting half: a failing stream
+// check whose Result carries the early-EOF observation says so, and one that
+// does not carries no phantom note. The observation itself is what the cmd
+// runner records now that it owns the capture pipes — a stream that ended before
+// the command did was closed by the child or never carried atago's pipe, which
+// is the distinction #339 could not make.
+func TestCheckStream_EarlyEOFHint(t *testing.T) {
+	t.Parallel()
+
+	t.Run("a failing check names the early end", func(t *testing.T) {
+		t.Parallel()
+		res := &runner.Result{ExitCode: 0, EarlyEOF: map[string]time.Duration{"stdout": time.Second}}
+		got := Check(&spec.Assert{Stdout: &spec.StreamAssert{Contains: spec.StringList{"anything"}}}, res, Env{})
+		if got.OK {
+			t.Fatalf("assertion should fail against empty stdout: %+v", got)
+		}
+		for _, want := range []string{"stdout ended 1s before the command exited", "never connected to atago's pipe"} {
+			if !strings.Contains(got.Hint, want) {
+				t.Errorf("hint %q should mention %q", got.Hint, want)
+			}
+		}
+		// The original explanation survives; the observation is appended to it.
+		if !strings.Contains(got.Hint, `the substring "anything" was not present in stdout`) {
+			t.Errorf("hint lost the original explanation: %q", got.Hint)
+		}
+	})
+
+	t.Run("an ordinary failure grows no note", func(t *testing.T) {
+		t.Parallel()
+		res := &runner.Result{ExitCode: 0, Stdout: []byte("something else\n")}
+		got := Check(&spec.Assert{Stdout: &spec.StreamAssert{Contains: spec.StringList{"anything"}}}, res, Env{})
+		if strings.Contains(got.Hint, "before the command exited") {
+			t.Errorf("a result with no observation must grow no note: %q", got.Hint)
+		}
+	})
+
+	t.Run("the other stream's observation is not borrowed", func(t *testing.T) {
+		t.Parallel()
+		res := &runner.Result{ExitCode: 0, EarlyEOF: map[string]time.Duration{"stderr": time.Second}}
+		got := Check(&spec.Assert{Stdout: &spec.StreamAssert{Contains: spec.StringList{"anything"}}}, res, Env{})
+		if strings.Contains(got.Hint, "before the command exited") {
+			t.Errorf("stdout borrowed stderr's observation: %q", got.Hint)
+		}
+	})
+
+	t.Run("a passing check stays green and silent", func(t *testing.T) {
+		t.Parallel()
+		res := &runner.Result{
+			ExitCode: 0,
+			Stdout:   []byte("hello\n"),
+			EarlyEOF: map[string]time.Duration{"stdout": time.Second},
+		}
+		got := Check(&spec.Assert{Stdout: &spec.StreamAssert{Contains: spec.StringList{"hello"}}}, res, Env{})
+		if !got.OK {
+			t.Fatalf("closing stdout early is legal and must not fail a step: %+v", got)
+		}
+		if got.Hint != "" {
+			t.Errorf("a passing check must carry no hint: %q", got.Hint)
+		}
+	})
+}

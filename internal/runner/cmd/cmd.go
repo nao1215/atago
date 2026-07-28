@@ -79,13 +79,56 @@ func (r *Runner) Run(ctx context.Context, run *spec.Run, workdir string) (*runne
 		cmd.Stdin = stdin
 	}
 
-	var stdout, stderr strings.Builder
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
+	// atago owns the capture pipes rather than assigning a strings.Builder and
+	// letting os/exec create the pipe and the copying goroutine internally. That
+	// is what makes end-of-file observable: os/exec would only ever hand back the
+	// final byte count, so a child that wrote to a handle that was not our pipe
+	// and a child that printed nothing produced the identical observation (#344).
+	stdout, err := newCapture()
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute %q: %w", run.Command, err)
+	}
+	defer stdout.close()
+	stderr, err := newCapture()
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute %q: %w", run.Command, err)
+	}
+	defer stderr.close()
+	cmd.Stdout = stdout.writer()
+	cmd.Stderr = stderr.writer()
 
 	start := time.Now()
-	runErr := cmd.Run()
+	if err := cmd.Start(); err != nil {
+		// Could not start the process at all (not found, permission, ...). Same
+		// message the combined Run() path produced for this case.
+		return nil, fmt.Errorf("failed to execute %q: %w", run.Command, err)
+	}
+	// The child now holds the write ends; drop atago's copies or the read side
+	// never sees EOF at all, and the drains below would never finish.
+	stdout.releaseWriter()
+	stderr.releaseWriter()
+	stdout.drain()
+	stderr.drain()
+
+	runErr := cmd.Wait()
+	exitedAt := time.Now()
 	elapsed := time.Since(start)
+
+	// Wait no longer implies the output is fully read: os/exec waits for pipes it
+	// created, and these are atago's. Join the drains under one shared deadline —
+	// WaitDelay's force-close does not apply here, so a grandchild holding the
+	// pipe would otherwise block forever.
+	deadline := exitedAt.Add(captureDrainGrace)
+	drained := stdout.waitUntil(deadline)
+	drained = stderr.waitUntil(deadline) && drained
+	if !drained {
+		// End the loops so their buffers are ours to read, then join: reading a
+		// buffer a live goroutine is still appending to would be a data race.
+		stdout.forceClose()
+		stderr.forceClose()
+		stdout.join()
+		stderr.join()
+	}
 
 	// A capture that was cut short is classified before ANY of it is persisted or
 	// returned: stdout_to/stderr_to must not write a stream atago only partly
@@ -93,13 +136,24 @@ func (r *Runner) Run(ctx context.Context, run *spec.Run, workdir string) (*runne
 	// A cancel or a step timeout is a different outcome, handled below — the
 	// output a killed command managed to produce IS observable — so ctx state
 	// wins over this check (#339).
-	var captureErr *exec.ExitError
-	if ctx.Err() == nil && runErr != nil && !errors.As(runErr, &captureErr) && cmd.ProcessState != nil {
+	if ctx.Err() == nil {
 		// The process started and exited; what failed is the capture of its
 		// output. Returning the bytes collected so far would present a stream we
 		// only partly read — possibly an empty one — as the observed value, and an
 		// assertion cannot tell that apart from a command that printed nothing.
-		return nil, captureFailure(run.Command, cmd.ProcessState.ExitCode(), runErr)
+		var captureErr *exec.ExitError
+		switch {
+		case !drained:
+			return nil, captureFailure(run.Command, cmd.ProcessState.ExitCode(), errDrainDeadline)
+		case stdout.err != nil:
+			return nil, captureFailure(run.Command, cmd.ProcessState.ExitCode(), stdout.err)
+		case stderr.err != nil:
+			return nil, captureFailure(run.Command, cmd.ProcessState.ExitCode(), stderr.err)
+		case runErr != nil && !errors.As(runErr, &captureErr) && cmd.ProcessState != nil:
+			// Everything else Wait can fail at while the process itself ran fine —
+			// the stdin copy, which os/exec still owns.
+			return nil, captureFailure(run.Command, cmd.ProcessState.ExitCode(), runErr)
+		}
 	}
 
 	// Redirect captured stdout/stderr to workdir-relative files when requested
@@ -116,6 +170,7 @@ func (r *Runner) Run(ctx context.Context, run *spec.Run, workdir string) (*runne
 		Stderr:   []byte(stderr.String()),
 		Duration: elapsed,
 		Workdir:  workdir,
+		EarlyEOF: earlyEOF(stdout, stderr, exitedAt),
 	}
 
 	// A step's own timeout (run.timeout) is an observable outcome, not an error:
@@ -159,7 +214,11 @@ func (r *Runner) Run(ctx context.Context, run *spec.Run, workdir string) (*runne
 // and os/exec force-closes them after WaitDelay rather than waiting forever.
 func captureFailure(command string, exitCode int, err error) error {
 	hint := ""
-	if errors.Is(err, exec.ErrWaitDelay) {
+	// errDrainDeadline is atago's own equivalent of exec.ErrWaitDelay now that it
+	// owns the capture pipes: os/exec's force-close applies only to pipes it
+	// created, so this condition is detected by the drain deadline instead. Same
+	// cause, same advice, same message.
+	if errors.Is(err, exec.ErrWaitDelay) || errors.Is(err, errDrainDeadline) {
 		hint = "; a process it started outlived it and kept the pipes open — declare a long-running program with a `service:` step instead of backgrounding it inside a run step"
 	}
 	return fmt.Errorf("run %q exited with code %d but its output could not be captured: %w%s", command, exitCode, err, hint)

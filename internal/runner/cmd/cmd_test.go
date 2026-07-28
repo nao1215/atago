@@ -847,6 +847,25 @@ func TestHelperProcess(t *testing.T) {
 	switch os.Getenv("ATAGO_CMD_HELPER") {
 	case "holder":
 		time.Sleep(10 * time.Second)
+	case "close-stdout-early":
+		// Legal behavior a daemonizing tool exhibits: close stdout, keep
+		// running, exit 0. The read side then sees EOF a full beat before the
+		// process exits — the one signal that tells a lost stream apart from a
+		// silent one (#344). Nothing is printed, so the captured stdout is
+		// empty for the same reason #339's was.
+		//
+		// os.Exit rather than returning: with stdout closed, the testing
+		// package's own shutdown (its result line, and the coverage writer
+		// under `go test -cover`) has nowhere to write and fails the binary
+		// with exit 2, which has nothing to do with what is under test.
+		_ = os.Stdout.Close()
+		time.Sleep(300 * time.Millisecond)
+		os.Exit(0)
+	case "write-then-close-stdout-early":
+		fmt.Println("produced")
+		_ = os.Stdout.Close()
+		time.Sleep(300 * time.Millisecond)
+		os.Exit(0)
 	case "lingering-writer":
 		fmt.Println("produced")
 		child := exec.CommandContext(context.Background(), os.Args[0], "-test.run=TestHelperProcess")
@@ -909,5 +928,101 @@ func TestRun_CaptureFailureIsNotSilentEmptyOutput(t *testing.T) {
 	// ran fine, and saying otherwise sends the reader after the wrong problem.
 	if strings.Contains(err.Error(), "failed to execute") {
 		t.Errorf("error = %q, want it to distinguish a capture failure from a command that could not start", err)
+	}
+}
+
+// TestRun_EarlyEOFIsObserved is the evidence #339 lacked (#344). os/exec closes
+// the parent's copy of the write end right after Start, so from that moment the
+// child is its only holder: EOF on the read end cannot arrive before the child
+// exits unless the child closed its own stdout, or never had atago's pipe at
+// all. atago used to throw that distance away — cmd.Stdout was a strings.Builder
+// and os/exec did the reading — so "the command printed nothing" and "the
+// command's output went somewhere else" produced the identical observation.
+func TestRun_EarlyEOFIsObserved(t *testing.T) {
+	t.Parallel()
+	res, err := New().Run(context.Background(), &spec.Run{
+		Command: helperCommand(),
+		Env:     map[string]string{"ATAGO_CMD_HELPER": "close-stdout-early"},
+	}, t.TempDir())
+	if err != nil {
+		t.Fatalf("Run() error = %v; closing stdout early is legal, not a failure", err)
+	}
+	if res.ExitCode != 0 {
+		t.Errorf("exit code = %d, want 0", res.ExitCode)
+	}
+	d, ok := res.EarlyEOF["stdout"]
+	if !ok {
+		t.Fatalf("stdout's early EOF was not observed: %+v", res.EarlyEOF)
+	}
+	// The helper sleeps 300ms after closing; allow generous slack for a loaded
+	// CI box, but the gap must be real, not noise.
+	if d < 100*time.Millisecond {
+		t.Errorf("observed gap = %s, want at least ~300ms", d)
+	}
+}
+
+// TestRun_NormalCommandHasNoEarlyEOF is the other half of the contract: a
+// command whose stdout simply closes when it exits must carry no observation, or
+// every ordinary failure would grow a phantom note.
+func TestRun_NormalCommandHasNoEarlyEOF(t *testing.T) {
+	t.Parallel()
+	res, err := New().Run(context.Background(), &spec.Run{
+		Command: argvCommand("echo hello", "cmd /c echo hello"),
+	}, t.TempDir())
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if strings.TrimSpace(string(res.Stdout)) != "hello" {
+		t.Errorf("stdout = %q, want hello", res.Stdout)
+	}
+	if len(res.EarlyEOF) != 0 {
+		t.Errorf("a normal command must carry no early-EOF observation: %+v", res.EarlyEOF)
+	}
+}
+
+// TestRun_EarlyEOFKeepsWhatWasWritten: closing stdout early does not discard
+// what the command managed to print first. The bytes and the observation are
+// both real and must both survive.
+func TestRun_EarlyEOFKeepsWhatWasWritten(t *testing.T) {
+	t.Parallel()
+	res, err := New().Run(context.Background(), &spec.Run{
+		Command: helperCommand(),
+		Env:     map[string]string{"ATAGO_CMD_HELPER": "write-then-close-stdout-early"},
+	}, t.TempDir())
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if !strings.Contains(string(res.Stdout), "produced") {
+		t.Errorf("stdout = %q, want it to keep the bytes written before the close", res.Stdout)
+	}
+	if _, ok := res.EarlyEOF["stdout"]; !ok {
+		t.Errorf("the observation was lost when bytes were written: %+v", res.EarlyEOF)
+	}
+}
+
+// TestRun_OwnedPipesDoNotLeak: atago creates the capture pipes itself now, so it
+// owns closing them and joining their drain goroutines. A leak here would be
+// invisible per-run and fatal over a 400-scenario suite.
+func TestRun_OwnedPipesDoNotLeak(t *testing.T) {
+	t.Parallel()
+	wd := t.TempDir()
+	r := New()
+	cmdStr := argvCommand("echo hi", "cmd /c echo hi")
+	// Warm up first: the first exec pulls in goroutines that are not per-run.
+	for range 5 {
+		if _, err := r.Run(context.Background(), &spec.Run{Command: cmdStr}, wd); err != nil {
+			t.Fatal(err)
+		}
+	}
+	before := runtime.NumGoroutine()
+	for range 60 {
+		if _, err := r.Run(context.Background(), &spec.Run{Command: cmdStr}, wd); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Give any goroutine that ended on the last run a moment to be reaped.
+	time.Sleep(100 * time.Millisecond)
+	if after := runtime.NumGoroutine(); after > before+10 {
+		t.Errorf("goroutines grew from %d to %d over 60 runs; a drain goroutine is leaking", before, after)
 	}
 }
