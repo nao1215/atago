@@ -268,6 +268,50 @@ func TestCheck_ContainsList_FailureNamesElement(t *testing.T) {
 	}
 }
 
+// TestCheck_EmptyObservationIsReported pins that a check which observed an
+// empty payload SAYS it observed nothing, instead of leaving Actual unset. The
+// console block prints an Actual: section only for a non-empty string, so an
+// empty capture used to render as a failure with no Actual: at all — the same
+// shape as a report that never recorded what it saw. That ambiguity is what a
+// Windows CI flake (#339) had to be read through: a nested atago exited 0 with
+// empty stdout, and the only evidence of the emptiness was a missing section.
+//
+// Every stream/file/snapshot comparison funnels its observed value through
+// excerpt, so the cases below cover the ones a reader hits first.
+func TestCheck_EmptyObservationIsReported(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "out.txt"), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	empty := &runner.Result{Stdout: nil, Stderr: nil, Workdir: dir}
+
+	tests := []struct {
+		name string
+		a    *spec.Assert
+	}{
+		{"stdout contains", &spec.Assert{Stdout: &spec.StreamAssert{Contains: spec.StringList{"PASSED"}}}},
+		{"stdout equals", &spec.Assert{Stdout: &spec.StreamAssert{Equals: strp("PASSED")}}},
+		{"stdout matches", &spec.Assert{Stdout: &spec.StreamAssert{Matches: strp("PASS.D")}}},
+		{"stdout empty: false", &spec.Assert{Stdout: &spec.StreamAssert{Empty: boolp(false)}}},
+		{"stderr contains", &spec.Assert{Stderr: &spec.StreamAssert{Contains: spec.StringList{"boom"}}}},
+		{"file contains", &spec.Assert{File: &spec.FileAssert{Path: "out.txt", Contains: spec.StringList{"PASSED"}}}},
+		{"file equals", &spec.Assert{File: &spec.FileAssert{Path: "out.txt", Equals: strp("PASSED")}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			cr := Check(tt.a, empty, Env{Workdir: dir})
+			if cr.OK {
+				t.Fatalf("expected the assertion to fail against empty output, got %+v", cr)
+			}
+			if cr.Actual != "(empty)" {
+				t.Errorf("Actual = %q, want %q so the report states what it observed", cr.Actual, "(empty)")
+			}
+		})
+	}
+}
+
 // TestCheckAll_MultiTarget verifies one assert with several targets yields one
 // result per target, in SetTargets order, and that AllOK aggregates them.
 func TestCheckAll_MultiTarget(t *testing.T) {

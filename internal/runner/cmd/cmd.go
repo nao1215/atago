@@ -127,11 +127,32 @@ func (r *Runner) Run(ctx context.Context, run *spec.Run, workdir string) (*runne
 		res.ExitCode = 0
 	case errors.As(runErr, &exitErr):
 		res.ExitCode = exitCodeFor(exitErr)
+	case cmd.ProcessState != nil:
+		// The process started and exited; what failed is the capture of its
+		// output. Returning the bytes collected so far would present a stream we
+		// only partly read — possibly an empty one — as the observed value, and an
+		// assertion cannot tell that apart from a command that printed nothing.
+		// Say what happened instead (#339).
+		return nil, captureFailure(run.Command, cmd.ProcessState.ExitCode(), runErr)
 	default:
 		// Could not start the process at all (not found, permission, ...).
 		return nil, fmt.Errorf("failed to execute %q: %w", run.Command, runErr)
 	}
 	return res, nil
+}
+
+// captureFailure describes a command that ran to completion while its
+// stdout/stderr capture did not. It names the exit code the process reached, so
+// the reader can see the program itself was fine, and — for the one cause a spec
+// author can act on — points at the `service:` step: a run step that leaves a
+// background process behind keeps the pipes open past the command's own exit,
+// and os/exec force-closes them after WaitDelay rather than waiting forever.
+func captureFailure(command string, exitCode int, err error) error {
+	hint := ""
+	if errors.Is(err, exec.ErrWaitDelay) {
+		hint = "; a process it started outlived it and kept the pipes open — declare a long-running program with a `service:` step instead of backgrounding it inside a run step"
+	}
+	return fmt.Errorf("run %q exited with code %d but its output could not be captured: %w%s", command, exitCode, err, hint)
 }
 
 // stdinReader builds the reader fed to the command's standard input (#18):

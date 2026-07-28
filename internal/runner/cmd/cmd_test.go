@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -799,5 +800,68 @@ func TestConfigureShell_NoopOnPOSIX(t *testing.T) {
 	ConfigureShell(c, "echo hi")
 	if len(c.Args) != len(before) {
 		t.Errorf("ConfigureShell mutated argv: %v -> %v", before, c.Args)
+	}
+}
+
+// helperCommand runs the test binary as the command under test. The path is
+// double-quoted so a space in it survives the runner's argv tokenizer on both
+// platforms.
+func helperCommand() string {
+	return `"` + os.Args[0] + `" -test.run=TestHelperProcess`
+}
+
+// TestHelperProcess is not a real test: it lets a test spawn a REAL process tree
+// on every OS. With no ATAGO_CMD_HELPER set (a normal `go test` run) it is an
+// instant no-op. Mode "lingering-writer" writes a line to stdout, hands the same
+// stdout to a detached grandchild, and exits 0 — so the command itself succeeds
+// while the capture pipe stays open behind it. Mode "holder" just idles, holding
+// that pipe; it self-terminates so no process survives the test.
+func TestHelperProcess(t *testing.T) {
+	switch os.Getenv("ATAGO_CMD_HELPER") {
+	case "holder":
+		time.Sleep(10 * time.Second)
+	case "lingering-writer":
+		fmt.Println("produced")
+		child := exec.CommandContext(context.Background(), os.Args[0], "-test.run=TestHelperProcess")
+		child.Env = append(os.Environ(), "ATAGO_CMD_HELPER=holder")
+		// The grandchild inherits this process's stdout: that is the whole point —
+		// the pipe outlives the command that wrote to it.
+		child.Stdout = os.Stdout
+		child.Stderr = os.Stderr
+		if err := child.Start(); err != nil {
+			t.Fatalf("helper could not start its grandchild: %v", err)
+		}
+	}
+}
+
+// TestRun_CaptureFailureIsNotSilentEmptyOutput pins the promise a stream
+// assertion depends on: what a Result carries is what the command produced. When
+// a grandchild keeps the stdout pipe open past the command's own exit, os/exec
+// force-closes the pipes after WaitDelay and reports it — the captured bytes are
+// then whatever arrived before the cut, which may be nothing at all. Presenting
+// that as the observed stream would make "the capture failed" indistinguishable
+// from "the command printed nothing", the ambiguity behind #339. Run must say
+// what happened, and must never hand back a Result built from a partial capture.
+func TestRun_CaptureFailureIsNotSilentEmptyOutput(t *testing.T) {
+	t.Parallel()
+	res, err := New().Run(context.Background(), &spec.Run{
+		Command: helperCommand(),
+		Env:     map[string]string{"ATAGO_CMD_HELPER": "lingering-writer"},
+	}, t.TempDir())
+	if err == nil {
+		t.Fatalf("Run() error = nil; a capture cut short must be reported, got Stdout %q", res.Stdout)
+	}
+	if res != nil {
+		t.Errorf("Run() returned a Result alongside the capture error: %+v", res)
+	}
+	for _, want := range []string{"could not be captured", "exited with code 0", "service:"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error = %q, want it to mention %q", err, want)
+		}
+	}
+	// "failed to execute" is the message for a command that never ran; this one
+	// ran fine, and saying otherwise sends the reader after the wrong problem.
+	if strings.Contains(err.Error(), "failed to execute") {
+		t.Errorf("error = %q, want it to distinguish a capture failure from a command that could not start", err)
 	}
 }

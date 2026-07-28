@@ -313,9 +313,23 @@ func emptiness(want bool) string {
 
 const excerptLimit = 2000
 
+// emptyExcerpt is what an observed-but-empty payload renders as. The console
+// block prints an Expected:/Actual: section only for a non-empty string, so an
+// empty observation used to render as no section at all — a report that looks
+// like it never recorded what it saw, when in fact it saw nothing. A reader then
+// has to know that omission means "empty" to read the failure, which is how a
+// Windows flake (#339) had to be diagnosed. Naming it keeps every excerpt-based
+// comparison self-describing, and matches the wording parseDoc already uses for
+// an empty JSON/YAML payload.
+const emptyExcerpt = "(empty)"
+
 func excerpt(s string) string {
-	if len(s) <= excerptLimit {
+	switch {
+	case s == "":
+		return emptyExcerpt
+	case len(s) <= excerptLimit:
 		return s
+	default:
+		return s[:excerptLimit] + "\n... (truncated)"
 	}
-	return s[:excerptLimit] + "\n... (truncated)"
 }

@@ -32,6 +32,24 @@ and this project follows [Semantic Versioning](https://semver.org/).
   through a `file:` assert, including the empty file that proves nothing of the
   UI leaked.
 
+### Fixed
+
+- A failure whose observed value was empty now says so. The console block prints
+  an `Actual:` section only for a non-empty value, so an assertion over a stream,
+  file, or snapshot that captured nothing rendered with no `Actual:` at all — the
+  same shape as a report that never recorded what it saw. Reading such a failure
+  meant knowing that the omission itself meant "empty" (#339). An observed empty
+  payload now renders as `(empty)`, the wording an empty JSON/YAML payload
+  already used.
+- A run step whose process ran to completion while its output capture did not no
+  longer reports `failed to execute`, which says the opposite of what happened.
+  It now names the exit code the process reached along with the capture error,
+  and — for the one cause a spec author can act on, a background process that
+  outlives the command and holds the pipes open past `WaitDelay` — points at the
+  `service:` step. The bytes read before the cut are still withheld rather than
+  handed back as the observed stream: a stream atago only partly read must not be
+  assertable as though it were complete.
+
 ## [0.16.0] - 2026-07-27
 
 A minor release about output you can act on. Three failure messages were true
