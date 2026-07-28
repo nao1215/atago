@@ -100,6 +100,33 @@ func TestRun_StdoutToCreatesParentDir(t *testing.T) {
 	}
 }
 
+// TestRun_StdoutToFileMode pins the mode of a redirect file. stdout_to/stderr_to
+// used to write 0o644 while every other workdir-confined write (http.body_to,
+// fixtures, snapshots) used 0o600, undocumented and untested — which is what a
+// divergence looks like right before someone asserts on it. They all share one
+// helper and one mode now (#349); this keeps it from drifting back silently.
+func TestRun_StdoutToFileMode(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows does not honor POSIX permission bits")
+	}
+	t.Parallel()
+	wd := t.TempDir()
+	r := New()
+	if _, err := r.Run(context.Background(), &spec.Run{
+		Command:  argvCommand("echo produced", "cmd /c echo produced"),
+		StdoutTo: "out.txt",
+	}, wd); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	fi, err := os.Stat(filepath.Join(wd, "out.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := fi.Mode().Perm(); got != 0o600 {
+		t.Errorf("stdout_to mode = %04o, want 0600", got)
+	}
+}
+
 // TestRun_StdoutToConfinedToWorkdir proves a redirect path may not escape the
 // scenario workdir.
 func TestRun_StdoutToConfinedToWorkdir(t *testing.T) {

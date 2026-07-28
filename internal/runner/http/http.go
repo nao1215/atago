@@ -147,17 +147,8 @@ func (r *Runner) Do(ctx context.Context, h *spec.HTTP) (*runner.Result, error) {
 	// body_to persists the response for the file/image/pdf assertion targets —
 	// the http analogue of run's stdout_to (workdir-confined, create/truncate).
 	if h.BodyTo != "" {
-		dst, perr := security.ResolveWorkdirPath("http.body_to", r.workdir, h.BodyTo)
-		if perr != nil {
+		if _, perr := security.WriteWorkdirFile("http.body_to", r.workdir, h.BodyTo, data); perr != nil {
 			return nil, perr
-		}
-		if perr := os.MkdirAll(filepath.Dir(dst), 0o750); perr != nil {
-			return nil, fmt.Errorf("creating directory for http.body_to %q: %w", h.BodyTo, perr)
-		}
-		// The program under test may have planted a symlink at the body_to target
-		// pointing outside the workdir; write without following it (issue #16).
-		if perr := security.WriteFileNoFollow(dst, data, 0o600); perr != nil {
-			return nil, fmt.Errorf("writing http.body_to %q: %w", h.BodyTo, perr)
 		}
 	}
 
