@@ -281,3 +281,32 @@ scenarios:
           exit_code: 1
           stdout:
             contains: "stderr satisfies this assertion (assert `stderr:` instead?)"
+
+  # A stream that came back empty must say why, not just that it was empty. The
+  # capture pipes are atago's own, so EOF on one cannot precede the child's exit
+  # unless the child closed its stdout or never had that pipe — the distinction
+  # #339 spent a day being unreadable for (#344). POSIX-only: `exec 1>&-` closes
+  # a stream from a shell, and cmd.exe has no equivalent.
+  - name: an empty stream that ended early says so in the failure block
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: earlyeof.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: earlyeof}
+            scenarios:
+              - name: a command that closes stdout then keeps running
+                steps:
+                  - run: {shell: true, command: "exec 1>&-; sleep 1; exit 0"}
+                  - assert:
+                      exit_code: 0
+                      stdout: {contains: "anything"}
+      - run: {command: "${atago} run earlyeof.atago.yaml"}
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - "before the command exited"
+              - "never connected to atago's pipe"

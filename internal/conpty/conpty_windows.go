@@ -73,6 +73,18 @@ func CommandLine(command string, shell bool) (string, error) {
 // workDir, with env (nil inherits the parent's environment; a non-nil slice,
 // even empty, starts the child from exactly that set). The returned
 // PseudoConsole must be Closed.
+//
+// Everything below is scoped to the CHILD. Start never calls AllocConsole,
+// AttachConsole, FreeConsole, or SetStdHandle, so atago's own console and
+// standard handles are untouched, and a `run` step executing concurrently in
+// another goroutine cannot have its stdout rebound by a pty step starting up.
+// This was one of the three things #339 listed as worth checking for a Windows
+// capture anomaly seen while pty and nested-run specs shared a parallel batch;
+// it is recorded here so the question is not re-opened from scratch. The
+// remaining handle discipline that keeps the two independent: the pipes below
+// are created with nil SECURITY_ATTRIBUTES (not inheritable), and CreateProcess
+// is called with bInheritHandles=false, so the child reaches its console only
+// through the PSEUDOCONSOLE attribute.
 func Start(commandLine, workDir string, env []string, rows, cols int) (*PseudoConsole, error) {
 	// Two anonymous pipes: one carries parent→child input, the other
 	// child→parent output. CreatePseudoConsole takes the child's ends (inRead,

@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-74 suites · 446 scenarios
+74 suites · 447 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -364,7 +364,7 @@
   - [console report prints the same counts in its summary line](#scenario-console-report-prints-the-same-counts-in-its-summary-line)
   - [an all-passing run reports a zero-failure suite and exits zero](#scenario-an-all-passing-run-reports-a-zero-failure-suite-and-exits-zero)
   - [an errored step is counted as an error, not a failure, across formats](#scenario-an-errored-step-is-counted-as-an-error-not-a-failure-across-formats)
-- [atago self-hosting / reports](#atago-self-hosting--reports) — 9 scenarios
+- [atago self-hosting / reports](#atago-self-hosting--reports) — 10 scenarios
   - [JUnit report is XML with a testsuite and testcase](#scenario-junit-report-is-xml-with-a-testsuite-and-testcase)
   - [GitHub Actions annotations are emitted on failure](#scenario-github-actions-annotations-are-emitted-on-failure)
   - [TAP report is a numbered TAP 13 stream with ok / not ok points](#scenario-tap-report-is-a-numbered-tap-13-stream-with-ok--not-ok-points)
@@ -374,6 +374,7 @@
   - [a failure against an empty stream reports the stream as empty](#scenario-a-failure-against-an-empty-stream-reports-the-stream-as-empty)
   - [an exit_code failure states that the command printed nothing](#scenario-an-exit_code-failure-states-that-the-command-printed-nothing)
   - [a stdout failure points at stderr when the text is there](#scenario-a-stdout-failure-points-at-stderr-when-the-text-is-there)
+  - [an empty stream that ended early says so in the failure block](#scenario-an-empty-stream-that-ended-early-says-so-in-the-failure-block)
 - [atago self-hosting / rerun-failed](#atago-self-hosting--rerun-failed) — 5 scenarios
   - [a failing run is recorded and rerun-failed selects only it](#scenario-a-failing-run-is-recorded-and-rerun-failed-selects-only-it)
   - [rerun-failed with nothing recorded is a no-op success](#scenario-rerun-failed-with-nothing-recorded-is-a-no-op-success)
@@ -6856,6 +6857,30 @@ ${atago} run wrongstream.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `stderr satisfies this assertion (assert `stderr:` instead?)`
+### Scenario: an empty stream that ended early says so in the failure block
+_skipped on Windows_
+#### Given
+- Fixture file `earlyeof.atago.yaml` is created.
+#### Inputs
+_Fixture `earlyeof.atago.yaml`:_
+```text
+version: "1"
+suite: {name: earlyeof}
+scenarios:
+  - name: a command that closes stdout then keeps running
+    steps:
+      - run: {shell: true, command: "exec 1>&-; sleep 1; exit 0"}
+      - assert:
+          exit_code: 0
+          stdout: {contains: "anything"}
+```
+#### When
+```shell
+${atago} run earlyeof.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `before the command exited`, `never connected to atago's pipe`
 ## atago self-hosting / rerun-failed
 Source: `test/e2e/atago/rerun.atago.yaml`
 ### Scenario: a failing run is recorded and rerun-failed selects only it
