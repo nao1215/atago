@@ -1271,14 +1271,22 @@ func TestConsole_ExitCodeFailureShowsStderr(t *testing.T) {
 		t.Errorf("exit_code failure with empty stderr does not surface stdout:\n%s", out)
 	}
 
-	// Both empty -> neither section appears.
+	// Both empty -> one section saying so. This used to assert that NEITHER
+	// section appeared, which is the omission #346 replaced: a block with no
+	// stream section reads the same as a block that has no such rule, so a reader
+	// could not tell "the command printed nothing" from "atago did not show it".
+	// The single Stdout/Stderr: section is not either of the per-stream sections
+	// above, so their exclusivity is still asserted.
 	b.Reset()
 	if err := Render(&b, FormatConsole, failedExitResults("", nil, nil)); err != nil {
 		t.Fatal(err)
 	}
 	out = b.String()
-	if strings.Contains(out, "Stderr:") || strings.Contains(out, "Stdout:") {
-		t.Errorf("exit_code failure with no output must not print empty sections:\n%s", out)
+	if strings.Contains(out, "\nStderr:") || strings.Contains(out, "\nStdout:") {
+		t.Errorf("exit_code failure with no output must not print a per-stream section:\n%s", out)
+	}
+	if !strings.Contains(out, "Stdout/Stderr:\n  "+assert.EmptyExcerpt) {
+		t.Errorf("exit_code failure with no output must state that the command printed nothing:\n%s", out)
 	}
 
 	// A long stderr is tailed, newest lines kept, with an honest header.
@@ -1460,4 +1468,150 @@ func TestRender_Console_SingleLineCommandUnchanged(t *testing.T) {
 	if !strings.Contains(v.String(), "[0] assert: atago run probe.atago.yaml\n") {
 		t.Errorf("single-line trace step line changed shape:\n%s", v.String())
 	}
+}
+
+// TestRender_Console_ExitCodeFailureStatesSilence pins that an exit_code failure
+// block states it when the command produced no output at all (#346). The block
+// used to print no stream section in that case — the same thing a reader sees
+// when there is no rule at all — so "the command printed nothing" was
+// indistinguishable from "atago decided not to show it here". A command that
+// exits non-zero without a word is a notable fact about the program under test.
+func TestRender_Console_ExitCodeFailureStatesSilence(t *testing.T) {
+	t.Parallel()
+
+	exitCodeFailure := func(run *runner.Result) []*engine.SuiteResult {
+		return []*engine.SuiteResult{{
+			Suite:  "probe2",
+			Status: engine.StatusFailed,
+			Scenarios: []engine.ScenarioResult{{
+				Name:   "exit code failure with no output at all",
+				Status: engine.StatusFailed,
+				Steps: []engine.StepResult{{Index: 0, Kind: spec.StepAssert, Run: run, Checks: []*assert.CheckResult{{
+					OK: false, Target: string(spec.AssertExitCode), Desc: "assert exit_code is 0",
+					Expected: "exit code 0", Actual: "exit code 7",
+					Hint: "expected exit code 0 but the command exited with 7",
+				}}}},
+			}},
+		}}
+	}
+
+	t.Run("both streams empty says so", func(t *testing.T) {
+		t.Parallel()
+		var b bytes.Buffer
+		if err := Render(&b, FormatConsole, exitCodeFailure(&runner.Result{Command: "exit 7", ExitCode: 7})); err != nil {
+			t.Fatal(err)
+		}
+		out := b.String()
+		if !strings.Contains(out, "Stdout/Stderr:\n  "+assert.EmptyExcerpt+"\n") {
+			t.Errorf("exit_code failure block does not state that the command printed nothing:\n%s", out)
+		}
+	})
+
+	// Guard against the new branch stealing the existing one: a command that did
+	// print to stderr must render exactly what it rendered before.
+	t.Run("non-empty stderr is unchanged", func(t *testing.T) {
+		t.Parallel()
+		var b bytes.Buffer
+		run := &runner.Result{Command: "sh -c 'echo boom 1>&2; exit 7'", ExitCode: 7, Stderr: []byte("boom\n")}
+		if err := Render(&b, FormatConsole, exitCodeFailure(run)); err != nil {
+			t.Fatal(err)
+		}
+		out := b.String()
+		if !strings.Contains(out, "Stderr:\n  boom\n") {
+			t.Errorf("stderr tail section changed shape:\n%s", out)
+		}
+		if strings.Contains(out, "Stdout/Stderr:") {
+			t.Errorf("empty-stream section fired for a command that did print:\n%s", out)
+		}
+	})
+
+	// A result family with no stdout/stderr of its own (an HTTP response, a DB
+	// query) must not grow a "Stdout/Stderr: (empty)" line: those streams are not
+	// merely empty there, they do not exist.
+	t.Run("a non-process result family says nothing", func(t *testing.T) {
+		t.Parallel()
+		var b bytes.Buffer
+		run := &runner.Result{Command: "GET http://x/", IsHTTP: true, StatusCode: 204}
+		if err := Render(&b, FormatConsole, exitCodeFailure(run)); err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(b.String(), "Stdout/Stderr:") {
+			t.Errorf("an http result grew a stdout/stderr section:\n%s", b.String())
+		}
+	})
+}
+
+// TestVerbose_EmptyStreamStatedOnlyWhenItMatters pins the deliberate split
+// #346 asks for: the trace omits an empty stream for a passing step, where the
+// compactness argument is real for a 300-step green trace, and states it for a
+// step that failed or errored — the step the reader came to look at, where the
+// omission makes a silent command indistinguishable from a lost capture.
+func TestVerbose_EmptyStreamStatedOnlyWhenItMatters(t *testing.T) {
+	t.Parallel()
+
+	t.Run("a passing step stays compact", func(t *testing.T) {
+		t.Parallel()
+		var b strings.Builder
+		NewVerbose(&b).Scenario(engine.ScenarioResult{
+			Suite: "demo", Name: "quiet but fine", Status: engine.StatusPassed,
+			Steps: []engine.StepResult{
+				{Index: 0, Kind: spec.StepRun, Run: &runner.Result{Command: "true", ExitCode: 0}},
+				{Index: 1, Kind: spec.StepAssert, Checks: []*assert.CheckResult{{OK: true, Desc: "assert exit_code is 0"}}},
+			},
+		})
+		if strings.Contains(b.String(), "stdout |") || strings.Contains(b.String(), assert.EmptyExcerpt) {
+			t.Errorf("a passing step grew an empty-stream block:\n%s", b.String())
+		}
+	})
+
+	t.Run("a failing scenario states the silence", func(t *testing.T) {
+		t.Parallel()
+		var b strings.Builder
+		NewVerbose(&b).Scenario(engine.ScenarioResult{
+			Suite: "demo", Name: "silent failure", Status: engine.StatusFailed,
+			Steps: []engine.StepResult{
+				{Index: 0, Kind: spec.StepRun, Run: &runner.Result{Command: "exit 7", ExitCode: 7}},
+				{Index: 1, Kind: spec.StepAssert, Checks: []*assert.CheckResult{{Desc: "assert exit_code is 0"}}},
+			},
+		})
+		out := b.String()
+		if !strings.Contains(out, "stdout |\n        "+assert.EmptyExcerpt+"\n") {
+			t.Errorf("trace does not state that stdout was empty:\n%s", out)
+		}
+		if !strings.Contains(out, "stderr |\n        "+assert.EmptyExcerpt+"\n") {
+			t.Errorf("trace does not state that stderr was empty:\n%s", out)
+		}
+	})
+
+	// An errored step in an otherwise-passing scenario (a failed teardown) is
+	// still a step the reader came to look at.
+	t.Run("an errored step states the silence", func(t *testing.T) {
+		t.Parallel()
+		var b strings.Builder
+		NewVerbose(&b).Scenario(engine.ScenarioResult{
+			Suite: "demo", Name: "teardown blew up", Status: engine.StatusPassed,
+			Teardown: []engine.StepResult{
+				{Index: 0, Kind: spec.StepRun, Run: &runner.Result{Command: "cleanup", ExitCode: 0}, ErrMsg: "boom"},
+			},
+		})
+		if !strings.Contains(b.String(), "stdout |\n        "+assert.EmptyExcerpt+"\n") {
+			t.Errorf("an errored teardown step does not state that stdout was empty:\n%s", b.String())
+		}
+	})
+
+	// The rule is applied per family, not only to stdout/stderr: an HTTP 204 with
+	// an empty body has exactly the same ambiguity.
+	t.Run("other result families state it too", func(t *testing.T) {
+		t.Parallel()
+		var b strings.Builder
+		NewVerbose(&b).Scenario(engine.ScenarioResult{
+			Suite: "demo", Name: "empty body", Status: engine.StatusFailed,
+			Steps: []engine.StepResult{
+				{Index: 0, Kind: spec.StepHTTP, Run: &runner.Result{Command: "GET http://x/", IsHTTP: true, StatusCode: 204}},
+			},
+		})
+		if !strings.Contains(b.String(), "body |\n        "+assert.EmptyExcerpt+"\n") {
+			t.Errorf("an http step does not state that the body was empty:\n%s", b.String())
+		}
+	})
 }

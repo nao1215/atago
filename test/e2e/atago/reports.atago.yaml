@@ -242,3 +242,21 @@ scenarios:
           exit_code: 1
           stdout:
             matches: "Actual:\n  \\(empty\\)"
+
+  - name: an exit_code failure states that the command printed nothing
+    steps:
+      - fixture:
+          file: quiet.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: quiet}
+            scenarios:
+              - name: exit code failure with no output at all
+                steps:
+                  - run: {shell: true, command: "exit 7"}
+                  - assert: {exit_code: 0}
+      - run: {command: "${atago} run quiet.atago.yaml"}
+      - assert:
+          exit_code: 1
+          stdout:
+            matches: "Stdout/Stderr:\n  \\(empty\\)"
