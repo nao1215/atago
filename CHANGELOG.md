@@ -46,9 +46,10 @@ and this project follows [Semantic Versioning](https://semver.org/).
   It now names the exit code the process reached along with the capture error,
   and — for the one cause a spec author can act on, a background process that
   outlives the command and holds the pipes open past `WaitDelay` — points at the
-  `service:` step. The bytes read before the cut are still withheld rather than
-  handed back as the observed stream: a stream atago only partly read must not be
-  assertable as though it were complete.
+  `service:` step. The bytes read before the cut are withheld rather than handed
+  back as the observed stream, and `stdout_to`/`stderr_to` no longer write them
+  to a file either: a stream atago only partly read must not be assertable as
+  though it were complete, in the step that produced it or in a later one.
 
 ## [0.16.0] - 2026-07-27
 

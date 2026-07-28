@@ -825,7 +825,11 @@ func TestHelperProcess(t *testing.T) {
 		child := exec.CommandContext(context.Background(), os.Args[0], "-test.run=TestHelperProcess")
 		child.Env = append(os.Environ(), "ATAGO_CMD_HELPER=holder")
 		// The grandchild inherits this process's stdout: that is the whole point —
-		// the pipe outlives the command that wrote to it.
+		// the pipe outlives the command that wrote to it. It must NOT inherit the
+		// working directory too: on Windows a live process holding the step's
+		// workdir as its cwd makes the directory unremovable, which would fail the
+		// test's cleanup for a reason that has nothing to do with the capture.
+		child.Dir = os.TempDir()
 		child.Stdout = os.Stdout
 		child.Stderr = os.Stderr
 		if err := child.Start(); err != nil {
@@ -844,15 +848,30 @@ func TestHelperProcess(t *testing.T) {
 // what happened, and must never hand back a Result built from a partial capture.
 func TestRun_CaptureFailureIsNotSilentEmptyOutput(t *testing.T) {
 	t.Parallel()
+	// Not t.TempDir(): the grandchild deliberately outlives the step, and on
+	// Windows a process that still exists can keep a directory from being
+	// removed. TempDir's cleanup would fail the test on that, so clean up
+	// best-effort like TestRun_ShellCancelKillsChildPromptly does.
+	wd, err := os.MkdirTemp("", "atago-capture-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(wd) })
 	res, err := New().Run(context.Background(), &spec.Run{
-		Command: helperCommand(),
-		Env:     map[string]string{"ATAGO_CMD_HELPER": "lingering-writer"},
-	}, t.TempDir())
+		Command:  helperCommand(),
+		Env:      map[string]string{"ATAGO_CMD_HELPER": "lingering-writer"},
+		StdoutTo: "out.txt",
+	}, wd)
 	if err == nil {
 		t.Fatalf("Run() error = nil; a capture cut short must be reported, got Stdout %q", res.Stdout)
 	}
 	if res != nil {
 		t.Errorf("Run() returned a Result alongside the capture error: %+v", res)
+	}
+	// stdout_to is the same claim written to a file: a later step reading it
+	// would see a truncated stream with nothing marking it as truncated.
+	if _, err := os.Stat(filepath.Join(wd, "out.txt")); !os.IsNotExist(err) {
+		t.Errorf("stdout_to file exists after a failed capture (stat err = %v); a partial stream must not be persisted either", err)
 	}
 	for _, want := range []string{"could not be captured", "exited with code 0", "service:"} {
 		if !strings.Contains(err.Error(), want) {
