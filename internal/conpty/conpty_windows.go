@@ -13,7 +13,9 @@ package conpty
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"sync"
@@ -172,15 +174,48 @@ func Start(commandLine, workDir string, env []string, rows, cols int) (*PseudoCo
 	}, nil
 }
 
-// Read drains the child's output (the transcript source). A broken/closed pipe
-// once the child exits is the ConPTY analog of POSIX EIO: it surfaces as an
-// error so the reader loop ends cleanly (after appending any final bytes).
+// Read drains the child's output (the transcript source).
+//
+// The error class is preserved, because the caller has to tell the end of a
+// session from a lost transcript (#345). This used to collapse every ReadFile
+// failure into os.ErrClosed, so the pty runner could not distinguish them even
+// if it wanted to — and a short transcript then produced a confidently wrong
+// screen assertion. The mapping:
+//
+//   - ERROR_BROKEN_PIPE / ERROR_HANDLE_EOF / ERROR_PIPE_NOT_CONNECTED are the
+//     ConPTY analog of POSIX EIO once the child is gone: the session ended, so
+//     they become io.EOF and the reader loop ends cleanly after appending any
+//     final bytes.
+//   - ERROR_INVALID_HANDLE / ERROR_OPERATION_ABORTED are what a pending read
+//     sees when Close runs on another goroutine — atago's own teardown, not a
+//     failure — so they stay os.ErrClosed, which the caller also treats as a
+//     normal end.
+//   - Anything else is a genuine read failure and is returned wrapped, so the
+//     caller can report the transcript as incomplete instead of silently
+//     truncating it.
 func (c *PseudoConsole) Read(p []byte) (int, error) {
 	var done uint32
 	if err := windows.ReadFile(c.outRead, p, &done, nil); err != nil {
-		return int(done), os.ErrClosed
+		return int(done), classifyReadError(err)
 	}
 	return int(done), nil
+}
+
+// classifyReadError implements Read's mapping. It is separate so the
+// classification is testable without a live pseudo console, which cannot be
+// made to fail on demand.
+func classifyReadError(err error) error {
+	switch {
+	case errors.Is(err, windows.ERROR_BROKEN_PIPE),
+		errors.Is(err, windows.ERROR_HANDLE_EOF),
+		errors.Is(err, windows.ERROR_PIPE_NOT_CONNECTED):
+		return io.EOF
+	case errors.Is(err, windows.ERROR_INVALID_HANDLE),
+		errors.Is(err, windows.ERROR_OPERATION_ABORTED):
+		return os.ErrClosed
+	default:
+		return fmt.Errorf("conpty: reading the pseudo console: %w", err)
+	}
 }
 
 // Write delivers a send to the child.
