@@ -70,7 +70,10 @@ func (v *Verbose) writeStep(b *strings.Builder, phase string, sr *engine.StepRes
 	}
 	fmt.Fprintf(b, "  [%s%d] %s", phase, sr.Index, label)
 	if sr.Run != nil && sr.Run.Command != "" {
-		fmt.Fprintf(b, ": %s", sr.Run.Command)
+		// The command shares this line with the step label, so it is rendered on
+		// one line: a raw newline would be ambiguous with the next step's line and
+		// would stop a CI-log grep mid-command (#348).
+		fmt.Fprintf(b, ": %s", oneLineCommand(sr.Run.Command))
 	}
 	fmt.Fprintln(b)
 

@@ -1312,3 +1312,152 @@ func TestConsole_ExitCodeFailureShowsStderr(t *testing.T) {
 		t.Errorf("stream-assert failure must not print the exit_code stderr section:\n%s", b.String())
 	}
 }
+
+// multiLineCommandResults builds a failing scenario whose command carries an
+// embedded newline — a YAML block scalar, a `shell: true` script, a literal
+// `printf 'x\n'` — plus a trailing newline, which is what a `>` block scalar
+// leaves behind. Both console renderings interpolated the command raw, so the
+// continuation line landed at column 0 in the failure block and split the step
+// line in the verbose trace (#348).
+func multiLineCommandResults() []*engine.SuiteResult {
+	const cmd = "printf 'boom: no such file\n' 1>&2; exit 1\n"
+	run := &runner.Result{Command: cmd, ExitCode: 1, Stderr: []byte("boom: no such file\n")}
+	return []*engine.SuiteResult{{
+		Suite:    "probe",
+		Status:   engine.StatusFailed,
+		Duration: time.Millisecond,
+		Scenarios: []engine.ScenarioResult{{
+			Name:   "assert stdout when the tool prints to stderr",
+			Status: engine.StatusFailed,
+			Steps: []engine.StepResult{
+				{Index: 0, Kind: spec.StepRun, Run: run},
+				{Index: 1, Kind: spec.StepAssert, Run: run, Checks: []*assert.CheckResult{{
+					OK: false, Target: string(spec.AssertStdout), Desc: `assert stdout contains "boom"`,
+					Expected: `stdout contains "boom"`, Hint: `the substring "boom" was not present in stdout`,
+				}}},
+			},
+		}},
+	}}
+}
+
+// TestRender_Console_MultiLineCommandIsIndented pins that the failure block's
+// Command: section indents continuation lines like every other block in it, so
+// no line of the block starts at column 0 except the section headers, and a
+// trailing newline in the command leaves no dangling blank line (#348).
+func TestRender_Console_MultiLineCommandIsIndented(t *testing.T) {
+	t.Parallel()
+	var b bytes.Buffer
+	if err := Render(&b, FormatConsole, multiLineCommandResults()); err != nil {
+		t.Fatal(err)
+	}
+	out := b.String()
+	if !strings.Contains(out, "Command:\n  printf 'boom: no such file\n  ' 1>&2; exit 1\n") {
+		t.Errorf("Command: section does not indent its continuation line:\n%s", out)
+	}
+
+	// Walk the failure block: every non-empty line is either a section header
+	// ("Step:", "Command:", …) or an indented body line. A body line at column 0
+	// is the layout break this test exists for.
+	body, _, _ := strings.Cut(out, "\nPASSED")
+	body, _, _ = strings.Cut(body, "\nFAILED  ")
+	for _, line := range strings.Split(body, "\n") {
+		if line == "" || strings.HasPrefix(line, "  ") {
+			continue
+		}
+		if strings.HasSuffix(line, ":") || strings.HasPrefix(line, "FAILED:") {
+			continue // a section header, or the block heading
+		}
+		t.Errorf("line %q starts at column 0 inside the failure block:\n%s", line, out)
+	}
+	if strings.Contains(out, "exit 1\n\n\n") {
+		t.Errorf("trailing newline in the command produced a dangling blank line:\n%s", out)
+	}
+}
+
+// TestVerbose_MultiLineCommandStaysOnOneLine pins that the trace's step line —
+// where the command shares a line with the step label — is never split by a
+// newline in the command. A raw newline there is ambiguous with the start of a
+// new step, and a grep for a step in a CI log stops matching at it (#348).
+func TestVerbose_MultiLineCommandStaysOnOneLine(t *testing.T) {
+	t.Parallel()
+	res := multiLineCommandResults()[0].Scenarios[0]
+	res.Suite = "probe"
+	var b strings.Builder
+	NewVerbose(&b).Scenario(res)
+	out := b.String()
+
+	var stepLines []string
+	for _, line := range strings.Split(out, "\n") {
+		if strings.HasPrefix(line, "  [") {
+			stepLines = append(stepLines, line)
+		}
+	}
+	if len(stepLines) != 2 {
+		t.Fatalf("step lines = %d, want 2 (a newline in the command split one):\n%s", len(stepLines), out)
+	}
+	// The escaped form must still be recognizably the same command as the one
+	// the failure block prints.
+	if !strings.Contains(stepLines[0], `printf 'boom: no such file\n' 1>&2; exit 1`) {
+		t.Errorf("step line does not carry the command in a readable escaped form: %q", stepLines[0])
+	}
+	if strings.Contains(out, "\n' 1>&2") {
+		t.Errorf("trace still contains a raw newline inside the command:\n%s", out)
+	}
+}
+
+// TestRender_TAP_MultiLineCommandKeepsOneLinePerPoint guards the newline-
+// delimited formats: TAP 13 points are lines, so a raw newline reaching one
+// would corrupt the stream for every consumer downstream of it.
+func TestRender_TAP_MultiLineCommandKeepsOneLinePerPoint(t *testing.T) {
+	t.Parallel()
+	var b bytes.Buffer
+	if err := Render(&b, FormatTAP, multiLineCommandResults()); err != nil {
+		t.Fatal(err)
+	}
+	out := b.String()
+	if n := strings.Count(out, "\nnot ok "); n != 1 {
+		t.Errorf("not-ok lines = %d, want 1:\n%s", n, out)
+	}
+	for _, line := range strings.Split(strings.TrimRight(out, "\n"), "\n") {
+		if strings.HasPrefix(line, "ok ") || strings.HasPrefix(line, "not ok ") {
+			continue
+		}
+		if line == "TAP version 13" || strings.HasPrefix(line, "1..") || strings.HasPrefix(line, "  ") {
+			continue
+		}
+		t.Errorf("stray unindented TAP line %q:\n%s", line, out)
+	}
+}
+
+// TestRender_Console_SingleLineCommandUnchanged is the parity guard for the
+// #348 fix: the overwhelmingly common single-line command must render exactly
+// as it did before, in both the failure block and the verbose trace.
+func TestRender_Console_SingleLineCommandUnchanged(t *testing.T) {
+	t.Parallel()
+	run := &runner.Result{Command: "atago run probe.atago.yaml", ExitCode: 1}
+	results := []*engine.SuiteResult{{
+		Suite:  "probe",
+		Status: engine.StatusFailed,
+		Scenarios: []engine.ScenarioResult{{
+			Name:   "one-liner",
+			Status: engine.StatusFailed,
+			Steps: []engine.StepResult{{Index: 0, Kind: spec.StepAssert, Run: run, Checks: []*assert.CheckResult{{
+				OK: false, Target: string(spec.AssertExitCode), Desc: "assert exit_code is 0",
+				Expected: "exit code 0", Actual: "exit code 1",
+			}}}},
+		}},
+	}}
+	var b bytes.Buffer
+	if err := Render(&b, FormatConsole, results); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(b.String(), "Command:\n  atago run probe.atago.yaml\n") {
+		t.Errorf("single-line Command: section changed shape:\n%s", b.String())
+	}
+
+	var v strings.Builder
+	NewVerbose(&v).Scenario(results[0].Scenarios[0])
+	if !strings.Contains(v.String(), "[0] assert: atago run probe.atago.yaml\n") {
+		t.Errorf("single-line trace step line changed shape:\n%s", v.String())
+	}
+}
