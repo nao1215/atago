@@ -12,7 +12,7 @@ require (
 	github.com/goccy/go-yaml v1.19.2
 	github.com/hinshun/vt10x v0.0.0-20220301184237-5011da428d02
 	github.com/jhump/protoreflect/v2 v2.0.0-beta.2
-	github.com/k1LoW/grpcstub v0.26.4
+	github.com/k1LoW/grpcstub v0.26.5
 	github.com/lib/pq v1.12.3
 	github.com/mattn/go-shellwords v1.0.13
 	github.com/nao1215/markdown v0.13.0
@@ -29,7 +29,7 @@ require (
 
 require (
 	filippo.io/edwards25519 v1.2.0 // indirect
-	github.com/IGLOU-EU/go-wildcard/v2 v2.1.0 // indirect
+	github.com/IGLOU-EU/go-wildcard/v2 v2.1.1 // indirect
 	github.com/anmitsu/go-shlex v0.0.0-20200514113438-38f4b401e2be // indirect
 	github.com/bufbuild/protocompile v0.14.1 // indirect
 	github.com/chromedp/sysutil v1.1.0 // indirect
@@ -56,7 +56,7 @@ require (
 	github.com/olekukonko/ll v0.1.4-0.20260115111900-9e59c2286df0 // indirect
 	github.com/olekukonko/tablewriter v1.1.3 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
-	golang.org/x/net v0.56.0 // indirect
+	golang.org/x/net v0.57.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect
 	golang.org/x/text v0.40.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260414002931-afd174a4e478 // indirect
