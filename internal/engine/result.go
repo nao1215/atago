@@ -135,6 +135,30 @@ type Counts struct {
 	Passed, Failed, Skipped, Errored, Flaky int
 }
 
+// Add returns the field-wise sum of two tallies. Every report format aggregates
+// per-suite counts for its summary line; they all go through this so a new
+// status is one edit here rather than a grep for open-coded additions that a
+// summary line would silently disagree with the rows above it about.
+func (c Counts) Add(o Counts) Counts {
+	c.Passed += o.Passed
+	c.Failed += o.Failed
+	c.Skipped += o.Skipped
+	c.Errored += o.Errored
+	c.Flaky += o.Flaky
+	return c
+}
+
+// SumCounts tallies every scenario of every suite in one call. An empty (or nil)
+// slice sums to the zero value, which is what an all-filtered-out run must
+// report.
+func SumCounts(results []*SuiteResult) Counts {
+	var agg Counts
+	for _, res := range results {
+		agg = agg.Add(res.Counts())
+	}
+	return agg
+}
+
 // Counts tallies scenario statuses.
 func (s *SuiteResult) Counts() Counts {
 	var c Counts

@@ -29,12 +29,6 @@ func writeSummary(b *strings.Builder, color bool, c engine.Counts, total int, d 
 	if total == 1 {
 		plural = "scenario"
 	}
-	// Flaky scenarios (#29) are green for the verdict but never hidden: the
-	// count appears only when non-zero so steady-state output is unchanged.
-	flaky := ""
-	if c.Flaky > 0 {
-		flaky = fmt.Sprintf(", %d flaky", c.Flaky)
-	}
 	// Spec-load failures are not scenarios, so they get their own count in the
 	// tally line — otherwise the totals silently omit the dropped files (#120).
 	loadFail := ""
@@ -47,7 +41,7 @@ func writeSummary(b *strings.Builder, color bool, c engine.Counts, total int, d 
 	}
 	fmt.Fprintf(b, "\n%s  %d %s: %d passed, %d failed, %d errored, %d skipped%s%s (%s)\n",
 		colorize(color, code+cBold, status), total, plural,
-		c.Passed, c.Failed, c.Errored, c.Skipped, flaky, loadFail, d.Round(time.Millisecond))
+		c.Passed, c.Failed, c.Errored, c.Skipped, flakySuffix(c), loadFail, d.Round(time.Millisecond))
 }
 
 // writeDetail prints the failure/error block for a scenario, or nothing if it
