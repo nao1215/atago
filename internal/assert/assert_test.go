@@ -2491,3 +2491,165 @@ func TestCheckTarget_CoversEveryAssertTarget(t *testing.T) {
 		}
 	}
 }
+
+// TestCheckStream_WrongStreamHint covers #347: asserting `stdout:` on text a CLI
+// actually prints to `stderr` is the most common mistake in CLI end-to-end
+// testing, and atago holds both streams when it reports the failure. The hint
+// now names the counterpart when — and only when — the counterpart genuinely
+// satisfies the very same assertion. A wrong suggestion would be worse than
+// none, so the whole matcher is re-run against the other stream through the
+// same code path rather than approximated.
+func TestCheckStream_WrongStreamHint(t *testing.T) {
+	t.Parallel()
+
+	const suggestion = "(assert `stderr:` instead?)"
+	const mirrorSuggestion = "(assert `stdout:` instead?)"
+
+	t.Run("contains: the needle is on stderr", func(t *testing.T) {
+		t.Parallel()
+		res := &runner.Result{Stderr: []byte("boom: no such file\n"), ExitCode: 1}
+		got := Check(&spec.Assert{Stdout: &spec.StreamAssert{Contains: spec.StringList{"boom"}}}, res, Env{})
+		if got.OK {
+			t.Fatalf("assertion should still fail: %+v", got)
+		}
+		if !strings.Contains(got.Hint, "stderr") || !strings.Contains(got.Hint, suggestion) {
+			t.Errorf("hint does not point at stderr: %q", got.Hint)
+		}
+		// The original hint must survive: the suggestion is appended, not a
+		// replacement for what actually failed.
+		if !strings.Contains(got.Hint, `the substring "boom" was not present in stdout`) {
+			t.Errorf("hint lost the original explanation: %q", got.Hint)
+		}
+	})
+
+	t.Run("the mirror: the needle is on stdout", func(t *testing.T) {
+		t.Parallel()
+		res := &runner.Result{Stdout: []byte("all good\n")}
+		got := Check(&spec.Assert{Stderr: &spec.StreamAssert{Contains: spec.StringList{"all good"}}}, res, Env{})
+		if got.OK {
+			t.Fatalf("assertion should still fail: %+v", got)
+		}
+		if !strings.Contains(got.Hint, mirrorSuggestion) {
+			t.Errorf("hint does not point at stdout: %q", got.Hint)
+		}
+	})
+
+	t.Run("absent from both: today's hint, unchanged", func(t *testing.T) {
+		t.Parallel()
+		res := &runner.Result{Stdout: []byte("nothing here\n"), Stderr: []byte("nor here\n")}
+		got := Check(&spec.Assert{Stdout: &spec.StreamAssert{Contains: spec.StringList{"boom"}}}, res, Env{})
+		if got.Hint != `the substring "boom" was not present in stdout` {
+			t.Errorf("hint should be unchanged when neither stream matches: %q", got.Hint)
+		}
+	})
+
+	t.Run("matches: fires on a real match, silent on an anchored miss", func(t *testing.T) {
+		t.Parallel()
+		res := &runner.Result{Stderr: []byte("error: bad token\n")}
+		got := Check(&spec.Assert{Stdout: &spec.StreamAssert{Matches: strp("bad tok")}}, res, Env{})
+		if !strings.Contains(got.Hint, suggestion) {
+			t.Errorf("matches should fire when the counterpart matches: %q", got.Hint)
+		}
+		// An anchored pattern the counterpart does NOT satisfy must stay silent.
+		got = Check(&spec.Assert{Stdout: &spec.StreamAssert{Matches: strp("^bad token$")}}, res, Env{})
+		if strings.Contains(got.Hint, suggestion) {
+			t.Errorf("matches suggested a stream that does not satisfy the pattern: %q", got.Hint)
+		}
+	})
+
+	t.Run("equals fires only on an exact counterpart", func(t *testing.T) {
+		t.Parallel()
+		exact := &runner.Result{Stderr: []byte("done\n")}
+		got := Check(&spec.Assert{Stdout: &spec.StreamAssert{Equals: strp("done\n")}}, exact, Env{})
+		if !strings.Contains(got.Hint, suggestion) {
+			t.Errorf("equals should fire when the counterpart is exactly the expected text: %q", got.Hint)
+		}
+		partial := &runner.Result{Stderr: []byte("done, mostly\n")}
+		got = Check(&spec.Assert{Stdout: &spec.StreamAssert{Equals: strp("done\n")}}, partial, Env{})
+		if strings.Contains(got.Hint, suggestion) {
+			t.Errorf("equals suggested a counterpart that only partly matches: %q", got.Hint)
+		}
+	})
+
+	// CRLF folding is the primary matcher's rule, so the counterpart check must
+	// use it too or the suggestion would be silently wrong on Windows.
+	t.Run("CRLF on the counterpart still fires", func(t *testing.T) {
+		t.Parallel()
+		res := &runner.Result{Stderr: []byte("boom\r\n")}
+		got := Check(&spec.Assert{Stdout: &spec.StreamAssert{Contains: spec.StringList{"boom"}}}, res, Env{})
+		if !strings.Contains(got.Hint, suggestion) {
+			t.Errorf("CRLF counterpart did not fire the hint: %q", got.Hint)
+		}
+	})
+
+	// A `line:` selector is applied to the counterpart identically, so a
+	// counterpart that has no such line simply does not satisfy the assertion
+	// and no suggestion is made. This is the pinned contract.
+	t.Run("line: is applied to the counterpart identically", func(t *testing.T) {
+		t.Parallel()
+		res := &runner.Result{Stdout: []byte("first\n"), Stderr: []byte("only one line\n")}
+		got := Check(&spec.Assert{Stdout: &spec.StreamAssert{Line: intp(2), Contains: spec.StringList{"only"}}}, res, Env{})
+		if strings.Contains(got.Hint, suggestion) {
+			t.Errorf("line 2 does not exist on the counterpart; no suggestion should be made: %q", got.Hint)
+		}
+		// When the counterpart DOES have that line and it matches, it fires.
+		res = &runner.Result{Stdout: []byte("a\nb\n"), Stderr: []byte("x\nboom\n")}
+		got = Check(&spec.Assert{Stdout: &spec.StreamAssert{Line: intp(2), Contains: spec.StringList{"boom"}}}, res, Env{})
+		if !strings.Contains(got.Hint, suggestion) {
+			t.Errorf("a matching counterpart line should fire the hint: %q", got.Hint)
+		}
+	})
+
+	// Negative matchers prove nothing about the counterpart: an absence there is
+	// not evidence the author meant the other stream. Whole-stream and
+	// golden-file matchers are excluded too — re-running `snapshot:` against the
+	// counterpart would compare (or under --update-snapshots write) a golden.
+	t.Run("only positive text matchers can suggest", func(t *testing.T) {
+		t.Parallel()
+		res := &runner.Result{Stdout: []byte("boom\n"), Stderr: []byte("quiet\n")}
+		for name, a := range map[string]*spec.StreamAssert{
+			"not_contains": {NotContains: spec.StringList{"boom"}},
+			"not_matches":  {NotMatches: strp("boom")},
+			"empty":        {Empty: boolp(true)},
+			"snapshot":     {Snapshot: "snaps/out.txt"},
+			"mixed":        {Contains: spec.StringList{"quiet"}, NotContains: spec.StringList{"nothing"}},
+		} {
+			got := Check(&spec.Assert{Stdout: a}, res, Env{})
+			if got.OK {
+				continue // nothing to suggest on a passing check
+			}
+			if strings.Contains(got.Hint, suggestion) {
+				t.Errorf("%s must not suggest the counterpart: %q", name, got.Hint)
+			}
+		}
+	})
+
+	// The suggestion is about the stdout/stderr pair only. body/rows/message/
+	// value have no counterpart and the code must not pretend otherwise.
+	t.Run("other targets never grow the hint", func(t *testing.T) {
+		t.Parallel()
+		res := &runner.Result{IsHTTP: true, StatusCode: 200, Body: []byte("{}"), Stderr: []byte("boom")}
+		got := Check(&spec.Assert{Body: &spec.StreamAssert{Contains: spec.StringList{"boom"}}}, res, Env{})
+		if got.OK {
+			t.Fatalf("body assertion should fail: %+v", got)
+		}
+		if strings.Contains(got.Hint, "instead?") {
+			t.Errorf("body grew a counterpart suggestion: %q", got.Hint)
+		}
+		db := &runner.Result{IsDB: true, RowsJSON: []byte("[]"), Stdout: []byte("boom")}
+		got = Check(&spec.Assert{Rows: &spec.StreamAssert{Contains: spec.StringList{"boom"}}}, db, Env{})
+		if strings.Contains(got.Hint, "instead?") {
+			t.Errorf("rows grew a counterpart suggestion: %q", got.Hint)
+		}
+	})
+
+	// The verdict is never changed by the hint.
+	t.Run("the verdict is untouched", func(t *testing.T) {
+		t.Parallel()
+		res := &runner.Result{Stderr: []byte("boom\n")}
+		got := Check(&spec.Assert{Stdout: &spec.StreamAssert{Contains: spec.StringList{"boom"}}}, res, Env{})
+		if got.OK {
+			t.Error("the hint must not turn a failing assertion green")
+		}
+	})
+}
