@@ -123,7 +123,8 @@ Commands:
 
 Run "atago <command> --help" for a command's options.
 Start with "atago init" — it writes a runnable example spec.
-Docs and the spec-file reference: https://github.com/nao1215/atago
+Documentation: https://nao1215.github.io/atago/
+GitHub Sponsors: https://github.com/sponsors/nao1215
 `)
 }
 
