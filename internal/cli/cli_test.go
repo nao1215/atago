@@ -891,6 +891,14 @@ func TestMain_HelpAndVersionVariants(t *testing.T) {
 		if !strings.Contains(out.String(), "atago <command>") {
 			t.Errorf("%s: usage not on stdout: %q", arg, out.String())
 		}
+		for _, want := range []string{
+			"Documentation: https://nao1215.github.io/atago/",
+			"GitHub Sponsors: https://github.com/sponsors/nao1215",
+		} {
+			if !strings.Contains(out.String(), want) {
+				t.Errorf("%s: help output does not contain %q: %q", arg, want, out.String())
+			}
+		}
 	}
 	for _, arg := range []string{"version", "-version", "--version"} {
 		var out, errb bytes.Buffer
