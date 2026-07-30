@@ -52,6 +52,11 @@ type renderOptions struct {
 	// in ~1s, not 4s).
 	elapsed    time.Duration
 	hasElapsed bool
+	// allowFlaky mirrors --allow-flaky. A flaky scenario fails the run, so the
+	// summary must read FAILED for one, or the headline contradicts the exit code
+	// the same way a load failure used to. When the caller accepts the
+	// instability, both go back to green together.
+	allowFlaky bool
 }
 
 // WithLoadFailures records how many spec files failed to load for this run, so
@@ -65,6 +70,12 @@ func WithLoadFailures(n int) Option {
 // concurrent (--parallel) suites.
 func WithElapsed(d time.Duration) Option {
 	return func(o *renderOptions) { o.elapsed = d; o.hasElapsed = true }
+}
+
+// WithAllowFlaky records that the caller accepts flakiness for this run, so the
+// summary reads PASSED for a flaky-only run and matches its zero exit code.
+func WithAllowFlaky(allow bool) Option {
+	return func(o *renderOptions) { o.allowFlaky = allow }
 }
 
 // Render writes one or more suite results in the requested format. Console
@@ -101,7 +112,7 @@ func Render(w io.Writer, f Format, results []*engine.SuiteResult, opts ...Option
 		if o.hasElapsed {
 			dur = o.elapsed
 		}
-		writeSummary(&b, color, agg, total, dur, hardFail, o.loadFailures)
+		writeSummary(&b, color, agg, total, dur, hardFail, o.loadFailures, o.allowFlaky)
 		_, err := io.WriteString(w, b.String())
 		return err
 	case FormatJSON:

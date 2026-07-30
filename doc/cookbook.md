@@ -2247,7 +2247,8 @@ other way — it surfaces instability instead of absorbing it:
 
 ```shell
 atago run --repeat 20 flaky.atago.yaml   # run each scenario 20 times; ONE bad iteration fails the run
-atago run --retry-failed 2 ./specs      # retry failures, but a pass-after-fail is REPORTED as flaky, never hidden
+atago run --retry-failed 2 ./specs      # retry failures; a pass-after-fail is REPORTED as flaky and still fails the run
+atago run --retry-failed 2 --allow-flaky ./specs  # ...unless the instability is known and accepted here
 atago run --rerun-failed ./specs        # while bisecting: re-run only what failed last time (from .atago/last-failed.json)
 ```
 

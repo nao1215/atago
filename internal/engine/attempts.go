@@ -32,8 +32,9 @@ func (e *Engine) runScenarioWithPolicy(ctx context.Context, idx int, sc *spec.Sc
 // tell apart (#138): a scenario that failed EVERY iteration is a deterministic
 // bug (StatusFailed, or StatusError when the failures were execution errors),
 // while one that passed some iterations and failed others is unstable, not
-// broken, and folds to StatusFlaky — surfaced with its flake rate but green for
-// the exit code, exactly like a --retry-failed recovery. Collapsing a partial
+// broken, and folds to StatusFlaky — surfaced with its flake rate, and failing
+// the run unless --allow-flaky, exactly like a --retry-failed recovery.
+// Collapsing a partial
 // failure into StatusFailed (the old behavior) erased that distinction, so
 // "3/10 flaked" was indistinguishable from "10/10 is a real bug".
 func (e *Engine) runRepeated(ctx context.Context, idx int, sc *spec.Scenario, rc runConfig) ScenarioResult {

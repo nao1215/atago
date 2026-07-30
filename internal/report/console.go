@@ -15,7 +15,7 @@ import (
 
 // writeSummary prints the final tally line. The uppercase status word
 // (PASSED/FAILED) anchors the line and is part of the stable output contract.
-func writeSummary(b *strings.Builder, color bool, c engine.Counts, total int, d time.Duration, hardFail bool, loadFailures int) {
+func writeSummary(b *strings.Builder, color bool, c engine.Counts, total int, d time.Duration, hardFail bool, loadFailures int, allowFlaky bool) {
 	status, code := "PASSED", cGreen
 	// hardFail covers a suite that errored before producing any scenario row (#7):
 	// the counts are all zero, but the verdict must still read FAILED to match the
@@ -23,7 +23,10 @@ func writeSummary(b *strings.Builder, color bool, c engine.Counts, total int, d 
 	// loadFailures covers spec files that could not be parsed/validated (#120):
 	// they run no scenario, so without this the headline would read PASSED while
 	// the process exits non-zero and the dropped file is silently uncounted.
-	if c.Failed > 0 || c.Errored > 0 || hardFail || loadFailures > 0 {
+	// A flaky scenario fails the run for the same reason it is reported at all, so
+	// the verdict follows it unless the caller passed --allow-flaky; the tally's
+	// ", N flaky" tail names it either way.
+	if c.Failed > 0 || c.Errored > 0 || hardFail || loadFailures > 0 || (c.Flaky > 0 && !allowFlaky) {
 		status, code = "FAILED", cRed
 	}
 	plural := "scenarios"

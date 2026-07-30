@@ -23,9 +23,11 @@ const (
 	// StatusFlaky means the scenario was unstable, not broken: it failed at
 	// least once and passed at least once. Two paths produce it — a
 	// --retry-failed re-run that recovered (#29), or a --repeat run where some
-	// iterations passed and some failed (#138). Either way it is green for the
-	// exit code, but surfaced everywhere (with its attempt count or flake rate)
-	// so instability is never silently hidden.
+	// iterations passed and some failed (#138). Either way it fails the run,
+	// because a scenario whose answer depends on how many times it ran has not
+	// been shown to work; --allow-flaky exits 0 for a suite whose instability the
+	// caller already knows about. It is surfaced everywhere with its attempt count
+	// or flake rate, so the distinction from a deterministic failure is kept.
 	StatusFlaky Status = "flaky"
 )
 

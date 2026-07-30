@@ -72,4 +72,4 @@ jobs:
         # --retry-failed absorbs the inherently racy interactive-pty specs (e.g.
         # sqly's readline REPL over a pty); a recovered scenario is reported as
         # flaky, a real regression still fails after the retries.
-        run: ./dist/atago run --retry-failed 3 "${{ matrix.tool.dir }}"
+        run: ./dist/atago run --retry-failed 3 --allow-flaky "${{ matrix.tool.dir }}"
