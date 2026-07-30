@@ -3422,16 +3422,21 @@ ${atago} run flaky.atago.yaml
 rm -f seen.txt
 ${atago} run --retry-failed 1 flaky.atago.yaml
 rm -f seen.txt
+${atago} run --retry-failed 1 --allow-flaky flaky.atago.yaml
+rm -f seen.txt
 ${atago} run --retry-failed 1 --report json flaky.atago.yaml
 ```
 #### Then
 - after `${atago} run flaky.atago.yaml`:
   - exit code is `1`
 - after `${atago} run --retry-failed 1 flaky.atago.yaml`:
+  - exit code is `1`
+  - stdout contains `FLAKY:`, `passed after 2 attempts`, `1 flaky`
+- after `${atago} run --retry-failed 1 --allow-flaky flaky.atago.yaml`:
   - exit code is `0`
   - stdout contains `FLAKY:`, `passed after 2 attempts`, `1 flaky`
 - after `${atago} run --retry-failed 1 --report json flaky.atago.yaml`:
-  - exit code is `0`
+  - exit code is `1`
   - stdout contains `"status": "flaky"`, `"attempts": 2`
 ### Scenario: repeat surfaces flakiness that a single run would miss
 _skipped on Windows_
@@ -3482,6 +3487,8 @@ scenarios:
 ```shell
 ${atago} run --repeat 3 green.atago.yaml
 ${atago} run --repeat 3 flaky.atago.yaml
+rm -f seen.txt
+${atago} run --repeat 3 --allow-flaky flaky.atago.yaml
 ${atago} run --repeat 3 broken.atago.yaml
 ```
 #### Then
@@ -3489,6 +3496,9 @@ ${atago} run --repeat 3 broken.atago.yaml
   - exit code is `0`
   - stdout contains `steady: 3/3 passed`
 - after `${atago} run --repeat 3 flaky.atago.yaml`:
+  - exit code is `1`
+  - stdout contains `flaky once: 2/3 passed`, `1 flaky`
+- after `${atago} run --repeat 3 --allow-flaky flaky.atago.yaml`:
   - exit code is `0`
   - stdout contains `flaky once: 2/3 passed`, `1 flaky`
 - after `${atago} run --repeat 3 broken.atago.yaml`:

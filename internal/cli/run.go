@@ -43,6 +43,7 @@ type runOptions struct {
 	skipTag         csvFlag
 	artifactsDir    string
 	rerunFailed     bool
+	allowFlaky      bool
 	verbose         bool
 	ci              bool
 	stdout          io.Writer
@@ -151,10 +152,11 @@ func parseRunFlags(label string, args []string, stdout, stderr io.Writer) (*runO
 	artifactsDir := fs.String("artifacts-dir", "", "write deterministic failure artifacts (actual/expected payloads) under DIR for review tooling")
 	rerunFailed := fs.Bool("rerun-failed", false, "run only the scenarios that failed on the previous run (recorded in .atago/last-failed.json)")
 	repeat := fs.Int("repeat", 0, "run each selected scenario N times to surface flakiness; any failing iteration fails the run")
-	retryFailed := fs.Int("retry-failed", 0, "retry failed scenarios up to N times; recovered scenarios are reported as flaky, never hidden")
+	retryFailed := fs.Int("retry-failed", 0, "retry failed scenarios up to N times; a recovered scenario is reported as flaky and still fails the run unless --allow-flaky")
+	allowFlaky := fs.Bool("allow-flaky", false, "exit 0 when the only problem is flakiness; for a suite whose instability is known and accepted")
 	verbose := fs.Bool("verbose", false, "trace every scenario as it finishes: commands, exit codes, captured output, and per-assertion verdicts — for passing scenarios too")
 	fs.Usage = func() {
-		fmt.Fprint(stderr, "Usage: atago run [--report console|json|junit|gha|tap] [--update-snapshots] [--parallel N] [--fail-fast] [--filter S] [--tag T] [--skip-tag T] [--rerun-failed] [--repeat N] [--retry-failed N] [--artifacts-dir DIR] [--verbose] [--ci] <path | dir>...\n  (directories are searched recursively)\n")
+		fmt.Fprint(stderr, "Usage: atago run [--report console|json|junit|gha|tap] [--update-snapshots] [--parallel N] [--fail-fast] [--filter S] [--tag T] [--skip-tag T] [--rerun-failed] [--repeat N] [--retry-failed N] [--allow-flaky] [--artifacts-dir DIR] [--verbose] [--ci] <path | dir>...\n  (directories are searched recursively)\n")
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(args); err != nil {
@@ -223,6 +225,7 @@ func parseRunFlags(label string, args []string, stdout, stderr io.Writer) (*runO
 		skipTag:         skipTag,
 		artifactsDir:    *artifactsDir,
 		rerunFailed:     *rerunFailed,
+		allowFlaky:      *allowFlaky,
 		verbose:         *verbose,
 		ci:              *ci,
 		stdout:          stdout,
@@ -271,7 +274,7 @@ func finishRun(opts *runOptions, suiteResults []*engine.SuiteResult, loadErrs []
 			continue
 		}
 		results = append(results, suiteResult)
-		exit = worseExit(exit, exitForSuite(suiteResult))
+		exit = worseExit(exit, exitForSuite(suiteResult, opts.allowFlaky))
 	}
 	if progress != nil {
 		progress.Done()
@@ -371,7 +374,7 @@ func finishRun(opts *runOptions, suiteResults []*engine.SuiteResult, loadErrs []
 		}
 	}
 
-	if err := report.Render(opts.stdout, opts.format, results, report.WithLoadFailures(loadFailures), report.WithElapsed(elapsed)); err != nil {
+	if err := report.Render(opts.stdout, opts.format, results, report.WithLoadFailures(loadFailures), report.WithElapsed(elapsed), report.WithAllowFlaky(opts.allowFlaky)); err != nil {
 		fmt.Fprintf(opts.stderr, opts.label+": failed to write report: %v\n", err)
 		return worseExit(exit, ExitInternal)
 	}
@@ -641,7 +644,14 @@ func exitForLoadError(err error) int {
 	return ExitParse
 }
 
-func exitForSuite(res *engine.SuiteResult) int {
+// exitForSuite maps a suite result to an exit code. allowFlaky decides the one
+// status whose severity is a policy rather than a fact: a scenario that needed a
+// retry to pass, or that passed on some iterations and failed on others, has not
+// been shown to work, so a suite holding one fails. --allow-flaky is for a suite
+// with instability the caller already knows about and accepts — atago's own pty
+// scenarios lose keystrokes when their sessions are starved of CPU — and it says
+// so at the command line instead of every run quietly going green.
+func exitForSuite(res *engine.SuiteResult, allowFlaky bool) int {
 	// A security policy violation (e.g. a denied network host) takes precedence
 	// over the generic execution-error code.
 	if res.SecurityViolation {
@@ -649,6 +659,13 @@ func exitForSuite(res *engine.SuiteResult) int {
 	}
 	switch res.Status {
 	case engine.StatusPassed, engine.StatusSkipped, engine.StatusFlaky:
+		// A flaky scenario does not raise the suite's status — worseStatus ranks it
+		// alongside passed, so a suite of one flake and nine passes still reports
+		// passed — which is why the count is what decides here, the same value the
+		// console verdict reads.
+		if !allowFlaky && res.Counts().Flaky > 0 {
+			return ExitFailures
+		}
 		return ExitOK
 	case engine.StatusFailed:
 		return ExitFailures

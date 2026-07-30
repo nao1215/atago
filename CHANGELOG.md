@@ -7,6 +7,34 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **A flaky scenario now fails the run.** A scenario that failed and then passed
+  on a `--retry-failed` re-run, or that passed some `--repeat` iterations and
+  failed others, was reported loudly and exited 0. So the two knobs whose whole
+  purpose is to surface instability went green when they found it — `--repeat`'s
+  own help said "any failing iteration fails the run" while a partial failure
+  exited 0 — and a suite could rot without CI ever noticing. Downstream, sqly's
+  runner passed `--retry-failed 3` for the sake of its interactive-pty specs, and
+  that silently extended tolerance to every other spec in the suite: a real
+  nondeterminism bug in filesql, where an LTSV table's column order came out of a
+  map, surfaced there as "flaky, PASSED" rather than as a failure.
+
+  A flaky scenario is still reported as flaky and not as a hard failure — TAP
+  keeps its `ok` point with a diagnostic, junit keeps `flakyFailure` inside a
+  passed testcase, gha keeps its warning — because per scenario the recovery is a
+  fact. What changed is the run-level verdict: the console summary now reads
+  FAILED, matching the exit code, where before the headline and the exit code
+  could disagree.
+
+### Added
+
+- `--allow-flaky` exits 0 when the only problem is flakiness, for a suite whose
+  instability is already known and accepted. atago's own pty scenarios lose
+  keystrokes when their sessions are starved of CPU, so its `dogfood`,
+  `thirdparty`, and pty CI jobs pass it — which puts the tolerance at the command
+  line instead of in a comment beside a flag that granted it invisibly.
+
 ## [0.17.0] - 2026-07-28
 
 A minor release about reach, and about failures that describe themselves.

@@ -332,4 +332,4 @@ jobs:
         # nothing but load: the TUI suites timed out waiting for a screen that
         # arrives promptly on a quiet machine. A regression still fails both
         # attempts; only a flake is absorbed, and the report names it.
-        run: ./dist/atago run --retry-failed 1 "${{ matrix.program.dir }}"
+        run: ./dist/atago run --retry-failed 1 --allow-flaky "${{ matrix.program.dir }}"

@@ -323,10 +323,15 @@ func TestRender_TAP(t *testing.T) {
 }
 
 // flakyResults builds a suite whose single scenario failed once and then passed
-// on retry (#29). atago treats a recovered scenario as green: the process exits 0
-// (exitForSuite), the console verdict stays PASSED, gha warns instead of erroring,
-// and junit records it as a passed testcase. Every report format must agree on
-// that verdict, so a flaky scenario is a pass and never a failure.
+// on retry (#29).
+//
+// Two different questions get two different answers here. Per scenario, the
+// recovery is a fact each format records in its own idiom — a TAP ok point with a
+// diagnostic, junit's flakyFailure inside a passed testcase (the Surefire
+// convention), a gha warning rather than an error — and none of them is a hard
+// failure, because the scenario did pass. At run level the verdict follows the
+// exit code, and a flaky scenario fails the run unless --allow-flaky, so the
+// console summary line reads FAILED where the per-scenario rows do not.
 func flakyResults() []*engine.SuiteResult {
 	return []*engine.SuiteResult{{
 		Suite:    "s1",
@@ -340,11 +345,11 @@ func flakyResults() []*engine.SuiteResult {
 	}}
 }
 
-// TestRender_FlakyIsGreenAcrossFormats is a metamorphic parity check: a scenario
-// that recovered on retry (StatusFlaky) reads as a pass in every report format,
-// matching the exit code and the console verdict. TAP fell through to a `not ok`
-// point, contradicting the green verdict the same run reported everywhere else.
-func TestRender_FlakyIsGreenAcrossFormats(t *testing.T) {
+// TestRender_FlakyIsDistinctFromFailed is a parity check across formats: a
+// scenario that recovered on retry is never rendered as a hard failure, and it is
+// never rendered as an unremarkable pass either. The run-level verdict is checked
+// separately, because that one follows the exit code.
+func TestRender_FlakyIsDistinctFromFailed(t *testing.T) {
 	t.Parallel()
 
 	t.Run("tap marks a flaky scenario ok, not failed", func(t *testing.T) {
@@ -398,18 +403,49 @@ func TestRender_FlakyIsGreenAcrossFormats(t *testing.T) {
 		}
 	})
 
-	t.Run("console verdict stays PASSED with a flaky scenario", func(t *testing.T) {
+	// The run-level verdict has to agree with the exit code, and a flaky scenario
+	// exits non-zero: a headline reading PASSED beside a failing exit code is the
+	// same contradiction a spec-load failure used to produce.
+	t.Run("console verdict reads FAILED for a flaky scenario", func(t *testing.T) {
 		t.Parallel()
 		var b bytes.Buffer
 		if err := Render(&b, FormatConsole, flakyResults()); err != nil {
 			t.Fatal(err)
 		}
 		out := b.String()
-		if strings.Contains(out, "FAILED") {
-			t.Errorf("console verdict flipped to FAILED for a flaky (green) scenario:\n%s", out)
+		if !strings.Contains(out, "FAILED") {
+			t.Errorf("console verdict should read FAILED for a flaky scenario, which fails the run:\n%s", out)
 		}
 		if !strings.Contains(out, "1 flaky") {
 			t.Errorf("console should surface the flaky count:\n%s", out)
+		}
+	})
+
+	t.Run("console verdict reads PASSED when flakiness is allowed", func(t *testing.T) {
+		t.Parallel()
+		var b bytes.Buffer
+		if err := Render(&b, FormatConsole, flakyResults(), WithAllowFlaky(true)); err != nil {
+			t.Fatal(err)
+		}
+		out := b.String()
+		if strings.Contains(out, "FAILED") {
+			t.Errorf("console verdict should read PASSED under --allow-flaky, matching its zero exit code:\n%s", out)
+		}
+		if !strings.Contains(out, "1 flaky") {
+			t.Errorf("--allow-flaky must still surface the flaky count:\n%s", out)
+		}
+	})
+
+	t.Run("a hard failure reads FAILED even when flakiness is allowed", func(t *testing.T) {
+		t.Parallel()
+		results := flakyResults()
+		results[0].Scenarios[0].Status = engine.StatusFailed
+		var b bytes.Buffer
+		if err := Render(&b, FormatConsole, results, WithAllowFlaky(true)); err != nil {
+			t.Fatal(err)
+		}
+		if out := b.String(); !strings.Contains(out, "FAILED") {
+			t.Errorf("--allow-flaky must not soften a real failure:\n%s", out)
 		}
 	})
 }

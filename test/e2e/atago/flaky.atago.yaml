@@ -37,10 +37,26 @@ scenarios:
       - run:
           shell: true
           command: rm -f seen.txt
-      # With --retry-failed the recovery is green BUT surfaced: exit 0, an
-      # 'f' progress dot, a FLAKY line, and ", 1 flaky" in the summary.
+      # With --retry-failed the recovery is surfaced — an 'f' progress dot, a
+      # FLAKY line, ", 1 flaky" in the summary — and it still fails the run: a
+      # scenario whose answer depends on how many times it ran has not been
+      # shown to work.
       - run:
           command: ${atago} run --retry-failed 1 flaky.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - "FLAKY:"
+              - "passed after 2 attempts"
+              - "1 flaky"
+      # --allow-flaky is for a suite whose instability the caller already knows
+      # about: same report, exit 0.
+      - run:
+          shell: true
+          command: rm -f seen.txt
+      - run:
+          command: ${atago} run --retry-failed 1 --allow-flaky flaky.atago.yaml
       - assert:
           exit_code: 0
           stdout:
@@ -55,7 +71,7 @@ scenarios:
       - run:
           command: ${atago} run --retry-failed 1 --report json flaky.atago.yaml
       - assert:
-          exit_code: 0
+          exit_code: 1
           stdout:
             contains:
               - '"status": "flaky"'
@@ -97,11 +113,24 @@ scenarios:
                       command: "if [ -f '${workdir}/seen.txt' ]; then echo recovered; else touch '${workdir}/seen.txt'; exit 1; fi"
                   - assert:
                       exit_code: 0
-      # A PARTIAL failure (some iterations pass, some fail) is instability, not a
-      # bug: repeat folds it to flaky — green for the exit code but surfaced with
-      # its rate and counted in the summary (#138).
+      # A PARTIAL failure (some iterations pass, some fail) is instability rather
+      # than a bug, so it folds to flaky and is surfaced with its rate (#138) —
+      # and it fails the run, which is what --repeat is for: a knob that exists
+      # to surface flakiness cannot exit 0 when it finds some.
       - run:
           command: ${atago} run --repeat 3 flaky.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - "flaky once: 2/3 passed"
+              - "1 flaky"
+      # --allow-flaky takes the same run back to green without hiding the rate.
+      - run:
+          shell: true
+          command: rm -f seen.txt
+      - run:
+          command: ${atago} run --repeat 3 --allow-flaky flaky.atago.yaml
       - assert:
           exit_code: 0
           stdout:

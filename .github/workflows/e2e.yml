@@ -80,7 +80,7 @@ jobs:
         # occasionally be lost with no observable signal to expect on. A recovered
         # scenario is reported as flaky, never hidden, and a real regression still
         # fails after the retries.
-        run: ./dist/atago run --retry-failed 3 ./test/e2e/tools/sqly
+        run: ./dist/atago run --retry-failed 3 --allow-flaky ./test/e2e/tools/sqly
 
   # Windows regressions must fail a PR, not surface days later in the daily
   # cross-platform run (#78 follow-up). This job runs the portable subset —
@@ -114,7 +114,7 @@ jobs:
         shell: bash
         run: |
           mapfile -t targets < <(bash scripts/windows_portable_specs.sh)
-          go run . run --retry-failed 1 "${targets[@]}"
+          go run . run --retry-failed 1 --allow-flaky "${targets[@]}"
 
       # Real-world proof that the ConPTY pty runner drives an INTERACTIVE CLI on
       # Windows, not just self-terminating output: sqly's shell is a readline
@@ -132,4 +132,4 @@ jobs:
       # sqly dogfood step above). A recovered scenario is reported as flaky.
       - name: Drive sqly's interactive shell over a Windows pty
         shell: bash
-        run: go run . run --parallel 1 --retry-failed 3 ./test/e2e/tools/sqly/repl_pty.atago.yaml
+        run: go run . run --parallel 1 --retry-failed 3 --allow-flaky ./test/e2e/tools/sqly/repl_pty.atago.yaml

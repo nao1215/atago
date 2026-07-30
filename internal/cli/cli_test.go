@@ -552,26 +552,59 @@ func (errWriter) Write([]byte) (int, error) { return 0, errors.New("boom") }
 func TestExitForSuite_Precedence(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
-		name string
-		res  *engine.SuiteResult
-		want int
+		name       string
+		res        *engine.SuiteResult
+		allowFlaky bool
+		want       int
 	}{
-		{"passed", &engine.SuiteResult{Status: engine.StatusPassed}, ExitOK},
-		{"skipped", &engine.SuiteResult{Status: engine.StatusSkipped}, ExitOK},
-		{"flaky", &engine.SuiteResult{Status: engine.StatusFlaky}, ExitOK},
-		{"failed", &engine.SuiteResult{Status: engine.StatusFailed}, ExitFailures},
-		{"error", &engine.SuiteResult{Status: engine.StatusError}, ExitExec},
-		{"unknown", &engine.SuiteResult{Status: engine.Status("weird")}, ExitInternal},
+		{name: "passed", res: &engine.SuiteResult{Status: engine.StatusPassed}, want: ExitOK},
+		{name: "skipped", res: &engine.SuiteResult{Status: engine.StatusSkipped}, want: ExitOK},
+		// A scenario that needed a retry to pass is unstable, and a suite whose
+		// answer depends on how many times it ran has not been shown to work. It
+		// fails unless the caller says that instability is expected here.
+		// A flaky scenario leaves the suite's status at passed, so these carry a
+		// scenario: the count is what exitForSuite reads.
+		{name: "flaky", res: suiteWithFlake(engine.StatusPassed), want: ExitFailures},
+		{name: "flaky allowed", res: suiteWithFlake(engine.StatusPassed), allowFlaky: true, want: ExitOK},
+		{name: "flaky beside a failure is still a failure", res: suiteWithFlake(engine.StatusFailed), allowFlaky: true, want: ExitFailures},
+		{name: "failed", res: &engine.SuiteResult{Status: engine.StatusFailed}, want: ExitFailures},
+		{name: "failed stays failed when flaky is allowed", res: &engine.SuiteResult{Status: engine.StatusFailed}, allowFlaky: true, want: ExitFailures},
+		{name: "error", res: &engine.SuiteResult{Status: engine.StatusError}, want: ExitExec},
+		{name: "error stays an error when flaky is allowed", res: &engine.SuiteResult{Status: engine.StatusError}, allowFlaky: true, want: ExitExec},
+		{name: "unknown", res: &engine.SuiteResult{Status: engine.Status("weird")}, want: ExitInternal},
 		// A security violation outranks the generic status entirely.
-		{"security over passed", &engine.SuiteResult{Status: engine.StatusPassed, SecurityViolation: true}, ExitSecurity},
-		{"security over error", &engine.SuiteResult{Status: engine.StatusError, SecurityViolation: true}, ExitSecurity},
-		{"security over failed", &engine.SuiteResult{Status: engine.StatusFailed, SecurityViolation: true}, ExitSecurity},
+		{name: "security over passed", res: &engine.SuiteResult{Status: engine.StatusPassed, SecurityViolation: true}, want: ExitSecurity},
+		{name: "security over error", res: &engine.SuiteResult{Status: engine.StatusError, SecurityViolation: true}, want: ExitSecurity},
+		{name: "security over failed", res: &engine.SuiteResult{Status: engine.StatusFailed, SecurityViolation: true}, want: ExitSecurity},
+		{name: "security over allowed flaky", res: &engine.SuiteResult{Status: engine.StatusFlaky, SecurityViolation: true}, allowFlaky: true, want: ExitSecurity},
+		{name: "security over refused flaky", res: suiteWithFlakeAndViolation(), want: ExitSecurity},
 	}
 	for _, c := range cases {
-		if got := exitForSuite(c.res); got != c.want {
+		if got := exitForSuite(c.res, c.allowFlaky); got != c.want {
 			t.Errorf("%s: exitForSuite = %d, want %d", c.name, got, c.want)
 		}
 	}
+}
+
+// suiteWithFlake builds a suite holding one flaky scenario, with the suite's own
+// status set by the caller. The scenario is what matters: worseStatus ranks flaky
+// alongside passed, so a suite is never itself "flaky" just because one of its
+// scenarios was.
+func suiteWithFlake(suiteStatus engine.Status) *engine.SuiteResult {
+	return &engine.SuiteResult{
+		Status: suiteStatus,
+		Scenarios: []engine.ScenarioResult{
+			{Name: "flake", Status: engine.StatusFlaky, Attempts: 2},
+		},
+	}
+}
+
+// suiteWithFlakeAndViolation is suiteWithFlake plus a security breach, so the
+// precedence table can check that the breach wins over the flaky refusal too.
+func suiteWithFlakeAndViolation() *engine.SuiteResult {
+	res := suiteWithFlake(engine.StatusPassed)
+	res.SecurityViolation = true
+	return res
 }
 
 // TestWorseExit_MonotonicAndCommutative exhaustively checks the exit-code
