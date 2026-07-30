@@ -268,7 +268,8 @@ Selection flags compose with any spec: `--filter NAME` (repeatable, and comma-se
 Real E2E suites flake (timing, ports, external tools). `--retry-failed N` re-runs failed scenarios in a fresh workdir and reports recovered ones as flaky, loud in every report format; silent retries are explicitly a non-goal. A flaky scenario still fails the run, because one whose answer depends on how many times it ran has not been shown to work — pass `--allow-flaky` for a suite whose instability you already know about and accept. `--repeat N` does the opposite job: run each scenario N times to detect flakiness before it reaches CI.
 
 ```shell
-atago run --ci --retry-failed 2 ./specs          # keep CI green, report instability loudly
+atago run --ci --retry-failed 2 ./specs          # retry, report instability loudly, still fail
+atago run --ci --retry-failed 2 --allow-flaky ./specs  # ...and keep CI green when that is accepted
 atago run --repeat 20 --filter "race prone" ./specs   # flake detection
 ```
 
