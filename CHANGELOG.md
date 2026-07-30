@@ -7,6 +7,15 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-07-30
+
+A release about the one verdict atago was getting wrong about itself. `--repeat`
+and `--retry-failed` exist to surface instability, and a run that found some
+still exited 0 — so a suite could rot with CI green, and `--repeat`'s own help
+said "any failing iteration fails the run" while a partial failure did not. A
+flaky scenario now fails the run, and `--allow-flaky` is there for a suite whose
+instability you already know about.
+
 ### Changed
 
 - **A flaky scenario now fails the run.** A scenario that failed and then passed
@@ -34,6 +43,13 @@ and this project follows [Semantic Versioning](https://semver.org/).
   keystrokes when their sessions are starved of CPU, so its `dogfood`,
   `thirdparty`, and pty CI jobs pass it — which puts the tolerance at the command
   line instead of in a comment beside a flag that granted it invisibly.
+
+### Upgrading
+
+A run that was green only because a scenario recovered on retry now fails. That
+is the point, but it can turn a passing pipeline red on the first run after
+upgrading. Two ways forward: fix the flake, which is what the report already
+names, or pass `--allow-flaky` for a suite whose instability is accepted.
 
 ## [0.17.0] - 2026-07-28
 
