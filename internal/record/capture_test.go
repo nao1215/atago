@@ -47,6 +47,54 @@ func TestCapturePTY_RecordsOutputAndExit(t *testing.T) {
 	}
 }
 
+// TestCapturePTY_NoShellFastExitOutputNotLost covers the same fast-exit path as
+// the macOS CrossPlatformE2E flake, but in the recorder: a no-shell `echo`
+// binary that exits immediately must still leave its output in the recording.
+func TestCapturePTY_NoShellFastExitOutputNotLost(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell:false echo is a POSIX path; windows coverage lives in the ConPTY tests")
+	}
+
+	for i := range 100 {
+		inR, inW, err := os.Pipe()
+		if err != nil {
+			t.Fatalf("iteration %d: input pipe: %v", i, err)
+		}
+		outR, outW, err := os.Pipe()
+		if err != nil {
+			_ = inR.Close()
+			_ = inW.Close()
+			t.Fatalf("iteration %d: output pipe: %v", i, err)
+		}
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			_, _ = io.Copy(io.Discard, outR)
+		}()
+
+		rec, err := CapturePTY("echo capture-marker", false, inR, outW, 30*time.Second)
+		_ = outW.Close()
+		_ = inR.Close()
+		_ = inW.Close()
+		<-done
+		_ = outR.Close()
+
+		if err != nil {
+			t.Fatalf("iteration %d: CapturePTY() error = %v", i, err)
+		}
+		if rec.ExitCode != 0 {
+			t.Fatalf("iteration %d: exit code = %d, want 0", i, rec.ExitCode)
+		}
+		var out strings.Builder
+		for _, seg := range rec.Segments {
+			out.Write(seg.Output)
+		}
+		if !strings.Contains(out.String(), "capture-marker") {
+			t.Fatalf("iteration %d: recording missing the child's output: %q", i, out.String())
+		}
+	}
+}
+
 // TestCapturePTY_TimesOutOnNonExitingChild is the cross-platform backstop for
 // #194: a program that never exits must not hang the recorder forever. It runs
 // a child that ignores stdin and outlives the timeout, and asserts CapturePTY

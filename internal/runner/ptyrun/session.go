@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"sync"
 	"syscall"
 	"time"
 
@@ -32,6 +31,11 @@ type ptyProcess struct {
 	// rw is the terminal master: reads yield the child's output (terminal echo
 	// included, ANSI intact), writes deliver sends to the child.
 	rw io.ReadWriter
+	// trans is an optional already-running terminal drain. The POSIX runner
+	// starts it before the child starts to close fast-exit races; other
+	// backends can leave it nil and let driveSession start the same drain when
+	// the backend cannot start it any earlier.
+	trans *transcriptDrain
 	// exit receives the child's observed exit code exactly once, when the
 	// process is reaped. It must be buffered (cap 1) so the reaper never blocks
 	// waiting for a receiver that a kill path drains later.
@@ -63,116 +67,22 @@ func driveSession(ctx context.Context, p *spec.PTY, proc ptyProcess) (*runner.Re
 	defer cancel()
 
 	start := time.Now()
-	var writeMu sync.Mutex
-	writeTerm := func(b []byte) (int, error) {
-		writeMu.Lock()
-		defer writeMu.Unlock()
-		return proc.rw.Write(b)
+	term := proc.trans
+	if term == nil {
+		term = startTranscriptDrain(proc.rw, p)
 	}
-	queries := newTerminalQueries(p, writerFunc(writeTerm))
-
-	// Transcript accumulator: one goroutine drains the master so the child never
-	// blocks on a full terminal buffer. Reads end when the child exits (EOF/EIO)
-	// or the master is closed.
-	//
-	// readErr holds the error that ended the loop when it is NOT one of those
-	// ends (#345). Every error used to end the loop the same way, so a transcript
-	// lost to a real read failure left exactly the state a completed session
-	// leaves — and every expect_screen/screen/transcript assertion afterwards ran
-	// against a partial transcript atago believed was whole. finish reads it and
-	// refuses to hand back a Result at all, the same call the cmd runner makes
-	// for a cut-short capture (#343).
-	var mu sync.Mutex
-	var transcript []byte
-	var readErr error
-	readDone := make(chan struct{})
-	go func() {
-		defer close(readDone)
-		buf := make([]byte, 4096)
-		for {
-			n, rerr := proc.rw.Read(buf)
-			if n > 0 {
-				mu.Lock()
-				transcript = append(transcript, buf[:n]...)
-				mu.Unlock()
-				queries.consume(buf[:n])
-			}
-			if rerr == nil {
-				continue
-			}
-			// An interrupted read is not an end: resume it, or a signal
-			// arriving mid-read truncates the transcript.
-			if errors.Is(rerr, syscall.EINTR) {
-				continue
-			}
-			if !isSessionEnd(rerr) {
-				mu.Lock()
-				readErr = rerr
-				mu.Unlock()
-			}
-			return
-		}
-	}()
-	snapshot := func() []byte {
-		mu.Lock()
-		defer mu.Unlock()
-		return append([]byte(nil), transcript...)
-	}
-	// tailFrom copies only transcript[from:] under the lock and reports the
-	// transcript's current length; curLen reports the length alone. Together
-	// they let a pending expect skip the poll entirely when nothing new
-	// arrived and copy only the bytes it can still match — a TUI redrawing at
-	// full speed otherwise costs an O(transcript) allocation every 10ms per
-	// expect, pure garbage churn on bytes before matchOffset that no later
-	// expect may ever see again.
-	tailFrom := func(from int) ([]byte, int) {
-		mu.Lock()
-		defer mu.Unlock()
-		if from > len(transcript) {
-			from = len(transcript)
-		}
-		return append([]byte(nil), transcript[from:]...), len(transcript)
-	}
-	curLen := func() int {
-		mu.Lock()
-		defer mu.Unlock()
-		return len(transcript)
-	}
-	screenLen := -1
-	var screenCache []byte
-	currentScreen := func() []byte {
-		mu.Lock()
-		n := len(transcript)
-		if n == screenLen {
-			screen := append([]byte(nil), screenCache...)
-			mu.Unlock()
-			return screen
-		}
-		snap := append([]byte(nil), transcript...)
-		mu.Unlock()
-
-		rendered := []byte(RenderScreen(snap, p))
-
-		mu.Lock()
-		if len(transcript) == n {
-			screenCache = append(screenCache[:0], rendered...)
-			screenLen = n
-		}
-		mu.Unlock()
-		return rendered
-	}
+	writeTerm := term.write
+	snapshot := term.snapshot
+	tailFrom := term.tailFrom
+	curLen := term.curLen
+	currentScreen := term.currentScreen
 
 	finish := func(timedOut bool, code int, ef *ExpectFailure) (*runner.Result, *ExpectFailure, error) {
 		// Drain before closing: a fast-exiting child's final output may still sit
 		// in the pty buffer, and closing the master discards it. Once the last
 		// handle is gone the reader hits EOF and readDone closes on its own;
 		// drainGrace bounds the wait in case a descendant kept the terminal open.
-		select {
-		case <-readDone:
-		case <-time.After(drainGrace):
-		}
-		proc.closeTerm()
-		<-readDone
+		term.waitDrain(proc.closeTerm, drainGrace)
 		tr := snapshot()
 		// A transcript atago knows is incomplete must not become a Result: an
 		// expect_screen compared against missing bytes is a confidently wrong
@@ -185,9 +95,7 @@ func driveSession(ctx context.Context, p *spec.PTY, proc ptyProcess) (*runner.Re
 		// session read error accepted here is by construction one that arrived
 		// after the child exited. That is why the reader can classify on the error
 		// alone without racing the exit.
-		mu.Lock()
-		rerr := readErr
-		mu.Unlock()
+		rerr := term.readError()
 		if rerr != nil {
 			return nil, nil, fmt.Errorf(
 				"pty %q: the terminal transcript is incomplete — reading the terminal failed after %d bytes: %w",
@@ -224,8 +132,7 @@ func driveSession(ctx context.Context, p *spec.PTY, proc ptyProcess) (*runner.Re
 	failHard := func(err error) (*runner.Result, *ExpectFailure, error) {
 		proc.kill()
 		<-proc.exit
-		proc.closeTerm()
-		<-readDone
+		term.waitDrain(proc.closeTerm, 0)
 		return nil, nil, err
 	}
 

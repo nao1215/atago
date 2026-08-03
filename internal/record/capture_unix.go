@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 	"sync"
 	"syscall"
 	"time"
@@ -49,15 +50,23 @@ func CapturePTY(command string, shell bool, in, out *os.File, timeout time.Durat
 	// context-aware exec contract without a redundant second deadline.
 	cmd := exec.CommandContext(context.Background(), name, args...) //nolint:gosec // recording the user's declared command is the purpose
 	cmd.Env = os.Environ()
-	// A fresh session so the child owns the pty and a stray descendant does not
-	// keep it open past the child's exit.
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	// A fresh session and controlling terminal so the child owns the pty and a
+	// stray descendant does not keep it open past the child's exit.
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true, Setctty: true}
 
 	rows, cols := terminalSize(out)
-	master, err := pty.StartWithSize(cmd, &pty.Winsize{Rows: uint16(rows), Cols: uint16(cols)}) //nolint:gosec // geometry is bounded by terminalSize
+	master, tty, err := pty.Open()
 	if err != nil {
 		return PTYRecording{}, fmt.Errorf("record --pty: start %q: %w", command, err)
 	}
+	defer func() { _ = tty.Close() }()
+	if err := pty.Setsize(master, &pty.Winsize{Rows: uint16(rows), Cols: uint16(cols)}); err != nil { //nolint:gosec // geometry is bounded by terminalSize
+		_ = master.Close()
+		return PTYRecording{}, fmt.Errorf("record --pty: start %q: %w", command, err)
+	}
+	cmd.Stdin = tty
+	cmd.Stdout = tty
+	cmd.Stderr = tty
 	defer func() { _ = master.Close() }()
 
 	rec := PTYRecording{Command: command, Shell: shell, Rows: rows, Cols: cols}
@@ -69,6 +78,35 @@ func CapturePTY(command string, shell bool, in, out *os.File, timeout time.Durat
 	if oldState, rerr := term.MakeRaw(int(in.Fd())); rerr == nil {
 		defer func() { _ = term.Restore(int(in.Fd()), oldState) }()
 	}
+
+	// Output: child → developer's screen, recorded verbatim (ANSI intact).
+	outDone := make(chan struct{})
+	go func() {
+		defer close(outDone)
+		buf := make([]byte, 4096)
+		for {
+			n, rerr := master.Read(buf)
+			if n > 0 {
+				mu.Lock()
+				rec.AppendOutput(buf[:n])
+				mu.Unlock()
+				_, _ = out.Write(buf[:n])
+			}
+			if rerr != nil {
+				return
+			}
+		}
+	}()
+	// Yield once so the output drain can enter Read before a no-shell fast-exit
+	// command has a chance to print and disappear.
+	runtime.Gosched()
+
+	if err := cmd.Start(); err != nil {
+		_ = master.Close()
+		<-outDone
+		return PTYRecording{}, fmt.Errorf("record --pty: start %q: %w", command, err)
+	}
+	_ = tty.Close()
 
 	// Input: developer keystrokes → child. Each Read is one burst; the pty's
 	// current ECHO state tags it as a secret (echo off) or not. This goroutine
@@ -86,25 +124,6 @@ func CapturePTY(command string, shell bool, in, out *os.File, timeout time.Durat
 				if _, werr := master.Write(buf[:n]); werr != nil {
 					return
 				}
-			}
-			if rerr != nil {
-				return
-			}
-		}
-	}()
-
-	// Output: child → developer's screen, recorded verbatim (ANSI intact).
-	outDone := make(chan struct{})
-	go func() {
-		defer close(outDone)
-		buf := make([]byte, 4096)
-		for {
-			n, rerr := master.Read(buf)
-			if n > 0 {
-				mu.Lock()
-				rec.AppendOutput(buf[:n])
-				mu.Unlock()
-				_, _ = out.Write(buf[:n])
 			}
 			if rerr != nil {
 				return

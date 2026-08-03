@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"runtime"
 	"syscall"
 
 	"github.com/creack/pty"
@@ -39,9 +40,9 @@ func Run(ctx context.Context, p *spec.PTY, workdir string, env []string) (*runne
 		cmd.Dir = runnercmd.ResolveDir(workdir, p.Cwd)
 	}
 	cmd.Env = env
-	// A fresh process group so cleanup kills the whole tree, mirroring the cmd
-	// runner's teardown discipline.
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	// A fresh session and controlling terminal: the child owns the pty, and
+	// cleanup can still kill the whole tree by the negative process-group pid.
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true, Setctty: true}
 
 	rows, cols := uint16(defaultRows), uint16(defaultCols)
 	if p.Rows > 0 && p.Rows < 1<<16 {
@@ -50,10 +51,31 @@ func Run(ctx context.Context, p *spec.PTY, workdir string, env []string) (*runne
 	if p.Cols > 0 && p.Cols < 1<<16 {
 		cols = uint16(p.Cols)
 	}
-	master, err := pty.StartWithSize(cmd, &pty.Winsize{Rows: rows, Cols: cols})
+	master, tty, err := pty.Open()
 	if err != nil {
 		return nil, nil, fmt.Errorf("pty: start %q: %w", p.Command, err)
 	}
+	defer func() { _ = tty.Close() }()
+	if err := pty.Setsize(master, &pty.Winsize{Rows: rows, Cols: cols}); err != nil {
+		_ = master.Close()
+		return nil, nil, fmt.Errorf("pty: start %q: %w", p.Command, err)
+	}
+	cmd.Stdin = tty
+	cmd.Stdout = tty
+	cmd.Stderr = tty
+
+	// Post the first Read before the child starts: macOS can otherwise let a
+	// no-shell fast-exit command print and disappear before the drain exists.
+	term := startTranscriptDrain(master, p)
+	// Yield once so the drain goroutine can enter its blocking Read before this
+	// goroutine launches a child that may write and exit immediately.
+	runtime.Gosched()
+	if err := cmd.Start(); err != nil {
+		_ = master.Close()
+		term.waitDrain(func() {}, 0)
+		return nil, nil, fmt.Errorf("pty: start %q: %w", p.Command, err)
+	}
+	_ = tty.Close()
 
 	// Reap exactly once, from one place: probing a zombie with signal 0 keeps
 	// succeeding, so liveness must come from Wait itself. The buffered channel
@@ -62,8 +84,9 @@ func Run(ctx context.Context, p *spec.PTY, workdir string, env []string) (*runne
 	go func() { exitCh <- waitExitCode(cmd.Wait()) }()
 
 	proc := ptyProcess{
-		rw:   master,
-		exit: exitCh,
+		rw:    master,
+		trans: term,
+		exit:  exitCh,
 		// Negative pid signals the whole process group created by Setsid.
 		kill:      func() { _ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) },
 		closeTerm: func() { _ = master.Close() },
