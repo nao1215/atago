@@ -252,7 +252,9 @@ func startsWithYAMLIndicator(s string) bool {
 // replay. The base64 alphabet ([A-Za-z0-9+/=]) contains nothing that breaks the
 // inline flow or starts a trailing ` # comment`, so it needs no quoting.
 func yamlBinary(s string) string {
-	return "!!binary " + base64.StdEncoding.EncodeToString([]byte(s))
+	// Quote the base64 payload so a digit-only encoding (for example "1803")
+	// still lexes as a string scalar under !!binary rather than a plain integer.
+	return `!!binary "` + base64.StdEncoding.EncodeToString([]byte(s)) + `"`
 }
 
 // hasControlByte reports whether s contains a C0 control character (tab,
