@@ -239,6 +239,31 @@ func TestGenerate_ControlBytesRoundTrip(t *testing.T) {
 	if len(got) != 1 || got[0] != rawLine {
 		t.Errorf("invalid-utf8 contains round-trip = %x, want [%x]", got, rawLine)
 	}
+
+	// A !!binary payload whose base64 is digits-only must still parse as binary,
+	// not as a numeric plain scalar under the tag.
+	digitsOnly := string([]byte{0xd7, 0xcd, '7'}) // base64: "1803"
+	out3, err := Generate(Observation{
+		Command:  "printf-tool",
+		ExitCode: 0,
+		Stdout:   []byte(digitsOnly + "\n"),
+	}, Options{SuiteName: "demo"})
+	if err != nil {
+		t.Fatalf("Generate(digits-only-binary): %v", err)
+	}
+	s3, err := loader.LoadBytes("g.atago.yaml", out3)
+	if err != nil {
+		t.Fatalf("reload(digits-only-binary): %v\n%s", err, out3)
+	}
+	got = nil
+	for _, st := range s3.Scenarios[0].Steps {
+		if st.Assert != nil && st.Assert.Stdout != nil && st.Assert.Stdout.Contains != nil {
+			got = st.Assert.Stdout.Contains
+		}
+	}
+	if len(got) != 1 || got[0] != digitsOnly {
+		t.Errorf("digits-only !!binary round-trip = %x, want [%x]", got, digitsOnly)
+	}
 }
 
 // TestGenerate_RecordRunRoundTrip is the metamorphic law for record (#30): a

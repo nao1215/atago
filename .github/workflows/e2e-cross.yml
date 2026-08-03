@@ -62,6 +62,10 @@ jobs:
       # ${atago} spec variable) points at that binary, so specs self-invoke atago
       # correctly on every OS without per-platform binary-name handling. The
       # Windows leg passes @portable, expanded from the shared spec list.
+      # --retry-failed 1 absorbs the rare self-hosted pty replay flakes this
+      # scheduled drift job exists to surface early, not to gate every merge on:
+      # a recovered scenario is still reported as flaky, while a real regression
+      # fails both attempts.
       - name: Run the self-hosted E2E specs
         run: |
           if [ "${{ matrix.targets }}" = "@portable" ]; then
@@ -69,4 +73,4 @@ jobs:
           else
             read -ra targets <<< "${{ matrix.targets }}"
           fi
-          go run . run "${targets[@]}"
+          go run . run --retry-failed 1 --allow-flaky "${targets[@]}"

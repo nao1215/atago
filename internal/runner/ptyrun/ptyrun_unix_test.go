@@ -42,6 +42,32 @@ func TestRun_FastExitOutputNotLost(t *testing.T) {
 	}
 }
 
+// TestRun_NoShellFastExitOutputNotLost covers the exact CrossPlatformE2E flake
+// shape from the scheduled macOS job: a no-session pty step running the real
+// `echo` binary exited 0 while its captured stdout came back empty. Repeating
+// the no-shell case keeps the regression guard aligned with the self-hosted
+// record spec that exercises `record --pty -- echo done`.
+func TestRun_NoShellFastExitOutputNotLost(t *testing.T) {
+	t.Parallel()
+
+	for i := range 200 {
+		p := &spec.PTY{Command: "echo done"}
+		res, ef, err := Run(context.Background(), p, t.TempDir(), nil)
+		if err != nil {
+			t.Fatalf("iteration %d: unexpected error: %v", i, err)
+		}
+		if ef != nil {
+			t.Fatalf("iteration %d: unexpected expect failure: %+v", i, ef)
+		}
+		if res.ExitCode != 0 {
+			t.Fatalf("iteration %d: exit code = %d, want 0 (stdout %q)", i, res.ExitCode, res.Stdout)
+		}
+		if !strings.Contains(string(res.Stdout), "done") {
+			t.Fatalf("iteration %d: transcript lost the child's output: %q", i, res.Stdout)
+		}
+	}
+}
+
 // TestResolveCwd covers cwd resolution for a pty step: empty stays at the
 // workdir, an absolute path is used verbatim, and a relative path nests inside
 // the workdir — matching the cmd runner's rule so a pty and a run step agree on
