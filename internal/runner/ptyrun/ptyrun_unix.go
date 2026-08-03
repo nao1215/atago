@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"runtime"
 	"syscall"
 
 	"github.com/creack/pty"
@@ -66,6 +67,9 @@ func Run(ctx context.Context, p *spec.PTY, workdir string, env []string) (*runne
 	// Post the first Read before the child starts: macOS can otherwise let a
 	// no-shell fast-exit command print and disappear before the drain exists.
 	term := startTranscriptDrain(master, p)
+	// Yield once so the drain goroutine can enter its blocking Read before this
+	// goroutine launches a child that may write and exit immediately.
+	runtime.Gosched()
 	if err := cmd.Start(); err != nil {
 		_ = master.Close()
 		term.waitDrain(func() {}, 0)

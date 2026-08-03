@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 	"sync"
 	"syscall"
 	"time"
@@ -96,6 +97,9 @@ func CapturePTY(command string, shell bool, in, out *os.File, timeout time.Durat
 			}
 		}
 	}()
+	// Yield once so the output drain can enter Read before a no-shell fast-exit
+	// command has a chance to print and disappear.
+	runtime.Gosched()
 
 	if err := cmd.Start(); err != nil {
 		_ = master.Close()
