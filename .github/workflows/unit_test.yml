@@ -40,5 +40,13 @@ jobs:
         # `.out` package ("FAIL .out [setup failed]"), failing only the Windows
         # legs while the tests themselves pass. Git Bash ships on the windows
         # runner, so the command parses identically across all three OSes.
+        #
+        # -timeout 5m so a hung package explains itself. Go's default is 10m,
+        # which equals this job's timeout-minutes: the runner killed the job at
+        # the same moment Go would have panicked, so a hang left nothing but
+        # "The operation was canceled" and a couple of orphan test binaries in
+        # the cleanup log. No package here takes more than a few seconds, so 5m
+        # only ever fires on a real hang — and then Go dumps every goroutine's
+        # stack with five minutes of job time left to flush it.
         shell: bash
-        run: go test -v -cover -coverprofile=coverage.out ./...
+        run: go test -v -timeout 5m -cover -coverprofile=coverage.out ./...
