@@ -295,3 +295,39 @@ scenarios:
       - assert:
           stdout:
             not_contains: "send its quit key"
+
+  - name: a timeout that expires before the process starts is still a timeout
+    steps:
+      # exec.CommandContext checks the deadline inside Start, so a budget this
+      # small is always already spent by the time the OS would create the
+      # process. atago used to report that as "failed to execute" — the message
+      # for a command that could not be started at all — telling the author their
+      # command was unrunnable when it had merely run out of time. The outcome
+      # must not depend on which side of process creation the deadline lands on,
+      # which is exactly the race a loaded Windows runner loses with a 50ms
+      # budget. No `sleep` here, so unlike its neighbours this runs on every OS.
+      - fixture:
+          file: prestart.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: prestart
+            scenarios:
+              - name: the budget is spent before the process exists
+                steps:
+                  - run:
+                      shell: true
+                      command: echo hi
+                      timeout: 1ns
+                  - assert:
+                      exit_code: 0
+      - run:
+          command: ${atago} run prestart.atago.yaml
+          timeout: 30s
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - "timed out"
+              - "run.timeout"
+            not_contains: "failed to execute"

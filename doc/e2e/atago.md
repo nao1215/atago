@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-74 suites · 448 scenarios
+74 suites · 449 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -489,7 +489,7 @@
   - [a failing setup errors every scenario and none runs (exit 4)](#scenario-a-failing-setup-errors-every-scenario-and-none-runs-exit-4)
   - [a suite service starts once and its store reaches every scenario](#scenario-a-suite-service-starts-once-and-its-store-reaches-every-scenario)
   - [a failing suite teardown is loud but does not flip the verdict](#scenario-a-failing-suite-teardown-is-loud-but-does-not-flip-the-verdict)
-- [atago self-hosting / step timeouts (suite default + escape hatch)](#atago-self-hosting--step-timeouts-suite-default--escape-hatch) — 10 scenarios
+- [atago self-hosting / step timeouts (suite default + escape hatch)](#atago-self-hosting--step-timeouts-suite-default--escape-hatch) — 11 scenarios
   - [suite.timeout kills a hanging step and the hint names it](#scenario-suitetimeout-kills-a-hanging-step-and-the-hint-names-it)
   - [a step timeout beats the suite timeout and the hint says run.timeout](#scenario-a-step-timeout-beats-the-suite-timeout-and-the-hint-says-runtimeout)
   - [timeout zero disables a short suite bound](#scenario-timeout-zero-disables-a-short-suite-bound)
@@ -500,6 +500,7 @@
   - [an invalid suite.timeout is a load-time error](#scenario-an-invalid-suitetimeout-is-a-load-time-error)
   - [a session outlived by its program says so instead of blaming the clock](#scenario-a-session-outlived-by-its-program-says-so-instead-of-blaming-the-clock)
   - [an expect that never matches still reports the pattern, not the quit advice](#scenario-an-expect-that-never-matches-still-reports-the-pattern-not-the-quit-advice)
+  - [a timeout that expires before the process starts is still a timeout](#scenario-a-timeout-that-expires-before-the-process-starts-is-still-a-timeout)
 - [atago self-hosting / tui](#atago-self-hosting--tui) — 4 scenarios
   - [a pty step exports a usable TERM by default](#scenario-a-pty-step-exports-a-usable-term-by-default)
   - [an explicit TERM overrides the default](#scenario-an-explicit-term-overrides-the-default)
@@ -9165,6 +9166,32 @@ ${atago} run nomatch.atago.yaml
 - exit code is `1`
 - stdout contains `never-going-to-appear`, `never appeared in the terminal transcript`
 - stdout does not contain `send its quit key`
+### Scenario: a timeout that expires before the process starts is still a timeout
+#### Given
+- Fixture file `prestart.atago.yaml` is created.
+#### Inputs
+_Fixture `prestart.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: prestart
+scenarios:
+  - name: the budget is spent before the process exists
+    steps:
+      - run:
+          shell: true
+          command: echo hi
+          timeout: 1ns
+      - assert:
+          exit_code: 0
+```
+#### When
+```shell
+${atago} run prestart.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `timed out`, `run.timeout`, does not contain `failed to execute`
 ## atago self-hosting / tui
 Source: `test/e2e/atago/tui.atago.yaml`
 ### Scenario: a pty step exports a usable TERM by default

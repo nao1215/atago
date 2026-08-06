@@ -99,6 +99,19 @@ func (r *Runner) Run(ctx context.Context, run *spec.Run, workdir string) (*runne
 
 	start := time.Now()
 	if err := cmd.Start(); err != nil {
+		// exec.CommandContext checks the context inside Start, so a deadline or a
+		// cancel can land in the window between building the command and the OS
+		// creating the process — on a loaded machine a short `timeout:` loses that
+		// race outright. Both are the same outcomes the post-Wait paths below
+		// report, and neither is a command that could not be started, so they must
+		// not borrow that message: it would tell a spec author their command is
+		// unrunnable when it merely ran out of time.
+		if res := timedOutBeforeStart(ctx, run, start, workdir); res != nil {
+			return res, nil
+		}
+		if cerr := ctx.Err(); cerr != nil {
+			return nil, fmt.Errorf("run %q canceled: %w", run.Command, cerr)
+		}
 		// Could not start the process at all (not found, permission, ...). Same
 		// message the combined Run() path produced for this case.
 		return nil, fmt.Errorf("failed to execute %q: %w", run.Command, err)
@@ -204,6 +217,30 @@ func (r *Runner) Run(ctx context.Context, run *spec.Run, workdir string) (*runne
 		return nil, fmt.Errorf("failed to execute %q: %w", run.Command, runErr)
 	}
 	return res, nil
+}
+
+// timedOutBeforeStart builds the outcome for a step whose own `timeout:` had
+// already expired when Start ran, so no process ever existed. A step timeout is
+// an observable outcome rather than an error (assertions inspect TimedOut, and
+// the failure hint names the level that supplied the budget, #17), and that must
+// not depend on which side of process creation the deadline happened to land on.
+// ExitCode is -1 because there is no exit status to report, and there are no
+// captured streams because nothing ever wrote to them.
+//
+// It returns nil when the context ended for any other reason, or not at all, so
+// the caller keeps handling a real start failure and a cancel on their own.
+func timedOutBeforeStart(ctx context.Context, run *spec.Run, start time.Time, workdir string) *runner.Result {
+	if !errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return nil
+	}
+	return &runner.Result{
+		Command:       run.Command,
+		Duration:      time.Since(start),
+		Workdir:       workdir,
+		TimedOut:      true,
+		TimeoutSource: run.TimeoutSource,
+		ExitCode:      -1,
+	}
 }
 
 // captureFailure describes a command that ran to completion while its

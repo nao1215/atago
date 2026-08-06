@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -1095,5 +1096,64 @@ func TestRun_ConcurrentCapturesNeverComeBackEmpty(t *testing.T) {
 		case strings.TrimSpace(got.stdout) != want:
 			t.Errorf("child %d: stdout = %q, want exactly %q", got.id, got.stdout, want)
 		}
+	}
+}
+
+// TestRun_TimeoutBeforeStartIsATimeout pins the outcome when a step's own
+// `timeout:` expires before the process could be started at all.
+//
+// exec.CommandContext checks the context inside Start, so on a loaded machine a
+// short timeout can fire in the window between building the command and the OS
+// creating the process. That returned context.DeadlineExceeded from Start, and
+// Run wrapped it in "failed to execute" — the message reserved for a command
+// that could not be started (not found, permission). The result was a spec
+// author being told their command was unrunnable when it had simply run out of
+// time, with no TimedOut flag and no timeout source to point at the budget that
+// killed it. It surfaced as a Windows CI failure of TestRun_Timeout, whose 50ms
+// budget lost the race to Windows process creation.
+//
+// A one-nanosecond timeout makes the race deterministic: the deadline is always
+// already past by the time Start runs.
+func TestRun_TimeoutBeforeStartIsATimeout(t *testing.T) {
+	t.Parallel()
+	res, err := New().Run(context.Background(), &spec.Run{
+		Command:       argvCommand("echo hi", "cmd /c echo hi"),
+		Timeout:       "1ns",
+		TimeoutSource: "step",
+	}, t.TempDir())
+	if err != nil {
+		t.Fatalf("Run() error = %v; an expired step timeout is an observable outcome, not a start failure", err)
+	}
+	if !res.TimedOut {
+		t.Error("TimedOut = false, want true")
+	}
+	if res.TimeoutSource != "step" {
+		t.Errorf("TimeoutSource = %q, want %q — the failure hint names the budget that killed the step", res.TimeoutSource, "step")
+	}
+	if res.ExitCode != -1 {
+		t.Errorf("ExitCode = %d, want -1 (no exit status exists for a process that never ran)", res.ExitCode)
+	}
+	if res.Command != argvCommand("echo hi", "cmd /c echo hi") {
+		t.Errorf("Command = %q, want the command as authored", res.Command)
+	}
+}
+
+// TestRun_ParentCancelBeforeStartIsNotAStartFailure is the same window for a
+// parent-context cancellation (Ctrl-C / suite cancel). It must read as the
+// cancellation it is — the wording issue #30 established for a cancel observed
+// after Wait — rather than claiming the command could not be started.
+func TestRun_ParentCancelBeforeStartIsNotAStartFailure(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := New().Run(ctx, &spec.Run{Command: argvCommand("echo hi", "cmd /c echo hi")}, t.TempDir())
+	if err == nil {
+		t.Fatal("Run() error = nil; a cancelled run must be reported as an error")
+	}
+	if !errors.Is(err, context.Canceled) {
+		t.Errorf("Run() error = %v, want it to wrap context.Canceled", err)
+	}
+	if strings.Contains(err.Error(), "failed to execute") {
+		t.Errorf("Run() error = %v; a cancel is not a start failure", err)
 	}
 }
