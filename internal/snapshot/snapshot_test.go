@@ -32,6 +32,11 @@ func TestNormalize_Idempotent(t *testing.T) {
 		"127.0.0.1:54321", "localhost:8080", "[::1]:22", "0.0.0.0:1",
 		"/tmp/atago-xyz", "plain text ", "\r\n", "\n", "$", "{", "}", "abc",
 		"127.0.0.1:", ":", "-", "T", "Z",
+		// A lone CR, with no LF of its own. Only paired with something that later
+		// disappears — an escape sequence, a stray ESC — does it become the left
+		// half of a CRLF, which is the interaction TestNormalize_IdempotentAcrossCR
+		// pins. Without this fragment every CR in the corpus already had its LF.
+		"\r",
 		// A bare ESC and an incomplete CSI: removing a complete OSC that sits
 		// between them can splice the leftover ESC onto the following bytes and
 		// form a fresh CSI escape, which a single-pass CSI-then-OSC strip would
@@ -73,6 +78,40 @@ func TestNormalize_IdempotentAcrossOSCSplice(t *testing.T) {
 		}
 		if bytes.ContainsRune(once, '\x1b') {
 			t.Errorf("Normalize(%q) = %q still contains a raw ESC byte", in, once)
+		}
+	}
+}
+
+// TestNormalize_IdempotentAcrossCR pins the other direction of the same
+// interaction: an escape sequence sitting between a CR and an LF ("\r\x1b[A\n")
+// hides the CRLF from a fold that runs before the strip, and the strip then
+// splices the pair back together. Normalize returned "\r\n" and a second call
+// folded it to "\n" — so a golden written by --update-snapshots carried a CR and
+// failed its very next comparison. Folding and stripping must run together to a
+// fixed point, leaving no CR before an LF after one call.
+func TestNormalize_IdempotentAcrossCR(t *testing.T) {
+	t.Parallel()
+	cases := []string{
+		// The minimized input from the FuzzNormalize failure.
+		"\r\x1b[A\n",
+		// The same splice with each of the other vanishing sequences: a full CSI
+		// color, an OSC title, an OSC hyperlink, and a bare ESC left over from an
+		// OSC removal.
+		"a\r\x1b[0m\nb",
+		"a\r\x1b]0;title\x07\nb",
+		"a\r\x1b]8;;http://x\x1b\\\nb",
+		"a\r\x1b\x1b]0;t\x07[m\nb",
+		// A run of CRs the strip has to fold past, not just one.
+		"a\r\r\x1b[0m\r\x1b[0m\nb",
+	}
+	for _, in := range cases {
+		once := Normalize([]byte(in), Options{})
+		twice := Normalize(once, Options{})
+		if !bytes.Equal(once, twice) {
+			t.Errorf("Normalize not idempotent\n in:    %q\n once:  %q\n twice: %q", in, once, twice)
+		}
+		if strings.Contains(string(once), "\r\n") {
+			t.Errorf("Normalize(%q) = %q still contains a CRLF pair", in, once)
 		}
 	}
 }

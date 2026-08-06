@@ -73,21 +73,28 @@ func Normalize(data []byte, opt Options) []byte {
 		data = opt.Scrub(data)
 	}
 	s := string(data)
-	// Line endings are an OS artifact, not observable behavior: fold CRLF so a
-	// snapshot recorded on POSIX matches cmd.exe output on Windows (and the
-	// committed golden never carries CRs). Matches the equals matcher's rule.
-	// Fold to a fixed point (`\r\r\n` -> `\r\n` -> `\n`): a single ReplaceAll is
-	// not idempotent for a run of CRs before the LF, which would make the whole
-	// function non-idempotent and fail a snapshot on its very next comparison.
-	s = foldCRLF(s)
-	// Strip CSI and OSC escapes to a fixed point. Removing a complete OSC
-	// sequence can splice a stray leading ESC onto the bytes that followed it and
-	// form a fresh CSI escape, which a single CSI-then-OSC pass leaves behind —
-	// a raw escape byte then leaks into the golden the CSI rule exists to keep
-	// clean, and Normalize is no longer idempotent. Loop until the text is stable
-	// (each pass only deletes bytes, so this always terminates).
+	// Fold CRLF and strip CSI/OSC escapes together, to a fixed point.
+	//
+	// Line endings are an OS artifact, not observable behavior: folding CRLF lets
+	// a snapshot recorded on POSIX match cmd.exe output on Windows, and keeps CRs
+	// out of the committed golden. Matches the equals matcher's rule.
+	//
+	// Each step can hand new work to the other, so neither can run just once and
+	// neither can run only before the other:
+	//   - a run of CRs before an LF ("\r\r\n") needs a second fold, since one
+	//     ReplaceAll leaves "\r\n" behind;
+	//   - an escape between a CR and an LF ("\r\x1b[A\n") hides the pair from the
+	//     fold, and stripping the escape splices it back together;
+	//   - removing a complete OSC sequence can splice a stray leading ESC onto the
+	//     bytes that followed it and form a fresh CSI escape, which a single
+	//     CSI-then-OSC pass leaves behind.
+	// Whatever a step leaves behind is a CR or a raw escape byte in the golden,
+	// and a Normalize that is no longer idempotent — so the golden written by
+	// --update-snapshots fails its very next comparison. Loop until the text is
+	// stable; each pass only deletes bytes, so this always terminates, and
+	// stability means every step is now a no-op.
 	for {
-		stripped := reOSC.ReplaceAllString(reCSI.ReplaceAllString(s, ""), "")
+		stripped := reOSC.ReplaceAllString(reCSI.ReplaceAllString(foldCRLF(s), ""), "")
 		if stripped == s {
 			break
 		}

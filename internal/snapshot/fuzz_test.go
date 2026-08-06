@@ -29,6 +29,9 @@ func FuzzNormalize(f *testing.F) {
 	f.Add([]byte("tok\x1b[0men"), "token")
 	f.Add([]byte("\x1b]0;title\x07body\x1b[2J"), "abcd")
 	f.Add([]byte("\r\r\n0"), "s3cr")
+	// An escape between a CR and an LF: the strip splices a CRLF that a fold
+	// running only before it never saw.
+	f.Add([]byte("\r\x1b[A\n"), "")
 	f.Fuzz(func(t *testing.T, data []byte, secret string) {
 		opt := Options{Workdir: "/tmp/atago-fz-work"}
 		m := security.NewMasker([]string{secret})
