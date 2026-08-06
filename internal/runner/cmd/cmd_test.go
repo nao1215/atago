@@ -1088,8 +1088,12 @@ func TestRun_ConcurrentCapturesNeverComeBackEmpty(t *testing.T) {
 			t.Errorf("child %d: exit code = %d, want 0", got.id, got.exit)
 		case strings.TrimSpace(got.stdout) == "":
 			t.Errorf("child %d: exited 0 with empty stdout; it printed %q", got.id, want)
-		case !strings.Contains(got.stdout, want):
-			t.Errorf("child %d: stdout = %q, want it to contain %q", got.id, got.stdout, want)
+		// Exact equality, not a substring: a capture that merged two children's
+		// output contains its own payload and would pass a Contains check while
+		// being precisely the crossed-pipe outcome this test exists to catch.
+		// TrimSpace absorbs the line ending echo appends (CRLF under cmd.exe).
+		case strings.TrimSpace(got.stdout) != want:
+			t.Errorf("child %d: stdout = %q, want exactly %q", got.id, got.stdout, want)
 		}
 	}
 }
