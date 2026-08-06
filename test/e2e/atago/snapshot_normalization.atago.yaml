@@ -97,6 +97,33 @@ scenarios:
       - assert:
           file: {path: g.txt, contains: "home=~/x"}
 
+  - name: an escape between a CR and an LF leaves no CR in the golden
+    steps:
+      # A progress line cleared before the next one — text, CR to return to
+      # column 0, erase-to-end-of-line, then the newline — is what any spinner
+      # emits on its way out. The escape sits between the CR and the LF, so a
+      # CRLF fold that runs before the escape strip never sees the
+      # pair, and stripping the escape splices it back together. The golden then
+      # carries a CR that its own source output no longer produces once the
+      # comparison folds it, and `snapshot update` immediately followed by `run`
+      # fails on output that never changed.
+      - fixture:
+          file: cr.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: cr}
+            scenarios:
+              - name: rewrites a progress line
+                steps:
+                  - run: {shell: true, command: "printf 'working\\r\\033[K\\ndone\\n'"}
+                  - assert: {stdout: {snapshot: g.txt}}
+      - run: {command: "${atago} snapshot update cr.atago.yaml"}
+      - assert: {exit_code: 0}
+      - assert:
+          file: {path: g.txt, not_contains: "\r"}
+      - run: {command: "${atago} run cr.atago.yaml"}
+      - assert: {exit_code: 0}
+
   - name: a golden verifies against a different volatile value
     steps:
       # Record with one UUID, then verify a spec that emits a DIFFERENT UUID

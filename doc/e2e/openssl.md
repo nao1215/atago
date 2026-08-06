@@ -105,8 +105,7 @@ openssl rand -hex 16
 ```
 #### Then
 - exit code is `0`
-- stdout matches `/^[0-9a-f]{32}
-?$/`
+- stdout matches `/^[0-9a-f]{32}\n?$/`
 ### Scenario: a generated private key is valid and yields its public half
 #### When
 ```shell

@@ -3,12 +3,59 @@ package docgen
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/nao1215/atago/internal/assertdesc"
 	"github.com/nao1215/atago/internal/spec"
 	"github.com/nao1215/markdown"
 )
+
+// code renders a spec-supplied string as an inline-code span, writing a value
+// the reader cannot see as a Go-quoted literal instead. A matcher may
+// legitimately assert on a control character — `not_contains: "\r"` is how a
+// spec guards a golden against a stray carriage return — and rendering that raw
+// produced a span that read as empty, and put a bare CR into the committed
+// Markdown. The console failure block already quotes such a value (`does not
+// contain "\r"`); the generated docs now say the same thing. Printable text,
+// including non-ASCII, is rendered exactly as authored.
+func code(s string) string {
+	if strings.ContainsFunc(s, unicode.IsControl) {
+		return markdown.Code(strconv.Quote(s))
+	}
+	return markdown.Code(s)
+}
+
+// codeRegex renders a regex matcher's pattern as an inline-code span. Control
+// characters are escaped so the span stays on one line — a pattern containing a
+// literal newline used to break the span across two, which is not inline code at
+// all — but the rest of the pattern is left byte-for-byte as authored.
+// strconv.Quote would double every backslash (`\.` into `\\.`) and stop the
+// published pattern from reading as the regex the spec wrote.
+func codeRegex(pattern string) string {
+	return markdown.Code("/" + escapeInvisible(pattern) + "/")
+}
+
+// escapeInvisible rewrites the runes a reader cannot see — CR, LF, tab, ESC, and
+// the other control characters — as their Go escapes, leaving every other byte
+// exactly as authored.
+func escapeInvisible(s string) string {
+	if !strings.ContainsFunc(s, unicode.IsControl) {
+		return s
+	}
+	var b strings.Builder
+	for _, r := range s {
+		if unicode.IsControl(r) {
+			// QuoteRune wraps its result in single quotes ('\r'); a control rune is
+			// never a quote itself, so trimming them yields the bare escape.
+			b.WriteString(strings.Trim(strconv.QuoteRune(r), "'"))
+			continue
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
+}
 
 // codeList renders a contains/not_contains matcher argument. A single element
 // is rendered as one inline-code span (byte-identical to the pre-list format); a
@@ -17,81 +64,81 @@ import (
 func codeList(subs spec.StringList) string {
 	parts := make([]string, len(subs))
 	for i, s := range subs {
-		parts[i] = markdown.Code(s)
+		parts[i] = code(s)
 	}
 	return strings.Join(parts, ", ")
 }
 
 var docgenJSONStyle = assertdesc.JSONStyle{
-	Prefix:  func(path string) string { return "at " + markdown.Code(path) },
-	Equals:  func(v any) string { return "equals " + markdown.Code(assertdesc.JSONValueText(v)) },
-	Matches: func(s string) string { return "matches " + markdown.Code("/"+s+"/") },
+	Prefix:  func(path string) string { return "at " + code(path) },
+	Equals:  func(v any) string { return "equals " + code(assertdesc.JSONValueText(v)) },
+	Matches: func(s string) string { return "matches " + codeRegex(s) },
 	Length:  func(n int) string { return fmt.Sprintf("has length %d", n) },
-	Compare: func(op string, v any) string { return "is " + markdown.Code(fmt.Sprintf("%s %v", op, v)) },
+	Compare: func(op string, v any) string { return "is " + code(fmt.Sprintf("%s %v", op, v)) },
 	Default: "is checked",
 }
 
 var docgenYAMLStyle = docgenJSONStyle.WithPrefix(func(path string) string {
-	return "YAML at " + markdown.Code(path)
+	return "YAML at " + code(path)
 })
 
 var docgenStreamStyle = assertdesc.StreamStyle{
 	List:      codeList,
-	Regex:     func(s string) string { return markdown.Code("/" + s + "/") },
+	Regex:     codeRegex,
 	Equals:    "equals an exact value",
 	NotEquals: "does not equal an exact value",
 	JSON:      docgenJSONStyle,
 	YAML:      docgenYAMLStyle,
-	Snapshot:  markdown.Code,
-	Line:      func(n int) string { return "line " + markdown.Code(fmt.Sprint(n)) },
+	Snapshot:  code,
+	Line:      func(n int) string { return "line " + code(fmt.Sprint(n)) },
 	NoMatcher: "is checked",
 }
 
 var docgenFileStyle = assertdesc.FileStyle{
-	Path:       markdown.Code,
+	Path:       code,
 	List:       codeList,
 	JSON:       docgenJSONStyle,
-	Snapshot:   markdown.Code,
-	Checked:    func(path string) string { return markdown.Code(path) + " is checked" },
+	Snapshot:   code,
+	Checked:    func(path string) string { return code(path) + " is checked" },
 	ExactBytes: "equals exact bytes",
 }
 
 var docgenHeaderStyle = assertdesc.HeaderStyle{
-	Name:  markdown.Code,
-	Value: markdown.Code,
-	Regex: func(s string) string { return markdown.Code("/" + s + "/") },
-	Bare:  func(s string) string { return markdown.Code(s) + " is checked" },
+	Name:  code,
+	Value: code,
+	Regex: codeRegex,
+	Bare:  func(s string) string { return code(s) + " is checked" },
 }
 
 var docgenImageStyle = assertdesc.ImageStyle{
-	Path:      markdown.Code,
-	Format:    markdown.Code,
-	SimilarTo: markdown.Code,
-	Checked:   func(path string) string { return markdown.Code(path) + " is checked" },
+	Path:      code,
+	Format:    code,
+	SimilarTo: code,
+	Checked:   func(path string) string { return code(path) + " is checked" },
 }
 
 var docgenDirStyle = assertdesc.DirStyle{
-	Path:    markdown.Code,
-	Item:    markdown.Code,
-	Token:   markdown.Code,
-	Checked: func(path string) string { return markdown.Code(path) + " is checked" },
+	Path:    code,
+	Item:    code,
+	Token:   code,
+	Checked: func(path string) string { return code(path) + " is checked" },
 }
 
 var docgenPDFStyle = assertdesc.PDFStyle{
-	Path:    markdown.Code,
-	Value:   markdown.Code,
+	Path:    code,
+	Value:   code,
 	Stream:  describeStream,
-	Checked: func(path string) string { return markdown.Code(path) + " is checked" },
+	Checked: func(path string) string { return code(path) + " is checked" },
 }
 
 var docgenChangesStyle = assertdesc.ChangesStyle{
-	Entry: markdown.Code,
+	Entry: code,
 	Join:  ", ",
 }
 
 var docgenMockStyle = assertdesc.MockStyle{
-	Name:  markdown.Code,
-	Route: markdown.Code,
+	Name:  code,
+	Route: code,
 	Count: func(n int) string { return fmt.Sprintf(" exactly %d time(s)", n) },
 }
 
@@ -115,17 +162,17 @@ func describeTarget(a *spec.Assert, target spec.AssertTarget) string {
 	switch target {
 	case spec.AssertExitCode:
 		if a.ExitCode.Not != nil {
-			return fmt.Sprintf("exit code is not %s", markdown.Code(fmt.Sprint(*a.ExitCode.Not)))
+			return fmt.Sprintf("exit code is not %s", code(fmt.Sprint(*a.ExitCode.Not)))
 		}
 		if len(a.ExitCode.In) > 0 {
 			codes := make([]string, len(a.ExitCode.In))
 			for i, n := range a.ExitCode.In {
-				codes[i] = markdown.Code(fmt.Sprint(n))
+				codes[i] = code(fmt.Sprint(n))
 			}
 			return "exit code is one of " + strings.Join(codes, ", ")
 		}
 		if a.ExitCode.Equals != nil {
-			return fmt.Sprintf("exit code is %s", markdown.Code(fmt.Sprint(*a.ExitCode.Equals)))
+			return fmt.Sprintf("exit code is %s", code(fmt.Sprint(*a.ExitCode.Equals)))
 		}
 		return "exit code is checked"
 	case spec.AssertMock:
@@ -150,7 +197,7 @@ func describeTarget(a *spec.Assert, target spec.AssertTarget) string {
 		return "pdf " + describePDF(a.PDF)
 	case spec.AssertStatus:
 		if a.Status != nil {
-			return "HTTP status is " + markdown.Code(fmt.Sprint(*a.Status))
+			return "HTTP status is " + code(fmt.Sprint(*a.Status))
 		}
 		return "HTTP status is checked"
 	case spec.AssertHeader:
@@ -164,7 +211,7 @@ func describeTarget(a *spec.Assert, target spec.AssertTarget) string {
 		return "rows " + describeStream(a.Rows)
 	case spec.AssertGRPCStatus:
 		if a.GRPCStatus != nil {
-			return "gRPC status is " + markdown.Code(fmt.Sprint(*a.GRPCStatus))
+			return "gRPC status is " + code(fmt.Sprint(*a.GRPCStatus))
 		}
 		return "gRPC status is checked"
 	case spec.AssertMessage:

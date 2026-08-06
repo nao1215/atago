@@ -2526,7 +2526,7 @@ iso8583tool view a.hex --no-color
 #### Then
 - after `iso8583tool view a.hex --no-color`:
   - exit code is `0`
-  - stdout does not contain ``
+  - stdout does not contain `"\x1b"`
   - stdout contains `^[`
 ### Scenario: validate escapes control bytes
 #### Given
@@ -2544,7 +2544,7 @@ iso8583tool validate a.hex --no-color
 #### Then
 - after `iso8583tool validate a.hex --no-color`:
   - exit code is `0`
-  - stdout does not contain ``
+  - stdout does not contain `"\x1b"`
 ### Scenario: diff escapes control bytes
 #### Given
 - Fixture file `bin41.json` is created.
@@ -2562,7 +2562,7 @@ iso8583tool diff a.hex b.hex --no-color
 #### Then
 - after `iso8583tool diff a.hex b.hex --no-color`:
   - exit code is `0`
-  - stdout does not contain ``
+  - stdout does not contain `"\x1b"`
   - stdout contains `^[`
 ### Scenario: redact text escapes control bytes
 #### Given
@@ -2580,7 +2580,7 @@ iso8583tool redact a.hex --format text --no-color
 #### Then
 - after `iso8583tool redact a.hex --format text --no-color`:
   - exit code is `0`
-  - stdout does not contain ``
+  - stdout does not contain `"\x1b"`
   - stdout contains `^[`
 ## iso8583tool send
 Source: `test/e2e/tools/iso8583tool/send.atago.yaml`

@@ -1026,3 +1026,74 @@ func TestRun_OwnedPipesDoNotLeak(t *testing.T) {
 		t.Errorf("goroutines grew from %d to %d over 60 runs; a drain goroutine is leaking", before, after)
 	}
 }
+
+// TestRun_ConcurrentCapturesNeverComeBackEmpty is the standing guard #339 asks
+// for: "a run step whose child writes to stdout and exits 0 must never report
+// empty output".
+//
+// #339 is a Windows-only anomaly where a nested `atago run` exited 0 while its
+// stdout came back empty — output the child certainly produced. It reproduced
+// once in fourteen runs of a parallel batch and has never been reproduced on
+// demand, so this does not claim to fix it. What it does is run the exact
+// invariant under the condition the flake appeared in: many captured children at
+// once, each printing a payload only it could have printed.
+//
+// The payload is per-child, so this catches more than an empty capture. Two
+// concurrent runs whose pipes got crossed would each come back with the other's
+// text and both would be non-empty, which a "not empty" check alone would pass.
+//
+// It is deliberately not Windows-guarded. The unit-test matrix runs
+// windows-latest on every push — far more Windows executions than the E2E leg
+// where the flake was seen — and on POSIX it costs a few hundred milliseconds
+// while pinning the same contract.
+func TestRun_ConcurrentCapturesNeverComeBackEmpty(t *testing.T) {
+	t.Parallel()
+	const workers = 24
+	type outcome struct {
+		id     int
+		stdout string
+		exit   int
+		err    error
+	}
+	results := make(chan outcome, workers)
+	for i := range workers {
+		go func() {
+			// A payload no other child in this test prints, so a capture that came
+			// from the wrong pipe is as visible as one that came back empty.
+			want := fmt.Sprintf("atago-capture-%d", i)
+			res, err := New().Run(
+				context.Background(),
+				&spec.Run{Command: argvCommand("echo "+want, "cmd /c echo "+want)},
+				t.TempDir(),
+			)
+			out := outcome{id: i, err: err}
+			if err == nil {
+				out.stdout = string(res.Stdout)
+				out.exit = res.ExitCode
+			}
+			results <- out
+		}()
+	}
+	for range workers {
+		got := <-results
+		want := fmt.Sprintf("atago-capture-%d", got.id)
+		switch {
+		case got.err != nil:
+			// A capture failure is a legitimate outcome (it is what #344 added), and
+			// it is NOT this failure: it says so instead of presenting an empty
+			// string as the observed value. Report it, since `echo` has no reason to
+			// produce one.
+			t.Errorf("child %d: Run() error = %v", got.id, got.err)
+		case got.exit != 0:
+			t.Errorf("child %d: exit code = %d, want 0", got.id, got.exit)
+		case strings.TrimSpace(got.stdout) == "":
+			t.Errorf("child %d: exited 0 with empty stdout; it printed %q", got.id, want)
+		// Exact equality, not a substring: a capture that merged two children's
+		// output contains its own payload and would pass a Contains check while
+		// being precisely the crossed-pipe outcome this test exists to catch.
+		// TrimSpace absorbs the line ending echo appends (CRLF under cmd.exe).
+		case strings.TrimSpace(got.stdout) != want:
+			t.Errorf("child %d: stdout = %q, want exactly %q", got.id, got.stdout, want)
+		}
+	}
+}

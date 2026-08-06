@@ -2466,7 +2466,7 @@ sqly user.csv
 #### Then
 - exit code is `0`
 - stderr contains `mode=tsv`
-- file `out.tsv` contains `user_name	identifier`
+- file `out.tsv` contains `"user_name\tidentifier"`
 - file `out.tsv` does not contain `user_name,identifier`
 ## sqly hermetic environment
 Source: `test/e2e/tools/sqly/hermetic.atago.yaml`
