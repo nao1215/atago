@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-74 suites · 447 scenarios
+74 suites · 448 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -431,12 +431,13 @@
   - [a snapshot assertion passes against a committed snapshot](#scenario-a-snapshot-assertion-passes-against-a-committed-snapshot)
   - [snapshot update creates the snapshot file](#scenario-snapshot-update-creates-the-snapshot-file)
   - [a snapshot mismatch writes the normalized actual as an artifact](#scenario-a-snapshot-mismatch-writes-the-normalized-actual-as-an-artifact)
-- [atago self-hosting / snapshot normalization and round-trip](#atago-self-hosting--snapshot-normalization-and-round-trip) — 9 scenarios
+- [atago self-hosting / snapshot normalization and round-trip](#atago-self-hosting--snapshot-normalization-and-round-trip) — 10 scenarios
   - [record then run round-trips green](#scenario-record-then-run-round-trips-green-1)
   - [a UUID is masked in the golden](#scenario-a-uuid-is-masked-in-the-golden)
   - [an ISO timestamp is masked in the golden](#scenario-an-iso-timestamp-is-masked-in-the-golden)
   - [a loopback host and port are masked in the golden](#scenario-a-loopback-host-and-port-are-masked-in-the-golden)
   - [the home directory is masked to a tilde in the golden](#scenario-the-home-directory-is-masked-to-a-tilde-in-the-golden)
+  - [an escape between a CR and an LF leaves no CR in the golden](#scenario-an-escape-between-a-cr-and-an-lf-leaves-no-cr-in-the-golden)
   - [a golden verifies against a different volatile value](#scenario-a-golden-verifies-against-a-different-volatile-value)
   - [updating a snapshot is deterministic](#scenario-updating-a-snapshot-is-deterministic)
   - [a real content change still fails the snapshot](#scenario-a-real-content-change-still-fails-the-snapshot)
@@ -4660,25 +4661,21 @@ printf 'only\r\n'
 printf 'alpha\r\nbeta\r\ngamma\r\n'
 ```
 #### Then
-- stdout contains `alpha
-beta`
+- stdout contains `"alpha\nbeta"`
 ### Scenario: contains authored with CRLF matches LF-folded output
 #### When
 ```shell
 printf 'alpha\r\nbeta\r\n'
 ```
 #### Then
-- stdout contains `alpha
-beta`
+- stdout contains `"alpha\r\nbeta"`
 ### Scenario: contains list every multi-line element folds
 #### When
 ```shell
 printf 'a\r\nb\r\nc\r\nd\r\n'
 ```
 #### Then
-- stdout contains `a
-b`, `c
-d`
+- stdout contains `"a\nb"`, `"c\nd"`
 ### Scenario: matches anchors a line over CRLF with the multiline flag
 #### When
 ```shell
@@ -4692,16 +4689,14 @@ printf 'hello\r\nworld\r\n'
 printf 'up\r\ndown\r\n'
 ```
 #### Then
-- stdout matches `/up
-down/`
+- stdout matches `/up\ndown/`
 ### Scenario: not_contains stays clear of an absent multi-line needle
 #### When
 ```shell
 printf 'red\r\ngreen\r\n'
 ```
 #### Then
-- stdout does not contain `red
-blue`
+- stdout does not contain `"red\nblue"`
 ### Scenario: not_matches passes for an anchored line that is absent
 #### When
 ```shell
@@ -6822,8 +6817,7 @@ ${atago} run silent.atago.yaml
 ```
 #### Then
 - exit code is `1`
-- stdout matches `/Actual:
-  \(empty\)/`
+- stdout matches `/Actual:\n  \(empty\)/`
 ### Scenario: an exit_code failure states that the command printed nothing
 #### Given
 - Fixture file `quiet.atago.yaml` is created.
@@ -6844,8 +6838,7 @@ ${atago} run quiet.atago.yaml
 ```
 #### Then
 - exit code is `1`
-- stdout matches `/Stdout/Stderr:
-  \(empty\)/`
+- stdout matches `/Stdout/Stderr:\n  \(empty\)/`
 ### Scenario: a stdout failure points at stderr when the text is there
 #### Given
 - Fixture file `wrongstream.atago.yaml` is created.
@@ -8127,6 +8120,31 @@ ${atago} snapshot update home.atago.yaml
 ```
 #### Then
 - file `g.txt` contains `home=~/x`
+### Scenario: an escape between a CR and an LF leaves no CR in the golden
+#### Given
+- Fixture file `cr.atago.yaml` is created.
+#### Inputs
+_Fixture `cr.atago.yaml`:_
+```text
+version: "1"
+suite: {name: cr}
+scenarios:
+  - name: rewrites a progress line
+    steps:
+      - run: {shell: true, command: "printf 'working\\r\\033[K\\ndone\\n'"}
+      - assert: {stdout: {snapshot: g.txt}}
+```
+#### When
+```shell
+${atago} snapshot update cr.atago.yaml
+${atago} run cr.atago.yaml
+```
+#### Then
+- after `${atago} snapshot update cr.atago.yaml`:
+  - exit code is `0`
+  - file `g.txt` does not contain `"\r"`
+- after `${atago} run cr.atago.yaml`:
+  - exit code is `0`
 ### Scenario: a golden verifies against a different volatile value
 #### Given
 - Fixture file `rec.atago.yaml` is created.
@@ -8717,7 +8735,7 @@ printf 'ab\n'
 printf 'name\tvalue\n'
 ```
 #### Then
-- stdout contains `name	value`
+- stdout contains `"name\tvalue"`
 ### Scenario: quotes and brackets survive an exact equals
 #### When
 ```shell

@@ -2597,8 +2597,7 @@ a
 readlink dst/a.txt
 ```
 #### Then
-- stdout matches `/^.+/src/a\.txt
-?$/`
+- stdout matches `/^.+/src/a\.txt\n?$/`
 ### Scenario: yank then underscore creates a relative symlink in the sibling directory
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -2636,8 +2635,7 @@ a
 readlink dst/sub
 ```
 #### Then
-- stdout matches `/^.+/src/sub
-?$/`
+- stdout matches `/^.+/src/sub\n?$/`
 ### Scenario: yanked directory can be relative-symlinked into a sibling directory
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -3140,8 +3138,7 @@ spaced
 readlink "dst/two words.txt"
 ```
 #### Then
-- stdout matches `/^.+/src/two words\.txt
-?$/`
+- stdout matches `/^.+/src/two words\.txt\n?$/`
 ### Scenario: underscore symlinks a spaced filename with a relative target
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -3179,8 +3176,7 @@ spaced
 readlink "dst/two words"
 ```
 #### Then
-- stdout matches `/^.+/src/two words
-?$/`
+- stdout matches `/^.+/src/two words\n?$/`
 ### Scenario: underscore symlinks a spaced directory with a relative target
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given

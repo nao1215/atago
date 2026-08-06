@@ -7444,7 +7444,7 @@ ls --color=never ${workdir}/ls_gnu
 #### Then
 - after `ls --color=never ${workdir}/ls_gnu`:
   - exit code is `0`
-  - stdout does not contain ``
+  - stdout does not contain `"\x1b"`
 ### Scenario: appends / * @ with -F
 #### When
 ```shell
