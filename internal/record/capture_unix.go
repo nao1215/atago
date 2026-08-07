@@ -18,11 +18,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/creack/pty"
 	"golang.org/x/sys/unix"
 	"golang.org/x/term"
 
 	runnercmd "github.com/nao1215/atago/internal/runner/cmd"
+	"github.com/nao1215/atago/internal/runner/ptyrun"
 )
 
 // captureDrainGrace bounds how long capture waits for the pty's final output to
@@ -55,15 +55,11 @@ func CapturePTY(command string, shell bool, in, out *os.File, timeout time.Durat
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true, Setctty: true}
 
 	rows, cols := terminalSize(out)
-	master, tty, err := pty.Open()
+	master, tty, err := ptyrun.OpenTerminal(uint16(rows), uint16(cols)) //nolint:gosec // geometry is bounded by terminalSize
 	if err != nil {
 		return PTYRecording{}, fmt.Errorf("record --pty: start %q: %w", command, err)
 	}
 	defer func() { _ = tty.Close() }()
-	if err := pty.Setsize(master, &pty.Winsize{Rows: uint16(rows), Cols: uint16(cols)}); err != nil { //nolint:gosec // geometry is bounded by terminalSize
-		_ = master.Close()
-		return PTYRecording{}, fmt.Errorf("record --pty: start %q: %w", command, err)
-	}
 	cmd.Stdin = tty
 	cmd.Stdout = tty
 	cmd.Stderr = tty
@@ -102,8 +98,12 @@ func CapturePTY(command string, shell bool, in, out *os.File, timeout time.Durat
 	runtime.Gosched()
 
 	if err := cmd.Start(); err != nil {
+		// Drop atago's own slave handle before waiting: while the recorder still
+		// holds the terminal open the master read has no reason to end, and the
+		// wait below would hang instead of reporting that the child never started.
+		_ = tty.Close()
 		_ = master.Close()
-		<-outDone
+		waitDrained(outDone)
 		return PTYRecording{}, fmt.Errorf("record --pty: start %q: %w", command, err)
 	}
 	_ = tty.Close()
@@ -156,7 +156,7 @@ func CapturePTY(command string, shell bool, in, out *os.File, timeout time.Durat
 	case <-time.After(captureDrainGrace):
 	}
 	_ = master.Close()
-	<-outDone
+	waitDrained(outDone)
 
 	mu.Lock()
 	rec.ExitCode = code

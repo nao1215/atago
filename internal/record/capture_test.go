@@ -47,6 +47,45 @@ func TestCapturePTY_RecordsOutputAndExit(t *testing.T) {
 	}
 }
 
+// TestCapturePTY_StartFailureDoesNotHang is a regression test for a recorder
+// hang: `atago record --pty -- <not-a-command>` printed its banner and then
+// waited forever. The child never started, so nothing ever wrote to the
+// terminal, and the recorder waited on an output reader whose read could not
+// end while the recorder itself still held the terminal's slave open — closing
+// the master does not interrupt a read already parked in the kernel.
+func TestCapturePTY_StartFailureDoesNotHang(t *testing.T) {
+	inR, inW, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("input pipe: %v", err)
+	}
+	defer func() { _ = inR.Close(); _ = inW.Close() }()
+	outR, outW, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("output pipe: %v", err)
+	}
+	defer func() { _ = outR.Close(); _ = outW.Close() }()
+	go func() { _, _ = io.Copy(io.Discard, outR) }()
+
+	const missing = "atago-no-such-binary-2a5f1c"
+	errCh := make(chan error, 1)
+	go func() {
+		_, cerr := CapturePTY(missing, false, inR, outW, 30*time.Second)
+		errCh <- cerr
+	}()
+
+	select {
+	case cerr := <-errCh:
+		if cerr == nil {
+			t.Fatal("CapturePTY() error = nil, want the start failure")
+		}
+		if !strings.Contains(cerr.Error(), missing) {
+			t.Errorf("CapturePTY() error = %v, want it to name the command %q", cerr, missing)
+		}
+	case <-time.After(60 * time.Second):
+		t.Fatal("CapturePTY() hung after the child failed to start")
+	}
+}
+
 // TestCapturePTY_NoShellFastExitOutputNotLost covers the same fast-exit path as
 // the macOS CrossPlatformE2E flake, but in the recorder: a no-shell `echo`
 // binary that exits immediately must still leave its output in the recording.
