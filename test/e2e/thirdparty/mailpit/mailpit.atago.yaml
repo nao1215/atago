@@ -43,8 +43,13 @@ runners:
 scenarios:
   - name: the binary reports its version
     steps:
+      # --no-release-check keeps the suite inside the network permission it
+      # declares: plain `mailpit version` asks GitHub for the latest release and
+      # exits 1 when that call fails, so an unauthenticated rate limit (HTTP 403
+      # on a shared CI runner) would fail this scenario for a reason that has
+      # nothing to do with mailpit.
       - run:
-          command: mailpit version
+          command: mailpit version --no-release-check
       - assert:
           exit_code: 0
           stdout:
