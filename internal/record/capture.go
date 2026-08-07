@@ -31,6 +31,21 @@ func resolveCaptureTimeout(d time.Duration) time.Duration {
 	return d
 }
 
+// captureCloseGrace bounds the join with the output reader after the terminal
+// is closed. Closing it is what ends the reader's pending read, so this is a
+// backstop rather than the normal path: a reader that stays blocked anyway must
+// not leave the developer staring at a recorder that never returns.
+const captureCloseGrace = 10 * time.Second
+
+// waitDrained waits for the output reader to finish, but never past
+// captureCloseGrace.
+func waitDrained(done <-chan struct{}) {
+	select {
+	case <-done:
+	case <-time.After(captureCloseGrace):
+	}
+}
+
 // terminalSize returns the invoking terminal's rows/cols, or the pty default
 // (24x80) when out is not a terminal. golang.org/x/term.GetSize reads a POSIX
 // terminal and a Windows console alike, so one helper serves both the POSIX and

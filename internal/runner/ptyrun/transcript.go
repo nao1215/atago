@@ -124,6 +124,12 @@ func (t *transcriptDrain) readError() error {
 	return t.readErr
 }
 
+// closeGrace bounds the join after the terminal is closed. Closing it is what
+// ends the pending read, so this is a backstop rather than the normal path: a
+// reader that stays blocked anyway must not wedge the whole run — a pty drain
+// blocked past a close is how two packages once died on the 5m test timeout.
+const closeGrace = 10 * time.Second
+
 func (t *transcriptDrain) waitDrain(closeTerm func(), grace time.Duration) {
 	if grace > 0 {
 		select {
@@ -132,5 +138,8 @@ func (t *transcriptDrain) waitDrain(closeTerm func(), grace time.Duration) {
 		}
 	}
 	closeTerm()
-	<-t.readDone
+	select {
+	case <-t.readDone:
+	case <-time.After(closeGrace):
+	}
 }

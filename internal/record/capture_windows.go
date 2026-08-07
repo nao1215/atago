@@ -134,7 +134,7 @@ func CapturePTY(command string, shell bool, in, out *os.File, timeout time.Durat
 	case <-time.After(captureDrainGrace):
 	}
 	_ = cpty.Close()
-	<-outDone
+	waitDrained(outDone)
 
 	mu.Lock()
 	rec.ExitCode = code

@@ -6,9 +6,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"runtime"
 	"syscall"
+	"time"
 
 	"github.com/creack/pty"
 
@@ -51,15 +53,11 @@ func Run(ctx context.Context, p *spec.PTY, workdir string, env []string) (*runne
 	if p.Cols > 0 && p.Cols < 1<<16 {
 		cols = uint16(p.Cols)
 	}
-	master, tty, err := pty.Open()
+	master, tty, err := OpenTerminal(rows, cols)
 	if err != nil {
 		return nil, nil, fmt.Errorf("pty: start %q: %w", p.Command, err)
 	}
 	defer func() { _ = tty.Close() }()
-	if err := pty.Setsize(master, &pty.Winsize{Rows: rows, Cols: cols}); err != nil {
-		_ = master.Close()
-		return nil, nil, fmt.Errorf("pty: start %q: %w", p.Command, err)
-	}
 	cmd.Stdin = tty
 	cmd.Stdout = tty
 	cmd.Stderr = tty
@@ -71,8 +69,11 @@ func Run(ctx context.Context, p *spec.PTY, workdir string, env []string) (*runne
 	// goroutine launches a child that may write and exit immediately.
 	runtime.Gosched()
 	if err := cmd.Start(); err != nil {
-		_ = master.Close()
-		term.waitDrain(func() {}, 0)
+		// Drop atago's own slave handle first: while the parent still holds the
+		// terminal open the master read has no reason to end, and waiting for the
+		// drain would hang instead of surfacing the start failure.
+		_ = tty.Close()
+		term.waitDrain(func() { _ = master.Close() }, 0)
 		return nil, nil, fmt.Errorf("pty: start %q: %w", p.Command, err)
 	}
 	_ = tty.Close()
@@ -93,6 +94,75 @@ func Run(ctx context.Context, p *spec.PTY, workdir string, env []string) (*runne
 		dir:       cmd.Dir,
 	}
 	return driveSession(ctx, p, proc)
+}
+
+// OpenTerminal opens a pseudo-terminal pair sized rows×cols and hands back a
+// master whose reads the runtime poller owns, so that closing it interrupts a
+// read already in flight — where the platform lets the poller own it at all.
+// Every POSIX pty atago opens — the pty runner here and the interactive
+// recorder — goes through it, because getting this wrong hangs the process
+// rather than failing it.
+//
+// That last part is the whole reason this helper exists. creack/pty runs its
+// ioctls through (*os.File).Fd(), which is documented to return a blocking
+// descriptor: os.File hands the descriptor over to the caller and takes it back
+// out of the poller. Reads then park inside read(2), where Close cannot reach
+// them — Go can only mark the file closed and defer the real close(2) until the
+// read returns on its own. A master read ends on its own when the last slave
+// handle goes away, so any surviving handle (a descendant that escaped the
+// process-group kill) left the drain blocked forever. Restoring O_NONBLOCK puts
+// reads back under the poller, where Close unblocks them with fs.ErrClosed —
+// which isSessionEnd already reads as a normal end of session.
+func OpenTerminal(rows, cols uint16) (master, tty *os.File, err error) {
+	master, tty, err = pty.Open()
+	if err != nil {
+		return nil, nil, err
+	}
+	closeBoth := func() {
+		_ = tty.Close()
+		_ = master.Close()
+	}
+	if err := pty.Setsize(master, &pty.Winsize{Rows: rows, Cols: cols}); err != nil {
+		closeBoth()
+		return nil, nil, err
+	}
+	if err := adoptMasterReads(master); err != nil {
+		closeBoth()
+		return nil, nil, err
+	}
+	return master, tty, nil
+}
+
+// adoptMasterReads puts the master's reads back under the runtime poller when
+// the poller is in a position to take them, and leaves them blocking when it is
+// not.
+//
+// That condition is not cosmetic. A non-blocking descriptor the poller does not
+// own surfaces EAGAIN straight to the caller, so every read fails instead of
+// waiting and the drain dies on the first one. Which regime a pty master lands
+// in is creack/pty's choice of constructor: on Linux it opens the master with
+// os.OpenFile, which registers the descriptor with the poller, and on macOS it
+// wraps a raw descriptor with os.NewFile, which does not. SetReadDeadline
+// reports that ownership directly — a descriptor the poller does not hold
+// answers os.ErrNoDeadline — so ask it instead of guessing from the platform.
+//
+// Where the answer is no, closing the master cannot interrupt a read already in
+// flight, and waitDrain's bounded join is what keeps that from wedging the run.
+func adoptMasterReads(master *os.File) error {
+	// The zero time means "no deadline": this sets nothing and clears nothing,
+	// it only asks the question.
+	if err := master.SetReadDeadline(time.Time{}); err != nil {
+		return nil //nolint:nilerr // a master the poller does not own is a platform fact, not a failure to open a terminal
+	}
+	sc, err := master.SyscallConn()
+	if err != nil {
+		return err
+	}
+	var setErr error
+	if ctlErr := sc.Control(func(fd uintptr) { setErr = syscall.SetNonblock(int(fd), true) }); ctlErr != nil {
+		return ctlErr
+	}
+	return setErr
 }
 
 // waitExitCode maps a cmd.Wait() error to the observed exit code, mirroring the

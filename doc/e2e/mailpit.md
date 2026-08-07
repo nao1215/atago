@@ -24,7 +24,7 @@ Source: `test/e2e/thirdparty/mailpit/mailpit.atago.yaml`
 ### Scenario: the binary reports its version
 #### When
 ```shell
-mailpit version
+mailpit version --no-release-check
 ```
 #### Then
 - exit code is `0`
