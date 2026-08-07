@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"runtime"
 	"syscall"
@@ -51,15 +52,11 @@ func Run(ctx context.Context, p *spec.PTY, workdir string, env []string) (*runne
 	if p.Cols > 0 && p.Cols < 1<<16 {
 		cols = uint16(p.Cols)
 	}
-	master, tty, err := pty.Open()
+	master, tty, err := OpenTerminal(rows, cols)
 	if err != nil {
 		return nil, nil, fmt.Errorf("pty: start %q: %w", p.Command, err)
 	}
 	defer func() { _ = tty.Close() }()
-	if err := pty.Setsize(master, &pty.Winsize{Rows: rows, Cols: cols}); err != nil {
-		_ = master.Close()
-		return nil, nil, fmt.Errorf("pty: start %q: %w", p.Command, err)
-	}
 	cmd.Stdin = tty
 	cmd.Stdout = tty
 	cmd.Stderr = tty
@@ -71,8 +68,11 @@ func Run(ctx context.Context, p *spec.PTY, workdir string, env []string) (*runne
 	// goroutine launches a child that may write and exit immediately.
 	runtime.Gosched()
 	if err := cmd.Start(); err != nil {
-		_ = master.Close()
-		term.waitDrain(func() {}, 0)
+		// Drop atago's own slave handle first: while the parent still holds the
+		// terminal open the master read has no reason to end, and waiting for the
+		// drain would hang instead of surfacing the start failure.
+		_ = tty.Close()
+		term.waitDrain(func() { _ = master.Close() }, 0)
 		return nil, nil, fmt.Errorf("pty: start %q: %w", p.Command, err)
 	}
 	_ = tty.Close()
@@ -93,6 +93,52 @@ func Run(ctx context.Context, p *spec.PTY, workdir string, env []string) (*runne
 		dir:       cmd.Dir,
 	}
 	return driveSession(ctx, p, proc)
+}
+
+// OpenTerminal opens a pseudo-terminal pair sized rows×cols and hands back a
+// master whose reads the runtime poller owns, so that closing it interrupts a
+// read already in flight. Every POSIX pty atago opens — the pty runner here and
+// the interactive recorder — goes through it, because getting this wrong hangs
+// the process rather than failing it.
+//
+// That last part is the whole reason this helper exists. creack/pty runs its
+// ioctls through (*os.File).Fd(), which is documented to return a blocking
+// descriptor: os.File hands the descriptor over to the caller and takes it back
+// out of the poller. Reads then park inside read(2), where Close cannot reach
+// them — Go can only mark the file closed and defer the real close(2) until the
+// read returns on its own. A master read ends on its own when the last slave
+// handle goes away, so any surviving handle (a descendant that escaped the
+// process-group kill) left the drain blocked forever. Restoring O_NONBLOCK puts
+// reads back under the poller, where Close unblocks them with fs.ErrClosed —
+// which isSessionEnd already reads as a normal end of session.
+func OpenTerminal(rows, cols uint16) (master, tty *os.File, err error) {
+	master, tty, err = pty.Open()
+	if err != nil {
+		return nil, nil, err
+	}
+	closeBoth := func() {
+		_ = tty.Close()
+		_ = master.Close()
+	}
+	if err := pty.Setsize(master, &pty.Winsize{Rows: rows, Cols: cols}); err != nil {
+		closeBoth()
+		return nil, nil, err
+	}
+	sc, err := master.SyscallConn()
+	if err != nil {
+		closeBoth()
+		return nil, nil, err
+	}
+	var setErr error
+	if ctlErr := sc.Control(func(fd uintptr) { setErr = syscall.SetNonblock(int(fd), true) }); ctlErr != nil {
+		closeBoth()
+		return nil, nil, ctlErr
+	}
+	if setErr != nil {
+		closeBoth()
+		return nil, nil, setErr
+	}
+	return master, tty, nil
 }
 
 // waitExitCode maps a cmd.Wait() error to the observed exit code, mirroring the

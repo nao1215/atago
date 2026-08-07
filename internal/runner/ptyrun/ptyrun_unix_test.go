@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	runnercmd "github.com/nao1215/atago/internal/runner/cmd"
 	"github.com/nao1215/atago/internal/spec"
@@ -65,6 +66,89 @@ func TestRun_NoShellFastExitOutputNotLost(t *testing.T) {
 		if !strings.Contains(string(res.Stdout), "done") {
 			t.Fatalf("iteration %d: transcript lost the child's output: %q", i, res.Stdout)
 		}
+	}
+}
+
+// TestWaitDrain_ClosingTheMasterEndsTheDrain is a regression test for a CI
+// hang: closing the pty master must interrupt the reader even when something
+// else still holds the terminal open.
+//
+// creack/pty performs its ioctls through (*os.File).Fd(), which hands back a
+// blocking descriptor, and a read(2) already parked in the kernel is immune to
+// Close — the descriptor is only really closed once that read returns. So while
+// any slave handle survived (a descendant that escaped the process-group kill,
+// or atago's own tty in the start-failure path) waitDrain blocked forever, and
+// internal/engine and internal/runner/ptyrun both died on the 5m test timeout.
+func TestWaitDrain_ClosingTheMasterEndsTheDrain(t *testing.T) {
+	t.Parallel()
+
+	master, tty, err := OpenTerminal(24, 80)
+	if err != nil {
+		t.Fatalf("OpenTerminal: %v", err)
+	}
+	// Deliberately keep the slave open: this is what makes the master read
+	// block instead of ending with EIO.
+	defer func() { _ = tty.Close() }()
+
+	term := startTranscriptDrain(master, &spec.PTY{})
+	// Park the reader inside read(2) first: a drain closed before its first read
+	// ends on the closed descriptor and would prove nothing. Seeing the written
+	// bytes land in the transcript means the goroutine consumed them and went
+	// back for more.
+	if _, werr := tty.Write([]byte("parked\n")); werr != nil {
+		t.Fatalf("write to the terminal: %v", werr)
+	}
+	deadline := time.Now().Add(10 * time.Second)
+	for term.curLen() == 0 {
+		if time.Now().After(deadline) {
+			t.Fatal("the drain never read the bytes written to the terminal")
+		}
+		time.Sleep(time.Millisecond)
+	}
+	time.Sleep(50 * time.Millisecond)
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		term.waitDrain(func() { _ = master.Close() }, 0)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(30 * time.Second):
+		t.Fatal("waitDrain never returned after the master was closed while the terminal stayed open")
+	}
+	// Closing the terminal is how atago ends the session, so the drain must not
+	// report it as a lost transcript.
+	if rerr := term.readError(); rerr != nil {
+		t.Errorf("readError() = %v, want nil: atago's own close is a session end, not a read failure", rerr)
+	}
+}
+
+// TestRun_StartFailureDoesNotHang covers the other half of the same hang: when
+// the child cannot be started at all, Run must surface that error instead of
+// waiting on a drain whose read can never end — atago still held the slave.
+func TestRun_StartFailureDoesNotHang(t *testing.T) {
+	t.Parallel()
+
+	p := &spec.PTY{Command: "atago-no-such-binary-2a5f1c"}
+	type outcome struct{ err error }
+	ch := make(chan outcome, 1)
+	go func() {
+		_, _, err := Run(context.Background(), p, t.TempDir(), nil)
+		ch <- outcome{err}
+	}()
+
+	select {
+	case got := <-ch:
+		if got.err == nil {
+			t.Fatal("Run() error = nil, want the start failure")
+		}
+		if !strings.Contains(got.err.Error(), p.Command) {
+			t.Errorf("Run() error = %v, want it to name the command %q", got.err, p.Command)
+		}
+	case <-time.After(30 * time.Second):
+		t.Fatal("Run() hung after the child failed to start")
 	}
 }
 
