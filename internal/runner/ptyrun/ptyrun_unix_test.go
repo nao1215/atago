@@ -70,8 +70,8 @@ func TestRun_NoShellFastExitOutputNotLost(t *testing.T) {
 }
 
 // TestWaitDrain_ClosingTheMasterEndsTheDrain is a regression test for a CI
-// hang: closing the pty master must interrupt the reader even when something
-// else still holds the terminal open.
+// hang: waitDrain must return even when something else still holds the terminal
+// open, so that a stuck reader fails a run instead of wedging it.
 //
 // creack/pty performs its ioctls through (*os.File).Fd(), which hands back a
 // blocking descriptor, and a read(2) already parked in the kernel is immune to
@@ -79,6 +79,10 @@ func TestRun_NoShellFastExitOutputNotLost(t *testing.T) {
 // any slave handle survived (a descendant that escaped the process-group kill,
 // or atago's own tty in the start-failure path) waitDrain blocked forever, and
 // internal/engine and internal/runner/ptyrun both died on the 5m test timeout.
+//
+// Where the poller owns the master, closing it ends the read outright, and the
+// test holds that to the stronger standard: it must not take the backstop to
+// get there.
 func TestWaitDrain_ClosingTheMasterEndsTheDrain(t *testing.T) {
 	t.Parallel()
 
@@ -86,6 +90,9 @@ func TestWaitDrain_ClosingTheMasterEndsTheDrain(t *testing.T) {
 	if err != nil {
 		t.Fatalf("OpenTerminal: %v", err)
 	}
+	// The same question OpenTerminal asks: does closing the master interrupt a
+	// read in flight, or does only the backstop end the wait?
+	pollerOwned := master.SetReadDeadline(time.Time{}) == nil
 	// Deliberately keep the slave open: this is what makes the master read
 	// block instead of ending with EIO.
 	defer func() { _ = tty.Close() }()
@@ -108,6 +115,7 @@ func TestWaitDrain_ClosingTheMasterEndsTheDrain(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 
 	done := make(chan struct{})
+	started := time.Now()
 	go func() {
 		defer close(done)
 		term.waitDrain(func() { _ = master.Close() }, 0)
@@ -115,8 +123,11 @@ func TestWaitDrain_ClosingTheMasterEndsTheDrain(t *testing.T) {
 
 	select {
 	case <-done:
-	case <-time.After(30 * time.Second):
+	case <-time.After(closeGrace + 30*time.Second):
 		t.Fatal("waitDrain never returned after the master was closed while the terminal stayed open")
+	}
+	if elapsed := time.Since(started); pollerOwned && elapsed >= closeGrace {
+		t.Errorf("waitDrain took %s: closing a poller-owned master must end the read outright, not wait out the %s backstop", elapsed, closeGrace)
 	}
 	// Closing the terminal is how atago ends the session, so the drain must not
 	// report it as a lost transcript.

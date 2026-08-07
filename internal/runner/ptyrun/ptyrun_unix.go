@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"runtime"
 	"syscall"
+	"time"
 
 	"github.com/creack/pty"
 
@@ -97,9 +98,10 @@ func Run(ctx context.Context, p *spec.PTY, workdir string, env []string) (*runne
 
 // OpenTerminal opens a pseudo-terminal pair sized rows×cols and hands back a
 // master whose reads the runtime poller owns, so that closing it interrupts a
-// read already in flight. Every POSIX pty atago opens — the pty runner here and
-// the interactive recorder — goes through it, because getting this wrong hangs
-// the process rather than failing it.
+// read already in flight — where the platform lets the poller own it at all.
+// Every POSIX pty atago opens — the pty runner here and the interactive
+// recorder — goes through it, because getting this wrong hangs the process
+// rather than failing it.
 //
 // That last part is the whole reason this helper exists. creack/pty runs its
 // ioctls through (*os.File).Fd(), which is documented to return a blocking
@@ -124,21 +126,43 @@ func OpenTerminal(rows, cols uint16) (master, tty *os.File, err error) {
 		closeBoth()
 		return nil, nil, err
 	}
-	sc, err := master.SyscallConn()
-	if err != nil {
+	if err := adoptMasterReads(master); err != nil {
 		closeBoth()
 		return nil, nil, err
 	}
+	return master, tty, nil
+}
+
+// adoptMasterReads puts the master's reads back under the runtime poller when
+// the poller is in a position to take them, and leaves them blocking when it is
+// not.
+//
+// That condition is not cosmetic. A non-blocking descriptor the poller does not
+// own surfaces EAGAIN straight to the caller, so every read fails instead of
+// waiting and the drain dies on the first one. Which regime a pty master lands
+// in is creack/pty's choice of constructor: on Linux it opens the master with
+// os.OpenFile, which registers the descriptor with the poller, and on macOS it
+// wraps a raw descriptor with os.NewFile, which does not. SetReadDeadline
+// reports that ownership directly — a descriptor the poller does not hold
+// answers os.ErrNoDeadline — so ask it instead of guessing from the platform.
+//
+// Where the answer is no, closing the master cannot interrupt a read already in
+// flight, and waitDrain's bounded join is what keeps that from wedging the run.
+func adoptMasterReads(master *os.File) error {
+	// The zero time means "no deadline": this sets nothing and clears nothing,
+	// it only asks the question.
+	if err := master.SetReadDeadline(time.Time{}); err != nil {
+		return nil //nolint:nilerr // a master the poller does not own is a platform fact, not a failure to open a terminal
+	}
+	sc, err := master.SyscallConn()
+	if err != nil {
+		return err
+	}
 	var setErr error
 	if ctlErr := sc.Control(func(fd uintptr) { setErr = syscall.SetNonblock(int(fd), true) }); ctlErr != nil {
-		closeBoth()
-		return nil, nil, ctlErr
+		return ctlErr
 	}
-	if setErr != nil {
-		closeBoth()
-		return nil, nil, setErr
-	}
-	return master, tty, nil
+	return setErr
 }
 
 // waitExitCode maps a cmd.Wait() error to the observed exit code, mirroring the
