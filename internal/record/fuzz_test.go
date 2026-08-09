@@ -214,7 +214,8 @@ func FuzzGeneratePTYRoundTrip(f *testing.F) {
 		_, named := spec.PTYKeyForSequence(string(input))
 		_, _, repeated := keyRepeat(input)
 		_, pasted := bracketedPaste(input)
-		if !named && !repeated && !pasted {
+		_, mouse := sgrMouseEvent(input)
+		if !named && !repeated && !pasted && !mouse {
 			want := escapeVarRefs(literalSend(input))
 			var got *string
 			for _, act := range pty.Session {

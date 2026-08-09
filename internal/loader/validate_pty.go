@@ -43,6 +43,9 @@ func validatePTY(add func(string, ...any), where string, p *spec.PTY) {
 			if a.Send.Key != "" && !spec.ValidPTYKey(a.Send.Key) {
 				add("%s.send.key %q is not a supported key (supported: %s)", aw, a.Send.Key, spec.PTYKeyNames())
 			}
+			if a.Send.Mouse != nil {
+				validatePTYMouse(add, aw+".send.mouse", a.Send.Mouse)
+			}
 		case hasExpectScreen:
 			validatePTYExpectScreen(add, aw+".expect_screen", a.ExpectScreen)
 		case hasResize:
@@ -58,6 +61,32 @@ func validatePTY(add func(string, ...any), where string, p *spec.PTY) {
 				add("%s.exec.command is required", aw)
 			}
 			positiveDuration(add, aw+".exec.timeout", a.Exec.Timeout, "10s", "10s")
+		}
+	}
+}
+
+// validatePTYMouse checks a mouse event (#381). Row and column are 1-based
+// screen cells with no upper bound checked here: a mid-session resize can change
+// the screen size, so the only honest claim at load time is that they name a
+// cell at all.
+func validatePTYMouse(add func(string, ...any), where string, m *spec.PTYMouse) {
+	if m.Row < 1 || m.Col < 1 {
+		add("%s: row and col are required 1-based screen cells (got row %d, col %d)", where, m.Row, m.Col)
+	}
+	if m.Button != "" && !spec.ValidPTYMouseButton(m.Button) {
+		add("%s.button %q is not a supported button (supported: %s)", where, m.Button, spec.PTYMouseButtonNames())
+	}
+	if m.Action != "" && !spec.ValidPTYMouseAction(m.Action) {
+		add("%s.action %q is not a supported action (supported: %s)", where, m.Action, spec.PTYMouseActionNames())
+	}
+	// A wheel notch is a single event in the SGR encoding — there is nothing to
+	// release — so asking for one is a mistake worth naming rather than a no-op.
+	if m.IsWheel() && m.Action == "release" {
+		add("%s: a wheel button has no release event; use action: press (the default click sends one notch)", where)
+	}
+	for _, mod := range m.Mods {
+		if !spec.ValidPTYMouseMod(mod) {
+			add("%s.mods %q is not a supported modifier (supported: %s)", where, mod, spec.PTYMouseModNames())
 		}
 	}
 }

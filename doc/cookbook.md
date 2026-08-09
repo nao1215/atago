@@ -412,6 +412,52 @@ silently does nothing.
 
 Full spec: [pty](../examples/pty.atago.yaml)
 
+## Click and scroll in a TUI
+
+lazygit, yazi, htop, `fzf --mouse`, and anything built on bubbletea accept the mouse. A click
+is also sometimes the only sane way to reach a target — hitting a specific pane beats walking
+to it with twenty keystrokes.
+
+```yaml
+version: "1"
+suite:
+  name: tui mouse
+
+scenarios:
+  - name: clicking a row selects it
+    steps:
+      - pty:
+          command: mytool browse
+          rows: 24
+          cols: 80
+          timeout: 30s
+          session:
+            # Wait for the UI first: a program enables mouse tracking as it
+            # starts up, and an event sent before that request is refused.
+            - expect_screen:
+                contains: "Files"
+                stable_for: 200ms
+            - send: { mouse: { row: 5, col: 12 } }        # left click
+            - send: { mouse: { row: 5, col: 12, button: wheel-down } }
+            - send: { mouse: { row: 3, col: 8, button: right, action: press, mods: [ctrl] } }
+            - expect_screen:
+                contains: "selected"
+            - send: "q"
+      - assert:
+          exit_code: 0
+```
+
+`row`/`col` are 1-based screen cells, as a person counts them. `action` defaults to `click`,
+which sends the press and its release in one write the way a real click arrives; `press` and
+`release` send one half. Buttons are `left`, `middle`, `right`, `wheel-up`, and `wheel-down`.
+
+Events go out as SGR (1006) reports. If the program has not enabled mouse tracking together
+with SGR encoding, atago fails the step and says which request was missing, instead of sending
+bytes the program would read as garbage — a keyboard-only program wants a `send: {key: ...}`
+instead.
+
+Full spec: [pty](../examples/pty.atago.yaml)
+
 ## Test a TUI that reacts to external change
 
 Some of what a TUI does is not caused by typing. A git client refreshes when a commit is made

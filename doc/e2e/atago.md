@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-74 suites · 454 scenarios
+74 suites · 455 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -323,7 +323,7 @@
   - [metadata is found inside a compressed object stream](#scenario-metadata-is-found-inside-a-compressed-object-stream)
   - [a wrong expectation still fails against compressed metadata](#scenario-a-wrong-expectation-still-fails-against-compressed-metadata)
   - [a stream that ends without a newline does not swallow the next object](#scenario-a-stream-that-ends-without-a-newline-does-not-swallow-the-next-object)
-- [atago self-hosting / pty](#atago-self-hosting--pty) — 12 scenarios
+- [atago self-hosting / pty](#atago-self-hosting--pty) — 13 scenarios
   - [a pty step sees a terminal where a run step sees a pipe](#scenario-a-pty-step-sees-a-terminal-where-a-run-step-sees-a-pipe)
   - [a never-matching expect fails with the pattern in the block](#scenario-a-never-matching-expect-fails-with-the-pattern-in-the-block)
   - [named keys transmit their documented bytes and ctrl-c aborts](#scenario-named-keys-transmit-their-documented-bytes-and-ctrl-c-aborts)
@@ -331,6 +331,7 @@
   - [a bracketed paste is delivered wrapped, and refused when unasked for](#scenario-a-bracketed-paste-is-delivered-wrapped-and-refused-when-unasked-for)
   - [a resize delivers the new size and the screen follows it](#scenario-a-resize-delivers-the-new-size-and-the-screen-follows-it)
   - [a session can change the world and watch the program notice](#scenario-a-session-can-change-the-world-and-watch-the-program-notice)
+  - [a mouse click is delivered as an SGR report, and refused when unasked for](#scenario-a-mouse-click-is-delivered-as-an-sgr-report-and-refused-when-unasked-for)
   - [an unknown key name is a load-time error listing the vocabulary](#scenario-an-unknown-key-name-is-a-load-time-error-listing-the-vocabulary)
   - [screen asserts see the final frame where the transcript sees history](#scenario-screen-asserts-see-the-final-frame-where-the-transcript-sees-history)
   - [a screen snapshot round-trips through update and compare](#scenario-a-screen-snapshot-round-trips-through-update-and-compare)
@@ -6069,6 +6070,35 @@ ${atago} run badexec.atago.yaml
 - stdout contains `exited 7`, `the change the session waits for was not made`
 #### Generated artifacts
 - `marker.txt`
+### Scenario: a mouse click is delivered as an SGR report, and refused when unasked for
+_skipped on Windows_
+#### Given
+- Fixture file `unasked_mouse.atago.yaml` is created.
+#### Inputs
+_Fixture `unasked_mouse.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: clicks at a program that never asked
+    steps:
+      - pty:
+          command: cat
+          timeout: 5s
+          session:
+            - send: {mouse: {row: 1, col: 1}}
+```
+#### When
+```shell
+# interactive (pty): stty raw -echo; printf "\033[?1002h\033[?1006hREADY\r\n"; head -c 20 | cat -v
+${atago} run unasked_mouse.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout contains `^[[<0;12;5M^[[<0;12;5m`
+- exit code is `4`
+- stdout contains `has not enabled mouse reporting`, `ESC [?1000h`
 ### Scenario: an unknown key name is a load-time error listing the vocabulary
 #### Given
 - Fixture file `badkey.atago.yaml` is created.

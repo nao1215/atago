@@ -1,6 +1,9 @@
 package ptyrun
 
-import "strconv"
+import (
+	"fmt"
+	"strconv"
+)
 
 // DEC private modes atago tracks from the program's own output. A terminal
 // feature like bracketed paste exists only once the application asks for it, so
@@ -11,7 +14,47 @@ const (
 	// markers. A program that never requests it reads those markers as
 	// ordinary characters.
 	decsetBracketedPaste = 2004
+	// Mouse tracking modes (#381). A program requests one of these to be told
+	// about clicks at all: 1000 reports button press/release, 1002 adds motion
+	// while a button is down, and 1003 reports every motion.
+	decsetMouseX11    = 1000
+	decsetMouseButton = 1002
+	decsetMouseAny    = 1003
+	// decsetMouseSGR is the ENCODING the reports arrive in. Without it a
+	// terminal falls back to the legacy X10 form, whose coordinates are single
+	// bytes and cannot address a screen wider than 223 columns; atago only
+	// sends SGR, so a program tracking without it is one atago cannot drive.
+	decsetMouseSGR = 1006
 )
+
+// checkMouseMode reports why a mouse event cannot be delivered, or nil when it
+// can (#381). The two answers are different mistakes and deserve different
+// messages: a program that never asked about the mouse wants a keyboard-driven
+// spec, while one tracking in the legacy encoding is a program atago cannot
+// drive at all — worth knowing about rather than silently mis-sending.
+func checkMouseMode(term *transcriptDrain, command string, idx int) error {
+	tracking := term.modeEnabled(decsetMouseX11) ||
+		term.modeEnabled(decsetMouseButton) ||
+		term.modeEnabled(decsetMouseAny)
+	switch {
+	case !tracking:
+		return fmt.Errorf(
+			"pty %q: session[%d] sends a mouse event, but the program has not enabled mouse reporting "+
+				"(it never wrote ESC [?1000h, ESC [?1002h, or ESC [?1003h, or turned tracking back off). "+
+				"Programs that only read the keyboard want a key send instead; "+
+				"if this one does enable tracking, wait for it with an expect or expect_screen before clicking",
+			command, idx)
+	case !term.modeEnabled(decsetMouseSGR):
+		return fmt.Errorf(
+			"pty %q: session[%d] sends a mouse event, but the program tracks the mouse in the legacy X10 "+
+				"encoding (it enabled tracking without ESC [?1006h). atago only sends SGR reports, whose "+
+				"coordinates are decimal and can address the whole screen; the X10 form packs them into "+
+				"single bytes and cannot. Modern TUI toolkits request SGR — please open an issue if you "+
+				"hit a real program that does not",
+			command, idx)
+	}
+	return nil
+}
 
 // decsetMode is one observed DEC private mode transition.
 type decsetMode struct {

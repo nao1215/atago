@@ -161,6 +161,51 @@ func TestGeneratePTY(t *testing.T) {
 			wantAbsent: []string{"paste:"},
 		},
 		{
+			// A click arrives as a press and its own release back to back; it
+			// records as one event rather than two half-events (#381).
+			name: "an SGR mouse click records as one mouse event",
+			rec: PTYRecording{
+				Command:  "lazygit",
+				ExitCode: 0,
+				Segments: []PTYSegment{
+					outSeg("ready"),
+					inSeg("\x1b[<0;12;5M\x1b[<0;12;5m"),
+				},
+			},
+			wantContain: []string{"send: {mouse: {row: 5, col: 12, button: left, action: click}}"},
+		},
+		{
+			name: "a wheel notch and a modified click record their names",
+			rec: PTYRecording{
+				Command:  "htop",
+				ExitCode: 0,
+				Segments: []PTYSegment{
+					outSeg("ready"),
+					inSeg("\x1b[<65;3;9M"),
+					outSeg("scrolled"),
+					inSeg("\x1b[<16;4;2M"),
+				},
+			},
+			wantContain: []string{
+				"button: wheel-down, action: press",
+				"button: left, action: press, mods: [ctrl]",
+			},
+		},
+		{
+			// Motion reporting carries a bit atago cannot name, so the burst must
+			// stay literal rather than be rounded to the nearest button.
+			name: "a motion report is not rendered as a click",
+			rec: PTYRecording{
+				Command:  "yazi",
+				ExitCode: 0,
+				Segments: []PTYSegment{
+					outSeg("ready"),
+					inSeg("\x1b[<32;4;2M"),
+				},
+			},
+			wantAbsent: []string{"mouse:"},
+		},
+		{
 			name: "multi-line output between inputs anchors on the last stable line",
 			rec: PTYRecording{
 				Command:  "wizard",
