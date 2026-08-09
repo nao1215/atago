@@ -73,7 +73,7 @@ func defBoundaries() map[reflect.Type]string {
 // so plain reflection over their fields sees no yaml names. Each is a scalar-or-
 // mapping union; the sub-keys here are the mapping-form keys the schema exposes
 // (the scalar form carries no key). Stdin (`run.stdin`, a string / {file} /
-// {base64}) and PTYSend (`pty.session[].send`, a string / {key, times}) are inline
+// {base64}) and PTYSend (`pty.session[].send`, a string / {key, times} / {paste}) are inline
 // nodes, so their keys hang off the field path. ExitCode (`exit_code`, an int /
 // {not} / {in}) is a `$defs/exitCode` boundary, so its keys hang off the
 // definition name; it is applied in collectStructPaths where the definition is
@@ -81,7 +81,7 @@ func defBoundaries() map[reflect.Type]string {
 func polymorphicKeys() map[reflect.Type][]string {
 	return map[reflect.Type][]string{
 		reflect.TypeOf(spec.Stdin{}):   {"file", "base64"},
-		reflect.TypeOf(spec.PTYSend{}): {"key", "times"},
+		reflect.TypeOf(spec.PTYSend{}): {"key", "times", "paste"},
 	}
 }
 

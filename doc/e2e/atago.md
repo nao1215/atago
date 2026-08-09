@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-74 suites · 450 scenarios
+74 suites · 451 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -323,11 +323,12 @@
   - [metadata is found inside a compressed object stream](#scenario-metadata-is-found-inside-a-compressed-object-stream)
   - [a wrong expectation still fails against compressed metadata](#scenario-a-wrong-expectation-still-fails-against-compressed-metadata)
   - [a stream that ends without a newline does not swallow the next object](#scenario-a-stream-that-ends-without-a-newline-does-not-swallow-the-next-object)
-- [atago self-hosting / pty](#atago-self-hosting--pty) — 9 scenarios
+- [atago self-hosting / pty](#atago-self-hosting--pty) — 10 scenarios
   - [a pty step sees a terminal where a run step sees a pipe](#scenario-a-pty-step-sees-a-terminal-where-a-run-step-sees-a-pipe)
   - [a never-matching expect fails with the pattern in the block](#scenario-a-never-matching-expect-fails-with-the-pattern-in-the-block)
   - [named keys transmit their documented bytes and ctrl-c aborts](#scenario-named-keys-transmit-their-documented-bytes-and-ctrl-c-aborts)
   - [shift-tab, meta chords, and modified arrows transmit their xterm bytes](#scenario-shift-tab-meta-chords-and-modified-arrows-transmit-their-xterm-bytes)
+  - [a bracketed paste is delivered wrapped, and refused when unasked for](#scenario-a-bracketed-paste-is-delivered-wrapped-and-refused-when-unasked-for)
   - [an unknown key name is a load-time error listing the vocabulary](#scenario-an-unknown-key-name-is-a-load-time-error-listing-the-vocabulary)
   - [screen asserts see the final frame where the transcript sees history](#scenario-screen-asserts-see-the-final-frame-where-the-transcript-sees-history)
   - [a screen snapshot round-trips through update and compare](#scenario-a-screen-snapshot-round-trips-through-update-and-compare)
@@ -5990,6 +5991,35 @@ _skipped on Windows_
 - exit code is `0`
 - stdout contains `^[[Z`
 - exit code is `130`
+### Scenario: a bracketed paste is delivered wrapped, and refused when unasked for
+_skipped on Windows_
+#### Given
+- Fixture file `unasked.atago.yaml` is created.
+#### Inputs
+_Fixture `unasked.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: pastes at a program that never asked
+    steps:
+      - pty:
+          command: cat
+          timeout: 5s
+          session:
+            - send: {paste: "ab"}
+```
+#### When
+```shell
+# interactive (pty): stty raw -echo; printf "\033[?2004hREADY\r\n"; head -c 14 | cat -v
+${atago} run unasked.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout contains `^[[200~ab^[[201~`
+- exit code is `4`
+- stdout contains `has not enabled bracketed paste`, `ESC [?2004h`
 ### Scenario: an unknown key name is a load-time error listing the vocabulary
 #### Given
 - Fixture file `badkey.atago.yaml` is created.

@@ -158,6 +158,16 @@ func renderSend(seg PTYSegment, secretN *int) []string {
 			fmt.Sprintf("            - send: %s\n", yamlDoubleQuoted("${env:"+name+"}"+suffix)),
 		}
 	}
+	// A burst the terminal bracketed is a paste, and replaying it as typed text
+	// would take the program's OTHER input path (#378).
+	if inner, ok := bracketedPaste(seg.Input); ok {
+		text := escapeVarRefs(literalSend(inner))
+		if utf8.ValidString(text) {
+			return []string{fmt.Sprintf("            - send: {paste: %s}\n", yamlDoubleQuoted(text))}
+		}
+		// Fall through: a paste that is not valid UTF-8 keeps the !!binary
+		// escape hatch below, which preserves the bytes markers and all.
+	}
 	if key, ok := spec.PTYKeyForSequence(string(seg.Input)); ok {
 		return []string{fmt.Sprintf("            - send: {key: %s}\n", key)}
 	}
@@ -184,6 +194,27 @@ func renderSend(seg PTYSegment, secretN *int) []string {
 		}
 	}
 	return []string{fmt.Sprintf("            - send: %s\n", yamlDoubleQuoted(text))}
+}
+
+// bracketedPaste unwraps a burst the terminal delivered as a paste — the
+// PasteStart/PasteEnd markers around the pasted text (#378) — and reports the
+// text inside. It requires the markers to bracket the WHOLE burst: a burst that
+// merely contains them is something else (a program echoing them back, a paste
+// interleaved with typing), and guessing there would rewrite input the replay
+// then delivers differently.
+func bracketedPaste(input []byte) ([]byte, bool) {
+	start, end := []byte(spec.PasteStart), []byte(spec.PasteEnd)
+	if len(input) < len(start)+len(end) {
+		return nil, false
+	}
+	if !bytes.HasPrefix(input, start) || !bytes.HasSuffix(input, end) {
+		return nil, false
+	}
+	inner := input[len(start) : len(input)-len(end)]
+	if bytes.Contains(inner, start) || bytes.Contains(inner, end) {
+		return nil, false
+	}
+	return inner, true
 }
 
 // keyRepeat reports whether input is exactly N (≥ 2) back-to-back copies of one

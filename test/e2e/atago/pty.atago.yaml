@@ -186,6 +186,52 @@ scenarios:
       - assert:
           exit_code: 130
 
+  # A paste is a different input path from typing, and a program only receives
+  # one after asking for the mode (#378). Both halves of that contract are
+  # pinned: the bytes when the program asked, and the refusal when it did not.
+  - name: a bracketed paste is delivered wrapped, and refused when unasked for
+    skip:
+      os: windows
+    steps:
+      # 14 bytes is exactly the paste: the two markers plus "ab". Bounding the
+      # read that way lets the program exit on its own instead of on a timeout.
+      - pty:
+          shell: true
+          command: 'stty raw -echo; printf "\033[?2004hREADY\r\n"; head -c 14 | cat -v'
+          timeout: 10s
+          session:
+            - expect: READY # printed after the mode request, so the mode is on
+            - send: { paste: "ab" }
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "^[[200~ab^[[201~"
+      # cat never enables the mode, so the markers would arrive as ordinary
+      # characters. atago refuses at the send rather than letting the mistake
+      # surface as strange input inside the program.
+      - fixture:
+          file: unasked.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: pastes at a program that never asked
+                steps:
+                  - pty:
+                      command: cat
+                      timeout: 5s
+                      session:
+                        - send: {paste: "ab"}
+      - run:
+          command: ${atago} run unasked.atago.yaml
+      - assert:
+          exit_code: 4 # an execution error, not an assertion failure
+          stdout:
+            contains:
+              - "has not enabled bracketed paste"
+              - "ESC [?2004h"
+
   - name: an unknown key name is a load-time error listing the vocabulary
     steps:
       - fixture:

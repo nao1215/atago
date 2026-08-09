@@ -213,7 +213,8 @@ func FuzzGeneratePTYRoundTrip(f *testing.F) {
 		// every other burst must decode back to the recorded bytes.
 		_, named := spec.PTYKeyForSequence(string(input))
 		_, _, repeated := keyRepeat(input)
-		if !named && !repeated {
+		_, pasted := bracketedPaste(input)
+		if !named && !repeated && !pasted {
 			want := escapeVarRefs(literalSend(input))
 			var got *string
 			for _, act := range pty.Session {

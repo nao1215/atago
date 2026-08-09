@@ -412,6 +412,43 @@ silently does nothing.
 
 Full spec: [pty](../examples/pty.atago.yaml)
 
+## Paste into a REPL
+
+A REPL that enables bracketed paste treats a pasted block as one unit: it must not run
+line by line, auto-indent, or fire completion. That is a different code path from typing the
+same characters, and `paste:` is how a spec reaches it.
+
+```yaml
+version: "1"
+suite:
+  name: repl paste
+
+scenarios:
+  - name: a pasted block runs as one unit
+    steps:
+      - pty:
+          command: mytool repl
+          timeout: 30s
+          session:
+            # Wait for the prompt first: the program enables bracketed paste as
+            # it starts up, and a paste sent before that request fails.
+            - expect: ">>> "
+            - send: { paste: "total = 1 + 1\nprint(total)\n" }
+            - expect: "2"
+            - send: { key: ctrl-d }
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "2"
+```
+
+If the program never asks for the mode (it never writes `ESC [?2004h`), atago fails the step
+and says so, instead of letting the markers arrive as literal `[200~` characters and turn up
+as a puzzling failure later. For a program that does not distinguish a paste from typing, use
+a plain `send:`.
+
+Full spec: [pty](../examples/pty.atago.yaml)
+
 ## Test an API-client CLI without the network
 
 ```yaml

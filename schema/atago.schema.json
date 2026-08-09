@@ -1255,10 +1255,23 @@
                   {
                     "type": "object",
                     "additionalProperties": false,
-                    "required": [
-                      "key"
+                    "oneOf": [
+                      {
+                        "required": [
+                          "key"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "paste"
+                        ]
+                      }
                     ],
                     "properties": {
+                      "paste": {
+                        "type": "string",
+                        "description": "Delivers the text as a BRACKETED PASTE, wrapped in the markers a terminal puts around pasted input, so a REPL or editor takes its paste path instead of its typing path. The step fails if the program has not enabled bracketed paste (`ESC [?2004h`), because the markers would otherwise arrive as ordinary characters. Mutually exclusive with `key`."
+                      },
                       "key": {
                         "type": "string",
                         "minLength": 1,
@@ -1273,7 +1286,7 @@
                     }
                   }
                 ],
-                "description": "Writes to the terminal: a string verbatim (\"\" sends EOF/^D; `${name}` expansion applies) or `{key: <name>}` for a named key — `enter`, `tab`, `shift-tab`, `esc`, arrows, `insert`, `f1`-`f12`, `ctrl-a`..`ctrl-z`, `alt-a`..`alt-z`, modified arrows such as `ctrl-left` and `shift-up`, `ctrl-space`/`ctrl-@`, `ctrl-[`, `ctrl-\\`, `ctrl-]`, `ctrl-^`, `ctrl-_`, `ctrl-hyphen`/`ctrl-minus`."
+                "description": "Writes to the terminal: a string verbatim (\"\" sends EOF/^D; `${name}` expansion applies), `{key: <name>}` for a named key — `enter`, `tab`, `shift-tab`, `esc`, arrows, `insert`, `f1`-`f12`, `ctrl-a`..`ctrl-z`, `alt-a`..`alt-z`, modified arrows such as `ctrl-left` and `shift-up`, `ctrl-space`/`ctrl-@`, `ctrl-[`, `ctrl-\\`, `ctrl-]`, `ctrl-^`, `ctrl-_`, `ctrl-hyphen`/`ctrl-minus` — or `{paste: <text>}` to deliver the text as a bracketed paste."
               },
               "expect_screen": {
                 "type": "object",

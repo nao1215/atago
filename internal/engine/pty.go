@@ -61,6 +61,12 @@ func (e *Engine) runPTY(ctx context.Context, p *spec.PTY, st *store.Store, scena
 					txt := st.Expand(*cs.Text)
 					cs.Text = &txt
 				}
+				// A paste carries author-written text like any other send, so it
+				// gets the same expansion (#378).
+				if cs.Paste != nil {
+					pasted := st.Expand(*cs.Paste)
+					cs.Paste = &pasted
+				}
 				na.Send = &cs
 			}
 			na.ExpectScreen = spec.WalkPTYExpectScreenStrings(a.ExpectScreen, st.Expand)
@@ -91,6 +97,11 @@ func checkPTYSessionResolved(session []spec.PTYAction, st *store.Store) error {
 		}
 		if a.Send != nil && a.Send.Text != nil {
 			if err := unresolvedRefError(i, "send", *a.Send.Text, st); err != nil {
+				return err
+			}
+		}
+		if a.Send != nil && a.Send.Paste != nil {
+			if err := unresolvedRefError(i, "send", *a.Send.Paste, st); err != nil {
 				return err
 			}
 		}
