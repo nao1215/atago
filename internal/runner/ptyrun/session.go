@@ -315,6 +315,13 @@ func driveSession(ctx context.Context, p *spec.PTY, proc ptyProcess) (*runner.Re
 						"if this one does enable the mode, wait for it with an expect or expect_screen before pasting",
 					p.Command, i))
 			}
+			// A mouse event only means something to a program that asked to be
+			// told about the mouse, and in the encoding atago speaks (#381).
+			if a.Send.Mouse != nil {
+				if merr := checkMouseMode(term, p.Command, i); merr != nil {
+					return failHard(merr)
+				}
+			}
 			// Bytes resolves named keys to their xterm sequences, wraps a paste
 			// in its markers, and keeps the historical rule that an empty
 			// verbatim send transmits EOF (^D).

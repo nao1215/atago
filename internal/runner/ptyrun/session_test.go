@@ -497,3 +497,58 @@ func TestCappedBuffer_ReportsWhatItDropped(t *testing.T) {
 		t.Errorf("String() = %q, want the drop count to accumulate", got)
 	}
 }
+
+// TestDriveSession_MouseRequiresTracking pins the gate on a mouse event (#381).
+// The two refusals are different mistakes: a program that never asked about the
+// mouse wants a keyboard-driven spec, while one tracking in the legacy X10
+// encoding is one atago cannot address at all.
+func TestDriveSession_MouseRequiresTracking(t *testing.T) {
+	t.Parallel()
+	click := &spec.PTYSend{Mouse: &spec.PTYMouse{Row: 5, Col: 12}}
+	p := &spec.PTY{
+		Command: "mytool ui",
+		Session: []spec.PTYAction{{Expect: "ready"}, {Send: click}},
+	}
+
+	t.Run("no tracking at all", func(t *testing.T) {
+		t.Parallel()
+		f := &fakePTY{script: []readStep{bytesStep("ready\r\n")}, end: io.EOF}
+		_, _, err := driveSession(context.Background(), p, fakeSession(f, 0))
+		if err == nil {
+			t.Fatal("a click at a program that never enabled mouse reporting must be an error")
+		}
+		for _, want := range []string{"mytool ui", "session[1]", "not enabled mouse reporting", "ESC [?1000h"} {
+			if !strings.Contains(err.Error(), want) {
+				t.Errorf("error %q should mention %q", err, want)
+			}
+		}
+		if got := string(f.writes); got != "" {
+			t.Errorf("nothing should have been written, got %q", got)
+		}
+	})
+
+	t.Run("tracking without SGR", func(t *testing.T) {
+		t.Parallel()
+		f := &fakePTY{script: []readStep{bytesStep("\x1b[?1000hready\r\n")}, end: io.EOF}
+		_, _, err := driveSession(context.Background(), p, fakeSession(f, 0))
+		if err == nil {
+			t.Fatal("a click at a program tracking in X10 must be an error")
+		}
+		for _, want := range []string{"legacy X10 encoding", "ESC [?1006h"} {
+			if !strings.Contains(err.Error(), want) {
+				t.Errorf("error %q should mention %q", err, want)
+			}
+		}
+	})
+
+	t.Run("tracking with SGR delivers the report", func(t *testing.T) {
+		t.Parallel()
+		f := &fakePTY{script: []readStep{bytesStep("\x1b[?1002;1006hready\r\n")}, end: io.EOF}
+		if _, ef, err := driveSession(context.Background(), p, fakeSession(f, 0)); err != nil || ef != nil {
+			t.Fatalf("err=%v ef=%+v", err, ef)
+		}
+		if got, want := string(f.writes), "\x1b[<0;12;5M\x1b[<0;12;5m"; got != want {
+			t.Errorf("terminal received %q, want %q", got, want)
+		}
+	})
+}

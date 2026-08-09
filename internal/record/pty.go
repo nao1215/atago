@@ -5,6 +5,8 @@ import (
 	"encoding/base64"
 	"fmt"
 	"regexp"
+	"slices"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 
@@ -158,6 +160,11 @@ func renderSend(seg PTYSegment, secretN *int) []string {
 			fmt.Sprintf("            - send: %s\n", yamlDoubleQuoted("${env:"+name+"}"+suffix)),
 		}
 	}
+	// An SGR mouse report replays as the event it describes, so a mouse-driven
+	// recording reads as clicks rather than as escape soup (#381).
+	if m, ok := sgrMouseEvent(seg.Input); ok {
+		return []string{fmt.Sprintf("            - send: {mouse: %s}\n", mouseFlowMapping(m))}
+	}
 	// A burst the terminal bracketed is a paste, and replaying it as typed text
 	// would take the program's OTHER input path (#378).
 	if inner, ok := bracketedPaste(seg.Input); ok {
@@ -194,6 +201,96 @@ func renderSend(seg PTYSegment, secretN *int) []string {
 		}
 	}
 	return []string{fmt.Sprintf("            - send: %s\n", yamlDoubleQuoted(text))}
+}
+
+// sgrMouseRe matches one xterm SGR (1006) mouse report: CSI < Cb ; col ; row
+// followed by M for a press or m for a release.
+var sgrMouseRe = regexp.MustCompile(`^\x1b\[<(\d+);(\d+);(\d+)([Mm])$`)
+
+// sgrMouseEvent decodes a captured burst that is exactly one mouse report — or
+// a press immediately followed by its own release, which is what a click
+// delivers — into the event a spec would write (#381). Anything else (motion
+// reports, a report mixed with typing, a modifier atago has no name for) is left
+// to the literal-text path, where the recorded bytes survive untouched.
+func sgrMouseEvent(input []byte) (*spec.PTYMouse, bool) {
+	if m, ok := parseSGRMouse(input); ok {
+		return m, true
+	}
+	// A click: the press and its release, back to back and identical apart from
+	// the final byte.
+	for split := 1; split < len(input); split++ {
+		press, ok := parseSGRMouse(input[:split])
+		if !ok || press.Action != "press" {
+			continue
+		}
+		release, ok := parseSGRMouse(input[split:])
+		if !ok || release.Action != "release" {
+			continue
+		}
+		if press.Row != release.Row || press.Col != release.Col ||
+			press.Button != release.Button || !slices.Equal(press.Mods, release.Mods) {
+			continue
+		}
+		press.Action = "click"
+		return press, true
+	}
+	return nil, false
+}
+
+// parseSGRMouse decodes a single report. The button code carries the modifier
+// bits, so it only decodes when every bit maps to a name atago can write back.
+func parseSGRMouse(b []byte) (*spec.PTYMouse, bool) {
+	match := sgrMouseRe.FindSubmatch(b)
+	if match == nil {
+		return nil, false
+	}
+	cb, err := strconv.Atoi(string(match[1]))
+	if err != nil {
+		return nil, false
+	}
+	col, err := strconv.Atoi(string(match[2]))
+	if err != nil {
+		return nil, false
+	}
+	row, err := strconv.Atoi(string(match[3]))
+	if err != nil {
+		return nil, false
+	}
+	button, mods, ok := spec.DecodePTYMouseButton(cb)
+	if !ok {
+		return nil, false
+	}
+	action := "press"
+	if match[4][0] == 'm' {
+		action = "release"
+	}
+	// Only decode what a spec could legally say. A terminal can report a
+	// 0-coordinate or a wheel release, and rendering either would produce a
+	// recording the loader then rejects — GeneratePTY validates its own output,
+	// so the whole recording would fail rather than one line. Falling through
+	// keeps the bytes as literal input, which replays identically.
+	if row < 1 || col < 1 {
+		return nil, false
+	}
+	if action == "release" && (button == "wheel-up" || button == "wheel-down") {
+		return nil, false
+	}
+	return &spec.PTYMouse{Row: row, Col: col, Button: button, Action: action, Mods: mods}, true
+}
+
+// mouseFlowMapping renders the event as a one-line YAML flow mapping, keeping a
+// recorded session as compact as the hand-written form.
+func mouseFlowMapping(m *spec.PTYMouse) string {
+	parts := []string{
+		fmt.Sprintf("row: %d", m.Row),
+		fmt.Sprintf("col: %d", m.Col),
+		fmt.Sprintf("button: %s", m.Button),
+		fmt.Sprintf("action: %s", m.Action),
+	}
+	if len(m.Mods) > 0 {
+		parts = append(parts, fmt.Sprintf("mods: [%s]", strings.Join(m.Mods, ", ")))
+	}
+	return "{" + strings.Join(parts, ", ") + "}"
 }
 
 // bracketedPaste unwraps a burst the terminal delivered as a paste — the

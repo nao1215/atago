@@ -1292,6 +1292,16 @@
                         "required": [
                           "paste"
                         ]
+                      },
+                      {
+                        "required": [
+                          "mouse"
+                        ],
+                        "not": {
+                          "required": [
+                            "times"
+                          ]
+                        }
                       }
                     ],
                     "properties": {
@@ -1303,6 +1313,91 @@
                         "type": "string",
                         "minLength": 1,
                         "description": "Named key: `enter`, `tab`, `shift-tab` (alias `backtab`), `esc`, `space`, `backspace`, `delete`, `insert`, arrows, home/end, pageup/pagedown, `f1`-`f12`, `ctrl-a`..`ctrl-z`, `alt-a`..`alt-z`, `alt-enter`, `alt-backspace`, modified arrows (`ctrl-left`, `shift-up`, …), `ctrl-space`/`ctrl-@`, `ctrl-[`, `ctrl-\\`, `ctrl-]`, `ctrl-^`, `ctrl-_`, `ctrl-hyphen`/`ctrl-minus`."
+                      },
+                      "mouse": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "row",
+                          "col"
+                        ],
+                        "description": "Sends a mouse event as an xterm SGR (1006) report, for TUIs that accept clicks and scrolling. The step fails if the program has not enabled mouse tracking (`ESC [?1000h`, `ESC [?1002h`, or `ESC [?1003h`) together with SGR encoding (`ESC [?1006h`), because the bytes would otherwise mean nothing to it. Mutually exclusive with `key`, `paste`, and `times`.",
+                        "not": {
+                          "anyOf": [
+                            {
+                              "properties": {
+                                "button": {
+                                  "const": "wheel-up"
+                                },
+                                "action": {
+                                  "const": "release"
+                                }
+                              },
+                              "required": [
+                                "button",
+                                "action"
+                              ]
+                            },
+                            {
+                              "properties": {
+                                "button": {
+                                  "const": "wheel-down"
+                                },
+                                "action": {
+                                  "const": "release"
+                                }
+                              },
+                              "required": [
+                                "button",
+                                "action"
+                              ]
+                            }
+                          ]
+                        },
+                        "properties": {
+                          "row": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "description": "1-based screen row of the cell to act on."
+                          },
+                          "col": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "description": "1-based screen column of the cell to act on."
+                          },
+                          "button": {
+                            "type": "string",
+                            "enum": [
+                              "left",
+                              "middle",
+                              "right",
+                              "wheel-up",
+                              "wheel-down"
+                            ],
+                            "description": "Which button (default `left`). A wheel button sends one scroll notch."
+                          },
+                          "action": {
+                            "type": "string",
+                            "enum": [
+                              "click",
+                              "press",
+                              "release"
+                            ],
+                            "description": "`click` (default) sends the press and its release in one write, the way a real click arrives; `press` and `release` send one half. A wheel button has no release, so `click` on one sends a single scroll notch and `release` is rejected."
+                          },
+                          "mods": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "shift",
+                                "alt",
+                                "ctrl"
+                              ]
+                            },
+                            "description": "Modifier keys held during the event."
+                          }
+                        }
                       },
                       "times": {
                         "type": "integer",

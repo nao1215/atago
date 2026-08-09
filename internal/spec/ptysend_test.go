@@ -1,6 +1,7 @@
 package spec
 
 import (
+	"slices"
 	"strings"
 	"testing"
 )
@@ -226,5 +227,122 @@ func TestPTYSend_TextAndEOF(t *testing.T) {
 	}
 	if got := (&PTYSend{Key: "enter"}).Label(); got != "press enter" {
 		t.Errorf("label = %q", got)
+	}
+}
+
+// TestPTYMouse_Encoding pins the SGR (1006) byte encoding (#381). A button code
+// that is off by one moves the click to a different button, which fails inside
+// the program under test rather than here — so the table is the contract.
+func TestPTYMouse_Encoding(t *testing.T) {
+	t.Parallel()
+	tests := map[string]struct {
+		mouse PTYMouse
+		want  string
+	}{
+		// A click is press + release in ONE write, the way a real click arrives.
+		"default is a left click": {
+			mouse: PTYMouse{Row: 5, Col: 12},
+			want:  "\x1b[<0;12;5M\x1b[<0;12;5m",
+		},
+		"press alone": {
+			mouse: PTYMouse{Row: 5, Col: 12, Action: "press"},
+			want:  "\x1b[<0;12;5M",
+		},
+		"release alone": {
+			mouse: PTYMouse{Row: 5, Col: 12, Action: "release"},
+			want:  "\x1b[<0;12;5m",
+		},
+		"right button": {
+			mouse: PTYMouse{Row: 1, Col: 1, Button: "right", Action: "press"},
+			want:  "\x1b[<2;1;1M",
+		},
+		// Wheel buttons live at 64+, not at the next number after right.
+		"wheel down": {
+			mouse: PTYMouse{Row: 9, Col: 3, Button: "wheel-down", Action: "press"},
+			want:  "\x1b[<65;3;9M",
+		},
+		// A wheel notch has no release, so the default click is ONE report — a
+		// paired release would be a report no real terminal produces.
+		"wheel up defaults to a single notch": {
+			mouse: PTYMouse{Row: 9, Col: 3, Button: "wheel-up"},
+			want:  "\x1b[<64;3;9M",
+		},
+		"wheel down defaults to a single notch": {
+			mouse: PTYMouse{Row: 9, Col: 3, Button: "wheel-down"},
+			want:  "\x1b[<65;3;9M",
+		},
+		// Modifiers are bit flags: repeating one must not carry into the next
+		// bit. Summing them turned [ctrl, ctrl] into 32, the MOTION bit.
+		"a repeated modifier stays one bit": {
+			mouse: PTYMouse{Row: 1, Col: 1, Mods: []string{"ctrl", "ctrl"}, Action: "press"},
+			want:  "\x1b[<16;1;1M",
+		},
+		"ctrl adds 16": {
+			mouse: PTYMouse{Row: 5, Col: 12, Mods: []string{"ctrl"}, Action: "press"},
+			want:  "\x1b[<16;12;5M",
+		},
+		"shift and alt stack": {
+			mouse: PTYMouse{Row: 2, Col: 4, Mods: []string{"shift", "alt"}, Action: "press"},
+			want:  "\x1b[<12;4;2M",
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			if got := (&PTYSend{Mouse: &tt.mouse}).Bytes(); string(got) != tt.want {
+				t.Errorf("bytes = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestDecodePTYMouseButton_RoundTrips is the drift guard between the encoder and
+// the decoder `atago record --pty` uses: every button and modifier combination
+// atago can WRITE must decode back to the same names, or a recorded click would
+// replay as a different event.
+func TestDecodePTYMouseButton_RoundTrips(t *testing.T) {
+	t.Parallel()
+	for button := range ptyMouseButtons {
+		for _, mods := range [][]string{
+			nil, {"shift"}, {"alt"}, {"ctrl"}, {"shift", "alt"}, {"shift", "alt", "ctrl"},
+		} {
+			m := PTYMouse{Row: 3, Col: 7, Button: button, Action: "press", Mods: mods}
+			cb := ptyMouseButtons[button]
+			for _, mod := range mods {
+				cb += ptyMouseMods[mod]
+			}
+			gotButton, gotMods, ok := DecodePTYMouseButton(cb)
+			if !ok {
+				t.Errorf("%s+%v encodes to %d, which does not decode", button, mods, cb)
+				continue
+			}
+			if gotButton != button || !slices.Equal(gotMods, mods) {
+				t.Errorf("%s+%v decoded as %s+%v", button, mods, gotButton, gotMods)
+			}
+			_ = m
+		}
+	}
+	// A code carrying motion reporting (bit 32) names no event atago can write,
+	// so it must be refused rather than rounded to the nearest button.
+	if _, _, ok := DecodePTYMouseButton(32); ok {
+		t.Error("a motion report should not decode to a button atago can send")
+	}
+}
+
+// TestPTYMouse_Label keeps the explain/doc rendering readable and unambiguous.
+func TestPTYMouse_Label(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		mouse PTYMouse
+		want  string
+	}{
+		{PTYMouse{Row: 5, Col: 12}, "left at (5,12)"},
+		{PTYMouse{Row: 5, Col: 12, Button: "right", Action: "press"}, "right-press at (5,12)"},
+		{PTYMouse{Row: 1, Col: 2, Button: "wheel-down"}, "wheel-down-click at (1,2)"},
+		{PTYMouse{Row: 1, Col: 2, Mods: []string{"ctrl"}}, "ctrl+left at (1,2)"},
+	} {
+		if got := tc.mouse.Label(); got != tc.want {
+			t.Errorf("label = %q, want %q", got, tc.want)
+		}
 	}
 }

@@ -161,6 +161,51 @@ func TestGeneratePTY(t *testing.T) {
 			wantAbsent: []string{"paste:"},
 		},
 		{
+			// A click arrives as a press and its own release back to back; it
+			// records as one event rather than two half-events (#381).
+			name: "an SGR mouse click records as one mouse event",
+			rec: PTYRecording{
+				Command:  "lazygit",
+				ExitCode: 0,
+				Segments: []PTYSegment{
+					outSeg("ready"),
+					inSeg("\x1b[<0;12;5M\x1b[<0;12;5m"),
+				},
+			},
+			wantContain: []string{"send: {mouse: {row: 5, col: 12, button: left, action: click}}"},
+		},
+		{
+			name: "a wheel notch and a modified click record their names",
+			rec: PTYRecording{
+				Command:  "htop",
+				ExitCode: 0,
+				Segments: []PTYSegment{
+					outSeg("ready"),
+					inSeg("\x1b[<65;3;9M"),
+					outSeg("scrolled"),
+					inSeg("\x1b[<16;4;2M"),
+				},
+			},
+			wantContain: []string{
+				"button: wheel-down, action: press",
+				"button: left, action: press, mods: [ctrl]",
+			},
+		},
+		{
+			// Motion reporting carries a bit atago cannot name, so the burst must
+			// stay literal rather than be rounded to the nearest button.
+			name: "a motion report is not rendered as a click",
+			rec: PTYRecording{
+				Command:  "yazi",
+				ExitCode: 0,
+				Segments: []PTYSegment{
+					outSeg("ready"),
+					inSeg("\x1b[<32;4;2M"),
+				},
+			},
+			wantAbsent: []string{"mouse:"},
+		},
+		{
 			name: "multi-line output between inputs anchors on the last stable line",
 			rec: PTYRecording{
 				Command:  "wizard",
@@ -461,5 +506,42 @@ func TestAppendInput_CoalescesConsecutiveBursts(t *testing.T) {
 	}
 	if strings.Contains(string(got), "ATAGO_SECRET_2") {
 		t.Errorf("password fragmented into multiple secret placeholders:\n%s", got)
+	}
+}
+
+// TestSGRMouseEvent_RefusesWhatASpecCannotSay is the guard behind a recording
+// that would not load. A terminal can report a zero coordinate or a wheel
+// release; PTYMouse allows neither, and GeneratePTY validates its own output —
+// so rendering one would fail the WHOLE recording rather than one line. These
+// bursts must fall through to the literal-text path, which replays identically.
+func TestSGRMouseEvent_RefusesWhatASpecCannotSay(t *testing.T) {
+	t.Parallel()
+	for name, input := range map[string]string{
+		"zero row":         "\x1b[<0;5;0M",
+		"zero column":      "\x1b[<0;0;5M",
+		"wheel release":    "\x1b[<65;3;9m",
+		"wheel up release": "\x1b[<64;3;9m",
+		"motion report":    "\x1b[<32;4;2M",
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			if m, ok := sgrMouseEvent([]byte(input)); ok {
+				t.Errorf("%q decoded to %+v, but no spec could say that", input, m)
+			}
+		})
+	}
+
+	// The shapes a spec CAN say still decode.
+	for name, input := range map[string]string{
+		"click": "\x1b[<0;12;5M\x1b[<0;12;5m",
+		"press": "\x1b[<2;1;1M",
+		"wheel": "\x1b[<65;3;9M",
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			if _, ok := sgrMouseEvent([]byte(input)); !ok {
+				t.Errorf("%q should decode", input)
+			}
+		})
 	}
 }

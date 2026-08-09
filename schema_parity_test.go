@@ -73,7 +73,8 @@ func defBoundaries() map[reflect.Type]string {
 // so plain reflection over their fields sees no yaml names. Each is a scalar-or-
 // mapping union; the sub-keys here are the mapping-form keys the schema exposes
 // (the scalar form carries no key). Stdin (`run.stdin`, a string / {file} /
-// {base64}) PTYSend (`pty.session[].send`, a string / {key, times} / {paste}), and PTYExec
+// {base64}), PTYSend (`pty.session[].send`, a string / {key, times} / {paste} /
+// {mouse}), and PTYExec
 // (`pty.session[].exec`, a string / {command, shell, timeout}) are inline
 // nodes, so their keys hang off the field path. ExitCode (`exit_code`, an int /
 // {not} / {in}) is a `$defs/exitCode` boundary, so its keys hang off the
@@ -81,8 +82,14 @@ func defBoundaries() map[reflect.Type]string {
 // walked, not here.
 func polymorphicKeys() map[reflect.Type][]string {
 	return map[reflect.Type][]string{
-		reflect.TypeOf(spec.Stdin{}):   {"file", "base64"},
-		reflect.TypeOf(spec.PTYSend{}): {"key", "times", "paste"},
+		reflect.TypeOf(spec.Stdin{}): {"file", "base64"},
+		// The mouse sub-keys are spelled out here rather than reached by
+		// reflection: PTYSend is hand-decoded, so the walk stops at it and never
+		// descends into the nested PTYMouse struct.
+		reflect.TypeOf(spec.PTYSend{}): {
+			"key", "times", "paste",
+			"mouse", "mouse.row", "mouse.col", "mouse.button", "mouse.action", "mouse.mods",
+		},
 		reflect.TypeOf(spec.PTYExec{}): {"command", "shell", "timeout"},
 	}
 }

@@ -326,6 +326,55 @@ scenarios:
               - "exited 7"
               - "the change the session waits for was not made"
 
+  # A mouse event (#381) only means something to a program that asked to be
+  # told about the mouse, in the encoding atago speaks. Both halves are pinned:
+  # the exact report bytes when the program asked, and the refusal when it did
+  # not.
+  - name: a mouse click is delivered as an SGR report, and refused when unasked for
+    skip:
+      os: windows
+    steps:
+      # 20 bytes is exactly the click: the press and its release, ten bytes each.
+      # Bounding the read that way lets the program exit on its own.
+      - pty:
+          shell: true
+          command: 'stty raw -echo; printf "\033[?1002h\033[?1006hREADY\r\n"; head -c 20 | cat -v'
+          timeout: 10s
+          session:
+            - expect: READY # printed after both mode requests, so both are on
+            - send: { mouse: { row: 5, col: 12 } }
+      - assert:
+          exit_code: 0
+          stdout:
+            # SGR order is column then row, which is the transposition worth
+            # catching here rather than inside a TUI.
+            contains: "^[[<0;12;5M^[[<0;12;5m"
+      # cat never enables tracking, so the report would be meaningless bytes.
+      # atago refuses at the send rather than letting the mistake surface as a
+      # TUI that mysteriously ignored a click.
+      - fixture:
+          file: unasked_mouse.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: clicks at a program that never asked
+                steps:
+                  - pty:
+                      command: cat
+                      timeout: 5s
+                      session:
+                        - send: {mouse: {row: 1, col: 1}}
+      - run:
+          command: ${atago} run unasked_mouse.atago.yaml
+      - assert:
+          exit_code: 4 # an execution error, not an assertion failure
+          stdout:
+            contains:
+              - "has not enabled mouse reporting"
+              - "ESC [?1000h"
+
   - name: an unknown key name is a load-time error listing the vocabulary
     steps:
       - fixture:
