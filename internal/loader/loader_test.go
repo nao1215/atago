@@ -175,6 +175,67 @@ scenarios:
 	}
 }
 
+// TestLoadBytes_PTYKeyFamilies proves the key families added in #376 survive
+// the real YAML path, not just the byte table: shift-tab and the modified
+// arrows contain a hyphen, and `alt-b` sits next to a `ctrl-b` that must stay a
+// different key. It also pins that the vocabulary is closed — a Meta digit is
+// rejected rather than silently sending nothing.
+func TestLoadBytes_PTYKeyFamilies(t *testing.T) {
+	t.Parallel()
+	src := `
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: ok
+    steps:
+      - pty:
+          command: editor
+          session:
+            - send: {key: shift-tab}
+            - send: {key: backtab}
+            - send: {key: insert}
+            - send: {key: alt-b}
+            - send: {key: alt-enter}
+            - send: {key: alt-backspace}
+            - send: {key: ctrl-left}
+            - send: {key: shift-up}
+`
+	s, err := LoadBytes("sample.atago.yaml", []byte(src))
+	if err != nil {
+		t.Fatalf("LoadBytes() error = %v", err)
+	}
+	want := []string{
+		"\x1b[Z", "\x1b[Z", "\x1b[2~", "\x1bb",
+		"\x1b\r", "\x1b\x7f", "\x1b[1;5D", "\x1b[1;2A",
+	}
+	session := s.Scenarios[0].Steps[0].PTY.Session
+	if len(session) != len(want) {
+		t.Fatalf("session has %d actions, want %d", len(session), len(want))
+	}
+	for i, w := range want {
+		if got := string(session[i].Send.Bytes()); got != w {
+			t.Errorf("session[%d] (%s) sends %q, want %q", i, session[i].Send.Key, got, w)
+		}
+	}
+
+	bad := `
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: ok
+    steps:
+      - pty:
+          command: editor
+          session:
+            - send: {key: alt-1}
+`
+	if _, err := LoadBytes("sample.atago.yaml", []byte(bad)); err == nil {
+		t.Error("alt-1 is not in the vocabulary and should be a load error, got nil")
+	}
+}
+
 // TestLoadBytes_Changes covers the load-time validation of the changes: assert
 // target (#70): it must follow a run/pty step, entries must be workdir-relative
 // and confined, and a valid placement loads.

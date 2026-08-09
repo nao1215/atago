@@ -89,6 +89,77 @@ scenarios:
               - "^[[B"
               - "^_"
               - "^[[45;5u"
+
+  # The families a real TUI binds (#376): reverse focus, Meta chords, and
+  # word-wise cursor movement. Each is pinned at the byte level through
+  # `cat -v`, because a key whose name is accepted but whose bytes are wrong
+  # fails far away — inside the program under test, as a keystroke that did
+  # nothing.
+  - name: shift-tab, meta chords, and modified arrows transmit their xterm bytes
+    skip:
+      os: windows
+    steps:
+      - pty:
+          command: cat -v
+          timeout: 10s
+          session:
+            - send: { key: shift-tab } # CSI Z, the reverse-focus key
+            - send: { key: enter }
+            - expect: '\^\[\[Z'
+            - send: { key: alt-b } # ESC-prefixed Meta chord
+            - send: { key: enter }
+            - expect: '\^\[b'
+            - send: { key: ctrl-left } # xterm modified arrow (modifier 5 = ctrl)
+            - send: { key: enter }
+            - expect: '\^\[\[1;5D'
+            - send: { key: shift-up } # modifier 2 = shift
+            - send: { key: enter }
+            - expect: '\^\[\[1;2A'
+            - send: { key: insert }
+            - send: { key: enter }
+            - expect: '\^\[\[2~'
+            - send: { key: ctrl-d }
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "^[[Z"
+              - "^[b"
+              - "^[[1;5D"
+              - "^[[1;2A"
+              - "^[[2~"
+      # alt-backspace ends in DEL (0x7f), which the line discipline claims as
+      # the ERASE character — in the cooked terminal above it rubs out the
+      # preceding byte instead of reaching the program. A TUI reads its keys in
+      # raw mode, which is where the chord is meant to arrive intact, so that is
+      # where its bytes are pinned. `head -c 3` bounds the read to exactly the
+      # ESC, the DEL, and the trailing X, so the program exits on its own.
+      - pty:
+          shell: true
+          command: 'stty raw -echo; printf "READY\r\n"; head -c 3 | cat -v'
+          timeout: 10s
+          session:
+            - expect: READY # raw mode is in effect only after stty returns
+            - send: { key: alt-backspace }
+            - send: "X"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "^[^?X"
+      # backtab is an alias, not a second key: it must put the same bytes on
+      # the wire as shift-tab.
+      - pty:
+          command: cat -v
+          timeout: 10s
+          session:
+            - send: { key: backtab }
+            - send: { key: enter }
+            - expect: '\^\[\[Z'
+            - send: { key: ctrl-d }
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "^[[Z"
       # ctrl-c delivers a real SIGINT to the foreground process group.
       - pty:
           shell: true

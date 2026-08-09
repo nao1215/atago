@@ -105,6 +105,26 @@ func TestPTYSend_YAMLRoundTrip(t *testing.T) {
 	}
 }
 
+// TestPTYSend_YAMLRoundTrip_EveryKey walks the WHOLE named-key vocabulary
+// through marshal-and-reload, so a key whose name YAML would mangle (the
+// punctuation aliases `ctrl-[`, `ctrl-\`, `ctrl-@`, and anything a later family
+// adds) cannot be introduced silently. `atago record --pty` writes these
+// mappings, so a name that does not survive a round trip would produce a
+// recording atago itself cannot reload.
+func TestPTYSend_YAMLRoundTrip_EveryKey(t *testing.T) {
+	t.Parallel()
+	for name := range ptyKeySequences {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			in := PTYSend{Key: name}
+			got := marshalReload(t, in)
+			if !reflect.DeepEqual(in, got) {
+				t.Errorf("send round-trip:\n in  = %+v\n got = %+v", in, got)
+			}
+		})
+	}
+}
+
 // TestJSONAssert_YAMLRoundTrip covers the pair `equals: null` and no `equals`
 // key at all (#309). The default struct marshal drops a null `equals` (omitempty
 // cannot see the difference between "null" and "unset"), which would rewrite a

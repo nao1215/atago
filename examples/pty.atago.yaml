@@ -64,10 +64,11 @@ scenarios:
       os: windows
     steps:
       # {key: <name>} presses a named key (#26) instead of embedding raw
-      # \x1b escape bytes: enter, tab, esc, space, backspace, delete, the
-      # arrows, home/end, pageup/pagedown, f1-f12, ctrl-a..ctrl-z, control-byte
-      # aliases such as ctrl-space / ctrl-[ / ctrl-_, and modified key events
-      # such as ctrl-hyphen for apps that care about the physical Ctrl+- key.
+      # \x1b escape bytes: enter, tab, shift-tab, esc, space, backspace,
+      # delete, insert, the arrows, home/end, pageup/pagedown, f1-f12,
+      # ctrl-a..ctrl-z, control-byte aliases such as ctrl-space / ctrl-[ /
+      # ctrl-_, and modified key events such as ctrl-hyphen for apps that care
+      # about the physical Ctrl+- key.
       # {key: ctrl-d} is the readable alias for the empty-send EOF rule.
       # `cat -v` renders control bytes visibly, so the down arrow it received
       # shows up as ^[[B in the transcript.
@@ -83,3 +84,36 @@ scenarios:
           exit_code: 0
           stdout:
             contains: "^[[B"
+
+  - name: the chords a TUI binds have names too
+    skip:
+      os: windows
+    steps:
+      # Beyond the plain keys, the vocabulary covers the chords form- and
+      # editor-style TUIs actually bind (#376): shift-tab (alias backtab) moves
+      # focus backwards, alt-a..alt-z are the ESC-prefixed Meta chords readline
+      # word operations use (with alt-enter and alt-backspace alongside), and
+      # the arrows take ctrl-/shift- modifiers for word-wise and selection
+      # movement. Each sends the sequence an xterm-class terminal would, which
+      # `cat -v` shows verbatim.
+      - pty:
+          command: cat -v
+          timeout: 10s
+          session:
+            - send: { key: shift-tab }
+            - send: { key: enter }
+            - expect: '\^\[\[Z'
+            - send: { key: alt-b }
+            - send: { key: enter }
+            - expect: '\^\[b'
+            - send: { key: ctrl-left }
+            - send: { key: enter }
+            - expect: '\^\[\[1;5D'
+            - send: { key: ctrl-d }
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "^[[Z" # shift-tab, i.e. CSI Z
+              - "^[b" # alt-b
+              - "^[[1;5D" # ctrl-left
