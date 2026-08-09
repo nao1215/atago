@@ -74,6 +74,36 @@ func TestGeneratePTY(t *testing.T) {
 			wantContain: []string{"send: {key: ctrl-c}", "exit_code: 130"},
 		},
 		{
+			// The families added in #376 record as readable keys too: without
+			// the reverse mapping these land in the spec as opaque \x1b escapes
+			// that a reader cannot tell apart from typed text.
+			name: "shift-tab records as its named key",
+			rec: PTYRecording{
+				Command:  "wizard",
+				ExitCode: 0,
+				Segments: []PTYSegment{
+					outSeg("Name: "),
+					inSeg("\x1b[Z"),
+				},
+			},
+			wantContain: []string{"send: {key: shift-tab}"},
+			wantAbsent:  []string{"backtab"},
+		},
+		{
+			name: "a meta chord and a modified arrow record as named keys",
+			rec: PTYRecording{
+				Command:  "editor",
+				ExitCode: 0,
+				Segments: []PTYSegment{
+					outSeg("> "),
+					inSeg("\x1bb"),
+					outSeg("> "),
+					inSeg("\x1b[1;5D"),
+				},
+			},
+			wantContain: []string{"send: {key: alt-b}", "send: {key: ctrl-left}"},
+		},
+		{
 			name: "multi-line output between inputs anchors on the last stable line",
 			rec: PTYRecording{
 				Command:  "wizard",

@@ -57,10 +57,11 @@ type PTYAction struct {
 	Expect string `yaml:"expect,omitempty"`
 	// Send writes to the terminal: a scalar string verbatim (the empty string
 	// sends EOF/^D; ${name} expansion applies) or {key: <name>} for a named
-	// key (#26) — enter, tab, esc, arrows, f1-f12, ctrl-a..ctrl-z, and common
-	// control-key aliases like ctrl-space / ctrl-[ / ctrl-_ plus terminal key
-	// events like ctrl-hyphen — so sessions stay readable instead of embedding
-	// \x1b escapes.
+	// key (#26) — enter, tab, shift-tab, esc, arrows, f1-f12, ctrl-a..ctrl-z,
+	// alt-a..alt-z, modified arrows like ctrl-left, and common control-key
+	// aliases like ctrl-space / ctrl-[ / ctrl-_ plus terminal key events like
+	// ctrl-hyphen (#376) — so sessions stay readable instead of embedding \x1b
+	// escapes.
 	Send *PTYSend `yaml:"send,omitempty"`
 	// ExpectScreen waits until the CURRENT rendered screen (the transcript
 	// replayed through the same vt10x emulator as a top-level `screen:` assert)
@@ -144,8 +145,8 @@ func (p PTYSend) MarshalYAML() (any, error) {
 
 // ptyKeySequences maps each named key (#26) to the xterm byte sequence it
 // transmits. Documented bytes: enter=\r, tab=\t, esc=\x1b, space=" ",
-// backspace=\x7f (DEL, the modern erase), delete=\x1b[3~, arrows
-// up/down/right/left=\x1b[A/B/C/D, home=\x1b[H, end=\x1b[F,
+// backspace=\x7f (DEL, the modern erase), delete=\x1b[3~, insert=\x1b[2~,
+// arrows up/down/right/left=\x1b[A/B/C/D, home=\x1b[H, end=\x1b[F,
 // pageup=\x1b[5~, pagedown=\x1b[6~, f1-f4=\x1bOP..\x1bOS,
 // f5..f12=\x1b[15~,[17~..[21~,[23~,[24~, ctrl-a..ctrl-z=0x01..0x1a,
 // plus the punctuation aliases terminals conventionally expose for the
@@ -154,6 +155,19 @@ func (p PTYSend) MarshalYAML() (any, error) {
 // not have a stable legacy C0 byte (e.g. Ctrl+-), use the terminal's CSI-u key
 // event instead so modern TUIs like Yazi see the intended modified key. ctrl-d
 // therefore stays the readable alias for the empty-send EOF rule.
+//
+// Three more families cover the chords real TUIs bind (#376), each the sequence
+// an xterm-class terminal sends for that physical key:
+//
+//   - shift-tab=\x1b[Z (CSI Z, "backtab"), the reverse-focus key every
+//     form-style TUI reads. `backtab` is an accepted alias for the same bytes.
+//   - alt-<letter>=\x1b<letter>, the ESC prefix a terminal transmits for a Meta
+//     chord (readline word operations, helix/emacs-style bindings), plus
+//     alt-enter=\x1b\r and alt-backspace=\x1b\x7f. Letters only: a Meta digit
+//     has no encoding stable enough to promise.
+//   - Modified arrows, in xterm's CSI 1 ; <modifier> <final> form —
+//     ctrl-<arrow>=\x1b[1;5A..D (word-wise cursor movement) and
+//     shift-<arrow>=\x1b[1;2A..D (selection movement).
 var ptyKeySequences = func() map[string]string {
 	m := map[string]string{
 		"enter":     "\r",
@@ -162,6 +176,9 @@ var ptyKeySequences = func() map[string]string {
 		"space":     " ",
 		"backspace": "\x7f",
 		"delete":    "\x1b[3~",
+		"insert":    "\x1b[2~",
+		"shift-tab": "\x1b[Z",
+		"backtab":   "\x1b[Z",
 		"up":        "\x1b[A",
 		"down":      "\x1b[B",
 		"right":     "\x1b[C",
@@ -185,6 +202,16 @@ var ptyKeySequences = func() map[string]string {
 	}
 	for c := byte('a'); c <= 'z'; c++ {
 		m["ctrl-"+string(c)] = string([]byte{c - 'a' + 1})
+		m["alt-"+string(c)] = "\x1b" + string(c)
+	}
+	m["alt-enter"] = "\x1b\r"
+	m["alt-backspace"] = "\x1b\x7f"
+	// Modified arrows share one shape: CSI 1 ; <modifier> <final>, where the
+	// modifier is 1+bitmask (shift 1, alt 2, ctrl 4) — so ctrl is 5 and shift 2.
+	for i, final := range []string{"A", "B", "C", "D"} {
+		name := []string{"up", "down", "right", "left"}[i]
+		m["ctrl-"+name] = "\x1b[1;5" + final
+		m["shift-"+name] = "\x1b[1;2" + final
 	}
 	m["ctrl-space"] = "\x00"
 	m["ctrl-@"] = "\x00"
@@ -215,16 +242,27 @@ var ptyKeyBySequence = func() map[string]string {
 	m["\x00"] = "ctrl-space"
 	for c := byte('a'); c <= 'z'; c++ {
 		m[string([]byte{c - 'a' + 1})] = "ctrl-" + string(c)
+		// alt-<letter> is two bytes (ESC + the letter), so it never collides
+		// with a single-byte ctrl chord or with a CSI sequence. A user who
+		// pressed Esc and then typed the letter produces the same bytes, and
+		// replaying {key: alt-x} reproduces them exactly either way.
+		m["\x1b"+string(c)] = "alt-" + string(c)
 	}
 	m["\x1c"] = "ctrl-\\"
 	m["\x1d"] = "ctrl-]"
 	m["\x1e"] = "ctrl-^"
 	m["\x1f"] = "ctrl-_"
 	m["\x1b[45;5u"] = "ctrl-hyphen"
+	// backtab is deliberately absent: it and shift-tab share \x1b[Z, and a
+	// recording reads better naming the key a keyboard has.
 	for _, name := range []string{
-		"enter", "tab", "esc", "space", "backspace", "delete",
+		"enter", "tab", "esc", "space", "backspace", "delete", "insert",
+		"shift-tab",
 		"up", "down", "right", "left", "home", "end",
 		"pageup", "pagedown",
+		"alt-enter", "alt-backspace",
+		"ctrl-up", "ctrl-down", "ctrl-right", "ctrl-left",
+		"shift-up", "shift-down", "shift-right", "shift-left",
 		"f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10", "f11", "f12",
 	} {
 		m[ptyKeySequences[name]] = name
@@ -243,7 +281,10 @@ func PTYKeyForSequence(seq string) (string, bool) {
 
 // PTYKeyNames lists the vocabulary for error messages, compactly.
 func PTYKeyNames() string {
-	return "enter, tab, esc, space, backspace, delete, up, down, left, right, home, end, pageup, pagedown, f1-f12, ctrl-a..ctrl-z, ctrl-space/ctrl-@, ctrl-[, ctrl-\\, ctrl-], ctrl-^, ctrl-_, ctrl-hyphen/ctrl-minus"
+	return "enter, tab, esc, space, backspace, delete, insert, up, down, left, right, home, end, pageup, pagedown, f1-f12, " +
+		"shift-tab (alias backtab), alt-a..alt-z, alt-enter, alt-backspace, " +
+		"ctrl-up/ctrl-down/ctrl-left/ctrl-right, shift-up/shift-down/shift-left/shift-right, " +
+		"ctrl-a..ctrl-z, ctrl-space/ctrl-@, ctrl-[, ctrl-\\, ctrl-], ctrl-^, ctrl-_, ctrl-hyphen/ctrl-minus"
 }
 
 // Bytes resolves the send payload to the bytes written to the terminal: the

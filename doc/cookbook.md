@@ -368,6 +368,47 @@ scenarios:
 
 Full spec: [pty_screen](../examples/pty_screen.atago.yaml)
 
+## Drive a TUI with the chords it binds
+
+```yaml
+version: "1"
+suite:
+  name: tui chords
+
+scenarios:
+  - name: the form walks focus backwards and edits a word
+    steps:
+      - pty:
+          command: mytool form
+          rows: 24
+          cols: 80
+          timeout: 10s
+          session:
+            - expect_screen:
+                contains: "Name"
+            # shift-tab (alias backtab) is the reverse-focus key every
+            # form-style TUI reads; tab alone only ever moves forward.
+            - send: { key: shift-tab }
+            - send: "widget-alpha"
+            # alt-<letter> is the ESC-prefixed Meta chord readline word
+            # operations use; alt-backspace kills the word behind the cursor.
+            - send: { key: alt-backspace }
+            # The arrows take ctrl- and shift- modifiers for word-wise and
+            # selection movement (xterm's CSI 1 ; modifier form).
+            - send: { key: ctrl-left }
+            - send: { key: shift-up }
+            - send: { key: esc }
+      - assert:
+          screen:
+            contains: "widget-"
+```
+
+Named keys exist so a session never embeds raw `\x1b` bytes. Run `atago run` on a spec with a
+misspelled key to see the whole accepted vocabulary — it is a load-time error, not a keystroke that
+silently does nothing.
+
+Full spec: [pty](../examples/pty.atago.yaml)
+
 ## Test an API-client CLI without the network
 
 ```yaml

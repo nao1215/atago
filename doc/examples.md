@@ -15,6 +15,7 @@
 | [Check what a CLI wrote to a database](cookbook.md#check-what-a-cli-wrote-to-a-database) | db runner, `query:` steps, `rows:` asserts |
 | [Test an interactive prompt](cookbook.md#test-an-interactive-prompt) | `pty:` expect/send sessions, named keys |
 | [Test a full-screen TUI](cookbook.md#test-a-full-screen-tui) | `screen:` rendered-frame asserts and snapshots |
+| [Drive a TUI with the chords it binds](cookbook.md#drive-a-tui-with-the-chords-it-binds) | `shift-tab`, `alt-*`, and modified arrows as named keys |
 | [Test an API-client CLI without the network](cookbook.md#test-an-api-client-cli-without-the-network) | `mock_servers:` + `mock:` request asserts |
 | [Test a CLI that starts a server](cookbook.md#test-a-cli-that-starts-a-server) | `services:` with readiness probes |
 | [Test graceful shutdown](cookbook.md#test-graceful-shutdown) | `signal:` steps with `wait:` |

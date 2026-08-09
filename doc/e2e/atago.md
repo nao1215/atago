@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-74 suites · 449 scenarios
+74 suites · 450 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -323,10 +323,11 @@
   - [metadata is found inside a compressed object stream](#scenario-metadata-is-found-inside-a-compressed-object-stream)
   - [a wrong expectation still fails against compressed metadata](#scenario-a-wrong-expectation-still-fails-against-compressed-metadata)
   - [a stream that ends without a newline does not swallow the next object](#scenario-a-stream-that-ends-without-a-newline-does-not-swallow-the-next-object)
-- [atago self-hosting / pty](#atago-self-hosting--pty) — 8 scenarios
+- [atago self-hosting / pty](#atago-self-hosting--pty) — 9 scenarios
   - [a pty step sees a terminal where a run step sees a pipe](#scenario-a-pty-step-sees-a-terminal-where-a-run-step-sees-a-pipe)
   - [a never-matching expect fails with the pattern in the block](#scenario-a-never-matching-expect-fails-with-the-pattern-in-the-block)
   - [named keys transmit their documented bytes and ctrl-c aborts](#scenario-named-keys-transmit-their-documented-bytes-and-ctrl-c-aborts)
+  - [shift-tab, meta chords, and modified arrows transmit their xterm bytes](#scenario-shift-tab-meta-chords-and-modified-arrows-transmit-their-xterm-bytes)
   - [an unknown key name is a load-time error listing the vocabulary](#scenario-an-unknown-key-name-is-a-load-time-error-listing-the-vocabulary)
   - [screen asserts see the final frame where the transcript sees history](#scenario-screen-asserts-see-the-final-frame-where-the-transcript-sees-history)
   - [a screen snapshot round-trips through update and compare](#scenario-a-screen-snapshot-round-trips-through-update-and-compare)
@@ -5965,11 +5966,26 @@ _skipped on Windows_
 #### When
 ```shell
 # interactive (pty): cat -v
-# interactive (pty): trap 'exit 130' INT; echo waiting; while true; do sleep 0.1; done
 ```
 #### Then
 - exit code is `0`
 - stdout contains `^[[B`, `^_`, `^[[45;5u`
+### Scenario: shift-tab, meta chords, and modified arrows transmit their xterm bytes
+_skipped on Windows_
+#### When
+```shell
+# interactive (pty): cat -v
+# interactive (pty): stty raw -echo; printf "READY\r\n"; head -c 3 | cat -v
+# interactive (pty): cat -v
+# interactive (pty): trap 'exit 130' INT; echo waiting; while true; do sleep 0.1; done
+```
+#### Then
+- exit code is `0`
+- stdout contains `^[[Z`, `^[b`, `^[[1;5D`, `^[[1;2A`, `^[[2~`
+- exit code is `0`
+- stdout contains `^[^?X`
+- exit code is `0`
+- stdout contains `^[[Z`
 - exit code is `130`
 ### Scenario: an unknown key name is a load-time error listing the vocabulary
 #### Given
