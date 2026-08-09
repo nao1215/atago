@@ -29,6 +29,10 @@ type transcriptDrain struct {
 	// its own output (#378). A terminal feature the program never asked for is
 	// one whose input atago must not fabricate.
 	modes map[int]bool
+	// resizes records where in the transcript each mid-session size change took
+	// effect (#379), so the replay that renders the screen applies the same
+	// sizes at the same points the live terminal did.
+	resizes []screenResize
 }
 
 func startTranscriptDrain(rw io.ReadWriter, p *spec.PTY) *transcriptDrain {
@@ -44,6 +48,12 @@ func startTranscriptDrain(rw io.ReadWriter, p *spec.PTY) *transcriptDrain {
 	go func() {
 		defer close(t.readDone)
 		buf := make([]byte, 4096)
+		// applied counts the size changes already handed to the query emulator.
+		// The emulator is resized HERE rather than in markResize so that a chunk
+		// is always fed to the emulator at the size that chunk was produced
+		// under: a resize recorded while this chunk was in flight belongs after
+		// it, and one recorded before it is applied below, before consume (#379).
+		applied := 0
 		for {
 			n, rerr := t.rw.Read(buf)
 			if n > 0 {
@@ -51,11 +61,19 @@ func startTranscriptDrain(rw io.ReadWriter, p *spec.PTY) *transcriptDrain {
 				// goroutine, so only the resulting transitions need guarding.
 				transitions := modeScan.consume(buf[:n])
 				t.mu.Lock()
+				// Read the pending resizes BEFORE appending: each was recorded
+				// at a transcript offset at or before this chunk's start, so it
+				// takes effect ahead of these bytes.
+				pending := append([]screenResize(nil), t.resizes[applied:]...)
 				t.transcript = append(t.transcript, buf[:n]...)
 				for _, m := range transitions {
 					t.modes[m.Param] = m.Enabled
 				}
 				t.mu.Unlock()
+				for _, r := range pending {
+					queries.resize(r.rows, r.cols)
+				}
+				applied += len(pending)
 				queries.consume(buf[:n])
 			}
 			if rerr == nil {
@@ -117,17 +135,50 @@ func (t *transcriptDrain) currentScreen() []byte {
 		return screen
 	}
 	snap := append([]byte(nil), t.transcript...)
+	sizes := append([]screenResize(nil), t.resizes...)
 	t.mu.Unlock()
 
-	rendered := []byte(RenderScreen(snap, t.p))
+	rendered := []byte(renderScreenResized(snap, t.p, sizes))
 
 	t.mu.Lock()
-	if len(t.transcript) == n {
+	// Re-check the resize count as well as the length: markResize invalidates
+	// the cache by clearing screenLen, and a resize with no new bytes after it
+	// would otherwise let this stale render be cached back in.
+	if len(t.transcript) == n && len(t.resizes) == len(sizes) {
 		t.screenCache = append(t.screenCache[:0], rendered...)
 		t.screenLen = n
 	}
 	t.mu.Unlock()
 	return rendered
+}
+
+// snapshotResizes copies the recorded size changes for a final render.
+func (t *transcriptDrain) snapshotResizes() []screenResize {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return append([]screenResize(nil), t.resizes...)
+}
+
+// markResize records that the terminal is about to become rows×cols, anchored
+// at the transcript length right now (#379). Taking the length under the same
+// lock the reader appends under is what makes the anchor meaningful: everything
+// already read is attributed to the old size, and everything read afterwards to
+// the new one. Output the program had already emitted but that has not been
+// read yet lands after the anchor — which is exactly what a real terminal does
+// with bytes still in flight when the window changes, and why the documented
+// authoring rule is to settle the screen before resizing.
+func (t *transcriptDrain) markResize(rows, cols int) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.resizes = append(t.resizes, screenResize{offset: len(t.transcript), rows: rows, cols: cols})
+	// The cached screen was rendered under the old sizes.
+	t.screenLen = -1
+	// The live query emulator is NOT resized here. Resizing it from this
+	// goroutine could land between the reader appending a chunk and feeding that
+	// same chunk to the emulator, so bytes produced at the old size would be
+	// replayed at the new one — and a cursor-position request inside them would
+	// be answered with coordinates from a screen the program has not seen yet.
+	// The reader applies the change instead, in order with the chunks.
 }
 
 // modeEnabled reports whether the program currently has a DEC private mode on,

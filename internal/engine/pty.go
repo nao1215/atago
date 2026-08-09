@@ -69,6 +69,9 @@ func (e *Engine) runPTY(ctx context.Context, p *spec.PTY, st *store.Store, scena
 				}
 				na.Send = &cs
 			}
+			// A resize carries only integers, so it needs no expansion — but it
+			// still has to be carried into the copy the runner drives (#379).
+			na.Resize = a.Resize
 			na.ExpectScreen = spec.WalkPTYExpectScreenStrings(a.ExpectScreen, st.Expand)
 			c.Session[i] = na
 		}

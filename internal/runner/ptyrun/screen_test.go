@@ -1,6 +1,7 @@
 package ptyrun
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 	"time"
@@ -145,5 +146,145 @@ func TestRenderScreen_TruncatesAtCols(t *testing.T) {
 	lines := strings.Split(got, "\n")
 	if len(lines) < 2 || len(lines[0]) != 10 || len(lines[1]) != 5 {
 		t.Errorf("screen = %q, want a 10-col wrap then 5 leftover chars", got)
+	}
+}
+
+// TestRenderScreenResized proves the rendered screen follows a mid-session
+// resize (#379): each part of the transcript is drawn under the size it was
+// actually produced under, so a frame written at 10 columns is not re-flowed by
+// a later widening — and one written after the widening is not truncated to the
+// old width.
+func TestRenderScreenResized(t *testing.T) {
+	t.Parallel()
+	// "abcdefghij" fills a 10-column row; at 10 columns the trailing "XY" wraps
+	// onto the next line, at 30 it stays on one.
+	transcript := []byte("abcdefghijXY\r\n")
+	narrow := RenderScreen(transcript, &spec.PTY{Rows: 5, Cols: 10})
+	if narrow != "abcdefghij\nXY" {
+		t.Fatalf("baseline at 10 cols = %q", narrow)
+	}
+
+	// The resize lands BEFORE those bytes, so they are drawn at 30 columns.
+	got := renderScreenResized(transcript, &spec.PTY{Rows: 5, Cols: 10},
+		[]screenResize{{offset: 0, rows: 5, cols: 30}})
+	if got != "abcdefghijXY" {
+		t.Errorf("after widening = %q, want one unwrapped line", got)
+	}
+
+	// The resize lands AFTER them, so they keep the wrap they were drawn with.
+	got = renderScreenResized(transcript, &spec.PTY{Rows: 5, Cols: 10},
+		[]screenResize{{offset: len(transcript), rows: 5, cols: 30}})
+	if got != "abcdefghij\nXY" {
+		t.Errorf("resize after the output = %q, want the original wrap kept", got)
+	}
+}
+
+// TestRenderScreenResized_OffsetsAreClamped keeps a recorded offset that no
+// longer indexes the transcript (a shorter snapshot, an offset past the end)
+// from panicking the render, since a screen assert runs on whatever bytes have
+// arrived rather than on a finished transcript.
+func TestRenderScreenResized_OffsetsAreClamped(t *testing.T) {
+	t.Parallel()
+	transcript := []byte("hello\r\n")
+	for _, sizes := range [][]screenResize{
+		{{offset: -5, rows: 4, cols: 20}},
+		{{offset: 999, rows: 4, cols: 20}},
+		// Out of order: the second offset precedes the first.
+		{{offset: 5, rows: 4, cols: 20}, {offset: 1, rows: 6, cols: 30}},
+	} {
+		got := renderScreenResized(transcript, &spec.PTY{Rows: 4, Cols: 20}, sizes)
+		if !strings.Contains(got, "hello") {
+			t.Errorf("resizes %+v lost the output: %q", sizes, got)
+		}
+	}
+}
+
+// TestRenderScreen_NoResizesIsUnchanged pins that adding the resize path did not
+// move the ordinary case: with no size changes the render is byte-identical to
+// what the one-segment version produced.
+func TestRenderScreen_NoResizesIsUnchanged(t *testing.T) {
+	t.Parallel()
+	transcript := []byte("loading...\rdone.     \r\n")
+	if got, want := renderScreenResized(transcript, &spec.PTY{Rows: 5, Cols: 20}, nil),
+		RenderScreen(transcript, &spec.PTY{Rows: 5, Cols: 20}); got != want {
+		t.Errorf("resized render = %q, plain render = %q", got, want)
+	}
+}
+
+// TestSanitizeTranscriptMarks_CutsLandOnUnitBoundaries is the regression for
+// the hang FuzzRenderScreen found while #379 was being written: the resized
+// render first cut the RAW transcript and sanitized each piece, so a cut inside
+// "\x1b[80111111110Z" hid the sequence from the repeat-count clamp — the pieces
+// passed through as a truncated CSI plus ordinary digits, vt10x's stateful
+// parser put them back together, and the render spun for minutes on a
+// quadrillion-step tab.
+//
+// Translating the offset instead keeps the clamp in force, and lands the cut on
+// a boundary between whole units so no sequence is ever split.
+func TestSanitizeTranscriptMarks_CutsLandOnUnitBoundaries(t *testing.T) {
+	t.Parallel()
+	raw := []byte("x\x1b[80111111110Zy")
+	// A mark in the middle of the sequence.
+	sanitized, cuts := sanitizeTranscriptMarks(raw, []int{len(raw) / 2})
+	if len(cuts) != 1 {
+		t.Fatalf("got %d translated offsets, want 1", len(cuts))
+	}
+	// The clamp still applied: the absurd repeat count is not in the output.
+	if bytes.Contains(sanitized, []byte("80111111110")) {
+		t.Errorf("the repeat count survived sanitizing: %q", sanitized)
+	}
+	// Neither piece ends mid-sequence: writing them in order is the same as
+	// writing the whole buffer.
+	head, tail := sanitized[:cuts[0]], sanitized[cuts[0]:]
+	if bytes.Contains(head, []byte{0x1b}) && !bytes.HasSuffix(head, []byte("Z")) {
+		t.Errorf("head %q ends inside a sequence", head)
+	}
+	if got := string(append(append([]byte(nil), head...), tail...)); got != string(sanitized) {
+		t.Errorf("pieces do not reassemble: %q", got)
+	}
+
+	// The render through that cut must finish promptly rather than hang.
+	done := make(chan string, 1)
+	go func() {
+		done <- renderScreenResized(raw, &spec.PTY{Rows: 5, Cols: 40},
+			[]screenResize{{offset: len(raw) / 2, rows: 5, cols: 40}})
+	}()
+	select {
+	case got := <-done:
+		// The clamped back-tab still runs, so what remains on screen is whatever
+		// the clamped sequence produced — the same thing the unsplit render
+		// produces. Equality is the real claim: cutting the transcript for a
+		// resize must not change what the frame says.
+		if want := RenderScreen(raw, &spec.PTY{Rows: 5, Cols: 40}); got != want {
+			t.Errorf("split render = %q, unsplit render = %q", got, want)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("renderScreenResized hangs when a resize falls inside a CSI sequence")
+	}
+}
+
+// TestSanitizeTranscriptMarks_TranslatesEveryOffset covers the plain
+// bookkeeping: one translated offset per mark, ascending, always inside the
+// sanitized buffer — including the no-ESC fast path and offsets past the end.
+func TestSanitizeTranscriptMarks_TranslatesEveryOffset(t *testing.T) {
+	t.Parallel()
+	for _, raw := range [][]byte{
+		[]byte("plain text with no escapes"),
+		[]byte("a\x1b[31mred\x1b[0mb"),
+		[]byte("\x1b[-5@dropped\x1b[2J"),
+	} {
+		marks := []int{0, 1, len(raw) / 2, len(raw), len(raw) + 100}
+		sanitized, cuts := sanitizeTranscriptMarks(raw, marks)
+		if len(cuts) != len(marks) {
+			t.Fatalf("%q: got %d offsets for %d marks", raw, len(cuts), len(marks))
+		}
+		for i, c := range cuts {
+			if c < 0 || c > len(sanitized) {
+				t.Errorf("%q: offset %d = %d, outside the sanitized buffer (len %d)", raw, i, c, len(sanitized))
+			}
+			if i > 0 && c < cuts[i-1] {
+				t.Errorf("%q: offsets not ascending: %v", raw, cuts)
+			}
+		}
 	}
 }

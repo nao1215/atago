@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"os/exec"
 	"runtime"
@@ -91,7 +92,17 @@ func Run(ctx context.Context, p *spec.PTY, workdir string, env []string) (*runne
 		// Negative pid signals the whole process group created by Setsid.
 		kill:      func() { _ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) },
 		closeTerm: func() { _ = master.Close() },
-		dir:       cmd.Dir,
+		// TIOCSWINSZ on the master is the whole mechanism: the kernel records
+		// the new size AND sends SIGWINCH to the terminal's foreground process
+		// group, so the child learns about it exactly as it would from a real
+		// window change (#379).
+		resize: func(rows, cols int) error {
+			if rows < 1 || cols < 1 || rows > math.MaxUint16 || cols > math.MaxUint16 {
+				return fmt.Errorf("size %dx%d is out of range for a terminal", rows, cols)
+			}
+			return pty.Setsize(master, &pty.Winsize{Rows: uint16(rows), Cols: uint16(cols)})
+		},
+		dir: cmd.Dir,
 	}
 	return driveSession(ctx, p, proc)
 }

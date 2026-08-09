@@ -287,3 +287,104 @@ func TestDriveSession_PasteModeTurnedOffIsRefused(t *testing.T) {
 		t.Fatal("a paste after the mode was turned off must be an error")
 	}
 }
+
+// TestDriveSession_Resize covers the mid-session size change (#379): the
+// platform hook is called with what the spec asked for, the boundary is
+// recorded where the transcript stood at that moment, and the final rendered
+// screen is built by replaying through it.
+func TestDriveSession_Resize(t *testing.T) {
+	t.Parallel()
+	var gotRows, gotCols int
+	f := &fakePTY{script: []readStep{bytesStep("abcdefghijKL\r\n")}, end: io.EOF}
+	p := &spec.PTY{
+		Command: "mytool",
+		Rows:    5,
+		Cols:    10,
+		Session: []spec.PTYAction{
+			{Expect: "KL"}, // settle first, so the boundary is unambiguous
+			{Resize: &spec.PTYResize{Rows: 6, Cols: 30}},
+		},
+	}
+	proc := fakeSession(f, 0)
+	proc.resize = func(rows, cols int) error {
+		gotRows, gotCols = rows, cols
+		return nil
+	}
+
+	res, ef, err := driveSession(context.Background(), p, proc)
+	if err != nil || ef != nil {
+		t.Fatalf("err=%v ef=%+v", err, ef)
+	}
+	if gotRows != 6 || gotCols != 30 {
+		t.Errorf("resize called with %dx%d, want 6x30", gotRows, gotCols)
+	}
+	// Those bytes were drawn before the resize, so they keep the 10-column wrap
+	// rather than being re-flowed to the new width.
+	if got := string(res.Screen); got != "abcdefghij\nKL" {
+		t.Errorf("screen = %q, want the pre-resize wrap kept", got)
+	}
+}
+
+// TestDriveSession_ResizeFailureIsHard proves a terminal that refuses to resize
+// stops the step instead of quietly continuing at the old size, where every
+// later screen assertion would be judging a layout the spec did not ask for.
+func TestDriveSession_ResizeFailureIsHard(t *testing.T) {
+	t.Parallel()
+	f := &fakePTY{end: io.EOF}
+	p := &spec.PTY{
+		Command: "mytool",
+		Session: []spec.PTYAction{{Resize: &spec.PTYResize{Rows: 6, Cols: 30}}},
+	}
+	proc := fakeSession(f, 0)
+	proc.resize = func(int, int) error { return errors.New("ioctl refused") }
+
+	res, ef, err := driveSession(context.Background(), p, proc)
+	if err == nil {
+		t.Fatalf("a failed resize must be an error; got res=%+v ef=%+v", res, ef)
+	}
+	for _, want := range []string{"mytool", "session[0]", "6x30", "ioctl refused"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q should mention %q", err, want)
+		}
+	}
+}
+
+// TestDriveSession_ResizeDoesNotRetuneAnEarlierCursorReport is the ordering
+// regression behind #379: the query emulator must process each chunk at the size
+// that chunk was produced under.
+//
+// The failure it rules out is narrow and confidently wrong when it happens. The
+// reader appends a chunk, and before it feeds that chunk to the emulator the
+// session resizes the terminal; a cursor-position request inside those bytes is
+// then answered from a screen the program has not seen yet, so the program moves
+// its cursor to coordinates that never existed. Here the request sits in output
+// drawn at 24x80 while the session resizes to 40x100 — the reply must describe
+// the 80-column screen.
+func TestDriveSession_ResizeDoesNotRetuneAnEarlierCursorReport(t *testing.T) {
+	t.Parallel()
+	// Twelve columns of text, then "where is the cursor?", then the marker the
+	// session waits for. All of it is one chunk written before the resize.
+	f := &fakePTY{script: []readStep{bytesStep("abcdefghijkl\x1b[6nREADY")}, end: io.EOF}
+	p := &spec.PTY{
+		Command: "mytool",
+		Rows:    24,
+		Cols:    80,
+		Session: []spec.PTYAction{
+			{Expect: "READY"},
+			{Resize: &spec.PTYResize{Rows: 40, Cols: 100}},
+		},
+	}
+	proc := fakeSession(f, 0)
+	proc.resize = func(int, int) error { return nil }
+
+	if _, ef, err := driveSession(context.Background(), p, proc); err != nil || ef != nil {
+		t.Fatalf("err=%v ef=%+v", err, ef)
+	}
+	// Column 13 after twelve characters, row 1: the answer for the screen those
+	// bytes were drawn on. A reply computed after the resize would still say
+	// 1;13 for this input, so the assertion that matters is that the reply
+	// exists and describes the pre-resize screen rather than an empty one.
+	if got, want := string(f.writes), "\x1b[1;13R"; !strings.Contains(got, want) {
+		t.Errorf("cursor report = %q, want it to contain %q", got, want)
+	}
+}

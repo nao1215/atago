@@ -9,6 +9,13 @@ import (
 	"github.com/nao1215/atago/internal/spec"
 )
 
+// screenResize is one mid-session terminal size change, anchored at the byte
+// offset in the RAW transcript where it took effect (#379).
+type screenResize struct {
+	offset     int
+	rows, cols int
+}
+
 // RenderScreen replays a pty transcript through a vt10x terminal emulator and
 // returns the final rendered screen as plain text (#27): what the user
 // actually SEES after every cursor move, overwrite, and erase — the signal a
@@ -16,6 +23,22 @@ import (
 // line and trailing blank lines are dropped; colors and attributes are out of
 // scope in v1.
 func RenderScreen(transcript []byte, p *spec.PTY) string {
+	return renderScreenResized(transcript, p, nil)
+}
+
+// renderScreenResized is RenderScreen for a session that changed size while it
+// ran (#379): the transcript is replayed in pieces, resizing the emulator at
+// each recorded boundary, so every part of the frame is drawn under the size it
+// was actually produced under. With no resizes it is one piece and behaves
+// exactly as before.
+//
+// The whole transcript is sanitized ONCE and the pieces are cut from the result.
+// Sanitizing each raw piece separately would be a different thing entirely: a
+// cut inside an escape sequence hides it from the scanner, and vt10x's stateful
+// parser reassembles it on the far side — which is how a clamped repeat count
+// gets back its quadrillion steps. sanitizeTranscriptMarks translates the
+// offsets instead, landing every cut on a boundary between whole units.
+func renderScreenResized(transcript []byte, p *spec.PTY, resizes []screenResize) string {
 	rows, cols := defaultRows, defaultCols
 	if p.Rows > 0 {
 		rows = p.Rows
@@ -24,7 +47,29 @@ func RenderScreen(transcript []byte, p *spec.PTY) string {
 		cols = p.Cols
 	}
 	term := vt10x.New(vt10x.WithSize(cols, rows))
-	writeTranscript(term, sanitizeTranscript(transcript))
+
+	// Offsets must be ascending and inside the transcript for the translation
+	// to mean anything; a recorded offset can be neither when the screen is
+	// rendered from a snapshot shorter than the one the resize was recorded
+	// against.
+	marks := make([]int, len(resizes))
+	prev := 0
+	for i, r := range resizes {
+		prev = min(max(r.offset, prev), len(transcript))
+		marks[i] = prev
+	}
+	sanitized, cuts := sanitizeTranscriptMarks(transcript, marks)
+
+	at := 0
+	for i, r := range resizes {
+		cut := min(max(cuts[i], at), len(sanitized))
+		writeTranscript(term, sanitized[at:cut])
+		// vt10x takes cols first; getting that backwards silently transposes
+		// every frame after a resize.
+		term.Resize(r.cols, r.rows)
+		at = cut
+	}
+	writeTranscript(term, sanitized[at:])
 
 	lines := strings.Split(term.String(), "\n")
 	for i, l := range lines {
@@ -63,8 +108,9 @@ func writeTranscript(term vt10x.Terminal, transcript []byte) {
 // otherwise spin the emulator for minutes. 9999 iterations are instant.
 const maxCSIParamDigits = 4
 
-// sanitizeTranscript defuses the transcript shapes that crash or hang vt10x's
-// parser, mirroring exactly what its Write loop and state machine will see:
+// sanitizeTranscriptMarks defuses the transcript shapes that crash or hang
+// vt10x's parser, mirroring exactly what its Write loop and state machine will
+// see:
 //
 //   - Write silently DROPS lone invalid-UTF-8 bytes without touching parser
 //     state, and handleControlCodes makes NUL/ENQ/XON/XOFF/DEL (and friends)
@@ -85,14 +131,48 @@ const maxCSIParamDigits = 4
 //
 // Clean sequences — including OSC runs and truncated trailing escapes — pass
 // through byte-for-byte.
-func sanitizeTranscript(b []byte) []byte {
+//
+// It also translates offsets: given raw transcript offsets in ascending order,
+// it returns where each one lands in the sanitized output (#379). Mid-session
+// resizes need that. The screen is rendered by replaying the transcript in
+// pieces and resizing the emulator between them, and the pieces must be cut
+// from the SANITIZED bytes, not the raw ones. Sanitizing each raw piece
+// separately looks equivalent and is not: a cut inside an escape sequence hides
+// that sequence from the scan above, so `\x1b[80111111110Z` split down the
+// middle passes through as a truncated CSI plus ordinary text, reassembles
+// inside vt10x's stateful parser, and hangs the render on a quadrillion-step
+// tab. FuzzRenderScreen finds that in seconds.
+//
+// Each mark is translated to the output length at the moment the scan reaches
+// (or passes) it, which is always a boundary between whole units — so the
+// pieces the caller cuts never split a sequence either. Pass a nil marks slice
+// to sanitize alone.
+func sanitizeTranscriptMarks(b []byte, marks []int) ([]byte, []int) {
 	if bytes.IndexByte(b, 0x1b) < 0 {
-		return b // no ESC: nothing can start a CSI sequence.
+		// No ESC: nothing can start a CSI sequence, so the bytes pass through
+		// unchanged and every offset means the same thing in both buffers.
+		translated := make([]int, len(marks))
+		for k, m := range marks {
+			translated[k] = min(max(m, 0), len(b))
+		}
+		return b, translated
 	}
 	out := make([]byte, 0, len(b))
+	translated := make([]int, 0, len(marks))
+	next := 0
+	// flushMarks records every mark the scan has now reached. It runs at the top
+	// of each iteration, where `i` sits on the first byte of the next unit and
+	// `out` holds only whole units — which is what makes a cut here safe.
+	flushMarks := func(i int) {
+		for next < len(marks) && marks[next] <= i {
+			translated = append(translated, len(out))
+			next++
+		}
+	}
 	i := 0
 scan:
 	for i < len(b) {
+		flushMarks(i)
 		if b[i] != 0x1b {
 			out = append(out, b[i])
 			i++
@@ -211,7 +291,12 @@ scan:
 		}
 		i = k
 	}
-	return out
+	// Anything still pending sat at or past the end of the transcript.
+	for next < len(marks) {
+		translated = append(translated, len(out))
+		next++
+	}
+	return out, translated
 }
 
 // clampDigitRuns rewrites every digit run longer than maxCSIParamDigits to

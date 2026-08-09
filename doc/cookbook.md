@@ -412,6 +412,51 @@ silently does nothing.
 
 Full spec: [pty](../examples/pty.atago.yaml)
 
+## Prove a TUI survives a window resize
+
+Relayout is where full-screen TUIs break: a stale right edge, a panel that keeps its old
+width, a crash on a zero-width column. `resize:` changes the terminal size while the program
+is running, so that path is testable instead of fixed at whatever the step started with.
+
+```yaml
+version: "1"
+suite:
+  name: tui resize
+
+scenarios:
+  - name: the dashboard relayouts when the window grows
+    steps:
+      - pty:
+          command: mytool dashboard
+          rows: 24
+          cols: 80
+          timeout: 30s
+          session:
+            # Settle the screen BEFORE resizing. Output still in flight when the
+            # resize lands is attributed to the old size, exactly as on a real
+            # terminal, so a quiet screen is what makes the boundary clean.
+            - expect_screen:
+                contains: "Status"
+                stable_for: 200ms
+            - resize: { rows: 40, cols: 120 }
+            # And settle again afterwards: the program redraws on its own
+            # schedule, so wait for the wider layout rather than assuming it.
+            - expect_screen:
+                contains: "Last updated"    # a column that only fits at 120
+                stable_for: 200ms
+            - send: "q"
+      - assert:
+          exit_code: 0
+```
+
+The size change reaches the program the way a real terminal delivers it — `SIGWINCH` on
+POSIX, a ConPTY notification on Windows — so anything that redraws on a window change
+redraws. The rendered screen follows too: each part of the transcript is drawn at the size it
+was produced under, so a frame written before the resize keeps the wrapping it was written
+with.
+
+Full spec: [pty_screen](../examples/pty_screen.atago.yaml)
+
 ## Paste into a REPL
 
 A REPL that enables bracketed paste treats a pasted block as one unit: it must not run

@@ -92,6 +92,19 @@ func FuzzRenderScreen(f *testing.F) {
 
 		got := RenderScreen(transcript, &spec.PTY{Rows: rows, Cols: cols})
 
+		// The resized path (#379) splits the transcript and sanitizes each piece
+		// on its own, so a boundary can fall inside an escape sequence — the one
+		// shape the whole-buffer sanitizer never sees. Replay the same input
+		// through a mid-transcript resize so the fuzzer attacks that split too;
+		// it must survive on the same terms (no panic, no hang, valid UTF-8).
+		if len(transcript) > 1 {
+			resized := renderScreenResized(transcript, &spec.PTY{Rows: rows, Cols: cols},
+				[]screenResize{{offset: len(transcript) / 2, rows: rows, cols: cols}})
+			if !utf8.ValidString(resized) {
+				t.Fatalf("renderScreenResized returned invalid UTF-8: %q\ntranscript=%q rows=%d cols=%d", resized, transcript, rows, cols)
+			}
+		}
+
 		if !utf8.ValidString(got) {
 			t.Fatalf("RenderScreen returned invalid UTF-8: %q\ntranscript=%q rows=%d cols=%d", got, transcript, rows, cols)
 		}

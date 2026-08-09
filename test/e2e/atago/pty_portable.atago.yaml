@@ -84,6 +84,40 @@ scenarios:
           screen:
             contains: "rendered line"
 
+  # A mid-session resize (#379) reaches the terminal through a different call on
+  # each platform — TIOCSWINSZ on a POSIX master, ResizePseudoConsole on a
+  # ConPTY — and only this suite runs on Windows, so this is where the Windows
+  # half of that is exercised at all.
+  #
+  # What it claims is deliberately narrow: the resize call succeeds against a
+  # live terminal and the session carries on to a clean exit. Proving the
+  # program was TOLD (SIGWINCH) and that the rendered frame keeps its pre-resize
+  # wrapping needs `stty` and a controlled `printf`, neither of which is a
+  # cmd.exe builtin, so those claims live in pty.atago.yaml's POSIX scenario.
+  - name: a mid-session resize succeeds on every platform
+    steps:
+      - pty:
+          shell: true
+          command: echo before resize && echo after resize
+          rows: 10
+          cols: 40
+          timeout: 15s
+          session:
+            - expect: "before resize" # a live terminal to resize
+            - resize: { rows: 24, cols: 100 }
+            - expect: "after resize" # the session still works afterwards
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "before resize"
+              - "after resize"
+      # The screen renders through the recorded size change rather than being
+      # abandoned by it.
+      - assert:
+          screen:
+            contains: "after resize"
+
   - name: a pty step drives the atago binary directly with no shell
     steps:
       - pty:

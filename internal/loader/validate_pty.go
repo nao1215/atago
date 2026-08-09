@@ -26,11 +26,12 @@ func validatePTY(add func(string, ...any), where string, p *spec.PTY) {
 		hasExpect := a.Expect != ""
 		hasSend := a.Send != nil
 		hasExpectScreen := a.ExpectScreen != nil
+		hasResize := a.Resize != nil
 		switch {
-		case countBools(hasExpect, hasSend, hasExpectScreen) > 1:
-			add("%s: set exactly one of expect/send/expect_screen (got more than one)", aw)
-		case !hasExpect && !hasSend && !hasExpectScreen:
-			add("%s: set exactly one of expect/send/expect_screen (an empty send: \"\" transmits EOF)", aw)
+		case countBools(hasExpect, hasSend, hasExpectScreen, hasResize) > 1:
+			add("%s: set exactly one of expect/send/expect_screen/resize (got more than one)", aw)
+		case !hasExpect && !hasSend && !hasExpectScreen && !hasResize:
+			add("%s: set exactly one of expect/send/expect_screen/resize (an empty send: \"\" transmits EOF)", aw)
 		case hasExpect:
 			if _, err := regexp.Compile(a.Expect); err != nil {
 				add("%s.expect %q is not a valid regexp: %v", aw, a.Expect, err)
@@ -43,6 +44,14 @@ func validatePTY(add func(string, ...any), where string, p *spec.PTY) {
 			}
 		case hasExpectScreen:
 			validatePTYExpectScreen(add, aw+".expect_screen", a.ExpectScreen)
+		case hasResize:
+			// Both dimensions are required: a resize that names one side would
+			// have to invent the other, and a terminal has no natural "keep".
+			if a.Resize.Rows < 1 || a.Resize.Cols < 1 {
+				add("%s.resize: rows and cols are both required and must be at least 1", aw)
+			} else if a.Resize.Rows > 65535 || a.Resize.Cols > 65535 {
+				add("%s.resize: rows/cols must be between 1 and 65535", aw)
+			}
 		}
 	}
 }
