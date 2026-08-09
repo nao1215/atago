@@ -100,7 +100,9 @@ func validatePTYMouse(add func(string, ...any), where string, m *spec.PTYMouse) 
 }
 
 func validatePTYExpectScreen(add func(string, ...any), where string, es *spec.PTYExpectScreen) {
-	validateStream(add, where, &es.StreamAssert)
+	// Share the screen validator so a mid-session wait accepts exactly what the
+	// post-step assert does — including an attrs-only wait (#382).
+	validateScreen(add, where, &es.ScreenAssert)
 	if es.Snapshot != "" {
 		add("%s.snapshot is not supported in expect_screen; use a post-step assert screen snapshot or text matchers here", where)
 	}

@@ -375,6 +375,59 @@ scenarios:
               - "has not enabled mouse reporting"
               - "ESC [?1000h"
 
+  # The visual grammar a TUI relies on (#382): the error is red, the selected
+  # row is reverse-video, and text the program never colored really is
+  # uncolored — which is what makes a --no-color contract assertable.
+  - name: screen attrs check colors and styling, not only text
+    skip:
+      os: windows
+    steps:
+      - pty:
+          shell: true
+          command: "printf '\\033[1;31mERROR\\033[0m plain\\r\\n\\033[7mSELECTED\\033[0m\\r\\n'"
+          rows: 6
+          cols: 40
+      - assert:
+          screen:
+            contains: ERROR
+            attrs:
+              # A terminal draws bold text in the BRIGHT variant of its color,
+              # so the emulator reports index 9 here; `fg: red` still means the
+              # SGR 31 the program emitted.
+              - { text: ERROR, fg: red, bold: true }
+              # `bold: false` is a claim, not the absence of one, and
+              # `fg: default` is how "no color was set" is stated.
+              - { text: plain, fg: default, bold: false }
+              - { text: SELECTED, reverse: true, row: 2 }
+      # A styling claim that does not hold fails, and the message says what was
+      # found instead — without that, the feature would be a way to write
+      # assertions that quietly pass.
+      - fixture:
+          file: badattrs.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: the error is not green
+                steps:
+                  - pty:
+                      shell: true
+                      command: "printf '\\033[31mERROR\\033[0m\\r\\n'"
+                      rows: 4
+                      cols: 20
+                  - assert:
+                      screen:
+                        attrs:
+                          - {text: ERROR, fg: green}
+      - run:
+          command: ${atago} run badattrs.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - "fg=red (wanted green)"
+
   - name: an unknown key name is a load-time error listing the vocabulary
     steps:
       - fixture:

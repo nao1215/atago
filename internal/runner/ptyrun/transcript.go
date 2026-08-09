@@ -7,6 +7,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/nao1215/atago/internal/runner"
 	"github.com/nao1215/atago/internal/spec"
 )
 
@@ -25,6 +26,7 @@ type transcriptDrain struct {
 	readDone    chan struct{}
 	screenLen   int
 	screenCache []byte
+	cellsCache  [][]runner.ScreenCell
 	// modes records the DEC private modes the program has requested, read off
 	// its own output (#378). A terminal feature the program never asked for is
 	// one whose input atago must not fabricate.
@@ -126,19 +128,23 @@ func (t *transcriptDrain) curLen() int {
 	return len(t.transcript)
 }
 
-func (t *transcriptDrain) currentScreen() []byte {
+// currentScreen renders the live screen, returning both the plain text and the
+// cells behind it (#382) so a mid-session wait can ask about styling too.
+func (t *transcriptDrain) currentScreen() ([]byte, [][]runner.ScreenCell) {
 	t.mu.Lock()
 	n := len(t.transcript)
 	if n == t.screenLen {
 		screen := append([]byte(nil), t.screenCache...)
+		cells := t.cellsCache
 		t.mu.Unlock()
-		return screen
+		return screen, cells
 	}
 	snap := append([]byte(nil), t.transcript...)
 	sizes := append([]screenResize(nil), t.resizes...)
 	t.mu.Unlock()
 
-	rendered := []byte(renderScreenResized(snap, t.p, sizes))
+	text, cells := renderScreenCells(snap, t.p, sizes)
+	rendered := []byte(text)
 
 	t.mu.Lock()
 	// Re-check the resize count as well as the length: markResize invalidates
@@ -146,10 +152,11 @@ func (t *transcriptDrain) currentScreen() []byte {
 	// would otherwise let this stale render be cached back in.
 	if len(t.transcript) == n && len(t.resizes) == len(sizes) {
 		t.screenCache = append(t.screenCache[:0], rendered...)
+		t.cellsCache = cells
 		t.screenLen = n
 	}
 	t.mu.Unlock()
-	return rendered
+	return rendered, cells
 }
 
 // snapshotResizes copies the recorded size changes for a final render.

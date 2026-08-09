@@ -76,6 +76,10 @@ type Result struct {
 	// assertion target (#27); Stdout keeps the raw transcript.
 	IsPTY  bool
 	Screen []byte
+	// ScreenCells is the same screen with its colors and attributes intact, for
+	// the `attrs:` matchers (#382). Screen is derived from it, so the two can
+	// never disagree about what is on which row.
+	ScreenCells [][]ScreenCell
 
 	// Browser fields, set only by the browser/CDP runner. CDPValue is the value
 	// captured by the last text/eval action (the document the `value` assertion

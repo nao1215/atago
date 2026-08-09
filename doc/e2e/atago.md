@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-74 suites · 455 scenarios
+74 suites · 456 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -323,7 +323,7 @@
   - [metadata is found inside a compressed object stream](#scenario-metadata-is-found-inside-a-compressed-object-stream)
   - [a wrong expectation still fails against compressed metadata](#scenario-a-wrong-expectation-still-fails-against-compressed-metadata)
   - [a stream that ends without a newline does not swallow the next object](#scenario-a-stream-that-ends-without-a-newline-does-not-swallow-the-next-object)
-- [atago self-hosting / pty](#atago-self-hosting--pty) — 13 scenarios
+- [atago self-hosting / pty](#atago-self-hosting--pty) — 14 scenarios
   - [a pty step sees a terminal where a run step sees a pipe](#scenario-a-pty-step-sees-a-terminal-where-a-run-step-sees-a-pipe)
   - [a never-matching expect fails with the pattern in the block](#scenario-a-never-matching-expect-fails-with-the-pattern-in-the-block)
   - [named keys transmit their documented bytes and ctrl-c aborts](#scenario-named-keys-transmit-their-documented-bytes-and-ctrl-c-aborts)
@@ -332,6 +332,7 @@
   - [a resize delivers the new size and the screen follows it](#scenario-a-resize-delivers-the-new-size-and-the-screen-follows-it)
   - [a session can change the world and watch the program notice](#scenario-a-session-can-change-the-world-and-watch-the-program-notice)
   - [a mouse click is delivered as an SGR report, and refused when unasked for](#scenario-a-mouse-click-is-delivered-as-an-sgr-report-and-refused-when-unasked-for)
+  - [screen attrs check colors and styling, not only text](#scenario-screen-attrs-check-colors-and-styling-not-only-text)
   - [an unknown key name is a load-time error listing the vocabulary](#scenario-an-unknown-key-name-is-a-load-time-error-listing-the-vocabulary)
   - [screen asserts see the final frame where the transcript sees history](#scenario-screen-asserts-see-the-final-frame-where-the-transcript-sees-history)
   - [a screen snapshot round-trips through update and compare](#scenario-a-screen-snapshot-round-trips-through-update-and-compare)
@@ -6099,6 +6100,38 @@ ${atago} run unasked_mouse.atago.yaml
 - stdout contains `^[[<0;12;5M^[[<0;12;5m`
 - exit code is `4`
 - stdout contains `has not enabled mouse reporting`, `ESC [?1000h`
+### Scenario: screen attrs check colors and styling, not only text
+_skipped on Windows_
+#### Given
+- Fixture file `badattrs.atago.yaml` is created.
+#### Inputs
+_Fixture `badattrs.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: the error is not green
+    steps:
+      - pty:
+          shell: true
+          command: "printf '\\033[31mERROR\\033[0m\\r\\n'"
+          rows: 4
+          cols: 20
+      - assert:
+          screen:
+            attrs:
+              - {text: ERROR, fg: green}
+```
+#### When
+```shell
+# interactive (pty): printf '\033[1;31mERROR\033[0m plain\r\n\033[7mSELECTED\033[0m\r\n'
+${atago} run badattrs.atago.yaml
+```
+#### Then
+- rendered screen contains `ERROR` and shows "ERROR" in bold red and shows "plain" in not bold default and shows "SELECTED" in reverse on row 2
+- exit code is `1`
+- stdout contains `fg=red (wanted green)`
 ### Scenario: an unknown key name is a load-time error listing the vocabulary
 #### Given
 - Fixture file `badkey.atago.yaml` is created.

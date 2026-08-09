@@ -61,7 +61,7 @@ type Assert struct {
 	// step's rows/cols, asserted as plain text with the stream matchers
 	// (line.n addresses screen rows 1-based). The raw transcript stays on
 	// stdout.
-	Screen *StreamAssert `yaml:"screen,omitempty"`
+	Screen *ScreenAssert `yaml:"screen,omitempty"`
 
 	// Duration is the wall-clock assertion target (#31), valid after a
 	// measurable step (run/http/query/grpc/pty): it bounds how long that step

@@ -1293,7 +1293,7 @@ func TestMetadataActual(t *testing.T) {
 
 func TestCheckScreen_NoPTY(t *testing.T) {
 	t.Parallel()
-	sa := &spec.StreamAssert{Contains: spec.StringList{"x"}}
+	sa := &spec.ScreenAssert{StreamAssert: spec.StreamAssert{Contains: spec.StringList{"x"}}}
 	if cr := checkScreen(sa, nil, Env{}); cr.OK {
 		t.Error("screen assert with no result should not pass")
 	}
@@ -1305,10 +1305,10 @@ func TestCheckScreen_NoPTY(t *testing.T) {
 func TestCheckScreen_PassAndFail(t *testing.T) {
 	t.Parallel()
 	res := &runner.Result{IsPTY: true, Screen: []byte("hello\nworld")}
-	if cr := checkScreen(&spec.StreamAssert{Contains: spec.StringList{"world"}}, res, Env{}); !cr.OK {
+	if cr := checkScreen(&spec.ScreenAssert{StreamAssert: spec.StreamAssert{Contains: spec.StringList{"world"}}}, res, Env{}); !cr.OK {
 		t.Errorf("matching screen should pass: %+v", cr)
 	}
-	fail := checkScreen(&spec.StreamAssert{Contains: spec.StringList{"absent"}}, res, Env{})
+	fail := checkScreen(&spec.ScreenAssert{StreamAssert: spec.StreamAssert{Contains: spec.StringList{"absent"}}}, res, Env{})
 	if fail.OK {
 		t.Fatal("non-matching screen should fail")
 	}
@@ -2110,7 +2110,7 @@ func TestCheckTarget_AllFamilies(t *testing.T) {
 	}
 	// Screen.
 	pty := &runner.Result{IsPTY: true, Screen: []byte("menu")}
-	if cr := Check(&spec.Assert{Screen: &spec.StreamAssert{Contains: spec.StringList{"menu"}}}, pty, Env{}); !cr.OK {
+	if cr := Check(&spec.Assert{Screen: &spec.ScreenAssert{StreamAssert: spec.StreamAssert{Contains: spec.StringList{"menu"}}}}, pty, Env{}); !cr.OK {
 		t.Errorf("screen target should pass: %+v", cr)
 	}
 	// Duration.
