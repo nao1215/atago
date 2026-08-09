@@ -17,7 +17,7 @@ require (
 	github.com/mattn/go-shellwords v1.0.13
 	github.com/nao1215/markdown v0.13.0
 	github.com/ohler55/ojg v1.28.3
-	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
+	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
 	golang.org/x/crypto v0.54.0
 	golang.org/x/image v0.44.0
 	golang.org/x/sys v0.47.0
