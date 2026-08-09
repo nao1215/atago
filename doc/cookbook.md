@@ -412,6 +412,64 @@ silently does nothing.
 
 Full spec: [pty](../examples/pty.atago.yaml)
 
+## Assert colors on the TUI screen
+
+A TUI's visual grammar is part of its contract: the error line is red, the selected row is
+reverse-video, a `--no-color` flag really does leave the frame uncolored. `attrs:` checks how
+text is drawn, alongside the matchers that check what it says.
+
+```yaml
+version: "1"
+suite:
+  name: tui colors
+
+scenarios:
+  - name: errors are red and the selection is highlighted
+    steps:
+      - pty:
+          command: mytool check
+          rows: 24
+          cols: 80
+      - assert:
+          screen:
+            contains: "2 problems"
+            attrs:
+              - { text: "ERROR", fg: red, bold: true }
+              - { text: "README.md", reverse: true }   # the selected row
+              - { text: "hint", fg: 244 }              # a 256-palette index
+              - { text: "ok", fg: default }            # explicitly uncolored
+
+  - name: --no-color leaves the frame uncolored
+    steps:
+      - pty:
+          command: mytool check --no-color
+          rows: 24
+          cols: 80
+      - assert:
+          screen:
+            attrs:
+              - { text: "ERROR", fg: default, bold: false }
+```
+
+An entry is position-free by default: it passes when at least one occurrence of its `text` has
+**every** cell carrying the demanded styling. That keeps a styling assertion from breaking each
+time the layout shifts; add `row` when the position is the point. Requiring every cell is
+deliberate — styling that stops halfway through a word is a real bug, and accepting it would let
+exactly that through.
+
+`bold: false` is a claim ("this must NOT be bold"), not the absence of one. `fg: default` means
+the terminal's own color, which is how "no color was set" becomes something you can assert.
+Colors are ANSI names (`red`, `bright-red`), 256-palette indices (`0`-`255`), or `default`.
+
+One terminal rule worth knowing: bold text is drawn in the **bright** variant of its color, so a
+program emitting `SGR 31` on bold text puts bright red on screen. `fg: red` accepts that — it
+means the color the program asked for — while `fg: bright-red` stays exact.
+
+`attrs:` works in `expect_screen:` too, so a mid-session wait can hold out for the styling and
+not just the text.
+
+Full spec: [pty_screen](../examples/pty_screen.atago.yaml)
+
 ## Click and scroll in a TUI
 
 lazygit, yazi, htop, `fzf --mouse`, and anything built on bubbletea accept the mouse. A click

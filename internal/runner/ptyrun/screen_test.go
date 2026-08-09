@@ -288,3 +288,69 @@ func TestSanitizeTranscriptMarks_TranslatesEveryOffset(t *testing.T) {
 		}
 	}
 }
+
+// TestRenderScreenCells_TracksColorsAndAttributes proves the cell render picks
+// up what the plain-text render throws away (#382), and — the part that matters
+// most — that the two views agree about which row a character is on. A row-number
+// mismatch would make every attribute failure point at the wrong line.
+func TestRenderScreenCells_TracksColorsAndAttributes(t *testing.T) {
+	t.Parallel()
+	transcript := []byte("\x1b[1;31mERROR\x1b[0m ok\r\n\x1b[7mSELECTED\x1b[0m\r\n")
+	text, cells := renderScreenCells(transcript, &spec.PTY{Rows: 5, Cols: 40}, nil)
+
+	if text != "ERROR ok\nSELECTED" {
+		t.Fatalf("text = %q", text)
+	}
+	if len(cells) != 2 {
+		t.Fatalf("got %d cell rows, want 2 (text has %d lines)", len(cells), strings.Count(text, "\n")+1)
+	}
+	// Row 1: ERROR is bold red, " ok" is neither. The emulator reports index 9
+	// rather than 1 because a terminal draws bold text in the BRIGHT variant of
+	// its color — the assertion layer accounts for that, this render does not
+	// hide it.
+	for i, r := range "ERROR" {
+		c := cells[0][i]
+		if c.Rune != r || c.FG != 9 || !c.Bold {
+			t.Errorf("cell (1,%d) = %+v, want %q bold bright-red", i+1, c, r)
+		}
+	}
+	for i := len("ERROR"); i < len("ERROR ok"); i++ {
+		if c := cells[0][i]; c.Bold || c.FG == 9 {
+			t.Errorf("cell (1,%d) = %+v, want unstyled", i+1, c)
+		}
+	}
+	// Row 2: reverse video, which is how a TUI draws the selected row.
+	for i := range "SELECTED" {
+		if c := cells[1][i]; !c.Reverse {
+			t.Errorf("cell (2,%d) = %+v, want reverse", i+1, c)
+		}
+	}
+
+	// The alignment law: the text is exactly the cells' runes, row for row.
+	for y, line := range strings.Split(text, "\n") {
+		var b strings.Builder
+		for _, c := range cells[y] {
+			b.WriteRune(c.Rune)
+		}
+		if got := strings.TrimRight(b.String(), " \t"); got != line {
+			t.Errorf("row %d: text %q, cells %q", y+1, line, got)
+		}
+	}
+}
+
+// TestRenderScreenCells_DefaultColorsAreDistinguishable is what makes a
+// `--no-color` contract assertable: text the program never colored has to come
+// back as the terminal's own color, not as some arbitrary index.
+func TestRenderScreenCells_DefaultColorsAreDistinguishable(t *testing.T) {
+	t.Parallel()
+	_, cells := renderScreenCells([]byte("plain\r\n"), &spec.PTY{Rows: 3, Cols: 20}, nil)
+	if len(cells) == 0 {
+		t.Fatal("no cells rendered")
+	}
+	for i := range "plain" {
+		c := cells[0][i]
+		if c.FG != spec.DefaultScreenColor && c.FG != spec.DefaultScreenColor+1 {
+			t.Errorf("cell %d fg = %d, want a default color", i, c.FG)
+		}
+	}
+}

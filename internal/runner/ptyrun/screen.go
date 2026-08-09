@@ -6,6 +6,8 @@ import (
 	"unicode/utf8"
 
 	"github.com/hinshun/vt10x"
+
+	"github.com/nao1215/atago/internal/runner"
 	"github.com/nao1215/atago/internal/spec"
 )
 
@@ -39,6 +41,17 @@ func RenderScreen(transcript []byte, p *spec.PTY) string {
 // gets back its quadrillion steps. sanitizeTranscriptMarks translates the
 // offsets instead, landing every cut on a boundary between whole units.
 func renderScreenResized(transcript []byte, p *spec.PTY, resizes []screenResize) string {
+	text, _ := renderScreenCells(transcript, p, resizes)
+	return text
+}
+
+// renderScreenCells is the one renderer: it replays the transcript and returns
+// BOTH the plain-text screen and the same screen with its colors and attributes
+// (#382). The text is derived from the cells rather than from the emulator's own
+// String(), so `attrs:` and the text matchers can never disagree about what is
+// on row 3 — a mismatch there would make an attribute failure point at the wrong
+// line, which is worse than not having the feature.
+func renderScreenCells(transcript []byte, p *spec.PTY, resizes []screenResize) (string, [][]runner.ScreenCell) {
 	rows, cols := defaultRows, defaultCols
 	if p.Rows > 0 {
 		rows = p.Rows
@@ -71,17 +84,69 @@ func renderScreenResized(transcript []byte, p *spec.PTY, resizes []screenResize)
 	}
 	writeTranscript(term, sanitized[at:])
 
-	lines := strings.Split(term.String(), "\n")
-	for i, l := range lines {
-		lines[i] = strings.TrimRight(l, " \t")
+	// Read the grid out of the emulator once, under its own lock, and build both
+	// views from it. term.String() is not consulted at all: two independent reads
+	// of the same state could disagree about a cell, and the whole value of the
+	// attribute matchers is that a row number means the same thing in both.
+	curCols, curRows := term.Size()
+	grid := make([][]runner.ScreenCell, 0, curRows)
+	term.Lock()
+	for y := 0; y < curRows; y++ {
+		row := make([]runner.ScreenCell, 0, curCols)
+		for x := 0; x < curCols; x++ {
+			row = append(row, glyphCell(term.Cell(x, y)))
+		}
+		grid = append(grid, row)
+	}
+	term.Unlock()
+
+	lines := make([]string, len(grid))
+	for i, row := range grid {
+		var b strings.Builder
+		for _, c := range row {
+			b.WriteRune(c.Rune)
+		}
+		lines[i] = strings.TrimRight(b.String(), " \t")
 	}
 	// Drop trailing blank rows: a 24-row screen showing two lines snapshots
-	// as two lines, not twenty-four.
+	// as two lines, not twenty-four. The cell grid is trimmed the same way, so
+	// row N of the text is row N of the cells.
 	end := len(lines)
 	for end > 0 && lines[end-1] == "" {
 		end--
 	}
-	return strings.Join(lines[:end], "\n")
+	return strings.Join(lines[:end], "\n"), grid[:end]
+}
+
+// vt10x attribute bits, mirrored here because the package does not export them.
+// The set is what its parser actually tracks; anything outside it (dim,
+// strikethrough) is absent from ScreenCell rather than reported as false.
+const (
+	vtAttrReverse   = 1 << 0
+	vtAttrUnderline = 1 << 1
+	vtAttrBold      = 1 << 2
+	vtAttrItalic    = 1 << 4
+	vtAttrBlink     = 1 << 5
+)
+
+// glyphCell converts one emulator glyph into the cell the assertion layer reads.
+// A cell the program never wrote carries NUL, which is not a character anyone
+// asserts on — it renders as a space, matching what the screen shows.
+func glyphCell(g vt10x.Glyph) runner.ScreenCell {
+	r := g.Char
+	if r == 0 {
+		r = ' '
+	}
+	return runner.ScreenCell{
+		Rune:      r,
+		FG:        uint32(g.FG),
+		BG:        uint32(g.BG),
+		Bold:      g.Mode&vtAttrBold != 0,
+		Italic:    g.Mode&vtAttrItalic != 0,
+		Underline: g.Mode&vtAttrUnderline != 0,
+		Reverse:   g.Mode&vtAttrReverse != 0,
+		Blink:     g.Mode&vtAttrBlink != 0,
+	}
 }
 
 // writeTranscript feeds the transcript to the emulator, containing panics

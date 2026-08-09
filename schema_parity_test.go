@@ -60,6 +60,7 @@ func defBoundaries() map[reflect.Type]string {
 		reflect.TypeOf(spec.DirAssert{}):      "dir",
 		reflect.TypeOf(spec.ExitCode{}):       "exitCode",
 		reflect.TypeOf(spec.StreamAssert{}):   "stream",
+		reflect.TypeOf(spec.ScreenAssert{}):   "screenAssert",
 		reflect.TypeOf(spec.FileAssert{}):     "file",
 		reflect.TypeOf(spec.ImageAssert{}):    "image",
 		reflect.TypeOf(spec.JSONAssert{}):     "jsonAssert",

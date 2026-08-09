@@ -373,7 +373,7 @@ func describeTarget(a *spec.Assert, target spec.AssertTarget) string {
 	case spec.AssertMock:
 		return describeMockAssert(a.Mock)
 	case spec.AssertScreen:
-		return "screen " + describeStream(a.Screen)
+		return "screen " + describeScreen(a.Screen)
 	case spec.AssertDuration:
 		return "completes " + a.Duration.DescribeDuration()
 	case spec.AssertChanges:
@@ -542,4 +542,20 @@ func toSet(m map[string]string) map[string]bool {
 		out[k] = true
 	}
 	return out
+}
+
+// describeScreen renders a rendered-screen assertion: its stream matcher, plus
+// the attribute entries (#382) that say how the text is drawn.
+func describeScreen(s *spec.ScreenAssert) string {
+	if s == nil {
+		return ""
+	}
+	parts := []string{}
+	if desc := describeStream(&s.StreamAssert); desc != "" {
+		parts = append(parts, desc)
+	}
+	for i := range s.Attrs {
+		parts = append(parts, "shows "+s.Attrs[i].Describe())
+	}
+	return strings.Join(parts, " and ")
 }

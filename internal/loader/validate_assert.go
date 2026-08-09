@@ -54,7 +54,7 @@ func validateAssertTarget(add func(string, ...any), where string, a *spec.Assert
 	case spec.AssertMock:
 		validateMockAssert(add, where+".assert.mock", a.Mock, mockNames)
 	case spec.AssertScreen:
-		validateStream(add, where+".assert.screen", a.Screen)
+		validateScreen(add, where+".assert.screen", a.Screen)
 	case spec.AssertDuration:
 		validateDuration(add, where+".assert.duration", a.Duration)
 	case spec.AssertChanges:

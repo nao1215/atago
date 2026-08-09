@@ -110,6 +110,8 @@ func driveSession(ctx context.Context, p *spec.PTY, proc ptyProcess) (*runner.Re
 				"pty %q: the terminal transcript is incomplete — reading the terminal failed after %d bytes: %w",
 				p.Command, len(tr), rerr)
 		}
+		screenTextStr, screenCells := renderScreenCells(tr, p, term.snapshotResizes())
+		screenText := []byte(screenTextStr)
 		res := &runner.Result{
 			Command:  p.Command,
 			Stdout:   tr,
@@ -122,7 +124,9 @@ func driveSession(ctx context.Context, p *spec.PTY, proc ptyProcess) (*runner.Re
 			// Replaying through the recorded size changes (#379) keeps that true
 			// for a session that resized: each part of the frame is drawn under
 			// the size it was produced under.
-			Screen: []byte(renderScreenResized(tr, p, term.snapshotResizes())),
+			Screen: screenText,
+			// The same frame with its colors and attributes, for `attrs:` (#382).
+			ScreenCells: screenCells,
 		}
 		if timedOut {
 			res.ExitCode = -1
@@ -213,8 +217,8 @@ func driveSession(ctx context.Context, p *spec.PTY, proc ptyProcess) (*runner.Re
 			for {
 				if n := curLen(); n != scannedTo {
 					scannedTo = n
-					screen := currentScreen()
-					cr := checkRenderedScreen(a.ExpectScreen, screen)
+					screen, cells := currentScreen()
+					cr := checkRenderedScreen(a.ExpectScreen, screen, cells)
 					if cr.OK {
 						if stableFor <= 0 {
 							matched = true
@@ -233,8 +237,8 @@ func driveSession(ctx context.Context, p *spec.PTY, proc ptyProcess) (*runner.Re
 				}
 				select {
 				case <-waitCtx.Done():
-					screen := currentScreen()
-					cr := checkRenderedScreen(a.ExpectScreen, screen)
+					screen, cells := currentScreen()
+					cr := checkRenderedScreen(a.ExpectScreen, screen, cells)
 					if cr.OK {
 						if stableFor <= 0 {
 							matched = true
@@ -265,8 +269,8 @@ func driveSession(ctx context.Context, p *spec.PTY, proc ptyProcess) (*runner.Re
 				if errors.Is(waitCtx.Err(), context.Canceled) || errors.Is(ctx.Err(), context.Canceled) {
 					return canceledResult()
 				}
-				screen := currentScreen()
-				cr := checkRenderedScreen(a.ExpectScreen, screen)
+				screen, cells := currentScreen()
+				cr := checkRenderedScreen(a.ExpectScreen, screen, cells)
 				if cr.OK && stableFor > 0 {
 					cr = &assert.CheckResult{
 						Desc:           fmt.Sprintf("pty expect_screen stable for %s", stableFor),
@@ -387,9 +391,10 @@ func parsePositiveDuration(s string) time.Duration {
 	return d
 }
 
-func checkRenderedScreen(es *spec.PTYExpectScreen, screen []byte) *assert.CheckResult {
-	return assert.Check(&spec.Assert{Screen: &es.StreamAssert}, &runner.Result{
-		IsPTY:  true,
-		Screen: screen,
+func checkRenderedScreen(es *spec.PTYExpectScreen, screen []byte, cells [][]runner.ScreenCell) *assert.CheckResult {
+	return assert.Check(&spec.Assert{Screen: &es.ScreenAssert}, &runner.Result{
+		IsPTY:       true,
+		Screen:      screen,
+		ScreenCells: cells,
 	}, assert.Env{})
 }

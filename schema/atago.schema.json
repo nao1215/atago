@@ -1569,6 +1569,57 @@
                   "yaml": {
                     "$ref": "#/$defs/jsonChecks",
                     "description": "Parses the rendered screen as YAML and applies one JSONPath check, or a list of checks that must all hold."
+                  },
+                  "attrs": {
+                    "type": "array",
+                    "description": "Checks how text is DRAWN, not only what it says (#382): the error line is red, the selected row is reverse-video, `--no-color` really did leave the frame uncolored. Every entry must hold. An entry is position-free by default — it passes when at least one occurrence of its `text` has every one of its cells carrying the demanded styling — so a styling claim does not break each time the layout shifts; pin `row` when the position is the point.",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "text"
+                      ],
+                      "properties": {
+                        "text": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The literal substring whose cells are checked."
+                        },
+                        "row": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "description": "Restricts the search to this 1-based screen row, addressed the same way `line` addresses the text matchers."
+                        },
+                        "fg": {
+                          "type": "string",
+                          "description": "Foreground color: an ANSI name (`red`, `bright-red`), a 256-palette index (`203`), or `default` — the terminal's own color, which is how a `--no-color` contract becomes assertable."
+                        },
+                        "bg": {
+                          "type": "string",
+                          "description": "Background color, same vocabulary as `fg`."
+                        },
+                        "bold": {
+                          "type": "boolean",
+                          "description": "Whether the text is bold. `false` is a real claim (\"must NOT be bold\"), not the absence of one."
+                        },
+                        "italic": {
+                          "type": "boolean",
+                          "description": "Whether the text is italic."
+                        },
+                        "underline": {
+                          "type": "boolean",
+                          "description": "Whether the text is underlined."
+                        },
+                        "reverse": {
+                          "type": "boolean",
+                          "description": "Whether the text is reverse-video, which is how most TUIs draw the selected row."
+                        },
+                        "blink": {
+                          "type": "boolean",
+                          "description": "Whether the text blinks."
+                        }
+                      }
+                    }
                   }
                 }
               }
@@ -2037,8 +2088,8 @@
           "description": "Asserts what the CLI under test actually sent to a declared mock server: request count, and header/body matchers on the last matching recorded request."
         },
         "screen": {
-          "$ref": "#/$defs/stream",
-          "description": "The rendered terminal screen of the preceding pty step (#27): the transcript replayed through a vt10x emulator, asserted as plain text (line.n = screen row)."
+          "$ref": "#/$defs/screenAssert",
+          "description": "The rendered terminal screen of the preceding pty step (#27), asserted as plain text and — with `attrs` — as colors and styling (#382)."
         },
         "duration": {
           "$ref": "#/$defs/durationAssert",
@@ -2071,7 +2122,10 @@
         "ignore": {
           "type": "array",
           "minItems": 1,
-          "items": {"type": "string", "minLength": 1},
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
           "description": "Workdir-relative doublestar globs whose matches are dropped from the observed delta before the categories are compared, for a path the program writes only sometimes (a state file, a cache in the sandboxed HOME). An ignored path neither counts as an unexpected change nor satisfies an entry, and an ignore glob that matches nothing is fine."
         }
       }
@@ -2371,6 +2425,113 @@
         "trim": {
           "type": "boolean",
           "description": "Store-only (#158): capture the whole stream. trim: true strips surrounding whitespace; trim: false keeps bytes verbatim."
+        }
+      }
+    },
+    "screenAssert": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The rendered terminal screen of the preceding pty step (#27): the transcript replayed through a vt10x emulator, asserted as plain text (`line.n` = screen row) and, with `attrs`, as colors and styling (#382). A screen assert may carry text matchers, attribute entries, or both — both must hold.",
+      "properties": {
+        "line": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "1-based line selector: applies the matcher to that single line instead of the whole stream. Not itself a matcher; does not compose with json/snapshot."
+        },
+        "empty": {
+          "type": "boolean",
+          "description": "Asserts the stream is empty (`true`) or non-empty (`false`)."
+        },
+        "contains": {
+          "$ref": "#/$defs/stringOrList",
+          "description": "Requires every listed substring (a scalar counts as a one-element list) to be present."
+        },
+        "not_contains": {
+          "$ref": "#/$defs/stringOrList",
+          "description": "Requires every listed substring to be absent."
+        },
+        "matches": {
+          "type": "string",
+          "description": "Requires the stream to match this Go (RE2) regular expression."
+        },
+        "not_matches": {
+          "type": "string",
+          "description": "Requires the stream NOT to match this Go (RE2) regular expression."
+        },
+        "equals": {
+          "type": "string",
+          "description": "Requires the stream to equal this string exactly (CRLF and one trailing newline are normalized)."
+        },
+        "not_equals": {
+          "type": "string",
+          "description": "Requires the stream NOT to equal this string."
+        },
+        "json": {
+          "$ref": "#/$defs/jsonChecks",
+          "description": "Parses the stream as JSON and applies one JSONPath check, or a list of checks that must all hold."
+        },
+        "yaml": {
+          "$ref": "#/$defs/jsonChecks",
+          "description": "Parses the stream as YAML and applies one JSONPath check, or a list of checks that must all hold."
+        },
+        "snapshot": {
+          "type": "string",
+          "description": "Compares the stream against a committed golden file (spec-relative path). Volatile details (ANSI, temp paths, UUIDs, timestamps, ports, CRLF) are normalized; refresh with `atago snapshot update`."
+        },
+        "trim": {
+          "type": "boolean",
+          "description": "Store-only (#158): capture the whole stream. trim: true strips surrounding whitespace; trim: false keeps bytes verbatim."
+        },
+        "attrs": {
+          "type": "array",
+          "description": "Checks how text is DRAWN, not only what it says (#382): the error line is red, the selected row is reverse-video, `--no-color` really did leave the frame uncolored. Every entry must hold. An entry is position-free by default — it passes when at least one occurrence of its `text` has every one of its cells carrying the demanded styling — so a styling claim does not break each time the layout shifts; pin `row` when the position is the point.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "text"
+            ],
+            "properties": {
+              "text": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The literal substring whose cells are checked."
+              },
+              "row": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Restricts the search to this 1-based screen row, addressed the same way `line` addresses the text matchers."
+              },
+              "fg": {
+                "type": "string",
+                "description": "Foreground color: an ANSI name (`red`, `bright-red`), a 256-palette index (`203`), or `default` — the terminal's own color, which is how a `--no-color` contract becomes assertable."
+              },
+              "bg": {
+                "type": "string",
+                "description": "Background color, same vocabulary as `fg`."
+              },
+              "bold": {
+                "type": "boolean",
+                "description": "Whether the text is bold. `false` is a real claim (\"must NOT be bold\"), not the absence of one."
+              },
+              "italic": {
+                "type": "boolean",
+                "description": "Whether the text is italic."
+              },
+              "underline": {
+                "type": "boolean",
+                "description": "Whether the text is underlined."
+              },
+              "reverse": {
+                "type": "boolean",
+                "description": "Whether the text is reverse-video, which is how most TUIs draw the selected row."
+              },
+              "blink": {
+                "type": "boolean",
+                "description": "Whether the text blinks."
+              }
+            }
+          }
         }
       }
     },

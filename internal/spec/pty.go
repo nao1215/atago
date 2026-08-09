@@ -388,7 +388,10 @@ const (
 // yaml, etc.) except snapshot/trim, which are validated out of this
 // mid-session context.
 type PTYExpectScreen struct {
-	StreamAssert `yaml:",inline"`
+	// Embedding ScreenAssert rather than StreamAssert gives a mid-session wait
+	// the attribute matchers too (#382): the live frame is the same frame the
+	// post-step assert reads, so it deserves the same questions.
+	ScreenAssert `yaml:",inline"`
 	// Timeout bounds THIS wait only; when empty, the enclosing pty timeout
 	// supplies the budget.
 	Timeout string `yaml:"timeout,omitempty"`

@@ -54,7 +54,7 @@ func TestWalkAssertStrings_CollectAndExpand(t *testing.T) {
 		File:    &FileAssert{Path: "${f}", Contains: StringList{"${g}"}},
 		Header:  &HeaderMatch{Name: "X", Equals: sp("${h}"), Matches: sp("${r}")},
 		Image:   &ImageAssert{Path: "${i}", SimilarTo: "${j}"},
-		Screen:  &StreamAssert{Contains: StringList{"${k}"}},
+		Screen:  &ScreenAssert{StreamAssert: StreamAssert{Contains: StringList{"${k}"}}},
 		Dir:     &DirAssert{Path: "${l}", Contains: []string{"${m}"}, NotContains: []string{"${n}"}, Glob: "${o}", Ignore: []string{"${p}"}},
 		PDF:     &PDFAssert{Path: "${q}", Metadata: map[string]string{"title": "${s}"}, Text: &StreamAssert{Contains: StringList{"${t}"}}},
 		Mock:    &MockAssert{Name: "api", Path: "${u}", Header: &HeaderMatch{Name: "Y", Contains: sp("${v}")}, Body: &StreamAssert{Contains: StringList{"${w}"}}},
@@ -235,7 +235,7 @@ func TestCollectStepVars_KnownFields(t *testing.T) {
 	pty := &Step{PTY: &PTY{Command: "${pcmd}", Cwd: "${pcwd}", Env: map[string]string{"K": "${penv}"}, Session: []PTYAction{
 		{Expect: "${pexp}"},
 		{Send: SendText("${psend}")},
-		{ExpectScreen: &PTYExpectScreen{StreamAssert: StreamAssert{Contains: StringList{"${pscreen}"}}}},
+		{ExpectScreen: &PTYExpectScreen{ScreenAssert: ScreenAssert{StreamAssert: StreamAssert{Contains: StringList{"${pscreen}"}}}}},
 	}}}
 	got = collectStep(pty)
 	for _, want := range []string{"pcmd", "pcwd", "penv", "pexp", "psend", "pscreen"} {
@@ -656,7 +656,7 @@ func TestSetTargets_All(t *testing.T) {
 		Dir:        &DirAssert{},
 		PDF:        &PDFAssert{},
 		Mock:       &MockAssert{},
-		Screen:     &StreamAssert{},
+		Screen:     &ScreenAssert{},
 		Duration:   &DurationAssert{},
 		Changes:    &ChangesAssert{},
 	}

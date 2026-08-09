@@ -215,9 +215,9 @@ func WalkPTYExpectScreenStrings(es *PTYExpectScreen, visit func(string) string) 
 	c := *es
 	// Reuse the assert walker so the matcher surface stays in exact lockstep
 	// with top-level `screen:` strings.
-	a := WalkAssertStrings(&Assert{Screen: &es.StreamAssert}, visit)
+	a := WalkAssertStrings(&Assert{Screen: &es.ScreenAssert}, visit)
 	if a.Screen != nil {
-		c.StreamAssert = *a.Screen
+		c.ScreenAssert = *a.Screen
 	}
 	return &c
 }
@@ -252,8 +252,23 @@ func WalkAssertStrings(a *Assert, visit func(string) string) *Assert {
 		ic.SimilarTo = visit(a.Image.SimilarTo)
 		c.Image = &ic
 	}
-	// The rendered-screen matcher is a stream matcher like stdout/stderr.
-	c.Screen = walkStream(a.Screen, visit)
+	// The rendered-screen target carries the stream matchers plus the attribute
+	// entries; both hold author-written text that takes ${name} expansion.
+	if a.Screen != nil {
+		sc := *a.Screen
+		if walked := walkStream(&a.Screen.StreamAssert, visit); walked != nil {
+			sc.StreamAssert = *walked
+		}
+		if len(a.Screen.Attrs) > 0 {
+			sc.Attrs = make([]ScreenAttr, len(a.Screen.Attrs))
+			for i, at := range a.Screen.Attrs {
+				ac := at
+				ac.Text = visit(at.Text)
+				sc.Attrs[i] = ac
+			}
+		}
+		c.Screen = &sc
+	}
 	if a.Dir != nil {
 		dc := *a.Dir
 		dc.Path = visit(a.Dir.Path)

@@ -627,7 +627,7 @@ func TestDescribeTarget_MatcherMatrix(t *testing.T) {
 		{"header equals", &spec.Assert{Header: &spec.HeaderMatch{Name: "X", Equals: strptr("1")}}, "header `X` equals `1`"},
 		{"header bare", &spec.Assert{Header: &spec.HeaderMatch{Name: "X"}}, "header `X` is checked"},
 		// screen / message / value streams
-		{"screen", &spec.Assert{Screen: &spec.StreamAssert{Contains: spec.StringList{"MENU"}}}, "rendered screen contains `MENU`"},
+		{"screen", &spec.Assert{Screen: &spec.ScreenAssert{StreamAssert: spec.StreamAssert{Contains: spec.StringList{"MENU"}}}}, "rendered screen contains `MENU`"},
 		{"message", &spec.Assert{Message: &spec.StreamAssert{Empty: boolptr(true)}}, "message is empty"},
 		{"value", &spec.Assert{Value: &spec.StreamAssert{Empty: boolptr(false)}}, "value is not empty"},
 		// duration

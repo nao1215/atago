@@ -13,11 +13,19 @@ import (
 // on failure the screen is shown in a bordered block so its width is
 // unambiguous, and the full text flows to --artifacts-dir as a sidecar next
 // to the raw transcript.
-func checkScreen(sa *spec.StreamAssert, res *runner.Result, env Env) *CheckResult {
+func checkScreen(sa *spec.ScreenAssert, res *runner.Result, env Env) *CheckResult {
 	if res == nil || !res.IsPTY {
 		return &CheckResult{Desc: "assert screen", Hint: "no pty step has run in this scenario yet (screen asserts render a pty step's terminal)"}
 	}
-	cr := checkStream("screen", sa, res.Screen, true, env)
+	// An assert may be attributes ALONE ("the error line is red"), in which case
+	// there is no stream matcher to run.
+	cr := &CheckResult{OK: true, Desc: "assert screen"}
+	if len(sa.SetMatchers()) > 0 {
+		cr = checkStream("screen", &sa.StreamAssert, res.Screen, true, env)
+	}
+	if cr.OK && len(sa.Attrs) > 0 {
+		cr = checkScreenAttrs(sa.Attrs, res)
+	}
 	if cr.OK {
 		return cr
 	}
