@@ -232,6 +232,45 @@ scenarios:
               - "has not enabled bracketed paste"
               - "ESC [?2004h"
 
+  # A mid-session resize (#379) has to do two separate things: deliver the size
+  # change to the program the way a real terminal does, and make the rendered
+  # screen follow. Both are pinned here.
+  - name: a resize delivers the new size and the screen follows it
+    skip:
+      os: windows
+    steps:
+      # `stty size` reads the terminal's own idea of its size, so this reports
+      # what the kernel recorded — and it only runs a second time because
+      # SIGWINCH was actually delivered to the foreground process group.
+      - pty:
+          shell: true
+          command: 'trap "stty size; exit 0" WINCH; stty size; while :; do sleep 0.05; done'
+          rows: 24
+          cols: 80
+          timeout: 15s
+          session:
+            - expect: "24 80" # settle before resizing, so the boundary is clean
+            - resize: { rows: 40, cols: 100 }
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "40 100"
+      # The rendered screen is replayed at the sizes each part was produced
+      # under. This line is 12 characters: at the starting 10 columns it wraps,
+      # and the resize afterwards must NOT re-flow what was already drawn.
+      - pty:
+          shell: true
+          command: "printf 'abcdefghijKL\r\n'; sleep 0.2"
+          rows: 5
+          cols: 10
+          timeout: 15s
+          session:
+            - expect: "KL"
+            - resize: { rows: 6, cols: 40 }
+      - assert:
+          screen:
+            contains: "abcdefghij\nKL"
+
   - name: an unknown key name is a load-time error listing the vocabulary
     steps:
       - fixture:

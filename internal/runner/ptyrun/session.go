@@ -46,6 +46,11 @@ type ptyProcess struct {
 	// closeTerm releases the terminal master so the read goroutine unblocks and
 	// finish can snapshot a complete transcript.
 	closeTerm func()
+	// resize changes the terminal size mid-session (#379). The platform decides
+	// how the child learns about it — a POSIX TIOCSWINSZ makes the kernel send
+	// SIGWINCH to the foreground process group, and ConPTY notifies its client
+	// directly — so driveSession only has to say when.
+	resize func(rows, cols int) error
 	// dir is the resolved workdir the child ran in, surfaced as Result.Workdir.
 	dir string
 }
@@ -110,7 +115,10 @@ func driveSession(ctx context.Context, p *spec.PTY, proc ptyProcess) (*runner.Re
 			IsPTY:    true,
 			// The rendered screen (#27) is derived from the same bytes, so screen
 			// asserts and transcript asserts never disagree about what happened.
-			Screen: []byte(RenderScreen(tr, p)),
+			// Replaying through the recorded size changes (#379) keeps that true
+			// for a session that resized: each part of the frame is drawn under
+			// the size it was produced under.
+			Screen: []byte(renderScreenResized(tr, p, term.snapshotResizes())),
 		}
 		if timedOut {
 			res.ExitCode = -1
@@ -266,6 +274,17 @@ func driveSession(ctx context.Context, p *spec.PTY, proc ptyProcess) (*runner.Re
 					}
 				}
 				return abort(&ExpectFailure{Check: cr})
+			}
+			continue
+		}
+		if a.Resize != nil {
+			// Record the boundary before changing the size, so the replay that
+			// builds the rendered screen splits the transcript at the same point
+			// the real terminal did (#379).
+			term.markResize(a.Resize.Rows, a.Resize.Cols)
+			if rerr := proc.resize(a.Resize.Rows, a.Resize.Cols); rerr != nil {
+				return failHard(fmt.Errorf("pty %q: session[%d] resize to %dx%d: %w",
+					p.Command, i, a.Resize.Rows, a.Resize.Cols, rerr))
 			}
 			continue
 		}

@@ -163,6 +163,17 @@ func explainScenario(b *strings.Builder, sc *spec.Scenario) {
 				if len(keys) > 0 {
 					commands[len(commands)-1] += "  [keys: " + strings.Join(keys, ", ") + "]"
 				}
+				// A resize changes what the program draws, so a reviewer reading
+				// the summary should see it (#379).
+				var resizes []string
+				for _, a := range step.PTY.Session {
+					if a.Resize != nil {
+						resizes = append(resizes, fmt.Sprintf("%dx%d", a.Resize.Rows, a.Resize.Cols))
+					}
+				}
+				if len(resizes) > 0 {
+					commands[len(commands)-1] += "  [resizes: " + strings.Join(resizes, ", ") + "]"
+				}
 			}
 		case spec.StepCDP:
 			if step.CDP != nil {

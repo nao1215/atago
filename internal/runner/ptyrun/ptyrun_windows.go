@@ -68,7 +68,11 @@ func Run(ctx context.Context, p *spec.PTY, workdir string, env []string) (*runne
 		exit:      exitCh,
 		kill:      func() { killTree(pid) },
 		closeTerm: func() { _ = cpty.Close() },
-		dir:       dir,
+		// ResizePseudoConsole notifies the ConPTY client of the new size, which
+		// is how a Windows console application learns about a window change —
+		// the platform's answer to the POSIX SIGWINCH (#379).
+		resize: func(rows, cols int) error { return cpty.Resize(rows, cols) },
+		dir:    dir,
 	}
 	return driveSession(ctx, p, proc)
 }

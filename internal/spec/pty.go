@@ -51,7 +51,7 @@ type PTY struct {
 	Session []PTYAction `yaml:"session,omitempty"`
 }
 
-// PTYAction is one expect/send/expect_screen entry in a pty session (#8).
+// PTYAction is one expect/send/expect_screen/resize entry in a pty session (#8).
 type PTYAction struct {
 	// Expect waits until the transcript matches this regexp. A never-matching
 	// expect fails the step (reported like an assertion) when the session
@@ -65,12 +65,35 @@ type PTYAction struct {
 	// ctrl-hyphen (#376) — so sessions stay readable instead of embedding \x1b
 	// escapes.
 	Send *PTYSend `yaml:"send,omitempty"`
+	// Resize changes the terminal size mid-session (#379), delivering the size
+	// change the way a real terminal does — SIGWINCH on POSIX, a ConPTY
+	// notification on Windows — so a TUI's relayout is testable instead of
+	// being fixed at whatever the step started with.
+	Resize *PTYResize `yaml:"resize,omitempty"`
 	// ExpectScreen waits until the CURRENT rendered screen (the transcript
 	// replayed through the same vt10x emulator as a top-level `screen:` assert)
 	// satisfies the matcher. `stable_for` requires the matcher to stay true
 	// continuously for that long; `timeout` optionally bounds only this wait,
 	// within the pty step's wider session timeout.
 	ExpectScreen *PTYExpectScreen `yaml:"expect_screen,omitempty"`
+}
+
+// PTYResize is a mid-session terminal resize (#379). Both dimensions are
+// required — there is no "keep the other one", because a spec that says what
+// the window becomes reads better than one that says what it changes by.
+//
+// The size change reaches the child the way a real terminal delivers it, so a
+// program that redraws on SIGWINCH redraws. The rendered screen follows: every
+// later `expect_screen`, the post-step `screen:` assert, and the snapshot all
+// see the transcript replayed at the sizes it was actually produced under.
+//
+// Authoring rule: settle the screen (an `expect` or `expect_screen`, ideally
+// with `stable_for`) before and after a resize. Output already in flight when
+// the resize lands is attributed to the old size, exactly as a real terminal
+// would — waiting for a quiet screen is what makes the boundary unambiguous.
+type PTYResize struct {
+	Rows int `yaml:"rows"`
+	Cols int `yaml:"cols"`
 }
 
 // PTYSend is the polymorphic pty send payload (#26): exactly one of Text

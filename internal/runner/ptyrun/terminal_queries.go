@@ -2,6 +2,7 @@ package ptyrun
 
 import (
 	"io"
+	"sync"
 
 	"github.com/hinshun/vt10x"
 
@@ -23,6 +24,10 @@ const vt102DA1 = "\x1b[?6c"
 // CPR/DSR requests can be answered against the current cursor position, and
 // supplements vt10x with the missing DA1/DECID replies Yazi expects at startup.
 type terminalQueries struct {
+	// mu guards term. consume runs on the drain goroutine while resize is
+	// called from the session goroutine (#379), so the emulator has two writers
+	// even though each is single-threaded on its own.
+	mu   sync.Mutex
 	term vt10x.Terminal
 	da1  da1Scanner
 	w    io.Writer
@@ -47,8 +52,19 @@ func newTerminalQueries(p *spec.PTY, w io.Writer) *terminalQueries {
 	}
 }
 
+// resize keeps the query emulator the same size as the real terminal (#379).
+// Its whole job is answering cursor-position reports, and a stale size makes
+// those answers wrong for every program that asks after a resize.
+func (t *terminalQueries) resize(rows, cols int) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.term.Resize(cols, rows)
+}
+
 func (t *terminalQueries) consume(chunk []byte) {
+	t.mu.Lock()
 	writeTranscript(t.term, chunk)
+	t.mu.Unlock()
 	for range t.da1.consume(chunk) {
 		_, _ = t.w.Write([]byte(vt102DA1))
 	}

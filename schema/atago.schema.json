@@ -1241,7 +1241,7 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "description": "Exactly one of expect (wait until the transcript matches the regexp), send (write to the terminal; \"\" sends EOF/^D; {key: enter} presses a named key, #26), or expect_screen (wait until the rendered screen matches, optionally stably for a duration). ${name}/${env:NAME} references in a send, expect, or expect_screen matcher are expanded against the store; a reference nothing resolves fails the step before any terminal I/O (#78) — write $${name} for literal text.",
+            "description": "Exactly one of expect (wait until the transcript matches the regexp), send (write to the terminal; \"\" sends EOF/^D; {key: enter} presses a named key, #26; {paste: text} delivers a bracketed paste, #378), expect_screen (wait until the rendered screen matches, optionally stably for a duration), or resize (change the terminal size mid-session, #379). ${name}/${env:NAME} references in a send, expect, or expect_screen matcher are expanded against the store; a reference nothing resolves fails the step before any terminal I/O (#78) — write $${name} for literal text.",
             "properties": {
               "expect": {
                 "type": "string",
@@ -1287,6 +1287,29 @@
                   }
                 ],
                 "description": "Writes to the terminal: a string verbatim (\"\" sends EOF/^D; `${name}` expansion applies), `{key: <name>}` for a named key — `enter`, `tab`, `shift-tab`, `esc`, arrows, `insert`, `f1`-`f12`, `ctrl-a`..`ctrl-z`, `alt-a`..`alt-z`, modified arrows such as `ctrl-left` and `shift-up`, `ctrl-space`/`ctrl-@`, `ctrl-[`, `ctrl-\\`, `ctrl-]`, `ctrl-^`, `ctrl-_`, `ctrl-hyphen`/`ctrl-minus` — or `{paste: <text>}` to deliver the text as a bracketed paste."
+              },
+              "resize": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "rows",
+                  "cols"
+                ],
+                "description": "Changes the terminal size mid-session, delivered the way a real terminal delivers it (`SIGWINCH` on POSIX, a ConPTY notification on Windows), so a TUI's relayout is testable instead of being fixed at the size the step started with. The rendered screen follows: every later `expect_screen`, the final `screen:` assert, and its snapshot see each part of the transcript drawn at the size it was produced under. Settle the screen with an `expect` or `expect_screen` before and after a resize — output already in flight when it lands is attributed to the old size, exactly as on a real terminal.",
+                "properties": {
+                  "rows": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 65535,
+                    "description": "New terminal height in rows."
+                  },
+                  "cols": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 65535,
+                    "description": "New terminal width in columns."
+                  }
+                }
               },
               "expect_screen": {
                 "type": "object",
