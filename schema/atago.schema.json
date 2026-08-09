@@ -1241,6 +1241,28 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
+            "oneOf": [
+              {
+                "required": [
+                  "expect"
+                ]
+              },
+              {
+                "required": [
+                  "send"
+                ]
+              },
+              {
+                "required": [
+                  "expect_screen"
+                ]
+              },
+              {
+                "required": [
+                  "resize"
+                ]
+              }
+            ],
             "description": "Exactly one of expect (wait until the transcript matches the regexp), send (write to the terminal; \"\" sends EOF/^D; {key: enter} presses a named key, #26; {paste: text} delivers a bracketed paste, #378), expect_screen (wait until the rendered screen matches, optionally stably for a duration), or resize (change the terminal size mid-session, #379). ${name}/${env:NAME} references in a send, expect, or expect_screen matcher are expanded against the store; a reference nothing resolves fails the step before any terminal I/O (#78) — write $${name} for literal text.",
             "properties": {
               "expect": {

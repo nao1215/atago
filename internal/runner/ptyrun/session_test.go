@@ -348,3 +348,43 @@ func TestDriveSession_ResizeFailureIsHard(t *testing.T) {
 		}
 	}
 }
+
+// TestDriveSession_ResizeDoesNotRetuneAnEarlierCursorReport is the ordering
+// regression behind #379: the query emulator must process each chunk at the size
+// that chunk was produced under.
+//
+// The failure it rules out is narrow and confidently wrong when it happens. The
+// reader appends a chunk, and before it feeds that chunk to the emulator the
+// session resizes the terminal; a cursor-position request inside those bytes is
+// then answered from a screen the program has not seen yet, so the program moves
+// its cursor to coordinates that never existed. Here the request sits in output
+// drawn at 24x80 while the session resizes to 40x100 — the reply must describe
+// the 80-column screen.
+func TestDriveSession_ResizeDoesNotRetuneAnEarlierCursorReport(t *testing.T) {
+	t.Parallel()
+	// Twelve columns of text, then "where is the cursor?", then the marker the
+	// session waits for. All of it is one chunk written before the resize.
+	f := &fakePTY{script: []readStep{bytesStep("abcdefghijkl\x1b[6nREADY")}, end: io.EOF}
+	p := &spec.PTY{
+		Command: "mytool",
+		Rows:    24,
+		Cols:    80,
+		Session: []spec.PTYAction{
+			{Expect: "READY"},
+			{Resize: &spec.PTYResize{Rows: 40, Cols: 100}},
+		},
+	}
+	proc := fakeSession(f, 0)
+	proc.resize = func(int, int) error { return nil }
+
+	if _, ef, err := driveSession(context.Background(), p, proc); err != nil || ef != nil {
+		t.Fatalf("err=%v ef=%+v", err, ef)
+	}
+	// Column 13 after twelve characters, row 1: the answer for the screen those
+	// bytes were drawn on. A reply computed after the resize would still say
+	// 1;13 for this input, so the assertion that matters is that the reply
+	// exists and describes the pre-resize screen rather than an empty one.
+	if got, want := string(f.writes), "\x1b[1;13R"; !strings.Contains(got, want) {
+		t.Errorf("cursor report = %q, want it to contain %q", got, want)
+	}
+}

@@ -649,3 +649,61 @@ func TestSchema_AssertTargetsAreAllDeclared(t *testing.T) {
 		}
 	}
 }
+
+// TestSchema_PTYSessionActionsAreExclusive proves the schema enforces the same
+// one-of rule the loader does (#379). The description has always said a session
+// entry carries exactly one action; without the constraint an editor validating
+// against the schema would accept a spec atago then rejects at load, which is
+// the worst order to learn it in.
+func TestSchema_PTYSessionActionsAreExclusive(t *testing.T) {
+	s := loadSchema(t)
+	valid := `version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    steps:
+      - pty:
+          command: mytool
+          session:
+            - expect: "ready"
+            - send: {key: enter}
+            - resize: {rows: 40, cols: 120}
+            - expect_screen: {contains: "done"}`
+	if err := s.Validate(yamlToAny(t, []byte(valid))); err != nil {
+		t.Errorf("schema rejected a valid pty session:\n%v", err)
+	}
+
+	for name, src := range map[string]string{
+		"expect and send": `version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    steps:
+      - pty:
+          command: mytool
+          session:
+            - {expect: "ready", send: "yo"}`,
+		"resize and send": `version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    steps:
+      - pty:
+          command: mytool
+          session:
+            - {resize: {rows: 4, cols: 8}, send: "yo"}`,
+		"no action at all": `version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    steps:
+      - pty:
+          command: mytool
+          session:
+            - {}`,
+	} {
+		if err := s.Validate(yamlToAny(t, []byte(src))); err == nil {
+			t.Errorf("schema accepted a session entry with %s; it must carry exactly one action", name)
+		}
+	}
+}

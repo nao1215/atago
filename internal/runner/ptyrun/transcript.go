@@ -33,10 +33,6 @@ type transcriptDrain struct {
 	// effect (#379), so the replay that renders the screen applies the same
 	// sizes at the same points the live terminal did.
 	resizes []screenResize
-	// queries is the live emulator answering cursor-position reports; it has to
-	// follow the terminal's size like everything else (#379). Written once
-	// during construction, before the reader goroutine starts.
-	queries *terminalQueries
 }
 
 func startTranscriptDrain(rw io.ReadWriter, p *spec.PTY) *transcriptDrain {
@@ -48,11 +44,16 @@ func startTranscriptDrain(rw io.ReadWriter, p *spec.PTY) *transcriptDrain {
 		modes:     map[int]bool{},
 	}
 	queries := newTerminalQueries(p, writerFunc(t.write))
-	t.queries = queries
 	var modeScan decsetScanner
 	go func() {
 		defer close(t.readDone)
 		buf := make([]byte, 4096)
+		// applied counts the size changes already handed to the query emulator.
+		// The emulator is resized HERE rather than in markResize so that a chunk
+		// is always fed to the emulator at the size that chunk was produced
+		// under: a resize recorded while this chunk was in flight belongs after
+		// it, and one recorded before it is applied below, before consume (#379).
+		applied := 0
 		for {
 			n, rerr := t.rw.Read(buf)
 			if n > 0 {
@@ -60,11 +61,19 @@ func startTranscriptDrain(rw io.ReadWriter, p *spec.PTY) *transcriptDrain {
 				// goroutine, so only the resulting transitions need guarding.
 				transitions := modeScan.consume(buf[:n])
 				t.mu.Lock()
+				// Read the pending resizes BEFORE appending: each was recorded
+				// at a transcript offset at or before this chunk's start, so it
+				// takes effect ahead of these bytes.
+				pending := append([]screenResize(nil), t.resizes[applied:]...)
 				t.transcript = append(t.transcript, buf[:n]...)
 				for _, m := range transitions {
 					t.modes[m.Param] = m.Enabled
 				}
 				t.mu.Unlock()
+				for _, r := range pending {
+					queries.resize(r.rows, r.cols)
+				}
+				applied += len(pending)
 				queries.consume(buf[:n])
 			}
 			if rerr == nil {
@@ -164,9 +173,12 @@ func (t *transcriptDrain) markResize(rows, cols int) {
 	t.resizes = append(t.resizes, screenResize{offset: len(t.transcript), rows: rows, cols: cols})
 	// The cached screen was rendered under the old sizes.
 	t.screenLen = -1
-	if t.queries != nil {
-		t.queries.resize(rows, cols)
-	}
+	// The live query emulator is NOT resized here. Resizing it from this
+	// goroutine could land between the reader appending a chunk and feeding that
+	// same chunk to the emulator, so bytes produced at the old size would be
+	// replayed at the new one — and a cursor-position request inside them would
+	// be answered with coordinates from a screen the program has not seen yet.
+	// The reader applies the change instead, in order with the chunks.
 }
 
 // modeEnabled reports whether the program currently has a DEC private mode on,
