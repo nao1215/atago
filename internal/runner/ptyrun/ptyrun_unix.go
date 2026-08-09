@@ -103,6 +103,7 @@ func Run(ctx context.Context, p *spec.PTY, workdir string, env []string) (*runne
 			return pty.Setsize(master, &pty.Winsize{Rows: uint16(rows), Cols: uint16(cols)})
 		},
 		dir: cmd.Dir,
+		env: env,
 	}
 	return driveSession(ctx, p, proc)
 }

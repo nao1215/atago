@@ -53,6 +53,10 @@ type ptyProcess struct {
 	resize func(rows, cols int) error
 	// dir is the resolved workdir the child ran in, surfaced as Result.Workdir.
 	dir string
+	// env is the environment the pty child was started with, reused for
+	// mid-session host commands (#380) so a helper cannot quietly step outside
+	// the isolation the step asked for.
+	env []string
 }
 
 // driveSession runs the platform-neutral half of a pty step: it drains the
@@ -274,6 +278,15 @@ func driveSession(ctx context.Context, p *spec.PTY, proc ptyProcess) (*runner.Re
 					}
 				}
 				return abort(&ExpectFailure{Check: cr})
+			}
+			continue
+		}
+		if a.Exec != nil {
+			// Blocking here is the contract: after this returns, the change the
+			// command made exists, so whatever the session waits for next is
+			// waiting on the program noticing it rather than on a race (#380).
+			if xerr := runSessionExec(ctx, a.Exec, proc.dir, proc.env); xerr != nil {
+				return failHard(fmt.Errorf("pty %q: session[%d]: %w", p.Command, i, xerr))
 			}
 			continue
 		}

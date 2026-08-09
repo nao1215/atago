@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"syscall"
@@ -386,5 +388,112 @@ func TestDriveSession_ResizeDoesNotRetuneAnEarlierCursorReport(t *testing.T) {
 	// exists and describes the pre-resize screen rather than an empty one.
 	if got, want := string(f.writes), "\x1b[1;13R"; !strings.Contains(got, want) {
 		t.Errorf("cursor report = %q, want it to contain %q", got, want)
+	}
+}
+
+// TestDriveSession_Exec covers the mid-session host command (#380): it runs in
+// the scenario workdir with the step's environment, it blocks (so the change it
+// makes is in place before the session moves on), and its output stays out of
+// the transcript.
+func TestDriveSession_Exec(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	marker := filepath.Join(dir, "marker.txt")
+
+	f := &fakePTY{script: []readStep{bytesStep("ready\r\n")}, end: io.EOF}
+	p := &spec.PTY{
+		Command: "mytool watch",
+		Session: []spec.PTYAction{
+			{Expect: "ready"},
+			// Relative path: proving cwd is the scenario workdir, not atago's.
+			{Exec: &spec.PTYExec{Command: "sh -c 'echo $ATAGO_EXEC_PROBE > marker.txt; echo noise-on-stdout'"}},
+		},
+	}
+	proc := fakeSession(f, 0)
+	proc.dir = dir
+	proc.env = append(os.Environ(), "ATAGO_EXEC_PROBE=from-the-step-env")
+
+	res, ef, err := driveSession(context.Background(), p, proc)
+	if err != nil || ef != nil {
+		t.Fatalf("err=%v ef=%+v", err, ef)
+	}
+	// Blocking is the contract: by the time driveSession returned the file is
+	// there, without the test waiting for it.
+	got, rerr := os.ReadFile(marker)
+	if rerr != nil {
+		t.Fatalf("exec did not create the marker in the workdir: %v", rerr)
+	}
+	if !strings.Contains(string(got), "from-the-step-env") {
+		t.Errorf("marker = %q, want the step environment to have reached the command", got)
+	}
+	// The transcript is what the TERMINAL showed; a host command's stdout is not
+	// that, and letting it in would make every later stream assert lie.
+	if strings.Contains(string(res.Stdout), "noise-on-stdout") {
+		t.Errorf("exec output leaked into the transcript: %q", res.Stdout)
+	}
+}
+
+// TestDriveSession_ExecFailureIsHard proves a broken helper stops the run at the
+// mistake. Without this the session would sail on to an expect_screen, wait out
+// its whole timeout for a change nobody made, and report the program under test
+// as the thing at fault.
+func TestDriveSession_ExecFailureIsHard(t *testing.T) {
+	t.Parallel()
+	for name, tc := range map[string]struct {
+		exec *spec.PTYExec
+		want []string
+	}{
+		"non-zero exit": {
+			exec: &spec.PTYExec{Command: "sh -c 'echo why-it-failed >&2; exit 3'"},
+			want: []string{"session[0]", "exited 3", "why-it-failed"},
+		},
+		"cannot start": {
+			exec: &spec.PTYExec{Command: "atago-no-such-helper-binary"},
+			want: []string{"session[0]", "could not run"},
+		},
+		"timeout": {
+			exec: &spec.PTYExec{Command: "sh -c 'sleep 30'", Timeout: "150ms"},
+			want: []string{"session[0]", "did not finish within 150ms"},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			f := &fakePTY{end: io.EOF}
+			p := &spec.PTY{Command: "mytool", Session: []spec.PTYAction{{Exec: tc.exec}}}
+			proc := fakeSession(f, 0)
+			proc.dir = t.TempDir()
+
+			res, ef, err := driveSession(context.Background(), p, proc)
+			if err == nil {
+				t.Fatalf("a failed exec must be an error; got res=%+v ef=%+v", res, ef)
+			}
+			for _, want := range tc.want {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("error %q should mention %q", err, want)
+				}
+			}
+		})
+	}
+}
+
+// TestCappedBuffer_ReportsWhatItDropped keeps a chatty helper from growing the
+// process without bound while still reporting the full write to the command, so
+// the command never sees a short write on its own output.
+func TestCappedBuffer_ReportsWhatItDropped(t *testing.T) {
+	t.Parallel()
+	c := &cappedBuffer{limit: 10}
+	n, err := c.Write([]byte("0123456789ABCDEF"))
+	if n != 16 || err != nil {
+		t.Fatalf("Write = %d, %v; want the full count and no error", n, err)
+	}
+	if got := c.String(); !strings.HasPrefix(got, "0123456789") || !strings.Contains(got, "6 more bytes") {
+		t.Errorf("String() = %q", got)
+	}
+	// A second write past the limit keeps counting rather than growing.
+	if _, err := c.Write([]byte("more")); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	if got := c.String(); !strings.Contains(got, "10 more bytes") {
+		t.Errorf("String() = %q, want the drop count to accumulate", got)
 	}
 }

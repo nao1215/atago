@@ -412,6 +412,56 @@ silently does nothing.
 
 Full spec: [pty](../examples/pty.atago.yaml)
 
+## Test a TUI that reacts to external change
+
+Some of what a TUI does is not caused by typing. A git client refreshes when a commit is made
+outside it, a file manager shows a file another process created, a log viewer follows a file
+that keeps growing. `exec:` runs one command on the host while the program is still running,
+so those paths are reachable from a spec.
+
+```yaml
+version: "1"
+suite:
+  name: tui reacts
+
+scenarios:
+  - name: the viewer picks up a commit made outside it
+    steps:
+      - run:
+          shell: true
+          command: git init -q repo && git -C repo commit -q --allow-empty -m first
+      - pty:
+          command: mytool log repo
+          rows: 24
+          cols: 80
+          timeout: 30s
+          session:
+            - expect_screen:
+                contains: "first"
+                stable_for: 200ms
+            # Runs on the host while the TUI keeps running, and blocks until it
+            # finishes — so by the next line the commit definitely exists and
+            # the wait is on the program noticing it, not on a race.
+            - exec: "git -C repo commit -q --allow-empty -m second"
+            - expect_screen:
+                contains: "second"
+                timeout: 10s
+            - send: "q"
+      - assert:
+          exit_code: 0
+```
+
+The command runs in the scenario workdir with the same environment the pty child got, so
+`sandbox_home` and `clear_env` isolation still holds. A non-zero exit, a timeout, or a
+failure to start ends the step with an error — the command is scaffolding, not the thing
+under test, so a broken one must not leave the next `expect_screen` waiting out its timeout
+for a change nobody made.
+
+One interaction worth knowing: files the command writes are part of the step's workdir delta,
+so a following `changes:` assert must list or `ignore:` them.
+
+Full spec: [pty_screen](../examples/pty_screen.atago.yaml)
+
 ## Prove a TUI survives a window resize
 
 Relayout is where full-screen TUIs break: a stale right edge, a panel that keeps its old
