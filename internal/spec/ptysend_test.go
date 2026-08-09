@@ -166,6 +166,28 @@ func TestPTYKeyNames_ListsEveryFamily(t *testing.T) {
 	}
 }
 
+// TestPTYSend_Times pins the repeat form (#377): a navigation key pressed N
+// times is one action, not N copies of the same line.
+func TestPTYSend_Times(t *testing.T) {
+	t.Parallel()
+	if got := (&PTYSend{Key: "left", Times: 3}).Bytes(); string(got) != "\x1b[D\x1b[D\x1b[D" {
+		t.Errorf("times 3 = %q", got)
+	}
+	// An unset or explicit 1 is exactly one press, so adding the field cannot
+	// change what an existing spec sends.
+	for _, n := range []int{0, 1} {
+		if got := (&PTYSend{Key: "left", Times: n}).Bytes(); string(got) != "\x1b[D" {
+			t.Errorf("times %d = %q, want one press", n, got)
+		}
+	}
+	if got := (&PTYSend{Key: "left", Times: 16}).Label(); got != "press left x16" {
+		t.Errorf("label = %q", got)
+	}
+	if got := (&PTYSend{Key: "left", Times: 1}).Label(); got != "press left" {
+		t.Errorf("label = %q", got)
+	}
+}
+
 // TestPTYSend_TextAndEOF proves the scalar form and the historical
 // empty-string EOF rule survive the polymorphic type.
 func TestPTYSend_TextAndEOF(t *testing.T) {

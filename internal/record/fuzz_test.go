@@ -208,9 +208,12 @@ func FuzzGeneratePTYRoundTrip(f *testing.F) {
 		}
 		pty := s.Scenarios[0].Steps[0].PTY
 
-		// A control-key burst is rendered as its named key instead of text; every
-		// other burst must decode back to the recorded bytes.
-		if _, named := spec.PTYKeyForSequence(string(input)); !named {
+		// A control-key burst is rendered as its named key — once, or with
+		// `times` when the burst is that key repeated (#377) — instead of text;
+		// every other burst must decode back to the recorded bytes.
+		_, named := spec.PTYKeyForSequence(string(input))
+		_, _, repeated := keyRepeat(input)
+		if !named && !repeated {
 			want := escapeVarRefs(literalSend(input))
 			var got *string
 			for _, act := range pty.Session {

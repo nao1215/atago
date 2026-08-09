@@ -146,6 +146,21 @@ scenarios:
           exit_code: 0
           stdout:
             contains: "^[^?X"
+      # `times` repeats a key (#377). The bytes must be the sequence back to
+      # back — one write, so the program reads the burst the way it reads a
+      # held key — and nothing else.
+      - pty:
+          command: cat -v
+          timeout: 10s
+          session:
+            - send: { key: down, times: 3 }
+            - send: { key: enter }
+            - expect: '\^\[\[B\^\[\[B\^\[\[B'
+            - send: { key: ctrl-d }
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "^[[B^[[B^[[B"
       # backtab is an alias, not a second key: it must put the same bytes on
       # the wire as shift-tab.
       - pty:

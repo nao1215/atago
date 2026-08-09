@@ -1,6 +1,7 @@
 package record
 
 import (
+	"bytes"
 	"encoding/base64"
 	"fmt"
 	"regexp"
@@ -160,6 +161,12 @@ func renderSend(seg PTYSegment, secretN *int) []string {
 	if key, ok := spec.PTYKeyForSequence(string(seg.Input)); ok {
 		return []string{fmt.Sprintf("            - send: {key: %s}\n", key)}
 	}
+	// A held navigation key arrives as one burst of the same sequence over and
+	// over (capture coalesces consecutive input reads), which would otherwise
+	// record as an opaque wall of escapes. `times` says what happened (#377).
+	if key, n, ok := keyRepeat(seg.Input); ok {
+		return []string{fmt.Sprintf("            - send: {key: %s, times: %d}\n", key, n)}
+	}
 	// Typed text is raw: escape ${...} so the replay engine types the literal
 	// bytes the user typed instead of expanding them (the secret placeholder
 	// above is the one send that MUST stay a live reference).
@@ -177,6 +184,35 @@ func renderSend(seg PTYSegment, secretN *int) []string {
 		}
 	}
 	return []string{fmt.Sprintf("            - send: %s\n", yamlDoubleQuoted(text))}
+}
+
+// keyRepeat reports whether input is exactly N (≥ 2) back-to-back copies of one
+// named key's byte sequence, and names that key (#377). It scans candidate
+// periods shortest-first so the answer is the most repetitions the bytes can be
+// read as — "\r\r" is two enters, never one two-byte mystery — and the period
+// must divide the input exactly, so a burst with anything else mixed in falls
+// through to the literal-text path where nothing is lost.
+func keyRepeat(input []byte) (string, int, bool) {
+	if len(input) < 2 {
+		return "", 0, false
+	}
+	for period := 1; period <= len(input)/2; period++ {
+		if len(input)%period != 0 {
+			continue
+		}
+		times := len(input) / period
+		if times > spec.MaxPTYSendTimes {
+			continue
+		}
+		unit := input[:period]
+		if !bytes.Equal(input, bytes.Repeat(unit, times)) {
+			continue
+		}
+		if key, ok := spec.PTYKeyForSequence(string(unit)); ok {
+			return key, times, true
+		}
+	}
+	return "", 0, false
 }
 
 // yamlDoubleQuoted renders s as a YAML double-quoted flow scalar, escaping

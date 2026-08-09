@@ -1,7 +1,9 @@
 package spec
 
 import (
+	"bytes"
 	"fmt"
+	"math"
 	"strings"
 
 	"github.com/goccy/go-yaml"
@@ -78,7 +80,18 @@ type PTYSend struct {
 	Text *string
 	// Key is a named key, normalized to lower case.
 	Key string
+	// Times repeats a named key (#377), so sixteen presses of an arrow are one
+	// readable action instead of sixteen identical session entries. Zero and one
+	// both mean a single press; the repeats go out as ONE terminal write, which
+	// is what a held key looks like to the program reading it. Only valid with
+	// Key: repeating text is already expressible inline.
+	Times int
 }
+
+// MaxPTYSendTimes bounds the repeat count (#377). Navigation never needs
+// anywhere near it, and the cap keeps a typo'd `times: 100000000` from writing
+// gigabytes into the terminal instead of failing at the mistake.
+const MaxPTYSendTimes = 10000
 
 // PTYExpectScreen is a session-local rendered-screen wait: the matcher runs on
 // the live terminal screen during a pty session, not only after the program
@@ -117,19 +130,63 @@ func (p *PTYSend) UnmarshalYAML(node ast.Node) error {
 		return fail("send must be a string or {key: <name>} (e.g. {key: enter})")
 	}
 	for k, v := range raw {
-		if k != "key" {
-			return fail("send: unknown key %q (accepted: key)", k)
+		switch k {
+		case "key":
+			str, ok := v.(string)
+			if !ok {
+				return fail("send.key must be a string")
+			}
+			p.Key = strings.ToLower(strings.TrimSpace(str))
+		case "times":
+			// The range check lives here rather than in the loader because this
+			// is the only layer that can still tell an authored `times: 0` from
+			// an omitted one — the decoded field is a plain int, so by the time
+			// validation runs the two are the same value.
+			n, ok := asInt(v)
+			if !ok {
+				return fail("send.times must be an integer (e.g. {key: left, times: 16})")
+			}
+			if n < 1 {
+				return fail("send.times must be at least 1 (got %d); omit it for a single press", n)
+			}
+			if n > MaxPTYSendTimes {
+				return fail("send.times must not exceed %d (got %d)", MaxPTYSendTimes, n)
+			}
+			p.Times = n
+		default:
+			return fail("send: unknown key %q (accepted: key, times)", k)
 		}
-		str, ok := v.(string)
-		if !ok {
-			return fail("send.key must be a string")
-		}
-		p.Key = strings.ToLower(strings.TrimSpace(str))
 	}
 	if p.Key == "" {
+		// This is also what rejects a lone `{times: N}`: repeating verbatim text
+		// is already expressible inline, so times only ever qualifies a key.
 		return fail("send: {key: <name>} requires a key name (e.g. enter, tab, ctrl-c)")
 	}
 	return nil
+}
+
+// asInt accepts the several numeric shapes a YAML decoder may hand back for an
+// integer scalar, and rejects a float that is not whole (`times: 1.5` is a
+// mistake, not a truncation).
+func asInt(v any) (int, bool) {
+	switch n := v.(type) {
+	case int:
+		return n, true
+	case int64:
+		return int(n), true
+	case uint64:
+		if n > math.MaxInt32 {
+			return 0, false
+		}
+		return int(n), true
+	case float64:
+		if n != math.Trunc(n) {
+			return 0, false
+		}
+		return int(n), true
+	default:
+		return 0, false
+	}
 }
 
 // MarshalYAML emits the same shape UnmarshalYAML accepts — the scalar text form,
@@ -139,6 +196,9 @@ func (p *PTYSend) UnmarshalYAML(node ast.Node) error {
 func (p PTYSend) MarshalYAML() (any, error) {
 	if p.Text != nil {
 		return *p.Text, nil
+	}
+	if p.Times != 0 {
+		return map[string]any{"key": p.Key, "times": p.Times}, nil
 	}
 	return map[string]string{"key": p.Key}, nil
 }
@@ -292,7 +352,14 @@ func PTYKeyNames() string {
 // historical empty-string EOF rule.
 func (p *PTYSend) Bytes() []byte {
 	if p.Key != "" {
-		return []byte(ptyKeySequences[p.Key])
+		seq := []byte(ptyKeySequences[p.Key])
+		if p.Times > 1 {
+			// One write, not p.Times writes: a held key reaches the program as a
+			// burst in a single read, and splitting it would let a redraw land
+			// between presses and change what the program sees.
+			return bytes.Repeat(seq, p.Times)
+		}
+		return seq
 	}
 	if p.Text != nil && *p.Text == "" {
 		return []byte{0x04}
@@ -307,6 +374,8 @@ func (p *PTYSend) Bytes() []byte {
 // for keys, a quoted excerpt for text, "EOF (^D)" for the empty string.
 func (p *PTYSend) Label() string {
 	switch {
+	case p.Key != "" && p.Times > 1:
+		return fmt.Sprintf("press %s x%d", p.Key, p.Times)
 	case p.Key != "":
 		return "press " + p.Key
 	case p.Text != nil && *p.Text == "":

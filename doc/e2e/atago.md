@@ -5977,6 +5977,7 @@ _skipped on Windows_
 # interactive (pty): cat -v
 # interactive (pty): stty raw -echo; printf "READY\r\n"; head -c 3 | cat -v
 # interactive (pty): cat -v
+# interactive (pty): cat -v
 # interactive (pty): trap 'exit 130' INT; echo waiting; while true; do sleep 0.1; done
 ```
 #### Then
@@ -5984,6 +5985,8 @@ _skipped on Windows_
 - stdout contains `^[[Z`, `^[b`, `^[[1;5D`, `^[[1;2A`, `^[[2~`
 - exit code is `0`
 - stdout contains `^[^?X`
+- exit code is `0`
+- stdout contains `^[[B^[[B^[[B`
 - exit code is `0`
 - stdout contains `^[[Z`
 - exit code is `130`

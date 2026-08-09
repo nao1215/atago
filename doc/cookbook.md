@@ -397,6 +397,9 @@ scenarios:
             # selection movement (xterm's CSI 1 ; modifier form).
             - send: { key: ctrl-left }
             - send: { key: shift-up }
+            # `times` repeats a key as one write, the way a held key reaches
+            # the program — sixteen presses stay one readable line.
+            - send: { key: left, times: 16 }
             - send: { key: esc }
       - assert:
           screen:

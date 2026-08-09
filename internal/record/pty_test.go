@@ -104,6 +104,34 @@ func TestGeneratePTY(t *testing.T) {
 			wantContain: []string{"send: {key: alt-b}", "send: {key: ctrl-left}"},
 		},
 		{
+			// Capture coalesces consecutive input reads, so a held arrow key
+			// arrives as one burst of the same sequence repeated (#377).
+			name: "a held navigation key records as one send with times",
+			rec: PTYRecording{
+				Command:  "editor",
+				ExitCode: 0,
+				Segments: []PTYSegment{
+					outSeg("> "),
+					inSeg("\x1b[D\x1b[D\x1b[D\x1b[D"),
+				},
+			},
+			wantContain: []string{"send: {key: left, times: 4}"},
+		},
+		{
+			// A burst that is not a whole number of one key's presses must stay
+			// literal text rather than be rounded into a repeat.
+			name: "a mixed burst is not collapsed into a repeat",
+			rec: PTYRecording{
+				Command:  "editor",
+				ExitCode: 0,
+				Segments: []PTYSegment{
+					outSeg("> "),
+					inSeg("\x1b[D\x1b[C"),
+				},
+			},
+			wantAbsent: []string{"times:"},
+		},
+		{
 			name: "multi-line output between inputs anchors on the last stable line",
 			rec: PTYRecording{
 				Command:  "wizard",

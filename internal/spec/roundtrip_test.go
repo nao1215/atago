@@ -93,6 +93,8 @@ func TestPTYSend_YAMLRoundTrip(t *testing.T) {
 		"text escape":    {Text: strp("\x01\x1b[A")},
 		"key enter":      {Key: "enter"},
 		"key ctrl-c":     {Key: "ctrl-c"},
+		"key times":      {Key: "left", Times: 16},
+		"key times one":  {Key: "left", Times: 1},
 	}
 	for name, in := range cases {
 		t.Run(name, func(t *testing.T) {
