@@ -261,6 +261,22 @@ func TestPTYMouse_Encoding(t *testing.T) {
 			mouse: PTYMouse{Row: 9, Col: 3, Button: "wheel-down", Action: "press"},
 			want:  "\x1b[<65;3;9M",
 		},
+		// A wheel notch has no release, so the default click is ONE report — a
+		// paired release would be a report no real terminal produces.
+		"wheel up defaults to a single notch": {
+			mouse: PTYMouse{Row: 9, Col: 3, Button: "wheel-up"},
+			want:  "\x1b[<64;3;9M",
+		},
+		"wheel down defaults to a single notch": {
+			mouse: PTYMouse{Row: 9, Col: 3, Button: "wheel-down"},
+			want:  "\x1b[<65;3;9M",
+		},
+		// Modifiers are bit flags: repeating one must not carry into the next
+		// bit. Summing them turned [ctrl, ctrl] into 32, the MOTION bit.
+		"a repeated modifier stays one bit": {
+			mouse: PTYMouse{Row: 1, Col: 1, Mods: []string{"ctrl", "ctrl"}, Action: "press"},
+			want:  "\x1b[<16;1;1M",
+		},
 		"ctrl adds 16": {
 			mouse: PTYMouse{Row: 5, Col: 12, Mods: []string{"ctrl"}, Action: "press"},
 			want:  "\x1b[<16;12;5M",

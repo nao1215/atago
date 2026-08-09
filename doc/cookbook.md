@@ -450,6 +450,8 @@ scenarios:
 `row`/`col` are 1-based screen cells, as a person counts them. `action` defaults to `click`,
 which sends the press and its release in one write the way a real click arrives; `press` and
 `release` send one half. Buttons are `left`, `middle`, `right`, `wheel-up`, and `wheel-down`.
+A wheel notch has no release, so `click` on a wheel button sends a single scroll report and
+`action: release` on one is a load error.
 
 Events go out as SGR (1006) reports. If the program has not enabled mouse tracking together
 with SGR encoding, atago fails the step and says which request was missing, instead of sending

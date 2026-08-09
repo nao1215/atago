@@ -84,10 +84,18 @@ func validatePTYMouse(add func(string, ...any), where string, m *spec.PTYMouse) 
 	if m.IsWheel() && m.Action == "release" {
 		add("%s: a wheel button has no release event; use action: press (the default click sends one notch)", where)
 	}
+	seen := map[string]bool{}
 	for _, mod := range m.Mods {
 		if !spec.ValidPTYMouseMod(mod) {
 			add("%s.mods %q is not a supported modifier (supported: %s)", where, mod, spec.PTYMouseModNames())
+			continue
 		}
+		// A modifier is a bit, so naming it twice says nothing new — and a spec
+		// that repeats one is far more likely to have meant two different ones.
+		if seen[mod] {
+			add("%s.mods lists %q twice", where, mod)
+		}
+		seen[mod] = true
 	}
 }
 

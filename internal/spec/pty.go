@@ -308,15 +308,24 @@ func (m *PTYMouse) ActionOrDefault() string {
 func (m *PTYMouse) Bytes() []byte {
 	cb := ptyMouseButtons[m.ButtonOrDefault()]
 	for _, mod := range m.Mods {
-		cb += ptyMouseMods[mod]
+		// OR, not add: the modifiers are bit flags, so repeating one must not
+		// carry into the next bit. `mods: [ctrl, ctrl]` summed to 32, which is
+		// the MOTION bit — a report atago does not send and a TUI would read as
+		// something else entirely.
+		cb |= ptyMouseMods[mod]
 	}
 	press := fmt.Sprintf("\x1b[<%d;%d;%dM", cb, m.Col, m.Row)
 	release := fmt.Sprintf("\x1b[<%d;%d;%dm", cb, m.Col, m.Row)
-	switch m.ActionOrDefault() {
-	case "press":
+	switch {
+	case m.ActionOrDefault() == "press":
 		return []byte(press)
-	case "release":
+	case m.ActionOrDefault() == "release":
 		return []byte(release)
+	case m.IsWheel():
+		// A wheel notch is a single event: there is no release to pair with it,
+		// and sending one would put a report on the wire that no real terminal
+		// produces. `click` on a wheel therefore means one notch.
+		return []byte(press)
 	default:
 		return []byte(press + release)
 	}

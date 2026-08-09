@@ -508,3 +508,40 @@ func TestAppendInput_CoalescesConsecutiveBursts(t *testing.T) {
 		t.Errorf("password fragmented into multiple secret placeholders:\n%s", got)
 	}
 }
+
+// TestSGRMouseEvent_RefusesWhatASpecCannotSay is the guard behind a recording
+// that would not load. A terminal can report a zero coordinate or a wheel
+// release; PTYMouse allows neither, and GeneratePTY validates its own output —
+// so rendering one would fail the WHOLE recording rather than one line. These
+// bursts must fall through to the literal-text path, which replays identically.
+func TestSGRMouseEvent_RefusesWhatASpecCannotSay(t *testing.T) {
+	t.Parallel()
+	for name, input := range map[string]string{
+		"zero row":         "\x1b[<0;5;0M",
+		"zero column":      "\x1b[<0;0;5M",
+		"wheel release":    "\x1b[<65;3;9m",
+		"wheel up release": "\x1b[<64;3;9m",
+		"motion report":    "\x1b[<32;4;2M",
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			if m, ok := sgrMouseEvent([]byte(input)); ok {
+				t.Errorf("%q decoded to %+v, but no spec could say that", input, m)
+			}
+		})
+	}
+
+	// The shapes a spec CAN say still decode.
+	for name, input := range map[string]string{
+		"click": "\x1b[<0;12;5M\x1b[<0;12;5m",
+		"press": "\x1b[<2;1;1M",
+		"wheel": "\x1b[<65;3;9M",
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			if _, ok := sgrMouseEvent([]byte(input)); !ok {
+				t.Errorf("%q should decode", input)
+			}
+		})
+	}
+}

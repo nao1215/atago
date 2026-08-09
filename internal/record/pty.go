@@ -264,6 +264,17 @@ func parseSGRMouse(b []byte) (*spec.PTYMouse, bool) {
 	if match[4][0] == 'm' {
 		action = "release"
 	}
+	// Only decode what a spec could legally say. A terminal can report a
+	// 0-coordinate or a wheel release, and rendering either would produce a
+	// recording the loader then rejects — GeneratePTY validates its own output,
+	// so the whole recording would fail rather than one line. Falling through
+	// keeps the bytes as literal input, which replays identically.
+	if row < 1 || col < 1 {
+		return nil, false
+	}
+	if action == "release" && (button == "wheel-up" || button == "wheel-down") {
+		return nil, false
+	}
 	return &spec.PTYMouse{Row: row, Col: col, Button: button, Action: action, Mods: mods}, true
 }
 
