@@ -103,7 +103,7 @@ func TestCheckScreenAttrs(t *testing.T) {
 }
 
 // TestCheckScreenAttrs_BoldBrightensTheColor pins the terminal rule that would
-// otherwise make the obvious spec fail. A terminal draws bold text in a colour's
+// otherwise make the obvious spec fail. A terminal draws bold text in a color's
 // BRIGHT variant, and the emulator mirrors it, so `SGR 31` on bold text comes
 // back as index 9 rather than 1. An author who wrote `fg: red` beside
 // `bold: true` meant the 31 their program emitted, so the bright twin satisfies

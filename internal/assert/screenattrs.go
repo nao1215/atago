@@ -146,10 +146,10 @@ func firstAttrMismatch(a *spec.ScreenAttr, cells []runner.ScreenCell) string {
 // `default` matches both of the emulator's two default values (foreground and
 // background), so a spec never has to know which slot it is asking about.
 //
-// Bold brightens: a terminal draws bold text in a colour's bright variant, and
+// Bold brightens: a terminal draws bold text in a color's bright variant, and
 // the emulator mirrors that, so SGR 31 on bold text comes back as index 9 rather
 // than 1. An author who wrote `fg: red` next to `bold: true` meant the 31 their
-// program emitted, so the bright twin of an ANSI colour satisfies it. Asking for
+// program emitted, so the bright twin of an ANSI color satisfies it. Asking for
 // `bright-red` specifically is still exact — the widening only runs from the
 // dim name toward the bright one.
 func colorMatches(got, want uint32, bold bool) bool {

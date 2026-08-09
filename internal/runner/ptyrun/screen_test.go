@@ -306,7 +306,7 @@ func TestRenderScreenCells_TracksColorsAndAttributes(t *testing.T) {
 	}
 	// Row 1: ERROR is bold red, " ok" is neither. The emulator reports index 9
 	// rather than 1 because a terminal draws bold text in the BRIGHT variant of
-	// its colour — the assertion layer accounts for that, this render does not
+	// its color — the assertion layer accounts for that, this render does not
 	// hide it.
 	for i, r := range "ERROR" {
 		c := cells[0][i]
