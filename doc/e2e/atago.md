@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-74 suites · 452 scenarios
+74 suites · 453 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -335,12 +335,13 @@
   - [a screen snapshot round-trips through update and compare](#scenario-a-screen-snapshot-round-trips-through-update-and-compare)
   - [a screen assert without a pty step is a load-time error](#scenario-a-screen-assert-without-a-pty-step-is-a-load-time-error)
   - [a send referencing an undefined variable is an execution error, not typed literally](#scenario-a-send-referencing-an-undefined-variable-is-an-execution-error-not-typed-literally)
-- [atago self-hosting / pty (portable)](#atago-self-hosting--pty-portable) — 8 scenarios
+- [atago self-hosting / pty (portable)](#atago-self-hosting--pty-portable) — 9 scenarios
   - [a pty step starts a command, captures its output, and reports exit 0](#scenario-a-pty-step-starts-a-command-captures-its-output-and-reports-exit-0)
   - [a pty step surfaces a command's non-zero exit code](#scenario-a-pty-step-surfaces-a-commands-non-zero-exit-code)
   - [sequential expects match successive output in declaration order](#scenario-sequential-expects-match-successive-output-in-declaration-order)
   - [an expect pattern is a regular expression, not a literal](#scenario-an-expect-pattern-is-a-regular-expression-not-a-literal)
   - [a screen assert reads the rendered frame sized by rows and cols](#scenario-a-screen-assert-reads-the-rendered-frame-sized-by-rows-and-cols)
+  - [a mid-session resize succeeds on every platform](#scenario-a-mid-session-resize-succeeds-on-every-platform)
   - [a pty step drives the atago binary directly with no shell](#scenario-a-pty-step-drives-the-atago-binary-directly-with-no-shell)
   - [a pty drives atago running an inner spec to a green result](#scenario-a-pty-drives-atago-running-an-inner-spec-to-a-green-result)
   - [a never-matching expect fails and names the pattern in the transcript](#scenario-a-never-matching-expect-fails-and-names-the-pattern-in-the-transcript)
@@ -6190,6 +6191,15 @@ Source: `test/e2e/atago/pty_portable.atago.yaml`
 #### Then
 - exit code is `0`
 - rendered screen contains `rendered line`
+### Scenario: a mid-session resize succeeds on every platform
+#### When
+```shell
+# interactive (pty): echo before resize && echo after resize
+```
+#### Then
+- exit code is `0`
+- stdout contains `before resize`, `after resize`
+- rendered screen contains `after resize`
 ### Scenario: a pty step drives the atago binary directly with no shell
 #### When
 ```shell
