@@ -270,8 +270,22 @@ func driveSession(ctx context.Context, p *spec.PTY, proc ptyProcess) (*runner.Re
 			continue
 		}
 		if a.Send != nil {
-			// Bytes resolves named keys to their xterm sequences and keeps the
-			// historical rule that an empty verbatim send transmits EOF (^D).
+			// A paste is only a paste if the program asked for one. Without the
+			// mode, the markers arrive as ordinary characters and the failure
+			// surfaces somewhere far away — as a REPL executing a pasted block
+			// line by line, or as "[200~" typed into a prompt — so refuse here,
+			// where the mistake is (#378).
+			if a.Send.Paste != nil && !term.modeEnabled(decsetBracketedPaste) {
+				return failHard(fmt.Errorf(
+					"pty %q: session[%d] sends a paste, but the program has not enabled bracketed paste "+
+						"(it never wrote ESC [?2004h, or turned the mode back off). "+
+						"Programs that do not distinguish a paste from typing take a plain send instead; "+
+						"if this one does enable the mode, wait for it with an expect or expect_screen before pasting",
+					p.Command, i))
+			}
+			// Bytes resolves named keys to their xterm sequences, wraps a paste
+			// in its markers, and keeps the historical rule that an empty
+			// verbatim send transmits EOF (^D).
 			if _, werr := writeTerm(a.Send.Bytes()); werr != nil {
 				return failHard(fmt.Errorf("pty: send: %w", werr))
 			}

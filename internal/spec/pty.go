@@ -86,12 +86,28 @@ type PTYSend struct {
 	// is what a held key looks like to the program reading it. Only valid with
 	// Key: repeating text is already expressible inline.
 	Times int
+	// Paste is text delivered as a BRACKETED PASTE (#378): the bytes go out
+	// wrapped in the markers a terminal puts around pasted input, so a program
+	// that distinguishes a paste from typing — a REPL that must not execute a
+	// pasted block line by line, an editor that must not auto-indent it — takes
+	// its paste path. The empty string is an empty paste, not the scalar form's
+	// EOF. Mutually exclusive with Key and with the scalar Text form.
+	Paste *string
 }
 
 // MaxPTYSendTimes bounds the repeat count (#377). Navigation never needs
 // anywhere near it, and the cap keeps a typo'd `times: 100000000` from writing
 // gigabytes into the terminal instead of failing at the mistake.
 const MaxPTYSendTimes = 10000
+
+// The xterm bracketed-paste markers, i.e. what a terminal wraps pasted input in
+// once the application has turned DEC private mode 2004 on (#378). A terminal
+// emits them ONLY after that request, which is why sending a paste is gated on
+// having seen the program ask.
+const (
+	PasteStart = "\x1b[200~"
+	PasteEnd   = "\x1b[201~"
+)
 
 // PTYExpectScreen is a session-local rendered-screen wait: the matcher runs on
 // the live terminal screen during a pty session, not only after the program
@@ -153,14 +169,29 @@ func (p *PTYSend) UnmarshalYAML(node ast.Node) error {
 				return fail("send.times must not exceed %d (got %d)", MaxPTYSendTimes, n)
 			}
 			p.Times = n
+		case "paste":
+			str, ok := v.(string)
+			if !ok {
+				return fail("send.paste must be a string")
+			}
+			p.Paste = &str
 		default:
-			return fail("send: unknown key %q (accepted: key, times)", k)
+			return fail("send: unknown key %q (accepted: key, times, paste)", k)
 		}
+	}
+	if p.Key != "" && p.Paste != nil {
+		return fail("send: set either {key: <name>} or {paste: <text>}, not both")
+	}
+	if p.Paste != nil {
+		if p.Times != 0 {
+			return fail("send.times repeats a named key; a paste is delivered once")
+		}
+		return nil
 	}
 	if p.Key == "" {
 		// This is also what rejects a lone `{times: N}`: repeating verbatim text
 		// is already expressible inline, so times only ever qualifies a key.
-		return fail("send: {key: <name>} requires a key name (e.g. enter, tab, ctrl-c)")
+		return fail("send: {key: <name>} requires a key name (e.g. enter, tab, ctrl-c), or use {paste: <text>}")
 	}
 	return nil
 }
@@ -196,6 +227,9 @@ func asInt(v any) (int, bool) {
 func (p PTYSend) MarshalYAML() (any, error) {
 	if p.Text != nil {
 		return *p.Text, nil
+	}
+	if p.Paste != nil {
+		return map[string]string{"paste": *p.Paste}, nil
 	}
 	if p.Times != 0 {
 		return map[string]any{"key": p.Key, "times": p.Times}, nil
@@ -351,6 +385,12 @@ func PTYKeyNames() string {
 // named key's xterm sequence, the verbatim text, or 0x04 (VEOF, ^D) for the
 // historical empty-string EOF rule.
 func (p *PTYSend) Bytes() []byte {
+	if p.Paste != nil {
+		b := make([]byte, 0, len(PasteStart)+len(*p.Paste)+len(PasteEnd))
+		b = append(b, PasteStart...)
+		b = append(b, *p.Paste...)
+		return append(b, PasteEnd...)
+	}
 	if p.Key != "" {
 		seq := []byte(ptyKeySequences[p.Key])
 		if p.Times > 1 {
@@ -374,6 +414,8 @@ func (p *PTYSend) Bytes() []byte {
 // for keys, a quoted excerpt for text, "EOF (^D)" for the empty string.
 func (p *PTYSend) Label() string {
 	switch {
+	case p.Paste != nil:
+		return fmt.Sprintf("paste %q", *p.Paste)
 	case p.Key != "" && p.Times > 1:
 		return fmt.Sprintf("press %s x%d", p.Key, p.Times)
 	case p.Key != "":

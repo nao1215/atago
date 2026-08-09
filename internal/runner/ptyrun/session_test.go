@@ -226,3 +226,64 @@ func TestDriveSession_LostTranscriptOutranksAnExpectFailure(t *testing.T) {
 		t.Errorf("error should wrap the underlying read failure: %v", err)
 	}
 }
+
+// TestDriveSession_PasteRequiresTheMode pins the gate on a bracketed paste
+// (#378). Without the program's own request for the mode the markers are just
+// characters, and the failure would surface far from the mistake — as a REPL
+// running a pasted block line by line, or as "[200~" typed into a prompt.
+func TestDriveSession_PasteRequiresTheMode(t *testing.T) {
+	t.Parallel()
+	paste := "x = 1\n"
+	p := &spec.PTY{
+		Command: "mytool repl",
+		Session: []spec.PTYAction{
+			{Expect: "ready"},
+			{Send: &spec.PTYSend{Paste: &paste}},
+		},
+	}
+
+	// The program printed a prompt but never asked for bracketed paste.
+	f := &fakePTY{script: []readStep{bytesStep("ready\r\n")}, end: io.EOF}
+	res, ef, err := driveSession(context.Background(), p, fakeSession(f, 0))
+	if err == nil {
+		t.Fatalf("a paste without the mode must be an error; got res=%+v ef=%+v", res, ef)
+	}
+	for _, want := range []string{"mytool repl", "session[1]", "bracketed paste", "ESC [?2004h"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q should mention %q", err, want)
+		}
+	}
+	if got := string(f.writes); got != "" {
+		t.Errorf("nothing should have been written to the terminal, got %q", got)
+	}
+
+	// The same session against a program that DID enable the mode writes the
+	// text wrapped in the markers.
+	enabled := &fakePTY{script: []readStep{bytesStep("\x1b[?2004hready\r\n")}, end: io.EOF}
+	if _, ef, err := driveSession(context.Background(), p, fakeSession(enabled, 0)); err != nil || ef != nil {
+		t.Fatalf("paste with the mode enabled: err=%v ef=%+v", err, ef)
+	}
+	want := spec.PasteStart + paste + spec.PasteEnd
+	if got := string(enabled.writes); got != want {
+		t.Errorf("terminal received %q, want %q", got, want)
+	}
+}
+
+// TestDriveSession_PasteModeTurnedOffIsRefused proves the tracked state follows
+// the program rather than latching: a REPL that leaves its paste-aware mode
+// (dropping into a pager, say) is one that no longer takes a paste.
+func TestDriveSession_PasteModeTurnedOffIsRefused(t *testing.T) {
+	t.Parallel()
+	paste := "x"
+	p := &spec.PTY{
+		Command: "mytool",
+		Session: []spec.PTYAction{
+			{Expect: "gone"},
+			{Send: &spec.PTYSend{Paste: &paste}},
+		},
+	}
+	f := &fakePTY{script: []readStep{bytesStep("\x1b[?2004hhere\x1b[?2004lgone")}, end: io.EOF}
+	if _, _, err := driveSession(context.Background(), p, fakeSession(f, 0)); err == nil {
+		t.Fatal("a paste after the mode was turned off must be an error")
+	}
+}

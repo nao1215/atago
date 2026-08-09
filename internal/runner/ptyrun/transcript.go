@@ -25,6 +25,10 @@ type transcriptDrain struct {
 	readDone    chan struct{}
 	screenLen   int
 	screenCache []byte
+	// modes records the DEC private modes the program has requested, read off
+	// its own output (#378). A terminal feature the program never asked for is
+	// one whose input atago must not fabricate.
+	modes map[int]bool
 }
 
 func startTranscriptDrain(rw io.ReadWriter, p *spec.PTY) *transcriptDrain {
@@ -33,16 +37,24 @@ func startTranscriptDrain(rw io.ReadWriter, p *spec.PTY) *transcriptDrain {
 		rw:        rw,
 		readDone:  make(chan struct{}),
 		screenLen: -1,
+		modes:     map[int]bool{},
 	}
 	queries := newTerminalQueries(p, writerFunc(t.write))
+	var modeScan decsetScanner
 	go func() {
 		defer close(t.readDone)
 		buf := make([]byte, 4096)
 		for {
 			n, rerr := t.rw.Read(buf)
 			if n > 0 {
+				// Scan before taking the lock: the scanner is owned by this
+				// goroutine, so only the resulting transitions need guarding.
+				transitions := modeScan.consume(buf[:n])
 				t.mu.Lock()
 				t.transcript = append(t.transcript, buf[:n]...)
+				for _, m := range transitions {
+					t.modes[m.Param] = m.Enabled
+				}
 				t.mu.Unlock()
 				queries.consume(buf[:n])
 			}
@@ -116,6 +128,14 @@ func (t *transcriptDrain) currentScreen() []byte {
 	}
 	t.mu.Unlock()
 	return rendered
+}
+
+// modeEnabled reports whether the program currently has a DEC private mode on,
+// as of every byte read so far (#378).
+func (t *transcriptDrain) modeEnabled(param int) bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.modes[param]
 }
 
 func (t *transcriptDrain) readError() error {

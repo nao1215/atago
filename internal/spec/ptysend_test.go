@@ -188,6 +188,29 @@ func TestPTYSend_Times(t *testing.T) {
 	}
 }
 
+// TestPTYSend_Paste pins the bracketed-paste form (#378): the text goes out
+// wrapped in the markers a terminal puts around a paste, so a program that
+// distinguishes pasted input from typed input sees a paste.
+func TestPTYSend_Paste(t *testing.T) {
+	t.Parallel()
+	p := &PTYSend{Paste: strPtr("SELECT 1;\nSELECT 2;\n")}
+	want := "\x1b[200~SELECT 1;\nSELECT 2;\n\x1b[201~"
+	if got := p.Bytes(); string(got) != want {
+		t.Errorf("paste bytes = %q, want %q", got, want)
+	}
+	// An empty paste is an empty paste, NOT the empty-send EOF rule: that rule
+	// belongs to the scalar form alone.
+	empty := &PTYSend{Paste: strPtr("")}
+	if got := empty.Bytes(); string(got) != "\x1b[200~\x1b[201~" {
+		t.Errorf("empty paste = %q, want just the markers", got)
+	}
+	if got := p.Label(); got != `paste "SELECT 1;\nSELECT 2;\n"` {
+		t.Errorf("label = %q", got)
+	}
+}
+
+func strPtr(s string) *string { return &s }
+
 // TestPTYSend_TextAndEOF proves the scalar form and the historical
 // empty-string EOF rule survive the polymorphic type.
 func TestPTYSend_TextAndEOF(t *testing.T) {

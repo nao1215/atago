@@ -132,6 +132,35 @@ func TestGeneratePTY(t *testing.T) {
 			wantAbsent: []string{"times:"},
 		},
 		{
+			// The terminal brackets a paste, and replaying it as typed text
+			// would take the program's other input path entirely (#378).
+			name: "a bracketed paste records as a paste",
+			rec: PTYRecording{
+				Command:  "python3",
+				ExitCode: 0,
+				Segments: []PTYSegment{
+					outSeg(">>> "),
+					inSeg("\x1b[200~x = 1\ny = 2\n\x1b[201~"),
+				},
+			},
+			wantContain: []string{`- send: {paste: "x = 1\ny = 2\n"}`},
+		},
+		{
+			// Markers that do not bracket the WHOLE burst are something else —
+			// typing around a paste, or a program echoing them back — and
+			// guessing would replay input the program never received.
+			name: "markers inside a larger burst are not a paste",
+			rec: PTYRecording{
+				Command:  "python3",
+				ExitCode: 0,
+				Segments: []PTYSegment{
+					outSeg(">>> "),
+					inSeg("a\x1b[200~x\x1b[201~b"),
+				},
+			},
+			wantAbsent: []string{"paste:"},
+		},
+		{
 			name: "multi-line output between inputs anchors on the last stable line",
 			rec: PTYRecording{
 				Command:  "wizard",
