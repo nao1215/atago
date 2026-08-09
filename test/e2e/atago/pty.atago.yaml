@@ -271,6 +271,61 @@ scenarios:
           screen:
             contains: "abcdefghij\nKL"
 
+  # Everything else in a session is caused by a keystroke. `exec:` (#380) is the
+  # one action that is not: it changes the world while the program runs, so a
+  # session can test what the program does about it — the watcher path no
+  # keystroke can reach.
+  - name: a session can change the world and watch the program notice
+    skip:
+      os: windows
+    steps:
+      # The program is a file watcher, so nothing it prints can be caused by
+      # typing. FOUND appears only because the exec below created the file while
+      # the program was already running and looking for it.
+      - pty:
+          shell: true
+          command: 'while :; do if [ -f marker.txt ]; then echo FOUND; break; fi; sleep 0.05; done'
+          timeout: 20s
+          session:
+            - exec: "touch marker.txt"
+            - expect: FOUND
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: FOUND
+      # The exec created it in the scenario workdir, not somewhere else.
+      - assert:
+          file:
+            path: marker.txt
+            exists: true
+      # A broken helper stops the run at the mistake. Without that, the expect
+      # after it would wait out the whole session budget for a change nobody
+      # made, and blame the program under test for not reacting.
+      - fixture:
+          file: badexec.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: the helper fails
+                steps:
+                  - pty:
+                      shell: true
+                      command: 'sleep 5'
+                      timeout: 10s
+                      session:
+                        - exec: {command: "exit 7", shell: true}
+                        - expect: never-comes
+      - run:
+          command: ${atago} run badexec.atago.yaml
+      - assert:
+          exit_code: 4 # an execution error, not an assertion failure
+          stdout:
+            contains:
+              - "exited 7"
+              - "the change the session waits for was not made"
+
   - name: an unknown key name is a load-time error listing the vocabulary
     steps:
       - fixture:

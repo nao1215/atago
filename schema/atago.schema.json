@@ -1261,6 +1261,11 @@
                 "required": [
                   "resize"
                 ]
+              },
+              {
+                "required": [
+                  "exec"
+                ]
               }
             ],
             "description": "Exactly one of expect (wait until the transcript matches the regexp), send (write to the terminal; \"\" sends EOF/^D; {key: enter} presses a named key, #26; {paste: text} delivers a bracketed paste, #378), expect_screen (wait until the rendered screen matches, optionally stably for a duration), or resize (change the terminal size mid-session, #379). ${name}/${env:NAME} references in a send, expect, or expect_screen matcher are expanded against the store; a reference nothing resolves fails the step before any terminal I/O (#78) — write $${name} for literal text.",
@@ -1309,6 +1314,37 @@
                   }
                 ],
                 "description": "Writes to the terminal: a string verbatim (\"\" sends EOF/^D; `${name}` expansion applies), `{key: <name>}` for a named key — `enter`, `tab`, `shift-tab`, `esc`, arrows, `insert`, `f1`-`f12`, `ctrl-a`..`ctrl-z`, `alt-a`..`alt-z`, modified arrows such as `ctrl-left` and `shift-up`, `ctrl-space`/`ctrl-@`, `ctrl-[`, `ctrl-\\`, `ctrl-]`, `ctrl-^`, `ctrl-_`, `ctrl-hyphen`/`ctrl-minus` — or `{paste: <text>}` to deliver the text as a bracketed paste."
+              },
+              "exec": {
+                "description": "Runs one command on the HOST while the program under test keeps running, so a session can test what a TUI does when the world changes underneath it — a commit made outside `lazygit`, a file another process creates, a line appended to a log a viewer is following. It blocks until the command exits, which is the point: after it, the change exists, so the `expect_screen` that follows is waiting on the program noticing rather than on a race. Runs in the scenario workdir with the same environment the pty child got, so `sandbox_home` / `clear_env` isolation still holds. A non-zero exit, a timeout, or a failure to start is an execution error — the command is scaffolding, not the subject under test. Its output never joins the transcript. Note that files it writes appear in a following `changes:` assert, so list or `ignore:` them.",
+                "oneOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "command"
+                    ],
+                    "properties": {
+                      "command": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The command to run on the host."
+                      },
+                      "shell": {
+                        "type": "boolean",
+                        "description": "Runs the command through the shell, like `run.shell`."
+                      },
+                      "timeout": {
+                        "type": "string",
+                        "description": "Go duration bounding this command (default `10s`). The remaining session budget bounds it too, whichever is shorter."
+                      }
+                    }
+                  }
+                ]
               },
               "resize": {
                 "type": "object",

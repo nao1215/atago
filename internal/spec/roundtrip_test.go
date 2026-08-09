@@ -211,3 +211,29 @@ func marshalReloadNoT[T any](v T) T {
 	_ = yaml.Unmarshal(b, &got)
 	return got
 }
+
+// TestPTYExec_YAMLRoundTrip pins both authored shapes of a mid-session host
+// command (#380): the scalar form stays scalar, and a mapping keeps every knob
+// it carried. `atago explain` and the doc generator both re-marshal specs, so a
+// form that does not survive the trip would silently change what a session runs.
+func TestPTYExec_YAMLRoundTrip(t *testing.T) {
+	t.Parallel()
+	yes := true
+	cases := map[string]PTYExec{
+		"scalar":            {Command: "touch marker.txt"},
+		"mapping with all":  {Command: "echo hi >> log", Shell: &yes, Timeout: "30s"},
+		"mapping with some": {Command: "git commit --allow-empty -m x", Timeout: "5s"},
+	}
+	for name, in := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			got := marshalReload(t, in)
+			if got.Command != in.Command || got.Timeout != in.Timeout {
+				t.Errorf("exec round-trip:\n in  = %+v\n got = %+v", in, got)
+			}
+			if (got.Shell == nil) != (in.Shell == nil) || (in.Shell != nil && *got.Shell != *in.Shell) {
+				t.Errorf("shell round-trip: in=%v got=%v", in.Shell, got.Shell)
+			}
+		})
+	}
+}

@@ -72,6 +72,11 @@ func (e *Engine) runPTY(ctx context.Context, p *spec.PTY, st *store.Store, scena
 			// A resize carries only integers, so it needs no expansion — but it
 			// still has to be carried into the copy the runner drives (#379).
 			na.Resize = a.Resize
+			if a.Exec != nil {
+				ce := *a.Exec
+				ce.Command = st.Expand(a.Exec.Command)
+				na.Exec = &ce
+			}
 			na.ExpectScreen = spec.WalkPTYExpectScreenStrings(a.ExpectScreen, st.Expand)
 			c.Session[i] = na
 		}
@@ -105,6 +110,14 @@ func checkPTYSessionResolved(session []spec.PTYAction, st *store.Store) error {
 		}
 		if a.Send != nil && a.Send.Paste != nil {
 			if err := unresolvedRefError(i, "send", *a.Send.Paste, st); err != nil {
+				return err
+			}
+		}
+		// A typo'd reference in an exec would run a command nobody wrote, on the
+		// host, with the step's environment — the one place in a session where
+		// that is worth catching before anything starts (#380).
+		if a.Exec != nil {
+			if err := unresolvedRefError(i, "exec", a.Exec.Command, st); err != nil {
 				return err
 			}
 		}

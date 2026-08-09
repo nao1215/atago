@@ -174,6 +174,17 @@ func explainScenario(b *strings.Builder, sc *spec.Scenario) {
 				if len(resizes) > 0 {
 					commands[len(commands)-1] += "  [resizes: " + strings.Join(resizes, ", ") + "]"
 				}
+				// A session that runs commands on the HOST is the one thing a
+				// reviewer must not have to read the YAML to discover (#380).
+				var execs []string
+				for _, a := range step.PTY.Session {
+					if a.Exec != nil {
+						execs = append(execs, a.Exec.Command)
+					}
+				}
+				if len(execs) > 0 {
+					commands[len(commands)-1] += "  [runs on the host: " + strings.Join(execs, "; ") + "]"
+				}
 			}
 		case spec.StepCDP:
 			if step.CDP != nil {

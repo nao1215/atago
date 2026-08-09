@@ -73,6 +73,7 @@ func Run(ctx context.Context, p *spec.PTY, workdir string, env []string) (*runne
 		// the platform's answer to the POSIX SIGWINCH (#379).
 		resize: func(rows, cols int) error { return cpty.Resize(rows, cols) },
 		dir:    dir,
+		env:    env,
 	}
 	return driveSession(ctx, p, proc)
 }

@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-74 suites · 453 scenarios
+74 suites · 454 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -323,13 +323,14 @@
   - [metadata is found inside a compressed object stream](#scenario-metadata-is-found-inside-a-compressed-object-stream)
   - [a wrong expectation still fails against compressed metadata](#scenario-a-wrong-expectation-still-fails-against-compressed-metadata)
   - [a stream that ends without a newline does not swallow the next object](#scenario-a-stream-that-ends-without-a-newline-does-not-swallow-the-next-object)
-- [atago self-hosting / pty](#atago-self-hosting--pty) — 11 scenarios
+- [atago self-hosting / pty](#atago-self-hosting--pty) — 12 scenarios
   - [a pty step sees a terminal where a run step sees a pipe](#scenario-a-pty-step-sees-a-terminal-where-a-run-step-sees-a-pipe)
   - [a never-matching expect fails with the pattern in the block](#scenario-a-never-matching-expect-fails-with-the-pattern-in-the-block)
   - [named keys transmit their documented bytes and ctrl-c aborts](#scenario-named-keys-transmit-their-documented-bytes-and-ctrl-c-aborts)
   - [shift-tab, meta chords, and modified arrows transmit their xterm bytes](#scenario-shift-tab-meta-chords-and-modified-arrows-transmit-their-xterm-bytes)
   - [a bracketed paste is delivered wrapped, and refused when unasked for](#scenario-a-bracketed-paste-is-delivered-wrapped-and-refused-when-unasked-for)
   - [a resize delivers the new size and the screen follows it](#scenario-a-resize-delivers-the-new-size-and-the-screen-follows-it)
+  - [a session can change the world and watch the program notice](#scenario-a-session-can-change-the-world-and-watch-the-program-notice)
   - [an unknown key name is a load-time error listing the vocabulary](#scenario-an-unknown-key-name-is-a-load-time-error-listing-the-vocabulary)
   - [screen asserts see the final frame where the transcript sees history](#scenario-screen-asserts-see-the-final-frame-where-the-transcript-sees-history)
   - [a screen snapshot round-trips through update and compare](#scenario-a-screen-snapshot-round-trips-through-update-and-compare)
@@ -6034,6 +6035,40 @@ _skipped on Windows_
 - exit code is `0`
 - stdout contains `40 100`
 - rendered screen contains `"abcdefghij\nKL"`
+### Scenario: a session can change the world and watch the program notice
+_skipped on Windows_
+#### Given
+- Fixture file `badexec.atago.yaml` is created.
+#### Inputs
+_Fixture `badexec.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: the helper fails
+    steps:
+      - pty:
+          shell: true
+          command: 'sleep 5'
+          timeout: 10s
+          session:
+            - exec: {command: "exit 7", shell: true}
+            - expect: never-comes
+```
+#### When
+```shell
+# interactive (pty): while :; do if [ -f marker.txt ]; then echo FOUND; break; fi; sleep 0.05; done
+${atago} run badexec.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout contains `FOUND`
+- file `marker.txt` exists
+- exit code is `4`
+- stdout contains `exited 7`, `the change the session waits for was not made`
+#### Generated artifacts
+- `marker.txt`
 ### Scenario: an unknown key name is a load-time error listing the vocabulary
 #### Given
 - Fixture file `badkey.atago.yaml` is created.

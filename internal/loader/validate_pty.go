@@ -27,11 +27,12 @@ func validatePTY(add func(string, ...any), where string, p *spec.PTY) {
 		hasSend := a.Send != nil
 		hasExpectScreen := a.ExpectScreen != nil
 		hasResize := a.Resize != nil
+		hasExec := a.Exec != nil
 		switch {
-		case countBools(hasExpect, hasSend, hasExpectScreen, hasResize) > 1:
-			add("%s: set exactly one of expect/send/expect_screen/resize (got more than one)", aw)
-		case !hasExpect && !hasSend && !hasExpectScreen && !hasResize:
-			add("%s: set exactly one of expect/send/expect_screen/resize (an empty send: \"\" transmits EOF)", aw)
+		case countBools(hasExpect, hasSend, hasExpectScreen, hasResize, hasExec) > 1:
+			add("%s: set exactly one of expect/send/expect_screen/resize/exec (got more than one)", aw)
+		case !hasExpect && !hasSend && !hasExpectScreen && !hasResize && !hasExec:
+			add("%s: set exactly one of expect/send/expect_screen/resize/exec (an empty send: \"\" transmits EOF)", aw)
 		case hasExpect:
 			if _, err := regexp.Compile(a.Expect); err != nil {
 				add("%s.expect %q is not a valid regexp: %v", aw, a.Expect, err)
@@ -52,6 +53,11 @@ func validatePTY(add func(string, ...any), where string, p *spec.PTY) {
 			} else if a.Resize.Rows > 65535 || a.Resize.Cols > 65535 {
 				add("%s.resize: rows/cols must be between 1 and 65535", aw)
 			}
+		case hasExec:
+			if a.Exec.Command == "" {
+				add("%s.exec.command is required", aw)
+			}
+			positiveDuration(add, aw+".exec.timeout", a.Exec.Timeout, "10s", "10s")
 		}
 	}
 }
