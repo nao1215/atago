@@ -209,6 +209,7 @@
   "pty.session[].expect_screen.yaml": "v0.12.0",
   "pty.session[].send": "v0.2.0",
   "pty.session[].send.key": "v0.3.0",
+  "pty.session[].send.times": "unreleased",
   "pty.shell": "v0.2.0",
   "pty.timeout": "v0.2.0",
   "query.runner": "v0.1.0",

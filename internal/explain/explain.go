@@ -148,9 +148,17 @@ func explainScenario(b *strings.Builder, sc *spec.Scenario) {
 				commands = append(commands, desc)
 				var keys []string
 				for _, a := range step.PTY.Session {
-					if a.Send != nil && a.Send.Key != "" {
-						keys = append(keys, a.Send.Key)
+					if a.Send == nil || a.Send.Key == "" {
+						continue
 					}
+					// A repeat says how many presses it stands for, so a
+					// reviewer sees "left x16" rather than a single "left"
+					// hiding sixteen of them (#377).
+					if a.Send.Times > 1 {
+						keys = append(keys, fmt.Sprintf("%s x%d", a.Send.Key, a.Send.Times))
+						continue
+					}
+					keys = append(keys, a.Send.Key)
 				}
 				if len(keys) > 0 {
 					commands[len(commands)-1] += "  [keys: " + strings.Join(keys, ", ") + "]"

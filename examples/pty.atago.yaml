@@ -109,6 +109,11 @@ scenarios:
             - send: { key: ctrl-left }
             - send: { key: enter }
             - expect: '\^\[\[1;5D'
+            # A key you would hold down is one action: `times` repeats it as a
+            # single write, the way a key-repeat burst reaches the program.
+            - send: { key: down, times: 3 }
+            - send: { key: enter }
+            - expect: '\^\[\[B\^\[\[B\^\[\[B'
             - send: { key: ctrl-d }
       - assert:
           exit_code: 0
@@ -117,3 +122,4 @@ scenarios:
               - "^[[Z" # shift-tab, i.e. CSI Z
               - "^[b" # alt-b
               - "^[[1;5D" # ctrl-left
+              - "^[[B^[[B^[[B" # down pressed three times

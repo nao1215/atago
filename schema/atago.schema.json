@@ -1263,6 +1263,12 @@
                         "type": "string",
                         "minLength": 1,
                         "description": "Named key: `enter`, `tab`, `shift-tab` (alias `backtab`), `esc`, `space`, `backspace`, `delete`, `insert`, arrows, home/end, pageup/pagedown, `f1`-`f12`, `ctrl-a`..`ctrl-z`, `alt-a`..`alt-z`, `alt-enter`, `alt-backspace`, modified arrows (`ctrl-left`, `shift-up`, …), `ctrl-space`/`ctrl-@`, `ctrl-[`, `ctrl-\\`, `ctrl-]`, `ctrl-^`, `ctrl-_`, `ctrl-hyphen`/`ctrl-minus`."
+                      },
+                      "times": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 10000,
+                        "description": "Presses the key this many times, as one terminal write — `{key: left, times: 16}` instead of sixteen identical session entries. Requires `key`; omit it (or `1`) for a single press."
                       }
                     }
                   }
