@@ -434,3 +434,80 @@ func TestRender_SummaryUsesElapsedNotSuiteSum(t *testing.T) {
 		t.Errorf("summary summed per-suite durations (2s) instead of using elapsed:\n%s", out)
 	}
 }
+
+// TestRender_AllowXPass_EveryFailureSignalAgrees is the #395 consistency rule
+// CodeRabbit caught: --allow-xpass makes the run exit 0, so a report format that
+// still says "failure" contradicts the exit code, and a CI dashboard shows a
+// failed test for a green build. Every failure-level signal has to move
+// together, and the scenario must still be visible as an xpass.
+func TestRender_AllowXPass_EveryFailureSignalAgrees(t *testing.T) {
+	t.Parallel()
+	res := &engine.SuiteResult{
+		Suite:  "mix",
+		Status: engine.StatusPassed,
+		Scenarios: []engine.ScenarioResult{{
+			Name:       "xp",
+			Status:     engine.StatusXPass,
+			ExpectFail: &spec.ExpectFail{Reason: "used to crash"},
+			Steps:      []engine.StepResult{{Kind: "assert", Checks: []*assert.CheckResult{{OK: true}}}},
+		}},
+	}
+
+	t.Run("json keeps it out of failures", func(t *testing.T) {
+		t.Parallel()
+		var doc jsonDocument
+		out := renderWith(t, FormatJSON, res, WithAllowXPass(true))
+		if err := json.Unmarshal([]byte(out), &doc); err != nil {
+			t.Fatalf("json invalid: %v", err)
+		}
+		if n := len(doc.Suites[0].Failures); n != 0 {
+			t.Errorf("failures = %d, want 0 under --allow-xpass: %+v", n, doc.Suites[0].Failures)
+		}
+		if got := doc.Suites[0].Scenarios[0].Status; got != "xpass" {
+			t.Errorf("status = %q, want xpass — the verdict must stay visible", got)
+		}
+	})
+
+	t.Run("junit reports no failure", func(t *testing.T) {
+		t.Parallel()
+		var root junitTestsuites
+		if err := xml.Unmarshal([]byte(renderWith(t, FormatJUnit, res, WithAllowXPass(true))), &root); err != nil {
+			t.Fatalf("junit invalid: %v", err)
+		}
+		if root.Failures != 0 {
+			t.Errorf("junit failures = %d, want 0 under --allow-xpass", root.Failures)
+		}
+		if root.Suites[0].Testcases[0].FlakyFailure == nil {
+			t.Error("the xpass must still be surfaced, as the non-failing signal junit has for it")
+		}
+	})
+
+	t.Run("gha warns instead of erroring", func(t *testing.T) {
+		t.Parallel()
+		out := renderWith(t, FormatGHA, res, WithAllowXPass(true))
+		if strings.Contains(out, "::error title=mix / xp::") {
+			t.Errorf("gha must not fail a job that exits 0:\n%s", out)
+		}
+		if !strings.Contains(out, "::warning title=mix / xp::") {
+			t.Errorf("gha must still surface the xpass:\n%s", out)
+		}
+	})
+
+	t.Run("console reads PASSED", func(t *testing.T) {
+		t.Parallel()
+		out := renderWith(t, FormatConsole, res, WithAllowXPass(true))
+		if !strings.Contains(out, "PASSED") || !strings.Contains(out, "1 xpass") {
+			t.Errorf("console summary must read PASSED and still count the xpass:\n%s", out)
+		}
+	})
+}
+
+// renderWith is render with extra options.
+func renderWith(t *testing.T, f Format, res *engine.SuiteResult, opts ...Option) string {
+	t.Helper()
+	var b strings.Builder
+	if err := Render(&b, f, []*engine.SuiteResult{res}, opts...); err != nil {
+		t.Fatalf("render %s: %v", f, err)
+	}
+	return b.String()
+}

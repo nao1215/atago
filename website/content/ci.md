@@ -18,7 +18,7 @@ atago run --ci ./specs                 # an XPASS fails the build: promote the s
 atago run --ci --allow-xpass ./specs   # the warning without the red build
 ```
 
-In `--report junit` an XFAIL is a `<skipped>` testcase and an XPASS a `<failure>`; in `--report tap` both carry the standard `# TODO` directive; in `--report gha` they are a notice and an error annotation.
+In `--report junit` an XFAIL is a `<skipped>` testcase and an XPASS a `<failure>`; in `--report tap` both carry the standard `# TODO` directive; in `--report gha` they are a notice and an error annotation; in `--report json` the scenario carries `status: "xfail"` / `"xpass"` and an `expect_fail` object, and an XFAIL is kept out of `failures[]`. With `--allow-xpass` every failure-level signal follows the exit code — no `<failure>`, no `::error`, nothing in `failures[]` — so a green build never shows a failed test.
 
 [setup-atago](https://github.com/nao1215/setup-atago) installs a released binary:
 

@@ -378,8 +378,14 @@ func expectFailNarrative(ef *spec.ExpectFail, xpass bool) string {
 	}
 	if xpass {
 		b.WriteString("This scenario documents a bug that is no longer there. Move it into the suite\n")
-		b.WriteString("that guards against a regression (drop expect_fail:), and close the issue.\n")
-		b.WriteString("Pass --allow-xpass to keep the run green while you do.")
+		b.WriteString("that guards against a regression (drop expect_fail:)")
+		// Only when the spec named one: telling an author to close an issue
+		// they never referenced sends them looking for something that does not
+		// exist.
+		if ef != nil && ef.Issue != "" {
+			b.WriteString(", and close the issue above")
+		}
+		b.WriteString(".\nPass --allow-xpass to keep the run green while you do.")
 	} else {
 		b.WriteString("Expected failure: the run stays green. It turns red the day the bug is fixed.")
 	}

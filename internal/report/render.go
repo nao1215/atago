@@ -166,15 +166,15 @@ func Render(w io.Writer, f Format, results []*engine.SuiteResult, opts ...Option
 	case FormatJSON:
 		doc := jsonDocument{SchemaVersion: jsonSchemaVersion, Suites: make([]jsonReport, 0, len(results))}
 		for _, res := range results {
-			doc.Suites = append(doc.Suites, buildJSON(res))
+			doc.Suites = append(doc.Suites, buildJSON(res, o.allowXPass))
 		}
 		enc := json.NewEncoder(w)
 		enc.SetIndent("", "  ")
 		return enc.Encode(doc)
 	case FormatJUnit:
-		return writeJUnit(w, buildJUnit(results))
+		return writeJUnit(w, buildJUnit(results, o.allowXPass))
 	case FormatGHA:
-		return writeGHA(w, results)
+		return writeGHA(w, results, o.allowXPass)
 	case FormatTAP:
 		return writeTAP(w, results)
 	default:

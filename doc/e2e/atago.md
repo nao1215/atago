@@ -3477,10 +3477,15 @@ scenarios:
 #### When
 ```shell
 ${atago} run --allow-xpass inner_allow.atago.yaml
+${atago} run --allow-xpass --report junit inner_allow.atago.yaml
 ```
 #### Then
-- exit code is `0`
-- stdout contains `1 xpass`
+- after `${atago} run --allow-xpass inner_allow.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `1 xpass`
+- after `${atago} run --allow-xpass --report junit inner_allow.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `failures="0"`, does not contain `<failure`
 ### Scenario: an execution error is still an error, not an expected failure
 #### Given
 - Fixture file `inner_error.atago.yaml` is created.

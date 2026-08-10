@@ -92,6 +92,15 @@ scenarios:
           exit_code: 0
           stdout:
             contains: "1 xpass"
+      - run:
+          # Every failure-level signal has to follow the exit code, or a CI
+          # dashboard shows a failed test for a green build.
+          command: ${atago} run --allow-xpass --report junit inner_allow.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: 'failures="0"'
+            not_contains: "<failure"
 
   - name: an execution error is still an error, not an expected failure
     steps:

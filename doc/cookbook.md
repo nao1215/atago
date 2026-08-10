@@ -1093,10 +1093,16 @@ keeps the run green while you do. `reason` is required — an expected failure w
 no stated reason cannot be told apart from a test somebody gave up on — and
 `issue` is what makes the XPASS message actionable.
 
-Every format carries the verdict in its own vocabulary: TAP uses the `# TODO`
-directive (both ways: `not ok … # TODO` for an XFAIL, `ok … # TODO` for the
-unexpected success), JUnit reports an XFAIL as `<skipped>` and an XPASS as
-`<failure>`, and GitHub Actions gets a notice and an error annotation.
+Every format carries the verdict in its own vocabulary. The console prints an
+XFAIL/XPASS block with the reason and the issue; JSON records `status: "xfail"` /
+`"xpass"` plus an `expect_fail` object, and keeps an XFAIL out of `failures[]`;
+TAP uses the `# TODO` directive both ways (`not ok … # TODO` for an XFAIL,
+`ok … # TODO` for the unexpected success); JUnit reports an XFAIL as `<skipped>`
+and an XPASS as `<failure>`; GitHub Actions gets a notice and an error
+annotation. Under `--allow-xpass` every failure-level signal moves together with
+the exit code — JSON drops it from `failures[]`, JUnit reports no `<failure>`,
+and GHA warns instead of erroring — so no dashboard shows a failed test for a
+green build.
 
 Full spec: [expect_fail](../examples/expect_fail.atago.yaml)
 

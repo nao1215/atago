@@ -12,7 +12,7 @@ import (
 // failures surface inline in the Actions UI. One `::error::` line per failed or
 // errored scenario, plus a final `::notice::` summary. Rendered by Render
 // (FormatGHA).
-func writeGHA(w io.Writer, results []*engine.SuiteResult) error {
+func writeGHA(w io.Writer, results []*engine.SuiteResult, allowXPass bool) error {
 	var b strings.Builder
 	var agg engine.Counts
 	var total int
@@ -33,8 +33,14 @@ func writeGHA(w io.Writer, results []*engine.SuiteResult) error {
 			case engine.StatusXPass:
 				// An error annotation, matching the exit code: the fix landed and
 				// the scenario has to be promoted, which nobody does for a notice.
-				fmt.Fprintf(&b, "::error title=%s::%s\n",
-					ghaEscapeProp(res.Suite+" / "+sc.Name), ghaEscapeData(xpassMessage(sc)))
+				// Under --allow-xpass the exit code is 0, so the annotation drops
+				// to a warning rather than failing a job that passed.
+				kind := "error"
+				if allowXPass {
+					kind = "warning"
+				}
+				fmt.Fprintf(&b, "::%s title=%s::%s\n",
+					kind, ghaEscapeProp(res.Suite+" / "+sc.Name), ghaEscapeData(xpassMessage(sc)))
 			case engine.StatusXFail:
 				// A notice, not a warning: a known bug that is still broken is the
 				// expected outcome, and a warning per known bug would train

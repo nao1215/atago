@@ -87,7 +87,7 @@ type jsonArtifact struct {
 }
 
 // buildJSON converts a suite result into the serializable report shape.
-func buildJSON(res *engine.SuiteResult) jsonReport {
+func buildJSON(res *engine.SuiteResult, allowXPass bool) jsonReport {
 	out := jsonReport{
 		Suite: res.Suite,
 		// Forward slashes keep spec_path portable across platforms (Windows uses
@@ -131,7 +131,15 @@ func buildJSON(res *engine.SuiteResult) jsonReport {
 			// it has no failing check to describe itself with — so the bucket
 			// gets a synthesized entry rather than staying silent about the one
 			// verdict that turned the run red.
-			out.Failures = append(out.Failures, jsonFailure{Scenario: sc.Name, Error: xpassMessage(sc)})
+			//
+			// Under --allow-xpass it did NOT turn the run red, and every
+			// failure-level signal has to agree with the exit code: a consumer
+			// that reads failures[] would otherwise report a failed test for a
+			// green build. The scenario row still carries status "xpass" and the
+			// expect_fail block, so nothing is hidden.
+			if !allowXPass {
+				out.Failures = append(out.Failures, jsonFailure{Scenario: sc.Name, Error: xpassMessage(sc)})
+			}
 		default:
 			out.Failures = append(out.Failures, failuresOf(sc)...)
 		}
