@@ -1178,6 +1178,7 @@ func TestBugHunt_Rejections(t *testing.T) {
 		{"file size and range together", specSteps("assert: {file: {path: out.txt, size: 1, min_size: 2}}"), "size is the exact form"},
 		{"file size unsatisfiable range", specSteps("assert: {file: {path: out.txt, min_size: 9, max_size: 2}}"), "greater than max_size"},
 		{"file size with snapshot", specSteps("assert: {file: {path: out.txt, snapshot: s.txt, size: 3}}"), "cannot be combined with snapshot"},
+		{"file size with exists false", specSteps("assert: {file: {path: out.txt, exists: false, size: 0}}"), "an absent file has no size"},
 		{"file size with two content matchers", specSteps("assert: {file: {path: out.txt, exists: true, contains: a, size: 3}}"), "must set exactly one of exists/contains"},
 
 		// ---- validateHeaderMatch ----

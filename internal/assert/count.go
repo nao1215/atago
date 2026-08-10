@@ -2,11 +2,11 @@ package assert
 
 import (
 	"fmt"
-	"os"
 	"regexp"
 	"strings"
 
 	"github.com/nao1215/atago/internal/plural"
+	"github.com/nao1215/atago/internal/security"
 	"github.com/nao1215/atago/internal/spec"
 )
 
@@ -205,7 +205,11 @@ func location(got string, off int) string {
 // the file the assertion is about.
 func checkFileSize(f *spec.FileAssert, path string) *CheckResult {
 	desc := fmt.Sprintf("assert file %q size %s", f.Path, sizeBounds(f).phrase())
-	info, err := os.Stat(path)
+	// StatNoFollow, not os.Stat: a program under test can plant a symlink at the
+	// assertion target, and following it would report the size of a host file
+	// outside the workdir — the same disclosure ReadFileNoFollow refuses on the
+	// read path (issue #16).
+	info, err := security.StatNoFollow(path)
 	if err != nil {
 		return &CheckResult{
 			Desc:     desc,

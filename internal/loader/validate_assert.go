@@ -276,6 +276,12 @@ func validateFile(add func(string, ...any), where string, f *spec.FileAssert) {
 	// So it satisfies the at-least-one rule without joining the one-of family.
 	if f.HasSize() {
 		validateSizeBounds(add, where, f.Size, f.MinSize, f.MaxSize)
+		// A size bound has to stat a regular file; `exists: false` demands there
+		// be nothing to stat. Nothing can satisfy both, so it is an authoring
+		// mistake rather than a contract.
+		if f.Exists != nil && !*f.Exists {
+			add("%s: size/min_size/max_size cannot be combined with exists: false — an absent file has no size", where)
+		}
 		if f.Snapshot != "" {
 			add("%s: size/min_size/max_size cannot be combined with snapshot — a snapshot already pins every byte", where)
 		}

@@ -3,6 +3,7 @@ package assert
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -209,3 +210,29 @@ func TestCheck_FileSize_NearMissNamesTheUsualCause(t *testing.T) {
 }
 
 func int64p(n int64) *int64 { return &n }
+
+// TestCheck_FileSize_RefusesToStatThroughASymlink is the #16 rule applied to
+// the size bounds: a program under test can plant a symlink at the assertion
+// target, and following it would report the size of a host file outside the
+// workdir. The read path already refuses; the stat path has to as well.
+func TestCheck_FileSize_RefusesToStatThroughASymlink(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("creating a symlink needs elevation on Windows; the POSIX path is the one at risk")
+	}
+	t.Parallel()
+	dir := t.TempDir()
+	outside := filepath.Join(t.TempDir(), "secret.txt")
+	if err := os.WriteFile(outside, []byte("0123456789"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(dir, "link.txt")); err != nil {
+		t.Fatal(err)
+	}
+	got := Check(&spec.Assert{File: &spec.FileAssert{Path: "link.txt", Size: int64p(10)}}, nil, Env{Workdir: dir})
+	if got.OK {
+		t.Fatal("a size bound must not be satisfied through a symlink to a host file")
+	}
+	if !strings.Contains(got.Hint, "symlink") {
+		t.Errorf("hint %q should name the refused symlink", got.Hint)
+	}
+}

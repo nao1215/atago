@@ -213,3 +213,58 @@ scenarios:
           exit_code: 2
           stderr:
             contains: "greater than max_size"
+
+  - name: a size bound refuses to stat through a planted symlink
+    skip:
+      os: windows   # creating a symlink needs elevation on Windows
+    steps:
+      - fixture:
+          file: inner_link.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner link
+            scenarios:
+              - name: the target is a link out of the workdir
+                steps:
+                  # A fixture cannot plant an escaping symlink (the loader
+                  # refuses), so the program under test plants it — which is
+                  # exactly the threat the assertion has to survive.
+                  - run:
+                      shell: true
+                      command: "ln -s /etc/hosts link.txt"
+                  - assert:
+                      file:
+                        path: link.txt
+                        min_size: 1
+      - run:
+          command: ${atago} run inner_link.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            # Following the link would disclose a host file's size into the
+            # report, which is the rule the read path already enforces (#16).
+            contains: "symlink"
+
+  - name: a size bound next to exists false is a load error
+    steps:
+      - fixture:
+          file: bad_absent.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: bad absent
+            scenarios:
+              - name: nothing can satisfy both
+                steps:
+                  - assert:
+                      file:
+                        path: out.txt
+                        exists: false
+                        size: 0
+      - run:
+          command: ${atago} run bad_absent.atago.yaml
+      - assert:
+          exit_code: 2
+          stderr:
+            contains: "an absent file has no size"

@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-75 suites · 468 scenarios
+75 suites · 470 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -67,7 +67,7 @@
   - [fish completion emits complete directives](#scenario-fish-completion-emits-complete-directives)
   - [powershell completion registers an argument completer](#scenario-powershell-completion-registers-an-argument-completer)
   - [unknown shell is a configuration error](#scenario-unknown-shell-is-a-configuration-error)
-- [atago self-hosting / occurrence counts and byte sizes](#atago-self-hosting--occurrence-counts-and-byte-sizes) — 12 scenarios
+- [atago self-hosting / occurrence counts and byte sizes](#atago-self-hosting--occurrence-counts-and-byte-sizes) — 14 scenarios
   - [an exact count distinguishes once from twice](#scenario-an-exact-count-distinguishes-once-from-twice)
   - [a count of zero is how a spec says never](#scenario-a-count-of-zero-is-how-a-spec-says-never)
   - [min and max bound a range a single number cannot](#scenario-min-and-max-bound-a-range-a-single-number-cannot)
@@ -80,6 +80,8 @@
   - [a count without a countable matcher is a load error](#scenario-a-count-without-a-countable-matcher-is-a-load-error)
   - [an ambiguous count over two countable matchers is a load error](#scenario-an-ambiguous-count-over-two-countable-matchers-is-a-load-error)
   - [an unsatisfiable size range is a load error](#scenario-an-unsatisfiable-size-range-is-a-load-error)
+  - [a size bound refuses to stat through a planted symlink](#scenario-a-size-bound-refuses-to-stat-through-a-planted-symlink)
+  - [a size bound next to exists false is a load error](#scenario-a-size-bound-next-to-exists-false-is-a-load-error)
 - [atago self-hosting / db runner](#atago-self-hosting--db-runner) — 2 scenarios
   - [query workflow (create, insert, select, row assert, value binding) passes](#scenario-query-workflow-create-insert-select-row-assert-value-binding-passes)
   - [a query against an undeclared runner fails validation (exit 2)](#scenario-a-query-against-an-undeclared-runner-fails-validation-exit-2)
@@ -1855,6 +1857,62 @@ ${atago} run bad_size.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `greater than max_size`
+### Scenario: a size bound refuses to stat through a planted symlink
+_skipped on Windows_
+#### Given
+- Fixture file `inner_link.atago.yaml` is created.
+#### Inputs
+_Fixture `inner_link.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner link
+scenarios:
+  - name: the target is a link out of the workdir
+    steps:
+      # A fixture cannot plant an escaping symlink (the loader
+      # refuses), so the program under test plants it — which is
+      # exactly the threat the assertion has to survive.
+      - run:
+          shell: true
+          command: "ln -s /etc/hosts link.txt"
+      - assert:
+          file:
+            path: link.txt
+            min_size: 1
+```
+#### When
+```shell
+${atago} run inner_link.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `symlink`
+### Scenario: a size bound next to exists false is a load error
+#### Given
+- Fixture file `bad_absent.atago.yaml` is created.
+#### Inputs
+_Fixture `bad_absent.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: bad absent
+scenarios:
+  - name: nothing can satisfy both
+    steps:
+      - assert:
+          file:
+            path: out.txt
+            exists: false
+            size: 0
+```
+#### When
+```shell
+${atago} run bad_absent.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `an absent file has no size`
 ## atago self-hosting / db runner
 Source: `test/e2e/atago/db.atago.yaml`
 ### Scenario: query workflow (create, insert, select, row assert, value binding) passes
