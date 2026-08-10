@@ -1,19 +1,19 @@
 {
-    "version": "0.18.0",
+    "version": "0.19.0",
     "architecture": {
         "64bit": {
-            "url": "https://github.com/nao1215/atago/releases/download/v0.18.0/atago_0.18.0_windows_amd64.zip",
+            "url": "https://github.com/nao1215/atago/releases/download/v0.19.0/atago_0.19.0_windows_amd64.zip",
             "bin": [
                 "atago.exe"
             ],
-            "hash": "545e62a57cf2678e77ee45e98baa939e957047a4da3aec53779fdb236d713e51"
+            "hash": "8893b32d24d203fa37fae18e9c4049751e98e5dd036fce96729f2f1347de6686"
         },
         "arm64": {
-            "url": "https://github.com/nao1215/atago/releases/download/v0.18.0/atago_0.18.0_windows_arm64.zip",
+            "url": "https://github.com/nao1215/atago/releases/download/v0.19.0/atago_0.19.0_windows_arm64.zip",
             "bin": [
                 "atago.exe"
             ],
-            "hash": "3ef55268fc4518cd7977cceeccc1e740ed721d4006270702c43cefcbeaacf39c"
+            "hash": "7f008c17990c62608d72f04ec632153c2d55b5e8ca4baf7edfc4cf7a723e3075"
         }
     },
     "homepage": "https://github.com/nao1215/atago",
