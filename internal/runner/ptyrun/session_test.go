@@ -125,7 +125,7 @@ func (b *blockingPTY) Write(p []byte) (int, error) { return len(p), nil }
 // in hand, and only then lets the read complete.
 //
 // What it deliberately does not assert is that the goroutine is inside Read by
-// the time startTranscriptDrain returns. It is signalled one statement earlier,
+// the time startTranscriptDrain returns. It is signaled one statement earlier,
 // and a test that demanded otherwise would be asserting on the scheduler.
 func TestStartTranscriptDrain_HandsBackARunningReader(t *testing.T) {
 	t.Parallel()
