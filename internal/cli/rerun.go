@@ -230,14 +230,29 @@ func dedupeEntries(in []failedEntry) []failedEntry {
 
 // collectFailures extracts the failing scenario identities from a set of suite
 // results and their spec paths, in a deterministic order.
-func collectFailures(results []*engine.SuiteResult) []failedEntry {
+//
+// An XPASS is recorded: it is what turned an otherwise green run red, so
+// leaving it out meant a red run wrote no ledger at all and the follow-up
+// `--rerun-failed` reported "nothing to rerun" and exited 0 — a green answer to
+// a run that failed. Re-running it reproduces the XPASS, which is the outcome
+// that keeps saying "promote this spec" until someone does. --allow-xpass makes
+// the same run green, and a green run must leave nothing behind.
+//
+// A flaky scenario stays out even though it also fails the run: its re-run most
+// likely passes, and clearing the ledger is not the same as fixing the
+// instability. What is worth re-running and what turns a run red are the same
+// question for every status but that one.
+func collectFailures(results []*engine.SuiteResult, allowXPass bool) []failedEntry {
 	var failed []failedEntry
 	for _, res := range results {
 		if res == nil {
 			continue
 		}
 		for _, sc := range res.Scenarios {
-			if sc.Status == engine.StatusFailed || sc.Status == engine.StatusError {
+			if sc.Status == engine.StatusFlaky {
+				continue
+			}
+			if engine.FailsRun(sc.Status, true, allowXPass) {
 				failed = append(failed, failedEntry{SpecPath: res.SpecPath, Scenario: sc.Name})
 			}
 		}
@@ -349,7 +364,7 @@ func executedScenarioIDs(results []*engine.SuiteResult) map[string]bool {
 	return executed
 }
 
-func updateRerunLedger(label string, stderr io.Writer, results []*engine.SuiteResult) {
+func updateRerunLedger(label string, stderr io.Writer, results []*engine.SuiteResult, allowXPass bool) {
 	prior, perr := loadRerunState()
 	if perr != nil {
 		fmt.Fprintf(stderr, label+": cannot read %s; leaving it untouched: %v\n", rerunStatePath(), perr)
@@ -362,7 +377,7 @@ func updateRerunLedger(label string, stderr io.Writer, results []*engine.SuiteRe
 			preserved = append(preserved, e)
 		}
 	}
-	entries := dedupeEntries(portableEntries(append(collectFailures(results), preserved...)))
+	entries := dedupeEntries(portableEntries(append(collectFailures(results, allowXPass), preserved...)))
 	if err := saveRerunState(entries); err != nil {
 		fmt.Fprintf(stderr, label+": could not update %s: %v\n", rerunStatePath(), err)
 	}
