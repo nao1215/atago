@@ -7,6 +7,20 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- A flag written after the spec paths is now read as a flag. `atago run specs/
+  --report json` exited 3 with `cannot access "--report": no such file or
+  directory` — an error about a file nobody typed — because Go's flag package
+  stops parsing at the first non-flag argument, and everything after it became a
+  spec path. "What to run, then how to run it" is the order people reach for
+  first, so the failure landed on a correct-looking command line and named the
+  wrong problem. `run`, `list`, `doc`, `explain`, `manifest`, and `init` now
+  accept flags in any position. `--` still ends flag parsing, which is how a file
+  whose name starts with a dash is addressed; `atago record` is unchanged,
+  because there the trailing arguments are another program's command line and its
+  flags belong to it.
+
 ## [0.18.0] - 2026-07-30
 
 A release about the one verdict atago was getting wrong about itself. `--repeat`
