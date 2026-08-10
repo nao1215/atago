@@ -33,6 +33,7 @@
 | [Clean up external state even when a step fails](cookbook.md#clean-up-external-state-even-when-a-step-fails) | `teardown:` steps sharing the store |
 | [Run expensive setup once for the whole suite](cookbook.md#run-expensive-setup-once-for-the-whole-suite) | `suite.setup`, `${suitedir}` |
 | [Configure a whole directory of specs at once](cookbook.md#configure-a-whole-directory-of-specs-at-once) | `atago.project.yaml`, `${fixtures}`, `${specdir}` |
+| [Build the binary under test before the suite runs](cookbook.md#build-the-binary-under-test-before-the-suite-runs) | manifest `subject:` + `--profile`, coverage as a profile |
 | [Run a scenario only where it can pass](cookbook.md#run-a-scenario-only-where-it-can-pass) | `tags`, `skip:`/`only:` gates |
 | [Run the same scenario over many inputs](cookbook.md#run-the-same-scenario-over-many-inputs) | `matrix:` expansion |
 | [Capture a value in one step and reuse it](cookbook.md#capture-a-value-in-one-step-and-reuse-it) | `store:` + `${name}` |

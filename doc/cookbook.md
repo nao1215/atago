@@ -982,6 +982,68 @@ scenarios:
 
 Full spec: [teardown](../examples/teardown.atago.yaml)
 
+## Build the binary under test before the suite runs
+
+`atago.project.yaml`:
+
+```yaml
+subject:
+  name: mytool                       # what specs call it; mytool.exe on Windows
+  artifact: bin/mytool               # written into a run-scoped scratch dir
+  build:
+    command: "go build -o ${artifact} ."
+    cwd: ".."                        # the manifest sits under e2e/, the module above
+profiles:
+  cover:                             # atago run --profile cover
+    build:
+      command: "go build -cover -covermode=atomic -coverpkg=./... -o ${artifact} ."
+    env:
+      GOCOVERDIR: "${env:GOCOVERDIR}"
+```
+
+The build runs **once per `atago run` invocation**, before any scenario, and the
+artifact's directory goes first on `PATH` — so a spec keeps saying
+`mytool convert in.png out.jpg`, the way a user invokes it, instead of an
+absolute path. A build failure is a run-level error carrying the build tool's own
+output: no scenario executes, because each would be testing a stale binary or
+none at all. A build that exits 0 but writes nothing is caught too.
+
+It is language-neutral because a build is just a command — the same
+`atago.project.yaml`, a different build tool:
+
+```yaml
+# Rust
+subject:
+  name: truss
+  artifact: bin/truss
+  build:
+    command: "cargo build --release --locked"
+```
+
+**Coverage is a profile, not an atago feature.** Instrumenting a binary is an
+alternate build command plus some environment, and that shape is the same
+everywhere — Go wants `go build -cover` and `GOCOVERDIR`, Rust wants
+`RUSTFLAGS="-C instrument-coverage"` and `LLVM_PROFILE_FILE`. Merging the raw
+profiles afterwards is a toolchain job and stays in a script:
+
+```shell
+# Go
+mkdir -p .cov/e2e
+COVER=1 GOCOVERDIR=$PWD/.cov/e2e atago run --profile cover ./e2e
+go tool covdata merge -i=.cov/unit,.cov/e2e -o=.cov/merged
+go tool covdata textfmt -i=.cov/merged -o=coverage.out
+
+# Rust
+LLVM_PROFILE_FILE="$PWD/.cov/%p.profraw" atago run --profile cover ./e2e
+llvm-profdata merge -sparse .cov/*.profraw -o .cov/merged.profdata
+llvm-cov report --instr-profile=.cov/merged.profdata target/release/truss
+```
+
+atago knowing how to merge covdata would be a Go-shaped abstraction wearing a
+neutral name; knowing how to run a build command is not.
+
+Full spec: [project_manifest](../examples/project_manifest.atago.yaml)
+
 ## Configure a whole directory of specs at once
 
 `atago.project.yaml`, beside (or above) your specs:

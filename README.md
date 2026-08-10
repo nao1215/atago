@@ -208,6 +208,8 @@ See [files_and_fixtures](examples/files_and_fixtures.atago.yaml), [snapshot](exa
 
 An `atago.project.yaml` beside your specs configures the whole directory at once — shared `env:`, shared `defaults:`, and `fixtures_dir:` for a committed corpus every spec reads as `${fixtures}`. See [project_manifest](examples/project_manifest.atago.yaml).
 
+The same manifest can declare the binary under test: `subject:` builds it once before the suite runs and puts it first on `PATH`, so specs call it by name, and `profiles:` (`--profile cover`) swap in an instrumented build. A build is just a command, so this works for any language.
+
 `count`/`min_count`/`max_count` say how MANY times a `contains` or `matches` matcher occurs — the duplicate-output bug a presence check passes — and `size`/`min_size`/`max_size` bound a file's byte count, composing with the content matchers or standing alone (`size: 0` pins "created but deliberately empty"). See [count_and_size](examples/count_and_size.atago.yaml).
 `deterministic: {}` re-runs a command and requires byte-identical output — the same-input-same-output property that catches map-iteration order leaking into a report, which every loose matcher passes on every run. See [deterministic](examples/deterministic.atago.yaml).
 
