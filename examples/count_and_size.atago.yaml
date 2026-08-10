@@ -15,6 +15,8 @@ suite:
 
 scenarios:
   - name: an error is reported exactly once
+    skip:
+      os: windows   # `cat` is POSIX; the bounds themselves work everywhere
     steps:
       - fixture:
           file: log.txt
@@ -33,6 +35,8 @@ scenarios:
             count: 1
 
   - name: bounds cover the ranges an exact count cannot
+    skip:
+      os: windows   # `cat` is POSIX
     steps:
       - fixture:
           file: rows.csv
@@ -59,6 +63,8 @@ scenarios:
             max_count: 0
 
   - name: a file's byte count is the observable
+    skip:
+      os: windows   # `cp`/`printf` are POSIX
     steps:
       - fixture:
           file: seed.txt

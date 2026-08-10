@@ -312,3 +312,75 @@ func TestJSONStyle_WithPrefix(t *testing.T) {
 		t.Errorf("Default = %q, want the base value %q carried over", yaml.Default, base.Default)
 	}
 }
+
+// TestDescribeStream_CountBoundsReplaceThePresenceClaim is the #396 regression:
+// a count bound changes what the matcher next to it claims, so rendering it as
+// plain presence publishes the OPPOSITE contract for `max_count: 0` — the
+// generated behavior docs said "stdout contains panic" for an assertion that
+// requires panic never to appear.
+func TestDescribeStream_CountBoundsReplaceThePresenceClaim(t *testing.T) {
+	t.Parallel()
+	style := StreamStyle{
+		List:      func(l spec.StringList) string { return l.Quoted() },
+		Regex:     func(p string) string { return "/" + p + "/" },
+		Equals:    "equals",
+		NotEquals: "does not equal",
+		Snapshot:  func(p string) string { return p },
+		NoMatcher: "is checked",
+	}
+	tests := map[string]struct {
+		s    *spec.StreamAssert
+		want string
+	}{
+		"exact":                          {&spec.StreamAssert{Contains: spec.StringList{"boom"}, Count: ip(1)}, `contains "boom" exactly 1 time`},
+		"zero is never":                  {&spec.StreamAssert{Contains: spec.StringList{"panic"}, Count: ip(0)}, `contains "panic" never`},
+		"max zero is never":              {&spec.StreamAssert{Contains: spec.StringList{"panic"}, MaxCount: ip(0)}, `contains "panic" never`},
+		"range":                          {&spec.StreamAssert{Matches: sp("^x"), MinCount: ip(2), MaxCount: ip(5)}, "matches /^x/ between 2 and 5 times"},
+		"at least":                       {&spec.StreamAssert{Matches: sp("^x"), MinCount: ip(2)}, "matches /^x/ at least 2 times"},
+		"unbounded matcher is unchanged": {&spec.StreamAssert{Contains: spec.StringList{"ok"}}, `contains "ok"`},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			if got := DescribeStream(tt.s, style); got != tt.want {
+				t.Errorf("DescribeStream = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestDescribeFile_SizeBoundsCompose pins the other half (#397): size bounds sit
+// next to the content matcher rather than replacing it, and stand alone when
+// there is no content matcher to sit next to.
+func TestDescribeFile_SizeBoundsCompose(t *testing.T) {
+	t.Parallel()
+	style := FileStyle{
+		Path:       func(p string) string { return `"` + p + `"` },
+		List:       func(l spec.StringList) string { return l.Quoted() },
+		Snapshot:   func(p string) string { return p },
+		Checked:    func(p string) string { return `"` + p + `" is checked` },
+		ExactBytes: "equals exact bytes",
+	}
+	tests := map[string]struct {
+		f    *spec.FileAssert
+		want string
+	}{
+		"size alone":                 {&spec.FileAssert{Path: "out.csv", Size: i64p(0)}, `"out.csv" is empty`},
+		"size with contains":         {&spec.FileAssert{Path: "a.txt", Contains: spec.StringList{"x"}, Size: i64p(5)}, `"a.txt" contains "x" and is exactly 5 bytes`},
+		"min one reads as non-empty": {&spec.FileAssert{Path: "a.bin", MinSize: i64p(1)}, `"a.bin" is not empty`},
+		"ceiling":                    {&spec.FileAssert{Path: "a.bin", MaxSize: i64p(1024)}, `"a.bin" is at most 1024 bytes`},
+		"count on a file":            {&spec.FileAssert{Path: "log.txt", Contains: spec.StringList{"hit"}, Count: ip(2)}, `"log.txt" contains "hit" exactly 2 times`},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			if got := DescribeFile(tt.f, style); got != tt.want {
+				t.Errorf("DescribeFile = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func ip(n int) *int       { return &n }
+func sp(s string) *string { return &s }
+func i64p(n int64) *int64 { return &n }

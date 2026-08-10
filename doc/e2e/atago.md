@@ -1671,28 +1671,28 @@ Source: `test/e2e/atago/count_size.atago.yaml`
 printf 'error: boom\nfine\n'
 ```
 #### Then
-- stdout contains `error:`
+- stdout contains `error:` exactly 1 time
 ### Scenario: a count of zero is how a spec says never
 #### When
 ```shell
 echo ok
 ```
 #### Then
-- stdout contains `panic`
+- stdout contains `panic` never
 ### Scenario: min and max bound a range a single number cannot
 #### When
 ```shell
 printf '1,a\n2,b\n3,c\n'
 ```
 #### Then
-- stdout matches `/(?m)^[0-9]+,/`
+- stdout matches `/(?m)^[0-9]+,/` between 3 and 10 times
 ### Scenario: a regexp counts its own non-overlapping matches
 #### When
 ```shell
 echo aaa
 ```
 #### Then
-- stdout matches `/aa/`
+- stdout matches `/aa/` exactly 1 time
 ### Scenario: a count applies to a file's content too
 #### Given
 - Fixture file `log.txt` is created.
@@ -1704,7 +1704,7 @@ miss
 hit
 ```
 #### Then
-- file `log.txt` contains `hit`
+- file `log.txt` contains `hit` exactly 2 times
 ### Scenario: a duplicated line fails the inner spec and names where it landed
 #### Given
 - Fixture file `inner.atago.yaml` is created.
@@ -1738,7 +1738,7 @@ ${atago} run inner.atago.yaml
 printf '' > empty.txt
 ```
 #### Then
-- file `empty.txt` is checked
+- file `empty.txt` is empty
 ### Scenario: size bounds compose with a content matcher
 #### Given
 - Fixture file `five.txt` is created.
@@ -1748,8 +1748,8 @@ _Fixture `five.txt`:_
 abcde
 ```
 #### Then
-- file `five.txt` contains `abc`
-- file `five.txt` is checked
+- file `five.txt` contains `abc` and is exactly 5 bytes
+- file `five.txt` is between 1 and 4096 bytes
 ### Scenario: a size miss by one byte names the usual cause
 #### Given
 - Fixture file `inner_size.atago.yaml` is created.
