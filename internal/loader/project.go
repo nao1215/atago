@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/goccy/go-yaml"
 
@@ -38,6 +39,13 @@ type Project struct {
 	// manifest's own directory and exposed to every spec under it as
 	// ${fixtures} (#394).
 	FixturesDir string `yaml:"fixtures_dir,omitempty"`
+	// Subject is the binary under test: how to build it, and what the specs
+	// call it (#393).
+	Subject *Subject `yaml:"subject,omitempty"`
+	// Profiles are named build variations selected with `atago run --profile
+	// NAME` — a coverage-instrumented build, a race build, a different
+	// toolchain.
+	Profiles map[string]Profile `yaml:"profiles,omitempty"`
 
 	// Path is where the manifest was found. It is never authored; explain, doc,
 	// list, and manifest print it, because configuration that applies to a file
@@ -78,6 +86,13 @@ func FindProject(dir string) (*Project, error) {
 
 // LoadProject reads and validates one manifest.
 func LoadProject(path string) (*Project, error) {
+	// Absolute from here on: fixtures_dir and a build cwd resolve against the
+	// manifest's directory, and a relative manifest path would silently make
+	// them resolve against the process's working directory instead — a
+	// difference nobody would see until a run from another directory failed.
+	if abs, aerr := filepath.Abs(path); aerr == nil {
+		path = abs
+	}
 	data, err := os.ReadFile(path) //nolint:gosec // path is the manifest atago itself located
 	if err != nil {
 		return nil, &Error{Path: path, Kind: KindValidation, Msg: err.Error()}
@@ -93,6 +108,7 @@ func LoadProject(path string) (*Project, error) {
 	if p.Defaults != nil {
 		validateDefaults(add, p.Defaults)
 	}
+	validateSubject(add, p.Subject, p.Profiles)
 	if p.FixturesDir != "" {
 		resolved := p.FixturesDir
 		if !filepath.IsAbs(resolved) {
@@ -137,5 +153,106 @@ func applyProject(s *spec.Spec, p *Project) {
 		// unset — the same "an explicit value always wins" rule, one pass later.
 		applyDefaults(s)
 		s.Defaults = p.Defaults
+	}
+}
+
+// Subject declares the binary under test (#393).
+//
+// Every downstream repo builds it in a shell wrapper before calling atago:
+// `go build -o "$TMP/bin/gup" .`, `cargo build --release --locked`, and so on,
+// then prepends the artifact directory to PATH so a bare `gup` in a spec
+// resolves to the freshly built binary. The build is just a command, which is
+// what keeps this language-neutral: nothing here knows about Go.
+//
+// The cookbook's older recipe — a suite.setup step building into ${suitedir} —
+// does not scale to it: a suite is one FILE, so sqly's 89 specs would rebuild
+// 89 times, the binary never lands on PATH, and there is no per-OS artifact
+// name or profile switch. That is why all nine repos kept the bash.
+type Subject struct {
+	// Name is what specs call the binary. On Windows the artifact resolves with
+	// a .exe suffix, which is the per-OS branch jose hand-rolls in bash today.
+	Name string `yaml:"name"`
+	// Build is the command that produces the artifact.
+	Build *Build `yaml:"build"`
+	// Artifact is where the build writes, relative to a run-scoped scratch
+	// directory. ${artifact} in the build command expands to its absolute path.
+	Artifact string `yaml:"artifact"`
+}
+
+// Build is one build command (#393).
+type Build struct {
+	// Command runs through the same argv parser a run step uses; set Shell for
+	// a command that needs shell syntax.
+	Command string `yaml:"command"`
+	Shell   *bool  `yaml:"shell,omitempty"`
+	// Cwd is where the build runs, relative to the manifest's directory. It
+	// exists because the manifest usually sits under e2e/ while the module root
+	// is above it — the `cd "$REPO_ROOT"` every wrapper script performs.
+	Cwd string `yaml:"cwd,omitempty"`
+	// Timeout bounds the build (Go duration). A build that hangs must fail the
+	// run rather than the CI job's own wall clock.
+	Timeout string `yaml:"timeout,omitempty"`
+}
+
+// Profile is a named build variation (#393).
+//
+// It is what keeps coverage out of atago: instrumenting a binary is an
+// alternate build command plus some environment, and that shape is the same in
+// every language — `go build -cover` with GOCOVERDIR, `RUSTFLAGS=-C
+// instrument-coverage` with LLVM_PROFILE_FILE. Merging the raw profiles
+// afterwards is a toolchain job (`go tool covdata`, `llvm-profdata`) and stays
+// in a script, where it belongs.
+type Profile struct {
+	// Build replaces the subject's build command wholly when the profile is
+	// selected. Whole-command replacement rather than a merge: a half-merged
+	// build command is unreadable and unpredictable.
+	Build *Build `yaml:"build,omitempty"`
+	// Env is layered into every spec under the manifest while the profile is
+	// active, the same way the manifest's own env is.
+	Env map[string]string `yaml:"env,omitempty"`
+}
+
+// validateSubject checks the subject/profiles block (#393).
+func validateSubject(add func(string, ...any), sub *Subject, profiles map[string]Profile) {
+	for name, prof := range profiles {
+		if name == "" {
+			add("profiles has an empty name")
+		}
+		if prof.Build == nil && len(prof.Env) == 0 {
+			add("profiles.%s sets neither build nor env, so selecting it would change nothing", name)
+		}
+		if prof.Build != nil {
+			validateBuild(add, "profiles."+name+".build", prof.Build)
+		}
+		if prof.Build != nil && sub == nil {
+			add("profiles.%s declares a build, but there is no subject: to build", name)
+		}
+	}
+	if sub == nil {
+		return
+	}
+	if sub.Name == "" {
+		add("subject.name is required: it is what specs call the binary")
+	}
+	if sub.Artifact == "" {
+		add("subject.artifact is required: it is where the build writes, and what ${artifact} expands to")
+	} else if filepath.IsAbs(sub.Artifact) {
+		add("subject.artifact %q must be relative: it is written into a run-scoped scratch directory, not into the repository", sub.Artifact)
+	}
+	if sub.Build == nil {
+		add("subject.build is required: atago has to know how to produce the binary")
+		return
+	}
+	validateBuild(add, "subject.build", sub.Build)
+}
+
+func validateBuild(add func(string, ...any), where string, b *Build) {
+	if b.Command == "" {
+		add("%s.command is required", where)
+	}
+	if b.Timeout != "" {
+		if d, err := time.ParseDuration(b.Timeout); err != nil || d <= 0 {
+			add("%s.timeout must be a positive Go duration (got %q)", where, b.Timeout)
+		}
 	}
 }

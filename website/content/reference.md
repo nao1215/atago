@@ -70,6 +70,25 @@ defaults:
 fixtures_dir: testdata
 ```
 
+It can also declare the binary under test:
+
+```yaml
+subject:
+  name: mytool
+  artifact: bin/mytool
+  build:
+    command: "go build -o ${artifact} ."
+    cwd: ".."
+profiles:
+  cover:
+    build:
+      command: "go build -cover -covermode=atomic -coverpkg=./... -o ${artifact} ."
+    env:
+      GOCOVERDIR: "${env:GOCOVERDIR}"
+```
+
+`atago run` builds it once per invocation, before any scenario, and prepends the artifact's directory to `PATH`. `--profile NAME` swaps in that profile's build command (whole-command replacement) and layers its `env`. A failing build — or one that exits 0 without writing `${artifact}` — is a run-level error and no scenario executes.
+
 It is discovered by walking up from a spec to the nearest one, so `atago run ./e2e` and `atago run ./e2e/one.atago.yaml` resolve the same configuration. Precedence is host < project < suite < scenario < step for `env`, and a spec file's own `defaults:` beat the manifest's. `fixtures_dir` resolves against the manifest's directory and must exist at load time. `atago explain` prints the manifest that applied and the resolved fixtures directory. Its own schema is [atago.project.schema.json](https://github.com/nao1215/atago/blob/main/schema/atago.project.schema.json).
 
 | Variable | Is |

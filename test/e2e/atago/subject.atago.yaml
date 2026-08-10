@@ -1,0 +1,282 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / subject builds
+
+# Exercises the subject build (#393) through the real binary. Each scenario
+# builds a tiny spec tree in its own workdir whose "build" is a portable copy
+# rather than a compiler: nothing about the feature is language-specific, and a
+# spec that reached for `go build` would quietly encode the opposite.
+scenarios:
+  - name: the built artifact resolves by bare name from a spec
+    skip:
+      os: windows   # the stand-in build command is POSIX
+    steps:
+      - fixture:
+          file: src/mytool
+          mode: "0755"
+          content: |
+            #!/bin/sh
+            echo "mytool ${MARK:-plain}"
+      - fixture:
+          file: atago.project.yaml
+          content: |
+            subject:
+              name: mytool
+              artifact: bin/mytool
+              build:
+                shell: true
+                command: "cp src/mytool $${artifact} && chmod +x $${artifact}"
+      - fixture:
+          file: spec.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: calls the binary by name
+                steps:
+                  - run:
+                      command: mytool
+                  - assert:
+                      exit_code: 0
+                      stdout:
+                        contains: "mytool plain"
+      - run:
+          command: ${atago} run spec.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "1 passed"
+
+  - name: a profile swaps the build and adds environment
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: src/mytool
+          mode: "0755"
+          content: |
+            #!/bin/sh
+            echo "mytool ${MARK:-plain}"
+      - fixture:
+          file: src/alt
+          mode: "0755"
+          content: |
+            #!/bin/sh
+            echo "mytool profiled"
+      - fixture:
+          file: atago.project.yaml
+          content: |
+            subject:
+              name: mytool
+              artifact: bin/mytool
+              build:
+                shell: true
+                command: "cp src/mytool $${artifact} && chmod +x $${artifact}"
+            profiles:
+              marked:
+                build:
+                  shell: true
+                  # A different build, not just different env: the profile
+                  # installs a second script, so a run that ignored the build
+                  # swap would still print "plain".
+                  command: "cp src/alt $${artifact} && chmod +x $${artifact}"
+                env:
+                  MARK: "ignored-by-alt"
+      - fixture:
+          file: spec.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: sees the profile environment
+                steps:
+                  - run:
+                      command: mytool
+                  - assert:
+                      stdout:
+                        contains: "mytool profiled"
+      - run:
+          command: ${atago} run --profile marked spec.atago.yaml
+      - assert:
+          exit_code: 0
+      - run:
+          # Without --profile the plain build runs and the env is absent, so the
+          # default path is unchanged by declaring a profile at all.
+          command: ${atago} run spec.atago.yaml
+      - assert:
+          exit_code: 1
+
+  - name: an unknown profile names the ones that exist
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: src/mytool
+          mode: "0755"
+          content: |
+            #!/bin/sh
+            echo ok
+      - fixture:
+          file: atago.project.yaml
+          content: |
+            subject:
+              name: mytool
+              artifact: bin/mytool
+              build:
+                shell: true
+                command: "cp src/mytool $${artifact} && chmod +x $${artifact}"
+            profiles:
+              cover:
+                env:
+                  GOCOVERDIR: "/tmp"
+      - fixture:
+          file: spec.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: one
+                steps:
+                  - run:
+                      command: mytool
+      - run:
+          command: ${atago} run --profile race spec.atago.yaml
+      - assert:
+          exit_code: 4
+          stderr:
+            contains:
+              - 'declares no profile "race"'
+              - "cover"
+
+  - name: an artifact nothing can execute is refused
+    skip:
+      os: windows   # Windows has no execute bit
+    steps:
+      - fixture:
+          file: atago.project.yaml
+          content: |
+            subject:
+              name: mytool
+              artifact: bin/mytool
+              build:
+                shell: true
+                command: "echo not-a-program > $${artifact}"
+      - fixture:
+          file: spec.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: one
+                steps:
+                  - run:
+                      command: mytool
+      - run:
+          command: ${atago} run spec.atago.yaml
+      - assert:
+          # Without this the build looks fine and every scenario fails with
+          # "permission denied" instead.
+          exit_code: 4
+          stderr:
+            contains: "execute bit"
+
+  - name: a failing build stops the run and carries the build output
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: atago.project.yaml
+          content: |
+            subject:
+              name: mytool
+              artifact: bin/mytool
+              build:
+                shell: true
+                command: "echo BUILD-BROKE >&2; exit 3"
+      - fixture:
+          file: spec.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: never runs
+                steps:
+                  - run:
+                      command: mytool
+      - run:
+          command: ${atago} run spec.atago.yaml
+      - assert:
+          # No scenario may execute: every one of them would be testing a stale
+          # binary or none at all.
+          exit_code: 4
+          stderr:
+            contains:
+              - "BUILD-BROKE"
+              - "exit 3"
+          stdout:
+            not_contains: "never runs"
+
+  - name: a build that writes nothing is caught, not passed on
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: atago.project.yaml
+          content: |
+            subject:
+              name: mytool
+              artifact: bin/mytool
+              build:
+                command: "true"
+      - fixture:
+          file: spec.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: one
+                steps:
+                  - run:
+                      command: mytool
+      - run:
+          command: ${atago} run spec.atago.yaml
+      - assert:
+          # A build command that forgets ${artifact} exits 0; without this check
+          # every scenario would fail on a missing binary instead.
+          exit_code: 4
+          stderr:
+            contains: "produced no file"
+
+  - name: a manifest with no subject leaves the run untouched
+    steps:
+      - fixture:
+          file: atago.project.yaml
+          content: |
+            env:
+              JUST_ENV: "1"
+      - fixture:
+          file: spec.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: one
+                steps:
+                  - run:
+                      command: echo hi
+                  - assert:
+                      exit_code: 0
+      - run:
+          command: ${atago} run spec.atago.yaml
+      - assert:
+          exit_code: 0
+          stderr:
+            not_contains: "building"
