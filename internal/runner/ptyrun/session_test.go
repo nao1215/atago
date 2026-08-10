@@ -96,6 +96,60 @@ func fakeSession(f *fakePTY, code int) ptyProcess {
 	}
 }
 
+// blockingPTY is a terminal whose first Read never returns until it is
+// released, and which records that the read was entered.
+type blockingPTY struct {
+	entered chan struct{}
+	release chan struct{}
+	once    sync.Once
+}
+
+func (b *blockingPTY) Read([]byte) (int, error) {
+	b.once.Do(func() { close(b.entered) })
+	<-b.release
+	return 0, io.EOF
+}
+
+func (b *blockingPTY) Write(p []byte) (int, error) { return len(p), nil }
+
+// TestStartTranscriptDrain_HandsBackAReaderThatHasReachedItsFirstRead names the
+// ordering the POSIX runner depends on (#385): Run posts the drain before it
+// starts a child that may print and exit immediately, and that is only worth
+// anything if the reader goroutine has actually reached its read by the time
+// startTranscriptDrain returns. Creating a goroutine only makes it runnable, and
+// the runtime.Gosched that used to stand in for this guaranteed nothing.
+//
+// The two halves matter equally. The reader must have got as far as reading —
+// and it must NOT have to finish that read, or a terminal with nothing to say
+// yet (every interactive program, until it prints its prompt) would wedge Run
+// before the child ever started.
+func TestStartTranscriptDrain_HandsBackAReaderThatHasReachedItsFirstRead(t *testing.T) {
+	t.Parallel()
+
+	b := &blockingPTY{entered: make(chan struct{}), release: make(chan struct{})}
+	returned := make(chan *transcriptDrain, 1)
+	go func() { returned <- startTranscriptDrain(b, &spec.PTY{}) }()
+
+	var term *transcriptDrain
+	select {
+	case term = <-returned:
+	case <-time.After(10 * time.Second):
+		close(b.release)
+		t.Fatal("startTranscriptDrain never returned: it must hand back the drain when its reader " +
+			"reaches the first read, not when that read completes")
+	}
+
+	select {
+	case <-b.entered:
+	case <-time.After(10 * time.Second):
+		close(b.release)
+		t.Fatal("startTranscriptDrain returned before its reader reached the first read")
+	}
+
+	close(b.release)
+	term.waitDrain(func() {}, 0)
+}
+
 // TestDriveSession_ReadErrorIsNotSilence is the #345 regression. Every read
 // error used to end the drain loop identically, so a transcript lost to a real
 // read failure was indistinguishable from a session that simply ended — and

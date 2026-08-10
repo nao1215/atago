@@ -47,6 +47,14 @@ func startTranscriptDrain(rw io.ReadWriter, p *spec.PTY) *transcriptDrain {
 	}
 	queries := newTerminalQueries(p, writerFunc(t.write))
 	var modeScan decsetScanner
+	// reading is closed by the reader goroutine when it has nothing left to do
+	// but read. Waiting for it is what lets the POSIX runner claim that the
+	// first Read is posted before the child starts: creating a goroutine only
+	// makes it runnable, and yielding the processor does not guarantee it was
+	// scheduled, let alone that it got as far as the read. The one gap this
+	// cannot close is the instruction or two between the close and entering the
+	// syscall, which no handshake in user space can.
+	reading := make(chan struct{})
 	go func() {
 		defer close(t.readDone)
 		buf := make([]byte, 4096)
@@ -56,6 +64,7 @@ func startTranscriptDrain(rw io.ReadWriter, p *spec.PTY) *transcriptDrain {
 		// under: a resize recorded while this chunk was in flight belongs after
 		// it, and one recorded before it is applied below, before consume (#379).
 		applied := 0
+		close(reading)
 		for {
 			n, rerr := t.rw.Read(buf)
 			if n > 0 {
@@ -94,6 +103,7 @@ func startTranscriptDrain(rw io.ReadWriter, p *spec.PTY) *transcriptDrain {
 			return
 		}
 	}()
+	<-reading
 	return t
 }
 

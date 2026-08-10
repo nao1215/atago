@@ -9,11 +9,8 @@ import (
 	"math"
 	"os"
 	"os/exec"
-	"runtime"
 	"syscall"
 	"time"
-
-	"github.com/creack/pty"
 
 	"github.com/nao1215/atago/internal/runner"
 	runnercmd "github.com/nao1215/atago/internal/runner/cmd"
@@ -22,7 +19,7 @@ import (
 
 // Run executes p.Command inside a POSIX pseudo-terminal in workdir and drives
 // the expect/send session against it via the shared driveSession core. The
-// terminal is a creack/pty master and cleanup kills the whole process group
+// terminal comes from OpenTerminal and cleanup kills the whole process group
 // (Setsid), so a timed-out or aborted session never leaks the child tree.
 func Run(ctx context.Context, p *spec.PTY, workdir string, env []string) (*runner.Result, *ExpectFailure, error) {
 	name, args, err := runnercmd.CommandLine(p.Command, p.Shell != nil && *p.Shell)
@@ -65,10 +62,9 @@ func Run(ctx context.Context, p *spec.PTY, workdir string, env []string) (*runne
 
 	// Post the first Read before the child starts: macOS can otherwise let a
 	// no-shell fast-exit command print and disappear before the drain exists.
+	// startTranscriptDrain does not return until its reader goroutine has
+	// reached that read, so this ordering is an invariant rather than a hope.
 	term := startTranscriptDrain(master, p)
-	// Yield once so the drain goroutine can enter its blocking Read before this
-	// goroutine launches a child that may write and exit immediately.
-	runtime.Gosched()
 	if err := cmd.Start(); err != nil {
 		// Drop atago's own slave handle first: while the parent still holds the
 		// terminal open the master read has no reason to end, and waiting for the
@@ -92,15 +88,15 @@ func Run(ctx context.Context, p *spec.PTY, workdir string, env []string) (*runne
 		// Negative pid signals the whole process group created by Setsid.
 		kill:      func() { _ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) },
 		closeTerm: func() { _ = master.Close() },
-		// TIOCSWINSZ on the master is the whole mechanism: the kernel records
-		// the new size AND sends SIGWINCH to the terminal's foreground process
-		// group, so the child learns about it exactly as it would from a real
-		// window change (#379).
+		// setTerminalSize's TIOCSWINSZ on the master is the whole mechanism: the
+		// kernel records the new size AND sends SIGWINCH to the terminal's
+		// foreground process group, so the child learns about it exactly as it
+		// would from a real window change (#379).
 		resize: func(rows, cols int) error {
 			if rows < 1 || cols < 1 || rows > math.MaxUint16 || cols > math.MaxUint16 {
 				return fmt.Errorf("size %dx%d is out of range for a terminal", rows, cols)
 			}
-			return pty.Setsize(master, &pty.Winsize{Rows: uint16(rows), Cols: uint16(cols)})
+			return setTerminalSize(master, uint16(rows), uint16(cols))
 		},
 		dir: cmd.Dir,
 		env: env,
@@ -115,18 +111,25 @@ func Run(ctx context.Context, p *spec.PTY, workdir string, env []string) (*runne
 // recorder — goes through it, because getting this wrong hangs the process
 // rather than failing it.
 //
-// That last part is the whole reason this helper exists. creack/pty runs its
-// ioctls through (*os.File).Fd(), which is documented to return a blocking
-// descriptor: os.File hands the descriptor over to the caller and takes it back
-// out of the poller. Reads then park inside read(2), where Close cannot reach
-// them — Go can only mark the file closed and defer the real close(2) until the
-// read returns on its own. A master read ends on its own when the last slave
-// handle goes away, so any surviving handle (a descendant that escaped the
-// process-group kill) left the drain blocked forever. Restoring O_NONBLOCK puts
-// reads back under the poller, where Close unblocks them with fs.ErrClosed —
-// which isSessionEnd already reads as a normal end of session.
+// The pair itself comes from openTerminalPair, which on Linux is atago's own
+// four syscalls rather than creack/pty's: creack/pty can silently report the
+// wrong slave there, and a master paired with a stranger's terminal loses the
+// whole transcript (#385, and the reasoning in terminal_linux.go).
+//
+// The poller part is the other reason this helper exists. An ioctl reached
+// through (*os.File).Fd() — which is how creack/pty sizes a terminal — costs
+// the file its poller: Fd() is documented to return a blocking descriptor, so
+// os.File clears O_NONBLOCK and hands the descriptor over. Reads then park
+// inside read(2), where Close cannot reach them — Go can only mark the file
+// closed and defer the real close(2) until the read returns on its own. A master
+// read ends on its own when the last slave handle goes away, so any surviving
+// handle (a descendant that escaped the process-group kill) left the drain
+// blocked forever. Every ioctl atago performs therefore goes through ControlFD
+// instead, and adoptMasterReads restores O_NONBLOCK on a master that arrived
+// blocking, so that Close unblocks a pending read with fs.ErrClosed — which
+// isSessionEnd already reads as a normal end of session.
 func OpenTerminal(rows, cols uint16) (master, tty *os.File, err error) {
-	master, tty, err = pty.Open()
+	master, tty, err = openTerminalPair()
 	if err != nil {
 		return nil, nil, err
 	}
@@ -134,7 +137,7 @@ func OpenTerminal(rows, cols uint16) (master, tty *os.File, err error) {
 		_ = tty.Close()
 		_ = master.Close()
 	}
-	if err := pty.Setsize(master, &pty.Winsize{Rows: rows, Cols: cols}); err != nil {
+	if err := setTerminalSize(master, rows, cols); err != nil {
 		closeBoth()
 		return nil, nil, err
 	}
@@ -152,9 +155,9 @@ func OpenTerminal(rows, cols uint16) (master, tty *os.File, err error) {
 // That condition is not cosmetic. A non-blocking descriptor the poller does not
 // own surfaces EAGAIN straight to the caller, so every read fails instead of
 // waiting and the drain dies on the first one. Which regime a pty master lands
-// in is creack/pty's choice of constructor: on Linux it opens the master with
-// os.OpenFile, which registers the descriptor with the poller, and on macOS it
-// wraps a raw descriptor with os.NewFile, which does not. SetReadDeadline
+// in is decided by how it was opened: os.OpenFile registers the descriptor with
+// the poller (atago's own Linux path), while creack/pty on macOS wraps a raw
+// descriptor with os.NewFile, which does not. SetReadDeadline
 // reports that ownership directly — a descriptor the poller does not hold
 // answers os.ErrNoDeadline — so ask it instead of guessing from the platform.
 //
