@@ -289,9 +289,29 @@ func (c *PseudoConsole) Pid() int { return int(c.pid) }
 // Close tears down the pseudo console and every handle exactly once. Closing the
 // pseudo console signals the child that its console went away; a caller that
 // must not let the child linger kills the tree first.
+//
+// CancelIoEx is what actually ends a read already in flight (#406). Read issues
+// a plain synchronous ReadFile on the output pipe, and CloseHandle does NOT
+// abort one that is already parked in the kernel: the reader goroutine stays
+// blocked until the write end goes away on its own, which a surviving conhost —
+// or a descendant that outlived the tree kill — can put off indefinitely. The
+// recorder's bounded join then has to wait out its whole grace on every timed-out
+// capture, and the goroutine leaks for the life of the process holding the pipe
+// handle open. CancelIoEx cancels pending I/O on the handle regardless of which
+// thread issued it (unlike CancelIo, which is limited to the calling thread), so
+// the parked read returns ERROR_OPERATION_ABORTED — which classifyReadError
+// already maps to os.ErrClosed, and which isSessionEnd already reads as a normal
+// end of session. That mapping was written for this case before anything
+// produced it.
+//
+// It runs after ClosePseudoConsole so a reader that can still finish normally
+// sees EOF rather than a cancellation, and before CloseHandle because cancelling
+// I/O on a closed handle is meaningless. A failure is ignored on purpose: there
+// is nothing to cancel when no read is pending, which is the common case.
 func (c *PseudoConsole) Close() error {
 	c.closeOnce.Do(func() {
 		windows.ClosePseudoConsole(c.hpc)
+		_ = windows.CancelIoEx(c.outRead, nil)
 		closeHandles(c.inWrite, c.outRead, c.process)
 		if c.attrList != nil {
 			c.attrList.Delete()
