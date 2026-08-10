@@ -44,10 +44,18 @@ type Engine struct {
 	// < 1 mean sequential execution.
 	Parallel int
 
-	// FailFast stops scheduling new scenarios once one fails or errors.
-	// In-flight scenarios are allowed to finish. With RetryFailed it triggers
-	// only on a FINAL failure (a recovered flaky scenario never trips it).
+	// FailFast stops scheduling new scenarios once one of them turns the run red
+	// (see FailsRun). In-flight scenarios are allowed to finish. With RetryFailed
+	// it triggers only on a FINAL verdict, never on an attempt that still has
+	// retries left.
 	FailFast bool
+
+	// AllowFlaky and AllowXPass carry the run-level policies into the engine, so
+	// FailFast stops for exactly the outcomes that decide the exit code. Without
+	// them the two would disagree: a flaky recovery or an XPASS fails the run,
+	// and fail-fast would keep scheduling scenarios for a verdict already made.
+	AllowFlaky bool
+	AllowXPass bool
 
 	// Repeat runs each selected scenario this many times (#29) to surface
 	// flakiness. The per-iteration statuses are recorded and the fold is
@@ -254,7 +262,7 @@ func (e *Engine) Run(ctx context.Context, s *spec.Spec, specPath string) *SuiteR
 				if e.OnScenario != nil {
 					e.OnScenario(sc)
 				}
-				if e.FailFast && (sc.Status == StatusFailed || sc.Status == StatusError) {
+				if e.FailFast && FailsRun(sc.Status, e.AllowFlaky, e.AllowXPass) {
 					failStop = true
 				}
 				mu.Unlock()

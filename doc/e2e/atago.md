@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-80 suites · 511 scenarios
+80 suites · 513 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -162,10 +162,12 @@
   - [a signal exit composes with the in matcher alongside normal codes](#scenario-a-signal-exit-composes-with-the-in-matcher-alongside-normal-codes)
   - [a missing command is 127 under the shell](#scenario-a-missing-command-is-127-under-the-shell)
   - [POSIX exit codes wrap modulo 256](#scenario-posix-exit-codes-wrap-modulo-256)
-- [atago self-hosting / expected failures](#atago-self-hosting--expected-failures) — 10 scenarios
+- [atago self-hosting / expected failures](#atago-self-hosting--expected-failures) — 12 scenarios
   - [a known bug that still fails keeps the run green](#scenario-a-known-bug-that-still-fails-keeps-the-run-green)
   - [a known bug that is fixed fails the run so it gets promoted](#scenario-a-known-bug-that-is-fixed-fails-the-run-so-it-gets-promoted)
   - [allow-xpass keeps the run green while the spec is promoted](#scenario-allow-xpass-keeps-the-run-green-while-the-spec-is-promoted)
+  - [fail-fast stops for an xpass and the ledger can rerun it](#scenario-fail-fast-stops-for-an-xpass-and-the-ledger-can-rerun-it)
+  - [an allowed xpass leaves nothing behind to rerun](#scenario-an-allowed-xpass-leaves-nothing-behind-to-rerun)
   - [an execution error is still an error, not an expected failure](#scenario-an-execution-error-is-still-an-error-not-an-expected-failure)
   - [a skip gate still decides on its own](#scenario-a-skip-gate-still-decides-on-its-own)
   - [an expected failure is not retried into a flake](#scenario-an-expected-failure-is-not-retried-into-a-flake)
@@ -3505,6 +3507,75 @@ ${atago} run --allow-xpass --report junit inner_allow.atago.yaml
 - after `${atago} run --allow-xpass --report junit inner_allow.atago.yaml`:
   - exit code is `0`
   - stdout contains `failures="0"`, does not contain `<failure`
+### Scenario: fail-fast stops for an xpass and the ledger can rerun it
+#### Given
+- Fixture file `inner_ff.atago.yaml` is created.
+#### Inputs
+_Fixture `inner_ff.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner fail fast
+scenarios:
+  - name: the bug is fixed
+    expect_fail:
+      reason: "used to print nothing at all"
+    steps:
+      - run:
+          command: echo present
+      - assert:
+          stdout:
+            contains: present
+  - name: never reached
+    steps:
+      - run:
+          command: echo later
+      - assert:
+          exit_code: 0
+```
+#### When
+```shell
+${atago} run --fail-fast --parallel 1 --report json inner_ff.atago.yaml
+${atago} run --rerun-failed --report json inner_ff.atago.yaml
+```
+#### Then
+- after `${atago} run --fail-fast --parallel 1 --report json inner_ff.atago.yaml`:
+  - exit code is `1`
+  - stdout at `$.suites[0].scenarios[0].status` equals `xpass`; at `$.suites[0].scenarios[1].status` equals `skipped`
+- after `${atago} run --rerun-failed --report json inner_ff.atago.yaml`:
+  - exit code is `1`
+  - stdout at `$.suites[0].scenarios` has length 1; at `$.suites[0].scenarios[0].status` equals `xpass`
+### Scenario: an allowed xpass leaves nothing behind to rerun
+#### Given
+- Fixture file `inner_allow_ledger.atago.yaml` is created.
+#### Inputs
+_Fixture `inner_allow_ledger.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner allow ledger
+scenarios:
+  - name: the bug is fixed
+    expect_fail:
+      reason: "used to crash"
+    steps:
+      - run:
+          command: echo ok
+      - assert:
+          stdout:
+            contains: ok
+```
+#### When
+```shell
+${atago} run --allow-xpass inner_allow_ledger.atago.yaml
+${atago} run --rerun-failed inner_allow_ledger.atago.yaml
+```
+#### Then
+- after `${atago} run --allow-xpass inner_allow_ledger.atago.yaml`:
+  - exit code is `0`
+- after `${atago} run --rerun-failed inner_allow_ledger.atago.yaml`:
+  - exit code is `0`
+  - stderr contains `nothing to rerun`
 ### Scenario: an execution error is still an error, not an expected failure
 #### Given
 - Fixture file `inner_error.atago.yaml` is created.

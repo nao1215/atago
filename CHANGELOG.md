@@ -7,6 +7,25 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- `--fail-fast` now stops for every outcome that fails the run, not just a
+  failed or errored scenario. An XPASS (a known bug that is fixed) and a flaky
+  recovery both decide the exit code, so a run whose verdict was already made
+  kept scheduling scenarios — the flag stopping for one red signal and not
+  another, with nothing in the reports to explain the difference. `--allow-flaky`
+  and `--allow-xpass` make those statuses green again, and then there is nothing
+  to stop for. One predicate now answers the question for the exit code,
+  `--fail-fast`, and the `--rerun-failed` ledger.
+- The `--rerun-failed` ledger records an XPASS. A run whose only red signal was
+  an XPASS wrote no ledger at all, so the follow-up `atago run --rerun-failed`
+  reported "nothing to rerun" and exited 0 — a green answer about a run that
+  failed. Re-running an XPASS reproduces it, which is the outcome that keeps
+  saying "promote this spec" until someone does; under `--allow-xpass` the run
+  is green and the ledger stays empty. A flaky scenario is still not recorded:
+  its re-run most likely passes, and clearing the ledger is not the same as
+  fixing the instability.
+
 ### Fixed
 
 - A flag written after the spec paths is now read as a flag. `atago run specs/

@@ -102,6 +102,86 @@ scenarios:
             contains: 'failures="0"'
             not_contains: "<failure"
 
+  # An XPASS decides the run's verdict, so the two things a red verdict drives
+  # have to see it: --fail-fast stops scheduling, and the ledger --rerun-failed
+  # reads knows what to run again. Neither did, so a red run kept working after
+  # the answer was known, and the follow-up rerun reported "nothing to rerun".
+  - name: fail-fast stops for an xpass and the ledger can rerun it
+    steps:
+      - fixture:
+          file: inner_ff.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner fail fast
+            scenarios:
+              - name: the bug is fixed
+                expect_fail:
+                  reason: "used to print nothing at all"
+                steps:
+                  - run:
+                      command: echo present
+                  - assert:
+                      stdout:
+                        contains: present
+              - name: never reached
+                steps:
+                  - run:
+                      command: echo later
+                  - assert:
+                      exit_code: 0
+      - run:
+          command: ${atago} run --fail-fast --parallel 1 --report json inner_ff.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            json:
+              - path: "$.suites[0].scenarios[0].status"
+                equals: xpass
+              - path: "$.suites[0].scenarios[1].status"
+                equals: skipped
+      - run:
+          # The ledger holds the xpass, so the shortened loop keeps reporting it
+          # until the spec is promoted.
+          command: ${atago} run --rerun-failed --report json inner_ff.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            json:
+              - path: "$.suites[0].scenarios"
+                length: 1
+              - path: "$.suites[0].scenarios[0].status"
+                equals: xpass
+
+  - name: an allowed xpass leaves nothing behind to rerun
+    steps:
+      - fixture:
+          file: inner_allow_ledger.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner allow ledger
+            scenarios:
+              - name: the bug is fixed
+                expect_fail:
+                  reason: "used to crash"
+                steps:
+                  - run:
+                      command: echo ok
+                  - assert:
+                      stdout:
+                        contains: ok
+      - run:
+          command: ${atago} run --allow-xpass inner_allow_ledger.atago.yaml
+      - assert:
+          exit_code: 0
+      - run:
+          command: ${atago} run --rerun-failed inner_allow_ledger.atago.yaml
+      - assert:
+          exit_code: 0
+          stderr:
+            contains: "nothing to rerun"
+
   - name: an execution error is still an error, not an expected failure
     steps:
       - fixture:

@@ -671,6 +671,57 @@ scenarios:
 	}
 }
 
+// TestEngine_FailFastCoversEveryFailureLevelStatus pins fail-fast to the same
+// notion of "this run is red" the exit code uses. An XPASS (a known bug that is
+// fixed) and a flaky scenario both fail the run, so --fail-fast has to stop for
+// them too — it stopped only for failed/errored, so a red run kept scheduling
+// work after the verdict was already decided. The allow flags are what make the
+// status green again, and then there is nothing to stop for.
+func TestEngine_FailFastCoversEveryFailureLevelStatus(t *testing.T) {
+	t.Parallel()
+	xpassSrc := `
+version: "1"
+suite:
+  name: ff
+scenarios:
+  - name: fixed bug
+    expect_fail: {reason: "used to print nothing"}
+    steps: [{run: {shell: true, command: echo hi}}, {assert: {exit_code: 0}}]
+  - name: never
+    steps: [{run: {shell: true, command: echo hi}}, {assert: {exit_code: 0}}]
+`
+	cases := []struct {
+		name       string
+		src        string
+		configure  func(*Engine)
+		wantFirst  Status
+		wantSecond Status
+	}{
+		{"xpass stops the run", xpassSrc, func(*Engine) {}, StatusXPass, StatusSkipped},
+		{"an allowed xpass does not", xpassSrc, func(e *Engine) { e.AllowXPass = true }, StatusXPass, StatusPassed},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			s, err := loader.LoadBytes("t.atago.yaml", []byte(c.src))
+			if err != nil {
+				t.Fatalf("load: %v", err)
+			}
+			eng := New()
+			eng.Parallel = 1 // deterministic: the first verdict decides the rest
+			eng.FailFast = true
+			c.configure(eng)
+			res := eng.Run(context.Background(), s, "t.atago.yaml")
+			if res.Scenarios[0].Status != c.wantFirst {
+				t.Fatalf("scenario[0] = %s, want %s", res.Scenarios[0].Status, c.wantFirst)
+			}
+			if res.Scenarios[1].Status != c.wantSecond {
+				t.Errorf("scenario[1] = %s, want %s", res.Scenarios[1].Status, c.wantSecond)
+			}
+		})
+	}
+}
+
 // Regression for issue #30: when the parent context is cancelled mid-scenario
 // (Ctrl-C / suite cancel), the engine step loop must stop rather than keep
 // executing steps and evaluating assertions against a killed result. The
