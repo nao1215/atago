@@ -100,6 +100,12 @@ func (e *Engine) runScenario(ctx context.Context, scenarioIdx int, sc *spec.Scen
 	if !x.startMocks(ctx) {
 		return x.out
 	}
+	// After the mocks, because a suite or scenario env value may legitimately
+	// reference ${<mock>.url}, and before anything runs, because the whole point
+	// is to refuse the literal text rather than hand it to a child (#399).
+	if !x.checkEnvRefs() {
+		return x.out
+	}
 	leadingFixtures, ok := x.applyLeadingFixtures()
 	if !ok {
 		return x.out

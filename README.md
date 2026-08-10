@@ -206,6 +206,8 @@ scenarios:
 
 See [files_and_fixtures](examples/files_and_fixtures.atago.yaml), [snapshot](examples/snapshot.atago.yaml), and [dir_tree](examples/dir_tree.atago.yaml) for whole-tree golden manifests.
 
+`suite.env` can carry a value `suite.setup` captured — the ephemeral address a suite-wide service published through `ready: {store:}` — so every scenario is pointed at a stub server without a shell wrapper exporting it. See [suite_env_from_setup](examples/suite_env_from_setup.atago.yaml).
+
 ### 3. Drive interactive prompts and TUIs
 
 A `pty` step runs the command in a real pseudo-terminal and drives it with a declarative expect/send session — wizards, REPLs, and TTY-detection branches, no `expect(1)` scripting:

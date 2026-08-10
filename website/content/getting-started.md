@@ -117,6 +117,10 @@ scenarios:
 
 See [files_and_fixtures](https://github.com/nao1215/atago/blob/main/examples/files_and_fixtures.atago.yaml), [snapshot](https://github.com/nao1215/atago/blob/main/examples/snapshot.atago.yaml), and [dir_tree](https://github.com/nao1215/atago/blob/main/examples/dir_tree.atago.yaml) for whole-tree golden manifests.
 
+`suite.env` values may reference variables `suite.setup` captured — a `store` step's value, or the ephemeral address a suite-wide service published through `ready: {store:}` — so a stub registry or proxy can be handed to every scenario as an environment variable without a shell wrapper around `atago run`. A value that cannot resolve is never passed on as the literal text `${name}`: a child process does not fail on that, it uses it, and the resulting error arrives from the tool under test rather than from the spec. A scenario whose env references an undefined name fails before it starts, naming the key, the reference, and the names that are defined.
+
+See [suite_env_from_setup](https://github.com/nao1215/atago/blob/main/examples/suite_env_from_setup.atago.yaml) and the cookbook recipe for [handing a service address to every scenario](/cookbook/#hand-a-suite-wide-services-address-to-every-scenario).
+
 ## 3. Drive interactive prompts and TUIs
 
 A `pty` step runs the command in a real pseudo-terminal and drives it with a declarative expect/send session — wizards, REPLs, and TTY-detection branches, no `expect(1)` scripting:
