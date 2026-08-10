@@ -7,6 +7,106 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-08-10
+
+A release about the two things a CLI suite still had to say in bash, and about
+finishing the terminal.
+
+Nine downstream repositories built the binary under test in a wrapper script
+before calling atago, and exported a throwaway `HOME` and the XDG variables for
+a whole tree of specs — even though `sandbox_home: true` already did that per
+step — because the only way to apply anything to 89 spec files was to repeat
+`defaults:` in all 89. `atago.project.yaml` says it once per directory, and
+`subject:` inside it says how to build the binary and what specs call it, so the
+wrapper script has nothing left to do.
+
+The other half is the terminal. `{key: ...}` existed so a session could be read
+without `\x1b` escapes, but the vocabulary had holes exactly where real TUIs
+live. Seven additions close them: the chords a form-style TUI binds, a repeat
+count, bracketed paste, a mid-session resize, a host command run while the
+session is live, mouse clicks and scrolling, and color/attribute matchers on the
+rendered screen.
+
+Four assertions and run behaviors round it out: an expected-failure scenario
+that keeps a known bug's reproduction in CI, occurrence counts, byte sizes, and
+a determinism check that reruns a command and requires identical bytes.
+
+### Added
+
+Directory-level configuration:
+
+- `atago.project.yaml`, a manifest for a TREE of specs rather than one file. It
+  carries `env:`, `defaults:`, and `fixtures_dir:`, is discovered by walking up
+  from a spec to the nearest one — so `atago run ./e2e` and `atago run
+  ./e2e/cli/one.atago.yaml` resolve the same configuration — and a spec file's
+  own values always win. `atago explain` prints which manifest applied, because
+  configuration that applies to a file without appearing in it has to be visible
+  somewhere.
+- `subject:` declares the binary under test: `build:` produces it, `artifact:`
+  says where, and `name:` is what specs call it (with the `.exe` suffix resolved
+  per OS). `atago run` builds it once per invocation, before any scenario, and
+  puts the artifact's directory first on `PATH` so a spec keeps invoking the tool
+  the way a user does. `profiles:` are named build variations selected with
+  `--profile NAME` — a coverage-instrumented build, a race build, a different
+  toolchain — which is what keeps coverage out of atago: instrumenting is an
+  alternate build command plus some environment in every language, and merging
+  the raw profiles afterwards is a toolchain job.
+- `${specdir}` and `${fixtures}` reach committed input trees. Scenarios run in an
+  isolated temp workdir, so both are absolute, and both are inputs: steps write
+  into `${workdir}`, never into them. `${fixtures}` comes from the manifest's
+  `fixtures_dir`, validated at load time so a typo is one message about the
+  manifest instead of N per-scenario failures about a missing file.
+- `suite.env` values may reference what `suite.setup` captured — a `store` step's
+  value, or the ephemeral address a suite-wide service published through `ready:
+  {store:}` — so a stub registry or proxy reaches every scenario without a shell
+  wrapper exporting it. A value that cannot resolve is never passed on as the
+  literal text `${name}`: a child process does not fail on that, it uses it, and
+  the error would then arrive from the tool under test rather than from the spec.
+
+Assertions and run semantics:
+
+- `expect_fail:` keeps a known bug's reproduction in the suite instead of exiling
+  it to a directory CI never runs. A scenario that fails is an XFAIL and the run
+  stays green; one that passes is an XPASS and the run fails, which is what gets
+  the spec promoted into the guarded suite. An execution error stays an error —
+  `expect_fail` says "the program gives the wrong answer", not "the spec cannot
+  run". `reason:` is required, `issue:` makes the XPASS message actionable, and
+  `--allow-xpass` keeps the run green while the spec is promoted, moving every
+  failure-level signal with the exit code: no `<failure>` in JUnit, no `::error`
+  in GitHub Actions, nothing in the JSON `failures[]`.
+- `count` / `min_count` / `max_count` on stream and file matchers answer "how
+  many times", which is the question a duplicate-output bug passes when the only
+  matcher available is `contains`. Occurrences are non-overlapping and the
+  failure names the lines each one landed on.
+- `size` / `min_size` / `max_size` assert byte counts on files and streams, and
+  compose with a content matcher — the `wc -c` a spec used to reach for.
+- `deterministic:` reruns a command and requires the declared observables to come
+  back byte-identical, which is the only cheap oracle for output whose order
+  leaks a map iteration. Assertions, `store`, snapshots, and `changes:` still
+  describe the first run. When a rerun changes the workdir, the failure says so:
+  the check is only meaningful for an effectively read-only command.
+
+Terminal sessions:
+
+- The named-key vocabulary covers what real TUIs bind: `shift-tab`, `alt-a`..
+  `alt-z` with `alt-enter`/`alt-backspace`, the modified arrows
+  (`ctrl-`/`shift-` plus a direction), and `insert`.
+- `times:` repeats a named key send, so moving sixteen columns is one step rather
+  than sixteen.
+- `send: {paste: ...}` delivers text as a bracketed paste, taking the program's
+  paste path instead of its typing path — the difference a REPL's multi-line
+  handling turns on. It fails if the program has not enabled paste mode, rather
+  than silently typing the brackets.
+- `resize: {rows, cols}` delivers a real size change mid-session, so the redraw a
+  window resize triggers is reachable from a spec.
+- `exec:` runs a host command while the session is live, which is how a watcher's
+  reaction to an external change becomes testable.
+- `send: {mouse: ...}` sends SGR 1006 mouse reports for clicks, drags, and
+  scrolling, gated on the program having enabled mouse mode.
+- `screen:` and `expect_screen:` gained `attrs:` — assert the foreground and
+  background color, bold, and reverse video of a region, which is what makes a
+  "selected row is highlighted" contract testable.
+
 ### Changed
 
 - `--fail-fast` now stops for every outcome that fails the run, not just a
@@ -39,6 +139,26 @@ and this project follows [Semantic Versioning](https://semver.org/).
   whose name starts with a dash is addressed; `atago record` is unchanged,
   because there the trailing arguments are another program's command line and its
   flags belong to it.
+- A pty session whose program exits immediately no longer loses its transcript.
+  The terminal handed the child a slave descriptor derived from the master, so a
+  fast exit could race the drain and leave the capture empty; the master is now
+  paired with its own slave, and the drain starts before the child does.
+- Closing a Windows ConPTY ends a read already parked in the kernel. `Read`
+  issues a synchronous `ReadFile`, which `CloseHandle` does not abort, so a
+  timed-out capture waited out its whole drain grace and leaked the goroutine for
+  as long as a surviving conhost held the pipe open. `Close` now cancels pending
+  I/O on the handle first.
+- A run step whose timeout expires before the process starts is reported as a
+  timeout rather than as a generic execution error.
+- `atago doc` renders invisible characters in assertion values instead of
+  dropping them, so a spec asserting on a control character produces documentation
+  that says which one.
+- Snapshot normalization folds CRLF after stripping escape sequences, which makes
+  `Normalize` idempotent: a golden recorded from output carrying both no longer
+  depends on how many times it has been normalized.
+- `atago record` takes the same reader handoff before starting the child that a
+  run step does, closing the window where a fast-exiting recorded program lost
+  output.
 
 ### Documentation
 
@@ -48,6 +168,18 @@ and this project follows [Semantic Versioning](https://semver.org/).
   the reference gained the same facts, and the progress-dot legend in the README
   and the getting-started page now lists the flaky and expected-failure markers
   it has been printing since 0.18.0.
+
+### Upgrading
+
+Two invocation-level changes can be noticed by an existing pipeline:
+
+- A spec path spelled like a flag (`-weird.atago.yaml`) used to be collected as a
+  path once it followed another path. Now it is a flag, so name it after `--`:
+  `atago run -- -weird.atago.yaml`.
+- `--fail-fast` stops for an XPASS and for a flaky recovery, so a run using it
+  may execute fewer scenarios than before and report the rest as `skipped after
+  fail-fast`. `--allow-xpass` and `--allow-flaky` restore the old scheduling for
+  the status they accept.
 
 ## [0.18.0] - 2026-07-30
 
