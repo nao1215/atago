@@ -9,6 +9,7 @@ import (
 
 	"github.com/nao1215/atago/internal/assert"
 	"github.com/nao1215/atago/internal/engine"
+	"github.com/nao1215/atago/internal/spec"
 )
 
 // mixedResults builds one suite carrying every terminal scenario status —
@@ -37,6 +38,16 @@ func mixedResults() *engine.SuiteResult {
 			{Name: "s", Status: engine.StatusSkipped, SkipReason: "only on os=plan9"},
 			{Name: "k", Status: engine.StatusFlaky, Attempts: 2, Duration: time.Millisecond,
 				Steps: []engine.StepResult{{Kind: "assert", Checks: []*assert.CheckResult{{OK: true}}}}},
+			// The expected-failure pair (#395): an xfail keeps the run green and
+			// an xpass fails it, so every format has to classify them opposite
+			// ways even though both carry the same expect_fail block.
+			{Name: "xf", Status: engine.StatusXFail, Duration: time.Millisecond,
+				ExpectFail: &spec.ExpectFail{Reason: "clamps the wrong way", Issue: "https://example.test/1"},
+				Steps: []engine.StepResult{{Kind: "assert", Checks: []*assert.CheckResult{{
+					OK: false, Desc: "assert stdout contains x", Expected: "x", Actual: "y", Hint: "differs"}}}}},
+			{Name: "xp", Status: engine.StatusXPass, Duration: time.Millisecond,
+				ExpectFail: &spec.ExpectFail{Reason: "used to print nothing"},
+				Steps:      []engine.StepResult{{Kind: "assert", Checks: []*assert.CheckResult{{OK: true}}}}},
 		},
 	}
 }
@@ -52,16 +63,24 @@ func TestRender_CrossFormatCountParity(t *testing.T) {
 	t.Parallel()
 	res := mixedResults()
 	const (
-		wantTotal   = 5
+		wantTotal   = 7
 		wantPassed  = 1
 		wantFailed  = 1
 		wantErrored = 1
 		wantSkipped = 1
 		wantFlaky   = 1
+		wantXFail   = 1
+		wantXPass   = 1
 	)
 	// The failure bucket is what a machine consumer treats as "acted-on
-	// failures": hard failures plus errors, never flaky recoveries.
-	const wantFailureBucket = wantFailed + wantErrored
+	// failures": hard failures plus errors, never flaky recoveries, and never an
+	// expected failure — but an XPASS belongs there, because it IS the thing to
+	// act on (#395).
+	const wantFailureBucket = wantFailed + wantErrored + wantXPass
+	// junit routes an xfail to <skipped> (pytest's convention, and the only
+	// thing JUnit XML can express) and an xpass to <failure>.
+	const wantJUnitSkipped = wantSkipped + wantXFail
+	const wantJUnitFailures = wantFailed + wantXPass
 
 	t.Run("junit", func(t *testing.T) {
 		t.Parallel()
@@ -72,14 +91,14 @@ func TestRender_CrossFormatCountParity(t *testing.T) {
 		if root.Tests != wantTotal {
 			t.Errorf("junit tests = %d, want %d", root.Tests, wantTotal)
 		}
-		if root.Failures != wantFailed {
-			t.Errorf("junit failures = %d, want %d", root.Failures, wantFailed)
+		if root.Failures != wantJUnitFailures {
+			t.Errorf("junit failures = %d, want %d", root.Failures, wantJUnitFailures)
 		}
 		if root.Errors != wantErrored {
 			t.Errorf("junit errors = %d, want %d", root.Errors, wantErrored)
 		}
-		if root.Skipped != wantSkipped {
-			t.Errorf("junit skipped = %d, want %d", root.Skipped, wantSkipped)
+		if root.Skipped != wantJUnitSkipped {
+			t.Errorf("junit skipped = %d, want %d", root.Skipped, wantJUnitSkipped)
 		}
 		// The flaky scenario is present as a testcase but counted in none of the
 		// failure/error/skip buckets: it is a green test carrying a flakyFailure.
@@ -115,7 +134,7 @@ func TestRender_CrossFormatCountParity(t *testing.T) {
 		}
 		if byStatus["passed"] != wantPassed || byStatus["failed"] != wantFailed ||
 			byStatus["error"] != wantErrored || byStatus["skipped"] != wantSkipped ||
-			byStatus["flaky"] != wantFlaky {
+			byStatus["flaky"] != wantFlaky || byStatus["xfail"] != wantXFail || byStatus["xpass"] != wantXPass {
 			t.Errorf("json status tally = %v", byStatus)
 		}
 		// failures[] carries hard failures and errors only; the flaky recovery
@@ -126,6 +145,9 @@ func TestRender_CrossFormatCountParity(t *testing.T) {
 		for _, f := range rep.Failures {
 			if f.Scenario == "k" {
 				t.Errorf("json failures[] must not include the flaky scenario: %+v", f)
+			}
+			if f.Scenario == "xf" {
+				t.Errorf("json failures[] must not include the expected failure: %+v", f)
 			}
 		}
 	})
@@ -148,12 +170,22 @@ func TestRender_CrossFormatCountParity(t *testing.T) {
 				}
 			}
 		}
-		// ok points: passed + skipped + flaky; not ok: failed + errored.
-		if okN != wantPassed+wantSkipped+wantFlaky {
-			t.Errorf("tap ok lines = %d, want %d\n%s", okN, wantPassed+wantSkipped+wantFlaky, out)
+		// ok points: passed + skipped + flaky + xpass (an xpass PASSED, so TAP
+		// says ok and carries the TODO directive that marks it unexpected).
+		// not ok: failed + errored + xfail, where the xfail's TODO directive is
+		// what tells a consumer not to count it against the run.
+		wantOK := wantPassed + wantSkipped + wantFlaky + wantXPass
+		if okN != wantOK {
+			t.Errorf("tap ok lines = %d, want %d\n%s", okN, wantOK, out)
 		}
-		if notOkN != wantFailureBucket {
-			t.Errorf("tap not-ok lines = %d, want %d\n%s", notOkN, wantFailureBucket, out)
+		wantNotOK := wantFailed + wantErrored + wantXFail
+		if notOkN != wantNotOK {
+			t.Errorf("tap not-ok lines = %d, want %d\n%s", notOkN, wantNotOK, out)
+		}
+		// Every expected-failure point carries a TODO directive, in both
+		// directions — that is the whole mechanism TAP offers for this.
+		if todo := strings.Count(out, "# TODO "); todo != wantXFail+wantXPass {
+			t.Errorf("tap # TODO directives = %d, want %d\n%s", todo, wantXFail+wantXPass, out)
 		}
 		if skipN != wantSkipped {
 			t.Errorf("tap # SKIP lines = %d, want %d\n%s", skipN, wantSkipped, out)
@@ -163,7 +195,7 @@ func TestRender_CrossFormatCountParity(t *testing.T) {
 	t.Run("gha", func(t *testing.T) {
 		t.Parallel()
 		out := render(t, FormatGHA, res)
-		wantNotice := "5 scenarios: 1 passed, 1 failed, 1 errored, 1 skipped, 1 flaky"
+		wantNotice := "7 scenarios: 1 passed, 1 failed, 1 errored, 1 skipped, 1 flaky, 1 xfail, 1 xpass"
 		if !strings.Contains(out, wantNotice) {
 			t.Errorf("gha notice summary missing %q:\n%s", wantNotice, out)
 		}
@@ -174,15 +206,23 @@ func TestRender_CrossFormatCountParity(t *testing.T) {
 		if !strings.Contains(out, "::warning title=mix / k::") {
 			t.Errorf("gha missing warning annotation for the flaky scenario:\n%s", out)
 		}
+		// An xfail is a notice (a known bug still broken is expected); an xpass
+		// is an error, matching the exit code that demands it be promoted.
+		if !strings.Contains(out, "::notice title=mix / xf::") {
+			t.Errorf("gha missing notice annotation for the expected failure:\n%s", out)
+		}
+		if !strings.Contains(out, "::error title=mix / xp::") {
+			t.Errorf("gha missing error annotation for the xpass:\n%s", out)
+		}
 	})
 
-	// The console summary and the gha notice aggregate the same five counters.
+	// The console summary and the gha notice aggregate the same counters.
 	// They used to do it with two hand-rolled copies of the same additions and
 	// two hand-rolled copies of the ", N flaky" suffix, so this subtest asserts
 	// the two lines carry the same numbers and the same wording for them.
 	t.Run("console and gha agree on the tally", func(t *testing.T) {
 		t.Parallel()
-		wantTally := "5 scenarios: 1 passed, 1 failed, 1 errored, 1 skipped, 1 flaky"
+		wantTally := "7 scenarios: 1 passed, 1 failed, 1 errored, 1 skipped, 1 flaky, 1 xfail, 1 xpass"
 		if out := render(t, FormatConsole, res); !strings.Contains(out, wantTally) {
 			t.Errorf("console summary missing %q:\n%s", wantTally, out)
 		}
@@ -393,4 +433,81 @@ func TestRender_SummaryUsesElapsedNotSuiteSum(t *testing.T) {
 	if strings.Contains(out, "(2s)") {
 		t.Errorf("summary summed per-suite durations (2s) instead of using elapsed:\n%s", out)
 	}
+}
+
+// TestRender_AllowXPass_EveryFailureSignalAgrees is the #395 consistency rule
+// CodeRabbit caught: --allow-xpass makes the run exit 0, so a report format that
+// still says "failure" contradicts the exit code, and a CI dashboard shows a
+// failed test for a green build. Every failure-level signal has to move
+// together, and the scenario must still be visible as an xpass.
+func TestRender_AllowXPass_EveryFailureSignalAgrees(t *testing.T) {
+	t.Parallel()
+	res := &engine.SuiteResult{
+		Suite:  "mix",
+		Status: engine.StatusPassed,
+		Scenarios: []engine.ScenarioResult{{
+			Name:       "xp",
+			Status:     engine.StatusXPass,
+			ExpectFail: &spec.ExpectFail{Reason: "used to crash"},
+			Steps:      []engine.StepResult{{Kind: "assert", Checks: []*assert.CheckResult{{OK: true}}}},
+		}},
+	}
+
+	t.Run("json keeps it out of failures", func(t *testing.T) {
+		t.Parallel()
+		var doc jsonDocument
+		out := renderWith(t, FormatJSON, res, WithAllowXPass(true))
+		if err := json.Unmarshal([]byte(out), &doc); err != nil {
+			t.Fatalf("json invalid: %v", err)
+		}
+		if n := len(doc.Suites[0].Failures); n != 0 {
+			t.Errorf("failures = %d, want 0 under --allow-xpass: %+v", n, doc.Suites[0].Failures)
+		}
+		if got := doc.Suites[0].Scenarios[0].Status; got != "xpass" {
+			t.Errorf("status = %q, want xpass — the verdict must stay visible", got)
+		}
+	})
+
+	t.Run("junit reports no failure", func(t *testing.T) {
+		t.Parallel()
+		var root junitTestsuites
+		if err := xml.Unmarshal([]byte(renderWith(t, FormatJUnit, res, WithAllowXPass(true))), &root); err != nil {
+			t.Fatalf("junit invalid: %v", err)
+		}
+		if root.Failures != 0 {
+			t.Errorf("junit failures = %d, want 0 under --allow-xpass", root.Failures)
+		}
+		if root.Suites[0].Testcases[0].FlakyFailure == nil {
+			t.Error("the xpass must still be surfaced, as the non-failing signal junit has for it")
+		}
+	})
+
+	t.Run("gha warns instead of erroring", func(t *testing.T) {
+		t.Parallel()
+		out := renderWith(t, FormatGHA, res, WithAllowXPass(true))
+		if strings.Contains(out, "::error title=mix / xp::") {
+			t.Errorf("gha must not fail a job that exits 0:\n%s", out)
+		}
+		if !strings.Contains(out, "::warning title=mix / xp::") {
+			t.Errorf("gha must still surface the xpass:\n%s", out)
+		}
+	})
+
+	t.Run("console reads PASSED", func(t *testing.T) {
+		t.Parallel()
+		out := renderWith(t, FormatConsole, res, WithAllowXPass(true))
+		if !strings.Contains(out, "PASSED") || !strings.Contains(out, "1 xpass") {
+			t.Errorf("console summary must read PASSED and still count the xpass:\n%s", out)
+		}
+	})
+}
+
+// renderWith is render with extra options.
+func renderWith(t *testing.T, f Format, res *engine.SuiteResult, opts ...Option) string {
+	t.Helper()
+	var b strings.Builder
+	if err := Render(&b, f, []*engine.SuiteResult{res}, opts...); err != nil {
+		t.Fatalf("render %s: %v", f, err)
+	}
+	return b.String()
 }

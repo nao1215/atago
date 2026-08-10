@@ -95,6 +95,14 @@ func explainScenario(b *strings.Builder, sc *spec.Scenario) {
 	if sc.Skip != nil && sc.Skip.OS != "" {
 		fmt.Fprintf(b, "  [skip os=%s]", sc.Skip.OS)
 	}
+	// A reviewer must see which scenarios are documentation of a known bug
+	// rather than guarantees, or a suite reads as promising more than it does.
+	if sc.ExpectFail != nil {
+		fmt.Fprintf(b, "  [expect_fail: %s]", sc.ExpectFail.Reason)
+		if sc.ExpectFail.Issue != "" {
+			fmt.Fprintf(b, " [%s]", sc.ExpectFail.Issue)
+		}
+	}
 	b.WriteByte('\n')
 
 	var fixtures, commands, expects, stores, services []string

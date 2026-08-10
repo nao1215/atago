@@ -13,6 +13,14 @@ import (
 // gets a fresh isolated workdir and runs its own teardown, exactly like a
 // normal run; with neither knob set this is a plain runScenario call.
 func (e *Engine) runScenarioWithPolicy(ctx context.Context, idx int, sc *spec.Scenario, rc runConfig) ScenarioResult {
+	// An expected failure runs exactly once, whatever the flaky knobs say (#395).
+	// Retrying it is incoherent — retry exists to give a scenario another chance
+	// to PASS, and passing is the outcome this one reports as a problem — and
+	// repeating it would fold "failed every time", which is precisely the
+	// expected outcome, into StatusFailed.
+	if sc.ExpectFail != nil {
+		return applyExpectFail(sc, e.runScenario(ctx, idx, sc, rc, 1))
+	}
 	switch {
 	case e.Repeat > 1:
 		return e.runRepeated(ctx, idx, sc, rc)
@@ -115,4 +123,24 @@ func (e *Engine) runWithRetries(ctx context.Context, idx int, sc *spec.Scenario,
 	}
 	run.Attempts = attempts
 	return run
+}
+
+// applyExpectFail maps a scenario's own verdict to the expected-failure
+// verdicts (#395).
+//
+// Only pass and fail are remapped. An ERROR stays an error: expect_fail says
+// "the program gives the wrong answer", not "the spec cannot run", and folding
+// a broken command or a missing binary into XFAIL is how a known-bug spec rots
+// unnoticed — which is exactly what happens to a known-bug suite kept OUT of CI
+// (sqly's run_known_bugs.sh), and the reason to bring it in. A skip stays a
+// skip: the gate decided the scenario had nothing to say here.
+func applyExpectFail(sc *spec.Scenario, res ScenarioResult) ScenarioResult {
+	res.ExpectFail = sc.ExpectFail
+	switch res.Status {
+	case StatusFailed:
+		res.Status = StatusXFail
+	case StatusPassed:
+		res.Status = StatusXPass
+	}
+	return res
 }

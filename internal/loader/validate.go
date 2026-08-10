@@ -93,6 +93,7 @@ func validate(s *spec.Spec) []string {
 		}
 		validateCondition(add, where, "skip", sc.Skip)
 		validateCondition(add, where, "only", sc.Only)
+		validateExpectFail(add, where, sc.ExpectFail)
 		validateServices(add, where, sc.Services)
 		serviceNames := maps.Clone(suiteServiceNames)
 		for j := range sc.Services {
@@ -438,5 +439,21 @@ func positiveDuration(add func(string, ...any), key, val, example, def string) {
 	}
 	if d <= 0 {
 		add("%s must be positive (got %q); omit it for the %s default", key, val, def)
+	}
+}
+
+// validateExpectFail checks a declared known bug (#395).
+//
+// `reason` is required, and that is the whole rule: an expected failure with no
+// stated reason is indistinguishable from a test somebody gave up on, and the
+// next reader has no way to tell whether the scenario documents a real defect
+// or is dead weight. An `issue` URL is optional but is what makes an XPASS
+// actionable, so its absence is worth nothing more than the missing link.
+func validateExpectFail(add func(string, ...any), where string, ef *spec.ExpectFail) {
+	if ef == nil {
+		return
+	}
+	if strings.TrimSpace(ef.Reason) == "" {
+		add("%s.expect_fail.reason is required: say what is broken, or a reader cannot tell a documented known bug from a test that was given up on", where)
 	}
 }

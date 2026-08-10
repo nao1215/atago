@@ -1187,6 +1187,10 @@ func TestBugHunt_Rejections(t *testing.T) {
 		{"deterministic duplicate observable", specSteps("run: {command: echo hi, deterministic: {compare: [stdout, stdout]}}"), "more than once"},
 		{"deterministic with retry", specSteps("run: {command: echo hi, deterministic: {}, retry: {times: 2, until: {exit_code: 0}}}"), "cannot be combined with retry"},
 
+		// ---- expect_fail (#395) ----
+		{"expect_fail without a reason", "version: \"1\"\nsuite: {name: s}\nscenarios:\n  - name: known\n    expect_fail: {issue: \"http://x\"}\n    steps:\n      - run: {command: echo hi}\n", "expect_fail.reason is required"},
+		{"expect_fail with a blank reason", "version: \"1\"\nsuite: {name: s}\nscenarios:\n  - name: known\n    expect_fail: {reason: \"   \"}\n    steps:\n      - run: {command: echo hi}\n", "expect_fail.reason is required"},
+
 		// ---- validateHeaderMatch ----
 		{"header name required", specSteps("assert: {header: {equals: text/html}}"), "header.name is required"},
 		{"header no matcher", specSteps("assert: {header: {name: Content-Type}}"), "must set one of contains/equals/matches"},

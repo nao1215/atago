@@ -522,6 +522,26 @@
           "$ref": "#/$defs/condition",
           "description": "Runs the scenario only when the condition holds."
         },
+        "expect_fail": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "reason"
+          ],
+          "description": "Declares that this scenario documents a KNOWN bug (#395). Failing is reported as XFAIL and does NOT fail the run, so a reproduction can live in CI and execute on every commit. Passing is XPASS, which DOES fail the run (unless `--allow-xpass`): the fix landed, and the scenario has to be promoted into the suite that guards against a regression. An execution ERROR is still an error — expect_fail says the program gives the wrong answer, not that the spec cannot run.",
+          "properties": {
+            "reason": {
+              "type": "string",
+              "minLength": 1,
+              "description": "What is broken, in the author's words. Required: an expected failure with no stated reason is indistinguishable from a test somebody gave up on."
+            },
+            "issue": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Where the bug is tracked. Optional, but it is what makes an XPASS actionable — the message can name the issue to close."
+            }
+          }
+        },
         "env": {
           "type": "object",
           "additionalProperties": {

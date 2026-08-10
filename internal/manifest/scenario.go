@@ -18,6 +18,9 @@ func buildScenario(sc *spec.Scenario, src SourceLocator) Scenario {
 		Only: condition(sc.Only),
 		Skip: condition(sc.Skip),
 	}
+	if sc.ExpectFail != nil {
+		out.ExpectFail = &ExpectFail{Reason: sc.ExpectFail.Reason, Issue: sc.ExpectFail.Issue}
+	}
 	if src != nil {
 		out.Source = sourceFrom(src.ScenarioPos(sc.SourceIndex))
 	}

@@ -5,6 +5,7 @@ import (
 
 	"github.com/nao1215/atago/internal/assert"
 	"github.com/nao1215/atago/internal/engine"
+	"github.com/nao1215/atago/internal/spec"
 )
 
 // jsonSchemaVersion is the stable top-level schema version for --report json.
@@ -41,6 +42,9 @@ type jsonScenario struct {
 	Status     string `json:"status"`
 	DurationMS int64  `json:"duration_ms"`
 	SkipReason string `json:"skip_reason,omitempty"`
+	// ExpectFail carries the declared known bug for an xfail/xpass scenario
+	// (#395), so a dashboard can link the issue rather than re-reading the spec.
+	ExpectFail *jsonExpectFail `json:"expect_fail,omitempty"`
 	// Attempts is the execution count under --retry-failed (#29); omitted
 	// when the feature was off. Iterations lists each --repeat execution's
 	// status. Both additive, so schema_version stays "1".
@@ -83,7 +87,7 @@ type jsonArtifact struct {
 }
 
 // buildJSON converts a suite result into the serializable report shape.
-func buildJSON(res *engine.SuiteResult) jsonReport {
+func buildJSON(res *engine.SuiteResult, allowXPass bool) jsonReport {
 	out := jsonReport{
 		Suite: res.Suite,
 		// Forward slashes keep spec_path portable across platforms (Windows uses
@@ -103,6 +107,7 @@ func buildJSON(res *engine.SuiteResult) jsonReport {
 			Status:           string(sc.Status),
 			DurationMS:       sc.Duration.Milliseconds(),
 			SkipReason:       sc.SkipReason,
+			ExpectFail:       jsonExpectFailOf(sc.ExpectFail),
 			TeardownFailures: teardownFailuresOf(sc),
 			ServiceLogs:      serviceLogsOf(sc),
 		}
@@ -113,7 +118,31 @@ func buildJSON(res *engine.SuiteResult) jsonReport {
 			js.Iterations = append(js.Iterations, string(it))
 		}
 		out.Scenarios = append(out.Scenarios, js)
-		out.Failures = append(out.Failures, failuresOf(sc)...)
+		// An XFAIL's checks did fail, but the scenario did not: listing it here
+		// would put a green scenario in the failures bucket every consumer reads
+		// as "what went wrong", and a dashboard would show a known bug as a
+		// regression forever. Its verdict and reason are on the scenario row
+		// (status + expect_fail), which is where a consumer looks for it (#395).
+		switch sc.Status {
+		case engine.StatusXFail:
+			// Its checks did fail, but the scenario did not.
+		case engine.StatusXPass:
+			// The opposite: nothing failed, yet this IS the thing to act on, and
+			// it has no failing check to describe itself with — so the bucket
+			// gets a synthesized entry rather than staying silent about the one
+			// verdict that turned the run red.
+			//
+			// Under --allow-xpass it did NOT turn the run red, and every
+			// failure-level signal has to agree with the exit code: a consumer
+			// that reads failures[] would otherwise report a failed test for a
+			// green build. The scenario row still carries status "xpass" and the
+			// expect_fail block, so nothing is hidden.
+			if !allowXPass {
+				out.Failures = append(out.Failures, jsonFailure{Scenario: sc.Name, Error: xpassMessage(sc)})
+			}
+		default:
+			out.Failures = append(out.Failures, failuresOf(sc)...)
+		}
 	}
 	return out
 }
@@ -240,4 +269,17 @@ func failuresOf(sc *engine.ScenarioResult) []jsonFailure {
 		}
 	}
 	return fs
+}
+
+// jsonExpectFail mirrors a scenario's declared known bug in the JSON report.
+type jsonExpectFail struct {
+	Reason string `json:"reason"`
+	Issue  string `json:"issue,omitempty"`
+}
+
+func jsonExpectFailOf(ef *spec.ExpectFail) *jsonExpectFail {
+	if ef == nil {
+		return nil
+	}
+	return &jsonExpectFail{Reason: ef.Reason, Issue: ef.Issue}
 }

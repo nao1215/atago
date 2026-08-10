@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-79 suites · 498 scenarios
+80 suites · 508 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -162,6 +162,17 @@
   - [a signal exit composes with the in matcher alongside normal codes](#scenario-a-signal-exit-composes-with-the-in-matcher-alongside-normal-codes)
   - [a missing command is 127 under the shell](#scenario-a-missing-command-is-127-under-the-shell)
   - [POSIX exit codes wrap modulo 256](#scenario-posix-exit-codes-wrap-modulo-256)
+- [atago self-hosting / expected failures](#atago-self-hosting--expected-failures) — 10 scenarios
+  - [a known bug that still fails keeps the run green](#scenario-a-known-bug-that-still-fails-keeps-the-run-green)
+  - [a known bug that is fixed fails the run so it gets promoted](#scenario-a-known-bug-that-is-fixed-fails-the-run-so-it-gets-promoted)
+  - [allow-xpass keeps the run green while the spec is promoted](#scenario-allow-xpass-keeps-the-run-green-while-the-spec-is-promoted)
+  - [an execution error is still an error, not an expected failure](#scenario-an-execution-error-is-still-an-error-not-an-expected-failure)
+  - [a skip gate still decides on its own](#scenario-a-skip-gate-still-decides-on-its-own)
+  - [an expected failure is not retried into a flake](#scenario-an-expected-failure-is-not-retried-into-a-flake)
+  - [tap marks both verdicts with a TODO directive](#scenario-tap-marks-both-verdicts-with-a-todo-directive)
+  - [junit routes an xfail to skipped and an xpass to failure](#scenario-junit-routes-an-xfail-to-skipped-and-an-xpass-to-failure)
+  - [explain and doc show which scenarios document a known bug](#scenario-explain-and-doc-show-which-scenarios-document-a-known-bug)
+  - [an expected failure without a reason is a load error](#scenario-an-expected-failure-without-a-reason-is-a-load-error)
 - [atago self-hosting / explain](#atago-self-hosting--explain) — 4 scenarios
   - [explain summarizes a spec without running it](#scenario-explain-summarizes-a-spec-without-running-it)
   - [explain describes every matcher of a composed stream assertion](#scenario-explain-describes-every-matcher-of-a-composed-stream-assertion)
@@ -3401,6 +3412,313 @@ exit 257
 ```
 #### Then
 - exit code is `1`
+## atago self-hosting / expected failures
+Source: `test/e2e/atago/expect_fail.atago.yaml`
+### Scenario: a known bug that still fails keeps the run green
+#### Given
+- Fixture file `inner_xfail.atago.yaml` is created.
+#### Inputs
+_Fixture `inner_xfail.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner xfail
+scenarios:
+  - name: the bug is still there
+    expect_fail:
+      reason: "rounds half-down instead of half-even"
+      issue: "https://example.test/issues/42"
+    steps:
+      - run:
+          command: echo total=2.5
+      - assert:
+          stdout:
+            contains: "total=2.50"
+```
+#### When
+```shell
+${atago} run inner_xfail.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout contains `XFAIL:`, `rounds half-down instead of half-even`, `https://example.test/issues/42`, `1 xfail`
+### Scenario: a known bug that is fixed fails the run so it gets promoted
+#### Given
+- Fixture file `inner_xpass.atago.yaml` is created.
+#### Inputs
+_Fixture `inner_xpass.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner xpass
+scenarios:
+  - name: the bug is fixed
+    expect_fail:
+      reason: "used to print nothing at all"
+      issue: "https://example.test/issues/7"
+    steps:
+      - run:
+          command: echo present
+      - assert:
+          stdout:
+            contains: present
+```
+#### When
+```shell
+${atago} run inner_xpass.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `XPASS:`, `Move it into the suite`, `1 xpass`
+### Scenario: allow-xpass keeps the run green while the spec is promoted
+#### Given
+- Fixture file `inner_allow.atago.yaml` is created.
+#### Inputs
+_Fixture `inner_allow.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner allow
+scenarios:
+  - name: the bug is fixed
+    expect_fail:
+      reason: "used to crash"
+    steps:
+      - run:
+          command: echo ok
+      - assert:
+          stdout:
+            contains: ok
+```
+#### When
+```shell
+${atago} run --allow-xpass inner_allow.atago.yaml
+${atago} run --allow-xpass --report junit inner_allow.atago.yaml
+```
+#### Then
+- after `${atago} run --allow-xpass inner_allow.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `1 xpass`
+- after `${atago} run --allow-xpass --report junit inner_allow.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `failures="0"`, does not contain `<failure`
+### Scenario: an execution error is still an error, not an expected failure
+#### Given
+- Fixture file `inner_error.atago.yaml` is created.
+#### Inputs
+_Fixture `inner_error.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner error
+scenarios:
+  - name: the spec itself cannot run
+    expect_fail:
+      reason: "the tool mishandles empty input"
+    steps:
+      - run:
+          command: atago-no-such-binary-4f81
+```
+#### When
+```shell
+${atago} run inner_error.atago.yaml
+```
+#### Then
+- exit code is `4`
+- stdout contains `ERROR:`, does not contain `XFAIL:`
+### Scenario: a skip gate still decides on its own
+#### Given
+- Fixture file `inner_skip.atago.yaml` is created.
+#### Inputs
+_Fixture `inner_skip.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner skip
+scenarios:
+  - name: not applicable here
+    expect_fail:
+      reason: "only reproducible on plan9"
+    skip:
+      os: linux
+    steps:
+      - run:
+          command: echo whatever
+      - assert:
+          stdout:
+            contains: nope
+```
+#### When
+```shell
+${atago} run inner_skip.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout contains `1 skipped`
+### Scenario: an expected failure is not retried into a flake
+#### Given
+- Fixture file `inner_retry.atago.yaml` is created.
+#### Inputs
+_Fixture `inner_retry.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner retry
+scenarios:
+  - name: the bug is still there
+    expect_fail:
+      reason: "still broken"
+    steps:
+      - run:
+          shell: true
+          # A per-attempt side effect OUTSIDE the scenario workdir,
+          # so the count survives the fresh workdir each attempt
+          # gets. Asserting only on the report would pass an
+          # implementation that ran three times and hid the word
+          # "flaky".
+          command: "echo x >> $${ATTEMPTS_FILE}; echo actual"
+      - assert:
+          stdout:
+            contains: expected
+```
+#### When
+```shell
+ATTEMPTS_FILE=${workdir}/retry.count ${atago} run --retry-failed 3 inner_retry.atago.yaml
+ATTEMPTS_FILE=${workdir}/repeat.count ${atago} run --repeat 3 inner_retry.atago.yaml
+```
+#### Then
+- after `ATTEMPTS_FILE=${workdir}/retry.count ${atago} run --retry-failed 3 inner_retry.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `1 xfail`, does not contain `flaky`
+  - file `retry.count` contains `x` exactly 1 time
+- after `ATTEMPTS_FILE=${workdir}/repeat.count ${atago} run --repeat 3 inner_retry.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `1 xfail`, does not contain `REPEAT:`
+  - file `repeat.count` contains `x` exactly 1 time
+### Scenario: tap marks both verdicts with a TODO directive
+#### Given
+- Fixture file `inner_tap.atago.yaml` is created.
+#### Inputs
+_Fixture `inner_tap.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner tap
+scenarios:
+  - name: still broken
+    expect_fail:
+      reason: "known"
+    steps:
+      - run:
+          command: echo a
+      - assert:
+          stdout:
+            contains: b
+  - name: now fixed
+    expect_fail:
+      reason: "known too"
+    steps:
+      - run:
+          command: echo a
+      - assert:
+… (truncated, 2 more lines)
+```
+#### When
+```shell
+${atago} run --report tap inner_tap.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `not ok 1 - inner tap / still broken # TODO known`, `ok 2 - inner tap / now fixed # TODO known too`
+### Scenario: junit routes an xfail to skipped and an xpass to failure
+#### Given
+- Fixture file `inner_junit.atago.yaml` is created.
+#### Inputs
+_Fixture `inner_junit.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner junit
+scenarios:
+  - name: still broken
+    expect_fail:
+      reason: "known"
+    steps:
+      - run:
+          command: echo a
+      - assert:
+          stdout:
+            contains: b
+  - name: now fixed
+    expect_fail:
+      reason: "known too"
+    steps:
+      - run:
+          command: echo a
+      - assert:
+… (truncated, 2 more lines)
+```
+#### When
+```shell
+${atago} run --report junit inner_junit.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `skipped="1"`, `failures="1"`, `<skipped message="xfail: known">`, `<failure message="xpass:`
+### Scenario: explain and doc show which scenarios document a known bug
+#### Given
+- Fixture file `shown.atago.yaml` is created.
+#### Inputs
+_Fixture `shown.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: shown
+scenarios:
+  - name: known bug
+    expect_fail:
+      reason: "wrong rounding"
+      issue: "https://example.test/9"
+    steps:
+      - run:
+          command: echo hi
+```
+#### When
+```shell
+${atago} explain shown.atago.yaml
+${atago} doc shown.atago.yaml
+```
+#### Then
+- after `${atago} explain shown.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `[expect_fail: wrong rounding]`, `https://example.test/9`
+- after `${atago} doc shown.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `expected to FAIL (known bug): wrong rounding`
+### Scenario: an expected failure without a reason is a load error
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: bad
+scenarios:
+  - name: unexplained
+    expect_fail:
+      issue: "https://example.test/1"
+    steps:
+      - run:
+          command: echo hi
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `expect_fail.reason is required`
 ## atago self-hosting / explain
 Source: `test/e2e/atago/explain.atago.yaml`
 ### Scenario: explain summarizes a spec without running it

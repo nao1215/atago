@@ -222,6 +222,13 @@ func scenarioMeta(sc *spec.Scenario) string {
 	}
 	parts = append(parts, conditionPhrases("only", sc.Only)...)
 	parts = append(parts, conditionPhrases("skip", sc.Skip)...)
+	if sc.ExpectFail != nil {
+		phrase := "expected to FAIL (known bug): " + sc.ExpectFail.Reason
+		if sc.ExpectFail.Issue != "" {
+			phrase += " — " + sc.ExpectFail.Issue
+		}
+		parts = append(parts, phrase)
+	}
 	if len(parts) == 0 {
 		return ""
 	}

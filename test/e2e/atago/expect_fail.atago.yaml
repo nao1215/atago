@@ -1,0 +1,342 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / expected failures
+
+# Exercises expect_fail (#395) through the real binary: the two verdicts and
+# their exit codes, the rules that keep a known-bug spec from rotting, the
+# --allow-xpass escape hatch, every report format's classification, and the
+# load error that keeps an unexplained expected failure out of a suite.
+scenarios:
+  - name: a known bug that still fails keeps the run green
+    steps:
+      - fixture:
+          file: inner_xfail.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner xfail
+            scenarios:
+              - name: the bug is still there
+                expect_fail:
+                  reason: "rounds half-down instead of half-even"
+                  issue: "https://example.test/issues/42"
+                steps:
+                  - run:
+                      command: echo total=2.5
+                  - assert:
+                      stdout:
+                        contains: "total=2.50"
+      - run:
+          command: ${atago} run inner_xfail.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "XFAIL:"
+              - "rounds half-down instead of half-even"
+              - "https://example.test/issues/42"
+              - "1 xfail"
+
+  - name: a known bug that is fixed fails the run so it gets promoted
+    steps:
+      - fixture:
+          file: inner_xpass.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner xpass
+            scenarios:
+              - name: the bug is fixed
+                expect_fail:
+                  reason: "used to print nothing at all"
+                  issue: "https://example.test/issues/7"
+                steps:
+                  - run:
+                      command: echo present
+                  - assert:
+                      stdout:
+                        contains: present
+      - run:
+          command: ${atago} run inner_xpass.atago.yaml
+      - assert:
+          # The whole point: a fixed known bug is not quietly green.
+          exit_code: 1
+          stdout:
+            contains:
+              - "XPASS:"
+              - "Move it into the suite"
+              - "1 xpass"
+
+  - name: allow-xpass keeps the run green while the spec is promoted
+    steps:
+      - fixture:
+          file: inner_allow.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner allow
+            scenarios:
+              - name: the bug is fixed
+                expect_fail:
+                  reason: "used to crash"
+                steps:
+                  - run:
+                      command: echo ok
+                  - assert:
+                      stdout:
+                        contains: ok
+      - run:
+          command: ${atago} run --allow-xpass inner_allow.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "1 xpass"
+      - run:
+          # Every failure-level signal has to follow the exit code, or a CI
+          # dashboard shows a failed test for a green build.
+          command: ${atago} run --allow-xpass --report junit inner_allow.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: 'failures="0"'
+            not_contains: "<failure"
+
+  - name: an execution error is still an error, not an expected failure
+    steps:
+      - fixture:
+          file: inner_error.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner error
+            scenarios:
+              - name: the spec itself cannot run
+                expect_fail:
+                  reason: "the tool mishandles empty input"
+                steps:
+                  - run:
+                      command: atago-no-such-binary-4f81
+      - run:
+          command: ${atago} run inner_error.atago.yaml
+      - assert:
+          # Folding this into XFAIL is exactly how an out-of-CI known-bug
+          # directory rots: the spec stops running and nobody notices.
+          exit_code: 4
+          stdout:
+            contains: "ERROR:"
+            not_contains: "XFAIL:"
+
+  - name: a skip gate still decides on its own
+    steps:
+      - fixture:
+          file: inner_skip.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner skip
+            scenarios:
+              - name: not applicable here
+                expect_fail:
+                  reason: "only reproducible on plan9"
+                skip:
+                  os: linux
+                steps:
+                  - run:
+                      command: echo whatever
+                  - assert:
+                      stdout:
+                        contains: nope
+      - run:
+          command: ${atago} run inner_skip.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "1 skipped"
+
+  - name: an expected failure is not retried into a flake
+    steps:
+      - fixture:
+          file: inner_retry.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner retry
+            scenarios:
+              - name: the bug is still there
+                expect_fail:
+                  reason: "still broken"
+                steps:
+                  - run:
+                      shell: true
+                      # A per-attempt side effect OUTSIDE the scenario workdir,
+                      # so the count survives the fresh workdir each attempt
+                      # gets. Asserting only on the report would pass an
+                      # implementation that ran three times and hid the word
+                      # "flaky".
+                      command: "echo x >> $${ATTEMPTS_FILE}; echo actual"
+                  - assert:
+                      stdout:
+                        contains: expected
+      - run:
+          # Retrying an expected failure is incoherent — retry exists to give a
+          # scenario another chance to PASS — so the knob must not touch it.
+          shell: true
+          command: "ATTEMPTS_FILE=${workdir}/retry.count ${atago} run --retry-failed 3 inner_retry.atago.yaml"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "1 xfail"
+            not_contains: "flaky"
+      - assert:
+          # Exactly one execution: the count, not the absence of a word.
+          file:
+            path: retry.count
+            contains: "x"
+            count: 1
+      - run:
+          # Same for --repeat: folding "failed every iteration" into a
+          # deterministic failure would report the expected outcome as a bug.
+          shell: true
+          command: "ATTEMPTS_FILE=${workdir}/repeat.count ${atago} run --repeat 3 inner_retry.atago.yaml"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "1 xfail"
+            not_contains: "REPEAT:"
+      - assert:
+          file:
+            path: repeat.count
+            contains: "x"
+            count: 1
+
+  - name: tap marks both verdicts with a TODO directive
+    steps:
+      - fixture:
+          file: inner_tap.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner tap
+            scenarios:
+              - name: still broken
+                expect_fail:
+                  reason: "known"
+                steps:
+                  - run:
+                      command: echo a
+                  - assert:
+                      stdout:
+                        contains: b
+              - name: now fixed
+                expect_fail:
+                  reason: "known too"
+                steps:
+                  - run:
+                      command: echo a
+                  - assert:
+                      stdout:
+                        contains: a
+      - run:
+          command: ${atago} run --report tap inner_tap.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            # TAP's own vocabulary for "allowed to fail" and "unexpectedly
+            # succeeded" — a consumer needs no atago-specific knowledge.
+            contains:
+              - "not ok 1 - inner tap / still broken # TODO known"
+              - "ok 2 - inner tap / now fixed # TODO known too"
+
+  - name: junit routes an xfail to skipped and an xpass to failure
+    steps:
+      - fixture:
+          file: inner_junit.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner junit
+            scenarios:
+              - name: still broken
+                expect_fail:
+                  reason: "known"
+                steps:
+                  - run:
+                      command: echo a
+                  - assert:
+                      stdout:
+                        contains: b
+              - name: now fixed
+                expect_fail:
+                  reason: "known too"
+                steps:
+                  - run:
+                      command: echo a
+                  - assert:
+                      stdout:
+                        contains: a
+      - run:
+          command: ${atago} run --report junit inner_junit.atago.yaml
+      - assert:
+          # The scenario claims BOTH routings, so it has to exercise both: an
+          # XPASS serialized as a success or a skip would otherwise slip through.
+          exit_code: 1
+          stdout:
+            contains:
+              - "skipped=\"1\""
+              - "failures=\"1\""
+              - "<skipped message=\"xfail: known\">"
+              - "<failure message=\"xpass:"
+
+  - name: explain and doc show which scenarios document a known bug
+    steps:
+      - fixture:
+          file: shown.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: shown
+            scenarios:
+              - name: known bug
+                expect_fail:
+                  reason: "wrong rounding"
+                  issue: "https://example.test/9"
+                steps:
+                  - run:
+                      command: echo hi
+      - run:
+          command: ${atago} explain shown.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "[expect_fail: wrong rounding]"
+              - "https://example.test/9"
+      - run:
+          command: ${atago} doc shown.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "expected to FAIL (known bug): wrong rounding"
+
+  - name: an expected failure without a reason is a load error
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: bad
+            scenarios:
+              - name: unexplained
+                expect_fail:
+                  issue: "https://example.test/1"
+                steps:
+                  - run:
+                      command: echo hi
+      - run:
+          command: ${atago} run bad.atago.yaml
+      - assert:
+          exit_code: 2
+          stderr:
+            contains: "expect_fail.reason is required"

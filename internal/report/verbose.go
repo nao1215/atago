@@ -48,11 +48,22 @@ func (v *Verbose) Scenario(res engine.ScenarioResult) {
 	if res.Status == engine.StatusSkipped && res.SkipReason != "" {
 		fmt.Fprintf(&b, "    skipped: %s\n", res.SkipReason)
 	}
+	// A trace of an expected failure has to say WHY it is one and what to do
+	// about an unexpected pass, or --verbose shows less than the plain console
+	// report does about the same scenario (#395).
+	if res.Status == engine.StatusXFail || res.Status == engine.StatusXPass {
+		for _, line := range strings.Split(expectFailNarrative(res.ExpectFail, res.Status == engine.StatusXPass), "\n") {
+			fmt.Fprintf(&b, "    %s\n", line)
+		}
+	}
 
 	// A trace of a scenario that did not pass is a trace the reader opened to
 	// find something, so its empty streams are stated rather than omitted (#346).
 	// See writeStream for why the split exists at all.
-	interesting := res.Status == engine.StatusFailed || res.Status == engine.StatusError
+	// An expected failure is one a reader opened the trace to understand too:
+	// the assertion that failed is the documentation of the known bug.
+	interesting := res.Status == engine.StatusFailed || res.Status == engine.StatusError ||
+		res.Status == engine.StatusXFail
 
 	for i := range res.Steps {
 		v.writeStep(&b, "", &res.Steps[i], interesting)
@@ -157,9 +168,9 @@ func headerColor(s engine.Status) string {
 	switch s {
 	case engine.StatusPassed:
 		return cGreen
-	case engine.StatusFailed, engine.StatusError:
+	case engine.StatusFailed, engine.StatusError, engine.StatusXPass:
 		return cRed + cBold
-	case engine.StatusSkipped, engine.StatusFlaky:
+	case engine.StatusSkipped, engine.StatusFlaky, engine.StatusXFail:
 		return cYellow
 	default:
 		return ""

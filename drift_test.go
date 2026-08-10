@@ -539,6 +539,7 @@ var exampleSpecs = map[string]bool{ // path -> hermetic (run, not just validate)
 	"examples/teardown.atago.yaml":             true,
 	"examples/timeouts.atago.yaml":             true,
 	"examples/project_manifest.atago.yaml":     true,
+	"examples/expect_fail.atago.yaml":          true,
 }
 
 // TestExamples_EveryFileCategorized fails when a spec is added to examples/

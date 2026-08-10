@@ -1,0 +1,54 @@
+version: "1"
+
+# Expected failures: keep a known bug's reproduction in CI (#395).
+#
+# The usual fate of a spec that documents a bug you have not fixed yet is exile
+# — a second directory, a second runner script, kept out of CI so the suite
+# stays green. That directory rots: nothing executes it, so a spec that stops
+# even LOADING is invisible, and "the upstream fix landed" is discovered only
+# when someone remembers to run it by hand.
+#
+# `expect_fail:` keeps the spec in the suite instead:
+#
+#   - it fails      -> XFAIL. The run stays green. The reproduction still runs
+#                      on every commit, so it cannot rot.
+#   - it passes     -> XPASS, and the run FAILS. The bug is fixed: drop
+#                      expect_fail: and move the scenario into the guarded
+#                      suite, then close the issue. --allow-xpass keeps the run
+#                      green while you do.
+#   - it errors     -> still an ERROR. expect_fail says "the program gives the
+#                      wrong answer", not "the spec cannot run" — folding a
+#                      missing binary into XFAIL is exactly how the exiled
+#                      directory rotted.
+#
+# `reason` is required: an expected failure with no stated reason cannot be told
+# apart from a test somebody gave up on. `issue` is optional and is what makes
+# the XPASS message actionable.
+#
+# Runs green as-is: atago run examples/expect_fail.atago.yaml
+
+suite:
+  name: expect fail
+
+scenarios:
+  - name: a known rounding bug is still there
+    expect_fail:
+      reason: "totals are rounded half-down instead of half-even"
+      issue: "https://github.com/example/mytool/issues/42"
+    steps:
+      - run:
+          command: "echo total=2.5"
+      - assert:
+          # What the tool SHOULD print once the bug is fixed. Until then this
+          # fails, which is the expected outcome and keeps the run green.
+          stdout:
+            contains: "total=2.50"
+
+  - name: an ordinary scenario next to it is unaffected
+    steps:
+      - run:
+          command: echo fine
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: fine

@@ -20,6 +20,17 @@ const (
 	StatusSkipped Status = "skipped"
 	// StatusError means a step could not execute (e.g. command not found).
 	StatusError Status = "error"
+	// StatusXFail means a scenario declared `expect_fail:` and did fail — the
+	// known bug it documents is still there (#395). It does not fail the run:
+	// the whole point is to keep a reproduction in CI, executing on every
+	// commit, without painting the suite red for something already known.
+	StatusXFail Status = "xfail"
+	// StatusXPass means a scenario declared `expect_fail:` and PASSED — the bug
+	// it documents is fixed. That fails the run by default, because a spec that
+	// silently starts passing is a spec nobody promotes: the failure is what
+	// tells the author to move it into the suite that guards against a
+	// regression. --allow-xpass downgrades it to a loud warning.
+	StatusXPass Status = "xpass"
 	// StatusFlaky means the scenario was unstable, not broken: it failed at
 	// least once and passed at least once. Two paths produce it — a
 	// --retry-failed re-run that recovered (#29), or a --repeat run where some
@@ -81,6 +92,10 @@ type ScenarioResult struct {
 	// visible Steps belong to the first failing iteration (or the last one
 	// when all passed).
 	Iterations []Status
+	// ExpectFail carries the scenario's declared known bug when it had one
+	// (#395), so every report can name the reason and issue next to the XFAIL
+	// or XPASS verdict rather than making a reader open the spec.
+	ExpectFail *spec.ExpectFail
 }
 
 // PassedIterations counts how many --repeat iterations came out clean (passed,
@@ -135,6 +150,9 @@ type SuiteResult struct {
 // Counts summarizes scenario outcomes.
 type Counts struct {
 	Passed, Failed, Skipped, Errored, Flaky int
+	// XFail counts expected failures that did fail, XPass those that passed
+	// (#395).
+	XFail, XPass int
 }
 
 // Add returns the field-wise sum of two tallies. Every report format aggregates
@@ -147,6 +165,8 @@ func (c Counts) Add(o Counts) Counts {
 	c.Skipped += o.Skipped
 	c.Errored += o.Errored
 	c.Flaky += o.Flaky
+	c.XFail += o.XFail
+	c.XPass += o.XPass
 	return c
 }
 
@@ -176,6 +196,10 @@ func (s *SuiteResult) Counts() Counts {
 			c.Errored++
 		case StatusFlaky:
 			c.Flaky++
+		case StatusXFail:
+			c.XFail++
+		case StatusXPass:
+			c.XPass++
 		}
 	}
 	return c

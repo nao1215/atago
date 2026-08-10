@@ -63,7 +63,7 @@ type junitSkipped struct {
 	Message string `xml:"message,attr"`
 }
 
-func buildJUnit(results []*engine.SuiteResult) junitTestsuites {
+func buildJUnit(results []*engine.SuiteResult, allowXPass bool) junitTestsuites {
 	root := junitTestsuites{}
 	for _, res := range results {
 		ts := junitTestsuite{Name: res.Suite, Time: junitSeconds(res.Duration.Seconds())}
@@ -85,6 +85,24 @@ func buildJUnit(results []*engine.SuiteResult) junitTestsuites {
 					Message: flakyMessage(sc),
 					Body:    detailText(sc),
 				}
+			case engine.StatusXFail:
+				// pytest's convention, and the only one JUnit XML can express: an
+				// expected failure is a skipped testcase carrying its reason. A
+				// <failure> would paint the build red for a known bug, which is
+				// the whole thing expect_fail exists to avoid.
+				tc.Skipped = &junitSkipped{Message: "xfail: " + expectFailSummary(sc)}
+				ts.Skipped++
+			case engine.StatusXPass:
+				if allowXPass {
+					// Green for the exit code, so green here too — a <failure>
+					// in a passing build is exactly the contradiction the flaky
+					// verdict already avoids. flakyFailure is JUnit's slot for
+					// "worth surfacing, not a failure".
+					tc.FlakyFailure = &junitMessage{Message: xpassMessage(sc), Body: detailText(sc)}
+					break
+				}
+				tc.Failure = &junitMessage{Message: xpassMessage(sc), Body: detailText(sc)}
+				ts.Failures++
 			}
 			ts.Testcases = append(ts.Testcases, tc)
 			ts.Tests++
