@@ -7,6 +7,15 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Documentation
+
+- A cookbook recipe for `--fail-fast`, the one run flag with no recipe and no
+  page of its own: what counts as a red verdict, what happens to the scenarios
+  that never started, and how it pairs with `--rerun-failed`. The CI page and
+  the reference gained the same facts, and the progress-dot legend in the README
+  and the getting-started page now lists the flaky and expected-failure markers
+  it has been printing since 0.18.0.
+
 ## [0.18.0] - 2026-07-30
 
 A release about the one verdict atago was getting wrong about itself. `--repeat`
