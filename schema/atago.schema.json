@@ -1534,6 +1534,21 @@
                     "minimum": 1,
                     "description": "1-based line selector: applies the matcher to that single rendered row instead of the whole screen."
                   },
+                  "count": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Exact number of times the `contains` substring or `matches` regexp next to it occurs on the rendered screen (#396). Occurrences are non-overlapping."
+                  },
+                  "min_count": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Lower bound on how many times the `contains` substring or `matches` regexp occurs on the rendered screen (#396)."
+                  },
+                  "max_count": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Upper bound on how many times the `contains` substring or `matches` regexp occurs on the rendered screen (#396)."
+                  },
                   "empty": {
                     "type": "boolean",
                     "description": "Asserts the rendered screen is empty (`true`) or non-empty (`false`)."
@@ -2422,6 +2437,21 @@
           "type": "string",
           "description": "Compares the stream against a committed golden file (spec-relative path). Volatile details (ANSI, temp paths, UUIDs, timestamps, ports, CRLF) are normalized; refresh with `atago snapshot update`."
         },
+        "count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Exact number of times the `contains` substring or `matches` regexp next to it occurs (#396). Occurrences are non-overlapping. Needs exactly one countable matcher; not combinable with equals/not_equals/empty/json/yaml/snapshot."
+        },
+        "min_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Lower bound on how many times the `contains` substring or `matches` regexp occurs (#396)."
+        },
+        "max_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Upper bound on how many times the `contains` substring or `matches` regexp occurs (#396). `max_count: 0` reads as \"never\"."
+        },
         "trim": {
           "type": "boolean",
           "description": "Store-only (#158): capture the whole stream. trim: true strips surrounding whitespace; trim: false keeps bytes verbatim."
@@ -2477,6 +2507,21 @@
         "snapshot": {
           "type": "string",
           "description": "Compares the stream against a committed golden file (spec-relative path). Volatile details (ANSI, temp paths, UUIDs, timestamps, ports, CRLF) are normalized; refresh with `atago snapshot update`."
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Exact number of times the `contains` substring or `matches` regexp next to it occurs (#396). Occurrences are non-overlapping. Needs exactly one countable matcher; not combinable with equals/not_equals/empty/json/yaml/snapshot."
+        },
+        "min_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Lower bound on how many times the `contains` substring or `matches` regexp occurs (#396)."
+        },
+        "max_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Upper bound on how many times the `contains` substring or `matches` regexp occurs (#396). `max_count: 0` reads as \"never\"."
         },
         "trim": {
           "type": "boolean",
@@ -2586,6 +2631,21 @@
           "required": [
             "text"
           ]
+        },
+        {
+          "required": [
+            "size"
+          ]
+        },
+        {
+          "required": [
+            "min_size"
+          ]
+        },
+        {
+          "required": [
+            "max_size"
+          ]
         }
       ],
       "properties": {
@@ -2593,6 +2653,36 @@
           "type": "string",
           "minLength": 1,
           "description": "The file under test, resolved against the scenario workdir when relative (confined to it)."
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Exact number of times the `contains` substring next to it occurs in the file (#396). Occurrences are non-overlapping."
+        },
+        "min_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Lower bound on how many times the `contains` substring occurs in the file (#396)."
+        },
+        "max_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Upper bound on how many times the `contains` substring occurs in the file (#396)."
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Exact file length in bytes (#397). Composes with the content matchers and may also stand alone: `size: 0` asserts a failed run left an empty file rather than a half-written one. Bytes are counted as written (no CRLF or trailing-newline normalization)."
+        },
+        "min_size": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Lower bound on the file length in bytes (#397). `min_size: 1` is the portable spelling of \"non-empty\"."
+        },
+        "max_size": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Upper bound on the file length in bytes (#397) — the regression shape of a compression or bundling bug, where output size is the product."
         },
         "exists": {
           "type": "boolean",

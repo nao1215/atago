@@ -115,6 +115,26 @@ func ReadFileNoFollow(path string) ([]byte, error) {
 	return os.ReadFile(path) //nolint:gosec // path is containment-checked by the caller and Lstat-guarded against a leaf symlink
 }
 
+// StatNoFollow reports a path's metadata without following a symlink planted at
+// the leaf. It is the stat half of ReadFileNoFollow's rule: lexical containment
+// proves the path is inside its root, but the untrusted program under test may
+// have replaced the leaf with a link pointing outside it, and os.Stat would
+// happily report the metadata of whatever the link points at — disclosing the
+// size of an arbitrary host file into the report (issue #16).
+//
+// A leaf symlink is rejected outright rather than resolved, matching the read
+// and write paths, so every path-taking feature enforces one rule.
+func StatNoFollow(path string) (os.FileInfo, error) {
+	fi, err := os.Lstat(path)
+	if err != nil {
+		return nil, err
+	}
+	if fi.Mode()&os.ModeSymlink != 0 {
+		return nil, fmt.Errorf("refusing to stat through the symlink %q (it escapes the scenario root)", path)
+	}
+	return fi, nil
+}
+
 // writeLocks serializes WriteFileNoFollow calls that target the same path.
 // Several parallel scenarios can share one golden file (e.g. matrix rows with an
 // identical snapshot under --update-snapshots); without serialization their

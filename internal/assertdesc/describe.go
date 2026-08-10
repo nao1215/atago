@@ -114,14 +114,26 @@ func DescribeStream(s *spec.StreamAssert, style StreamStyle) string {
 			parts = append(parts, "is not empty")
 		}
 	}
+	// A count bound does not sit BESIDE the matcher it bounds — it replaces what
+	// that matcher claims. Rendering "contains panic" for `contains: panic,
+	// max_count: 0` publishes the opposite of the assertion (#396).
+	counted := s.HasCount()
 	if s.Contains != nil {
-		parts = append(parts, "contains "+style.List(s.Contains))
+		if counted {
+			parts = append(parts, "contains "+style.List(s.Contains)+" "+describeCount(s.Count, s.MinCount, s.MaxCount))
+		} else {
+			parts = append(parts, "contains "+style.List(s.Contains))
+		}
 	}
 	if s.NotContains != nil {
 		parts = append(parts, "does not contain "+style.List(s.NotContains))
 	}
 	if s.Matches != nil {
-		parts = append(parts, "matches "+style.Regex(*s.Matches))
+		if counted && s.Contains == nil {
+			parts = append(parts, "matches "+style.Regex(*s.Matches)+" "+describeCount(s.Count, s.MinCount, s.MaxCount))
+		} else {
+			parts = append(parts, "matches "+style.Regex(*s.Matches))
+		}
 	}
 	if s.NotMatches != nil {
 		parts = append(parts, "does not match "+style.Regex(*s.NotMatches))
@@ -167,6 +179,20 @@ type FileStyle struct {
 // publish "the file is checked" for an assertion that actually pins content or
 // permissions.
 func DescribeFile(f *spec.FileAssert, style FileStyle) string {
+	desc := describeFileMatcher(f, style)
+	// Size bounds compose with the content matcher rather than replacing it, so
+	// they are appended; a size-only assert has no content phrase to append to
+	// and the bound is the whole description (#397).
+	if f.HasSize() {
+		if desc == style.Checked(f.Path) {
+			return style.Path(f.Path) + " " + describeSize(f.Size, f.MinSize, f.MaxSize)
+		}
+		return desc + " and " + describeSize(f.Size, f.MinSize, f.MaxSize)
+	}
+	return desc
+}
+
+func describeFileMatcher(f *spec.FileAssert, style FileStyle) string {
 	switch {
 	case f.Exists != nil:
 		if *f.Exists {
@@ -174,6 +200,9 @@ func DescribeFile(f *spec.FileAssert, style FileStyle) string {
 		}
 		return style.Path(f.Path) + " does not exist"
 	case f.Contains != nil:
+		if f.HasCount() {
+			return style.Path(f.Path) + " contains " + style.List(f.Contains) + " " + describeCount(f.Count, f.MinCount, f.MaxCount)
+		}
 		return style.Path(f.Path) + " contains " + style.List(f.Contains)
 	case f.NotContains != nil:
 		return style.Path(f.Path) + " does not contain " + style.List(f.NotContains)
@@ -387,4 +416,46 @@ func DescribeMock(m *spec.MockAssert, style MockStyle) string {
 		desc += style.Count(*m.Count)
 	}
 	return desc
+}
+
+// describeCount renders an occurrence bound as the phrase that replaces plain
+// presence (#396). `count: 0` becomes "never", because "occurring exactly 0
+// times" reads as an assertion about counting rather than about absence.
+func describeCount(exact, minCount, maxCount *int) string {
+	switch {
+	case exact != nil && *exact == 0:
+		return "never"
+	case exact != nil:
+		return "exactly " + plural.Count(*exact, "time", "times")
+	case minCount != nil && maxCount != nil:
+		return fmt.Sprintf("between %d and %s", *minCount, plural.Count(*maxCount, "time", "times"))
+	case minCount != nil:
+		return "at least " + plural.Count(*minCount, "time", "times")
+	case maxCount != nil && *maxCount == 0:
+		return "never"
+	case maxCount != nil:
+		return "at most " + plural.Count(*maxCount, "time", "times")
+	default:
+		return ""
+	}
+}
+
+// describeSize renders a byte-size bound (#397).
+func describeSize(exact, minSize, maxSize *int64) string {
+	switch {
+	case exact != nil && *exact == 0:
+		return "is empty"
+	case exact != nil:
+		return "is exactly " + plural.Count64(*exact, "byte", "bytes")
+	case minSize != nil && maxSize != nil:
+		return fmt.Sprintf("is between %d and %s", *minSize, plural.Count64(*maxSize, "byte", "bytes"))
+	case minSize != nil && *minSize == 1:
+		return "is not empty"
+	case minSize != nil:
+		return "is at least " + plural.Count64(*minSize, "byte", "bytes")
+	case maxSize != nil:
+		return "is at most " + plural.Count64(*maxSize, "byte", "bytes")
+	default:
+		return ""
+	}
 }

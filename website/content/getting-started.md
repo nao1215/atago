@@ -117,6 +117,11 @@ scenarios:
 
 See [files_and_fixtures](https://github.com/nao1215/atago/blob/main/examples/files_and_fixtures.atago.yaml), [snapshot](https://github.com/nao1215/atago/blob/main/examples/snapshot.atago.yaml), and [dir_tree](https://github.com/nao1215/atago/blob/main/examples/dir_tree.atago.yaml) for whole-tree golden manifests.
 
+`count:`, `min_count:`, and `max_count:` attach to the `contains` or `matches` matcher next to them and say how MANY times it occurs — the question a duplicate-output bug passes when you only ask whether the text is present, and one that used to need `grep -c` in a shell step. `size:`, `min_size:`, and `max_size:` do the same for a file's byte count, compose with the content matchers, and can stand alone: `size: 0` is how a spec pins "the failed run created the file but left it empty rather than half-written", and a `max_size` ceiling is the regression shape of a bundling or compression bug. Occurrences are non-overlapping and a failure names the lines each one landed on; sizes are counted as written, with no CRLF or trailing-newline normalization.
+
+See [count_and_size](https://github.com/nao1215/atago/blob/main/examples/count_and_size.atago.yaml) and the cookbook recipes for [counting](/cookbook/#assert-an-error-is-printed-exactly-once) and [sizing](/cookbook/#assert-a-failed-run-leaves-no-partial-output).
+
+
 ## 3. Drive interactive prompts and TUIs
 
 A `pty` step runs the command in a real pseudo-terminal and drives it with a declarative expect/send session — wizards, REPLs, and TTY-detection branches, no `expect(1)` scripting:

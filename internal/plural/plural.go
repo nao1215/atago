@@ -16,6 +16,12 @@ func Count(n int, singular, plural string) string {
 	return strconv.Itoa(n) + " " + Noun(n, singular, plural)
 }
 
+// Count64 is Count for a value that is naturally 64-bit — a byte size, whose
+// range is the file system's, not an int's.
+func Count64(n int64, singular, plural string) string {
+	return strconv.FormatInt(n, 10) + " " + Noun(int(min(max(n, -2), 2)), singular, plural)
+}
+
 // Noun returns the form of the noun that fits n, without the number. Use it
 // when the count is already in the sentence for another reason.
 func Noun(n int, singular, plural string) string {

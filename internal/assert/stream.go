@@ -111,6 +111,17 @@ func checkStream(name string, s *spec.StreamAssert, data []byte, hasData bool, e
 	// matches POSIX LF output. Byte-exact comparison (including CRLF) is the file
 	// matchers' domain (equals_file / sha256), not the stream text matchers'.
 	folded := foldCRLF(got)
+
+	// A count bound turns the single countable matcher next to it into an
+	// occurrence check, which subsumes presence: `contains: X, count: 0` is how a
+	// spec says "not there", and `count: 1` is how it says "exactly once". The
+	// loader guarantees exactly one countable matcher is set here.
+	if s.HasCount() {
+		return checkOccurrences(name, folded, countTarget(s), countBounds{
+			Count: s.Count, Min: s.MinCount, Max: s.MaxCount,
+		})
+	}
+
 	var last *CheckResult
 	for _, r := range []*CheckResult{
 		streamContains(name, folded, s.Contains),
