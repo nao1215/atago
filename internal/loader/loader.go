@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/goccy/go-yaml"
@@ -49,7 +50,16 @@ func Load(path string) (*spec.Spec, error) {
 	if err != nil {
 		return nil, &Error{Path: path, Kind: KindValidation, Msg: err.Error()}
 	}
-	return LoadBytes(path, data)
+	// A directory-level manifest (#392) is configuration for a TREE of specs, so
+	// it is discovered from the spec's own location rather than passed in: every
+	// command that reads a spec — run, explain, doc, list, manifest — has to
+	// resolve the same configuration, or the file means different things
+	// depending on which subcommand opened it.
+	proj, perr := FindProject(filepath.Dir(path))
+	if perr != nil {
+		return nil, perr
+	}
+	return loadBytesWithProject(path, data, proj)
 }
 
 // binaryTag is the one explicit YAML tag a spec may carry. `atago record`
@@ -150,6 +160,12 @@ func decodeSpec(dec *yaml.Decoder, s *spec.Spec) (err error) {
 
 // LoadBytes parses and validates spec bytes, labeling errors with path.
 func LoadBytes(path string, data []byte) (*spec.Spec, error) {
+	return loadBytesWithProject(path, data, nil)
+}
+
+// loadBytesWithProject is LoadBytes with a directory manifest layered beneath
+// the spec's own values (#392).
+func loadBytesWithProject(path string, data []byte, proj *Project) (*spec.Spec, error) {
 	// Strip a leading UTF-8 byte-order mark. Windows/Notepad-family editors emit
 	// one routinely, and goccy/go-yaml does not skip it: it glues the BOM onto the
 	// first key, so a correctly-authored spec failed with a confusing "unknown
@@ -182,6 +198,9 @@ func LoadBytes(path string, data []byte) (*spec.Spec, error) {
 		return nil, &Error{Path: path, Kind: KindValidation, Msg: joinErrors(errs)}
 	}
 	expandMatrix(&s)
+	// A directory manifest is the weakest layer, applied before the file's own
+	// defaults are expanded so both go through one merge path (#392).
+	applyProject(&s, proj)
 	// Expand the top-level defaults into the concrete scenario/step/service model
 	// so validation and the engine only ever see fully-resolved scenarios.
 	applyDefaults(&s)

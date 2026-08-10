@@ -65,6 +65,12 @@ type Document struct {
 type Spec struct {
 	SpecPath string `json:"spec_path"`
 	Suite    string `json:"suite"`
+	// ProjectPath is the directory manifest that applied to this spec, and
+	// FixturesDir the committed fixture tree it pointed at (#392, #394). Both
+	// are omitted when no manifest applied, so tooling can tell a spec that
+	// carries hidden configuration from one that does not.
+	ProjectPath string `json:"project_path,omitempty"`
+	FixturesDir string `json:"fixtures_dir,omitempty"`
 	// SuiteTimeout mirrors suite.timeout, the suite-level default step timeout
 	// (#17); empty when the built-in default applies.
 	SuiteTimeout string `json:"suite_timeout,omitempty"`
@@ -226,6 +232,8 @@ func buildSpec(in Input) Spec {
 		// Forward slashes keep spec_path stable across platforms (Windows
 		// filepath.Clean uses backslashes), so the manifest is a portable contract.
 		SpecPath:     filepath.ToSlash(in.Path),
+		ProjectPath:  filepath.ToSlash(in.Spec.ProjectPath),
+		FixturesDir:  filepath.ToSlash(in.Spec.FixturesDir),
 		Suite:        s.Suite.Name,
 		SuiteTimeout: s.Suite.Timeout,
 		Secrets:      append([]string(nil), s.Secrets...),

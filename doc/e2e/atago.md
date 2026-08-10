@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-76 suites · 478 scenarios
+77 suites · 485 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -347,6 +347,14 @@
   - [metadata is found inside a compressed object stream](#scenario-metadata-is-found-inside-a-compressed-object-stream)
   - [a wrong expectation still fails against compressed metadata](#scenario-a-wrong-expectation-still-fails-against-compressed-metadata)
   - [a stream that ends without a newline does not swallow the next object](#scenario-a-stream-that-ends-without-a-newline-does-not-swallow-the-next-object)
+- [atago self-hosting / directory manifest](#atago-self-hosting--directory-manifest) — 7 scenarios
+  - [a manifest applies to a spec nested below it](#scenario-a-manifest-applies-to-a-spec-nested-below-it)
+  - [the nearest manifest wins](#scenario-the-nearest-manifest-wins)
+  - [a spec's own values beat the manifest](#scenario-a-specs-own-values-beat-the-manifest)
+  - [specdir points at the spec's own directory](#scenario-specdir-points-at-the-specs-own-directory)
+  - [explain names the manifest that applied](#scenario-explain-names-the-manifest-that-applied)
+  - [a manifest pointing at a missing fixtures dir fails to load](#scenario-a-manifest-pointing-at-a-missing-fixtures-dir-fails-to-load)
+  - [an unknown manifest key is rejected](#scenario-an-unknown-manifest-key-is-rejected)
 - [atago self-hosting / pty](#atago-self-hosting--pty) — 14 scenarios
   - [a pty step sees a terminal where a run step sees a pipe](#scenario-a-pty-step-sees-a-terminal-where-a-run-step-sees-a-pipe)
   - [a never-matching expect fails with the pattern in the block](#scenario-a-never-matching-expect-fails-with-the-pattern-in-the-block)
@@ -6366,6 +6374,238 @@ ${atago} run nonewline.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `PASSED`
+## atago self-hosting / directory manifest
+Source: `test/e2e/atago/project_manifest.atago.yaml`
+### Scenario: a manifest applies to a spec nested below it
+#### Given
+- Fixture file `atago.project.yaml` is created.
+- Fixture file `corpus/golden.txt` is created.
+- Fixture file `deep/nested/inner.atago.yaml` is created.
+#### Inputs
+_Fixture `atago.project.yaml`:_
+```text
+env:
+  PROJECT_WIDE: from-manifest
+fixtures_dir: corpus
+```
+_Fixture `corpus/golden.txt`:_
+```text
+committed corpus
+```
+_Fixture `deep/nested/inner.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: reads the manifest env and the fixture corpus
+    steps:
+      - run:
+          shell: true
+          command: "echo v=$PROJECT_WIDE && cat $${fixtures}/golden.txt"
+      - assert:
+          stdout:
+            contains:
+              - "v=from-manifest"
+              - "committed corpus"
+```
+#### When
+```shell
+${atago} run deep/nested/inner.atago.yaml
+```
+#### Then
+- exit code is `0`
+### Scenario: the nearest manifest wins
+#### Given
+- Fixture file `atago.project.yaml` is created.
+- Fixture file `deep/atago.project.yaml` is created.
+- Fixture file `deep/spec.atago.yaml` is created.
+#### Inputs
+_Fixture `atago.project.yaml`:_
+```text
+env:
+  WHICH: outer
+```
+_Fixture `deep/atago.project.yaml`:_
+```text
+env:
+  WHICH: inner
+```
+_Fixture `deep/spec.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: nearest
+scenarios:
+  - name: reads the nearer manifest
+    steps:
+      - run:
+          shell: true
+          command: "echo which=$WHICH"
+      - assert:
+          stdout:
+            contains: "which=inner"
+```
+#### When
+```shell
+${atago} run deep/spec.atago.yaml
+```
+#### Then
+- exit code is `0`
+### Scenario: a spec's own values beat the manifest
+#### Given
+- Fixture file `atago.project.yaml` is created.
+- Fixture file `spec.atago.yaml` is created.
+#### Inputs
+_Fixture `atago.project.yaml`:_
+```text
+env:
+  SHARED: manifest
+  ONLY_HERE: yes
+defaults:
+  run:
+    shell: true
+```
+_Fixture `spec.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: precedence
+  env:
+    SHARED: spec
+scenarios:
+  - name: the spec wins per key, and inherits the rest
+    steps:
+      - run:
+          command: "echo shared=$SHARED only=$ONLY_HERE"
+      - assert:
+          stdout:
+            contains: "shared=spec only=yes"
+```
+#### When
+```shell
+${atago} run spec.atago.yaml
+```
+#### Then
+- exit code is `0`
+### Scenario: specdir points at the spec's own directory
+#### Given
+- Fixture file `sub/marker.txt` is created.
+- Fixture file `sub/spec.atago.yaml` is created.
+#### Inputs
+_Fixture `sub/marker.txt`:_
+```text
+beside the spec
+```
+_Fixture `sub/spec.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: specdir
+scenarios:
+  - name: reads a file beside itself
+    steps:
+      - run:
+          shell: true
+          command: "cat $${specdir}/marker.txt"
+      - assert:
+          stdout:
+            contains: "beside the spec"
+```
+#### When
+```shell
+${atago} run sub/spec.atago.yaml
+```
+#### Then
+- exit code is `0`
+### Scenario: explain names the manifest that applied
+#### Given
+- Fixture file `atago.project.yaml` is created.
+- Fixture file `corpus/keep.txt` is created.
+- Fixture file `spec.atago.yaml` is created.
+#### Inputs
+_Fixture `atago.project.yaml`:_
+```text
+env:
+  SHOWN: yes
+fixtures_dir: corpus
+```
+_Fixture `corpus/keep.txt`:_
+```text
+x
+```
+_Fixture `spec.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: shown
+scenarios:
+  - name: one
+    steps:
+      - run:
+          command: echo hi
+```
+#### When
+```shell
+${atago} explain spec.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout contains `Project manifest:`, `atago.project.yaml`, `Fixtures ($${fixtures}):`
+### Scenario: a manifest pointing at a missing fixtures dir fails to load
+#### Given
+- Fixture file `atago.project.yaml` is created.
+- Fixture file `spec.atago.yaml` is created.
+#### Inputs
+_Fixture `atago.project.yaml`:_
+```text
+fixtures_dir: not-there
+```
+_Fixture `spec.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: bad
+scenarios:
+  - name: one
+    steps:
+      - run:
+          command: echo hi
+```
+#### When
+```shell
+${atago} run spec.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `fixtures_dir "not-there" does not exist`
+### Scenario: an unknown manifest key is rejected
+#### Given
+- Fixture file `atago.project.yaml` is created.
+- Fixture file `spec.atago.yaml` is created.
+#### Inputs
+_Fixture `atago.project.yaml`:_
+```text
+scenarios: []
+```
+_Fixture `spec.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: bad key
+scenarios:
+  - name: one
+    steps:
+      - run:
+          command: echo hi
+```
+#### When
+```shell
+${atago} run spec.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `scenarios`
 ## atago self-hosting / pty
 Source: `test/e2e/atago/pty.atago.yaml`
 ### Scenario: a pty step sees a terminal where a run step sees a pipe

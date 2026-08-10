@@ -1,0 +1,223 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / directory manifest
+
+# Exercises the directory-level manifest (#392) and the input-path variables
+# (#394) through the real binary. Each scenario builds a small spec tree inside
+# its own workdir — manifest, fixture corpus, nested spec — and runs atago
+# against it, so nothing here depends on a committed layout.
+scenarios:
+  - name: a manifest applies to a spec nested below it
+    steps:
+      - fixture:
+          file: atago.project.yaml
+          content: |
+            env:
+              PROJECT_WIDE: from-manifest
+            fixtures_dir: corpus
+      - fixture:
+          file: corpus/golden.txt
+          content: |
+            committed corpus
+      - fixture:
+          file: deep/nested/inner.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: reads the manifest env and the fixture corpus
+                steps:
+                  - run:
+                      shell: true
+                      command: "echo v=$PROJECT_WIDE && cat $${fixtures}/golden.txt"
+                  - assert:
+                      stdout:
+                        contains:
+                          - "v=from-manifest"
+                          - "committed corpus"
+      - run:
+          command: ${atago} run deep/nested/inner.atago.yaml
+      - assert:
+          exit_code: 0
+
+  - name: the nearest manifest wins
+    steps:
+      - fixture:
+          file: atago.project.yaml
+          content: |
+            env:
+              WHICH: outer
+      - fixture:
+          file: deep/atago.project.yaml
+          content: |
+            env:
+              WHICH: inner
+      - fixture:
+          file: deep/spec.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: nearest
+            scenarios:
+              - name: reads the nearer manifest
+                steps:
+                  - run:
+                      shell: true
+                      command: "echo which=$WHICH"
+                  - assert:
+                      stdout:
+                        contains: "which=inner"
+      - run:
+          command: ${atago} run deep/spec.atago.yaml
+      - assert:
+          exit_code: 0
+
+  - name: a spec's own values beat the manifest
+    steps:
+      - fixture:
+          file: atago.project.yaml
+          content: |
+            env:
+              SHARED: manifest
+              ONLY_HERE: yes
+            defaults:
+              run:
+                shell: true
+      - fixture:
+          file: spec.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: precedence
+              env:
+                SHARED: spec
+            scenarios:
+              - name: the spec wins per key, and inherits the rest
+                steps:
+                  - run:
+                      command: "echo shared=$SHARED only=$ONLY_HERE"
+                  - assert:
+                      stdout:
+                        contains: "shared=spec only=yes"
+      - run:
+          command: ${atago} run spec.atago.yaml
+      - assert:
+          # The command uses $VAR expansion with no `shell: true` of its own:
+          # it works only because the manifest's defaults.run reached it.
+          exit_code: 0
+
+  - name: specdir points at the spec's own directory
+    steps:
+      - fixture:
+          file: sub/marker.txt
+          content: |
+            beside the spec
+      - fixture:
+          file: sub/spec.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: specdir
+            scenarios:
+              - name: reads a file beside itself
+                steps:
+                  - run:
+                      shell: true
+                      command: "cat $${specdir}/marker.txt"
+                  - assert:
+                      stdout:
+                        contains: "beside the spec"
+      - run:
+          command: ${atago} run sub/spec.atago.yaml
+      - assert:
+          exit_code: 0
+
+  - name: explain names the manifest that applied
+    steps:
+      - fixture:
+          file: atago.project.yaml
+          content: |
+            env:
+              SHOWN: yes
+            fixtures_dir: corpus
+      - fixture:
+          file: corpus/keep.txt
+          content: |
+            x
+      - fixture:
+          file: spec.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: shown
+            scenarios:
+              - name: one
+                steps:
+                  - run:
+                      command: echo hi
+      - run:
+          command: ${atago} explain spec.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            # Configuration that applies to a file without appearing in it has
+            # to be attributable, or nobody can answer "where did this come
+            # from" without guessing.
+            contains:
+              - "Project manifest:"
+              - "atago.project.yaml"
+              - "Fixtures ($${fixtures}):"
+
+  - name: a manifest pointing at a missing fixtures dir fails to load
+    steps:
+      - fixture:
+          file: atago.project.yaml
+          content: |
+            fixtures_dir: not-there
+      - fixture:
+          file: spec.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: bad
+            scenarios:
+              - name: one
+                steps:
+                  - run:
+                      command: echo hi
+      - run:
+          command: ${atago} run spec.atago.yaml
+      - assert:
+          # One message about the manifest, not N per-scenario failures about a
+          # missing file.
+          exit_code: 2
+          stderr:
+            contains: "fixtures_dir \"not-there\" does not exist"
+
+  - name: an unknown manifest key is rejected
+    steps:
+      - fixture:
+          file: atago.project.yaml
+          content: |
+            scenarios: []
+      - fixture:
+          file: spec.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: bad key
+            scenarios:
+              - name: one
+                steps:
+                  - run:
+                      command: echo hi
+      - run:
+          command: ${atago} run spec.atago.yaml
+      - assert:
+          # The manifest is configuration, not composition: scenarios belong in
+          # a spec file.
+          exit_code: 2
+          stderr:
+            contains: "scenarios"
