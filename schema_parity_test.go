@@ -47,6 +47,7 @@ func defBoundaries() map[reflect.Type]string {
 		reflect.TypeOf(spec.Fixture{}):        "fixture",
 		reflect.TypeOf(spec.Run{}):            "run",
 		reflect.TypeOf(spec.Retry{}):          "retry",
+		reflect.TypeOf(spec.Deterministic{}):  "deterministic",
 		reflect.TypeOf(spec.PTY{}):            "pty",
 		reflect.TypeOf(spec.MockServer{}):     "mockServer",
 		reflect.TypeOf(spec.MockRoute{}):      "mockRoute",

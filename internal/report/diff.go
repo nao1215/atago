@@ -41,8 +41,14 @@ func checkDiff(ck *assert.CheckResult) string {
 		return ""
 	}
 	expectedLabel, actualLabel := "expected", "actual"
-	if ck.ArtifactKind == "snapshot" {
+	switch ck.ArtifactKind {
+	case "snapshot":
 		expectedLabel, actualLabel = "snapshot (golden)", "actual"
+	case "deterministic":
+		// Neither side is the expected one here: the claim is that two runs of
+		// the same command agree, so labeling one "expected" would invent an
+		// authority the spec never named (#398).
+		expectedLabel, actualLabel = "first run", "later run"
 	}
 	return unifiedDiff(expected, actual, expectedLabel, actualLabel)
 }

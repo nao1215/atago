@@ -68,7 +68,63 @@ type Run struct {
 	// Retry, when set, re-runs the command until the Until assertion passes,
 	// polling declaratively for async behavior.
 	Retry *Retry `yaml:"retry,omitempty"`
+	// Deterministic, when set, re-runs the command and requires the declared
+	// observables to come back byte-identical (#398).
+	Deterministic *Deterministic `yaml:"deterministic,omitempty"`
 }
+
+// Deterministic asks for the same-input-same-output property to be checked by
+// running the command more than once and comparing what came back (#398).
+//
+// It exists because nondeterministic output is a CLI bug class that every other
+// assertion passes: a column order that leaks Go map iteration, an unsorted
+// listing, a JSON object whose keys move. `--repeat` looks for pass/fail
+// instability and sees none — each run satisfies the same loose matchers — so
+// the only cheap oracle is comparing one run's bytes against the next's, which
+// specs were spelling as `cmd > one && cmd > two && cmd one two` inside a shell.
+type Deterministic struct {
+	// Runs is how many times the command executes in total (default 2). It is
+	// capped: a large number is a benchmark, not a test.
+	Runs int `yaml:"runs,omitempty"`
+	// Compare lists the observables that must match across runs. Default is
+	// stdout and exit_code — stderr is opt-in because progress output routinely
+	// and legitimately carries timings.
+	Compare []string `yaml:"compare,omitempty"`
+}
+
+// DeterministicRuns resolves the run count, applying the default.
+func (d *Deterministic) DeterministicRuns() int {
+	if d == nil || d.Runs == 0 {
+		return DefaultDeterministicRuns
+	}
+	return d.Runs
+}
+
+// Comparables resolves the observable list, applying the default.
+func (d *Deterministic) Comparables() []string {
+	if d == nil || len(d.Compare) == 0 {
+		return []string{DeterministicStdout, DeterministicExitCode}
+	}
+	return d.Compare
+}
+
+// DefaultDeterministicRuns / MaxDeterministicRuns bound the repeat count (#398).
+const (
+	DefaultDeterministicRuns = 2
+	MaxDeterministicRuns     = 10
+)
+
+// The observables `compare` accepts, named once so the loader's validation and
+// the engine's comparison cannot drift apart.
+const (
+	DeterministicStdout   = "stdout"
+	DeterministicStderr   = "stderr"
+	DeterministicExitCode = "exit_code"
+)
+
+// DeterministicObservables lists every accepted `compare` entry, in the order
+// error messages should offer them.
+var DeterministicObservables = []string{DeterministicStdout, DeterministicStderr, DeterministicExitCode}
 
 // Bool returns a pointer to v — sugar for authoring optional booleans (Shell)
 // in Go literals.

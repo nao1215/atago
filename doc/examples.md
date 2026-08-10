@@ -11,6 +11,8 @@
 | [Pin exactly which files a command touches](cookbook.md#pin-exactly-which-files-a-command-touches) | `changes:` workdir delta |
 | [Test error handling: exit codes and stderr](cookbook.md#test-error-handling-exit-codes-and-stderr) | `exit_code` (`not`/`in`), `stderr`, `exists: false` |
 | [Feed stdin to a filter CLI](cookbook.md#feed-stdin-to-a-filter-cli) | `stdin:` inline / file / base64 |
+| [Assert an error is printed exactly once](cookbook.md#assert-an-error-is-printed-exactly-once) | `count`/`min_count`/`max_count` occurrence bounds |
+| [Assert a failed run leaves no partial output](cookbook.md#assert-a-failed-run-leaves-no-partial-output) | `size`/`min_size`/`max_size` byte bounds |
 | [Assert on JSON or YAML output](cookbook.md#assert-on-json-or-yaml-output) | `json:`/`yaml:` JSONPath matchers, numeric bounds |
 | [Check what a CLI wrote to a database](cookbook.md#check-what-a-cli-wrote-to-a-database) | db runner, `query:` steps, `rows:` asserts |
 | [Test an interactive prompt](cookbook.md#test-an-interactive-prompt) | `pty:` expect/send sessions, named keys |
@@ -41,6 +43,7 @@
 | [Test a REPL](cookbook.md#test-a-repl) | `pty:` prompt-gated expect/send, EOF via `ctrl-d` |
 | [Prove a command is idempotent](cookbook.md#prove-a-command-is-idempotent) | second-run `changes:` pinned to empty |
 | [Compare two implementations of the same command](cookbook.md#compare-two-implementations-of-the-same-command) | `store:` + `equals: ${reference}` oracle |
+| [Prove the same input gives the same output](cookbook.md#prove-the-same-input-gives-the-same-output) | `deterministic:` byte-identical reruns |
 | [Record an interactive session instead of scripting it](cookbook.md#record-an-interactive-session-instead-of-scripting-it) | `atago record --pty`, secrets become `${env:...}` |
 | [Refresh snapshots when output legitimately changes](cookbook.md#refresh-snapshots-when-output-legitimately-changes) | `atago snapshot update`, `scrub:`, git-reviewable goldens |
 | [Pin the final TUI frame with a screen snapshot](cookbook.md#pin-the-final-tui-frame-with-a-screen-snapshot) | `screen:` line/contains asserts and snapshots, `rows:`/`cols:` |
@@ -83,6 +86,8 @@
 | Example | Shows |
 |---------|-------|
 | [run_and_assert](../examples/run_and_assert.atago.yaml) | exit code (exact, `not`, `in: [0, 2]` sets), stdout/stderr matchers (`contains`, `equals`, `matches`/`not_matches`, `empty: true`/`false`, lists, `line`), combining `contains`/`not_contains`/`matches`/`not_matches` in one block, multi-target asserts |
+| [count_and_size](../examples/count_and_size.atago.yaml) | occurrence bounds (`count`/`min_count`/`max_count`) on stream and file matchers, byte-size bounds (`size`/`min_size`/`max_size`) that compose with a content matcher |
+| [deterministic](../examples/deterministic.atago.yaml) | `deterministic:` reruns a command and requires byte-identical observables, `runs`/`compare`, the read-only caveat |
 | [shell_and_redirect](../examples/shell_and_redirect.atago.yaml) | `shell: true` vs direct argv execution, `stdout_to`/`stderr_to` redirects |
 | [json_and_yaml](../examples/json_and_yaml.atago.yaml) | JSONPath assertions, numeric bounds (`gt`/`lte`), a list of checks under one `json:`/`yaml:`, the `yaml` matcher |
 | [files_and_fixtures](../examples/files_and_fixtures.atago.yaml) | input fixtures (inline `content:` and `base64:`), `file` and `dir` assertions, byte-exact `equals`/`equals_file` round-trip checks |

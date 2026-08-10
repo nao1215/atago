@@ -205,6 +205,87 @@ suggests the swap, so you do not have to re-run with `--verbose` to find out.
 
 Full spec: [run_and_assert](../examples/run_and_assert.atago.yaml)
 
+## Assert an error is printed exactly once
+
+```yaml
+version: "1"
+suite:
+  name: no duplicate diagnostics
+
+scenarios:
+  - name: the failure is reported once, not once per layer
+    steps:
+      - run:
+          command: mytool query --from missing.csv
+      - assert:
+          exit_code: 1
+          stderr:
+            contains: "missing.csv"
+            count: 1        # exactly once: `contains` alone passes at 2 as well
+      - assert:
+          stderr:
+            # A range where an exact number would be brittle. `max_count: 0`
+            # reads as "never" and keeps the bound in the same vocabulary.
+            matches: "(?m)^warning:"
+            max_count: 0
+```
+
+An error logged once by the library and again by `main` is a real and easy
+regression, and every presence matcher passes it — which is why specs used to
+reach for `grep -c ... | wc -l` inside a shell step. `count`, `min_count`, and
+`max_count` attach to the `contains` or `matches` matcher next to them, count
+non-overlapping occurrences, and name the lines each occurrence landed on when
+the number is wrong, so an off-by-one is diagnosable from the report. A `^`
+anchor needs `(?m)` to mean "every line" rather than "the whole stream".
+
+The same bounds work on a file (`file: {path: build.log, contains: "ERROR", count: 0}`)
+and on a rendered TUI screen (`screen: {contains: "> ", count: 1}` — the cursor
+marker is drawn once).
+
+Full spec: [count_and_size](../examples/count_and_size.atago.yaml)
+
+## Assert a failed run leaves no partial output
+
+```yaml
+version: "1"
+suite:
+  name: write safety
+
+scenarios:
+  - name: a failing query does not leave a half-written export
+    steps:
+      - run:
+          shell: true
+          command: "mytool export --sql 'SELECT * FROM nope' > out.csv"
+      - assert:
+          exit_code:
+            not: 0
+      - assert:
+          # The observable here is the byte count, not the content: the contract
+          # is "nothing was written", and `contains` has nothing to look for.
+          file:
+            path: out.csv
+            size: 0
+
+  - name: the real export is non-empty and stays under the ceiling
+    steps:
+      - run:
+          command: mytool export --format parquet --out data.parquet
+      - assert:
+          file:
+            path: data.parquet
+            min_size: 1          # the portable spelling of "non-empty"
+            max_size: 10485760   # a bundling or compression regression trips this
+```
+
+Sizes are counted as written — no CRLF or trailing-newline normalization, the
+same rule `equals`/`equals_file` follow — and they compose with the content
+matchers, so one assert can say "parses as JSON, and is under a megabyte". When
+an exact `size` misses by one byte, the report names the trailing newline as the
+usual cause instead of leaving you with two numbers.
+
+Full spec: [count_and_size](../examples/count_and_size.atago.yaml)
+
 ## Feed stdin to a filter CLI
 
 ```yaml
@@ -1263,6 +1344,59 @@ scenarios:
 ```
 
 Full spec: [changes](../examples/changes.atago.yaml)
+
+## Prove the same input gives the same output
+
+```yaml
+version: "1"
+suite:
+  name: determinism
+
+scenarios:
+  - name: the report is byte-identical on every run
+    steps:
+      - run:
+          command: mytool inspect data.csv --format json
+          deterministic: {}          # 2 runs, comparing stdout and exit_code
+      - assert:
+          exit_code: 0
+          stdout:                    # the asserts describe the FIRST run
+            json:
+              path: "$.rows"
+              equals: 3
+
+  - name: a failure is stable too
+    steps:
+      - run:
+          command: mytool inspect no-such-file
+          deterministic:
+            runs: 3                  # capped at 10 — more is a benchmark
+            compare: [exit_code, stderr]
+      - assert:
+          exit_code:
+            not: 0
+```
+
+Nondeterministic-but-passing output is the bug every other assertion misses: a
+column order that leaks map iteration, an unsorted listing, a JSON object whose
+keys move. Each run satisfies the same loose matchers, so `--repeat` sees no
+instability at all — and the only cheap oracle is comparing one run's bytes
+against the next's, which specs used to spell as
+`cmd > one && cmd > two && cmp one two` inside a shell step. A mismatch fails
+the step with a unified diff between the runs, so you see *which* field moved.
+
+`stderr` is opt-in because progress output legitimately carries timings. The
+reruns add a claim; they do not change what the step means — assertions,
+`store`, snapshots, and `changes:` all still describe run 1.
+
+One honest caveat: this is only meaningful for an **effectively read-only**
+command. One that appends to a log, consumes its input, or rewrites a file in
+place is *expected* to differ the second time; when a rerun changes the workdir,
+the failure hint says so instead of sending you after a map-order bug you do not
+have. `retry:` is refused next to it — retry re-runs until the answer changes,
+which is the opposite claim.
+
+Full spec: [deterministic](../examples/deterministic.atago.yaml)
 
 ## Compare two implementations of the same command
 

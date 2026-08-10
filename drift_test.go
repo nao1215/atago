@@ -504,8 +504,10 @@ func isExternal(target string) bool {
 var exampleSpecs = map[string]bool{ // path -> hermetic (run, not just validate)
 	"examples/browser.atago.yaml":              false,
 	"examples/changes.atago.yaml":              true,
+	"examples/count_and_size.atago.yaml":       true,
 	"examples/db.atago.yaml":                   true,
 	"examples/defaults.atago.yaml":             true,
+	"examples/deterministic.atago.yaml":        true,
 	"examples/dir_tree.atago.yaml":             true,
 	"examples/duration.atago.yaml":             true,
 	"examples/extend_host_env.atago.yaml":      true,

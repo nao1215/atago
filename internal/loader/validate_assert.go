@@ -141,6 +141,37 @@ func validateStream(add func(string, ...any), where string, s *spec.StreamAssert
 	validateStringList(add, where, "contains", s.Contains)
 	validateStringList(add, where, "not_contains", s.NotContains)
 
+	// A count bound needs exactly one countable matcher to count (#396).
+	// contains and matches both compose freely without it, so the ambiguity only
+	// appears once a bound is written, and it has to be refused there rather
+	// than resolved by a precedence rule nobody would remember.
+	if s.HasCount() {
+		validateCountBounds(add, where, s.Count, s.MinCount, s.MaxCount)
+		countable := 0
+		if s.Contains != nil {
+			countable++
+			if len(s.Contains) > 1 {
+				add("%s: count applies to one substring; contains lists %d (write one assert per substring)", where, len(s.Contains))
+			}
+		}
+		if s.Matches != nil {
+			countable++
+		}
+		switch {
+		case countable == 0:
+			add("%s: count/min_count/max_count need a contains or matches matcher to count", where)
+		case countable > 1:
+			add("%s: count/min_count/max_count need exactly one countable matcher, but both contains and matches are set", where)
+		}
+		// The other text matchers stay meaningful next to a count, but the
+		// whole-stream ones do not: `equals` already pins every byte.
+		for _, m := range matchers {
+			if streamExclusiveMatchers[m] {
+				add("%s: count/min_count/max_count cannot be combined with %s", where, m)
+			}
+		}
+	}
+
 	if s.Line != nil {
 		if *s.Line < 1 {
 			add("%s.line must be >= 1 (got %d)", where, *s.Line)
@@ -150,6 +181,40 @@ func validateStream(add func(string, ...any), where string, s *spec.StreamAssert
 		if len(s.JSON) > 0 || len(s.YAML) > 0 || s.Snapshot != "" {
 			add("%s.line cannot be combined with json/yaml/snapshot (use contains/matches/equals/empty)", where)
 		}
+	}
+}
+
+// validateCountBounds checks the shape shared by every occurrence bound (#396):
+// counts are non-negative, the exact form excludes the range form, and a range
+// has to be satisfiable. An unsatisfiable range (min above max) is an authoring
+// mistake that would otherwise fail at runtime with a message about the output
+// rather than about the spec.
+func validateCountBounds(add func(string, ...any), where string, exact, minCount, maxCount *int) {
+	for name, v := range map[string]*int{"count": exact, "min_count": minCount, "max_count": maxCount} {
+		if v != nil && *v < 0 {
+			add("%s.%s must be >= 0 (got %d)", where, name, *v)
+		}
+	}
+	if exact != nil && (minCount != nil || maxCount != nil) {
+		add("%s: count is the exact form; use min_count/max_count for a range, not both", where)
+	}
+	if minCount != nil && maxCount != nil && *minCount > *maxCount {
+		add("%s: min_count %d is greater than max_count %d, so nothing can satisfy it", where, *minCount, *maxCount)
+	}
+}
+
+// validateSizeBounds is validateCountBounds for the byte-size family (#397).
+func validateSizeBounds(add func(string, ...any), where string, exact, minSize, maxSize *int64) {
+	for name, v := range map[string]*int64{"size": exact, "min_size": minSize, "max_size": maxSize} {
+		if v != nil && *v < 0 {
+			add("%s.%s must be >= 0 (got %d)", where, name, *v)
+		}
+	}
+	if exact != nil && (minSize != nil || maxSize != nil) {
+		add("%s: size is the exact form; use min_size/max_size for a range, not both", where)
+	}
+	if minSize != nil && maxSize != nil && *minSize > *maxSize {
+		add("%s: min_size %d is greater than max_size %d, so nothing can satisfy it", where, *minSize, *maxSize)
 	}
 }
 
@@ -205,7 +270,39 @@ func validateFile(add func(string, ...any), where string, f *spec.FileAssert) {
 	if f.Snapshot != "" {
 		n++
 	}
-	requireExactlyOne(add, where, "exists/contains/not_contains/executable/equals/equals_file/json/snapshot", n)
+
+	// The size family composes with the content matchers and can also stand
+	// alone (#397): "the failed run left a zero-byte file" is a complete claim.
+	// So it satisfies the at-least-one rule without joining the one-of family.
+	if f.HasSize() {
+		validateSizeBounds(add, where, f.Size, f.MinSize, f.MaxSize)
+		// A size bound has to stat a regular file; `exists: false` demands there
+		// be nothing to stat. Nothing can satisfy both, so it is an authoring
+		// mistake rather than a contract.
+		if f.Exists != nil && !*f.Exists {
+			add("%s: size/min_size/max_size cannot be combined with exists: false — an absent file has no size", where)
+		}
+		if f.Snapshot != "" {
+			add("%s: size/min_size/max_size cannot be combined with snapshot — a snapshot already pins every byte", where)
+		}
+		if n > 1 {
+			add("%s: must set exactly one of exists/contains/not_contains/executable/equals/equals_file/json/snapshot", where)
+		}
+	} else {
+		requireExactlyOne(add, where, "exists/contains/not_contains/executable/equals/equals_file/json/snapshot", n)
+	}
+
+	// A count bound counts the single `contains` substring (#396). A file assert
+	// has no `matches`, so contains is the only countable matcher here.
+	if f.HasCount() {
+		validateCountBounds(add, where, f.Count, f.MinCount, f.MaxCount)
+		switch {
+		case f.Contains == nil:
+			add("%s: count/min_count/max_count need a contains matcher to count", where)
+		case len(f.Contains) > 1:
+			add("%s: count applies to one substring; contains lists %d (write one assert per substring)", where, len(f.Contains))
+		}
+	}
 }
 
 func validateHeaderMatch(add func(string, ...any), where string, h *spec.HeaderMatch) {

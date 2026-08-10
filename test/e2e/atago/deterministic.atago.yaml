@@ -1,0 +1,198 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / deterministic runs
+
+# Exercises the same-input-same-output check (#398) through the real binary:
+# the property holding, the property failing with a diff a reader can act on,
+# the first run staying the one the scenario observes, and the load errors that
+# keep a self-contradictory or pointless configuration out of a spec.
+scenarios:
+  - name: a read-only command satisfies the default check
+    steps:
+      - fixture:
+          file: rows.csv
+          content: |
+            id,name
+            1,alice
+      - run:
+          command: cat rows.csv
+          deterministic: {}
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: alice
+
+  - name: the asserts and store still describe the first run
+    steps:
+      - run:
+          command: echo stable
+          deterministic:
+            runs: 3
+      - store:
+          name: captured
+          from:
+            stdout:
+              trim: true
+      - assert:
+          stdout:
+            equals: stable
+      - run:
+          command: echo ${captured}
+      - assert:
+          stdout:
+            contains: stable
+
+  - name: a stable failure is a stable answer
+    steps:
+      - run:
+          command: cat definitely-not-here.txt
+          deterministic:
+            compare: [exit_code]
+      - assert:
+          exit_code:
+            not: 0
+
+  - name: output that changes between runs fails with a diff
+    steps:
+      - fixture:
+          file: inner.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: the command answers differently each time
+                steps:
+                  - run:
+                      shell: true
+                      command: "echo $$; echo tail"
+                      deterministic: {}
+      - run:
+          command: ${atago} run inner.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            # The verdict names the observable and the run, and the report
+            # renders the two runs as a diff rather than two excerpts.
+            contains:
+              - "deterministic: stdout identical"
+              - "not deterministic"
+              - "first run"
+              - "later run"
+
+  - name: a command that rewrites its own input is called out, not blamed
+    steps:
+      - fixture:
+          file: inner_mutating.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner mutating
+            scenarios:
+              - name: each run appends to the file it prints
+                steps:
+                  - fixture:
+                      file: log.txt
+                      content: "start\n"
+                  - run:
+                      shell: true
+                      command: "echo tick >> log.txt; cat log.txt"
+                      deterministic: {}
+      - run:
+          command: ${atago} run inner_mutating.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            # The hint has to send the author to their own side effects rather
+            # than to a map-order bug they do not have.
+            contains: "changed the workdir"
+
+  - name: explain shows that the command runs more than once
+    steps:
+      - fixture:
+          file: shown.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: shown
+            scenarios:
+              - name: repeated
+                steps:
+                  - run:
+                      command: echo hi
+                      deterministic:
+                        runs: 3
+                        compare: [stdout]
+      - run:
+          command: ${atago} explain shown.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "deterministic: stdout compared across 3 runs"
+
+  - name: deterministic next to retry is a load error
+    steps:
+      - fixture:
+          file: bad_retry.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: bad retry
+            scenarios:
+              - name: contradictory
+                steps:
+                  - run:
+                      command: echo hi
+                      deterministic: {}
+                      retry:
+                        times: 3
+                        until:
+                          exit_code: 0
+      - run:
+          command: ${atago} run bad_retry.atago.yaml
+      - assert:
+          exit_code: 2
+          stderr:
+            contains: "cannot be combined with retry"
+
+  - name: a single run and an unknown observable are load errors
+    steps:
+      - fixture:
+          file: bad_runs.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: bad runs
+            scenarios:
+              - name: one run proves nothing
+                steps:
+                  - run:
+                      command: echo hi
+                      deterministic:
+                        runs: 1
+      - run:
+          command: ${atago} run bad_runs.atago.yaml
+      - assert:
+          exit_code: 2
+          stderr:
+            contains: "must be at least 2"
+      - fixture:
+          file: bad_compare.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: bad compare
+            scenarios:
+              - name: nothing to compare there
+                steps:
+                  - run:
+                      command: echo hi
+                      deterministic:
+                        compare: [workdir]
+      - run:
+          command: ${atago} run bad_compare.atago.yaml
+      - assert:
+          exit_code: 2
+          stderr:
+            contains: "unknown observable"

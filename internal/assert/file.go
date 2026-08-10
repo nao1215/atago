@@ -41,6 +41,30 @@ func checkFile(f *spec.FileAssert, env Env) (out *CheckResult) {
 		return data, cr
 	}
 
+	// Size bounds compose with the content matchers instead of being one of them
+	// (#397): they answer a different question, and a spec routinely wants both
+	// ("the export parses as JSON AND stays under a megabyte"). They are checked
+	// first because a wrong size explains a content mismatch better than the
+	// other way round, and when nothing else is set they are the whole assertion.
+	if f.HasSize() {
+		if cr := checkFileSize(f, path); !cr.OK || !f.HasContentMatcher() {
+			return cr
+		}
+	}
+
+	// A count bound turns `contains` into an occurrence check (#396), which
+	// subsumes presence. The loader has already required a single-element
+	// contains next to it.
+	if f.HasCount() {
+		data, cr := read(f.Path, path)
+		if cr != nil {
+			return cr
+		}
+		return checkOccurrences(fmt.Sprintf("file %q", f.Path), string(data),
+			occurrenceTarget{Literal: f.Contains[0]},
+			countBounds{Count: f.Count, Min: f.MinCount, Max: f.MaxCount})
+	}
+
 	switch {
 	case f.Exists != nil:
 		desc := fmt.Sprintf("assert file %q exists: %t", f.Path, *f.Exists)
