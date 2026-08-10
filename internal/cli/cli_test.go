@@ -1022,6 +1022,105 @@ func TestRunCmd_ArgParsingErrors(t *testing.T) {
 	}
 }
 
+// TestSpecCmds_FlagsAfterPaths pins the invocation order every spec-reading
+// subcommand accepts: a flag written AFTER the paths means the same as one
+// written before them. Go's flag package stops at the first non-flag argument,
+// so `atago run specs/ --report json` used to report `cannot access "--report"`
+// — the flag was read as a spec path — which is a shape users type constantly
+// and an error message that names the wrong problem.
+func TestSpecCmds_FlagsAfterPaths(t *testing.T) {
+	dir := t.TempDir()
+	p := writeSpec(t, dir, "ok.atago.yaml", passingSpec)
+	cases := []struct {
+		name     string
+		args     []string
+		wantExit int
+		wantOut  string
+	}{
+		{"run report after path", []string{"run", p, "--report", "json"}, ExitOK, `"schema_version"`},
+		{"run flag between paths", []string{"run", p, "--report", "json", p}, ExitOK, `"schema_version"`},
+		{"run verbose after path", []string{"run", p, "--verbose"}, ExitOK, "exit 0 passes"},
+		{"list json after path", []string{"list", p, "--json"}, ExitOK, `"scenarios"`},
+		{"doc out-dir after path", []string{"doc", p, "--split-by-spec", "--out-dir", filepath.Join(dir, "d")}, ExitOK, ""},
+		{"manifest out after path", []string{"manifest", p, "--out", filepath.Join(dir, "m.json")}, ExitOK, ""},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			var out, errb bytes.Buffer
+			if got := Main(c.args, &out, &errb); got != c.wantExit {
+				t.Fatalf("exit = %d, want %d (stderr=%s)", got, c.wantExit, errb.String())
+			}
+			if !strings.Contains(out.String(), c.wantOut) {
+				t.Errorf("stdout = %q, want it to contain %q", out.String(), c.wantOut)
+			}
+		})
+	}
+	// The trailing --out was honored rather than read as a spec path.
+	if _, err := os.Stat(filepath.Join(dir, "m.json")); err != nil {
+		t.Errorf("manifest --out after the path wrote no file: %v", err)
+	}
+
+	// explain takes no flags of its own today, so --help is what proves it reads
+	// the same parser: a trailing help request prints usage instead of being
+	// collected as a spec path.
+	t.Run("explain help after path", func(t *testing.T) {
+		var out, errb bytes.Buffer
+		if got := Main([]string{"explain", p, "--help"}, &out, &errb); got != ExitOK {
+			t.Fatalf("exit = %d, want %d (stderr=%s)", got, ExitOK, errb.String())
+		}
+		if !strings.Contains(out.String(), "Usage: atago explain") {
+			t.Errorf("stdout = %q, want the usage text", out.String())
+		}
+	})
+
+	// init takes one path, so the flag has to be honored without becoming a
+	// second path (which would be rejected as "too many paths").
+	t.Run("init template after path", func(t *testing.T) {
+		target := filepath.Join(dir, "gen.atago.yaml")
+		var out, errb bytes.Buffer
+		if got := Main([]string{"init", target, "--template", "http"}, &out, &errb); got != ExitOK {
+			t.Fatalf("exit = %d, want %d (stderr=%s)", got, ExitOK, errb.String())
+		}
+		body, err := os.ReadFile(target)
+		if err != nil {
+			t.Fatalf("init wrote no file: %v", err)
+		}
+		if !strings.Contains(string(body), "type: http") {
+			t.Errorf("generated spec is not the http template:\n%s", body)
+		}
+	})
+}
+
+// TestRunCmd_DoubleDashKeepsPathsLiteral pins the escape hatch that makes the
+// interspersed parsing above safe: everything after `--` is a path, even when it
+// is spelled like a flag. Without it a file legitimately named `--weird` could
+// not be addressed at all.
+func TestRunCmd_DoubleDashKeepsPathsLiteral(t *testing.T) {
+	dir := t.TempDir()
+	p := writeSpec(t, dir, "ok.atago.yaml", passingSpec)
+	var out, errb bytes.Buffer
+	if got := Main([]string{"run", "--", p, "--report"}, &out, &errb); got != ExitConfig {
+		t.Fatalf("exit = %d, want %d (stderr=%s)", got, ExitConfig, errb.String())
+	}
+	if !strings.Contains(errb.String(), `cannot access "--report"`) {
+		t.Errorf("stderr = %q, want the terminator to make --report a path", errb.String())
+	}
+}
+
+// TestRecordCmd_FlagsAfterCommandStayLiteral guards the one command that must
+// NOT read a later flag as its own: `atago record -- mytool --verbose` records
+// mytool's --verbose, so record keeps the standard "stop at the first operand"
+// parsing.
+func TestRecordCmd_FlagsAfterCommandStayLiteral(t *testing.T) {
+	var out, errb bytes.Buffer
+	if got := Main([]string{"record", "--", "echo", "--out"}, &out, &errb); got != ExitOK {
+		t.Fatalf("exit = %d, want %d (stderr=%s)", got, ExitOK, errb.String())
+	}
+	if !strings.Contains(out.String(), "--out") {
+		t.Errorf("stdout = %q, want the recorded command to keep --out", out.String())
+	}
+}
+
 // TestRunCmd_CIFlagAndParallel exercises the --ci and --parallel>1 branches of
 // runCmd (setting NO_COLOR and the shared scenario semaphore).
 func TestRunCmd_CIFlagAndParallel(t *testing.T) {

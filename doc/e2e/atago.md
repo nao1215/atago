@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-80 suites · 510 scenarios
+80 suites · 513 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -437,7 +437,7 @@
   - [retry polls until the condition becomes true](#scenario-retry-polls-until-the-condition-becomes-true)
   - [retry fails the inner spec when until never holds](#scenario-retry-fails-the-inner-spec-when-until-never-holds)
   - [until with a changes target is a load-time error](#scenario-until-with-a-changes-target-is-a-load-time-error)
-- [atago self-hosting / run](#atago-self-hosting--run) — 8 scenarios
+- [atago self-hosting / run](#atago-self-hosting--run) — 11 scenarios
   - [a passing spec exits zero and reports PASS](#scenario-a-passing-spec-exits-zero-and-reports-pass)
   - [a failing assertion exits one and reports the failure](#scenario-a-failing-assertion-exits-one-and-reports-the-failure)
   - [an exit_code failure surfaces the command's stderr](#scenario-an-exit_code-failure-surfaces-the-commands-stderr)
@@ -446,6 +446,9 @@
   - [an exit_code failure falls back to stdout when stderr is silent (windows)](#scenario-an-exit_code-failure-falls-back-to-stdout-when-stderr-is-silent-windows)
   - [a parse error exits with code two](#scenario-a-parse-error-exits-with-code-two)
   - [JSON report is valid JSON with a passed status](#scenario-json-report-is-valid-json-with-a-passed-status)
+  - [a flag after the spec path is still a flag](#scenario-a-flag-after-the-spec-path-is-still-a-flag)
+  - [a flag between two spec paths is still a flag](#scenario-a-flag-between-two-spec-paths-is-still-a-flag)
+  - [a double dash keeps later arguments as paths](#scenario-a-double-dash-keeps-later-arguments-as-paths)
 - [atago self-hosting / sandbox_home (isolated per-OS home)](#atago-self-hosting--sandbox_home-isolated-per-os-home) — 3 scenarios
   - [Unix XDG family — write config, read it back, inspect it under the workdir](#scenario-unix-xdg-family--write-config-read-it-back-inspect-it-under-the-workdir)
   - [Windows APPDATA family — write config, read it back, inspect it under the workdir](#scenario-windows-appdata-family--write-config-read-it-back-inspect-it-under-the-workdir)
@@ -8610,6 +8613,96 @@ ${atago} run --report json ok.atago.yaml
 - stdout at `$.schema_version` equals `1`
 - stdout at `$.suites[0].status` equals `passed`
 - stdout at `$.suites[0].scenarios` has length 1
+### Scenario: a flag after the spec path is still a flag
+#### Given
+- Fixture file `ok.atago.yaml` is created.
+#### Inputs
+_Fixture `ok.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: echo
+    steps:
+      - run:
+          shell: true
+          command: "exit 0"
+      - assert:
+          exit_code: 0
+```
+#### When
+```shell
+${atago} run ok.atago.yaml --report json
+```
+#### Then
+- exit code is `0`
+- stdout at `$.suites[0].status` equals `passed`
+### Scenario: a flag between two spec paths is still a flag
+#### Given
+- Fixture file `ok.atago.yaml` is created.
+- Fixture file `second.atago.yaml` is created.
+#### Inputs
+_Fixture `ok.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: echo
+    steps:
+      - run:
+          shell: true
+          command: "exit 0"
+      - assert:
+          exit_code: 0
+```
+_Fixture `second.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: echo
+    steps:
+      - run:
+          shell: true
+          command: "exit 0"
+      - assert:
+          exit_code: 0
+```
+#### When
+```shell
+${atago} run ok.atago.yaml --report json second.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout at `$.suites` has length 2
+### Scenario: a double dash keeps later arguments as paths
+#### Given
+- Fixture file `ok.atago.yaml` is created.
+#### Inputs
+_Fixture `ok.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: echo
+    steps:
+      - run:
+          shell: true
+          command: "exit 0"
+      - assert:
+          exit_code: 0
+```
+#### When
+```shell
+${atago} run -- ok.atago.yaml --report
+```
+#### Then
+- exit code is `3`
+- stderr contains `cannot access "--report"`
 ## atago self-hosting / sandbox_home (isolated per-OS home)
 Source: `test/e2e/atago/sandbox_home.atago.yaml`
 ### Scenario: Unix XDG family — write config, read it back, inspect it under the workdir

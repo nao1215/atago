@@ -399,7 +399,8 @@ func initCmd(args []string, stdout, stderr io.Writer) int {
 	// explicitly below — to stdout for an explicit --help (so it can be piped),
 	// to stderr for a genuine parse error.
 	fs.Usage = func() {}
-	if err := fs.Parse(args); err != nil {
+	operands, err := parseFlagsAnywhere(fs, args)
+	if err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			printUsage(stdout)
 			return ExitOK
@@ -422,13 +423,13 @@ func initCmd(args []string, stdout, stderr io.Writer) int {
 		return ExitConfig
 	}
 
-	if fs.NArg() > 1 {
-		fmt.Fprintf(stderr, "atago init: too many paths — init writes one spec file, got %d (%s)\n", fs.NArg(), strings.Join(fs.Args(), ", "))
+	if len(operands) > 1 {
+		fmt.Fprintf(stderr, "atago init: too many paths — init writes one spec file, got %d (%s)\n", len(operands), strings.Join(operands, ", "))
 		return ExitConfig
 	}
 	path := defaultInitFilename(*template)
-	if fs.NArg() > 0 {
-		path = fs.Arg(0)
+	if len(operands) > 0 {
+		path = operands[0]
 	}
 
 	if _, err := os.Stat(path); err == nil && !*force {
