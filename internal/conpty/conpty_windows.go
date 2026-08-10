@@ -305,7 +305,7 @@ func (c *PseudoConsole) Pid() int { return int(c.pid) }
 // produced it.
 //
 // It runs after ClosePseudoConsole so a reader that can still finish normally
-// sees EOF rather than a cancellation, and before CloseHandle because cancelling
+// sees EOF rather than a cancellation, and before CloseHandle because canceling
 // I/O on a closed handle is meaningless. A failure is ignored on purpose: there
 // is nothing to cancel when no read is pending, which is the common case.
 func (c *PseudoConsole) Close() error {

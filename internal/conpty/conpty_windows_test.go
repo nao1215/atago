@@ -132,10 +132,10 @@ func TestClose_ReleasesAPendingRead(t *testing.T) {
 		_ = cp.Close()
 		select {
 		case rerr := <-readErr:
-			// os.ErrClosed is what classifyReadError maps a cancelled read to,
+			// os.ErrClosed is what classifyReadError maps a canceled read to,
 			// and what the recorder already treats as a normal end of session.
 			if !errors.Is(rerr, os.ErrClosed) && !errors.Is(rerr, io.EOF) {
-				t.Errorf("iteration %d: read ended with %v, want os.ErrClosed (cancelled) or io.EOF", i, rerr)
+				t.Errorf("iteration %d: read ended with %v, want os.ErrClosed (canceled) or io.EOF", i, rerr)
 			}
 		case <-time.After(10 * time.Second):
 			t.Fatalf("iteration %d: a read parked in the kernel was still blocked %s after Close: "+
