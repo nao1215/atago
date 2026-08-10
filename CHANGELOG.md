@@ -7,6 +7,19 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- A pty step or `record --pty` no longer loses the output of a command that
+  prints and exits at once. macOS discards whatever the terminal still holds the
+  moment its last slave handle closes — a read already parked in the kernel comes
+  back EOF with no bytes — so handing the terminal to the child and closing
+  atago's own handle immediately made the child's exit a race against the drain,
+  whatever order the drain was started in. It surfaced as an empty transcript
+  from a scenario whose command clearly printed, roughly once in a few hundred
+  fast-exit runs. atago now keeps its slave handle until the child has been
+  reaped, which puts the terminal's last close after the transcript has been
+  read, on a schedule atago controls.
+
 ## [0.19.0] - 2026-08-10
 
 A release about the two things a CLI suite still had to say in bash, and about

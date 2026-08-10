@@ -5,7 +5,9 @@ package ptyrun
 import (
 	"context"
 	"os"
+	"os/exec"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -68,6 +70,59 @@ func TestRun_NoShellFastExitOutputNotLost(t *testing.T) {
 		if !strings.Contains(string(res.Stdout), "done") {
 			t.Fatalf("iteration %d: transcript lost the child's output: %q", i, res.Stdout)
 		}
+	}
+}
+
+// TestTerminal_SlaveHandleOutlivesTheChildsOutput pins the platform fact the
+// runner's ordering depends on: a child's output survives the child's exit only
+// while some slave handle is still open.
+//
+// On macOS the terminal discards whatever it still holds the moment its last
+// slave handle closes — even a read already parked in the kernel comes back EOF
+// with no bytes, so starting the drain earlier cannot win that race. That is
+// why Run keeps its own slave handle until the child has been reaped, and why
+// this test writes from a real child, waits for it to exit, and only then drops
+// the handle. Linux keeps the bytes either way, so the test passes there for a
+// weaker reason; it fails on macOS the moment the handle is released too early.
+func TestTerminal_SlaveHandleOutlivesTheChildsOutput(t *testing.T) {
+	t.Parallel()
+
+	master, tty, err := OpenTerminal(24, 80)
+	if err != nil {
+		t.Fatalf("open terminal: %v", err)
+	}
+	defer func() { _ = master.Close() }()
+
+	cmd := exec.CommandContext(context.Background(), "echo", "done")
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = tty, tty, tty
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true, Setctty: true}
+	if serr := cmd.Start(); serr != nil {
+		_ = tty.Close()
+		t.Fatalf("start: %v", serr)
+	}
+	if werr := cmd.Wait(); werr != nil {
+		_ = tty.Close()
+		t.Fatalf("wait: %v", werr)
+	}
+	// The child is gone and its descriptors with it. Nothing has read yet, which
+	// is exactly the window a fast-exiting command opens; the runner's handle is
+	// what keeps the bytes alive across it.
+	time.Sleep(50 * time.Millisecond)
+	if cerr := tty.Close(); cerr != nil {
+		t.Fatalf("close the slave: %v", cerr)
+	}
+
+	var got []byte
+	buf := make([]byte, 4096)
+	for range 8 {
+		n, rerr := master.Read(buf)
+		got = append(got, buf[:n]...)
+		if rerr != nil {
+			break
+		}
+	}
+	if !strings.Contains(string(got), "done") {
+		t.Fatalf("the terminal lost the child's output after its exit: %q", got)
 	}
 }
 
