@@ -3554,23 +3554,31 @@ scenarios:
       reason: "still broken"
     steps:
       - run:
-          command: echo actual
+          shell: true
+          # A per-attempt side effect OUTSIDE the scenario workdir,
+          # so the count survives the fresh workdir each attempt
+          # gets. Asserting only on the report would pass an
+          # implementation that ran three times and hid the word
+          # "flaky".
+          command: "echo x >> $${ATTEMPTS_FILE}; echo actual"
       - assert:
           stdout:
             contains: expected
 ```
 #### When
 ```shell
-${atago} run --retry-failed 3 inner_retry.atago.yaml
-${atago} run --repeat 3 inner_retry.atago.yaml
+ATTEMPTS_FILE=${workdir}/retry.count ${atago} run --retry-failed 3 inner_retry.atago.yaml
+ATTEMPTS_FILE=${workdir}/repeat.count ${atago} run --repeat 3 inner_retry.atago.yaml
 ```
 #### Then
-- after `${atago} run --retry-failed 3 inner_retry.atago.yaml`:
+- after `ATTEMPTS_FILE=${workdir}/retry.count ${atago} run --retry-failed 3 inner_retry.atago.yaml`:
   - exit code is `0`
   - stdout contains `1 xfail`, does not contain `flaky`
-- after `${atago} run --repeat 3 inner_retry.atago.yaml`:
+  - file `retry.count` contains `x` exactly 1 time
+- after `ATTEMPTS_FILE=${workdir}/repeat.count ${atago} run --repeat 3 inner_retry.atago.yaml`:
   - exit code is `0`
   - stdout contains `1 xfail`, does not contain `REPEAT:`
+  - file `repeat.count` contains `x` exactly 1 time
 ### Scenario: tap marks both verdicts with a TODO directive
 #### Given
 - Fixture file `inner_tap.atago.yaml` is created.
@@ -3625,14 +3633,22 @@ scenarios:
       - assert:
           stdout:
             contains: b
+  - name: now fixed
+    expect_fail:
+      reason: "known too"
+    steps:
+      - run:
+          command: echo a
+      - assert:
+… (truncated, 2 more lines)
 ```
 #### When
 ```shell
 ${atago} run --report junit inner_junit.atago.yaml
 ```
 #### Then
-- exit code is `0`
-- stdout contains `skipped="1"`, `<skipped message="xfail: known">`
+- exit code is `1`
+- stdout contains `skipped="1"`, `failures="1"`, `<skipped message="xfail: known">`, `<failure message="xpass:`
 ### Scenario: explain and doc show which scenarios document a known bug
 #### Given
 - Fixture file `shown.atago.yaml` is created.

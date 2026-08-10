@@ -168,28 +168,47 @@ scenarios:
                   reason: "still broken"
                 steps:
                   - run:
-                      command: echo actual
+                      shell: true
+                      # A per-attempt side effect OUTSIDE the scenario workdir,
+                      # so the count survives the fresh workdir each attempt
+                      # gets. Asserting only on the report would pass an
+                      # implementation that ran three times and hid the word
+                      # "flaky".
+                      command: "echo x >> $${ATTEMPTS_FILE}; echo actual"
                   - assert:
                       stdout:
                         contains: expected
       - run:
           # Retrying an expected failure is incoherent — retry exists to give a
           # scenario another chance to PASS — so the knob must not touch it.
-          command: ${atago} run --retry-failed 3 inner_retry.atago.yaml
+          shell: true
+          command: "ATTEMPTS_FILE=${workdir}/retry.count ${atago} run --retry-failed 3 inner_retry.atago.yaml"
       - assert:
           exit_code: 0
           stdout:
             contains: "1 xfail"
             not_contains: "flaky"
+      - assert:
+          # Exactly one execution: the count, not the absence of a word.
+          file:
+            path: retry.count
+            contains: "x"
+            count: 1
       - run:
           # Same for --repeat: folding "failed every iteration" into a
           # deterministic failure would report the expected outcome as a bug.
-          command: ${atago} run --repeat 3 inner_retry.atago.yaml
+          shell: true
+          command: "ATTEMPTS_FILE=${workdir}/repeat.count ${atago} run --repeat 3 inner_retry.atago.yaml"
       - assert:
           exit_code: 0
           stdout:
             contains: "1 xfail"
             not_contains: "REPEAT:"
+      - assert:
+          file:
+            path: repeat.count
+            contains: "x"
+            count: 1
 
   - name: tap marks both verdicts with a TODO directive
     steps:
@@ -247,14 +266,27 @@ scenarios:
                   - assert:
                       stdout:
                         contains: b
+              - name: now fixed
+                expect_fail:
+                  reason: "known too"
+                steps:
+                  - run:
+                      command: echo a
+                  - assert:
+                      stdout:
+                        contains: a
       - run:
           command: ${atago} run --report junit inner_junit.atago.yaml
       - assert:
-          exit_code: 0
+          # The scenario claims BOTH routings, so it has to exercise both: an
+          # XPASS serialized as a success or a skip would otherwise slip through.
+          exit_code: 1
           stdout:
             contains:
               - "skipped=\"1\""
+              - "failures=\"1\""
               - "<skipped message=\"xfail: known\">"
+              - "<failure message=\"xpass:"
 
   - name: explain and doc show which scenarios document a known bug
     steps:
