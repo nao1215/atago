@@ -213,7 +213,6 @@ See [files_and_fixtures](examples/files_and_fixtures.atago.yaml), [snapshot](exa
 `suite.env` can carry a value `suite.setup` captured — the ephemeral address a suite-wide service published through `ready: {store:}` — so every scenario is pointed at a stub server without a shell wrapper exporting it. See [suite_env_from_setup](examples/suite_env_from_setup.atago.yaml).
 
 An `atago.project.yaml` beside your specs configures the whole directory at once — shared `env:`, shared `defaults:`, and `fixtures_dir:` for a committed corpus every spec reads as `${fixtures}`. See [project_manifest](examples/project_manifest.atago.yaml).
-
 The same manifest can declare the binary under test: `subject:` builds it once before the suite runs and puts it first on `PATH`, so specs call it by name, and `profiles:` (`--profile cover`) swap in an instrumented build. A build is just a command, so this works for any language.
 
 ### 3. Drive interactive prompts and TUIs
