@@ -1007,11 +1007,52 @@ scenarios:
 
 Full spec: [suite_setup](../examples/suite_setup.atago.yaml)
 
+## Hand a suite-wide service's address to every scenario
+
 ## Track a known bug with an expected-failure spec
 
 ```yaml
 version: "1"
 suite:
+  name: offline registry
+  setup:
+    # The port is ephemeral, so the address cannot be written in the spec — the
+    # process publishes it, and `ready.store` captures what it wrote.
+    - service:
+        name: registry
+        command: "myregistry --addr 127.0.0.1:0 --addr-file addr.txt"
+        ready:
+          file: addr.txt
+          store: registry_addr
+          timeout: 10s
+  env:
+    # Every scenario receives this, resolved once setup has run.
+    MYTOOL_REGISTRY: "http://${registry_addr}"
+
+scenarios:
+  - name: the CLI talks to the stub registry
+    steps:
+      - run:
+          command: mytool pull demo
+      - assert:
+          exit_code: 0
+```
+
+This is the shape that otherwise forces a shell wrapper around `atago run`:
+start the server, poll for its address, `export` it, then invoke atago. Suite
+setup already has the service and the `ready.store` capture; `suite.env` is what
+carries the captured value the rest of the way.
+
+A value that cannot resolve is never passed on as the literal text `${name}`. A
+child process does not fail on that — it *uses* it, and the resulting error
+arrives from the tool under test, layers away from the typo. So a scenario whose
+env references an undefined name fails before it starts, naming the key, the
+reference, and the names that ARE defined; and a setup child simply does not
+receive an entry yet whose value the running step is still producing. Write
+`$${name}` when you want the literal text.
+
+Full spec: [suite_env_from_setup](../examples/suite_env_from_setup.atago.yaml)
+
   name: known bugs
 
 scenarios:
@@ -1352,6 +1393,59 @@ scenarios:
 ```
 
 Full spec: [changes](../examples/changes.atago.yaml)
+
+## Prove the same input gives the same output
+
+```yaml
+version: "1"
+suite:
+  name: determinism
+
+scenarios:
+  - name: the report is byte-identical on every run
+    steps:
+      - run:
+          command: mytool inspect data.csv --format json
+          deterministic: {}          # 2 runs, comparing stdout and exit_code
+      - assert:
+          exit_code: 0
+          stdout:                    # the asserts describe the FIRST run
+            json:
+              path: "$.rows"
+              equals: 3
+
+  - name: a failure is stable too
+    steps:
+      - run:
+          command: mytool inspect no-such-file
+          deterministic:
+            runs: 3                  # capped at 10 — more is a benchmark
+            compare: [exit_code, stderr]
+      - assert:
+          exit_code:
+            not: 0
+```
+
+Nondeterministic-but-passing output is the bug every other assertion misses: a
+column order that leaks map iteration, an unsorted listing, a JSON object whose
+keys move. Each run satisfies the same loose matchers, so `--repeat` sees no
+instability at all — and the only cheap oracle is comparing one run's bytes
+against the next's, which specs used to spell as
+`cmd > one && cmd > two && cmp one two` inside a shell step. A mismatch fails
+the step with a unified diff between the runs, so you see *which* field moved.
+
+`stderr` is opt-in because progress output legitimately carries timings. The
+reruns add a claim; they do not change what the step means — assertions,
+`store`, snapshots, and `changes:` all still describe run 1.
+
+One honest caveat: this is only meaningful for an **effectively read-only**
+command. One that appends to a log, consumes its input, or rewrites a file in
+place is *expected* to differ the second time; when a rerun changes the workdir,
+the failure hint says so instead of sending you after a map-order bug you do not
+have. `retry:` is refused next to it — retry re-runs until the answer changes,
+which is the opposite claim.
+
+Full spec: [deterministic](../examples/deterministic.atago.yaml)
 
 ## Compare two implementations of the same command
 

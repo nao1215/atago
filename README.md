@@ -206,9 +206,13 @@ scenarios:
 
 See [files_and_fixtures](examples/files_and_fixtures.atago.yaml), [snapshot](examples/snapshot.atago.yaml), and [dir_tree](examples/dir_tree.atago.yaml) for whole-tree golden manifests.
 
-`expect_fail:` pins a known bug you have not fixed yet without painting CI red: the scenario runs on every commit, an expected failure is XFAIL (green), and the day it starts passing the run turns red so the spec gets promoted. See [expect_fail](examples/expect_fail.atago.yaml).
-
 `count`/`min_count`/`max_count` say how MANY times a `contains` or `matches` matcher occurs — the duplicate-output bug a presence check passes — and `size`/`min_size`/`max_size` bound a file's byte count, composing with the content matchers or standing alone (`size: 0` pins "created but deliberately empty"). See [count_and_size](examples/count_and_size.atago.yaml).
+
+`deterministic: {}` re-runs a command and requires byte-identical output — the same-input-same-output property that catches map-iteration order leaking into a report, which every loose matcher passes on every run. See [deterministic](examples/deterministic.atago.yaml).
+
+`suite.env` can carry a value `suite.setup` captured — the ephemeral address a suite-wide service published through `ready: {store:}` — so every scenario is pointed at a stub server without a shell wrapper exporting it. See [suite_env_from_setup](examples/suite_env_from_setup.atago.yaml).
+
+`expect_fail:` pins a known bug you have not fixed yet without painting CI red: the scenario runs on every commit, an expected failure is XFAIL (green), and the day it starts passing the run turns red so the spec gets promoted. See [expect_fail](examples/expect_fail.atago.yaml).
 
 ### 3. Drive interactive prompts and TUIs
 

@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-76 suites · 480 scenarios
+78 suites · 494 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -92,6 +92,15 @@
   - [an unsupported defaults field is a load-time error (exit 2)](#scenario-an-unsupported-defaults-field-is-a-load-time-error-exit-2)
   - [defaults.run.env merges per key and a step env wins the collisions](#scenario-defaultsrunenv-merges-per-key-and-a-step-env-wins-the-collisions)
   - [a step opts out of defaults.run.shell with an explicit shell false](#scenario-a-step-opts-out-of-defaultsrunshell-with-an-explicit-shell-false)
+- [atago self-hosting / deterministic runs](#atago-self-hosting--deterministic-runs) — 8 scenarios
+  - [a read-only command satisfies the default check](#scenario-a-read-only-command-satisfies-the-default-check)
+  - [the asserts and store still describe the first run](#scenario-the-asserts-and-store-still-describe-the-first-run)
+  - [a stable failure is a stable answer](#scenario-a-stable-failure-is-a-stable-answer)
+  - [output that changes between runs fails with a diff](#scenario-output-that-changes-between-runs-fails-with-a-diff)
+  - [a command that rewrites its own input is called out, not blamed](#scenario-a-command-that-rewrites-its-own-input-is-called-out-not-blamed)
+  - [explain shows that the command runs more than once](#scenario-explain-shows-that-the-command-runs-more-than-once)
+  - [deterministic next to retry is a load error](#scenario-deterministic-next-to-retry-is-a-load-error)
+  - [a single run and an unknown observable are load errors](#scenario-a-single-run-and-an-unknown-observable-are-load-errors)
 - [atago self-hosting / dir assertion](#atago-self-hosting--dir-assertion) — 9 scenarios
   - [directory/tree assertions cover a multi-file generator](#scenario-directorytree-assertions-cover-a-multi-file-generator)
   - [a missing directory can be asserted absent](#scenario-a-missing-directory-can-be-asserted-absent)
@@ -517,6 +526,13 @@
   - [a line selector composes with contains](#scenario-a-line-selector-composes-with-contains)
   - [a line selector composes with a regex](#scenario-a-line-selector-composes-with-a-regex)
   - [stderr carries the same matcher semantics as stdout](#scenario-stderr-carries-the-same-matcher-semantics-as-stdout)
+- [atago self-hosting / suite env from setup](#atago-self-hosting--suite-env-from-setup) — 6 scenarios
+  - [a value captured in setup reaches every scenario as env](#scenario-a-value-captured-in-setup-reaches-every-scenario-as-env)
+  - [a service publishes its ephemeral address into suite env](#scenario-a-service-publishes-its-ephemeral-address-into-suite-env)
+  - [a setup step still runs when a later key is not resolvable yet](#scenario-a-setup-step-still-runs-when-a-later-key-is-not-resolvable-yet)
+  - [an env value nothing defines is refused instead of leaking](#scenario-an-env-value-nothing-defines-is-refused-instead-of-leaking)
+  - [an unset host variable in suite env stays literal, as documented](#scenario-an-unset-host-variable-in-suite-env-stays-literal-as-documented)
+  - [an escaped reference stays literal on purpose](#scenario-an-escaped-reference-stays-literal-on-purpose)
 - [atago self-hosting / suite setup](#atago-self-hosting--suite-setup) — 4 scenarios
   - [setup runs once, shares stores and env, and teardown always runs](#scenario-setup-runs-once-shares-stores-and-env-and-teardown-always-runs)
   - [a failing setup errors every scenario and none runs (exit 4)](#scenario-a-failing-setup-errors-every-scenario-and-none-runs-exit-4)
@@ -2170,6 +2186,189 @@ ${atago} run optout.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `PASSED`
+## atago self-hosting / deterministic runs
+Source: `test/e2e/atago/deterministic.atago.yaml`
+### Scenario: a read-only command satisfies the default check
+#### Given
+- Fixture file `rows.csv` is created.
+#### Inputs
+_Fixture `rows.csv`:_
+```text
+id,name
+1,alice
+```
+#### When
+```shell
+cat rows.csv
+```
+#### Then
+- exit code is `0`
+- stdout contains `alice`
+### Scenario: the asserts and store still describe the first run
+#### When
+```shell
+echo stable
+# capture ${captured} from stdout
+echo ${captured}
+```
+#### Then
+- after `echo stable`:
+  - stdout equals an exact value
+- after `echo ${captured}`:
+  - stdout contains `stable`
+### Scenario: a stable failure is a stable answer
+#### When
+```shell
+cat definitely-not-here.txt
+```
+#### Then
+- exit code is not `0`
+### Scenario: output that changes between runs fails with a diff
+#### Given
+- Fixture file `inner.atago.yaml` is created.
+#### Inputs
+_Fixture `inner.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: the command answers differently each time
+    steps:
+      - run:
+          shell: true
+          command: "echo $$; echo tail"
+          deterministic: {}
+```
+#### When
+```shell
+${atago} run inner.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `deterministic: stdout identical`, `not deterministic`, `first run`, `later run`
+### Scenario: a command that rewrites its own input is called out, not blamed
+#### Given
+- Fixture file `inner_mutating.atago.yaml` is created.
+#### Inputs
+_Fixture `inner_mutating.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner mutating
+scenarios:
+  - name: each run appends to the file it prints
+    steps:
+      - fixture:
+          file: log.txt
+          content: "start\n"
+      - run:
+          shell: true
+          command: "echo tick >> log.txt; cat log.txt"
+          deterministic: {}
+```
+#### When
+```shell
+${atago} run inner_mutating.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `changed the workdir`
+### Scenario: explain shows that the command runs more than once
+#### Given
+- Fixture file `shown.atago.yaml` is created.
+#### Inputs
+_Fixture `shown.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: shown
+scenarios:
+  - name: repeated
+    steps:
+      - run:
+          command: echo hi
+          deterministic:
+            runs: 3
+            compare: [stdout]
+```
+#### When
+```shell
+${atago} explain shown.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout contains `deterministic: stdout compared across 3 runs`
+### Scenario: deterministic next to retry is a load error
+#### Given
+- Fixture file `bad_retry.atago.yaml` is created.
+#### Inputs
+_Fixture `bad_retry.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: bad retry
+scenarios:
+  - name: contradictory
+    steps:
+      - run:
+          command: echo hi
+          deterministic: {}
+          retry:
+            times: 3
+            until:
+              exit_code: 0
+```
+#### When
+```shell
+${atago} run bad_retry.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `cannot be combined with retry`
+### Scenario: a single run and an unknown observable are load errors
+#### Given
+- Fixture file `bad_runs.atago.yaml` is created.
+- Fixture file `bad_compare.atago.yaml` is created.
+#### Inputs
+_Fixture `bad_runs.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: bad runs
+scenarios:
+  - name: one run proves nothing
+    steps:
+      - run:
+          command: echo hi
+          deterministic:
+            runs: 1
+```
+_Fixture `bad_compare.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: bad compare
+scenarios:
+  - name: nothing to compare there
+    steps:
+      - run:
+          command: echo hi
+          deterministic:
+            compare: [workdir]
+```
+#### When
+```shell
+${atago} run bad_runs.atago.yaml
+${atago} run bad_compare.atago.yaml
+```
+#### Then
+- after `${atago} run bad_runs.atago.yaml`:
+  - exit code is `2`
+  - stderr contains `must be at least 2`
+- after `${atago} run bad_compare.atago.yaml`:
+  - exit code is `2`
+  - stderr contains `unknown observable`
 ## atago self-hosting / dir assertion
 Source: `test/e2e/atago/dir.atago.yaml`
 ### Scenario: directory/tree assertions cover a multi-file generator
@@ -9503,6 +9702,194 @@ printf 'to stderr\n' 1>&2
 #### Then
 - stdout is empty
 - stderr equals an exact value
+## atago self-hosting / suite env from setup
+Source: `test/e2e/atago/suite_env.atago.yaml`
+### Scenario: a value captured in setup reaches every scenario as env
+#### Given
+- Fixture file `inner.atago.yaml` is created.
+#### Inputs
+_Fixture `inner.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+  setup:
+    - run:
+        command: echo 127.0.0.1:19991
+    - store:
+        name: addr
+        from:
+          stdout:
+            trim: true
+  env:
+    REGISTRY_ADDR: "${addr}"
+scenarios:
+  - name: reads the address
+    steps:
+      - run:
+          shell: true
+          command: "echo got=$REGISTRY_ADDR"
+      - assert:
+… (truncated, 2 more lines)
+```
+#### When
+```shell
+${atago} run inner.atago.yaml
+```
+#### Then
+- exit code is `0`
+### Scenario: a service publishes its ephemeral address into suite env
+#### Given
+- Fixture file `inner_service.atago.yaml` is created.
+#### Inputs
+_Fixture `inner_service.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner service
+  setup:
+    - service:
+        name: publisher
+        command: "sh -c 'printf 127.0.0.1:19992 > ready.txt; sleep 30'"
+        ready:
+          file: ready.txt
+          store: svc_addr
+          timeout: 10s
+  env:
+    SERVICE_ADDR: "${svc_addr}"
+scenarios:
+  - name: reads the published address
+    steps:
+      - run:
+          shell: true
+          command: "echo got=$SERVICE_ADDR"
+      - assert:
+… (truncated, 2 more lines)
+```
+#### When
+```shell
+${atago} run inner_service.atago.yaml
+```
+#### Then
+- exit code is `0`
+### Scenario: a setup step still runs when a later key is not resolvable yet
+#### Given
+- Fixture file `inner_order.atago.yaml` is created.
+#### Inputs
+_Fixture `inner_order.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner order
+  setup:
+    # This run PRODUCES the value the env key below consumes, so at
+    # this moment the key cannot resolve. Refusing here would make
+    # the pattern impossible; the entry is simply not part of this
+    # child's environment yet.
+    - run:
+        shell: true
+        command: "echo produced=[$LATER] 127.0.0.1:19993"
+    - store:
+        name: later_addr
+        from:
+          stdout:
+            trim: true
+  env:
+    LATER: "${later_addr}"
+scenarios:
+  - name: the value exists by the time scenarios run
+… (truncated, 7 more lines)
+```
+#### When
+```shell
+${atago} run inner_order.atago.yaml
+```
+#### Then
+- exit code is `0`
+### Scenario: an env value nothing defines is refused instead of leaking
+#### Given
+- Fixture file `inner_typo.atago.yaml` is created.
+#### Inputs
+_Fixture `inner_typo.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner typo
+  setup:
+    - run:
+        command: echo 127.0.0.1:19994
+    - store:
+        name: proxy_addr
+        from:
+          stdout:
+            trim: true
+  env:
+    GOPROXY: "${proxy_url}"
+scenarios:
+  - name: would have received the literal text
+    steps:
+      - run:
+          command: echo hi
+```
+#### When
+```shell
+${atago} run inner_typo.atago.yaml
+```
+#### Then
+- exit code is `4`
+- stdout contains `environment setup`, `suite.env GOPROXY references ${proxy_url}`, `literal text`, `proxy_addr`
+### Scenario: an unset host variable in suite env stays literal, as documented
+#### Given
+- Fixture file `inner_hostenv.atago.yaml` is created.
+#### Inputs
+_Fixture `inner_hostenv.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner hostenv
+  env:
+    MAYBE: "a:${env:ATAGO_DEFINITELY_UNSET_XYZ}:b"
+scenarios:
+  - name: an optional host variable is not an error
+    steps:
+      - run:
+          command: echo ok
+      - assert:
+          exit_code: 0
+```
+#### When
+```shell
+${atago} run inner_hostenv.atago.yaml
+```
+#### Then
+- exit code is `0`
+### Scenario: an escaped reference stays literal on purpose
+#### Given
+- Fixture file `inner_escaped.atago.yaml` is created.
+#### Inputs
+_Fixture `inner_escaped.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner escaped
+  env:
+    TEMPLATE: "$$${not_a_variable}"
+scenarios:
+  - name: the literal survives
+    steps:
+      - run:
+          shell: true
+          command: "echo got=$TEMPLATE"
+      - assert:
+          stdout:
+            contains: "got=$${not_a_variable}"
+```
+#### When
+```shell
+${atago} run inner_escaped.atago.yaml
+```
+#### Then
+- exit code is `0`
 ## atago self-hosting / suite setup
 Source: `test/e2e/atago/suite_setup.atago.yaml`
 ### Scenario: setup runs once, shares stores and env, and teardown always runs

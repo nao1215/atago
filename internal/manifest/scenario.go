@@ -108,6 +108,12 @@ func buildStep(index int, step *spec.Step, vars map[string]bool) Step {
 		if r.Retry != nil {
 			st.Retry = &Retry{Times: r.Retry.Times, Interval: r.Retry.Interval}
 		}
+		if r.Deterministic != nil {
+			st.Deterministic = &Deterministic{
+				Runs:    r.Deterministic.DeterministicRuns(),
+				Compare: r.Deterministic.Comparables(),
+			}
+		}
 
 	case spec.StepHTTP:
 		h := step.HTTP

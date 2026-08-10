@@ -1180,6 +1180,12 @@ func TestBugHunt_Rejections(t *testing.T) {
 		{"file size with snapshot", specSteps("assert: {file: {path: out.txt, snapshot: s.txt, size: 3}}"), "cannot be combined with snapshot"},
 		{"file size with exists false", specSteps("assert: {file: {path: out.txt, exists: false, size: 0}}"), "an absent file has no size"},
 		{"file size with two content matchers", specSteps("assert: {file: {path: out.txt, exists: true, contains: a, size: 3}}"), "must set exactly one of exists/contains"},
+		// ---- deterministic (#398) ----
+		{"deterministic runs below two", specSteps("run: {command: echo hi, deterministic: {runs: 1}}"), "must be at least 2"},
+		{"deterministic runs above the cap", specSteps("run: {command: echo hi, deterministic: {runs: 99}}"), "capped at 10"},
+		{"deterministic unknown observable", specSteps("run: {command: echo hi, deterministic: {compare: [stdout, workdir]}}"), "unknown observable"},
+		{"deterministic duplicate observable", specSteps("run: {command: echo hi, deterministic: {compare: [stdout, stdout]}}"), "more than once"},
+		{"deterministic with retry", specSteps("run: {command: echo hi, deterministic: {}, retry: {times: 2, until: {exit_code: 0}}}"), "cannot be combined with retry"},
 
 		// ---- expect_fail (#395) ----
 		{"expect_fail without a reason", "version: \"1\"\nsuite: {name: s}\nscenarios:\n  - name: known\n    expect_fail: {issue: \"http://x\"}\n    steps:\n      - run: {command: echo hi}\n", "expect_fail.reason is required"},

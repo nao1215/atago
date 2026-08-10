@@ -32,6 +32,7 @@
 | [Bound how long a command may take](cookbook.md#bound-how-long-a-command-may-take) | `duration:` wall-clock bounds |
 | [Clean up external state even when a step fails](cookbook.md#clean-up-external-state-even-when-a-step-fails) | `teardown:` steps sharing the store |
 | [Run expensive setup once for the whole suite](cookbook.md#run-expensive-setup-once-for-the-whole-suite) | `suite.setup`, `${suitedir}` |
+| [Hand a suite-wide service's address to every scenario](cookbook.md#hand-a-suite-wide-services-address-to-every-scenario) | `suite.env` carrying a setup-captured value |
 | [Run a scenario only where it can pass](cookbook.md#run-a-scenario-only-where-it-can-pass) | `tags`, `skip:`/`only:` gates |
 | [Track a known bug with an expected-failure spec](cookbook.md#track-a-known-bug-with-an-expected-failure-spec) | `expect_fail:` — XFAIL stays green, XPASS fails the run |
 | [Run the same scenario over many inputs](cookbook.md#run-the-same-scenario-over-many-inputs) | `matrix:` expansion |
@@ -43,6 +44,7 @@
 | [Test a REPL](cookbook.md#test-a-repl) | `pty:` prompt-gated expect/send, EOF via `ctrl-d` |
 | [Prove a command is idempotent](cookbook.md#prove-a-command-is-idempotent) | second-run `changes:` pinned to empty |
 | [Compare two implementations of the same command](cookbook.md#compare-two-implementations-of-the-same-command) | `store:` + `equals: ${reference}` oracle |
+| [Prove the same input gives the same output](cookbook.md#prove-the-same-input-gives-the-same-output) | `deterministic:` byte-identical reruns |
 | [Record an interactive session instead of scripting it](cookbook.md#record-an-interactive-session-instead-of-scripting-it) | `atago record --pty`, secrets become `${env:...}` |
 | [Refresh snapshots when output legitimately changes](cookbook.md#refresh-snapshots-when-output-legitimately-changes) | `atago snapshot update`, `scrub:`, git-reviewable goldens |
 | [Pin the final TUI frame with a screen snapshot](cookbook.md#pin-the-final-tui-frame-with-a-screen-snapshot) | `screen:` line/contains asserts and snapshots, `rows:`/`cols:` |
@@ -86,6 +88,7 @@
 |---------|-------|
 | [run_and_assert](../examples/run_and_assert.atago.yaml) | exit code (exact, `not`, `in: [0, 2]` sets), stdout/stderr matchers (`contains`, `equals`, `matches`/`not_matches`, `empty: true`/`false`, lists, `line`), combining `contains`/`not_contains`/`matches`/`not_matches` in one block, multi-target asserts |
 | [count_and_size](../examples/count_and_size.atago.yaml) | occurrence bounds (`count`/`min_count`/`max_count`) on stream and file matchers, byte-size bounds (`size`/`min_size`/`max_size`) that compose with a content matcher |
+| [deterministic](../examples/deterministic.atago.yaml) | `deterministic:` reruns a command and requires byte-identical observables, `runs`/`compare`, the read-only caveat |
 | [shell_and_redirect](../examples/shell_and_redirect.atago.yaml) | `shell: true` vs direct argv execution, `stdout_to`/`stderr_to` redirects |
 | [json_and_yaml](../examples/json_and_yaml.atago.yaml) | JSONPath assertions, numeric bounds (`gt`/`lte`), a list of checks under one `json:`/`yaml:`, the `yaml` matcher |
 | [files_and_fixtures](../examples/files_and_fixtures.atago.yaml) | input fixtures (inline `content:` and `base64:`), `file` and `dir` assertions, byte-exact `equals`/`equals_file` round-trip checks |
@@ -110,6 +113,7 @@
 | [services](../examples/services.atago.yaml) | background servers: readiness probes, `ready.store`, bounded log retention (`max_log_bytes`), teardown |
 | [signal](../examples/signal.atago.yaml) | `signal:` steps deliver SIGTERM/SIGHUP/... to a managed service's process group for graceful-shutdown and reload testing (POSIX-only) |
 | [defaults](../examples/defaults.atago.yaml) | sharing `shell`/`env`/`service` fragments across scenarios |
+| [suite_env_from_setup](../examples/suite_env_from_setup.atago.yaml) | `suite.env` carrying a value captured by `suite.setup`, scenario env overriding a suite key, and the refusal that keeps a literal `${name}` out of a child environment |
 | [suite_setup](../examples/suite_setup.atago.yaml) | once-per-suite bootstrap: ordered setup steps, suite-wide `service:` steps, `${suitedir}`, suite env, always-run suite teardown |
 | [expect_fail](../examples/expect_fail.atago.yaml) | `expect_fail:` keeps a known bug's reproduction in CI: XFAIL is green, XPASS fails the run so the fix gets promoted, an execution error is still an error |
 | [select_skip_only](../examples/select_skip_only.atago.yaml) | tags, and gating scenarios by OS, env var, or a probe command |
