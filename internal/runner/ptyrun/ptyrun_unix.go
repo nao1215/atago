@@ -60,10 +60,11 @@ func Run(ctx context.Context, p *spec.PTY, workdir string, env []string) (*runne
 	cmd.Stdout = tty
 	cmd.Stderr = tty
 
-	// Post the first Read before the child starts: macOS can otherwise let a
-	// no-shell fast-exit command print and disappear before the drain exists.
-	// startTranscriptDrain does not return until its reader goroutine has
-	// reached that read, so this ordering is an invariant rather than a hope.
+	// Start draining before the child starts: macOS can otherwise let a no-shell
+	// fast-exit command print and disappear before the drain exists.
+	// startTranscriptDrain does not return until its reader goroutine has been
+	// scheduled and has reached its read call — one statement short of a promise
+	// that the read is posted, but as close as user space gets.
 	term := startTranscriptDrain(master, p)
 	if err := cmd.Start(); err != nil {
 		// Drop atago's own slave handle first: while the parent still holds the

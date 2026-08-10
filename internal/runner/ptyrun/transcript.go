@@ -48,12 +48,17 @@ func startTranscriptDrain(rw io.ReadWriter, p *spec.PTY) *transcriptDrain {
 	queries := newTerminalQueries(p, writerFunc(t.write))
 	var modeScan decsetScanner
 	// reading is closed by the reader goroutine when it has nothing left to do
-	// but read. Waiting for it is what lets the POSIX runner claim that the
-	// first Read is posted before the child starts: creating a goroutine only
-	// makes it runnable, and yielding the processor does not guarantee it was
-	// scheduled, let alone that it got as far as the read. The one gap this
-	// cannot close is the instruction or two between the close and entering the
-	// syscall, which no handshake in user space can.
+	// but read, and startTranscriptDrain waits for it. What that buys is modest
+	// and worth stating exactly: the goroutine has been scheduled and has run
+	// its setup, so the only thing left between it and the terminal is the read
+	// call itself. It is NOT a proof that the read is posted — the goroutine can
+	// still be preempted between this close and entering the syscall, and no
+	// handshake in user space can close that gap.
+	//
+	// It replaces a runtime.Gosched, which promised the same thing and delivered
+	// less: yielding does not guarantee the new goroutine ran at all. Nothing
+	// depends on the stronger reading; the fast-exit transcript loss that made
+	// this look load-bearing was a mispaired terminal (#385), fixed elsewhere.
 	reading := make(chan struct{})
 	go func() {
 		defer close(t.readDone)

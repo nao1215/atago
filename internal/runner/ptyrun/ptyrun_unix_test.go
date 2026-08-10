@@ -189,14 +189,39 @@ func TestOpenTerminal_PairsTheMasterWithItsOwnSlave(t *testing.T) {
 		if _, werr := tty.Write([]byte("atago\n")); werr != nil {
 			t.Fatalf("iteration %d: write to the terminal: %v", i, werr)
 		}
-		buf := make([]byte, 64)
-		n, rerr := master.Read(buf)
-		if rerr != nil {
-			t.Fatalf("iteration %d: read the master: %v", i, rerr)
+		// The read has to be bounded, because the failure this test exists for
+		// does not fail the read — a master with no slave of its own simply never
+		// becomes readable, and an unbounded read would report the whole package
+		// as timing out rather than reporting the mispaired terminal.
+		type readResult struct {
+			data string
+			err  error
 		}
-		if got := string(buf[:n]); !strings.Contains(got, "atago") {
-			t.Fatalf("iteration %d: the master read %q, want the bytes written to its own slave: "+
-				"the pair is not a pair", i, got)
+		done := make(chan readResult, 1)
+		go func() {
+			buf := make([]byte, 64)
+			n, rerr := master.Read(buf)
+			done <- readResult{string(buf[:n]), rerr}
+		}()
+		select {
+		case got := <-done:
+			if got.err != nil {
+				_ = tty.Close()
+				_ = master.Close()
+				t.Fatalf("iteration %d: read the master: %v", i, got.err)
+			}
+			if !strings.Contains(got.data, "atago") {
+				_ = tty.Close()
+				_ = master.Close()
+				t.Fatalf("iteration %d: the master read %q, want the bytes written to its own slave: "+
+					"the pair is not a pair", i, got.data)
+			}
+		case <-time.After(30 * time.Second):
+			// Closing the master is what releases the pending read.
+			_ = master.Close()
+			_ = tty.Close()
+			t.Fatalf("iteration %d: nothing written to the tty ever reached the master: "+
+				"the pair is not a pair", i)
 		}
 		_ = tty.Close()
 		_ = master.Close()

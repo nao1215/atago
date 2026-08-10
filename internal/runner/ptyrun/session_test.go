@@ -112,18 +112,22 @@ func (b *blockingPTY) Read([]byte) (int, error) {
 
 func (b *blockingPTY) Write(p []byte) (int, error) { return len(p), nil }
 
-// TestStartTranscriptDrain_HandsBackAReaderThatHasReachedItsFirstRead names the
-// ordering the POSIX runner depends on (#385): Run posts the drain before it
-// starts a child that may print and exit immediately, and that is only worth
-// anything if the reader goroutine has actually reached its read by the time
-// startTranscriptDrain returns. Creating a goroutine only makes it runnable, and
-// the runtime.Gosched that used to stand in for this guaranteed nothing.
+// TestStartTranscriptDrain_HandsBackARunningReader pins what the startup
+// handshake does and does not promise. Run starts the drain before it starts a
+// child that may print and exit immediately, so startTranscriptDrain must not
+// hand back a drain whose reader goroutine has yet to be scheduled — which is
+// all the runtime.Gosched it replaced ever offered.
 //
-// The two halves matter equally. The reader must have got as far as reading —
-// and it must NOT have to finish that read, or a terminal with nothing to say
-// yet (every interactive program, until it prints its prompt) would wedge Run
-// before the child ever started.
-func TestStartTranscriptDrain_HandsBackAReaderThatHasReachedItsFirstRead(t *testing.T) {
+// The other half matters just as much: the reader must NOT have to finish its
+// read first. A terminal with nothing to say yet is every interactive program
+// until it prints its prompt, and waiting for that read would wedge Run before
+// the child ever started. So the test releases nothing until the drain is back
+// in hand, and only then lets the read complete.
+//
+// What it deliberately does not assert is that the goroutine is inside Read by
+// the time startTranscriptDrain returns. It is signalled one statement earlier,
+// and a test that demanded otherwise would be asserting on the scheduler.
+func TestStartTranscriptDrain_HandsBackARunningReader(t *testing.T) {
 	t.Parallel()
 
 	b := &blockingPTY{entered: make(chan struct{}), release: make(chan struct{})}
@@ -143,7 +147,7 @@ func TestStartTranscriptDrain_HandsBackAReaderThatHasReachedItsFirstRead(t *test
 	case <-b.entered:
 	case <-time.After(10 * time.Second):
 		close(b.release)
-		t.Fatal("startTranscriptDrain returned before its reader reached the first read")
+		t.Fatal("the reader goroutine never reached its first read")
 	}
 
 	close(b.release)

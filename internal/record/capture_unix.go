@@ -13,7 +13,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"runtime"
 	"sync"
 	"syscall"
 	"time"
@@ -76,10 +75,18 @@ func CapturePTY(command string, shell bool, in, out *os.File, timeout time.Durat
 	}
 
 	// Output: child → developer's screen, recorded verbatim (ANSI intact).
+	//
+	// reading is closed when the goroutine has nothing left to do but read, and
+	// waiting for it below is what puts this reader ahead of the child: creating
+	// a goroutine only makes it runnable, so the runtime.Gosched that used to
+	// stand here guaranteed nothing about a no-shell fast-exit command that
+	// prints and disappears. The pty runner's drain takes the same handoff.
 	outDone := make(chan struct{})
+	reading := make(chan struct{})
 	go func() {
 		defer close(outDone)
 		buf := make([]byte, 4096)
+		close(reading)
 		for {
 			n, rerr := master.Read(buf)
 			if n > 0 {
@@ -93,9 +100,7 @@ func CapturePTY(command string, shell bool, in, out *os.File, timeout time.Durat
 			}
 		}
 	}()
-	// Yield once so the output drain can enter Read before a no-shell fast-exit
-	// command has a chance to print and disappear.
-	runtime.Gosched()
+	<-reading
 
 	if err := cmd.Start(); err != nil {
 		// Drop atago's own slave handle before waiting: while the recorder still
