@@ -1006,7 +1006,13 @@ artifact's directory goes first on `PATH` — so a spec keeps saying
 `mytool convert in.png out.jpg`, the way a user invokes it, instead of an
 absolute path. A build failure is a run-level error carrying the build tool's own
 output: no scenario executes, because each would be testing a stale binary or
-none at all. A build that exits 0 but writes nothing is caught too.
+none at all. A build that exits 0 but writes nothing to `${artifact}` is caught
+too, as is one that writes a file nothing can execute — otherwise every scenario
+fails with "permission denied" instead of one message naming the build.
+
+Two manifests in one run may not declare the same subject `name`: every artifact
+directory shares one `PATH`, so the name would resolve to whichever was
+prepended last, for both trees.
 
 It is language-neutral because a build is just a command — the same
 `atago.project.yaml`, a different build tool:
@@ -1017,7 +1023,10 @@ subject:
   name: truss
   artifact: bin/truss
   build:
-    command: "cargo build --release --locked"
+    shell: true
+    # cargo writes into target/, so the build has to put the binary where
+    # ${artifact} points — atago checks that the artifact exists and can run.
+    command: "cargo build --release --locked && cp target/release/truss ${artifact}"
 ```
 
 **Coverage is a profile, not an atago feature.** Instrumenting a binary is an

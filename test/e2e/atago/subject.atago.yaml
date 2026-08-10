@@ -60,6 +60,12 @@ scenarios:
             #!/bin/sh
             echo "mytool ${MARK:-plain}"
       - fixture:
+          file: src/alt
+          mode: "0755"
+          content: |
+            #!/bin/sh
+            echo "mytool profiled"
+      - fixture:
           file: atago.project.yaml
           content: |
             subject:
@@ -70,8 +76,14 @@ scenarios:
                 command: "cp src/mytool $${artifact} && chmod +x $${artifact}"
             profiles:
               marked:
+                build:
+                  shell: true
+                  # A different build, not just different env: the profile
+                  # installs a second script, so a run that ignored the build
+                  # swap would still print "plain".
+                  command: "cp src/alt $${artifact} && chmod +x $${artifact}"
                 env:
-                  MARK: "profiled"
+                  MARK: "ignored-by-alt"
       - fixture:
           file: spec.atago.yaml
           content: |
@@ -139,6 +151,39 @@ scenarios:
             contains:
               - 'declares no profile "race"'
               - "cover"
+
+  - name: an artifact nothing can execute is refused
+    skip:
+      os: windows   # Windows has no execute bit
+    steps:
+      - fixture:
+          file: atago.project.yaml
+          content: |
+            subject:
+              name: mytool
+              artifact: bin/mytool
+              build:
+                shell: true
+                command: "echo not-a-program > $${artifact}"
+      - fixture:
+          file: spec.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: one
+                steps:
+                  - run:
+                      command: mytool
+      - run:
+          command: ${atago} run spec.atago.yaml
+      - assert:
+          # Without this the build looks fine and every scenario fails with
+          # "permission denied" instead.
+          exit_code: 4
+          stderr:
+            contains: "execute bit"
 
   - name: a failing build stops the run and carries the build output
     skip:

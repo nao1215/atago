@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nao1215/atago/internal/fskind"
 	"github.com/nao1215/atago/internal/loader"
 	runnercmd "github.com/nao1215/atago/internal/runner/cmd"
 	"github.com/nao1215/atago/internal/spec"
@@ -40,6 +41,7 @@ type builtSubject struct {
 // of them would be testing either a stale binary or nothing at all.
 func buildSubjects(ctx context.Context, paths []string, profile string, scratch string, stderr io.Writer) ([]builtSubject, error) {
 	seen := map[string]bool{}
+	byName := map[string]string{}
 	var built []builtSubject
 	for _, p := range paths {
 		proj, err := loader.FindProject(filepath.Dir(p))
@@ -58,6 +60,18 @@ func buildSubjects(ctx context.Context, paths []string, profile string, scratch 
 		if err != nil {
 			return nil, err
 		}
+		// Two manifests declaring the same subject name in one run is refused
+		// rather than resolved. Every artifact directory goes on one PATH, so
+		// the name would resolve to whichever was prepended last — for BOTH
+		// trees — and the run would silently test one binary twice. Scoping
+		// PATH per spec is not on the table: the point of the feature is that a
+		// spec invokes the tool the way a user does, which means one PATH.
+		if prev, dup := byName[b.Name]; dup {
+			return nil, fmt.Errorf(
+				"two manifests in this run declare a subject named %q (%s and %s); one PATH cannot serve both, "+
+					"so give them distinct names or run the trees separately", b.Name, prev, proj.Path)
+		}
+		byName[b.Name] = proj.Path
 		built = append(built, b)
 	}
 	if profile != "" && len(built) == 0 {
@@ -130,10 +144,22 @@ func buildOne(ctx context.Context, proj *loader.Project, profile, scratch string
 		return builtSubject{}, fmt.Errorf("building %s failed (exit %d)\n%s%s",
 			sub.Name, res.ExitCode, res.Stderr, res.Stdout)
 	}
-	if st, serr := os.Stat(artifact); serr != nil || st.IsDir() {
+	st, serr := os.Stat(artifact)
+	switch {
+	case serr != nil || st.IsDir():
 		return builtSubject{}, fmt.Errorf(
 			"building %s succeeded but produced no file at %s: check that the build command writes to ${artifact}",
 			sub.Name, artifact)
+	case !st.Mode().IsRegular():
+		return builtSubject{}, fmt.Errorf(
+			"building %s produced a %s at %s, not a program", sub.Name, fskind.Name(st.Mode()), artifact)
+	case runtime.GOOS != "windows" && st.Mode().Perm()&0o111 == 0:
+		// A build that copies a file without chmod +x exits 0 and looks fine
+		// here, and every scenario then fails with "permission denied" — N
+		// confusing failures instead of one that names the build.
+		return builtSubject{}, fmt.Errorf(
+			"building %s produced %s without an execute bit (mode %s), so no scenario could run it: "+
+				"have the build chmod +x the artifact", sub.Name, artifact, st.Mode().Perm())
 	}
 	return builtSubject{Name: sub.Name, Artifact: artifact, Env: env}, nil
 }

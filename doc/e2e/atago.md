@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-79 suites · 497 scenarios
+79 suites · 498 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -523,10 +523,11 @@
   - [a line selector composes with contains](#scenario-a-line-selector-composes-with-contains)
   - [a line selector composes with a regex](#scenario-a-line-selector-composes-with-a-regex)
   - [stderr carries the same matcher semantics as stdout](#scenario-stderr-carries-the-same-matcher-semantics-as-stdout)
-- [atago self-hosting / subject builds](#atago-self-hosting--subject-builds) — 6 scenarios
+- [atago self-hosting / subject builds](#atago-self-hosting--subject-builds) — 7 scenarios
   - [the built artifact resolves by bare name from a spec](#scenario-the-built-artifact-resolves-by-bare-name-from-a-spec)
   - [a profile swaps the build and adds environment](#scenario-a-profile-swaps-the-build-and-adds-environment)
   - [an unknown profile names the ones that exist](#scenario-an-unknown-profile-names-the-ones-that-exist)
+  - [an artifact nothing can execute is refused](#scenario-an-artifact-nothing-can-execute-is-refused)
   - [a failing build stops the run and carries the build output](#scenario-a-failing-build-stops-the-run-and-carries-the-build-output)
   - [a build that writes nothing is caught, not passed on](#scenario-a-build-that-writes-nothing-is-caught-not-passed-on)
   - [a manifest with no subject leaves the run untouched](#scenario-a-manifest-with-no-subject-leaves-the-run-untouched)
@@ -9701,6 +9702,7 @@ ${atago} run spec.atago.yaml
 _skipped on Windows_
 #### Given
 - Fixture file `src/mytool` is created.
+- Fixture file `src/alt` is created.
 - Fixture file `atago.project.yaml` is created.
 - Fixture file `spec.atago.yaml` is created.
 #### Inputs
@@ -9708,6 +9710,11 @@ _Fixture `src/mytool`:_
 ```text
 #!/bin/sh
 echo "mytool ${MARK:-plain}"
+```
+_Fixture `src/alt`:_
+```text
+#!/bin/sh
+echo "mytool profiled"
 ```
 _Fixture `atago.project.yaml`:_
 ```text
@@ -9719,8 +9726,14 @@ subject:
     command: "cp src/mytool $${artifact} && chmod +x $${artifact}"
 profiles:
   marked:
+    build:
+      shell: true
+      # A different build, not just different env: the profile
+      # installs a second script, so a run that ignored the build
+      # swap would still print "plain".
+      command: "cp src/alt $${artifact} && chmod +x $${artifact}"
     env:
-      MARK: "profiled"
+      MARK: "ignored-by-alt"
 ```
 _Fixture `spec.atago.yaml`:_
 ```text
@@ -9789,6 +9802,39 @@ ${atago} run --profile race spec.atago.yaml
 #### Then
 - exit code is `4`
 - stderr contains `declares no profile "race"`, `cover`
+### Scenario: an artifact nothing can execute is refused
+_skipped on Windows_
+#### Given
+- Fixture file `atago.project.yaml` is created.
+- Fixture file `spec.atago.yaml` is created.
+#### Inputs
+_Fixture `atago.project.yaml`:_
+```text
+subject:
+  name: mytool
+  artifact: bin/mytool
+  build:
+    shell: true
+    command: "echo not-a-program > $${artifact}"
+```
+_Fixture `spec.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: one
+    steps:
+      - run:
+          command: mytool
+```
+#### When
+```shell
+${atago} run spec.atago.yaml
+```
+#### Then
+- exit code is `4`
+- stderr contains `execute bit`
 ### Scenario: a failing build stops the run and carries the build output
 _skipped on Windows_
 #### Given

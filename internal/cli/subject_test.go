@@ -44,7 +44,9 @@ func copyCommand(t *testing.T) string {
 	if runtime.GOOS == "windows" {
 		t.Skip("the stand-in build command is POSIX; the subject mechanism itself is platform-neutral")
 	}
-	return "cp go.mod ${artifact}"
+	// chmod +x because the produced file has to be runnable: a subject that
+	// cannot execute is caught at build time now, which is the point.
+	return "cp go.mod ${artifact} && chmod +x ${artifact}"
 }
 
 // TestBuildSubjects_ProducesTheArtifactOnce covers the core promise: the build
@@ -56,7 +58,7 @@ func TestBuildSubjects_ProducesTheArtifactOnce(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module x\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	manifest := "subject:\n  name: mytool\n  artifact: bin/mytool\n  build:\n    command: \"" + cmd + "\"\n"
+	manifest := "subject:\n  name: mytool\n  artifact: bin/mytool\n  build:\n    shell: true\n    command: \"" + cmd + "\"\n"
 	if err := os.WriteFile(filepath.Join(root, "atago.project.yaml"), []byte(manifest), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -102,7 +104,7 @@ func TestBuildSubjects_NoManifestIsANoOp(t *testing.T) {
 // would go green having tested a binary built the wrong way.
 func TestBuildSubjects_UnknownProfileNamesWhatExists(t *testing.T) {
 	cmd := copyCommand(t)
-	path := subjectTree(t, "subject:\n  name: mytool\n  artifact: bin/mytool\n  build:\n    command: \""+cmd+"\"\nprofiles:\n  cover:\n    env:\n      X: \"1\"\n")
+	path := subjectTree(t, "subject:\n  name: mytool\n  artifact: bin/mytool\n  build:\n    shell: true\n    command: \""+cmd+"\"\nprofiles:\n  cover:\n    env:\n      X: \"1\"\n")
 	if err := os.WriteFile(filepath.Join(filepath.Dir(path), "go.mod"), []byte("module x\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -174,5 +176,39 @@ func TestExposeSubjects_PutsTheArtifactFirstOnPath(t *testing.T) {
 	}
 	if os.Getenv("PROFILE_MARK") != "on" {
 		t.Error("a profile's env must reach the specs")
+	}
+}
+
+// TestBuildSubjects_NonExecutableArtifactIsRefused pins the check a `cp` build
+// makes necessary: the file exists and the build exited 0, but nothing could
+// run it, and without this every scenario fails with "permission denied"
+// instead of one message naming the build.
+func TestBuildSubjects_NonExecutableArtifactIsRefused(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows has no execute bit; the artifact check there is regular-file only")
+	}
+	path := subjectTree(t, "subject:\n  name: mytool\n  artifact: bin/mytool\n  build:\n    shell: true\n    command: \"echo x > ${artifact}\"\n")
+	_, err := buildSubjects(context.Background(), []string{path}, "", t.TempDir(), io.Discard)
+	if err == nil || !strings.Contains(err.Error(), "execute bit") {
+		t.Errorf("error = %v, want it to name the missing execute bit", err)
+	}
+}
+
+// TestBuildSubjects_DuplicateSubjectNameIsRefused covers the ambiguity two
+// manifests in one run can create: every artifact directory shares one PATH, so
+// the same name would resolve to whichever was prepended last — for both trees.
+// Refusing beats silently testing one binary twice.
+func TestBuildSubjects_DuplicateSubjectNameIsRefused(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the stand-in build command is POSIX")
+	}
+	manifest := "subject:\n  name: mytool\n  artifact: bin/mytool\n  build:\n    shell: true\n    command: \"echo x > ${artifact} && chmod +x ${artifact}\"\n"
+	var specs []string
+	for range 2 {
+		specs = append(specs, subjectTree(t, manifest))
+	}
+	_, err := buildSubjects(context.Background(), specs, "", t.TempDir(), io.Discard)
+	if err == nil || !strings.Contains(err.Error(), "declare a subject named") {
+		t.Errorf("error = %v, want the duplicate-name refusal", err)
 	}
 }

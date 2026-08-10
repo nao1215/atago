@@ -86,6 +86,13 @@ func FindProject(dir string) (*Project, error) {
 
 // LoadProject reads and validates one manifest.
 func LoadProject(path string) (*Project, error) {
+	// Absolute from here on: fixtures_dir and a build cwd resolve against the
+	// manifest's directory, and a relative manifest path would silently make
+	// them resolve against the process's working directory instead — a
+	// difference nobody would see until a run from another directory failed.
+	if abs, aerr := filepath.Abs(path); aerr == nil {
+		path = abs
+	}
 	data, err := os.ReadFile(path) //nolint:gosec // path is the manifest atago itself located
 	if err != nil {
 		return nil, &Error{Path: path, Kind: KindValidation, Msg: err.Error()}
