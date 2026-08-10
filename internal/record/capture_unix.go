@@ -58,7 +58,15 @@ func CapturePTY(command string, shell bool, in, out *os.File, timeout time.Durat
 	if err != nil {
 		return PTYRecording{}, fmt.Errorf("record --pty: start %q: %w", command, err)
 	}
-	defer func() { _ = tty.Close() }()
+	// releaseTTY drops the recorder's own slave handle. It stays open until the
+	// child has been reaped: on macOS the terminal discards whatever it still
+	// holds the moment its last slave handle closes, so a command that prints and
+	// exits at once would lose its final bytes even to a read already parked in
+	// the kernel. Holding one handle here puts that last close after the drain,
+	// on a schedule the recorder controls.
+	var ttyOnce sync.Once
+	releaseTTY := func() { ttyOnce.Do(func() { _ = tty.Close() }) }
+	defer releaseTTY()
 	cmd.Stdin = tty
 	cmd.Stdout = tty
 	cmd.Stderr = tty
@@ -103,15 +111,14 @@ func CapturePTY(command string, shell bool, in, out *os.File, timeout time.Durat
 	<-reading
 
 	if err := cmd.Start(); err != nil {
-		// Drop atago's own slave handle before waiting: while the recorder still
-		// holds the terminal open the master read has no reason to end, and the
-		// wait below would hang instead of reporting that the child never started.
-		_ = tty.Close()
+		// Nothing started, so nothing is waiting to be read: drop the slave handle
+		// before waiting, or the master read has no reason to end and the wait
+		// below would hang instead of reporting that the child never started.
+		releaseTTY()
 		_ = master.Close()
 		waitDrained(outDone)
 		return PTYRecording{}, fmt.Errorf("record --pty: start %q: %w", command, err)
 	}
-	_ = tty.Close()
 
 	// Input: developer keystrokes → child. Each Read is one burst; the pty's
 	// current ECHO state tags it as a secret (echo off) or not. This goroutine
@@ -154,6 +161,10 @@ func CapturePTY(command string, shell bool, in, out *os.File, timeout time.Durat
 		code = <-waitCh
 	}
 
+	// The child is reaped, so the handle held since before it started has done
+	// its job; drop it now, or the reader has no end-of-terminal to reach and the
+	// drain below would spend its whole grace waiting for one.
+	releaseTTY()
 	// Drain the pty's final bytes before closing the master, then stop the
 	// output reader. A bounded grace keeps a lingering descendant from hanging us.
 	select {

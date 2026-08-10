@@ -46,6 +46,13 @@ type ptyProcess struct {
 	// closeTerm releases the terminal master so the read goroutine unblocks and
 	// finish can snapshot a complete transcript.
 	closeTerm func()
+	// releaseTTY drops the runner's own handle on the terminal's slave side, and
+	// must be called only once the child has been reaped. Until it runs, the
+	// terminal cannot reach its last close — which is what keeps a fast-exiting
+	// child's final bytes readable on a platform that discards them there (see
+	// the POSIX runner). It may be nil for a backend with no such handle, and it
+	// must be safe to call more than once.
+	releaseTTY func()
 	// resize changes the terminal size mid-session (#379). The platform decides
 	// how the child learns about it — a POSIX TIOCSWINSZ makes the kernel send
 	// SIGWINCH to the foreground process group, and ConPTY notifies its client
@@ -87,6 +94,14 @@ func driveSession(ctx context.Context, p *spec.PTY, proc ptyProcess) (*runner.Re
 	currentScreen := term.currentScreen
 
 	finish := func(timedOut bool, code int, ef *ExpectFailure) (*runner.Result, *ExpectFailure, error) {
+		// The child is reaped by now (see the note further down), so the runner's
+		// own slave handle has done its job: it kept the terminal from reaching
+		// its last close while output was still unread. Drop it here, because
+		// until it goes the reader has no EOF to end on and waitDrain would
+		// spend its whole grace waiting for one.
+		if proc.releaseTTY != nil {
+			proc.releaseTTY()
+		}
 		// Drain before closing: a fast-exiting child's final output may still sit
 		// in the pty buffer, and closing the master discards it. Once the last
 		// handle is gone the reader hits EOF and readDone closes on its own;
@@ -148,6 +163,9 @@ func driveSession(ctx context.Context, p *spec.PTY, proc ptyProcess) (*runner.Re
 	failHard := func(err error) (*runner.Result, *ExpectFailure, error) {
 		proc.kill()
 		<-proc.exit
+		if proc.releaseTTY != nil {
+			proc.releaseTTY()
+		}
 		term.waitDrain(proc.closeTerm, 0)
 		return nil, nil, err
 	}

@@ -71,6 +71,63 @@ func TestRun_NoShellFastExitOutputNotLost(t *testing.T) {
 	}
 }
 
+// TestTerminal_SlaveHandleOutlivesTheChildsOutput pins the platform fact the
+// runner's ordering depends on: output written through one slave handle is
+// still readable after that handle closes, as long as another one is open.
+//
+// It matters because macOS discards whatever the terminal holds at its LAST
+// slave close, and does so even to a read already parked in the kernel — so no
+// amount of starting the drain earlier can win that race. Run therefore keeps
+// its own slave handle until the child has been reaped, which is what turns the
+// child's exit from "the last close" into an ordinary one. The dup below stands
+// in for the child's descriptors: closing it is the child exiting, and the
+// handle Run holds is the one that keeps the bytes alive across it.
+func TestTerminal_SlaveHandleOutlivesTheChildsOutput(t *testing.T) {
+	t.Parallel()
+
+	master, tty, err := OpenTerminal(24, 80)
+	if err != nil {
+		t.Fatalf("open terminal: %v", err)
+	}
+	defer func() { _ = master.Close() }()
+	defer func() { _ = tty.Close() }()
+
+	// The child's copy of the terminal, taken without Fd() so the slave keeps
+	// whatever descriptor regime it was opened under.
+	var dup int
+	sc, err := tty.SyscallConn()
+	if err != nil {
+		t.Fatalf("syscall conn: %v", err)
+	}
+	var dupErr error
+	if ctlErr := sc.Control(func(fd uintptr) { dup, dupErr = unix.Dup(int(fd)) }); ctlErr != nil {
+		t.Fatalf("control: %v", ctlErr)
+	}
+	if dupErr != nil {
+		t.Fatalf("dup the slave: %v", dupErr)
+	}
+	child := os.NewFile(uintptr(dup), "child-tty")
+
+	if _, werr := child.WriteString("done\n"); werr != nil {
+		t.Fatalf("write through the child's handle: %v", werr)
+	}
+	// The child exits: its descriptors go, and nothing has read yet. This is the
+	// window a command that prints and exits at once opens.
+	if cerr := child.Close(); cerr != nil {
+		t.Fatalf("close the child's handle: %v", cerr)
+	}
+	time.Sleep(50 * time.Millisecond)
+
+	buf := make([]byte, 4096)
+	n, rerr := master.Read(buf)
+	if rerr != nil {
+		t.Fatalf("read the master after the child's handle closed: %v", rerr)
+	}
+	if !strings.Contains(string(buf[:n]), "done") {
+		t.Fatalf("the terminal lost the output written before the child's exit: %q", buf[:n])
+	}
+}
+
 // TestWaitDrain_ClosingTheMasterEndsTheDrain is a regression test for a CI
 // hang: waitDrain must return even when something else still holds the terminal
 // open, so that a stuck reader fails a run instead of wedging it.

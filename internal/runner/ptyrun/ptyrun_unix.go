@@ -9,6 +9,7 @@ import (
 	"math"
 	"os"
 	"os/exec"
+	"sync"
 	"syscall"
 	"time"
 
@@ -55,26 +56,37 @@ func Run(ctx context.Context, p *spec.PTY, workdir string, env []string) (*runne
 	if err != nil {
 		return nil, nil, fmt.Errorf("pty: start %q: %w", p.Command, err)
 	}
-	defer func() { _ = tty.Close() }()
+	// releaseTTY drops atago's own slave handle. It is deferred as a backstop and
+	// called explicitly at the points below, so it has to tolerate both.
+	var ttyOnce sync.Once
+	releaseTTY := func() { ttyOnce.Do(func() { _ = tty.Close() }) }
+	defer releaseTTY()
 	cmd.Stdin = tty
 	cmd.Stdout = tty
 	cmd.Stderr = tty
 
-	// Start draining before the child starts: macOS can otherwise let a no-shell
-	// fast-exit command print and disappear before the drain exists.
-	// startTranscriptDrain does not return until its reader goroutine has been
-	// scheduled and has reached its read call — one statement short of a promise
-	// that the read is posted, but as close as user space gets.
+	// Start draining before the child starts, so the reader is in place for a
+	// command that prints and exits at once. startTranscriptDrain does not return
+	// until its reader goroutine has been scheduled and has reached its read call
+	// — one statement short of a promise that the read is posted, but as close as
+	// user space gets.
 	term := startTranscriptDrain(master, p)
 	if err := cmd.Start(); err != nil {
-		// Drop atago's own slave handle first: while the parent still holds the
-		// terminal open the master read has no reason to end, and waiting for the
-		// drain would hang instead of surfacing the start failure.
-		_ = tty.Close()
+		// Nothing was started, so nothing can be waiting to be read: drop the
+		// slave handle now, or the master read has no reason to end and waiting
+		// for the drain would hang instead of surfacing the start failure.
+		releaseTTY()
 		term.waitDrain(func() { _ = master.Close() }, 0)
 		return nil, nil, fmt.Errorf("pty: start %q: %w", p.Command, err)
 	}
-	_ = tty.Close()
+	// atago's slave handle deliberately stays open until the child has been
+	// reaped (driveSession's finish calls releaseTTY). Handing the terminal to
+	// the child and closing this handle immediately would leave the child's own
+	// descriptors as the last ones, and on macOS the pty discards whatever it
+	// still holds the moment that last handle closes — a read already parked in
+	// the kernel returns EOF with no bytes, so no amount of draining earlier can
+	// win that race. Keeping one handle here means the last close happens after
+	// atago has read, on a schedule atago controls.
 
 	// Reap exactly once, from one place: probing a zombie with signal 0 keeps
 	// succeeding, so liveness must come from Wait itself. The buffered channel
@@ -87,8 +99,9 @@ func Run(ctx context.Context, p *spec.PTY, workdir string, env []string) (*runne
 		trans: term,
 		exit:  exitCh,
 		// Negative pid signals the whole process group created by Setsid.
-		kill:      func() { _ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) },
-		closeTerm: func() { _ = master.Close() },
+		kill:       func() { _ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) },
+		closeTerm:  func() { _ = master.Close() },
+		releaseTTY: releaseTTY,
 		// setTerminalSize's TIOCSWINSZ on the master is the whole mechanism: the
 		// kernel records the new size AND sends SIGWINCH to the terminal's
 		// foreground process group, so the child learns about it exactly as it
