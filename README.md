@@ -152,7 +152,7 @@ scenarios:
             empty: true
 ```
 
-`atago run` accepts spec files and directories (searched recursively for `*.atago.yaml`; the `*.atago.yml` spelling is accepted too). Each scenario runs in its own temporary directory, and progress streams as a dot per scenario (`.` pass, `F` fail, `E` error, `s` skip):
+`atago run` accepts spec files and directories (searched recursively for `*.atago.yaml`; the `*.atago.yml` spelling is accepted too). Each scenario runs in its own temporary directory, and progress streams as a dot per scenario (`.` pass, `F` fail, `E` error, `s` skip, `f` flaky, `x` XFAIL, `X` XPASS):
 
 ```shell
 $ atago run ./specs
@@ -273,7 +273,7 @@ ssh       run a command on a remote host over SSH (edit host/user first)
 
 Every feature has a commented, runnable spec under [examples/](examples/), tested in CI on Linux, macOS, and Windows. The **[cookbook](https://nao1215.github.io/atago/cookbook/)** collects 50+ copyable recipes for common jobs — converting images, driving prompts and TUIs, simulating API failures offline, proving idempotency — and indexes every spec by task and by feature.
 
-Selection flags compose with any spec: `--filter NAME` (repeatable, and comma-separated for OR — `--filter a,b` or `--filter a --filter b` runs scenarios whose name contains `a` or `b`), `--tag T` and `--skip-tag T` (tags match exactly, not by substring — `atago list` shows the available tags), `--parallel N`, `--fail-fast`, and `--rerun-failed`. While authoring, `--verbose` traces every command, capture, and assertion verdict — for passing scenarios too.
+Selection flags compose with any spec: `--filter NAME` (repeatable, and comma-separated for OR — `--filter a,b` or `--filter a --filter b` runs scenarios whose name contains `a` or `b`), `--tag T` and `--skip-tag T` (tags match exactly, not by substring — `atago list` shows the available tags), `--parallel N`, `--fail-fast` (stops at the first outcome that fails the run), and `--rerun-failed`. Flags may be written before, after, or between the paths. While authoring, `--verbose` traces every command, capture, and assertion verdict — for passing scenarios too.
 
 ## Use it in CI
 

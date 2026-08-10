@@ -2900,6 +2900,50 @@ the test from the host environment](#isolate-the-test-from-the-host-environment)
 and unpinned terminal geometry in TUI tests — set `rows:`/`cols:` on the
 `pty:` step so the frame cannot wrap differently between machines.
 
+## Stop a suite at the first red verdict
+
+A suite that takes twenty minutes has already told you what you need to know
+the moment one scenario goes red. `--fail-fast` stops scheduling new scenarios
+then, across every spec file in the run:
+
+```yaml
+version: "1"
+suite:
+  name: long suite
+
+scenarios:
+  - name: the migration applies cleanly
+    steps:
+      - run:
+          command: mytool migrate
+      - assert:
+          exit_code: 0
+
+  - name: an export of the migrated data round-trips
+    steps:
+      - run:
+          command: mytool export --all
+      - assert:
+          exit_code: 0
+```
+
+```shell
+atago run --fail-fast ./specs                  # stop as soon as the run is red
+atago run --fail-fast --parallel 1 ./specs     # deterministic: exactly one red scenario runs
+```
+
+Red means every outcome that decides the exit code: a failed assertion, an
+execution error, an **XPASS** (an `expect_fail:` scenario whose bug is fixed),
+and a scenario that only passed on a retry. `--allow-flaky` and `--allow-xpass`
+make those last two green again, and then they no longer stop the run.
+
+Scenarios already in flight finish, so under `--parallel N` up to N results
+still arrive after the first failure. Everything that never started is reported
+as `skipped after fail-fast` rather than silently missing, which keeps the
+summary's counts honest about how much of the suite actually ran. Pair it with
+[`--rerun-failed`](#hunt-down-a-flaky-scenario) to replay just what stopped the
+run after a fix.
+
 ## Troubleshooting
 
 The failures every new spec hits once, and the fast way out of each.
