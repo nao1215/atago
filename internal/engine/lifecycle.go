@@ -29,6 +29,15 @@ func (x *scenarioRun) initStore() {
 	// specs can build absolute env paths (e.g. HOME=${workdir}/home,
 	// GOBIN=${workdir}/gobin) that child toolchains require.
 	st.Set("workdir", x.workdir)
+	// ${specdir} is where the spec file lives, and ${fixtures} the committed
+	// fixture tree a directory manifest points at (#394). Both are inputs: a
+	// scenario reads from them and writes into ${workdir}, which is the only
+	// directory it owns. They are seeded after the suite values and before the
+	// matrix row, so a matrix cell could shadow neither by accident.
+	st.Set("specdir", absPath(x.specDir))
+	if x.rc.fixturesDir != "" {
+		st.Set("fixtures", x.rc.fixturesDir)
+	}
 	// Seed matrix row variables so ${name} references in commands, env, and
 	// assertions resolve to this instance's values.
 	for k, v := range x.sc.Vars {

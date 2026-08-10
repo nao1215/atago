@@ -538,6 +538,7 @@ var exampleSpecs = map[string]bool{ // path -> hermetic (run, not just validate)
 	"examples/suite_setup.atago.yaml":          false,
 	"examples/teardown.atago.yaml":             true,
 	"examples/timeouts.atago.yaml":             true,
+	"examples/project_manifest.atago.yaml":     true,
 	"examples/expect_fail.atago.yaml":          true,
 }
 
@@ -577,20 +578,53 @@ func TestExamples_EveryFileCategorized(t *testing.T) {
 func TestCookbook_SnippetsValid(t *testing.T) {
 	t.Parallel()
 	doc := readDoc(t, "doc/cookbook.md")
-	blocks := regexp.MustCompile("(?s)```yaml\n(.*?)```").FindAllStringSubmatch(doc, -1)
+	// The prose preceding a block decides which loader validates it: the
+	// cookbook shows two kinds of YAML, and a directory manifest is not a spec
+	// (#392). Keying on the introducing text rather than on a special fence
+	// keeps both kinds guarded — a manifest snippet with a typo would otherwise
+	// have to be excluded from the drift test entirely to stop it failing as a
+	// spec, which is how an unvalidated recipe gets in.
+	blocks := regexp.MustCompile("(?s)```yaml\n(.*?)```").FindAllStringSubmatchIndex(doc, -1)
 	if len(blocks) == 0 {
 		t.Fatal("doc/cookbook.md contains no ```yaml blocks")
 	}
 	dir := t.TempDir()
-	for i, m := range blocks {
+	for i, loc := range blocks {
+		body := doc[loc[2]:loc[3]]
+		if isManifestSnippet(doc, loc[0]) {
+			// A recipe names a fixtures_dir the reader will create; materialize
+			// it so the snippet is validated for SHAPE, which is what a doc
+			// drift guard is for, rather than failing on a directory that only
+			// exists in the reader's repository.
+			if err := os.MkdirAll(filepath.Join(dir, "testdata"), 0o750); err != nil {
+				t.Fatalf("prepare snippet fixtures dir: %v", err)
+			}
+			path := filepath.Join(dir, fmt.Sprintf("snippet_%02d.project.yaml", i))
+			if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+				t.Fatalf("write snippet %d: %v", i, err)
+			}
+			if _, err := loader.LoadProject(path); err != nil {
+				t.Errorf("doc/cookbook.md manifest snippet %d does not load/validate: %v", i, err)
+			}
+			continue
+		}
 		path := filepath.Join(dir, fmt.Sprintf("snippet_%02d.atago.yaml", i))
-		if err := os.WriteFile(path, []byte(m[1]), 0o600); err != nil {
+		if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
 			t.Fatalf("write snippet %d: %v", i, err)
 		}
 		if _, err := loader.Load(path); err != nil {
 			t.Errorf("doc/cookbook.md snippet %d does not load/validate: %v", i, err)
 		}
 	}
+}
+
+// isManifestSnippet reports whether the fenced block starting at fenceStart is
+// introduced as a directory manifest rather than a spec. It looks at the prose
+// immediately above the fence, which is where the cookbook names the file.
+func isManifestSnippet(doc string, fenceStart int) bool {
+	const lookback = 200
+	from := max(fenceStart-lookback, 0)
+	return strings.Contains(doc[from:fenceStart], loader.ProjectFileName)
 }
 
 // TestExamplesIndex_InLockstep keeps doc/examples.md honest in both

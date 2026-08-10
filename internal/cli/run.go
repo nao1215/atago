@@ -45,6 +45,7 @@ type runOptions struct {
 	rerunFailed     bool
 	allowFlaky      bool
 	allowXPass      bool
+	profile         string
 	verbose         bool
 	ci              bool
 	stdout          io.Writer
@@ -124,6 +125,34 @@ func runCmd(label string, args []string, stdout, stderr io.Writer) int {
 	if opts.parallel > 1 {
 		eng.Sem = make(chan struct{}, opts.parallel)
 	}
+	// Build the binary under test before anything runs (#393). It happens after
+	// the signal context exists so Ctrl-C interrupts a long build too, and
+	// before the first scenario because every scenario would otherwise be
+	// testing a stale binary or none at all.
+	scratch, scratchErr := os.MkdirTemp("", "atago-subject-")
+	if scratchErr != nil {
+		fmt.Fprintf(stderr, "%s: %v\n", label, scratchErr)
+		return ExitInternal
+	}
+	defer func() { _ = os.RemoveAll(scratch) }()
+	built, buildErr := buildSubjects(ctx, paths, opts.profile, scratch, stderr)
+	if buildErr != nil {
+		fmt.Fprintf(stderr, "%s: %v\n", label, buildErr)
+		// A manifest that will not load is spec content, not an execution
+		// failure, and it has to exit the same way it did before the build phase
+		// existed — discovering the manifest earlier must not change what the
+		// same broken file reports.
+		var lerr *loader.Error
+		if errors.As(buildErr, &lerr) {
+			return exitForLoadError(lerr)
+		}
+		return ExitExec
+	}
+	if err := exposeSubjects(built); err != nil {
+		fmt.Fprintf(stderr, "%s: %v\n", label, err)
+		return ExitInternal
+	}
+
 	start := time.Now()
 	suiteResults, loadErrs := runSpecs(ctx, eng, paths)
 	elapsed := time.Since(start)
@@ -154,11 +183,12 @@ func parseRunFlags(label string, args []string, stdout, stderr io.Writer) (*runO
 	rerunFailed := fs.Bool("rerun-failed", false, "run only the scenarios that failed on the previous run (recorded in .atago/last-failed.json)")
 	repeat := fs.Int("repeat", 0, "run each selected scenario N times to surface flakiness; any failing iteration fails the run")
 	retryFailed := fs.Int("retry-failed", 0, "retry failed scenarios up to N times; a recovered scenario is reported as flaky and still fails the run unless --allow-flaky")
+	profile := fs.String("profile", "", "build the subject with the named `profile` from the directory manifest (e.g. a coverage-instrumented build)")
 	allowFlaky := fs.Bool("allow-flaky", false, "exit 0 when the only problem is flakiness; for a suite whose instability is known and accepted")
 	allowXPass := fs.Bool("allow-xpass", false, "exit 0 when an expect_fail scenario passed (XPASS); by default a fixed known bug fails the run so the spec gets promoted")
 	verbose := fs.Bool("verbose", false, "trace every scenario as it finishes: commands, exit codes, captured output, and per-assertion verdicts — for passing scenarios too")
 	fs.Usage = func() {
-		fmt.Fprint(stderr, "Usage: atago run [--report console|json|junit|gha|tap] [--update-snapshots] [--parallel N] [--fail-fast] [--filter S] [--tag T] [--skip-tag T] [--rerun-failed] [--repeat N] [--retry-failed N] [--allow-flaky] [--allow-xpass] [--artifacts-dir DIR] [--verbose] [--ci] <path | dir>...\n  (directories are searched recursively)\n")
+		fmt.Fprint(stderr, "Usage: atago run [--report console|json|junit|gha|tap] [--update-snapshots] [--parallel N] [--fail-fast] [--filter S] [--tag T] [--skip-tag T] [--rerun-failed] [--repeat N] [--retry-failed N] [--allow-flaky] [--allow-xpass] [--profile NAME] [--artifacts-dir DIR] [--verbose] [--ci] <path | dir>...\n  (directories are searched recursively)\n")
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(args); err != nil {
@@ -229,6 +259,7 @@ func parseRunFlags(label string, args []string, stdout, stderr io.Writer) (*runO
 		rerunFailed:     *rerunFailed,
 		allowFlaky:      *allowFlaky,
 		allowXPass:      *allowXPass,
+		profile:         *profile,
 		verbose:         *verbose,
 		ci:              *ci,
 		stdout:          stdout,

@@ -123,6 +123,7 @@ func (e *Engine) Run(ctx context.Context, s *spec.Spec, specPath string) *SuiteR
 	res := &SuiteResult{Suite: s.Suite.Name, SpecPath: specPath, Status: StatusPassed}
 	rc := runConfig{
 		specDir:      filepath.Dir(specPath),
+		fixturesDir:  absPath(s.FixturesDir),
 		specPath:     specPath,
 		masker:       security.NewMaskerForSpec(s),
 		scrubber:     newScrubber(s),
@@ -144,7 +145,7 @@ func (e *Engine) Run(ctx context.Context, s *spec.Spec, specPath string) *SuiteR
 	// Suite lifecycle (#7): run suite.setup once before any scenario, expose
 	// its scratch dir/stores/services to every scenario, and guarantee
 	// suite.teardown runs after the last one (before services stop, LIFO).
-	suiteRT, rtErr := e.newSuiteRuntime(s)
+	suiteRT, rtErr := e.newSuiteRuntime(s, rc.specDir, rc.fixturesDir)
 	if rtErr != nil {
 		res.Status = StatusError
 		for _, i := range selected {
@@ -346,9 +347,12 @@ func hasAnyTag(sc *spec.Scenario, tags []string) bool {
 // suite: where the spec lives, the secret masker, the named runners, and the
 // network allowlist enforced for HTTP steps.
 type runConfig struct {
-	specDir  string
-	specPath string
-	masker   *security.Masker
+	specDir string
+	// fixturesDir is the committed fixture tree a directory manifest points at
+	// (#394), exposed to every scenario as ${fixtures}.
+	fixturesDir string
+	specPath    string
+	masker      *security.Masker
 	// scrubber applies the spec's declarative snapshot scrub rules (#137). Nil
 	// when the spec declares no `scrub:`; its Apply method is nil-safe, so it is
 	// always safe to pass scrubber.Apply as the assert Env's Scrub hook.
@@ -375,6 +379,24 @@ type runConfig struct {
 	// suiteMocks are the suite-wide stub HTTP servers (#24), threaded here so
 	// scenario `mock:` asserts can read their recorded requests.
 	suiteMocks []*mockrunner.Server
+}
+
+// absPath makes a path absolute for use as a spec variable, falling back to the
+// original when the working directory cannot be read.
+//
+// ${specdir} and ${fixtures} MUST be absolute: a scenario runs in an isolated
+// temp workdir, so a relative path — which is what the CLI usually receives —
+// would resolve against the wrong directory and silently read nothing. This is
+// the same reason ${workdir} is absolute.
+func absPath(p string) string {
+	if p == "" {
+		return p
+	}
+	abs, err := filepath.Abs(p)
+	if err != nil {
+		return p
+	}
+	return abs
 }
 
 // worseStatus returns the more severe of two statuses (error > failed > passed,

@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/nao1215/atago/main/schema/atago.project.schema.json",
+  "title": "atago project manifest",
+  "description": "Directory-level configuration for a tree of atago specs (#392). Named atago.project.yaml and discovered from a spec's own location by walking up to the nearest one, so `atago run ./e2e` and `atago run ./e2e/one.atago.yaml` resolve the same configuration. It carries what belongs to a DIRECTORY rather than to a file — shared defaults, shared environment, and the committed fixture tree — and never scenario definitions: it is configuration, not composition.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "env": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "Environment variables for every spec under this directory. The weakest layer: host < project < suite < scenario < step, so any level below may override a key."
+    },
+    "defaults": {
+      "$ref": "https://raw.githubusercontent.com/nao1215/atago/main/schema/atago.schema.json#/$defs/defaults",
+      "description": "Default fragments merged beneath every matching element of every spec under this directory, with the same rules a spec file's own `defaults:` uses (#39): an explicit value always wins, maps shallow-merge, and a spec file's own defaults: beat these."
+    },
+    "fixtures_dir": {
+      "type": "string",
+      "minLength": 1,
+      "description": "A committed fixture tree, resolved relative to this manifest's directory (absolute paths allowed) and exposed to every spec under it as ${fixtures} (#394). It is checked to exist at load time, so a typo is one message about the manifest rather than N per-scenario failures about a missing file. Treat it as read-only input: steps write into ${workdir}."
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "artifact",
+        "build"
+      ],
+      "description": "The binary under test (#393): how to build it, and what specs call it. The build runs ONCE per `atago run` invocation, before any scenario, and the artifact's directory is prepended to PATH so a bare name in a spec resolves to the freshly built binary. Deliberately language-neutral — a build is just a command.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "What specs call the binary. On Windows the artifact resolves with a .exe suffix automatically."
+        },
+        "artifact": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Where the build writes, relative to a run-scoped scratch directory (never into the repository). ${artifact} in the build command expands to its absolute path."
+        },
+        "build": {
+          "$ref": "#/$defs/build",
+          "description": "The command that produces the artifact."
+        }
+      }
+    },
+    "profiles": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "A named build variation selected with `atago run --profile NAME`. It must set build, env, or both.",
+        "properties": {
+          "build": {
+            "$ref": "#/$defs/build",
+            "description": "Replaces the subject's build command wholly while this profile is active. Whole-command replacement rather than a merge: a half-merged build command is unpredictable."
+          },
+          "env": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Environment layered into the build and into every spec under the manifest while this profile is active. This is where a coverage run passes GOCOVERDIR or LLVM_PROFILE_FILE — atago knows nothing about either; merging the raw profiles afterwards stays a toolchain job."
+          }
+        }
+      },
+      "description": "Named build variations (#393), e.g. a coverage-instrumented build. Without --profile the plain subject.build runs, so the default path is unchanged."
+    }
+  },
+  "$defs": {
+    "build": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command"
+      ],
+      "description": "One build command.",
+      "properties": {
+        "command": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The build command. ${artifact} expands to the absolute output path. Parsed as argv unless shell is set."
+        },
+        "shell": {
+          "type": "boolean",
+          "description": "Run the command through a shell, for a build that needs shell syntax."
+        },
+        "cwd": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Where the build runs, relative to the manifest's directory. A manifest under e2e/ usually builds from the module root above it."
+        },
+        "timeout": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Go duration bounding the build (default 10m). A hung build must fail the run rather than the CI job's wall clock."
+        }
+      }
+    }
+  }
+}

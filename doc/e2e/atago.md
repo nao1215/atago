@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-78 suites · 494 scenarios
+80 suites · 508 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -358,6 +358,14 @@
   - [metadata is found inside a compressed object stream](#scenario-metadata-is-found-inside-a-compressed-object-stream)
   - [a wrong expectation still fails against compressed metadata](#scenario-a-wrong-expectation-still-fails-against-compressed-metadata)
   - [a stream that ends without a newline does not swallow the next object](#scenario-a-stream-that-ends-without-a-newline-does-not-swallow-the-next-object)
+- [atago self-hosting / directory manifest](#atago-self-hosting--directory-manifest) — 7 scenarios
+  - [a manifest applies to a spec nested below it](#scenario-a-manifest-applies-to-a-spec-nested-below-it)
+  - [the nearest manifest wins](#scenario-the-nearest-manifest-wins)
+  - [a spec's own values beat the manifest](#scenario-a-specs-own-values-beat-the-manifest)
+  - [specdir points at the spec's own directory](#scenario-specdir-points-at-the-specs-own-directory)
+  - [explain names the manifest that applied](#scenario-explain-names-the-manifest-that-applied)
+  - [a manifest pointing at a missing fixtures dir fails to load](#scenario-a-manifest-pointing-at-a-missing-fixtures-dir-fails-to-load)
+  - [an unknown manifest key is rejected](#scenario-an-unknown-manifest-key-is-rejected)
 - [atago self-hosting / pty](#atago-self-hosting--pty) — 14 scenarios
   - [a pty step sees a terminal where a run step sees a pipe](#scenario-a-pty-step-sees-a-terminal-where-a-run-step-sees-a-pipe)
   - [a never-matching expect fails with the pattern in the block](#scenario-a-never-matching-expect-fails-with-the-pattern-in-the-block)
@@ -526,6 +534,14 @@
   - [a line selector composes with contains](#scenario-a-line-selector-composes-with-contains)
   - [a line selector composes with a regex](#scenario-a-line-selector-composes-with-a-regex)
   - [stderr carries the same matcher semantics as stdout](#scenario-stderr-carries-the-same-matcher-semantics-as-stdout)
+- [atago self-hosting / subject builds](#atago-self-hosting--subject-builds) — 7 scenarios
+  - [the built artifact resolves by bare name from a spec](#scenario-the-built-artifact-resolves-by-bare-name-from-a-spec)
+  - [a profile swaps the build and adds environment](#scenario-a-profile-swaps-the-build-and-adds-environment)
+  - [an unknown profile names the ones that exist](#scenario-an-unknown-profile-names-the-ones-that-exist)
+  - [an artifact nothing can execute is refused](#scenario-an-artifact-nothing-can-execute-is-refused)
+  - [a failing build stops the run and carries the build output](#scenario-a-failing-build-stops-the-run-and-carries-the-build-output)
+  - [a build that writes nothing is caught, not passed on](#scenario-a-build-that-writes-nothing-is-caught-not-passed-on)
+  - [a manifest with no subject leaves the run untouched](#scenario-a-manifest-with-no-subject-leaves-the-run-untouched)
 - [atago self-hosting / suite env from setup](#atago-self-hosting--suite-env-from-setup) — 6 scenarios
   - [a value captured in setup reaches every scenario as env](#scenario-a-value-captured-in-setup-reaches-every-scenario-as-env)
   - [a service publishes its ephemeral address into suite env](#scenario-a-service-publishes-its-ephemeral-address-into-suite-env)
@@ -6691,6 +6707,238 @@ ${atago} run nonewline.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `PASSED`
+## atago self-hosting / directory manifest
+Source: `test/e2e/atago/project_manifest.atago.yaml`
+### Scenario: a manifest applies to a spec nested below it
+#### Given
+- Fixture file `atago.project.yaml` is created.
+- Fixture file `corpus/golden.txt` is created.
+- Fixture file `deep/nested/inner.atago.yaml` is created.
+#### Inputs
+_Fixture `atago.project.yaml`:_
+```text
+env:
+  PROJECT_WIDE: from-manifest
+fixtures_dir: corpus
+```
+_Fixture `corpus/golden.txt`:_
+```text
+committed corpus
+```
+_Fixture `deep/nested/inner.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: reads the manifest env and the fixture corpus
+    steps:
+      - run:
+          shell: true
+          command: "echo v=$PROJECT_WIDE && cat $${fixtures}/golden.txt"
+      - assert:
+          stdout:
+            contains:
+              - "v=from-manifest"
+              - "committed corpus"
+```
+#### When
+```shell
+${atago} run deep/nested/inner.atago.yaml
+```
+#### Then
+- exit code is `0`
+### Scenario: the nearest manifest wins
+#### Given
+- Fixture file `atago.project.yaml` is created.
+- Fixture file `deep/atago.project.yaml` is created.
+- Fixture file `deep/spec.atago.yaml` is created.
+#### Inputs
+_Fixture `atago.project.yaml`:_
+```text
+env:
+  WHICH: outer
+```
+_Fixture `deep/atago.project.yaml`:_
+```text
+env:
+  WHICH: inner
+```
+_Fixture `deep/spec.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: nearest
+scenarios:
+  - name: reads the nearer manifest
+    steps:
+      - run:
+          shell: true
+          command: "echo which=$WHICH"
+      - assert:
+          stdout:
+            contains: "which=inner"
+```
+#### When
+```shell
+${atago} run deep/spec.atago.yaml
+```
+#### Then
+- exit code is `0`
+### Scenario: a spec's own values beat the manifest
+#### Given
+- Fixture file `atago.project.yaml` is created.
+- Fixture file `spec.atago.yaml` is created.
+#### Inputs
+_Fixture `atago.project.yaml`:_
+```text
+env:
+  SHARED: manifest
+  ONLY_HERE: yes
+defaults:
+  run:
+    shell: true
+```
+_Fixture `spec.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: precedence
+  env:
+    SHARED: spec
+scenarios:
+  - name: the spec wins per key, and inherits the rest
+    steps:
+      - run:
+          command: "echo shared=$SHARED only=$ONLY_HERE"
+      - assert:
+          stdout:
+            contains: "shared=spec only=yes"
+```
+#### When
+```shell
+${atago} run spec.atago.yaml
+```
+#### Then
+- exit code is `0`
+### Scenario: specdir points at the spec's own directory
+#### Given
+- Fixture file `sub/marker.txt` is created.
+- Fixture file `sub/spec.atago.yaml` is created.
+#### Inputs
+_Fixture `sub/marker.txt`:_
+```text
+beside the spec
+```
+_Fixture `sub/spec.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: specdir
+scenarios:
+  - name: reads a file beside itself
+    steps:
+      - run:
+          shell: true
+          command: "cat $${specdir}/marker.txt"
+      - assert:
+          stdout:
+            contains: "beside the spec"
+```
+#### When
+```shell
+${atago} run sub/spec.atago.yaml
+```
+#### Then
+- exit code is `0`
+### Scenario: explain names the manifest that applied
+#### Given
+- Fixture file `atago.project.yaml` is created.
+- Fixture file `corpus/keep.txt` is created.
+- Fixture file `spec.atago.yaml` is created.
+#### Inputs
+_Fixture `atago.project.yaml`:_
+```text
+env:
+  SHOWN: yes
+fixtures_dir: corpus
+```
+_Fixture `corpus/keep.txt`:_
+```text
+x
+```
+_Fixture `spec.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: shown
+scenarios:
+  - name: one
+    steps:
+      - run:
+          command: echo hi
+```
+#### When
+```shell
+${atago} explain spec.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout contains `Project manifest:`, `atago.project.yaml`, `Fixtures ($${fixtures}):`
+### Scenario: a manifest pointing at a missing fixtures dir fails to load
+#### Given
+- Fixture file `atago.project.yaml` is created.
+- Fixture file `spec.atago.yaml` is created.
+#### Inputs
+_Fixture `atago.project.yaml`:_
+```text
+fixtures_dir: not-there
+```
+_Fixture `spec.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: bad
+scenarios:
+  - name: one
+    steps:
+      - run:
+          command: echo hi
+```
+#### When
+```shell
+${atago} run spec.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `fixtures_dir "not-there" does not exist`
+### Scenario: an unknown manifest key is rejected
+#### Given
+- Fixture file `atago.project.yaml` is created.
+- Fixture file `spec.atago.yaml` is created.
+#### Inputs
+_Fixture `atago.project.yaml`:_
+```text
+scenarios: []
+```
+_Fixture `spec.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: bad key
+scenarios:
+  - name: one
+    steps:
+      - run:
+          command: echo hi
+```
+#### When
+```shell
+${atago} run spec.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `scenarios`
 ## atago self-hosting / pty
 Source: `test/e2e/atago/pty.atago.yaml`
 ### Scenario: a pty step sees a terminal where a run step sees a pipe
@@ -9723,6 +9971,284 @@ printf 'to stderr\n' 1>&2
 #### Then
 - stdout is empty
 - stderr equals an exact value
+## atago self-hosting / subject builds
+Source: `test/e2e/atago/subject.atago.yaml`
+### Scenario: the built artifact resolves by bare name from a spec
+_skipped on Windows_
+#### Given
+- Fixture file `src/mytool` is created.
+- Fixture file `atago.project.yaml` is created.
+- Fixture file `spec.atago.yaml` is created.
+#### Inputs
+_Fixture `src/mytool`:_
+```text
+#!/bin/sh
+echo "mytool ${MARK:-plain}"
+```
+_Fixture `atago.project.yaml`:_
+```text
+subject:
+  name: mytool
+  artifact: bin/mytool
+  build:
+    shell: true
+    command: "cp src/mytool $${artifact} && chmod +x $${artifact}"
+```
+_Fixture `spec.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: calls the binary by name
+    steps:
+      - run:
+          command: mytool
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "mytool plain"
+```
+#### When
+```shell
+${atago} run spec.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout contains `1 passed`
+### Scenario: a profile swaps the build and adds environment
+_skipped on Windows_
+#### Given
+- Fixture file `src/mytool` is created.
+- Fixture file `src/alt` is created.
+- Fixture file `atago.project.yaml` is created.
+- Fixture file `spec.atago.yaml` is created.
+#### Inputs
+_Fixture `src/mytool`:_
+```text
+#!/bin/sh
+echo "mytool ${MARK:-plain}"
+```
+_Fixture `src/alt`:_
+```text
+#!/bin/sh
+echo "mytool profiled"
+```
+_Fixture `atago.project.yaml`:_
+```text
+subject:
+  name: mytool
+  artifact: bin/mytool
+  build:
+    shell: true
+    command: "cp src/mytool $${artifact} && chmod +x $${artifact}"
+profiles:
+  marked:
+    build:
+      shell: true
+      # A different build, not just different env: the profile
+      # installs a second script, so a run that ignored the build
+      # swap would still print "plain".
+      command: "cp src/alt $${artifact} && chmod +x $${artifact}"
+    env:
+      MARK: "ignored-by-alt"
+```
+_Fixture `spec.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: sees the profile environment
+    steps:
+      - run:
+          command: mytool
+      - assert:
+          stdout:
+            contains: "mytool profiled"
+```
+#### When
+```shell
+${atago} run --profile marked spec.atago.yaml
+${atago} run spec.atago.yaml
+```
+#### Then
+- after `${atago} run --profile marked spec.atago.yaml`:
+  - exit code is `0`
+- after `${atago} run spec.atago.yaml`:
+  - exit code is `1`
+### Scenario: an unknown profile names the ones that exist
+_skipped on Windows_
+#### Given
+- Fixture file `src/mytool` is created.
+- Fixture file `atago.project.yaml` is created.
+- Fixture file `spec.atago.yaml` is created.
+#### Inputs
+_Fixture `src/mytool`:_
+```text
+#!/bin/sh
+echo ok
+```
+_Fixture `atago.project.yaml`:_
+```text
+subject:
+  name: mytool
+  artifact: bin/mytool
+  build:
+    shell: true
+    command: "cp src/mytool $${artifact} && chmod +x $${artifact}"
+profiles:
+  cover:
+    env:
+      GOCOVERDIR: "/tmp"
+```
+_Fixture `spec.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: one
+    steps:
+      - run:
+          command: mytool
+```
+#### When
+```shell
+${atago} run --profile race spec.atago.yaml
+```
+#### Then
+- exit code is `4`
+- stderr contains `declares no profile "race"`, `cover`
+### Scenario: an artifact nothing can execute is refused
+_skipped on Windows_
+#### Given
+- Fixture file `atago.project.yaml` is created.
+- Fixture file `spec.atago.yaml` is created.
+#### Inputs
+_Fixture `atago.project.yaml`:_
+```text
+subject:
+  name: mytool
+  artifact: bin/mytool
+  build:
+    shell: true
+    command: "echo not-a-program > $${artifact}"
+```
+_Fixture `spec.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: one
+    steps:
+      - run:
+          command: mytool
+```
+#### When
+```shell
+${atago} run spec.atago.yaml
+```
+#### Then
+- exit code is `4`
+- stderr contains `execute bit`
+### Scenario: a failing build stops the run and carries the build output
+_skipped on Windows_
+#### Given
+- Fixture file `atago.project.yaml` is created.
+- Fixture file `spec.atago.yaml` is created.
+#### Inputs
+_Fixture `atago.project.yaml`:_
+```text
+subject:
+  name: mytool
+  artifact: bin/mytool
+  build:
+    shell: true
+    command: "echo BUILD-BROKE >&2; exit 3"
+```
+_Fixture `spec.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: never runs
+    steps:
+      - run:
+          command: mytool
+```
+#### When
+```shell
+${atago} run spec.atago.yaml
+```
+#### Then
+- exit code is `4`
+- stdout does not contain `never runs`
+- stderr contains `BUILD-BROKE`, `exit 3`
+### Scenario: a build that writes nothing is caught, not passed on
+_skipped on Windows_
+#### Given
+- Fixture file `atago.project.yaml` is created.
+- Fixture file `spec.atago.yaml` is created.
+#### Inputs
+_Fixture `atago.project.yaml`:_
+```text
+subject:
+  name: mytool
+  artifact: bin/mytool
+  build:
+    command: "true"
+```
+_Fixture `spec.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: one
+    steps:
+      - run:
+          command: mytool
+```
+#### When
+```shell
+${atago} run spec.atago.yaml
+```
+#### Then
+- exit code is `4`
+- stderr contains `produced no file`
+### Scenario: a manifest with no subject leaves the run untouched
+#### Given
+- Fixture file `atago.project.yaml` is created.
+- Fixture file `spec.atago.yaml` is created.
+#### Inputs
+_Fixture `atago.project.yaml`:_
+```text
+env:
+  JUST_ENV: "1"
+```
+_Fixture `spec.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: one
+    steps:
+      - run:
+          command: echo hi
+      - assert:
+          exit_code: 0
+```
+#### When
+```shell
+${atago} run spec.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stderr does not contain `building`
 ## atago self-hosting / suite env from setup
 Source: `test/e2e/atago/suite_env.atago.yaml`
 ### Scenario: a value captured in setup reaches every scenario as env

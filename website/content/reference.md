@@ -57,6 +57,49 @@ release).
 
 {{< spec-reference >}}
 
+## Directory manifest
+
+A directory of specs may carry an `atago.project.yaml` holding what belongs to the tree rather than to one file:
+
+```yaml
+env:
+  MYTOOL_REGISTRY: "http://127.0.0.1:8080"
+defaults:
+  run:
+    sandbox_home: true
+fixtures_dir: testdata
+```
+
+It can also declare the binary under test:
+
+```yaml
+subject:
+  name: mytool
+  artifact: bin/mytool
+  build:
+    command: "go build -o ${artifact} ."
+    cwd: ".."
+profiles:
+  cover:
+    build:
+      command: "go build -cover -covermode=atomic -coverpkg=./... -o ${artifact} ."
+    env:
+      GOCOVERDIR: "${env:GOCOVERDIR}"
+```
+
+`atago run` builds it once per invocation, before any scenario, and prepends the artifact's directory to `PATH`. `--profile NAME` swaps in that profile's build command (whole-command replacement) and layers its `env`. A failing build — or one that exits 0 without writing `${artifact}` — is a run-level error and no scenario executes.
+
+It is discovered by walking up from a spec to the nearest one, so `atago run ./e2e` and `atago run ./e2e/one.atago.yaml` resolve the same configuration. Precedence is host < project < suite < scenario < step for `env`, and a spec file's own `defaults:` beat the manifest's. `fixtures_dir` resolves against the manifest's directory and must exist at load time. `atago explain` prints the manifest that applied and the resolved fixtures directory. Its own schema is [atago.project.schema.json](https://github.com/nao1215/atago/blob/main/schema/atago.project.schema.json).
+
+| Variable | Is |
+|----------|----|
+| `${workdir}` | this scenario's isolated temp directory — the only one it owns |
+| `${suitedir}` | the suite's scratch directory, shared by `suite.setup` and every scenario |
+| `${specdir}` | the directory holding the spec file (read-only input) |
+| `${fixtures}` | the manifest's `fixtures_dir` (read-only input); unset when no manifest declares one |
+
+All four are absolute, because a scenario runs somewhere other than where its spec lives.
+
 ## Editor support (JSON Schema)
 
 A JSON Schema lives at [schema/atago.schema.json](https://github.com/nao1215/atago/blob/main/schema/atago.schema.json). With the YAML language server you get completion and validation as you type — step types, every matcher, and the `${workdir}` / `${env:NAME}` / `${name}` / `$${...}` expansion rules. `atago init` and `atago record` already emit this header as the first line of every generated spec, so scaffolded specs get completion out of the box. To add it to an existing spec, use the absolute URL (it resolves in any project, unlike a repo-relative path):

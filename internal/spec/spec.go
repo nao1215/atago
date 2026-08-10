@@ -27,6 +27,16 @@ type Spec struct {
 	// so nothing downstream (engine, manifest, explain) ever observes `defaults`.
 	Defaults  *Defaults  `yaml:"defaults,omitempty"`
 	Scenarios []Scenario `yaml:"scenarios"`
+
+	// FixturesDir is the committed fixture tree a directory manifest points at
+	// (#394), absolute. Set by the loader from atago.project.yaml, never
+	// authored in a spec, and exposed to every scenario as ${fixtures}.
+	FixturesDir string `yaml:"-"`
+	// ProjectPath is the manifest that applied to this spec, if any (#392). Set
+	// by the loader, never authored; the read-only commands print it, because
+	// configuration that applies to a file without appearing in it has to be
+	// visible somewhere.
+	ProjectPath string `yaml:"-"`
 }
 
 // ScrubRule is one declarative output-normalization rule (#137): every substring

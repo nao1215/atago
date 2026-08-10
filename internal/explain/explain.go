@@ -20,6 +20,14 @@ func Explain(w io.Writer, s *spec.Spec, path string) error {
 
 	fmt.Fprintf(&b, "Spec: %s\n", path)
 	fmt.Fprintf(&b, "Suite: %s\n", s.Suite.Name)
+	// Configuration that applies to a file without appearing in it has to be
+	// visible somewhere, or "where did this env come from" is unanswerable (#392).
+	if s.ProjectPath != "" {
+		fmt.Fprintf(&b, "Project manifest: %s\n", s.ProjectPath)
+	}
+	if s.FixturesDir != "" {
+		fmt.Fprintf(&b, "Fixtures (${fixtures}): %s\n", s.FixturesDir)
+	}
 	if s.Suite.Timeout != "" {
 		fmt.Fprintf(&b, "Default step timeout: %s (suite.timeout; a step or runner timeout overrides it)\n", s.Suite.Timeout)
 	}
