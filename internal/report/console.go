@@ -15,7 +15,7 @@ import (
 
 // writeSummary prints the final tally line. The uppercase status word
 // (PASSED/FAILED) anchors the line and is part of the stable output contract.
-func writeSummary(b *strings.Builder, color bool, c engine.Counts, total int, d time.Duration, hardFail bool, loadFailures int, allowFlaky bool) {
+func writeSummary(b *strings.Builder, color bool, c engine.Counts, total int, d time.Duration, hardFail bool, loadFailures int, allowFlaky, allowXPass bool) {
 	status, code := "PASSED", cGreen
 	// hardFail covers a suite that errored before producing any scenario row (#7):
 	// the counts are all zero, but the verdict must still read FAILED to match the
@@ -26,7 +26,10 @@ func writeSummary(b *strings.Builder, color bool, c engine.Counts, total int, d 
 	// A flaky scenario fails the run for the same reason it is reported at all, so
 	// the verdict follows it unless the caller passed --allow-flaky; the tally's
 	// ", N flaky" tail names it either way.
-	if c.Failed > 0 || c.Errored > 0 || hardFail || loadFailures > 0 || (c.Flaky > 0 && !allowFlaky) {
+	// An XPASS follows the same rule as a flake: it fails the run, so the
+	// headline has to say FAILED or it contradicts the exit code.
+	if c.Failed > 0 || c.Errored > 0 || hardFail || loadFailures > 0 ||
+		(c.Flaky > 0 && !allowFlaky) || (c.XPass > 0 && !allowXPass) {
 		status, code = "FAILED", cRed
 	}
 	plural := "scenarios"
@@ -45,7 +48,7 @@ func writeSummary(b *strings.Builder, color bool, c engine.Counts, total int, d 
 	}
 	fmt.Fprintf(b, "\n%s  %d %s: %d passed, %d failed, %d errored, %d skipped%s%s (%s)\n",
 		colorize(color, code+cBold, status), total, plural,
-		c.Passed, c.Failed, c.Errored, c.Skipped, flakySuffix(c), loadFail, d.Round(time.Millisecond))
+		c.Passed, c.Failed, c.Errored, c.Skipped, flakySuffix(c)+expectFailSuffix(c), loadFail, d.Round(time.Millisecond))
 }
 
 // writeDetail prints the failure/error block for a scenario, or nothing if it
@@ -82,6 +85,17 @@ func writeDetail(b *strings.Builder, color bool, suite, specPath string, sc *eng
 				}
 			}
 		}
+	case engine.StatusXPass:
+		// The loud one. A known bug that is no longer there means the fix landed
+		// and the scenario has to move into the suite that guards against a
+		// regression — a message nobody would ever read if it were a quiet note.
+		fmt.Fprintf(b, "\n%s %s / %s%s\n", colorize(color, cRed+cBold, "XPASS:"), suite, sc.Name, where)
+		fmt.Fprintf(b, "\n%s\n", indent(expectFailNarrative(sc.ExpectFail, true)))
+	case engine.StatusXFail:
+		// The quiet one: a known bug still failing is the expected outcome, so it
+		// is reported as a fact rather than as a problem to act on.
+		fmt.Fprintf(b, "\n%s %s / %s%s\n", colorize(color, cYellow+cBold, "XFAIL:"), suite, sc.Name, where)
+		fmt.Fprintf(b, "\n%s\n", indent(expectFailNarrative(sc.ExpectFail, false)))
 	case engine.StatusError:
 		for _, step := range sc.Steps {
 			if step.ErrMsg == "" {
@@ -347,4 +361,27 @@ func writeCheckFailure(b *strings.Builder, color bool, ck *assert.CheckResult, c
 	if ck.Hint != "" {
 		fmt.Fprintf(b, "\nHint:\n  %s\n", ck.Hint)
 	}
+}
+
+// expectFailNarrative renders what a reader needs next to an XFAIL or XPASS:
+// the reason the scenario is a known bug, where it is tracked, and — for an
+// XPASS — what to do about it now that it passes.
+func expectFailNarrative(ef *spec.ExpectFail, xpass bool) string {
+	var b strings.Builder
+	if ef != nil {
+		if ef.Reason != "" {
+			fmt.Fprintf(&b, "expect_fail: %s\n", ef.Reason)
+		}
+		if ef.Issue != "" {
+			fmt.Fprintf(&b, "issue: %s\n", ef.Issue)
+		}
+	}
+	if xpass {
+		b.WriteString("This scenario documents a bug that is no longer there. Move it into the suite\n")
+		b.WriteString("that guards against a regression (drop expect_fail:), and close the issue.\n")
+		b.WriteString("Pass --allow-xpass to keep the run green while you do.")
+	} else {
+		b.WriteString("Expected failure: the run stays green. It turns red the day the bug is fixed.")
+	}
+	return b.String()
 }

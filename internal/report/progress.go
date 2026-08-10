@@ -55,6 +55,10 @@ func (p *Progress) marker(status engine.Status) string {
 		return colorize(p.color, cYellow, "s")
 	case engine.StatusFlaky:
 		return colorize(p.color, cYellow, "f")
+	case engine.StatusXFail:
+		return colorize(p.color, cYellow, "x")
+	case engine.StatusXPass:
+		return colorize(p.color, cRed, "X")
 	default:
 		return "?"
 	}

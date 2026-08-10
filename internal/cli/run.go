@@ -44,6 +44,7 @@ type runOptions struct {
 	artifactsDir    string
 	rerunFailed     bool
 	allowFlaky      bool
+	allowXPass      bool
 	verbose         bool
 	ci              bool
 	stdout          io.Writer
@@ -154,9 +155,10 @@ func parseRunFlags(label string, args []string, stdout, stderr io.Writer) (*runO
 	repeat := fs.Int("repeat", 0, "run each selected scenario N times to surface flakiness; any failing iteration fails the run")
 	retryFailed := fs.Int("retry-failed", 0, "retry failed scenarios up to N times; a recovered scenario is reported as flaky and still fails the run unless --allow-flaky")
 	allowFlaky := fs.Bool("allow-flaky", false, "exit 0 when the only problem is flakiness; for a suite whose instability is known and accepted")
+	allowXPass := fs.Bool("allow-xpass", false, "exit 0 when an expect_fail scenario passed (XPASS); by default a fixed known bug fails the run so the spec gets promoted")
 	verbose := fs.Bool("verbose", false, "trace every scenario as it finishes: commands, exit codes, captured output, and per-assertion verdicts — for passing scenarios too")
 	fs.Usage = func() {
-		fmt.Fprint(stderr, "Usage: atago run [--report console|json|junit|gha|tap] [--update-snapshots] [--parallel N] [--fail-fast] [--filter S] [--tag T] [--skip-tag T] [--rerun-failed] [--repeat N] [--retry-failed N] [--allow-flaky] [--artifacts-dir DIR] [--verbose] [--ci] <path | dir>...\n  (directories are searched recursively)\n")
+		fmt.Fprint(stderr, "Usage: atago run [--report console|json|junit|gha|tap] [--update-snapshots] [--parallel N] [--fail-fast] [--filter S] [--tag T] [--skip-tag T] [--rerun-failed] [--repeat N] [--retry-failed N] [--allow-flaky] [--allow-xpass] [--artifacts-dir DIR] [--verbose] [--ci] <path | dir>...\n  (directories are searched recursively)\n")
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(args); err != nil {
@@ -226,6 +228,7 @@ func parseRunFlags(label string, args []string, stdout, stderr io.Writer) (*runO
 		artifactsDir:    *artifactsDir,
 		rerunFailed:     *rerunFailed,
 		allowFlaky:      *allowFlaky,
+		allowXPass:      *allowXPass,
 		verbose:         *verbose,
 		ci:              *ci,
 		stdout:          stdout,
@@ -274,7 +277,7 @@ func finishRun(opts *runOptions, suiteResults []*engine.SuiteResult, loadErrs []
 			continue
 		}
 		results = append(results, suiteResult)
-		exit = worseExit(exit, exitForSuite(suiteResult, opts.allowFlaky))
+		exit = worseExit(exit, exitForSuite(suiteResult, opts.allowFlaky, opts.allowXPass))
 	}
 	if progress != nil {
 		progress.Done()
@@ -374,7 +377,7 @@ func finishRun(opts *runOptions, suiteResults []*engine.SuiteResult, loadErrs []
 		}
 	}
 
-	if err := report.Render(opts.stdout, opts.format, results, report.WithLoadFailures(loadFailures), report.WithElapsed(elapsed), report.WithAllowFlaky(opts.allowFlaky)); err != nil {
+	if err := report.Render(opts.stdout, opts.format, results, report.WithLoadFailures(loadFailures), report.WithElapsed(elapsed), report.WithAllowFlaky(opts.allowFlaky), report.WithAllowXPass(opts.allowXPass)); err != nil {
 		fmt.Fprintf(opts.stderr, opts.label+": failed to write report: %v\n", err)
 		return worseExit(exit, ExitInternal)
 	}
@@ -651,19 +654,28 @@ func exitForLoadError(err error) int {
 // with instability the caller already knows about and accepts — atago's own pty
 // scenarios lose keystrokes when their sessions are starved of CPU — and it says
 // so at the command line instead of every run quietly going green.
-func exitForSuite(res *engine.SuiteResult, allowFlaky bool) int {
+func exitForSuite(res *engine.SuiteResult, allowFlaky, allowXPass bool) int {
 	// A security policy violation (e.g. a denied network host) takes precedence
 	// over the generic execution-error code.
 	if res.SecurityViolation {
 		return ExitSecurity
 	}
 	switch res.Status {
-	case engine.StatusPassed, engine.StatusSkipped, engine.StatusFlaky:
+	case engine.StatusPassed, engine.StatusSkipped, engine.StatusFlaky, engine.StatusXFail, engine.StatusXPass:
 		// A flaky scenario does not raise the suite's status — worseStatus ranks it
 		// alongside passed, so a suite of one flake and nine passes still reports
 		// passed — which is why the count is what decides here, the same value the
 		// console verdict reads.
-		if !allowFlaky && res.Counts().Flaky > 0 {
+		counts := res.Counts()
+		if !allowFlaky && counts.Flaky > 0 {
+			return ExitFailures
+		}
+		// An XPASS is a fixed bug nobody promoted yet: the scenario documents a
+		// defect that is no longer there, so it must move into the suite that
+		// guards against a regression. Failing the run is what makes that
+		// happen; --allow-xpass is for a caller who wants the warning without
+		// the red build.
+		if !allowXPass && counts.XPass > 0 {
 			return ExitFailures
 		}
 		return ExitOK

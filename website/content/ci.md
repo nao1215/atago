@@ -1,7 +1,7 @@
 ---
 toc: true
 title: Use it in CI
-description: Run atago suites in CI with JUnit/JSON/TAP/GitHub reports, loud retries for flaky scenarios, repeat-based flake detection, kept artifacts, and secret masking.
+description: Run atago suites in CI with JUnit/JSON/TAP/GitHub reports, loud retries for flaky scenarios, repeat-based flake detection, expected failures for known bugs, kept artifacts, and secret masking.
 ---
 
 Real E2E suites flake (timing, ports, external tools). `--retry-failed N` re-runs failed scenarios in a fresh workdir and reports recovered ones as flaky — green for the exit code, but loud in every report format; silent retries are explicitly a non-goal. `--repeat N` does the opposite job: run each scenario N times to detect flakiness before it reaches CI.
@@ -10,6 +10,15 @@ Real E2E suites flake (timing, ports, external tools). `--retry-failed N` re-run
 atago run --ci --retry-failed 2 ./specs          # keep CI green, report instability loudly
 atago run --repeat 20 --filter "race prone" ./specs   # flake detection
 ```
+
+A known bug you have not fixed yet belongs in CI too. A scenario with `expect_fail:` is reported **XFAIL** when it fails — the run stays green, and the reproduction keeps executing on every commit instead of rotting in a directory CI never runs. The day the bug is fixed it becomes **XPASS** and the run turns red, which is what gets the spec promoted into the guarded suite. An execution error is still an error, so a spec that stops running is never mistaken for a bug that is still there.
+
+```shell
+atago run --ci ./specs                 # an XPASS fails the build: promote the spec
+atago run --ci --allow-xpass ./specs   # the warning without the red build
+```
+
+In `--report junit` an XFAIL is a `<skipped>` testcase and an XPASS a `<failure>`; in `--report tap` both carry the standard `# TODO` directive; in `--report gha` they are a notice and an error annotation.
 
 [setup-atago](https://github.com/nao1215/setup-atago) installs a released binary:
 

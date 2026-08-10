@@ -378,9 +378,14 @@ type runConfig struct {
 }
 
 // worseStatus returns the more severe of two statuses (error > failed > passed,
-// skipped is neutral at suite level).
+// skipped is neutral at suite level). xfail is neutral for the same reason
+// flaky is — it is a fact about a scenario, and the run-level verdict is
+// decided by the counts, not by the worst scenario (#395).
 func worseStatus(a, b Status) Status {
-	rank := map[Status]int{StatusPassed: 0, StatusSkipped: 0, StatusFlaky: 0, StatusFailed: 1, StatusError: 2}
+	rank := map[Status]int{
+		StatusPassed: 0, StatusSkipped: 0, StatusFlaky: 0, StatusXFail: 0, StatusXPass: 0,
+		StatusFailed: 1, StatusError: 2,
+	}
 	if rank[b] > rank[a] {
 		return b
 	}

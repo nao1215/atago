@@ -168,6 +168,20 @@ type NetworkPolicy struct {
 }
 
 // Scenario is a single named behavior under test.
+// ExpectFail marks a scenario as a documented known bug (#395).
+//
+// The mapping form is the only one: a bare boolean would let an expected
+// failure into a suite with no record of WHY, and the next reader would have no
+// way to tell a deliberate reproduction from a test somebody gave up on.
+type ExpectFail struct {
+	// Reason says what is broken, in the author's words. Required.
+	Reason string `yaml:"reason"`
+	// Issue is where the bug is tracked. Optional, but it is what turns an
+	// XPASS into an actionable message ("this is fixed — close <url> and move
+	// the scenario into the guarded suite").
+	Issue string `yaml:"issue,omitempty"`
+}
+
 type Scenario struct {
 	Name string `yaml:"name"`
 	// Description is optional prose explaining the behavior this scenario pins
@@ -176,11 +190,17 @@ type Scenario struct {
 	// expanded, never read by the engine. Use it where the name cannot carry the
 	// background — the regression it guards, the failure mode it rules out — not
 	// to restate the name.
-	Description string            `yaml:"description,omitempty"`
-	Tags        []string          `yaml:"tags,omitempty"`
-	Skip        *Condition        `yaml:"skip,omitempty"`
-	Only        *Condition        `yaml:"only,omitempty"`
-	Env         map[string]string `yaml:"env,omitempty"`
+	Description string     `yaml:"description,omitempty"`
+	Tags        []string   `yaml:"tags,omitempty"`
+	Skip        *Condition `yaml:"skip,omitempty"`
+	Only        *Condition `yaml:"only,omitempty"`
+	// ExpectFail declares that this scenario documents a KNOWN bug: it is
+	// expected to fail, and failing is reported as XFAIL without failing the
+	// run (#395). Passing is XPASS, which does fail the run — a spec that
+	// silently starts passing is one nobody promotes, and the failure is what
+	// says the fix landed and the scenario belongs in the guarded suite now.
+	ExpectFail *ExpectFail       `yaml:"expect_fail,omitempty"`
+	Env        map[string]string `yaml:"env,omitempty"`
 	// Matrix, when set, makes this scenario a template: the loader expands it into
 	// one concrete scenario per row before validation.
 	// Each row's key/value pairs are seeded as ${name} variables for that instance.

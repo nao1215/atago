@@ -23,6 +23,27 @@ func flakyMessage(sc *engine.ScenarioResult) string {
 	return fmt.Sprintf("flaky: passed after %d attempts", sc.Attempts)
 }
 
+// expectFailSummary is the one-line "why is this a known bug" text every format
+// puts next to an XFAIL or XPASS: the reason, and the issue when there is one.
+// Shared for the same reason flakyMessage is — two lines describing the same
+// scenario must not word it differently.
+func expectFailSummary(sc *engine.ScenarioResult) string {
+	if sc.ExpectFail == nil {
+		return "expected failure"
+	}
+	if sc.ExpectFail.Issue != "" {
+		return sc.ExpectFail.Reason + " (" + sc.ExpectFail.Issue + ")"
+	}
+	return sc.ExpectFail.Reason
+}
+
+// xpassMessage says what an XPASS means and what to do, in one line, for the
+// formats that have room for one.
+func xpassMessage(sc *engine.ScenarioResult) string {
+	return "xpass: the known bug is fixed — drop expect_fail: and move this scenario into the guarded suite (" +
+		expectFailSummary(sc) + ")"
+}
+
 // flakySuffix renders the ", N flaky" tail of a summary tally. Flaky scenarios
 // (#29) are green for the verdict but never hidden, and the suffix appears only
 // when non-zero so steady-state output is unchanged. Console and gha share this
@@ -33,6 +54,22 @@ func flakySuffix(c engine.Counts) string {
 		return ""
 	}
 	return fmt.Sprintf(", %d flaky", c.Flaky)
+}
+
+// expectFailSuffix names the expected-failure tallies in the summary line
+// (#395). They are appended rather than folded into passed/failed because they
+// answer a different question — "how many known bugs are still known, and how
+// many are fixed" — and a reader who sees neither number cannot tell a suite
+// documenting three live bugs from one documenting none.
+func expectFailSuffix(c engine.Counts) string {
+	out := ""
+	if c.XFail > 0 {
+		out += fmt.Sprintf(", %d xfail", c.XFail)
+	}
+	if c.XPass > 0 {
+		out += fmt.Sprintf(", %d xpass", c.XPass)
+	}
+	return out
 }
 
 // Option configures an optional aspect of a Render call. It keeps the common
@@ -57,6 +94,10 @@ type renderOptions struct {
 	// the same way a load failure used to. When the caller accepts the
 	// instability, both go back to green together.
 	allowFlaky bool
+	// allowXPass mirrors --allow-xpass, for the same reason allowFlaky exists:
+	// an XPASS fails the run by default, so the summary must read FAILED unless
+	// the caller accepted it.
+	allowXPass bool
 }
 
 // WithLoadFailures records how many spec files failed to load for this run, so
@@ -76,6 +117,13 @@ func WithElapsed(d time.Duration) Option {
 // summary reads PASSED for a flaky-only run and matches its zero exit code.
 func WithAllowFlaky(allow bool) Option {
 	return func(o *renderOptions) { o.allowFlaky = allow }
+}
+
+// WithAllowXPass records that the caller accepts an expect_fail scenario that
+// passed, so the summary reads PASSED for an xpass-only run and matches its
+// zero exit code.
+func WithAllowXPass(allow bool) Option {
+	return func(o *renderOptions) { o.allowXPass = allow }
 }
 
 // Render writes one or more suite results in the requested format. Console
@@ -112,7 +160,7 @@ func Render(w io.Writer, f Format, results []*engine.SuiteResult, opts ...Option
 		if o.hasElapsed {
 			dur = o.elapsed
 		}
-		writeSummary(&b, color, agg, total, dur, hardFail, o.loadFailures, o.allowFlaky)
+		writeSummary(&b, color, agg, total, dur, hardFail, o.loadFailures, o.allowFlaky, o.allowXPass)
 		_, err := io.WriteString(w, b.String())
 		return err
 	case FormatJSON:

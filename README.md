@@ -206,6 +206,8 @@ scenarios:
 
 See [files_and_fixtures](examples/files_and_fixtures.atago.yaml), [snapshot](examples/snapshot.atago.yaml), and [dir_tree](examples/dir_tree.atago.yaml) for whole-tree golden manifests.
 
+`expect_fail:` pins a known bug you have not fixed yet without painting CI red: the scenario runs on every commit, an expected failure is XFAIL (green), and the day it starts passing the run turns red so the spec gets promoted. See [expect_fail](examples/expect_fail.atago.yaml).
+
 `count`/`min_count`/`max_count` say how MANY times a `contains` or `matches` matcher occurs — the duplicate-output bug a presence check passes — and `size`/`min_size`/`max_size` bound a file's byte count, composing with the content matchers or standing alone (`size: 0` pins "created but deliberately empty"). See [count_and_size](examples/count_and_size.atago.yaml).
 
 ### 3. Drive interactive prompts and TUIs

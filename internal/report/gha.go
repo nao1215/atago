@@ -30,6 +30,17 @@ func writeGHA(w io.Writer, results []*engine.SuiteResult) error {
 				// Green for the job, loud in the annotations (#29, #138).
 				fmt.Fprintf(&b, "::warning title=%s::%s\n",
 					ghaEscapeProp(res.Suite+" / "+sc.Name), ghaEscapeData(flakyMessage(sc)))
+			case engine.StatusXPass:
+				// An error annotation, matching the exit code: the fix landed and
+				// the scenario has to be promoted, which nobody does for a notice.
+				fmt.Fprintf(&b, "::error title=%s::%s\n",
+					ghaEscapeProp(res.Suite+" / "+sc.Name), ghaEscapeData(xpassMessage(sc)))
+			case engine.StatusXFail:
+				// A notice, not a warning: a known bug that is still broken is the
+				// expected outcome, and a warning per known bug would train
+				// reviewers to ignore the annotation channel.
+				fmt.Fprintf(&b, "::notice title=%s::%s\n",
+					ghaEscapeProp(res.Suite+" / "+sc.Name), ghaEscapeData("xfail: "+expectFailSummary(sc)))
 			}
 		}
 		// A suite that errored before any scenario ran (#7) surfaces its cause as
@@ -55,7 +66,7 @@ func writeGHA(w io.Writer, results []*engine.SuiteResult) error {
 	}
 	fmt.Fprintf(&b, "::notice title=atago::%s\n", ghaEscapeData(fmt.Sprintf(
 		"%d scenarios: %d passed, %d failed, %d errored, %d skipped%s",
-		total, agg.Passed, agg.Failed, agg.Errored, agg.Skipped, flakySuffix(agg))))
+		total, agg.Passed, agg.Failed, agg.Errored, agg.Skipped, flakySuffix(agg)+expectFailSuffix(agg))))
 	_, err := io.WriteString(w, b.String())
 	return err
 }

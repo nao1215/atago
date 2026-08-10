@@ -33,6 +33,7 @@
 | [Clean up external state even when a step fails](cookbook.md#clean-up-external-state-even-when-a-step-fails) | `teardown:` steps sharing the store |
 | [Run expensive setup once for the whole suite](cookbook.md#run-expensive-setup-once-for-the-whole-suite) | `suite.setup`, `${suitedir}` |
 | [Run a scenario only where it can pass](cookbook.md#run-a-scenario-only-where-it-can-pass) | `tags`, `skip:`/`only:` gates |
+| [Track a known bug with an expected-failure spec](cookbook.md#track-a-known-bug-with-an-expected-failure-spec) | `expect_fail:` — XFAIL stays green, XPASS fails the run |
 | [Run the same scenario over many inputs](cookbook.md#run-the-same-scenario-over-many-inputs) | `matrix:` expansion |
 | [Capture a value in one step and reuse it](cookbook.md#capture-a-value-in-one-step-and-reuse-it) | `store:` + `${name}` |
 | [Isolate the test from the host environment](cookbook.md#isolate-the-test-from-the-host-environment) | `clear_env`, `pass_env`, `sandbox_home` |
@@ -110,6 +111,7 @@
 | [signal](../examples/signal.atago.yaml) | `signal:` steps deliver SIGTERM/SIGHUP/... to a managed service's process group for graceful-shutdown and reload testing (POSIX-only) |
 | [defaults](../examples/defaults.atago.yaml) | sharing `shell`/`env`/`service` fragments across scenarios |
 | [suite_setup](../examples/suite_setup.atago.yaml) | once-per-suite bootstrap: ordered setup steps, suite-wide `service:` steps, `${suitedir}`, suite env, always-run suite teardown |
+| [expect_fail](../examples/expect_fail.atago.yaml) | `expect_fail:` keeps a known bug's reproduction in CI: XFAIL is green, XPASS fails the run so the fix gets promoted, an execution error is still an error |
 | [select_skip_only](../examples/select_skip_only.atago.yaml) | tags, and gating scenarios by OS, env var, or a probe command |
 | [db](../examples/db.atago.yaml) | SQL via the bundled SQLite driver, `rows` assertions, value binding |
 | [image_and_pdf](../examples/image_and_pdf.atago.yaml) | image format/dimension/similarity checks, PDF page/metadata/text checks |

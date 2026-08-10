@@ -1181,6 +1181,10 @@ func TestBugHunt_Rejections(t *testing.T) {
 		{"file size with exists false", specSteps("assert: {file: {path: out.txt, exists: false, size: 0}}"), "an absent file has no size"},
 		{"file size with two content matchers", specSteps("assert: {file: {path: out.txt, exists: true, contains: a, size: 3}}"), "must set exactly one of exists/contains"},
 
+		// ---- expect_fail (#395) ----
+		{"expect_fail without a reason", "version: \"1\"\nsuite: {name: s}\nscenarios:\n  - name: known\n    expect_fail: {issue: \"http://x\"}\n    steps:\n      - run: {command: echo hi}\n", "expect_fail.reason is required"},
+		{"expect_fail with a blank reason", "version: \"1\"\nsuite: {name: s}\nscenarios:\n  - name: known\n    expect_fail: {reason: \"   \"}\n    steps:\n      - run: {command: echo hi}\n", "expect_fail.reason is required"},
+
 		// ---- validateHeaderMatch ----
 		{"header name required", specSteps("assert: {header: {equals: text/html}}"), "header.name is required"},
 		{"header no matcher", specSteps("assert: {header: {name: Content-Type}}"), "must set one of contains/equals/matches"},

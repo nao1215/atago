@@ -1007,6 +1007,58 @@ scenarios:
 
 Full spec: [suite_setup](../examples/suite_setup.atago.yaml)
 
+## Track a known bug with an expected-failure spec
+
+```yaml
+version: "1"
+suite:
+  name: known bugs
+
+scenarios:
+  - name: DATE_ADD should clamp a month-end rollover
+    expect_fail:
+      reason: "the dialect layer normalizes Feb 31 forward instead of clamping"
+      issue: "https://github.com/example/upstream/issues/123"
+    steps:
+      - run:
+          command: mytool --sql "SELECT DATE_ADD('2026-01-31', INTERVAL 1 MONTH)"
+      - assert:
+          stdout:
+            contains: "2026-02-28"   # what it SHOULD print once the bug is fixed
+```
+
+The usual fate of a spec that documents a bug you have not fixed yet is exile: a
+second directory and a second runner script, kept out of CI so the suite stays
+green. That directory rots. Nothing executes it, so a spec that stops even
+*loading* is invisible, and "the upstream fix landed" gets discovered only when
+someone remembers to run it by hand.
+
+`expect_fail:` keeps the spec in the suite:
+
+| It | Verdict | Run |
+|----|---------|-----|
+| fails | **XFAIL** | green — the reproduction keeps running on every commit |
+| passes | **XPASS** | **red** — the bug is fixed; promote the scenario |
+| errors | **ERROR** | red — the spec could not run at all |
+
+That last row is the one that makes this safe to put in CI. `expect_fail` says
+"the program gives the wrong answer", not "the spec cannot run", so a missing
+binary or a broken command is still an error — folding it into XFAIL is exactly
+how the exiled directory rotted.
+
+When it turns red with XPASS, the fix has landed: delete `expect_fail:` so the
+scenario becomes an ordinary guarantee, and close the issue. `--allow-xpass`
+keeps the run green while you do. `reason` is required — an expected failure with
+no stated reason cannot be told apart from a test somebody gave up on — and
+`issue` is what makes the XPASS message actionable.
+
+Every format carries the verdict in its own vocabulary: TAP uses the `# TODO`
+directive (both ways: `not ok … # TODO` for an XFAIL, `ok … # TODO` for the
+unexpected success), JUnit reports an XFAIL as `<skipped>` and an XPASS as
+`<failure>`, and GitHub Actions gets a notice and an error annotation.
+
+Full spec: [expect_fail](../examples/expect_fail.atago.yaml)
+
 ## Run a scenario only where it can pass
 
 ```yaml

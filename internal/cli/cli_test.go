@@ -555,6 +555,7 @@ func TestExitForSuite_Precedence(t *testing.T) {
 		name       string
 		res        *engine.SuiteResult
 		allowFlaky bool
+		allowXPass bool
 		want       int
 	}{
 		{name: "passed", res: &engine.SuiteResult{Status: engine.StatusPassed}, want: ExitOK},
@@ -578,11 +579,30 @@ func TestExitForSuite_Precedence(t *testing.T) {
 		{name: "security over failed", res: &engine.SuiteResult{Status: engine.StatusFailed, SecurityViolation: true}, want: ExitSecurity},
 		{name: "security over allowed flaky", res: &engine.SuiteResult{Status: engine.StatusFlaky, SecurityViolation: true}, allowFlaky: true, want: ExitSecurity},
 		{name: "security over refused flaky", res: suiteWithFlakeAndViolation(), want: ExitSecurity},
+		// An expect_fail scenario that still fails keeps the run green: that is
+		// the whole point of keeping a known-bug reproduction in CI (#395).
+		{name: "xfail is green", res: suiteWithStatus(engine.StatusXFail), want: ExitOK},
+		{name: "xfail is green under allow-xpass", res: suiteWithStatus(engine.StatusXFail), allowXPass: true, want: ExitOK},
+		// One that passes fails the run, so the fix gets promoted — unless the
+		// caller asked for the warning without the red build.
+		{name: "xpass fails the run", res: suiteWithStatus(engine.StatusXPass), want: ExitFailures},
+		{name: "xpass allowed", res: suiteWithStatus(engine.StatusXPass), allowXPass: true, want: ExitOK},
+		{name: "xpass is not covered by allow-flaky", res: suiteWithStatus(engine.StatusXPass), allowFlaky: true, want: ExitFailures},
 	}
 	for _, c := range cases {
-		if got := exitForSuite(c.res, c.allowFlaky); got != c.want {
+		if got := exitForSuite(c.res, c.allowFlaky, c.allowXPass); got != c.want {
 			t.Errorf("%s: exitForSuite = %d, want %d", c.name, got, c.want)
 		}
+	}
+}
+
+// suiteWithStatus builds a suite whose single scenario carries the given status.
+// The suite's own status stays passed, mirroring worseStatus, which ranks xfail
+// and xpass alongside passed — the run-level verdict comes from the counts.
+func suiteWithStatus(st engine.Status) *engine.SuiteResult {
+	return &engine.SuiteResult{
+		Status:    engine.StatusPassed,
+		Scenarios: []engine.ScenarioResult{{Name: "known bug", Status: st}},
 	}
 }
 

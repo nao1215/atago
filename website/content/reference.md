@@ -77,7 +77,7 @@ The report and manifest outputs have schemas too: [report.schema.json](https://g
 | Code | Meaning                   |
 |------|---------------------------|
 | `0`  | all scenarios passed      |
-| `1`  | one or more failed        |
+| `1`  | one or more failed (including an **XPASS**: an `expect_fail:` scenario that passed, unless `--allow-xpass`) |
 | `2`  | spec error (YAML syntax or schema/semantic validation) |
 | `3`  | CLI-invocation error (unknown subcommand, bad flag, or no matching spec files) |
 | `4`  | execution error           |

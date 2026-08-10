@@ -122,10 +122,14 @@ type Scenario struct {
 	Tags []string `json:"tags,omitempty"`
 	// Vars holds the bound matrix row for a scenario expanded from a matrix,
 	// so tooling can see which parameterized instance this is.
-	Vars     map[string]string `json:"vars,omitempty"`
-	Only     *Condition        `json:"only,omitempty"`
-	Skip     *Condition        `json:"skip,omitempty"`
-	Services []Service         `json:"services,omitempty"`
+	Vars map[string]string `json:"vars,omitempty"`
+	Only *Condition        `json:"only,omitempty"`
+	Skip *Condition        `json:"skip,omitempty"`
+	// ExpectFail marks a scenario that documents a known bug (#395): it is
+	// expected to fail, so tooling reading the manifest must not count it as a
+	// guarantee the suite makes.
+	ExpectFail *ExpectFail `json:"expect_fail,omitempty"`
+	Services   []Service   `json:"services,omitempty"`
 	// MockServers summarizes the scenario's stub HTTP servers (#24).
 	MockServers []MockServer `json:"mock_servers,omitempty"`
 	Steps       []Step       `json:"steps"`
@@ -191,6 +195,12 @@ type Step struct {
 	Retry    *Retry   `json:"retry,omitempty"`
 	// Source is the authored location of this step (#80).
 	Source *Source `json:"source,omitempty"`
+}
+
+// ExpectFail mirrors a scenario's declared known bug (#395).
+type ExpectFail struct {
+	Reason string `json:"reason"`
+	Issue  string `json:"issue,omitempty"`
 }
 
 // Retry mirrors a run or http step's retry policy.

@@ -157,9 +157,9 @@ func headerColor(s engine.Status) string {
 	switch s {
 	case engine.StatusPassed:
 		return cGreen
-	case engine.StatusFailed, engine.StatusError:
+	case engine.StatusFailed, engine.StatusError, engine.StatusXPass:
 		return cRed + cBold
-	case engine.StatusSkipped, engine.StatusFlaky:
+	case engine.StatusSkipped, engine.StatusFlaky, engine.StatusXFail:
 		return cYellow
 	default:
 		return ""

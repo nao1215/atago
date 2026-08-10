@@ -46,6 +46,18 @@ func writeTAP(w io.Writer, results []*engine.SuiteResult) error {
 				// diagnostic rather than hiding it.
 				fmt.Fprintf(&b, "ok %d - %s\n", n, name)
 				writeTAPDiagnostic(&b, flakyMessage(sc), detailText(sc))
+			case engine.StatusXFail:
+				// This is what TAP's TODO directive is for: a point that is
+				// allowed to fail because the work is known to be outstanding.
+				// A harness reading TAP will not count it against the run.
+				fmt.Fprintf(&b, "not ok %d - %s # TODO %s\n", n, name, tapInline(expectFailSummary(sc)))
+				writeTAPDiagnostic(&b, firstFailureMessage(sc), detailText(sc))
+			case engine.StatusXPass:
+				// A TODO point that PASSED is the "unexpectedly succeeded" case
+				// TAP consumers already know how to surface, so it stays a TODO
+				// directive on a passing point rather than a bare failure.
+				fmt.Fprintf(&b, "ok %d - %s # TODO %s\n", n, name, tapInline(expectFailSummary(sc)))
+				writeTAPDiagnostic(&b, xpassMessage(sc), "")
 			case engine.StatusFailed:
 				fmt.Fprintf(&b, "not ok %d - %s\n", n, name)
 				writeTAPDiagnostic(&b, firstFailureMessage(sc), detailText(sc))
