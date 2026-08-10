@@ -1220,6 +1220,59 @@ scenarios:
 
 Full spec: [changes](../examples/changes.atago.yaml)
 
+## Prove the same input gives the same output
+
+```yaml
+version: "1"
+suite:
+  name: determinism
+
+scenarios:
+  - name: the report is byte-identical on every run
+    steps:
+      - run:
+          command: mytool inspect data.csv --format json
+          deterministic: {}          # 2 runs, comparing stdout and exit_code
+      - assert:
+          exit_code: 0
+          stdout:                    # the asserts describe the FIRST run
+            json:
+              path: "$.rows"
+              equals: 3
+
+  - name: a failure is stable too
+    steps:
+      - run:
+          command: mytool inspect no-such-file
+          deterministic:
+            runs: 3                  # capped at 10 — more is a benchmark
+            compare: [exit_code, stderr]
+      - assert:
+          exit_code:
+            not: 0
+```
+
+Nondeterministic-but-passing output is the bug every other assertion misses: a
+column order that leaks map iteration, an unsorted listing, a JSON object whose
+keys move. Each run satisfies the same loose matchers, so `--repeat` sees no
+instability at all — and the only cheap oracle is comparing one run's bytes
+against the next's, which specs used to spell as
+`cmd > one && cmd > two && cmp one two` inside a shell step. A mismatch fails
+the step with a unified diff between the runs, so you see *which* field moved.
+
+`stderr` is opt-in because progress output legitimately carries timings. The
+reruns add a claim; they do not change what the step means — assertions,
+`store`, snapshots, and `changes:` all still describe run 1.
+
+One honest caveat: this is only meaningful for an **effectively read-only**
+command. One that appends to a log, consumes its input, or rewrites a file in
+place is *expected* to differ the second time; when a rerun changes the workdir,
+the failure hint says so instead of sending you after a map-order bug you do not
+have. `retry:` is refused next to it — retry re-runs until the answer changes,
+which is the opposite claim.
+
+Full spec: [deterministic](../examples/deterministic.atago.yaml)
+
 ## Compare two implementations of the same command
 
 Capture the reference output with `store:`, then assert the other path

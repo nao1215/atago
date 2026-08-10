@@ -206,6 +206,8 @@ scenarios:
 
 See [files_and_fixtures](examples/files_and_fixtures.atago.yaml), [snapshot](examples/snapshot.atago.yaml), and [dir_tree](examples/dir_tree.atago.yaml) for whole-tree golden manifests.
 
+`deterministic: {}` re-runs a command and requires byte-identical output — the same-input-same-output property that catches map-iteration order leaking into a report, which every loose matcher passes on every run. See [deterministic](examples/deterministic.atago.yaml).
+
 ### 3. Drive interactive prompts and TUIs
 
 A `pty` step runs the command in a real pseudo-terminal and drives it with a declarative expect/send session — wizards, REPLs, and TTY-detection branches, no `expect(1)` scripting:

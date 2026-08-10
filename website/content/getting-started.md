@@ -117,6 +117,10 @@ scenarios:
 
 See [files_and_fixtures](https://github.com/nao1215/atago/blob/main/examples/files_and_fixtures.atago.yaml), [snapshot](https://github.com/nao1215/atago/blob/main/examples/snapshot.atago.yaml), and [dir_tree](https://github.com/nao1215/atago/blob/main/examples/dir_tree.atago.yaml) for whole-tree golden manifests.
 
+`deterministic: {}` on a `run` step re-runs the command and requires the declared observables to come back byte-identical — the same-input-same-output property that catches iteration order leaking into output (a column order from a map, an unsorted listing, a JSON object whose keys move). Every loose matcher passes such output on every run, so `--repeat` sees no instability; comparing one run's bytes against the next's is the only cheap oracle. A mismatch fails the step with a unified diff between the runs. It is meaningful for an effectively read-only command; when a rerun changes the workdir, the failure says so rather than blaming a bug you do not have.
+
+See [deterministic](https://github.com/nao1215/atago/blob/main/examples/deterministic.atago.yaml) and the cookbook recipe for [proving determinism](/cookbook/#prove-the-same-input-gives-the-same-output).
+
 ## 3. Drive interactive prompts and TUIs
 
 A `pty` step runs the command in a real pseudo-terminal and drives it with a declarative expect/send session — wizards, REPLs, and TTY-detection branches, no `expect(1)` scripting:

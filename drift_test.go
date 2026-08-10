@@ -506,6 +506,7 @@ var exampleSpecs = map[string]bool{ // path -> hermetic (run, not just validate)
 	"examples/changes.atago.yaml":             true,
 	"examples/db.atago.yaml":                  true,
 	"examples/defaults.atago.yaml":            true,
+	"examples/deterministic.atago.yaml":       true,
 	"examples/dir_tree.atago.yaml":            true,
 	"examples/duration.atago.yaml":            true,
 	"examples/extend_host_env.atago.yaml":     true,

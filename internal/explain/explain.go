@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/nao1215/atago/internal/assertdesc"
+	"github.com/nao1215/atago/internal/plural"
 	"github.com/nao1215/atago/internal/spec"
 )
 
@@ -335,6 +336,13 @@ func describeRun(r *spec.Run) string {
 	}
 	if r.ShellEnabled() {
 		notes = append(notes, "shell")
+	}
+	if d := r.Deterministic; d != nil {
+		// A reviewer must see that the command is executed more than once and
+		// what is being compared: it changes how many times side effects happen,
+		// which is exactly what a reader of a spec summary needs to know (#398).
+		notes = append(notes, fmt.Sprintf("deterministic: %s compared across %s",
+			strings.Join(d.Comparables(), "+"), plural.Count(d.DeterministicRuns(), "run", "runs")))
 	}
 	desc := r.Command
 	if len(notes) > 0 {

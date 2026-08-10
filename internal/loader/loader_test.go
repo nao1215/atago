@@ -1162,6 +1162,13 @@ func TestBugHunt_Rejections(t *testing.T) {
 		{"file equals and equals_file exclusive", specSteps("assert: {file: {path: out.txt, equals: x, equals_file: in.txt}}"), "must set exactly one of exists/contains/not_contains/executable/equals/equals_file/json/snapshot"},
 		{"file equals_file empty", specSteps("assert: {file: {path: out.txt, equals_file: \"\"}}"), "equals_file must not be empty"},
 
+		// ---- deterministic (#398) ----
+		{"deterministic runs below two", specSteps("run: {command: echo hi, deterministic: {runs: 1}}"), "must be at least 2"},
+		{"deterministic runs above the cap", specSteps("run: {command: echo hi, deterministic: {runs: 99}}"), "capped at 10"},
+		{"deterministic unknown observable", specSteps("run: {command: echo hi, deterministic: {compare: [stdout, workdir]}}"), "unknown observable"},
+		{"deterministic duplicate observable", specSteps("run: {command: echo hi, deterministic: {compare: [stdout, stdout]}}"), "more than once"},
+		{"deterministic with retry", specSteps("run: {command: echo hi, deterministic: {}, retry: {times: 2, until: {exit_code: 0}}}"), "cannot be combined with retry"},
+
 		// ---- validateHeaderMatch ----
 		{"header name required", specSteps("assert: {header: {equals: text/html}}"), "header.name is required"},
 		{"header no matcher", specSteps("assert: {header: {name: Content-Type}}"), "must set one of contains/equals/matches"},
