@@ -513,7 +513,20 @@ func (e *Engine) runStep(ctx context.Context, run *spec.Run, st *store.Store, wo
 			beforeAttempt()
 		}
 		r, err := exec(ctx)
-		return r, nil, err
+		if err != nil || run.Deterministic == nil {
+			return r, nil, err
+		}
+		// The reruns happen AFTER the observable result is in hand, and r is what
+		// the rest of the scenario sees. They add a claim about the command; they
+		// do not change what the step means (#398).
+		cr, derr := checkDeterminism(ctx, run.Deterministic, r, workdir, exec)
+		if derr != nil {
+			return nil, nil, derr
+		}
+		if cr != nil {
+			return r, []*assert.CheckResult{cr}, nil
+		}
+		return r, nil, nil
 	}
 	env := assert.Env{Workdir: workdir, SpecDir: specDir, UpdateSnapshots: e.UpdateSnapshots, Secrets: rc.masker.MaskBytes, Scrub: rc.scrubber.Apply}
 	return pollUntil(ctx, run.Retry, st, env, exec, beforeAttempt)

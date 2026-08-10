@@ -2,6 +2,8 @@ package loader
 
 import (
 	"encoding/base64"
+	"slices"
+	"strings"
 
 	"github.com/nao1215/atago/internal/spec"
 )
@@ -33,6 +35,7 @@ func validateRunStep(add func(string, ...any), where string, r *spec.Run, runner
 	validateHermeticEnv(add, where+".run", r.ClearEnv, r.PassEnv)
 	validateStdin(add, where+".run", r.Stdin)
 	validateRetry(add, where+".run", r.Retry)
+	validateDeterministic(add, where+".run", r)
 	if full {
 		validateSSHRunFields(add, where, r, runners)
 	}
@@ -217,5 +220,40 @@ func validateRetry(add func(string, ...any), where string, r *spec.Retry) {
 	}
 	if r.Until.Screen != nil {
 		add("%s.retry.until.screen cannot be satisfied in a retry condition (screen renders a pty step's terminal, and a run/http result is never a pty); move it to an assert after a pty step", where)
+	}
+}
+
+// validateDeterministic checks the same-input-same-output claim (#398): a
+// satisfiable run count, observables atago knows how to compare, and no
+// combination whose meaning would be self-contradictory.
+func validateDeterministic(add func(string, ...any), where string, r *spec.Run) {
+	d := r.Deterministic
+	if d == nil {
+		return
+	}
+	if d.Runs != 0 && d.Runs < 2 {
+		add("%s.deterministic.runs must be at least 2 — comparing one run against itself proves nothing (got %d)", where, d.Runs)
+	}
+	if d.Runs > spec.MaxDeterministicRuns {
+		add("%s.deterministic.runs is capped at %d; a larger number is a benchmark, not a test (got %d)",
+			where, spec.MaxDeterministicRuns, d.Runs)
+	}
+	seen := map[string]bool{}
+	for _, name := range d.Compare {
+		if !slices.Contains(spec.DeterministicObservables, name) {
+			add("%s.deterministic.compare has unknown observable %q; use one of %s",
+				where, name, strings.Join(spec.DeterministicObservables, "/"))
+			continue
+		}
+		if seen[name] {
+			add("%s.deterministic.compare lists %q more than once", where, name)
+		}
+		seen[name] = true
+	}
+	// Retrying a determinism probe is self-contradictory: retry exists to let a
+	// command converge on a different answer, which is the very thing this
+	// claims will not happen.
+	if r.Retry != nil {
+		add("%s: deterministic cannot be combined with retry — retry re-runs until the answer CHANGES, deterministic asserts it does not", where)
 	}
 }

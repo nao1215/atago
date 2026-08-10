@@ -189,8 +189,18 @@ type Step struct {
 	File     string   `json:"file,omitempty"`
 	Target   string   `json:"target,omitempty"` // assert target / store name
 	Retry    *Retry   `json:"retry,omitempty"`
+	// Deterministic mirrors a run step's same-input-same-output claim (#398), so
+	// a reviewer reading the manifest sees that the command is run more than
+	// once and what is compared.
+	Deterministic *Deterministic `json:"deterministic,omitempty"`
 	// Source is the authored location of this step (#80).
 	Source *Source `json:"source,omitempty"`
+}
+
+// Deterministic mirrors a run step's determinism check (#398).
+type Deterministic struct {
+	Runs    int      `json:"runs"`
+	Compare []string `json:"compare"`
 }
 
 // Retry mirrors a run or http step's retry policy.

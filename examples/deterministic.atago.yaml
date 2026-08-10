@@ -1,0 +1,83 @@
+version: "1"
+
+# Same input, same output (#398).
+#
+# Nondeterministic output is a CLI bug class every other assertion passes: a
+# column order that leaks Go map iteration, an unsorted listing, a JSON object
+# whose keys move. Each run satisfies the same loose matchers, so `--repeat`
+# sees no instability — the only cheap oracle is comparing one run's bytes
+# against the next's, which specs used to spell as
+# `cmd > one && cmd > two && cmp one two` inside a shell step.
+#
+# `deterministic:` runs the command again and requires the declared observables
+# to come back byte-identical. Assertions, `store`, snapshots, and `changes:`
+# all still describe the FIRST run — the reruns add a claim, they do not change
+# what the step means.
+#
+# IMPORTANT: it is only meaningful for an effectively read-only command. One
+# that appends to a log, consumes its input, or rewrites a file in place is
+# EXPECTED to differ the second time; when a rerun changes the workdir, the
+# failure hint says so.
+#
+# Runs green as-is: atago run examples/deterministic.atago.yaml
+
+suite:
+  name: deterministic
+
+scenarios:
+  - name: a formatting command gives the same answer every time
+    skip:
+      os: windows   # `cat` is POSIX; deterministic: itself works everywhere
+    steps:
+      - fixture:
+          file: rows.csv
+          content: |
+            id,name
+            2,bob
+            1,alice
+      - run:
+          command: cat rows.csv
+          # Defaults: 2 runs, comparing stdout and exit_code.
+          deterministic: {}
+      - assert:
+          # The asserts describe run 1, exactly as they would without the check.
+          exit_code: 0
+          stdout:
+            contains: alice
+
+  - name: more runs and an explicit observable list
+    skip:
+      os: windows   # `cat` is POSIX
+    steps:
+      - fixture:
+          file: doc.json
+          content: |
+            {"b": 2, "a": 1}
+      - run:
+          command: cat doc.json
+          deterministic:
+            # Three executions in total: the first, plus two reruns compared
+            # against it. Capped at 10 — a larger number is a benchmark.
+            runs: 3
+            # stderr is opt-in: progress output legitimately carries timings,
+            # so comparing it by default would fail honest programs.
+            compare: [stdout, stderr, exit_code]
+      - assert:
+          stdout:
+            json:
+              path: "$.a"
+              equals: 1
+
+  - name: a stable failure is still a stable answer
+    skip:
+      os: windows   # `cat` is POSIX
+    steps:
+      - run:
+          command: cat no-such-file
+          deterministic:
+            # The claim is about consistency, not success: a command that fails
+            # must fail the same way every time, with the same message.
+            compare: [exit_code, stderr]
+      - assert:
+          exit_code:
+            not: 0
