@@ -191,7 +191,8 @@ func parseRunFlags(label string, args []string, stdout, stderr io.Writer) (*runO
 		fmt.Fprint(stderr, "Usage: atago run [--report console|json|junit|gha|tap] [--update-snapshots] [--parallel N] [--fail-fast] [--filter S] [--tag T] [--skip-tag T] [--rerun-failed] [--repeat N] [--retry-failed N] [--allow-flaky] [--allow-xpass] [--profile NAME] [--artifacts-dir DIR] [--verbose] [--ci] <path | dir>...\n  (directories are searched recursively)\n")
 		fs.PrintDefaults()
 	}
-	if err := fs.Parse(args); err != nil {
+	operands, err := parseFlagsAnywhere(fs, args)
+	if err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return nil, ExitOK, true
 		}
@@ -208,7 +209,7 @@ func parseRunFlags(label string, args []string, stdout, stderr io.Writer) (*runO
 		return nil, ExitConfig, true
 	}
 
-	paths, exitCode, ok := specTargets(label, fs.Args(), stderr)
+	paths, exitCode, ok := specTargets(label, operands, stderr)
 	if !ok {
 		return nil, exitCode, true
 	}

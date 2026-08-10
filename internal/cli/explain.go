@@ -24,7 +24,8 @@ func explainCmd(args []string, stdout, stderr io.Writer) int {
 	// explicitly below — to stdout for an explicit --help (so it can be piped),
 	// to stderr for a genuine parse error.
 	fs.Usage = func() {}
-	if err := fs.Parse(args); err != nil {
+	operands, err := parseFlagsAnywhere(fs, args)
+	if err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			printUsage(stdout)
 			return ExitOK
@@ -33,7 +34,7 @@ func explainCmd(args []string, stdout, stderr io.Writer) int {
 		return ExitConfig
 	}
 
-	paths, exitCode, ok := specTargets("atago explain", fs.Args(), stderr)
+	paths, exitCode, ok := specTargets("atago explain", operands, stderr)
 	if !ok {
 		return exitCode
 	}

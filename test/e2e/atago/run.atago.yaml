@@ -220,3 +220,57 @@ scenarios:
             json:
               path: "$.suites[0].scenarios"
               length: 1
+
+  # A flag written after the paths means what it means before them. The order
+  # people reach for first is "what to run, then how to run it", and the flag
+  # package stops parsing at the first path, so this used to die with
+  # `cannot access "--report"` — a complaint about a file nobody named.
+  - name: a flag after the spec path is still a flag
+    steps:
+      - fixture:
+          file: ok.atago.yaml
+          content: &flagorder |
+            version: "1"
+            suite:
+              name: sample
+            scenarios:
+              - name: echo
+                steps:
+                  - run:
+                      shell: true
+                      command: "exit 0"
+                  - assert:
+                      exit_code: 0
+      - run:
+          command: ${atago} run ok.atago.yaml --report json
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              path: "$.suites[0].status"
+              equals: passed
+
+  - name: a flag between two spec paths is still a flag
+    steps:
+      - fixture: {file: ok.atago.yaml, content: *flagorder}
+      - fixture: {file: second.atago.yaml, content: *flagorder}
+      - run:
+          command: ${atago} run ok.atago.yaml --report json second.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              path: "$.suites"
+              length: 2
+
+  # The escape hatch: after `--` every argument is a path, which is the only way
+  # to name a file whose name starts with a dash.
+  - name: a double dash keeps later arguments as paths
+    steps:
+      - fixture: {file: ok.atago.yaml, content: *flagorder}
+      - run:
+          command: ${atago} run -- ok.atago.yaml --report
+      - assert:
+          exit_code: 3
+          stderr:
+            contains: 'cannot access "--report"'
