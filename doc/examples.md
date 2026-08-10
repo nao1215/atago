@@ -32,6 +32,7 @@
 | [Bound how long a command may take](cookbook.md#bound-how-long-a-command-may-take) | `duration:` wall-clock bounds |
 | [Clean up external state even when a step fails](cookbook.md#clean-up-external-state-even-when-a-step-fails) | `teardown:` steps sharing the store |
 | [Run expensive setup once for the whole suite](cookbook.md#run-expensive-setup-once-for-the-whole-suite) | `suite.setup`, `${suitedir}` |
+| [Hand a suite-wide service's address to every scenario](cookbook.md#hand-a-suite-wide-services-address-to-every-scenario) | `suite.env` carrying a setup-captured value |
 | [Configure a whole directory of specs at once](cookbook.md#configure-a-whole-directory-of-specs-at-once) | `atago.project.yaml`, `${fixtures}`, `${specdir}` |
 | [Run a scenario only where it can pass](cookbook.md#run-a-scenario-only-where-it-can-pass) | `tags`, `skip:`/`only:` gates |
 | [Run the same scenario over many inputs](cookbook.md#run-the-same-scenario-over-many-inputs) | `matrix:` expansion |
@@ -113,6 +114,7 @@
 | [services](../examples/services.atago.yaml) | background servers: readiness probes, `ready.store`, bounded log retention (`max_log_bytes`), teardown |
 | [signal](../examples/signal.atago.yaml) | `signal:` steps deliver SIGTERM/SIGHUP/... to a managed service's process group for graceful-shutdown and reload testing (POSIX-only) |
 | [defaults](../examples/defaults.atago.yaml) | sharing `shell`/`env`/`service` fragments across scenarios |
+| [suite_env_from_setup](../examples/suite_env_from_setup.atago.yaml) | `suite.env` carrying a value captured by `suite.setup`, scenario env overriding a suite key, and the refusal that keeps a literal `${name}` out of a child environment |
 | [suite_setup](../examples/suite_setup.atago.yaml) | once-per-suite bootstrap: ordered setup steps, suite-wide `service:` steps, `${suitedir}`, suite env, always-run suite teardown |
 | [select_skip_only](../examples/select_skip_only.atago.yaml) | tags, and gating scenarios by OS, env var, or a probe command |
 | [db](../examples/db.atago.yaml) | SQL via the bundled SQLite driver, `rows` assertions, value binding |

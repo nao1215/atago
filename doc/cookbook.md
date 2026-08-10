@@ -1061,6 +1061,50 @@ scenarios:
 
 Full spec: [suite_setup](../examples/suite_setup.atago.yaml)
 
+## Hand a suite-wide service's address to every scenario
+
+```yaml
+version: "1"
+suite:
+  name: offline registry
+  setup:
+    # The port is ephemeral, so the address cannot be written in the spec — the
+    # process publishes it, and `ready.store` captures what it wrote.
+    - service:
+        name: registry
+        command: "myregistry --addr 127.0.0.1:0 --addr-file addr.txt"
+        ready:
+          file: addr.txt
+          store: registry_addr
+          timeout: 10s
+  env:
+    # Every scenario receives this, resolved once setup has run.
+    MYTOOL_REGISTRY: "http://${registry_addr}"
+
+scenarios:
+  - name: the CLI talks to the stub registry
+    steps:
+      - run:
+          command: mytool pull demo
+      - assert:
+          exit_code: 0
+```
+
+This is the shape that otherwise forces a shell wrapper around `atago run`:
+start the server, poll for its address, `export` it, then invoke atago. Suite
+setup already has the service and the `ready.store` capture; `suite.env` is what
+carries the captured value the rest of the way.
+
+A value that cannot resolve is never passed on as the literal text `${name}`. A
+child process does not fail on that — it *uses* it, and the resulting error
+arrives from the tool under test, layers away from the typo. So a scenario whose
+env references an undefined name fails before it starts, naming the key, the
+reference, and the names that ARE defined; and a setup child simply does not
+receive an entry yet whose value the running step is still producing. Write
+`$${name}` when you want the literal text.
+
+Full spec: [suite_env_from_setup](../examples/suite_env_from_setup.atago.yaml)
+
 ## Run a scenario only where it can pass
 
 ```yaml
