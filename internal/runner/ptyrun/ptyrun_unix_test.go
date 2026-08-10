@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/sys/unix"
+
 	runnercmd "github.com/nao1215/atago/internal/runner/cmd"
 	"github.com/nao1215/atago/internal/spec"
 )
@@ -161,6 +163,121 @@ func TestRun_StartFailureDoesNotHang(t *testing.T) {
 	case <-time.After(30 * time.Second):
 		t.Fatal("Run() hung after the child failed to start")
 	}
+}
+
+// TestOpenTerminal_PairsTheMasterWithItsOwnSlave pins the invariant behind
+// #385: the two files OpenTerminal returns must be the two ends of ONE
+// terminal. They were not always — creack/pty's Linux ptsname hands the ioctl
+// its answer buffer as a bare uintptr, and a goroutine stack that moves before
+// the syscall leaves the index reading 0, so atago opened /dev/pts/0 (somebody
+// else's terminal) and paired it with a master that had no slave at all. The
+// child's output then went to that stranger's terminal and the step reported a
+// clean exit 0 with an empty transcript.
+//
+// A byte written to the tty has to come out of the master; nothing else proves
+// the two halves are connected. The loop is there because a wrong pair was
+// never the common case: it is cheap enough to run a batch, and a batch is what
+// makes a still-broken pairing likely to show up here rather than in a pty step.
+func TestOpenTerminal_PairsTheMasterWithItsOwnSlave(t *testing.T) {
+	t.Parallel()
+
+	for i := range 100 {
+		master, tty, err := OpenTerminal(24, 80)
+		if err != nil {
+			t.Fatalf("iteration %d: OpenTerminal: %v", i, err)
+		}
+		if _, werr := tty.Write([]byte("atago\n")); werr != nil {
+			t.Fatalf("iteration %d: write to the terminal: %v", i, werr)
+		}
+		// The read has to be bounded, because the failure this test exists for
+		// does not fail the read — a master with no slave of its own simply never
+		// becomes readable, and an unbounded read would report the whole package
+		// as timing out rather than reporting the mispaired terminal.
+		type readResult struct {
+			data string
+			err  error
+		}
+		done := make(chan readResult, 1)
+		go func() {
+			buf := make([]byte, 64)
+			n, rerr := master.Read(buf)
+			done <- readResult{string(buf[:n]), rerr}
+		}()
+		select {
+		case got := <-done:
+			if got.err != nil {
+				_ = tty.Close()
+				_ = master.Close()
+				t.Fatalf("iteration %d: read the master: %v", i, got.err)
+			}
+			if !strings.Contains(got.data, "atago") {
+				_ = tty.Close()
+				_ = master.Close()
+				t.Fatalf("iteration %d: the master read %q, want the bytes written to its own slave: "+
+					"the pair is not a pair", i, got.data)
+			}
+		case <-time.After(30 * time.Second):
+			// Closing the master is what releases the pending read.
+			_ = master.Close()
+			_ = tty.Close()
+			t.Fatalf("iteration %d: nothing written to the tty ever reached the master: "+
+				"the pair is not a pair", i)
+		}
+		_ = tty.Close()
+		_ = master.Close()
+	}
+}
+
+// TestSetTerminalSize_KeepsTheMasterUnderThePoller pins the other half of the
+// same rule: sizing a terminal must not cost it its poller. creack/pty's
+// Setsize reaches the descriptor through (*os.File).Fd(), which is documented
+// to return it in blocking mode — so a mid-session resize (#379) used to clear
+// O_NONBLOCK on the master and leave the drain parked inside read(2), where
+// closing the terminal can no longer reach it. atago's ioctls go through
+// ControlFD, which borrows the descriptor and leaves the file as it found it.
+func TestSetTerminalSize_KeepsTheMasterUnderThePoller(t *testing.T) {
+	t.Parallel()
+
+	master, tty, err := OpenTerminal(24, 80)
+	if err != nil {
+		t.Fatalf("OpenTerminal: %v", err)
+	}
+	defer func() { _ = tty.Close() }()
+	defer func() { _ = master.Close() }()
+
+	// Whether the poller owns this master at all is a platform fact; only where
+	// it does is there anything for the resize to take away.
+	if err := master.SetReadDeadline(time.Time{}); err != nil {
+		t.Skipf("this platform's pty master is not poller-owned: %v", err)
+	}
+	if err := setTerminalSize(master, 40, 120); err != nil {
+		t.Fatalf("setTerminalSize: %v", err)
+	}
+	if err := master.SetReadDeadline(time.Time{}); err != nil {
+		t.Errorf("after a resize the master is no longer poller-owned (%v): "+
+			"closing it can no longer interrupt the drain's pending read", err)
+	}
+	if !nonblocking(t, master) {
+		t.Error("after a resize the master lost O_NONBLOCK: its reads park in read(2), " +
+			"where Close cannot reach them")
+	}
+}
+
+// nonblocking reports whether f's descriptor still carries O_NONBLOCK.
+func nonblocking(t *testing.T, f *os.File) bool {
+	t.Helper()
+	on := false
+	if err := ControlFD(f, func(fd int) error {
+		flags, ferr := unix.FcntlInt(uintptr(fd), unix.F_GETFL, 0)
+		if ferr != nil {
+			return ferr
+		}
+		on = flags&unix.O_NONBLOCK != 0
+		return nil
+	}); err != nil {
+		t.Fatalf("reading the descriptor's flags: %v", err)
+	}
+	return on
 }
 
 // TestResolveCwd covers cwd resolution for a pty step: empty stays at the

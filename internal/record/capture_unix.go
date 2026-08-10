@@ -13,7 +13,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"runtime"
 	"sync"
 	"syscall"
 	"time"
@@ -76,10 +75,18 @@ func CapturePTY(command string, shell bool, in, out *os.File, timeout time.Durat
 	}
 
 	// Output: child → developer's screen, recorded verbatim (ANSI intact).
+	//
+	// reading is closed when the goroutine has nothing left to do but read, and
+	// waiting for it below is what puts this reader ahead of the child: creating
+	// a goroutine only makes it runnable, so the runtime.Gosched that used to
+	// stand here guaranteed nothing about a no-shell fast-exit command that
+	// prints and disappears. The pty runner's drain takes the same handoff.
 	outDone := make(chan struct{})
+	reading := make(chan struct{})
 	go func() {
 		defer close(outDone)
 		buf := make([]byte, 4096)
+		close(reading)
 		for {
 			n, rerr := master.Read(buf)
 			if n > 0 {
@@ -93,9 +100,7 @@ func CapturePTY(command string, shell bool, in, out *os.File, timeout time.Durat
 			}
 		}
 	}()
-	// Yield once so the output drain can enter Read before a no-shell fast-exit
-	// command has a chance to print and disappear.
-	runtime.Gosched()
+	<-reading
 
 	if err := cmd.Start(); err != nil {
 		// Drop atago's own slave handle before waiting: while the recorder still
@@ -169,12 +174,23 @@ func CapturePTY(command string, shell bool, in, out *os.File, timeout time.Durat
 
 // echoDisabled reports whether the pty's terminal echo is currently off — the
 // signal of a password prompt, whose typed bytes must not be recorded (#69).
+// Asking through ControlFD rather than master.Fd() is what keeps this poll
+// harmless: Fd() would take the master out of the runtime poller and leave its
+// reads blocking in read(2), where closing the terminal can no longer interrupt
+// them — and this runs on every prompt.
 func echoDisabled(master *os.File) bool {
-	t, err := unix.IoctlGetTermios(int(master.Fd()), ioctlGetTermios)
-	if err != nil {
+	off := false
+	if err := ptyrun.ControlFD(master, func(fd int) error {
+		t, terr := unix.IoctlGetTermios(fd, ioctlGetTermios)
+		if terr != nil {
+			return terr
+		}
+		off = t.Lflag&unix.ECHO == 0
+		return nil
+	}); err != nil {
 		return false
 	}
-	return t.Lflag&unix.ECHO == 0
+	return off
 }
 
 // exitCode extracts a process exit code from cmd.Wait's error (0 on success,

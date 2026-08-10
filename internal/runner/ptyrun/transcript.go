@@ -47,6 +47,19 @@ func startTranscriptDrain(rw io.ReadWriter, p *spec.PTY) *transcriptDrain {
 	}
 	queries := newTerminalQueries(p, writerFunc(t.write))
 	var modeScan decsetScanner
+	// reading is closed by the reader goroutine when it has nothing left to do
+	// but read, and startTranscriptDrain waits for it. What that buys is modest
+	// and worth stating exactly: the goroutine has been scheduled and has run
+	// its setup, so the only thing left between it and the terminal is the read
+	// call itself. It is NOT a proof that the read is posted — the goroutine can
+	// still be preempted between this close and entering the syscall, and no
+	// handshake in user space can close that gap.
+	//
+	// It replaces a runtime.Gosched, which promised the same thing and delivered
+	// less: yielding does not guarantee the new goroutine ran at all. Nothing
+	// depends on the stronger reading; the fast-exit transcript loss that made
+	// this look load-bearing was a mispaired terminal (#385), fixed elsewhere.
+	reading := make(chan struct{})
 	go func() {
 		defer close(t.readDone)
 		buf := make([]byte, 4096)
@@ -56,6 +69,7 @@ func startTranscriptDrain(rw io.ReadWriter, p *spec.PTY) *transcriptDrain {
 		// under: a resize recorded while this chunk was in flight belongs after
 		// it, and one recorded before it is applied below, before consume (#379).
 		applied := 0
+		close(reading)
 		for {
 			n, rerr := t.rw.Read(buf)
 			if n > 0 {
@@ -94,6 +108,7 @@ func startTranscriptDrain(rw io.ReadWriter, p *spec.PTY) *transcriptDrain {
 			return
 		}
 	}()
+	<-reading
 	return t
 }
 

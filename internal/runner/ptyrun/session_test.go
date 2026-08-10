@@ -96,6 +96,64 @@ func fakeSession(f *fakePTY, code int) ptyProcess {
 	}
 }
 
+// blockingPTY is a terminal whose first Read never returns until it is
+// released, and which records that the read was entered.
+type blockingPTY struct {
+	entered chan struct{}
+	release chan struct{}
+	once    sync.Once
+}
+
+func (b *blockingPTY) Read([]byte) (int, error) {
+	b.once.Do(func() { close(b.entered) })
+	<-b.release
+	return 0, io.EOF
+}
+
+func (b *blockingPTY) Write(p []byte) (int, error) { return len(p), nil }
+
+// TestStartTranscriptDrain_HandsBackARunningReader pins what the startup
+// handshake does and does not promise. Run starts the drain before it starts a
+// child that may print and exit immediately, so startTranscriptDrain must not
+// hand back a drain whose reader goroutine has yet to be scheduled — which is
+// all the runtime.Gosched it replaced ever offered.
+//
+// The other half matters just as much: the reader must NOT have to finish its
+// read first. A terminal with nothing to say yet is every interactive program
+// until it prints its prompt, and waiting for that read would wedge Run before
+// the child ever started. So the test releases nothing until the drain is back
+// in hand, and only then lets the read complete.
+//
+// What it deliberately does not assert is that the goroutine is inside Read by
+// the time startTranscriptDrain returns. It is signaled one statement earlier,
+// and a test that demanded otherwise would be asserting on the scheduler.
+func TestStartTranscriptDrain_HandsBackARunningReader(t *testing.T) {
+	t.Parallel()
+
+	b := &blockingPTY{entered: make(chan struct{}), release: make(chan struct{})}
+	returned := make(chan *transcriptDrain, 1)
+	go func() { returned <- startTranscriptDrain(b, &spec.PTY{}) }()
+
+	var term *transcriptDrain
+	select {
+	case term = <-returned:
+	case <-time.After(10 * time.Second):
+		close(b.release)
+		t.Fatal("startTranscriptDrain never returned: it must hand back the drain when its reader " +
+			"reaches the first read, not when that read completes")
+	}
+
+	select {
+	case <-b.entered:
+	case <-time.After(10 * time.Second):
+		close(b.release)
+		t.Fatal("the reader goroutine never reached its first read")
+	}
+
+	close(b.release)
+	term.waitDrain(func() {}, 0)
+}
+
 // TestDriveSession_ReadErrorIsNotSilence is the #345 regression. Every read
 // error used to end the drain loop identically, so a transcript lost to a real
 // read failure was indistinguishable from a session that simply ended — and
