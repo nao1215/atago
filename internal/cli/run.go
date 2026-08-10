@@ -137,6 +137,14 @@ func runCmd(label string, args []string, stdout, stderr io.Writer) int {
 	built, buildErr := buildSubjects(ctx, paths, opts.profile, scratch, stderr)
 	if buildErr != nil {
 		fmt.Fprintf(stderr, "%s: %v\n", label, buildErr)
+		// A manifest that will not load is spec content, not an execution
+		// failure, and it has to exit the same way it did before the build phase
+		// existed — discovering the manifest earlier must not change what the
+		// same broken file reports.
+		var lerr *loader.Error
+		if errors.As(buildErr, &lerr) {
+			return exitForLoadError(lerr)
+		}
 		return ExitExec
 	}
 	if err := exposeSubjects(built); err != nil {
