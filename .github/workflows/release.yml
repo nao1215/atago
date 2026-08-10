@@ -66,3 +66,17 @@ jobs:
             dist/checksums.txt
             dist/*.sbom.json
             dist/checksums.txt.sigstore.json
+
+  # Republish the site from the tag: its Since column says which release
+  # introduced each spec key, which is only knowable once the tag exists. The
+  # release event cannot trigger the website workflow on its own — a run started
+  # by GITHUB_TOKEN never triggers another — so the tag push that started this
+  # run calls it directly.
+  website:
+    name: Publish the website from the tag
+    needs: release
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/website.yml

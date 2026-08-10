@@ -45,6 +45,14 @@ The release workflow then:
 ## After releasing
 - Check the [Releases page](https://github.com/nao1215/atago/releases) for the
   generated notes and artifacts.
+- Nothing to do for the website: the release workflow republishes it from the
+  tag, deriving the reference's Since column from the schema at every tag, so
+  the keys the release introduced stop reading `unreleased`. Refresh the
+  committed copy (`website/data/spec_keys.json`, which is what a local
+  `hugo server` reads) whenever convenient:
+  ```shell
+  python3 website/tools/gen-spec-keys.py
+  ```
 - Verify a downloaded artifact as described in
   [Verifying release integrity](https://nao1215.github.io/atago/install/#verifying-release-integrity).
 
