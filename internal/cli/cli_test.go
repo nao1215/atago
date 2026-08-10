@@ -1081,7 +1081,7 @@ func TestSpecCmds_FlagsAfterPaths(t *testing.T) {
 		if got := Main([]string{"init", target, "--template", "http"}, &out, &errb); got != ExitOK {
 			t.Fatalf("exit = %d, want %d (stderr=%s)", got, ExitOK, errb.String())
 		}
-		body, err := os.ReadFile(target) //nolint:gosec // path built from t.TempDir
+		body, err := os.ReadFile(target)
 		if err != nil {
 			t.Fatalf("init wrote no file: %v", err)
 		}
