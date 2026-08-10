@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"testing"
+	"time"
 
 	"golang.org/x/sys/windows"
 )
@@ -80,5 +81,66 @@ func TestReadErrorClassification(t *testing.T) {
 				t.Errorf("a real failure lost its cause: %v does not wrap %v", got, c.err)
 			}
 		})
+	}
+}
+
+// TestClose_ReleasesAPendingRead is the #406 regression, and the one thing the
+// package could not previously do: end a read that is already parked in the
+// kernel.
+//
+// Read issues a plain synchronous ReadFile, and CloseHandle does not abort one
+// that is already in flight — the reader stays blocked until the write end goes
+// away on its own, which a surviving conhost or an escaped descendant can put
+// off indefinitely. In the recorder that showed up twice: every timed-out
+// capture had to wait out its whole drain grace, and the reader goroutine leaked
+// for the life of the process holding the pipe handle open. Close now cancels
+// pending I/O on the handle first.
+//
+// The child is a command that produces nothing and outlives the test, so the
+// read under way is genuinely parked with no data coming: exactly the state the
+// bug needed.
+func TestClose_ReleasesAPendingRead(t *testing.T) {
+	// Repeated because the bug it guards was intermittent in CI: whether a read
+	// is parked at close time depended on timing, so one green iteration proves
+	// less than a handful. Each iteration is a fresh console and costs well
+	// under a second.
+	for i := range 5 {
+		cp, err := Start(`cmd /S /C "ping -n 30 127.0.0.1 > NUL"`, "", nil, 24, 80)
+		if err != nil {
+			t.Fatalf("iteration %d: Start: %v", i, err)
+		}
+
+		// Drain first: the console emits its initial screen setup, and Close has
+		// to interrupt a read waiting for MORE, not one about to return bytes
+		// that are already buffered.
+		readErr := make(chan error, 1)
+		reading := make(chan struct{})
+		go func() {
+			buf := make([]byte, 4096)
+			close(reading)
+			for {
+				if _, rerr := cp.Read(buf); rerr != nil {
+					readErr <- rerr
+					return
+				}
+			}
+		}()
+		<-reading
+		time.Sleep(300 * time.Millisecond) // the setup output drains; the read parks
+
+		start := time.Now()
+		_ = cp.Close()
+		select {
+		case rerr := <-readErr:
+			// os.ErrClosed is what classifyReadError maps a canceled read to,
+			// and what the recorder already treats as a normal end of session.
+			if !errors.Is(rerr, os.ErrClosed) && !errors.Is(rerr, io.EOF) {
+				t.Errorf("iteration %d: read ended with %v, want os.ErrClosed (canceled) or io.EOF", i, rerr)
+			}
+		case <-time.After(10 * time.Second):
+			t.Fatalf("iteration %d: a read parked in the kernel was still blocked %s after Close: "+
+				"CloseHandle alone does not abort it, so the reader leaks and the recorder waits out its drain grace",
+				i, time.Since(start))
+		}
 	}
 }

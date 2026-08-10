@@ -10,6 +10,63 @@ import (
 	"time"
 )
 
+// drainTeardownGrace bounds the teardown wait in capturePipes. It is generous —
+// the drain ends as soon as the write end closes — and exists only so a future
+// regression fails one test by name rather than wedging the package.
+const drainTeardownGrace = 30 * time.Second
+
+// capturePipes builds the two pipes a CapturePTY call needs — an input pipe the
+// child reads from and an output pipe standing in for the developer's screen —
+// drains the output so a terminal write never blocks on a full buffer, and
+// registers a teardown that closes them in the ONE order that terminates.
+//
+// The order is the whole point (#406). The drain goroutine sits parked in a
+// read on outR, and on Windows os.Pipe hands back synchronous handles: Close
+// cannot interrupt a read already in the kernel, so (*File).Close waits for the
+// in-flight read to finish before it returns. Closing outR first therefore
+// deadlocks — the read it is waiting for can only end when outW closes, which is
+// the statement that never runs — and that is exactly how this file wedged the
+// whole package on the 5-minute test timeout in CI. Closing the WRITE end first
+// gives the drain EOF; waiting for the drain to exit releases the last reference
+// to outR; only then can outR close. POSIX forgives the wrong order because its
+// pipe fds are poller-owned and Close unblocks a parked read.
+func capturePipes(t *testing.T) (in *os.File, out *os.File) {
+	t.Helper()
+	inR, inW, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("input pipe: %v", err)
+	}
+	outR, outW, err := os.Pipe()
+	if err != nil {
+		_ = inR.Close()
+		_ = inW.Close()
+		t.Fatalf("output pipe: %v", err)
+	}
+	drained := make(chan struct{})
+	go func() {
+		defer close(drained)
+		_, _ = io.Copy(io.Discard, outR)
+	}()
+	t.Cleanup(func() {
+		_ = outW.Close() // the drain now reaches EOF
+		_ = inR.Close()
+		_ = inW.Close()
+		select {
+		case <-drained: // and has released its reference to outR
+			_ = outR.Close()
+		case <-time.After(drainTeardownGrace):
+			// Never block here. A drain that will not end means outR.Close()
+			// would wait forever on Windows, and a teardown that hangs takes the
+			// whole PACKAGE down on the go test timeout — which is how one stuck
+			// recorder erased the results of every other test in this package.
+			// Leak the handle and fail this test by name instead.
+			t.Errorf("the output drain did not finish %s after its write end closed: "+
+				"something still holds the pipe open, and closing the read end would hang", drainTeardownGrace)
+		}
+	})
+	return inR, outW
+}
+
 // TestCapturePTY_RecordsOutputAndExit drives the whole capture path with a
 // self-exiting command and no interactive input: start the child in a real pty
 // (POSIX) / ConPTY (Windows), drain its output into the recording, and reap its
@@ -17,18 +74,7 @@ import (
 // otherwise interactive, human-driven `record --pty` — including the Windows
 // ConPTY capture, which has no other test.
 func TestCapturePTY_RecordsOutputAndExit(t *testing.T) {
-	inR, inW, err := os.Pipe() // an empty input pipe: the command needs no keystrokes
-	if err != nil {
-		t.Fatalf("input pipe: %v", err)
-	}
-	defer func() { _ = inR.Close(); _ = inW.Close() }()
-	outR, outW, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("output pipe: %v", err)
-	}
-	defer func() { _ = outR.Close(); _ = outW.Close() }()
-	// Drain the output pipe so the terminal's writes never block on a full buffer.
-	go func() { _, _ = io.Copy(io.Discard, outR) }()
+	inR, outW := capturePipes(t) // an empty input pipe: the command needs no keystrokes
 
 	// shell:true → `sh -c` / `cmd /S /C`, so echo is a builtin on both shells.
 	rec, err := CapturePTY("echo capture-marker", true, inR, outW, 30*time.Second)
@@ -54,17 +100,7 @@ func TestCapturePTY_RecordsOutputAndExit(t *testing.T) {
 // end while the recorder itself still held the terminal's slave open — closing
 // the master does not interrupt a read already parked in the kernel.
 func TestCapturePTY_StartFailureDoesNotHang(t *testing.T) {
-	inR, inW, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("input pipe: %v", err)
-	}
-	defer func() { _ = inR.Close(); _ = inW.Close() }()
-	outR, outW, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("output pipe: %v", err)
-	}
-	defer func() { _ = outR.Close(); _ = outW.Close() }()
-	go func() { _, _ = io.Copy(io.Discard, outR) }()
+	inR, outW := capturePipes(t)
 
 	const missing = "atago-no-such-binary-2a5f1c"
 	errCh := make(chan error, 1)
@@ -141,17 +177,7 @@ func TestCapturePTY_NoShellFastExitOutputNotLost(t *testing.T) {
 // exercises both the POSIX pty process-group kill and the Windows ConPTY tree
 // kill, since that timeout path has no other automated coverage.
 func TestCapturePTY_TimesOutOnNonExitingChild(t *testing.T) {
-	inR, inW, err := os.Pipe() // the child ignores input; the pipe just gives it a stdin
-	if err != nil {
-		t.Fatalf("input pipe: %v", err)
-	}
-	defer func() { _ = inR.Close(); _ = inW.Close() }()
-	outR, outW, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("output pipe: %v", err)
-	}
-	defer func() { _ = outR.Close(); _ = outW.Close() }()
-	go func() { _, _ = io.Copy(io.Discard, outR) }()
+	inR, outW := capturePipes(t) // the child ignores input; the pipe just gives it a stdin
 
 	// A command that ignores stdin and runs far longer than the timeout, so the
 	// only way CapturePTY returns is the timeout firing — not the child exiting.
