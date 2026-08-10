@@ -74,7 +74,7 @@ func (rt *suiteRuntime) stop() {
 // newSuiteRuntime prepares the suite scratch dir and store. It returns nil
 // when the spec declares no suite-level blocks, so the common case pays
 // nothing.
-func (e *Engine) newSuiteRuntime(s *spec.Spec) (*suiteRuntime, error) {
+func (e *Engine) newSuiteRuntime(s *spec.Spec, specDir, fixturesDir string) (*suiteRuntime, error) {
 	if len(s.Suite.Setup) == 0 && len(s.Suite.Teardown) == 0 && len(s.Suite.Env) == 0 {
 		return nil, nil
 	}
@@ -93,6 +93,11 @@ func (e *Engine) newSuiteRuntime(s *spec.Spec) (*suiteRuntime, error) {
 		rt.st.Set(k, v)
 	}
 	rt.set("suitedir", dir)
+	// Suite setup reads the same input directories scenarios do (#394).
+	rt.set("specdir", absPath(specDir))
+	if fixturesDir != "" {
+		rt.set("fixtures", fixturesDir)
+	}
 	return rt, nil
 }
 

@@ -33,6 +33,7 @@
 | [Clean up external state even when a step fails](cookbook.md#clean-up-external-state-even-when-a-step-fails) | `teardown:` steps sharing the store |
 | [Run expensive setup once for the whole suite](cookbook.md#run-expensive-setup-once-for-the-whole-suite) | `suite.setup`, `${suitedir}` |
 | [Hand a suite-wide service's address to every scenario](cookbook.md#hand-a-suite-wide-services-address-to-every-scenario) | `suite.env` carrying a setup-captured value |
+| [Configure a whole directory of specs at once](cookbook.md#configure-a-whole-directory-of-specs-at-once) | `atago.project.yaml`, `${fixtures}`, `${specdir}` |
 | [Run a scenario only where it can pass](cookbook.md#run-a-scenario-only-where-it-can-pass) | `tags`, `skip:`/`only:` gates |
 | [Run the same scenario over many inputs](cookbook.md#run-the-same-scenario-over-many-inputs) | `matrix:` expansion |
 | [Capture a value in one step and reuse it](cookbook.md#capture-a-value-in-one-step-and-reuse-it) | `store:` + `${name}` |
@@ -99,6 +100,7 @@
 | [stdin](../examples/stdin.atago.yaml) | stdin sources: inline text, `stdin: {file: ...}` from a workdir file, and binary input via `stdin: {base64: ...}` |
 | [matrix](../examples/matrix.atago.yaml) | one template scenario expanded per parameter row |
 | [mock_server](../examples/mock_server.atago.yaml) | test API-client CLIs offline: `mock_servers` serve canned routes, record every request, and `mock:` asserts what the client actually sent |
+| [project_manifest](../examples/project_manifest.atago.yaml) | directory-level `atago.project.yaml` (shared env, defaults, `fixtures_dir`), and `${specdir}` for files committed beside a spec |
 | [pty](../examples/pty.atago.yaml) | interactive testing in a real pseudo-terminal: expect/send sessions, named keys (`send: {key: enter}`), TTY-detection (scenarios use POSIX-only inner commands) |
 | [pty_portable](../examples/pty_portable.atago.yaml) | the same `pty` mechanism on every OS — Linux, macOS, and Windows (ConPTY): drive a self-terminating command, match its output, assert the rendered screen |
 | [pty_screen](../examples/pty_screen.atago.yaml) | TUI testing on the RENDERED terminal screen: mid-session `expect_screen`, row-addressed final `screen:` asserts, and screen snapshots (scenarios use POSIX-only inner commands) |

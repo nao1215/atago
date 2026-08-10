@@ -1,0 +1,68 @@
+version: "1"
+
+# Directory-level configuration (#392) and the input-path variables (#394).
+#
+# Some configuration belongs to a TREE of specs, not to one file: a throwaway
+# HOME for every step of every spec, an env var every scenario reads, the
+# committed fixture corpus they all share. A `suite:` block cannot say "once per
+# directory", so downstream suites said it in a shell wrapper around `atago run`
+# instead — exporting HOME and the XDG variables in bash even though
+# `sandbox_home: true` already does that per step, because the only way to apply
+# it to 89 spec files was to repeat `defaults:` in all 89.
+#
+# An `atago.project.yaml` beside (or above) a spec says it once:
+#
+#     env:
+#       MYTOOL_REGISTRY: http://127.0.0.1:8080
+#     defaults:
+#       run:
+#         sandbox_home: true      # every run step, every spec under this dir
+#     fixtures_dir: testdata      # exposed to every spec as ${fixtures}
+#
+# It is discovered by walking UP from the spec to the nearest one, so running a
+# whole tree and re-running one failing spec inside it resolve the same
+# configuration. A spec file's own values always win, and `atago explain` prints
+# which manifest applied — configuration that applies to a file without
+# appearing in it has to be visible somewhere.
+#
+# This example needs no manifest of its own: it demonstrates ${specdir}, the
+# variable that lets a spec reach files committed NEXT TO it. Scenarios run in
+# an isolated temp workdir, so ${specdir} (and ${fixtures}) are absolute, and
+# both are inputs — steps write into ${workdir}, never into them.
+#
+# Runs green as-is: atago run examples/project_manifest.atago.yaml
+
+suite:
+  name: project manifest
+
+scenarios:
+  - name: a spec can read a file committed beside it
+    skip:
+      os: windows   # `cat` is POSIX; ${specdir} itself works everywhere
+    steps:
+      - run:
+          shell: true
+          command: "cat ${specdir}/project_manifest.atago.yaml"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "suite:"
+
+  - name: copy a committed input in, then work on the copy
+    skip:
+      os: windows
+    steps:
+      # ${specdir} is read-only by convention: copy what you need into the
+      # workdir first, so a scenario can never damage the repository it runs in.
+      - run:
+          shell: true
+          command: "cp ${specdir}/project_manifest.atago.yaml local.yaml"
+      - run:
+          shell: true
+          command: "wc -l < local.yaml"
+      - assert:
+          exit_code: 0
+      - assert:
+          file:
+            path: local.yaml
+            exists: true

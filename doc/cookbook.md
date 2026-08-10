@@ -982,6 +982,60 @@ scenarios:
 
 Full spec: [teardown](../examples/teardown.atago.yaml)
 
+## Configure a whole directory of specs at once
+
+`atago.project.yaml`, beside (or above) your specs:
+
+```yaml
+env:
+  MYTOOL_REGISTRY: "http://127.0.0.1:8080"   # every spec under this directory
+defaults:
+  run:
+    sandbox_home: true      # every run step of every spec, written once
+fixtures_dir: testdata      # exposed to every spec as ${fixtures}
+```
+
+and any spec beneath it:
+
+```yaml
+version: "1"
+suite:
+  name: cli
+scenarios:
+  - name: convert a committed sample
+    steps:
+      - run:
+          # ${fixtures} is the committed corpus; ${specdir} is this spec's own
+          # directory. Both are absolute, because a scenario runs in an isolated
+          # temp workdir. Treat them as read-only input and write into ${workdir}.
+          command: mytool convert ${fixtures}/sample.png out.jpg
+      - assert:
+          file:
+            path: out.jpg
+            exists: true
+```
+
+Some configuration belongs to a *tree* of specs rather than to one file, and a
+`suite:` block cannot say "once per directory". That is why suites end up with a
+shell wrapper around `atago run` — exporting a throwaway `HOME` and the XDG
+variables in bash even though `sandbox_home: true` already does exactly that per
+step, because the only way to apply it to 89 spec files was to repeat
+`defaults:` in all 89, where file number 90 silently forgets.
+
+The manifest is discovered by walking **up** from the spec to the nearest one, so
+`atago run ./e2e` and `atago run ./e2e/cli/one.atago.yaml` resolve the same
+configuration — a developer re-running one failing spec must not get a different
+environment from CI. A spec file's own values always win (per key for maps, and
+its own `defaults:` beat the manifest's), and `atago explain` prints which
+manifest applied, because configuration that applies to a file without appearing
+in it has to be visible somewhere.
+
+It is deliberately configuration, not composition: no scenarios, no includes, no
+chaining. `defaults:` is documented as "not a macro system", and the manifest
+inherits that stance.
+
+Full spec: [project_manifest](../examples/project_manifest.atago.yaml)
+
 ## Run expensive setup once for the whole suite
 
 ```yaml

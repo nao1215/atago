@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/nao1215/atago/main/schema/atago.project.schema.json",
+  "title": "atago project manifest",
+  "description": "Directory-level configuration for a tree of atago specs (#392). Named atago.project.yaml and discovered from a spec's own location by walking up to the nearest one, so `atago run ./e2e` and `atago run ./e2e/one.atago.yaml` resolve the same configuration. It carries what belongs to a DIRECTORY rather than to a file — shared defaults, shared environment, and the committed fixture tree — and never scenario definitions: it is configuration, not composition.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "env": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "Environment variables for every spec under this directory. The weakest layer: host < project < suite < scenario < step, so any level below may override a key."
+    },
+    "defaults": {
+      "$ref": "https://raw.githubusercontent.com/nao1215/atago/main/schema/atago.schema.json#/$defs/defaults",
+      "description": "Default fragments merged beneath every matching element of every spec under this directory, with the same rules a spec file's own `defaults:` uses (#39): an explicit value always wins, maps shallow-merge, and a spec file's own defaults: beat these."
+    },
+    "fixtures_dir": {
+      "type": "string",
+      "minLength": 1,
+      "description": "A committed fixture tree, resolved relative to this manifest's directory (absolute paths allowed) and exposed to every spec under it as ${fixtures} (#394). It is checked to exist at load time, so a typo is one message about the manifest rather than N per-scenario failures about a missing file. Treat it as read-only input: steps write into ${workdir}."
+    }
+  }
+}
