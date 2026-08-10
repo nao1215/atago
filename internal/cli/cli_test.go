@@ -1059,6 +1059,36 @@ func TestSpecCmds_FlagsAfterPaths(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(dir, "m.json")); err != nil {
 		t.Errorf("manifest --out after the path wrote no file: %v", err)
 	}
+
+	// explain takes no flags of its own today, so --help is what proves it reads
+	// the same parser: a trailing help request prints usage instead of being
+	// collected as a spec path.
+	t.Run("explain help after path", func(t *testing.T) {
+		var out, errb bytes.Buffer
+		if got := Main([]string{"explain", p, "--help"}, &out, &errb); got != ExitOK {
+			t.Fatalf("exit = %d, want %d (stderr=%s)", got, ExitOK, errb.String())
+		}
+		if !strings.Contains(out.String(), "Usage: atago explain") {
+			t.Errorf("stdout = %q, want the usage text", out.String())
+		}
+	})
+
+	// init takes one path, so the flag has to be honored without becoming a
+	// second path (which would be rejected as "too many paths").
+	t.Run("init template after path", func(t *testing.T) {
+		target := filepath.Join(dir, "gen.atago.yaml")
+		var out, errb bytes.Buffer
+		if got := Main([]string{"init", target, "--template", "http"}, &out, &errb); got != ExitOK {
+			t.Fatalf("exit = %d, want %d (stderr=%s)", got, ExitOK, errb.String())
+		}
+		body, err := os.ReadFile(target) //nolint:gosec // path built from t.TempDir
+		if err != nil {
+			t.Fatalf("init wrote no file: %v", err)
+		}
+		if !strings.Contains(string(body), "type: http") {
+			t.Errorf("generated spec is not the http template:\n%s", body)
+		}
+	})
 }
 
 // TestRunCmd_DoubleDashKeepsPathsLiteral pins the escape hatch that makes the
