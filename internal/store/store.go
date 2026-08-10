@@ -6,6 +6,7 @@ package store
 import (
 	"os"
 	"regexp"
+	"sort"
 )
 
 // varRef matches an optional escaping `$` (group 1) followed by a `${name}` or
@@ -40,6 +41,19 @@ func (s *Store) Set(name, value string) { s.vars[name] = value }
 func (s *Store) Get(name string) (string, bool) {
 	v, ok := s.vars[name]
 	return v, ok
+}
+
+// Names returns every variable defined in the store, sorted. It exists so an
+// unresolved-reference error can say what IS available: a spec author staring
+// at "no variable named proxy_url" needs to see that the store holds
+// proxy_addr, not to go hunting through the file for the typo.
+func (s *Store) Names() []string {
+	names := make([]string, 0, len(s.vars))
+	for k := range s.vars {
+		names = append(names, k)
+	}
+	sort.Strings(names)
+	return names
 }
 
 // resolve looks up one reference name: an `env:`-prefixed name resolves from

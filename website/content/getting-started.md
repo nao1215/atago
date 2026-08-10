@@ -132,6 +132,9 @@ See [count_and_size](https://github.com/nao1215/atago/blob/main/examples/count_a
 `deterministic: {}` on a `run` step re-runs the command and requires the declared observables to come back byte-identical — the same-input-same-output property that catches iteration order leaking into output (a column order from a map, an unsorted listing, a JSON object whose keys move). Every loose matcher passes such output on every run, so `--repeat` sees no instability; comparing one run's bytes against the next's is the only cheap oracle. A mismatch fails the step with a unified diff between the runs. It is meaningful for an effectively read-only command; when a rerun changes the workdir, the failure says so rather than blaming a bug you do not have.
 
 See [deterministic](https://github.com/nao1215/atago/blob/main/examples/deterministic.atago.yaml) and the cookbook recipe for [proving determinism](/cookbook/#prove-the-same-input-gives-the-same-output).
+`suite.env` values may reference variables `suite.setup` captured — a `store` step's value, or the ephemeral address a suite-wide service published through `ready: {store:}` — so a stub registry or proxy can be handed to every scenario as an environment variable without a shell wrapper around `atago run`. A value that cannot resolve is never passed on as the literal text `${name}`: a child process does not fail on that, it uses it, and the resulting error arrives from the tool under test rather than from the spec. A scenario whose env references an undefined name fails before it starts, naming the key, the reference, and the names that are defined.
+
+See [suite_env_from_setup](https://github.com/nao1215/atago/blob/main/examples/suite_env_from_setup.atago.yaml) and the cookbook recipe for [handing a service address to every scenario](/cookbook/#hand-a-suite-wide-services-address-to-every-scenario).
 
 ## 3. Drive interactive prompts and TUIs
 

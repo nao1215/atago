@@ -34,14 +34,30 @@ func isSuiteSetupError(step engine.StepResult) bool {
 	return isSetupError(step) && strings.HasPrefix(step.ErrMsg, suiteSetupPhaseLabel)
 }
 
+// envSetupPhaseLabel names an environment-resolution failure (#399), which
+// happens before services start and has nothing to do with readiness — the
+// generic "service setup" label would send a reader looking at the wrong thing.
+const envSetupPhaseLabel = "environment setup"
+
+// isEnvSetupError reports whether a setup-phase error came from resolving the
+// effective environment. The engine names the offending block at the front of
+// the message ("suite.env X references ..."), which is what this recognizes.
+func isEnvSetupError(step engine.StepResult) bool {
+	return isSetupError(step) && strings.HasPrefix(step.ErrMsg, "suite.env ")
+}
+
 // setupPhaseLabelFor returns the phase label for a setup-phase error, telling a
 // suite.setup failure apart from a service-readiness / workdir-creation failure
 // so neither is rendered under the other's label.
 func setupPhaseLabelFor(step engine.StepResult) string {
-	if isSuiteSetupError(step) {
+	switch {
+	case isSuiteSetupError(step):
 		return suiteSetupPhaseLabel
+	case isEnvSetupError(step):
+		return envSetupPhaseLabel
+	default:
+		return setupPhaseLabel
 	}
-	return setupPhaseLabel
 }
 
 // stepPhase returns the phase label for the machine-readable `step` field: the

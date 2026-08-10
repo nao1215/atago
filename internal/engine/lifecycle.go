@@ -47,6 +47,21 @@ func (x *scenarioRun) initStore() {
 	x.scEnv = mergedEnv(x.rc.suiteEnv, x.sc.Env)
 }
 
+// checkEnvRefs refuses a suite.env value that references a ${name} nothing
+// defines, before any child process can receive the literal text as its value
+// (#399). It runs per scenario because that is the first moment every setup
+// capture is guaranteed to exist.
+func (x *scenarioRun) checkEnvRefs() bool {
+	msg := envRefGuard(x.st, "suite.env", x.rc.suiteEnv)
+	if msg == "" {
+		return true
+	}
+	x.out.Status = StatusError
+	x.out.Steps = append(x.out.Steps, StepResult{Kind: spec.StepNone, Setup: true, ErrMsg: x.masker.Mask(msg)})
+	x.out.Duration = time.Since(x.start)
+	return false
+}
+
 // startMocks starts the scenario's mock servers (#24) before the leading
 // fixtures and services, so fixture contents and service commands/env can
 // reference ${<mock>.url}. Each binds an ephemeral loopback port and seeds

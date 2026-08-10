@@ -1,0 +1,194 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / suite env from setup
+
+# Exercises suite.env carrying setup-captured values (#399) through the real
+# binary: the shape a suite-level service on an ephemeral port needs, the
+# refusal that keeps literal ${name} text out of a child's environment, and the
+# rule that a setup child simply does not receive an entry it cannot resolve yet.
+scenarios:
+  - name: a value captured in setup reaches every scenario as env
+    steps:
+      - fixture:
+          file: inner.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+              setup:
+                - run:
+                    command: echo 127.0.0.1:19991
+                - store:
+                    name: addr
+                    from:
+                      stdout:
+                        trim: true
+              env:
+                REGISTRY_ADDR: "${addr}"
+            scenarios:
+              - name: reads the address
+                steps:
+                  - run:
+                      shell: true
+                      command: "echo got=$REGISTRY_ADDR"
+                  - assert:
+                      stdout:
+                        contains: "got=127.0.0.1:19991"
+      - run:
+          command: ${atago} run inner.atago.yaml
+      - assert:
+          exit_code: 0
+
+  - name: a service publishes its ephemeral address into suite env
+    steps:
+      - fixture:
+          file: inner_service.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner service
+              setup:
+                - service:
+                    name: publisher
+                    command: "sh -c 'printf 127.0.0.1:19992 > ready.txt; sleep 30'"
+                    ready:
+                      file: ready.txt
+                      store: svc_addr
+                      timeout: 10s
+              env:
+                SERVICE_ADDR: "${svc_addr}"
+            scenarios:
+              - name: reads the published address
+                steps:
+                  - run:
+                      shell: true
+                      command: "echo got=$SERVICE_ADDR"
+                  - assert:
+                      stdout:
+                        contains: "got=127.0.0.1:19992"
+      - run:
+          command: ${atago} run inner_service.atago.yaml
+      - assert:
+          exit_code: 0
+
+  - name: a setup step still runs when a later key is not resolvable yet
+    steps:
+      - fixture:
+          file: inner_order.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner order
+              setup:
+                # This run PRODUCES the value the env key below consumes, so at
+                # this moment the key cannot resolve. Refusing here would make
+                # the pattern impossible; the entry is simply not part of this
+                # child's environment yet.
+                - run:
+                    shell: true
+                    command: "echo produced=[$LATER] 127.0.0.1:19993"
+                - store:
+                    name: later_addr
+                    from:
+                      stdout:
+                        trim: true
+              env:
+                LATER: "${later_addr}"
+            scenarios:
+              - name: the value exists by the time scenarios run
+                steps:
+                  - run:
+                      shell: true
+                      command: "echo got=$LATER"
+                  - assert:
+                      stdout:
+                        contains: "got=produced=[] 127.0.0.1:19993"
+      - run:
+          command: ${atago} run inner_order.atago.yaml
+      - assert:
+          exit_code: 0
+
+  - name: an env value nothing defines is refused instead of leaking
+    steps:
+      - fixture:
+          file: inner_typo.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner typo
+              setup:
+                - run:
+                    command: echo 127.0.0.1:19994
+                - store:
+                    name: proxy_addr
+                    from:
+                      stdout:
+                        trim: true
+              env:
+                GOPROXY: "${proxy_url}"
+            scenarios:
+              - name: would have received the literal text
+                steps:
+                  - run:
+                      command: echo hi
+      - run:
+          command: ${atago} run inner_typo.atago.yaml
+      - assert:
+          exit_code: 4
+          stdout:
+            contains:
+              # Names the block, the key, the reference, what would have
+              # happened, and — the part that saves the author — what IS defined.
+              - "environment setup"
+              - "suite.env GOPROXY references ${proxy_url}"
+              - "literal text"
+              - "proxy_addr"
+
+  - name: an unset host variable in suite env stays literal, as documented
+    steps:
+      - fixture:
+          file: inner_hostenv.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner hostenv
+              env:
+                MAYBE: "a:${env:ATAGO_DEFINITELY_UNSET_XYZ}:b"
+            scenarios:
+              - name: an optional host variable is not an error
+                steps:
+                  - run:
+                      command: echo ok
+                  - assert:
+                      exit_code: 0
+      - run:
+          command: ${atago} run inner_hostenv.atago.yaml
+      - assert:
+          # The guard is for values suite.setup was supposed to produce, not for
+          # optional host passthrough — that stays literal, as documented.
+          exit_code: 0
+
+  - name: an escaped reference stays literal on purpose
+    steps:
+      - fixture:
+          file: inner_escaped.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner escaped
+              env:
+                TEMPLATE: "$$${not_a_variable}"
+            scenarios:
+              - name: the literal survives
+                steps:
+                  - run:
+                      shell: true
+                      command: "echo got=$TEMPLATE"
+                  - assert:
+                      stdout:
+                        contains: "got=$${not_a_variable}"
+      - run:
+          command: ${atago} run inner_escaped.atago.yaml
+      - assert:
+          exit_code: 0

@@ -1,0 +1,71 @@
+version: "1"
+
+# suite.env carrying a value that only exists after setup ran (#399).
+#
+# A suite-level service that binds an ephemeral port cannot have its address
+# written in the spec — it is only known once the process starts and publishes
+# it. `ready: {file:, store:}` captures it, and `suite.env` hands it to every
+# scenario as an environment variable, which is how a CLI under test is pointed
+# at a stub registry, proxy, or API without a shell wrapper exporting it.
+#
+# The rule that makes this safe: a value that cannot resolve is never passed on
+# as the literal text `${name}`. A child process does not fail on that — it uses
+# it — so the mistake would surface as a baffling error from the tool under test
+# instead of from the spec. Scenarios refuse to start; setup children simply do
+# not receive the entry yet, because the step producing it is still running.
+#
+# Runs green as-is: atago run examples/suite_env_from_setup.atago.yaml
+
+suite:
+  name: suite env from setup
+  setup:
+    # A `store` capture: whatever the setup step computed becomes a variable.
+    - run:
+        command: echo 127.0.0.1:19999
+    - store:
+        name: registry_addr
+        from:
+          stdout:
+            trim: true
+  env:
+    # Every scenario receives this, resolved once the setup above has run.
+    REGISTRY_ADDR: "${registry_addr}"
+    # ${suitedir} is a built-in, so it resolves during setup too.
+    SUITE_SCRATCH: "${suitedir}"
+
+scenarios:
+  - name: the captured address arrives as an environment variable
+    skip:
+      os: windows   # $VAR expansion is POSIX shell syntax
+    steps:
+      - run:
+          shell: true
+          command: "echo addr=$REGISTRY_ADDR"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "addr=127.0.0.1:19999"
+
+  - name: a scenario env value wins over the suite value for the same key
+    skip:
+      os: windows
+    env:
+      REGISTRY_ADDR: "127.0.0.1:20000"
+    steps:
+      - run:
+          shell: true
+          command: "echo addr=$REGISTRY_ADDR"
+      - assert:
+          stdout:
+            contains: "addr=127.0.0.1:20000"
+
+  - name: a built-in resolves in suite env as well
+    skip:
+      os: windows
+    steps:
+      - run:
+          shell: true
+          command: "test -d \"$SUITE_SCRATCH\" && echo scratch-exists"
+      - assert:
+          stdout:
+            contains: scratch-exists
