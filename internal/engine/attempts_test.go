@@ -59,6 +59,49 @@ func TestEngine_RetryFailedRecoversAsFlaky(t *testing.T) {
 	}
 }
 
+// TestEngine_FailFastStopsForAFlakyRecovery pins fail-fast to the run-level
+// verdict for the other status that is green per scenario and red for the run: a
+// recovery on retry fails the run unless --allow-flaky, so --fail-fast must stop
+// scheduling for it too. With the flakiness allowed the verdict is green again
+// and the rest of the suite runs.
+func TestEngine_FailFastStopsForAFlakyRecovery(t *testing.T) {
+	skipOnWindows(t)
+	t.Parallel()
+	cases := []struct {
+		name       string
+		allowFlaky bool
+		wantSecond Status
+	}{
+		{"a flaky recovery stops the run", false, StatusSkipped},
+		{"an allowed flake does not", true, StatusPassed},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			src := flakyOnceSpec(t) + `
+  - name: never
+    steps: [{run: {shell: true, command: echo hi}}, {assert: {exit_code: 0}}]
+`
+			s, err := loader.LoadBytes("t.atago.yaml", []byte(src))
+			if err != nil {
+				t.Fatalf("load: %v", err)
+			}
+			eng := New()
+			eng.Parallel = 1 // deterministic: the first verdict decides the rest
+			eng.RetryFailed = 2
+			eng.FailFast = true
+			eng.AllowFlaky = c.allowFlaky
+			res := eng.Run(context.Background(), s, "t.atago.yaml")
+			if res.Scenarios[0].Status != StatusFlaky {
+				t.Fatalf("scenario[0] = %s, want flaky", res.Scenarios[0].Status)
+			}
+			if res.Scenarios[1].Status != c.wantSecond {
+				t.Errorf("scenario[1] = %s, want %s", res.Scenarios[1].Status, c.wantSecond)
+			}
+		})
+	}
+}
+
 // TestEngine_RetryFailedExhaustedStaysFailed proves exhausted retries keep the
 // failure with the attempt count recorded.
 func TestEngine_RetryFailedExhaustedStaysFailed(t *testing.T) {

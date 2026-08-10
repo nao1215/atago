@@ -42,6 +42,28 @@ const (
 	StatusFlaky Status = "flaky"
 )
 
+// FailsRun reports whether a finished scenario turns the run red, given the two
+// policies that decide the statuses whose severity is a choice rather than a
+// fact: --allow-flaky and --allow-xpass.
+//
+// It exists so the answer is given in one place. The exit code has always known
+// that a flaky recovery and an XPASS fail the run, but --fail-fast asked a
+// narrower question of its own (failed or errored), so a run whose verdict was
+// already decided kept scheduling scenarios — the flag stopping for one red
+// signal and not another, with nothing in the reports to explain the difference.
+func FailsRun(st Status, allowFlaky, allowXPass bool) bool {
+	switch st {
+	case StatusFailed, StatusError:
+		return true
+	case StatusFlaky:
+		return !allowFlaky
+	case StatusXPass:
+		return !allowXPass
+	default:
+		return false
+	}
+}
+
 // StepResult records what happened for a single step.
 type StepResult struct {
 	Index int

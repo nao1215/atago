@@ -7,6 +7,39 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- `--fail-fast` now stops for every outcome that fails the run, not just a
+  failed or errored scenario. An XPASS (a known bug that is fixed) and a flaky
+  recovery both decide the exit code, so a run whose verdict was already made
+  kept scheduling scenarios — the flag stopping for one red signal and not
+  another, with nothing in the reports to explain the difference. `--allow-flaky`
+  and `--allow-xpass` make those statuses green again, and then there is nothing
+  to stop for. One predicate now answers the question for the exit code,
+  `--fail-fast`, and the `--rerun-failed` ledger.
+- The `--rerun-failed` ledger records an XPASS. A run whose only red signal was
+  an XPASS wrote no ledger at all, so the follow-up `atago run --rerun-failed`
+  reported "nothing to rerun" and exited 0 — a green answer about a run that
+  failed. Re-running an XPASS reproduces it, which is the outcome that keeps
+  saying "promote this spec" until someone does; under `--allow-xpass` the run
+  is green and the ledger stays empty. A flaky scenario is still not recorded:
+  its re-run most likely passes, and clearing the ledger is not the same as
+  fixing the instability.
+
+### Fixed
+
+- A flag written after the spec paths is now read as a flag. `atago run specs/
+  --report json` exited 3 with `cannot access "--report": no such file or
+  directory` — an error about a file nobody typed — because Go's flag package
+  stops parsing at the first non-flag argument, and everything after it became a
+  spec path. "What to run, then how to run it" is the order people reach for
+  first, so the failure landed on a correct-looking command line and named the
+  wrong problem. `run`, `list`, `doc`, `explain`, `manifest`, and `init` now
+  accept flags in any position. `--` still ends flag parsing, which is how a file
+  whose name starts with a dash is addressed; `atago record` is unchanged,
+  because there the trailing arguments are another program's command line and its
+  flags belong to it.
+
 ### Documentation
 
 - A cookbook recipe for `--fail-fast`, the one run flag with no recipe and no

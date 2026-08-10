@@ -74,6 +74,8 @@ func runCmd(label string, args []string, stdout, stderr io.Writer) int {
 	eng.UpdateSnapshots = opts.updateSnapshots
 	eng.Parallel = opts.parallel
 	eng.FailFast = opts.failFast
+	eng.AllowFlaky = opts.allowFlaky
+	eng.AllowXPass = opts.allowXPass
 	eng.Repeat = opts.repeat
 	eng.RetryFailed = opts.retryFailed
 	eng.FilterNames = opts.filter
@@ -172,7 +174,7 @@ func parseRunFlags(label string, args []string, stdout, stderr io.Writer) (*runO
 	updateSnapshots := fs.Bool("update-snapshots", false, "create or overwrite snapshot files instead of comparing")
 	ci := fs.Bool("ci", false, "CI-safe defaults: deterministic, no color (sets NO_COLOR), secret masking")
 	parallel := fs.Int("parallel", runtime.NumCPU(), "number of scenarios to run concurrently; scenarios are isolated, each in its own temp dir")
-	failFast := fs.Bool("fail-fast", false, "stop scheduling new scenarios after the first failure")
+	failFast := fs.Bool("fail-fast", false, "stop scheduling new scenarios after the first outcome that fails the run (a failure, an error, an XPASS, or a flake unless allowed)")
 	var filter csvFlag
 	fs.Var(&filter, "filter", "run only scenarios whose name contains any of these comma-separated substrings (repeatable; OR semantics like --tag)")
 	var tag csvFlag
@@ -191,7 +193,8 @@ func parseRunFlags(label string, args []string, stdout, stderr io.Writer) (*runO
 		fmt.Fprint(stderr, "Usage: atago run [--report console|json|junit|gha|tap] [--update-snapshots] [--parallel N] [--fail-fast] [--filter S] [--tag T] [--skip-tag T] [--rerun-failed] [--repeat N] [--retry-failed N] [--allow-flaky] [--allow-xpass] [--profile NAME] [--artifacts-dir DIR] [--verbose] [--ci] <path | dir>...\n  (directories are searched recursively)\n")
 		fs.PrintDefaults()
 	}
-	if err := fs.Parse(args); err != nil {
+	operands, err := parseFlagsAnywhere(fs, args)
+	if err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return nil, ExitOK, true
 		}
@@ -208,7 +211,7 @@ func parseRunFlags(label string, args []string, stdout, stderr io.Writer) (*runO
 		return nil, ExitConfig, true
 	}
 
-	paths, exitCode, ok := specTargets(label, fs.Args(), stderr)
+	paths, exitCode, ok := specTargets(label, operands, stderr)
 	if !ok {
 		return nil, exitCode, true
 	}
@@ -350,7 +353,7 @@ func finishRun(opts *runOptions, suiteResults []*engine.SuiteResult, loadErrs []
 		if opts.rerunFailed && !opts.selectionActive() {
 			warnUnmatchedRerunEntries(opts.label, opts.stderr, results)
 		}
-		updateRerunLedger(opts.label, opts.stderr, results)
+		updateRerunLedger(opts.label, opts.stderr, results, opts.allowXPass)
 	}
 
 	// Every spec failed to load, or an interrupt skipped every suite before it
@@ -451,7 +454,7 @@ func runSpecs(ctx context.Context, eng *engine.Engine, paths []string) ([]*engin
 			return
 		}
 		suiteResults[i] = eng.Run(ctx, s, p)
-		if eng.FailFast && suiteFailed(suiteResults[i]) {
+		if eng.FailFast && suiteFailed(suiteResults[i], eng.AllowFlaky, eng.AllowXPass) {
 			failStop.Store(true)
 		}
 	}
@@ -504,9 +507,23 @@ func runSpecs(ctx context.Context, eng *engine.Engine, paths []string) ([]*engin
 }
 
 // suiteFailed reports whether a completed suite counts as a failure for
-// --fail-fast: a failed or errored verdict, or a security-policy violation.
-func suiteFailed(res *engine.SuiteResult) bool {
-	return res != nil && (res.Status == engine.StatusFailed || res.Status == engine.StatusError || res.SecurityViolation)
+// --fail-fast across spec files: a security-policy violation, or any scenario
+// whose outcome turns the run red. The suite's own Status is not enough — a
+// flaky recovery and an XPASS both rank green there while failing the run — so
+// the scenarios are consulted with the same predicate the exit code uses.
+func suiteFailed(res *engine.SuiteResult, allowFlaky, allowXPass bool) bool {
+	if res == nil {
+		return false
+	}
+	if res.SecurityViolation {
+		return true
+	}
+	for _, sc := range res.Scenarios {
+		if engine.FailsRun(sc.Status, allowFlaky, allowXPass) {
+			return true
+		}
+	}
+	return false
 }
 
 // specTargets resolves a subcommand's positional arguments into the spec files
@@ -693,21 +710,18 @@ func exitForSuite(res *engine.SuiteResult, allowFlaky, allowXPass bool) int {
 	}
 	switch res.Status {
 	case engine.StatusPassed, engine.StatusSkipped, engine.StatusFlaky, engine.StatusXFail, engine.StatusXPass:
-		// A flaky scenario does not raise the suite's status — worseStatus ranks it
-		// alongside passed, so a suite of one flake and nine passes still reports
-		// passed — which is why the count is what decides here, the same value the
-		// console verdict reads.
-		counts := res.Counts()
-		if !allowFlaky && counts.Flaky > 0 {
-			return ExitFailures
-		}
-		// An XPASS is a fixed bug nobody promoted yet: the scenario documents a
-		// defect that is no longer there, so it must move into the suite that
-		// guards against a regression. Failing the run is what makes that
-		// happen; --allow-xpass is for a caller who wants the warning without
-		// the red build.
-		if !allowXPass && counts.XPass > 0 {
-			return ExitFailures
+		// A flaky scenario and an XPASS do not raise the suite's status —
+		// worseStatus ranks both alongside passed, so a suite of one flake and nine
+		// passes still reports passed — which is why the scenarios are what decide
+		// here. A flake is a scenario whose answer depended on how many times it
+		// ran, and an XPASS is a fixed bug nobody promoted yet; both fail the run
+		// unless the caller accepted them at the command line. engine.FailsRun is
+		// the same predicate --fail-fast consults, so the flag stops for exactly
+		// the outcomes that decide this exit code.
+		for _, sc := range res.Scenarios {
+			if engine.FailsRun(sc.Status, allowFlaky, allowXPass) {
+				return ExitFailures
+			}
 		}
 		return ExitOK
 	case engine.StatusFailed:

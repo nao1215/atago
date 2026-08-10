@@ -3,6 +3,7 @@
 package cli
 
 import (
+	"flag"
 	"fmt"
 	"io"
 
@@ -141,6 +142,43 @@ func wantsHelp(args []string) bool {
 		}
 	}
 	return false
+}
+
+// parseFlagsAnywhere parses args with fs and returns the operands, accepting a
+// flag written after them: `atago run specs/ --report json` means what `atago
+// run --report json specs/` means.
+//
+// The flag package stops at the first non-flag argument, so a trailing flag
+// silently became a spec path and the run died with `cannot access "--report"`
+// — an error about a file nobody typed, for the invocation order most people
+// reach for first (the paths are the subject, the flags are an afterthought).
+// Rather than reordering argv by guessing which flags take a value, this
+// re-enters Parse after each operand, which asks the FlagSet itself.
+//
+// A `--` terminator still ends flag parsing for good: everything after it is an
+// operand even when it looks like a flag, which is the only way to name a file
+// whose name starts with a dash. `atago record` deliberately does NOT use this —
+// there the trailing arguments are another program's command line, and its
+// flags belong to it.
+func parseFlagsAnywhere(fs *flag.FlagSet, args []string) ([]string, error) {
+	var operands []string
+	for {
+		if err := fs.Parse(args); err != nil {
+			return nil, err
+		}
+		rest := fs.Args()
+		if len(rest) == 0 {
+			return operands, nil
+		}
+		// Parse stopped either at an operand or at an explicit `--`. The
+		// terminator is consumed, so it is the last token before what is left;
+		// seeing it there means the caller asked for the rest to stay literal.
+		if consumed := len(args) - len(rest); consumed > 0 && args[consumed-1] == "--" {
+			return append(operands, rest...), nil
+		}
+		operands = append(operands, rest[0])
+		args = rest[1:]
+	}
 }
 
 // snapshotCmd implements `atago snapshot <subcommand>`.
