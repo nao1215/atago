@@ -1,0 +1,215 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / occurrence counts and byte sizes
+
+# Exercises the occurrence bounds on stream/file matchers (#396) and the byte
+# bounds on a file assert (#397) through the real binary: the passing shapes,
+# the failure text a duplicate has to produce, and the load errors that keep an
+# ambiguous or unsatisfiable bound out of a spec.
+scenarios:
+  - name: an exact count distinguishes once from twice
+    steps:
+      - run:
+          shell: true
+          command: "printf 'error: boom\\nfine\\n'"
+      - assert:
+          stdout:
+            contains: "error:"
+            count: 1
+
+  - name: a count of zero is how a spec says never
+    steps:
+      - run:
+          command: echo ok
+      - assert:
+          stdout:
+            contains: panic
+            count: 0
+
+  - name: min and max bound a range a single number cannot
+    steps:
+      - run:
+          shell: true
+          command: "printf '1,a\\n2,b\\n3,c\\n'"
+      - assert:
+          stdout:
+            matches: "(?m)^[0-9]+,"
+            min_count: 3
+            max_count: 10
+
+  - name: a regexp counts its own non-overlapping matches
+    steps:
+      - run:
+          command: echo aaa
+      - assert:
+          stdout:
+            matches: "aa"
+            count: 1
+
+  - name: a count applies to a file's content too
+    steps:
+      - fixture:
+          file: log.txt
+          content: |
+            hit
+            miss
+            hit
+      - assert:
+          file:
+            path: log.txt
+            contains: hit
+            count: 2
+
+  - name: a duplicated line fails the inner spec and names where it landed
+    steps:
+      - fixture:
+          file: inner.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: the error is printed twice
+                steps:
+                  - run:
+                      shell: true
+                      command: "printf 'boom\\nfine\\nboom\\n'"
+                  - assert:
+                      stdout:
+                        contains: boom
+                        count: 1
+      - run:
+          command: ${atago} run inner.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            # The report has to carry the observed count AND the lines it saw,
+            # or an off-by-one leaves the author hunting for the extra copy.
+            contains:
+              - "occurs 2 times"
+              - "line 1"
+              - "line 3"
+
+  - name: size zero pins a file that was created but left empty
+    steps:
+      - run:
+          shell: true
+          command: "printf '' > empty.txt"
+      - assert:
+          file:
+            path: empty.txt
+            size: 0
+
+  - name: size bounds compose with a content matcher
+    steps:
+      - fixture:
+          file: five.txt
+          content: "abcde"
+      - assert:
+          file:
+            path: five.txt
+            contains: abc
+            size: 5
+      - assert:
+          file:
+            path: five.txt
+            min_size: 1
+            max_size: 4096
+
+  - name: a size miss by one byte names the usual cause
+    steps:
+      - fixture:
+          file: inner_size.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner size
+            scenarios:
+              - name: the file carries a trailing newline
+                steps:
+                  - fixture:
+                      file: nl.txt
+                      content: "abc\n"
+                  - assert:
+                      file:
+                        path: nl.txt
+                        size: 3
+      - run:
+          command: ${atago} run inner_size.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: "trailing newline"
+
+  - name: a count without a countable matcher is a load error
+    steps:
+      - fixture:
+          file: bad_count.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: bad count
+            scenarios:
+              - name: nothing to count
+                steps:
+                  - run:
+                      command: echo hi
+                  - assert:
+                      stdout:
+                        equals: hi
+                        count: 1
+      - run:
+          command: ${atago} run bad_count.atago.yaml
+      - assert:
+          exit_code: 2
+          stderr:
+            contains: "need a contains or matches matcher to count"
+
+  - name: an ambiguous count over two countable matchers is a load error
+    steps:
+      - fixture:
+          file: bad_two.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: bad two
+            scenarios:
+              - name: which one is counted
+                steps:
+                  - run:
+                      command: echo hi
+                  - assert:
+                      stdout:
+                        contains: h
+                        matches: i
+                        count: 1
+      - run:
+          command: ${atago} run bad_two.atago.yaml
+      - assert:
+          exit_code: 2
+          stderr:
+            contains: "exactly one countable matcher"
+
+  - name: an unsatisfiable size range is a load error
+    steps:
+      - fixture:
+          file: bad_size.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: bad size
+            scenarios:
+              - name: nothing can be both
+                steps:
+                  - assert:
+                      file:
+                        path: out.txt
+                        min_size: 9
+                        max_size: 2
+      - run:
+          command: ${atago} run bad_size.atago.yaml
+      - assert:
+          exit_code: 2
+          stderr:
+            contains: "greater than max_size"

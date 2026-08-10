@@ -206,6 +206,8 @@ scenarios:
 
 See [files_and_fixtures](examples/files_and_fixtures.atago.yaml), [snapshot](examples/snapshot.atago.yaml), and [dir_tree](examples/dir_tree.atago.yaml) for whole-tree golden manifests.
 
+`count`/`min_count`/`max_count` say how MANY times a `contains` or `matches` matcher occurs — the duplicate-output bug a presence check passes — and `size`/`min_size`/`max_size` bound a file's byte count, composing with the content matchers or standing alone (`size: 0` pins "created but deliberately empty"). See [count_and_size](examples/count_and_size.atago.yaml).
+
 ### 3. Drive interactive prompts and TUIs
 
 A `pty` step runs the command in a real pseudo-terminal and drives it with a declarative expect/send session — wizards, REPLs, and TTY-detection branches, no `expect(1)` scripting:

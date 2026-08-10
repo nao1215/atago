@@ -1,0 +1,99 @@
+version: "1"
+
+# Occurrence counts (#396) and byte sizes (#397).
+#
+# `contains` answers "is it there at all", which is exactly the question a
+# duplicate-output bug passes: an error the library logs once and main logs
+# again reads as present either way. `count` / `min_count` / `max_count` say how
+# MANY times, and `size` / `min_size` / `max_size` say how many bytes — the two
+# facts CLI specs used to reach for `grep -c` and `wc -c` to get.
+#
+# Runs green as-is: atago run examples/count_and_size.atago.yaml
+
+suite:
+  name: count and size
+
+scenarios:
+  - name: an error is reported exactly once
+    steps:
+      - fixture:
+          file: log.txt
+          content: |
+            starting
+            error: cannot open input
+            stopping
+      - run:
+          command: cat log.txt
+      - assert:
+          # The whole point: "present" would also pass if the line were printed
+          # twice. Occurrences are non-overlapping, and the failure names the
+          # lines each one landed on.
+          stdout:
+            contains: "error:"
+            count: 1
+
+  - name: bounds cover the ranges an exact count cannot
+    steps:
+      - fixture:
+          file: rows.csv
+          content: |
+            id,name
+            1,alice
+            2,bob
+            3,carol
+      - run:
+          command: cat rows.csv
+      - assert:
+          stdout:
+            # (?m) makes ^ match at every line start, which is what makes this
+            # count "how many data rows" rather than "does the output start
+            # with a digit" — a bare ^ anchors to the whole stream.
+            matches: "(?m)^[0-9]+,"
+            min_count: 3
+            max_count: 50
+      - assert:
+          # max_count: 0 reads as "never" and keeps the number visible next to
+          # the bounds above, rather than switching matcher vocabulary.
+          stdout:
+            contains: "panic"
+            max_count: 0
+
+  - name: a file's byte count is the observable
+    steps:
+      - fixture:
+          file: seed.txt
+          content: "abcde"
+      - run:
+          shell: true
+          command: "cp seed.txt copy.txt && printf '' > empty.txt"
+      - assert:
+          # size: 0 is how a spec says "created, and deliberately empty" — the
+          # write-safety contract a failed run has to honor instead of leaving a
+          # half-written file behind.
+          file:
+            path: empty.txt
+            size: 0
+      - assert:
+          # Size bounds COMPOSE with a content matcher: both must hold. Bytes
+          # are counted as written, with no newline or CRLF normalization.
+          file:
+            path: copy.txt
+            contains: "abc"
+            size: 5
+
+  - name: a bound catches output that grew without changing shape
+    steps:
+      - fixture:
+          file: report.json
+          content: |
+            {"rows": 3}
+      - assert:
+          # A ceiling is the regression shape of a bundling or compression bug:
+          # the output still parses, still contains the right keys, and is
+          # suddenly ten times the size.
+          file:
+            path: report.json
+            json:
+              path: "$.rows"
+              equals: 3
+            max_size: 4096
