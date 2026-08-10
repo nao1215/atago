@@ -132,7 +132,7 @@ func (e *Engine) runSuiteSteps(ctx context.Context, steps []spec.Step, rt *suite
 				failed = true
 				break
 			}
-			run := mergeScenarioEnv(rt.env, expandRun(rt.st, step.Run), rt.st)
+			run := mergeScenarioEnv(resolvableEnv(rt.st, rt.env), expandRun(rt.st, step.Run), rt.st)
 			r, untilChecks, err := e.runStep(ctx, run, rt.st, rt.dir, rc.specDir, rc, rt.sshConns, nil) // suite setup/teardown steps carry no changes assert
 			if err != nil {
 				sr.ErrMsg = err.Error()
@@ -181,7 +181,7 @@ func (e *Engine) runSuiteSteps(ctx context.Context, steps []spec.Step, rt *suite
 				failed = true
 			}
 		case spec.StepService:
-			proc, captured, err := servicerunner.Start(ctx, expandService(rt.st, rt.env, step.Service), rt.dir)
+			proc, captured, err := servicerunner.Start(ctx, expandService(rt.st, resolvableEnv(rt.st, rt.env), step.Service), rt.dir)
 			if proc != nil {
 				rt.services = append(rt.services, proc)
 			}

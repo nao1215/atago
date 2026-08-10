@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-76 suites · 478 scenarios
+77 suites · 484 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -515,6 +515,13 @@
   - [a line selector composes with contains](#scenario-a-line-selector-composes-with-contains)
   - [a line selector composes with a regex](#scenario-a-line-selector-composes-with-a-regex)
   - [stderr carries the same matcher semantics as stdout](#scenario-stderr-carries-the-same-matcher-semantics-as-stdout)
+- [atago self-hosting / suite env from setup](#atago-self-hosting--suite-env-from-setup) — 6 scenarios
+  - [a value captured in setup reaches every scenario as env](#scenario-a-value-captured-in-setup-reaches-every-scenario-as-env)
+  - [a service publishes its ephemeral address into suite env](#scenario-a-service-publishes-its-ephemeral-address-into-suite-env)
+  - [a setup step still runs when a later key is not resolvable yet](#scenario-a-setup-step-still-runs-when-a-later-key-is-not-resolvable-yet)
+  - [an env value nothing defines is refused instead of leaking](#scenario-an-env-value-nothing-defines-is-refused-instead-of-leaking)
+  - [an unset host variable in suite env stays literal, as documented](#scenario-an-unset-host-variable-in-suite-env-stays-literal-as-documented)
+  - [an escaped reference stays literal on purpose](#scenario-an-escaped-reference-stays-literal-on-purpose)
 - [atago self-hosting / suite setup](#atago-self-hosting--suite-setup) — 4 scenarios
   - [setup runs once, shares stores and env, and teardown always runs](#scenario-setup-runs-once-shares-stores-and-env-and-teardown-always-runs)
   - [a failing setup errors every scenario and none runs (exit 4)](#scenario-a-failing-setup-errors-every-scenario-and-none-runs-exit-4)
@@ -9398,6 +9405,194 @@ printf 'to stderr\n' 1>&2
 #### Then
 - stdout is empty
 - stderr equals an exact value
+## atago self-hosting / suite env from setup
+Source: `test/e2e/atago/suite_env.atago.yaml`
+### Scenario: a value captured in setup reaches every scenario as env
+#### Given
+- Fixture file `inner.atago.yaml` is created.
+#### Inputs
+_Fixture `inner.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+  setup:
+    - run:
+        command: echo 127.0.0.1:19991
+    - store:
+        name: addr
+        from:
+          stdout:
+            trim: true
+  env:
+    REGISTRY_ADDR: "${addr}"
+scenarios:
+  - name: reads the address
+    steps:
+      - run:
+          shell: true
+          command: "echo got=$REGISTRY_ADDR"
+      - assert:
+… (truncated, 2 more lines)
+```
+#### When
+```shell
+${atago} run inner.atago.yaml
+```
+#### Then
+- exit code is `0`
+### Scenario: a service publishes its ephemeral address into suite env
+#### Given
+- Fixture file `inner_service.atago.yaml` is created.
+#### Inputs
+_Fixture `inner_service.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner service
+  setup:
+    - service:
+        name: publisher
+        command: "sh -c 'printf 127.0.0.1:19992 > ready.txt; sleep 30'"
+        ready:
+          file: ready.txt
+          store: svc_addr
+          timeout: 10s
+  env:
+    SERVICE_ADDR: "${svc_addr}"
+scenarios:
+  - name: reads the published address
+    steps:
+      - run:
+          shell: true
+          command: "echo got=$SERVICE_ADDR"
+      - assert:
+… (truncated, 2 more lines)
+```
+#### When
+```shell
+${atago} run inner_service.atago.yaml
+```
+#### Then
+- exit code is `0`
+### Scenario: a setup step still runs when a later key is not resolvable yet
+#### Given
+- Fixture file `inner_order.atago.yaml` is created.
+#### Inputs
+_Fixture `inner_order.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner order
+  setup:
+    # This run PRODUCES the value the env key below consumes, so at
+    # this moment the key cannot resolve. Refusing here would make
+    # the pattern impossible; the entry is simply not part of this
+    # child's environment yet.
+    - run:
+        shell: true
+        command: "echo produced=[$LATER] 127.0.0.1:19993"
+    - store:
+        name: later_addr
+        from:
+          stdout:
+            trim: true
+  env:
+    LATER: "${later_addr}"
+scenarios:
+  - name: the value exists by the time scenarios run
+… (truncated, 7 more lines)
+```
+#### When
+```shell
+${atago} run inner_order.atago.yaml
+```
+#### Then
+- exit code is `0`
+### Scenario: an env value nothing defines is refused instead of leaking
+#### Given
+- Fixture file `inner_typo.atago.yaml` is created.
+#### Inputs
+_Fixture `inner_typo.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner typo
+  setup:
+    - run:
+        command: echo 127.0.0.1:19994
+    - store:
+        name: proxy_addr
+        from:
+          stdout:
+            trim: true
+  env:
+    GOPROXY: "${proxy_url}"
+scenarios:
+  - name: would have received the literal text
+    steps:
+      - run:
+          command: echo hi
+```
+#### When
+```shell
+${atago} run inner_typo.atago.yaml
+```
+#### Then
+- exit code is `4`
+- stdout contains `environment setup`, `suite.env GOPROXY references ${proxy_url}`, `literal text`, `proxy_addr`
+### Scenario: an unset host variable in suite env stays literal, as documented
+#### Given
+- Fixture file `inner_hostenv.atago.yaml` is created.
+#### Inputs
+_Fixture `inner_hostenv.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner hostenv
+  env:
+    MAYBE: "a:${env:ATAGO_DEFINITELY_UNSET_XYZ}:b"
+scenarios:
+  - name: an optional host variable is not an error
+    steps:
+      - run:
+          command: echo ok
+      - assert:
+          exit_code: 0
+```
+#### When
+```shell
+${atago} run inner_hostenv.atago.yaml
+```
+#### Then
+- exit code is `0`
+### Scenario: an escaped reference stays literal on purpose
+#### Given
+- Fixture file `inner_escaped.atago.yaml` is created.
+#### Inputs
+_Fixture `inner_escaped.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner escaped
+  env:
+    TEMPLATE: "$$${not_a_variable}"
+scenarios:
+  - name: the literal survives
+    steps:
+      - run:
+          shell: true
+          command: "echo got=$TEMPLATE"
+      - assert:
+          stdout:
+            contains: "got=$${not_a_variable}"
+```
+#### When
+```shell
+${atago} run inner_escaped.atago.yaml
+```
+#### Then
+- exit code is `0`
 ## atago self-hosting / suite setup
 Source: `test/e2e/atago/suite_setup.atago.yaml`
 ### Scenario: setup runs once, shares stores and env, and teardown always runs
