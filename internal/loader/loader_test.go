@@ -1162,6 +1162,24 @@ func TestBugHunt_Rejections(t *testing.T) {
 		{"file equals and equals_file exclusive", specSteps("assert: {file: {path: out.txt, equals: x, equals_file: in.txt}}"), "must set exactly one of exists/contains/not_contains/executable/equals/equals_file/json/snapshot"},
 		{"file equals_file empty", specSteps("assert: {file: {path: out.txt, equals_file: \"\"}}"), "equals_file must not be empty"},
 
+		// ---- occurrence counts (#396) ----
+		{"stream count without a countable matcher", specSteps("assert: {stdout: {equals: x, count: 1}}"), "need a contains or matches matcher to count"},
+		{"stream count with both countable matchers", specSteps("assert: {stdout: {contains: a, matches: b, count: 1}}"), "exactly one countable matcher"},
+		{"stream count with a contains list", specSteps("assert: {stdout: {contains: [a, b], count: 1}}"), "count applies to one substring"},
+		{"stream count and range together", specSteps("assert: {stdout: {contains: a, count: 1, min_count: 2}}"), "count is the exact form"},
+		{"stream count negative", specSteps("assert: {stdout: {contains: a, count: -1}}"), "count must be >= 0"},
+		{"stream count unsatisfiable range", specSteps("assert: {stdout: {contains: a, min_count: 3, max_count: 2}}"), "greater than max_count"},
+		{"stream count with snapshot", specSteps("assert: {stdout: {snapshot: s.txt, count: 1}}"), "cannot be combined with snapshot"},
+		{"file count without contains", specSteps("assert: {file: {path: out.txt, exists: true, count: 1}}"), "need a contains matcher to count"},
+		{"file count with a contains list", specSteps("assert: {file: {path: out.txt, contains: [a, b], count: 1}}"), "count applies to one substring"},
+
+		// ---- file size bounds (#397) ----
+		{"file size negative", specSteps("assert: {file: {path: out.txt, size: -1}}"), "size must be >= 0"},
+		{"file size and range together", specSteps("assert: {file: {path: out.txt, size: 1, min_size: 2}}"), "size is the exact form"},
+		{"file size unsatisfiable range", specSteps("assert: {file: {path: out.txt, min_size: 9, max_size: 2}}"), "greater than max_size"},
+		{"file size with snapshot", specSteps("assert: {file: {path: out.txt, snapshot: s.txt, size: 3}}"), "cannot be combined with snapshot"},
+		{"file size with exists false", specSteps("assert: {file: {path: out.txt, exists: false, size: 0}}"), "an absent file has no size"},
+		{"file size with two content matchers", specSteps("assert: {file: {path: out.txt, exists: true, contains: a, size: 3}}"), "must set exactly one of exists/contains"},
 		// ---- deterministic (#398) ----
 		{"deterministic runs below two", specSteps("run: {command: echo hi, deterministic: {runs: 1}}"), "must be at least 2"},
 		{"deterministic runs above the cap", specSteps("run: {command: echo hi, deterministic: {runs: 99}}"), "capped at 10"},

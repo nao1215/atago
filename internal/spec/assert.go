@@ -320,6 +320,16 @@ type StreamAssert struct {
 	YAML        JSONChecks `yaml:"yaml,omitempty"`
 	Snapshot    string     `yaml:"snapshot,omitempty"`
 
+	// Count, MinCount, and MaxCount bound how MANY times the `contains` or
+	// `matches` matcher next to them occurs (#396). They are modifiers, not
+	// matchers: without one, `contains` asks "is it there at all", which cannot
+	// express the duplicate-output bug class — an error the library logs once and
+	// main logs again, a warning emitted per row instead of per file. The
+	// vocabulary is the one DirAssert already uses for entry counts, deliberately.
+	Count    *int `yaml:"count,omitempty"`
+	MinCount *int `yaml:"min_count,omitempty"`
+	MaxCount *int `yaml:"max_count,omitempty"`
+
 	// Trim is a store-only selector (#158): when set, `store` captures the
 	// whole stream verbatim instead of extracting via a json path or regex.
 	// trim: true strips surrounding whitespace (the common "grab the whole
@@ -327,6 +337,11 @@ type StreamAssert struct {
 	// trim: false keeps the bytes verbatim. It is not an assertion matcher —
 	// the loader rejects it outside a store source.
 	Trim *bool `yaml:"trim,omitempty"`
+}
+
+// HasCount reports whether any occurrence-count bound is set (#396).
+func (s *StreamAssert) HasCount() bool {
+	return s != nil && (s.Count != nil || s.MinCount != nil || s.MaxCount != nil)
 }
 
 // StringList is a matcher argument that accepts either a single YAML scalar
@@ -393,11 +408,51 @@ type FileAssert struct {
 	JSON       JSONChecks `yaml:"json,omitempty"`
 	Snapshot   string     `yaml:"snapshot,omitempty"`
 
+	// Count, MinCount, and MaxCount bound how many times the `contains` matcher
+	// next to them occurs in the file (#396), with the same meaning they have on
+	// a StreamAssert.
+	Count    *int `yaml:"count,omitempty"`
+	MinCount *int `yaml:"min_count,omitempty"`
+	MaxCount *int `yaml:"max_count,omitempty"`
+
+	// Size, MinSize, and MaxSize bound the file's length in bytes (#397). Unlike
+	// the content matchers they COMPOSE with everything and can also stand alone,
+	// because the interesting value is sometimes only the byte count: `size: 0`
+	// is "the failed run left the file empty rather than half-written", and a
+	// max_size bound is the regression shape of a compression bug, where the
+	// output's size IS the product. Bytes are counted as written — no CRLF or
+	// trailing-newline normalization, matching equals/equals_file.
+	Size    *int64 `yaml:"size,omitempty"`
+	MinSize *int64 `yaml:"min_size,omitempty"`
+	MaxSize *int64 `yaml:"max_size,omitempty"`
+
 	// Text is a store-only selector (#158): when true, `store` captures the
 	// whole file content verbatim instead of extracting a value via a json path.
 	// It is not an assertion matcher — the loader rejects it outside a store
 	// source.
 	Text *bool `yaml:"text,omitempty"`
+}
+
+// HasCount reports whether any occurrence-count bound is set (#396).
+func (f *FileAssert) HasCount() bool {
+	return f != nil && (f.Count != nil || f.MinCount != nil || f.MaxCount != nil)
+}
+
+// HasSize reports whether any byte-size bound is set (#397).
+func (f *FileAssert) HasSize() bool {
+	return f != nil && (f.Size != nil || f.MinSize != nil || f.MaxSize != nil)
+}
+
+// HasContentMatcher reports whether the assert sets one of the mutually
+// exclusive content matchers, as opposed to only the size bounds that compose
+// with them (#397).
+func (f *FileAssert) HasContentMatcher() bool {
+	if f == nil {
+		return false
+	}
+	return f.Exists != nil || f.Contains != nil || f.NotContains != nil ||
+		f.Executable != nil || f.Equals != nil || f.EqualsFile != nil ||
+		len(f.JSON) > 0 || f.Snapshot != ""
 }
 
 // JSONAssert matches a value selected by a JSONPath. One matcher.

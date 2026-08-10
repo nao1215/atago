@@ -17,7 +17,10 @@ func validateScreen(add func(string, ...any), where string, sa *spec.ScreenAsser
 	// A screen assert may consist of attribute entries ALONE — "the error line is
 	// red" is a complete claim — so the stream half is only checked when the
 	// author wrote one.
-	if len(sa.SetMatchers()) > 0 || len(sa.Attrs) == 0 {
+	// A count bound also belongs to the stream half, so an attrs-only assert that
+	// carries one must still be checked — otherwise the bound is silently
+	// ignored, which is worse than rejecting it.
+	if len(sa.SetMatchers()) > 0 || sa.HasCount() || len(sa.Attrs) == 0 {
 		validateStream(add, where, &sa.StreamAssert)
 	}
 	for i := range sa.Attrs {

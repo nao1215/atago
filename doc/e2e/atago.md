@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-75 suites · 464 scenarios
+76 suites · 478 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -67,6 +67,21 @@
   - [fish completion emits complete directives](#scenario-fish-completion-emits-complete-directives)
   - [powershell completion registers an argument completer](#scenario-powershell-completion-registers-an-argument-completer)
   - [unknown shell is a configuration error](#scenario-unknown-shell-is-a-configuration-error)
+- [atago self-hosting / occurrence counts and byte sizes](#atago-self-hosting--occurrence-counts-and-byte-sizes) — 14 scenarios
+  - [an exact count distinguishes once from twice](#scenario-an-exact-count-distinguishes-once-from-twice)
+  - [a count of zero is how a spec says never](#scenario-a-count-of-zero-is-how-a-spec-says-never)
+  - [min and max bound a range a single number cannot](#scenario-min-and-max-bound-a-range-a-single-number-cannot)
+  - [a regexp counts its own non-overlapping matches](#scenario-a-regexp-counts-its-own-non-overlapping-matches)
+  - [a count applies to a file's content too](#scenario-a-count-applies-to-a-files-content-too)
+  - [a duplicated line fails the inner spec and names where it landed](#scenario-a-duplicated-line-fails-the-inner-spec-and-names-where-it-landed)
+  - [size zero pins a file that was created but left empty](#scenario-size-zero-pins-a-file-that-was-created-but-left-empty)
+  - [size bounds compose with a content matcher](#scenario-size-bounds-compose-with-a-content-matcher)
+  - [a size miss by one byte names the usual cause](#scenario-a-size-miss-by-one-byte-names-the-usual-cause)
+  - [a count without a countable matcher is a load error](#scenario-a-count-without-a-countable-matcher-is-a-load-error)
+  - [an ambiguous count over two countable matchers is a load error](#scenario-an-ambiguous-count-over-two-countable-matchers-is-a-load-error)
+  - [an unsatisfiable size range is a load error](#scenario-an-unsatisfiable-size-range-is-a-load-error)
+  - [a size bound refuses to stat through a planted symlink](#scenario-a-size-bound-refuses-to-stat-through-a-planted-symlink)
+  - [a size bound next to exists false is a load error](#scenario-a-size-bound-next-to-exists-false-is-a-load-error)
 - [atago self-hosting / db runner](#atago-self-hosting--db-runner) — 2 scenarios
   - [query workflow (create, insert, select, row assert, value binding) passes](#scenario-query-workflow-create-insert-select-row-assert-value-binding-passes)
   - [a query against an undeclared runner fails validation (exit 2)](#scenario-a-query-against-an-undeclared-runner-fails-validation-exit-2)
@@ -1659,6 +1674,254 @@ ${atago} completion tcsh
 #### Then
 - exit code is `3`
 - stderr contains `unknown shell`
+## atago self-hosting / occurrence counts and byte sizes
+Source: `test/e2e/atago/count_size.atago.yaml`
+### Scenario: an exact count distinguishes once from twice
+#### When
+```shell
+printf 'error: boom\nfine\n'
+```
+#### Then
+- stdout contains `error:` exactly 1 time
+### Scenario: a count of zero is how a spec says never
+#### When
+```shell
+echo ok
+```
+#### Then
+- stdout contains `panic` never
+### Scenario: min and max bound a range a single number cannot
+#### When
+```shell
+printf '1,a\n2,b\n3,c\n'
+```
+#### Then
+- stdout matches `/(?m)^[0-9]+,/` between 3 and 10 times
+### Scenario: a regexp counts its own non-overlapping matches
+#### When
+```shell
+echo aaa
+```
+#### Then
+- stdout matches `/aa/` exactly 1 time
+### Scenario: a count applies to a file's content too
+#### Given
+- Fixture file `log.txt` is created.
+#### Inputs
+_Fixture `log.txt`:_
+```text
+hit
+miss
+hit
+```
+#### Then
+- file `log.txt` contains `hit` exactly 2 times
+### Scenario: a duplicated line fails the inner spec and names where it landed
+#### Given
+- Fixture file `inner.atago.yaml` is created.
+#### Inputs
+_Fixture `inner.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: the error is printed twice
+    steps:
+      - run:
+          shell: true
+          command: "printf 'boom\\nfine\\nboom\\n'"
+      - assert:
+          stdout:
+            contains: boom
+            count: 1
+```
+#### When
+```shell
+${atago} run inner.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `occurs 2 times`, `line 1`, `line 3`
+### Scenario: size zero pins a file that was created but left empty
+#### When
+```shell
+printf '' > empty.txt
+```
+#### Then
+- file `empty.txt` is empty
+### Scenario: size bounds compose with a content matcher
+#### Given
+- Fixture file `five.txt` is created.
+#### Inputs
+_Fixture `five.txt`:_
+```text
+abcde
+```
+#### Then
+- file `five.txt` contains `abc` and is exactly 5 bytes
+- file `five.txt` is between 1 and 4096 bytes
+### Scenario: a size miss by one byte names the usual cause
+#### Given
+- Fixture file `inner_size.atago.yaml` is created.
+#### Inputs
+_Fixture `inner_size.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner size
+scenarios:
+  - name: the file carries a trailing newline
+    steps:
+      - fixture:
+          file: nl.txt
+          content: "abc\n"
+      - assert:
+          file:
+            path: nl.txt
+            size: 3
+```
+#### When
+```shell
+${atago} run inner_size.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `trailing newline`
+### Scenario: a count without a countable matcher is a load error
+#### Given
+- Fixture file `bad_count.atago.yaml` is created.
+#### Inputs
+_Fixture `bad_count.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: bad count
+scenarios:
+  - name: nothing to count
+    steps:
+      - run:
+          command: echo hi
+      - assert:
+          stdout:
+            equals: hi
+            count: 1
+```
+#### When
+```shell
+${atago} run bad_count.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `need a contains or matches matcher to count`
+### Scenario: an ambiguous count over two countable matchers is a load error
+#### Given
+- Fixture file `bad_two.atago.yaml` is created.
+#### Inputs
+_Fixture `bad_two.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: bad two
+scenarios:
+  - name: which one is counted
+    steps:
+      - run:
+          command: echo hi
+      - assert:
+          stdout:
+            contains: h
+            matches: i
+            count: 1
+```
+#### When
+```shell
+${atago} run bad_two.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `exactly one countable matcher`
+### Scenario: an unsatisfiable size range is a load error
+#### Given
+- Fixture file `bad_size.atago.yaml` is created.
+#### Inputs
+_Fixture `bad_size.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: bad size
+scenarios:
+  - name: nothing can be both
+    steps:
+      - assert:
+          file:
+            path: out.txt
+            min_size: 9
+            max_size: 2
+```
+#### When
+```shell
+${atago} run bad_size.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `greater than max_size`
+### Scenario: a size bound refuses to stat through a planted symlink
+_skipped on Windows_
+#### Given
+- Fixture file `inner_link.atago.yaml` is created.
+#### Inputs
+_Fixture `inner_link.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner link
+scenarios:
+  - name: the target is a link out of the workdir
+    steps:
+      # A fixture cannot plant an escaping symlink (the loader
+      # refuses), so the program under test plants it — which is
+      # exactly the threat the assertion has to survive.
+      - run:
+          shell: true
+          command: "ln -s /etc/hosts link.txt"
+      - assert:
+          file:
+            path: link.txt
+            min_size: 1
+```
+#### When
+```shell
+${atago} run inner_link.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `symlink`
+### Scenario: a size bound next to exists false is a load error
+#### Given
+- Fixture file `bad_absent.atago.yaml` is created.
+#### Inputs
+_Fixture `bad_absent.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: bad absent
+scenarios:
+  - name: nothing can satisfy both
+    steps:
+      - assert:
+          file:
+            path: out.txt
+            exists: false
+            size: 0
+```
+#### When
+```shell
+${atago} run bad_absent.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `an absent file has no size`
 ## atago self-hosting / db runner
 Source: `test/e2e/atago/db.atago.yaml`
 ### Scenario: query workflow (create, insert, select, row assert, value binding) passes
