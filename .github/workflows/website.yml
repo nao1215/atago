@@ -18,6 +18,9 @@ on:
       - "site/samples/**"
       - ".github/workflows/website.yml"
   workflow_dispatch:
+  # Called by the release workflow after a tag publishes, so the Since column
+  # names the new version without waiting for the next website-touching commit.
+  workflow_call:
 
 permissions: {}
 
@@ -39,7 +42,18 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # The Since column is derived from the schema at every release tag, so
+          # the build needs the tags and their history.
+          fetch-depth: 0
           persist-credentials: false
+
+      # The committed copy is what a local `hugo server` reads, and it is one
+      # release behind from the moment a tag is pushed. Deriving it here means
+      # the published Since column is never stale, whoever forgot to regenerate.
+      - name: Derive the spec-key Since data from the release tags
+        run: |
+          python3 website/tools/gen-spec-keys.py
+          git --no-pager diff --stat website/data/spec_keys.json
 
       - name: Install Hugo
         run: |

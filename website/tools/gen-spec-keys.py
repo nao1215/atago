@@ -2,8 +2,13 @@
 """Regenerate website/data/spec_keys.json: spec-key path -> first atago release.
 
 Walks every release tag's schema/atago.schema.json and records the first tag
-each key path appears in; keys only on main map to "unreleased". Run from the
-repository root after tagging a release that changed the schema:
+each key path appears in; keys only on main map to "unreleased".
+
+The published site does not depend on the committed copy: the website workflow
+runs this before every Hugo build, so a release's keys stop reading "unreleased"
+the moment the site is rebuilt from the tag. The committed copy is what a local
+`hugo server` reads and what schema_parity_test.go checks the key inventory
+against. Refresh it from the repository root:
 
     python3 website/tools/gen-spec-keys.py
 
