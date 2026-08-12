@@ -143,20 +143,26 @@ func TestWalkTree_DoesNotOpenANamedPipe(t *testing.T) {
 		t.Fatalf("walkTree: %v", got.err)
 	}
 
-	var pipe *treeEntry
+	// Located by index rather than by taking a *treeEntry: a pointer that is
+	// nil-checked and then dereferenced is the shape staticcheck's SA5011 reports
+	// non-deterministically, since knowing t.Fatalf never returns depends on a
+	// cached fact. golangci-lint is an enforced gate, so the flake is not worth
+	// the pointer.
+	found := -1
 	for i := range got.entries {
 		if got.entries[i].rel == "pipe" {
-			pipe = &got.entries[i]
+			found = i
 		}
 	}
-	if pipe == nil {
+	if found < 0 {
 		t.Fatalf("the pipe is missing from the walk: %+v", got.entries)
 	}
+	pipe := got.entries[found]
 	if pipe.kind == "file" {
-		t.Errorf("pipe recorded as a regular file: %+v", *pipe)
+		t.Errorf("pipe recorded as a regular file: %+v", pipe)
 	}
 	if pipe.hash != "" {
-		t.Errorf("pipe was hashed: %+v", *pipe)
+		t.Errorf("pipe was hashed: %+v", pipe)
 	}
 	if line := pipe.manifestLine(); !strings.Contains(line, "pipe") || strings.Contains(line, "sha256:") {
 		t.Errorf("manifest line = %q, want it to name the entry without a hash", line)

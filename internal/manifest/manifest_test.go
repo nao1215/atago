@@ -238,15 +238,21 @@ scenarios:
 		t.Fatalf("load: %v", err)
 	}
 	doc := Build([]Input{{Spec: s, Path: "b.atago.yaml"}})
-	var web *Runner
+	// Located by index rather than by taking a *Runner: a pointer that is
+	// nil-checked and then dereferenced is the shape staticcheck's SA5011 reports
+	// non-deterministically, since knowing t.Fatal never returns depends on a
+	// cached fact. golangci-lint is an enforced gate, so the flake is not worth
+	// the pointer.
+	found := -1
 	for i := range doc.Specs[0].Runners {
 		if doc.Specs[0].Runners[i].Name == "web" {
-			web = &doc.Specs[0].Runners[i]
+			found = i
 		}
 	}
-	if web == nil {
+	if found < 0 {
 		t.Fatal("web runner missing from manifest")
 	}
+	web := doc.Specs[0].Runners[found]
 	if web.Headless == nil || *web.Headless {
 		t.Errorf("manifest headless = %v, want explicit false", web.Headless)
 	}
