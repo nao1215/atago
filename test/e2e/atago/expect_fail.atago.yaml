@@ -209,6 +209,12 @@ scenarios:
 
   - name: a skip gate still decides on its own
     steps:
+      # The gate is `skip: env:` rather than `skip: os:` on purpose. A hardcoded
+      # OS only fires on that OS, so the same spec asserted "1 skipped" on Linux
+      # and got "1 xfail" on the scheduled macOS leg. An env gate the outer step
+      # sets itself fires on every host, so the claim under test — a skip gate
+      # decides before expect_fail can classify anything — is the same claim
+      # everywhere.
       - fixture:
           file: inner_skip.atago.yaml
           content: |
@@ -220,7 +226,7 @@ scenarios:
                 expect_fail:
                   reason: "only reproducible on plan9"
                 skip:
-                  os: linux
+                  env: ATAGO_E2E_INNER_SKIP
                 steps:
                   - run:
                       command: echo whatever
@@ -229,6 +235,8 @@ scenarios:
                         contains: nope
       - run:
           command: ${atago} run inner_skip.atago.yaml
+          env:
+            ATAGO_E2E_INNER_SKIP: "1"
       - assert:
           exit_code: 0
           stdout:

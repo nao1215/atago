@@ -3603,6 +3603,7 @@ ${atago} run inner_error.atago.yaml
 ### Scenario: a skip gate still decides on its own
 #### Given
 - Fixture file `inner_skip.atago.yaml` is created.
+- Environment variables are set: ATAGO_E2E_INNER_SKIP.
 #### Inputs
 _Fixture `inner_skip.atago.yaml`:_
 ```text
@@ -3614,7 +3615,7 @@ scenarios:
     expect_fail:
       reason: "only reproducible on plan9"
     skip:
-      os: linux
+      env: ATAGO_E2E_INNER_SKIP
     steps:
       - run:
           command: echo whatever
