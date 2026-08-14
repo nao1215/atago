@@ -81,6 +81,10 @@ func GeneratePTY(rec PTYRecording, opts Options) ([]byte, error) {
 	b.WriteString("# Recorded by `atago record --pty` — a starting point, not a verdict:\n")
 	b.WriteString("# each send replays a burst you typed, and each expect anchors on the\n")
 	b.WriteString("# prompt that preceded it. Tighten the matchers to pin what you care about.\n")
+
+	session, lastOutput, unanchored := renderSession(&rec)
+	writeUnanchoredWarning(&b, unanchored)
+
 	fmt.Fprintf(&b, "suite:\n  name: %s\n\n", yamlScalar(opts.SuiteName))
 	b.WriteString("scenarios:\n")
 	// scenarioLabel, not the raw command: the loader rejects a control character
@@ -100,7 +104,6 @@ func GeneratePTY(rec PTYRecording, opts Options) ([]byte, error) {
 		fmt.Fprintf(&b, "          cols: %d\n", rec.Cols)
 	}
 
-	session, lastOutput := renderSession(&rec)
 	if len(session) > 0 {
 		b.WriteString("          session:\n")
 		for _, line := range session {
@@ -127,21 +130,85 @@ func GeneratePTY(rec PTYRecording, opts Options) ([]byte, error) {
 // each input burst becomes a send, preceded by an expect derived from the last
 // stable line of the output before it. It returns the session lines and the
 // trailing output (after the final input) for the closing assertion (#69).
-func renderSession(rec *PTYRecording) (lines []string, trailingOutput []byte) {
+func renderSession(rec *PTYRecording) (lines []string, trailingOutput []byte, unanchored []int) {
 	var pending []byte
 	secretN := 0
+	sendN := 0
 	for _, seg := range rec.Segments {
 		if seg.Input == nil {
 			pending = append(pending, seg.Output...)
 			continue
 		}
+		hasAnchor := false
 		if anchor := stableLine(pending); anchor != "" {
 			lines = append(lines, fmt.Sprintf("            - expect: %s\n", yamlScalar(regexp.QuoteMeta(anchor))))
+			hasAnchor = true
+		}
+		sendN++
+		// A send with no expect before it is only a replay hazard when another send
+		// precedes it: the two are written back to back and a program that drains
+		// typeahead on a mode switch drops the second. The FIRST send has no prior
+		// send to race, so an anchorless first send is not called out.
+		if sendN > 1 && !hasAnchor {
+			unanchored = append(unanchored, sendN)
 		}
 		lines = append(lines, renderSend(seg, &secretN)...)
 		pending = nil
 	}
-	return lines, pending
+	return lines, pending, unanchored
+}
+
+// writeUnanchoredWarning notes, once in the header, every send that has no
+// expect before it (see renderSession). The list is left empty for the common
+// case — a session where every send is anchored — so nothing is written and the
+// header stays as it was.
+func writeUnanchoredWarning(b *strings.Builder, unanchored []int) {
+	if len(unanchored) == 0 {
+		return
+	}
+	ordinals := make([]string, len(unanchored))
+	for i, n := range unanchored {
+		ordinals[i] = ordinal(n)
+	}
+	verb, subj, them, each := "has", "send", "it", "it is"
+	if len(unanchored) > 1 {
+		verb, subj, them, each = "have", "sends", "them", "each is"
+	}
+	b.WriteString("#\n")
+	fmt.Fprintf(b, "# The %s %s no expect before %s: the program printed no text to anchor\n",
+		joinOrdinals(ordinals)+" "+subj, verb, them)
+	fmt.Fprintf(b, "# on, so on replay %s written right after the send before it. If the\n", each)
+	b.WriteString("# program drops fast input, add an expect or expect_screen before it.\n")
+}
+
+// joinOrdinals renders ["2nd"] as "2nd" and ["2nd","3rd","5th"] as
+// "2nd, 3rd and 5th" so the note reads as a sentence.
+func joinOrdinals(o []string) string {
+	switch len(o) {
+	case 1:
+		return o[0]
+	case 2:
+		return o[0] + " and " + o[1]
+	default:
+		return strings.Join(o[:len(o)-1], ", ") + " and " + o[len(o)-1]
+	}
+}
+
+// ordinal renders 1->"1st", 2->"2nd", 3->"3rd", 4->"4th", handling the 11-13
+// exception (11th, 12th, 13th) the usual way.
+func ordinal(n int) string {
+	suffix := "th"
+	if n%100 < 11 || n%100 > 13 {
+		switch n % 10 {
+		case 1:
+			suffix = "st"
+		case 2:
+			suffix = "nd"
+		case 3:
+			suffix = "rd"
+		}
+	}
+	return fmt.Sprintf("%d%s", n, suffix)
 }
 
 // renderSend renders one input burst as a send entry: an ${env:...} placeholder

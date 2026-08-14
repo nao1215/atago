@@ -393,6 +393,99 @@ func TestStableLine_PrefersInformativeAnchor(t *testing.T) {
 	}
 }
 
+// TestGeneratePTY_WarnsUnanchoredSends pins the heads-up a generated spec gives
+// when a send has no expect before it. The recorder anchors a send on the plain
+// text that preceded it, but a program that redraws with pure cursor addressing
+// (a full-screen TUI) prints no text to anchor on, so two sends land back to
+// back. On replay they are written as fast as the engine can, and a program that
+// drains typeahead when it switches input mode reads the first and drops the
+// second — a failure with nothing in the spec explaining it. The comment names
+// the sends so the author can add an expect or expect_screen.
+//
+// Only a send that FOLLOWS another send without an anchor is called out: the very
+// first send has no prior send to race, so an anchorless first send is silent.
+func TestGeneratePTY_WarnsUnanchoredSends(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name        string
+		segments    []PTYSegment
+		wantContain []string
+		wantAbsent  []string
+	}{
+		{
+			// Clear-screen between two inputs: no text to anchor the second send.
+			name: "control-only output between sends is flagged",
+			segments: []PTYSegment{
+				outSeg("Name: "),
+				inSeg("alice\r"),
+				outSeg("\x1b[2J\x1b[H"),
+				inSeg("bob\r"),
+				outSeg("done\r\n"),
+			},
+			wantContain: []string{"no expect", "2nd send"},
+		},
+		{
+			// A real prompt separates every send: nothing to warn about.
+			name: "text between every send is not flagged",
+			segments: []PTYSegment{
+				outSeg("First: "),
+				inSeg("alice\r"),
+				outSeg("Second: "),
+				inSeg("bob\r"),
+				outSeg("done\r\n"),
+			},
+			wantAbsent: []string{"no expect"},
+		},
+		{
+			// The first send has no prompt before it, but it is the first send, so
+			// there is nothing for it to race with — no warning.
+			name: "an anchorless first send alone is not flagged",
+			segments: []PTYSegment{
+				inSeg("alice\r"),
+				outSeg("Second: "),
+				inSeg("bob\r"),
+				outSeg("done\r\n"),
+			},
+			wantAbsent: []string{"no expect"},
+		},
+		{
+			// Two anchorless sends in a row: both the 2nd and 3rd are named.
+			name: "several unanchored sends are all named",
+			segments: []PTYSegment{
+				outSeg("Go: "),
+				inSeg("a\r"),
+				outSeg("\x1b[H"),
+				inSeg("b\r"),
+				outSeg("\x1b[2J"),
+				inSeg("c\r"),
+				outSeg("done\r\n"),
+			},
+			wantContain: []string{"2nd", "3rd send"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := GeneratePTY(PTYRecording{Command: "prog", Segments: tt.segments}, Options{SuiteName: "gen"})
+			if err != nil {
+				t.Fatalf("GeneratePTY: %v", err)
+			}
+			s := string(got)
+			for _, want := range tt.wantContain {
+				if !strings.Contains(s, want) {
+					t.Errorf("generated spec missing %q:\n%s", want, s)
+				}
+			}
+			for _, absent := range tt.wantAbsent {
+				if strings.Contains(s, absent) {
+					t.Errorf("generated spec unexpectedly contains %q:\n%s", absent, s)
+				}
+			}
+			loadGenerated(t, got) // the heads-up is a comment; the spec must still load
+		})
+	}
+}
+
 // TestStableLine_AnchorIsRawSubstring is a regression for the pty round-trip law
 // (#30/#69): the anchor an expect/contains is built from must be a verbatim
 // substring of the RAW transcript the replay matches against. Stripping ANSI and
