@@ -40,7 +40,11 @@ type terminalQueries struct {
 	mu   sync.Mutex
 	term vt10x.Terminal
 	da1  da1Scanner
-	w    io.Writer
+	// sanitize holds an incomplete trailing escape between chunks so a CSI split
+	// across reads is bounded as one sequence instead of reassembling inside
+	// vt10x (#438). Only consume touches it, under mu.
+	sanitize streamSanitizer
+	w        io.Writer
 }
 
 func newTerminalQueries(p *spec.PTY, w io.Writer) *terminalQueries {
@@ -73,7 +77,10 @@ func (t *terminalQueries) resize(rows, cols int) {
 
 func (t *terminalQueries) consume(chunk []byte) {
 	t.mu.Lock()
-	writeQueryTerminal(t.term, chunk)
+	// The emulator sees the sanitized stream (counts clamped, malformed and split
+	// sequences bounded); the DA1 scanner below sees the raw chunk because it must
+	// still recognize a well-formed DA1/DECID request wherever it lands.
+	writeQueryTerminal(t.term, t.sanitize.feed(chunk))
 	t.mu.Unlock()
 	for range t.da1.consume(chunk) {
 		_, _ = t.w.Write([]byte(vt102DA1))

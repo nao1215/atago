@@ -56,6 +56,16 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- The live terminal that answers a program's device queries during a `pty`
+  session (DA1, cursor-position and status reports) now runs the incoming bytes
+  through the same CSI sanitizer the screen render uses, carried across read
+  boundaries. An oversized count-based sequence (a backward-tab with a
+  billion-step count) would otherwise spin the emulator before it reached a
+  following `\x1b[6n`, and a malformed sequence could abort the rest of a read
+  chunk so a later query went unanswered. Because a read can split a sequence in
+  half, the sanitizer holds an incomplete trailing escape until the next chunk
+  completes it, rather than letting the two halves reassemble inside the emulator
+  where the clamp no longer applies.
 - A `screen:` assertion now keeps a grapheme cluster whole. The rendered screen
   stored only the leading rune of each cell, so a ZWJ emoji sequence (a
   woman-technologist, a flag) rendered as its first emoji and a
