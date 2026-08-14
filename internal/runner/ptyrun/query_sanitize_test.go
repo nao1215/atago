@@ -76,6 +76,10 @@ func TestIncompleteEscapeStart(t *testing.T) {
 		{"trailing OSC without terminator is incomplete", "ab\x1b]0;title", 2},
 		{"OSC closed by BEL is complete", "\x1b]0;t\x07", len("\x1b]0;t\x07")},
 		{"OSC closed by ST is complete", "\x1b]0;t\x1b\\", len("\x1b]0;t\x1b\\")},
+		// An ESC that is not the start of ST aborts the string; the CSI after it is
+		// a complete unit, so nothing is held.
+		{"OSC aborted by a new escape ends at that escape", "\x1b]x\x1bA\x1b[6n", len("\x1b]x\x1bA\x1b[6n")},
+		{"OSC aborted then trailing incomplete CSI", "\x1b]x\x1bA\x1b[6", len("\x1b]x\x1bA")},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()

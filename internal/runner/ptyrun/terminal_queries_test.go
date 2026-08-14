@@ -89,3 +89,19 @@ func TestTerminalQueries_MalformedCSIStillAnswersCPR(t *testing.T) {
 		t.Fatalf("no cursor-position reply after a malformed CSI: %q", got)
 	}
 }
+
+// TestTerminalQueries_AbortedStringStillAnswersCPR pins that an OSC/string
+// sequence aborted by a new escape (an ESC not followed by ST) does not swallow
+// the rest of the stream: the CPR request after it is still answered. Holding the
+// aborted string in the carry would have stranded the query.
+func TestTerminalQueries_AbortedStringStillAnswersCPR(t *testing.T) {
+	var out bytes.Buffer
+	q := newTerminalQueries(&spec.PTY{Rows: 10, Cols: 40}, &out)
+
+	// OSC "x" aborted by ESC A, then a cursor-position request.
+	q.consume([]byte("\x1b]x\x1bA\x1b[6n"))
+
+	if got := out.String(); !strings.HasSuffix(got, "R") {
+		t.Fatalf("no cursor-position reply after an aborted string sequence: %q", got)
+	}
+}

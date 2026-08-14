@@ -123,12 +123,20 @@ func stringEnd(b []byte, j int) (end int, complete bool) {
 	for k := j; k < len(b); k++ {
 		switch b[k] {
 		case 0x07:
-			return k + 1, true
+			return k + 1, true // BEL terminator
 		case 0x1b:
-			if k+1 < len(b) && b[k+1] == '\\' {
-				return k + 2, true
+			switch {
+			case k+1 >= len(b):
+				return 0, false // a lone trailing ESC: wait for what follows
+			case b[k+1] == '\\':
+				return k + 2, true // ST terminator (ESC \)
+			default:
+				// An ESC followed by any other byte ABORTS the string and begins a
+				// new sequence — vt10x exits string parsing here. The string ends at
+				// the ESC (it is not consumed), so scanning resumes at it rather than
+				// holding the rest of the stream and stranding a later query.
+				return k, true
 			}
-			return 0, false // ESC with no following byte yet: wait for it
 		}
 	}
 	return 0, false
