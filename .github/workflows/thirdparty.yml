@@ -263,6 +263,16 @@ jobs:
               tar -xzf grafana.tar.gz -C "$HOME"
               echo "GF_PATHS_HOME=$HOME/grafana-${ver}" >> "$GITHUB_ENV"
               echo "$HOME/grafana-${ver}/bin" >> "$GITHUB_PATH"
+          # The fga CLI's file-containment contract (store file references)
+          # is newer than its latest tagged release, so the CLI pins the
+          # pseudo-version of the commit that ships it — the same pin style as
+          # fx, verified by the Go checksum database. The openfga server pins
+          # its latest release.
+          - name: openfga
+            dir: ./test/e2e/thirdparty/openfga
+            install: |
+              go install github.com/openfga/cli/cmd/fga@v0.7.21-0.20260811061028-cef729e5d1a4
+              go install github.com/openfga/openfga/cmd/openfga@v1.18.3
           # Prometheus cannot be `go install`ed (its go.mod uses replace
           # directives), so the official release tarball provides prometheus
           # and promtool. Unlike the `go install` legs (whose module downloads

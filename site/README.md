@@ -44,6 +44,7 @@ A browsable, repo-local index of atago's documentation, generated from repositor
 - [mobilepkg.md](../doc/e2e/mobilepkg.md)
 - [nats.md](../doc/e2e/nats.md)
 - [ntfy.md](../doc/e2e/ntfy.md)
+- [openfga.md](../doc/e2e/openfga.md)
 - [openssl.md](../doc/e2e/openssl.md)
 - [pandoc.md](../doc/e2e/pandoc.md)
 - [prometheus.md](../doc/e2e/prometheus.md)
