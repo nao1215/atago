@@ -34,8 +34,9 @@ func ResolveSpecPath(field, specDir, p string) (string, error) {
 // resolveInRoot resolves p against root and rejects any result that would escape
 // root. A relative path is joined onto root; an absolute path is taken as-is but
 // must still land inside root — so an absolute `${workdir}/out.txt` is allowed
-// while `/etc/passwd` is not. `../` traversal is rejected either way. The
-// returned path is cleaned and ready to hand to the filesystem.
+// while `/etc/passwd` is not. `../` traversal is rejected either way, and so is a
+// path that leaves root through a symlinked directory. The returned path is
+// cleaned and ready to hand to the filesystem.
 func resolveInRoot(field, rootLabel, root, p string) (string, error) {
 	dest := p
 	if filepath.IsAbs(dest) {
@@ -46,7 +47,61 @@ func resolveInRoot(field, rootLabel, root, p string) (string, error) {
 	if !WithinRoot(root, dest) {
 		return "", fmt.Errorf("%s %q escapes the %s", field, p, rootLabel)
 	}
+	if target, escapes := escapingAncestor(root, dest); escapes {
+		return "", fmt.Errorf("%s %q resolves through a symlink to %q, which escapes the %s", field, p, target, rootLabel)
+	}
 	return dest, nil
+}
+
+// escapingAncestor reports where a directory symlink above dest's leaf leads,
+// when that is outside root.
+//
+// WithinRoot is lexical — it compares path components — so it cannot see that
+// `<root>/escape/secret.txt` names a host file once the program under test has
+// made `escape` a link to a host directory. Every path-taking feature inherited
+// that blind spot from this one resolver: a file assertion read the host file
+// into the report, and a fixture, a run.stdout_to, an http.body_to wrote into
+// the host directory, all while the run stayed green. Resolving the ancestors
+// closes it for every caller at once.
+//
+// Only the ancestors are resolved. A link AT the leaf belongs to the read and
+// write helpers, which refuse it by name (ReadFileNoFollow, StatNoFollow,
+// WriteFileNoFollow); resolving it here would take that refusal away from them
+// and would turn a merely absent path into an error, which `exists: false` asks
+// about legitimately.
+func escapingAncestor(root, dest string) (string, bool) {
+	for dir := filepath.Dir(dest); WithinRoot(root, dir); dir = filepath.Dir(dir) {
+		if resolved, err := filepath.EvalSymlinks(dir); err == nil {
+			if WithinResolvedRoot(root, resolved) {
+				return "", false
+			}
+			return resolved, true
+		}
+		// dir does not resolve: it is missing, or it is a link whose target is.
+		// A dangling link still declares where it points, and the program under
+		// test can create that target at any moment, so judging it by its declared
+		// target keeps containment from depending on that timing. Anything else
+		// unresolvable is an absent directory — ordinary, and the caller's own
+		// error to report — so keep walking up to a component that does resolve.
+		if target, ok := LinkTarget(dir); ok && !WithinResolvedRoot(root, target) {
+			return target, true
+		}
+	}
+	return "", false
+}
+
+// LinkTarget reports where a symlink points, as a cleaned path. A relative
+// target resolves against the directory holding the link, the way the kernel
+// resolves it. Anything that is not a symlink reports false.
+func LinkTarget(p string) (string, bool) {
+	target, err := os.Readlink(p)
+	if err != nil {
+		return "", false
+	}
+	if !filepath.IsAbs(target) {
+		target = filepath.Join(filepath.Dir(p), target)
+	}
+	return filepath.Clean(target), true
 }
 
 // confinedFileMode is the mode of every file atago writes on a spec's behalf
@@ -207,4 +262,21 @@ func WithinRoot(root, resolved string) bool {
 		return false
 	}
 	return rel != ".." && !strings.HasPrefix(rel, ".."+string(os.PathSeparator))
+}
+
+// WithinResolvedRoot reports whether p stays inside root, accepting either
+// spelling of a root that itself sits behind a symlink.
+//
+// The root can be reached through a link — macOS puts /tmp behind /private/tmp
+// and /var behind /private/var, which is where CI's scenario workdirs live — and
+// p arrives in either spelling: a path EvalSymlinks resolved takes the resolved
+// form, while a dangling link's declared target keeps the form the link was
+// written with. Both spellings name the same directory, so containment holds if
+// either does; a path genuinely outside the root is inside neither.
+func WithinResolvedRoot(root, p string) bool {
+	if WithinRoot(root, p) {
+		return true
+	}
+	resolved, err := filepath.EvalSymlinks(root)
+	return err == nil && WithinRoot(resolved, p)
 }

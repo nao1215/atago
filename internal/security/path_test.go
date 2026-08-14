@@ -88,6 +88,112 @@ func TestResolve_RelativeRoot(t *testing.T) {
 	}
 }
 
+// TestResolve_AncestorSymlinkMayNotEscapeTheRoot pins the containment rule
+// against a symlink ABOVE the leaf. The check was purely lexical, so a link the
+// program under test planted at a directory component was invisible to it:
+// `<root>/escape/secret.txt` compares as in-root while naming a host file, and
+// every path-taking feature inherited the hole from this one resolver.
+//
+// A link that stays inside the root is ordinary and must keep resolving, and a
+// path that is merely absent must not become an error — `exists: false` asks
+// exactly that question.
+func TestResolve_AncestorSymlinkMayNotEscapeTheRoot(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink creation is not reliably available on Windows CI")
+	}
+	t.Parallel()
+	root := t.TempDir()
+	outside := t.TempDir()
+	if err := os.Symlink(outside, filepath.Join(root, "escape")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(root, "real"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("real", filepath.Join(root, "alias")); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, tt := range []struct {
+		name    string
+		in      string
+		wantErr bool
+	}{
+		{name: "through a link out of the root", in: "escape/secret.txt", wantErr: true},
+		{name: "deeper through a link out of the root", in: "escape/sub/secret.txt", wantErr: true},
+		{name: "the link itself is left to the read and write helpers", in: "escape"},
+		{name: "through a link that stays inside the root", in: "alias/out.txt"},
+		{name: "a path that simply does not exist", in: "absent/out.txt"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			_, err := ResolveWorkdirPath("assert.file.path", root, tt.in)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("ResolveWorkdirPath(%q) = nil error; the path names a location outside the root", tt.in)
+				}
+				if !strings.Contains(err.Error(), "symlink") || !strings.Contains(err.Error(), "scenario workdir") {
+					t.Errorf("error %q should say the path resolves through a symlink out of the workdir", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("ResolveWorkdirPath(%q) error = %v; want it accepted", tt.in, err)
+			}
+		})
+	}
+}
+
+// TestResolve_DanglingAncestorJudgedByItsDeclaredTarget keeps the rule from
+// depending on whether a link's target happens to exist yet: a link out of the
+// root that currently dangles still declares where it points, and the program
+// under test can create that target at any moment. A dangling link that stays
+// inside the root is ordinary (a `latest ->` for a release not built yet).
+func TestResolve_DanglingAncestorJudgedByItsDeclaredTarget(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink creation is not reliably available on Windows CI")
+	}
+	t.Parallel()
+	root := t.TempDir()
+	if err := os.Symlink(filepath.Join(t.TempDir(), "absent"), filepath.Join(root, "escape")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("releases/v3", filepath.Join(root, "latest")); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := ResolveWorkdirPath("fixture path", root, "escape/out.txt"); err == nil {
+		t.Error("a dangling link out of the root must be refused, not written through")
+	}
+	if _, err := ResolveWorkdirPath("fixture path", root, "latest/out.txt"); err != nil {
+		t.Errorf("a dangling link inside the root must still resolve: %v", err)
+	}
+}
+
+// TestResolve_RootBehindASymlink is the macOS spelling case. CI resolves the
+// scenario workdir under /var and /tmp, which sit behind /private, so an
+// ancestor EvalSymlinks resolved comes back in a spelling the root itself is
+// never written with — comparing only the two literal forms refuses a path that
+// never left the root.
+func TestResolve_RootBehindASymlink(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink creation is not reliably available on Windows CI")
+	}
+	t.Parallel()
+	base := t.TempDir()
+	real := filepath.Join(base, "real")
+	if err := os.MkdirAll(filepath.Join(real, "sub"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	alias := filepath.Join(base, "alias")
+	if err := os.Symlink("real", alias); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ResolveWorkdirPath("assert.file.path", alias, "sub/out.txt"); err != nil {
+		t.Errorf("a path inside a workdir reached through a symlink was refused: %v", err)
+	}
+}
+
 // TestReadFileNoFollow verifies a leaf symlink pointing outside the root is
 // refused (issue #16): the untrusted program under test could plant such a link
 // at an assertion/snapshot read target to disclose an arbitrary host file. A

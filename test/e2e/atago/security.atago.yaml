@@ -60,6 +60,98 @@ scenarios:
           stdout:
             contains: "escapes the scenario workdir"
 
+  # The traversal above is lexical and easy to see. A directory symlink the
+  # program under test plants is the same escape with nothing to see: the path
+  # still compares as workdir-relative, and every path-taking key followed it.
+  # Reading is a failed assertion: exists:false would otherwise answer a question
+  # about a directory the spec has no business seeing.
+  - name: a file assertion may not read through a symlinked directory
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: link_read.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: read through the link
+                steps:
+                  - run:
+                      command: ln -s .. escape
+                  - assert:
+                      file:
+                        path: escape/anything.txt
+                        exists: false
+      - run:
+          command: ${atago} run link_read.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: "escapes the scenario workdir"
+
+  # Writing is an execution error: the redirect never runs, so no host file is
+  # created for a later assertion to be built on.
+  - name: a redirect may not write through a symlinked directory
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: link_write.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: write through the link
+                steps:
+                  - run:
+                      command: ln -s .. escape
+                  - run:
+                      shell: true
+                      command: echo planted
+                      stdout_to: escape/planted.txt
+      - run:
+          command: ${atago} run link_write.atago.yaml
+      - assert:
+          exit_code: 4
+          stdout:
+            contains: "escapes the scenario workdir"
+
+  # The other half of the same rule: a link that stays inside the workdir is an
+  # ordinary thing for a program to produce, and both halves must keep working
+  # through it.
+  - name: a symlinked directory inside the workdir still resolves
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: link_ok.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: read and write through an in-workdir link
+                steps:
+                  - run:
+                      command: mkdir real
+                  - run:
+                      command: ln -s real alias
+                  - run:
+                      shell: true
+                      command: echo through the alias
+                      stdout_to: alias/out.txt
+                  - assert:
+                      file:
+                        path: real/out.txt
+                        contains: through the alias
+      - run:
+          command: ${atago} run link_ok.atago.yaml
+      - assert:
+          exit_code: 0
+
   - name: a snapshot path may not escape the spec directory
     steps:
       - fixture:

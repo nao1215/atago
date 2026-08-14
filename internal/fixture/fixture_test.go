@@ -146,6 +146,35 @@ func TestWrite_RefusesToFollowPlantedSymlink(t *testing.T) {
 	}
 }
 
+// TestWrite_RefusesPlantedSymlinkedAncestor is the same TOCTOU one directory up.
+// The leaf refusal above only guards a link AT the destination, so a program
+// under test that made a directory component a link — `ln -s /host/dir escape` —
+// got the fixture to create files, and whole directory trees, outside the
+// workdir while the run stayed green.
+func TestWrite_RefusesPlantedSymlinkedAncestor(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	outside := t.TempDir()
+	if err := os.Symlink(outside, filepath.Join(dir, "escape")); err != nil {
+		t.Skipf("symlink creation unavailable: %v", err) // Windows without privilege
+	}
+	if err := Write(&spec.Fixture{File: "escape/planted.txt", Content: "x"}, dir, ""); err == nil {
+		t.Error("writing through a planted symlinked ancestor should be refused")
+	}
+	// A nested destination is the worse case: the write creates its parents, so an
+	// unguarded fixture builds a directory tree inside the host directory.
+	if err := Write(&spec.Fixture{File: "escape/deep/planted.txt", Content: "x"}, dir, ""); err == nil {
+		t.Error("creating parents through a planted symlinked ancestor should be refused")
+	}
+	entries, err := os.ReadDir(outside)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		t.Errorf("the host directory was written into through the symlink: %v", entries)
+	}
+}
+
 // TestWrite_ModeMtimeRefusesPlantedSymlink is a security regression: a
 // mode/mtime-only fixture operates in place and chmod/chtimes FOLLOW symlinks,
 // so a link the program-under-test planted at the destination must be refused
