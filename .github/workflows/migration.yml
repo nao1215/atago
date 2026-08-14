@@ -34,17 +34,23 @@ jobs:
           go-version-file: "go.mod"
 
       - name: Install Bats (pinned)
-        # The release the migration guide is written against. Bump this and
-        # website/content/migrate.md together.
+        # Bats-core v1.14.0 — the release the migration guide is written
+        # against, fetched by immutable commit ID because a tag can move.
+        # Bump the SHA, the label, and website/content/migrate.md together.
         run: |
-          git clone --depth 1 --branch v1.14.0 https://github.com/bats-core/bats-core.git "$RUNNER_TEMP/bats-core"
+          git init "$RUNNER_TEMP/bats-core"
+          git -C "$RUNNER_TEMP/bats-core" fetch --depth 1 https://github.com/bats-core/bats-core.git eb7f42f8d608ac693d7a4b67474f6714ea68cfc5
+          git -C "$RUNNER_TEMP/bats-core" checkout --detach eb7f42f8d608ac693d7a4b67474f6714ea68cfc5
           sudo "$RUNNER_TEMP/bats-core/install.sh" /usr/local
 
       - name: Install ShellSpec (pinned)
-        # The release the migration guide is written against. Bump this and
-        # website/content/migrate.md together.
+        # ShellSpec 0.28.1 — the release the migration guide is written
+        # against, fetched by immutable commit ID because a tag can move.
+        # Bump the SHA, the label, and website/content/migrate.md together.
         run: |
-          git clone --depth 1 --branch 0.28.1 https://github.com/shellspec/shellspec.git "$RUNNER_TEMP/shellspec"
+          git init "$RUNNER_TEMP/shellspec"
+          git -C "$RUNNER_TEMP/shellspec" fetch --depth 1 https://github.com/shellspec/shellspec.git 90e48c950239f3b8a9fdfa3e869592872c77b981
+          git -C "$RUNNER_TEMP/shellspec" checkout --detach 90e48c950239f3b8a9fdfa3e869592872c77b981
           sudo make -C "$RUNNER_TEMP/shellspec" install PREFIX=/usr/local
 
       - name: Run the original Bats suite

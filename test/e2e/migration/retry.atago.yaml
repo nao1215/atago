@@ -7,18 +7,20 @@ version: "1"
 # runn:      `loop:` with `until:` and `interval:` on a step.
 #
 # atago maps these to a `run.retry` block: re-run the command until an `until`
-# assertion passes (or the attempt budget is spent). The command below is
-# deterministic (prints "ready" immediately), so the first attempt satisfies
-# `until` and the scenario passes green without any real waiting.
+# assertion passes (or the attempt budget is spent). The command is stateful,
+# like a service warming up: the first attempt creates a marker file and
+# prints "waiting"; the second sees the marker and prints "ready" — so the
+# retry loop, its interval, and the `until` gate genuinely execute.
 suite:
   name: migration / retry — poll until ready
 
 scenarios:
   - name: retry re-runs the command until until passes
+    skip: { os: windows }        # the marker-file idiom below is POSIX shell
     steps:
       - run:
           shell: true
-          command: echo ready
+          command: "if [ -f marker ]; then echo ready; else touch marker; echo waiting; fi"
           retry:
             times: 5
             interval: 10ms

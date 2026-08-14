@@ -14,7 +14,8 @@ Everything on this page is executable. The original Bats and ShellSpec suites
 live at [test/e2e/migration](https://github.com/nao1215/atago/blob/main/test/e2e/migration/)
 next to the migrated atago specs, and the
 [MigrationParity workflow](https://github.com/nao1215/atago/blob/main/.github/workflows/migration.yml)
-runs all three on every push: the originals under pinned **Bats-core v1.14.0**
+runs all three on every pull request and on every push to `main`: the
+originals under pinned **Bats-core v1.14.0**
 and **ShellSpec 0.28.1**, the migrations under the freshly built atago binary.
 A snippet you read here is an excerpt of a file CI ran.
 
@@ -30,7 +31,7 @@ atago does not), see the [comparison](/comparison/).
 | `[ "$output" = "x" ]` / `assert_output` | `The output should equal "x"` | `stdout: {equals: x}` |
 | `[[ "$output" =~ regex ]]` | `The output should match pattern` | `stdout: {matches: regex}` |
 | `run --separate-stderr` + `$stderr` | `The error should include` | `stderr: {contains: ...}` |
-| `setup()` / `teardown()` | `BeforeEach` / `AfterEach` | `fixture:` step; teardown does not exist (fresh temp workdir per scenario) |
+| `setup()` / `teardown()` | `BeforeEach` / `AfterEach` | `fixture:` step; scratch-file cleanup is automatic (fresh temp workdir per scenario) |
 | pipe to `jq` | pipe to `jq` | `stdout: {json: {path: ...}}` |
 | one `@test` per case | `Parameters` block | `matrix:` |
 | retry loop in bash | retry loop in a helper | `run.retry` with `until:` |
@@ -119,7 +120,7 @@ stderr is a separate stream. Bats needs `run --separate-stderr`; ShellSpec has
             contains: warn
 ```
 
-## setup/teardown become fixtures — and teardown disappears
+## setup/teardown become fixtures — and file cleanup disappears
 
 A Bats `setup()` writes input files and `teardown()` removes them:
 
@@ -161,9 +162,13 @@ ShellSpec does the same with `BeforeEach`/`AfterEach` helpers:
   End
 ```
 
-In atago the setup is a declarative `fixture:` step, and there is no teardown
-to write: every scenario runs in its own temp workdir that atago removes
-([fixtures_and_files.atago.yaml](https://github.com/nao1215/atago/blob/main/test/e2e/migration/fixtures_and_files.atago.yaml)):
+In atago the setup is a declarative `fixture:` step, and for scratch files
+there is no teardown to write: every scenario runs in its own temp workdir
+that atago removes. (`teardown:` steps do exist — they are for external state
+a workdir cannot carry away, like database rows or remote resources; see
+[the cookbook](/cookbook/#clean-up-external-state-even-when-a-step-fails).)
+From
+[fixtures_and_files.atago.yaml](https://github.com/nao1215/atago/blob/main/test/e2e/migration/fixtures_and_files.atago.yaml):
 
 ```yaml
   # BeforeEach writes input.txt -> fixture step. The command consumes it and
@@ -288,12 +293,16 @@ row, each key available as `${name}`
 
 ## Polling loops become retry
 
-Waiting for an async result is a hand-written loop in shell:
+Waiting for an async result is a hand-written loop in shell. The probed
+command here is stateful, like a service warming up — the first attempt
+creates a marker and prints "waiting", the second prints "ready" — so the
+loop genuinely iterates:
 
 ```bash
 @test "poll until the command reports ready" {
+  marker="$BATS_TEST_TMPDIR/marker"
   for _ in 1 2 3 4 5; do
-    run echo ready
+    run sh -c "if [ -f '$marker' ]; then echo ready; else touch '$marker'; echo waiting; fi"
     if [[ "$output" == *ready* ]]; then
       return 0
     fi
@@ -303,16 +312,18 @@ Waiting for an async result is a hand-written loop in shell:
 }
 ```
 
-atago re-runs the command until an `until:` assertion passes, with the
-attempt budget and interval declared
+atago re-runs the same stateful command until an `until:` assertion passes,
+with the attempt budget and interval declared — the first attempt prints
+"waiting", the retry sees "ready"
 ([retry.atago.yaml](https://github.com/nao1215/atago/blob/main/test/e2e/migration/retry.atago.yaml)):
 
 ```yaml
   - name: retry re-runs the command until until passes
+    skip: { os: windows }        # the marker-file idiom below is POSIX shell
     steps:
       - run:
           shell: true
-          command: echo ready
+          command: "if [ -f marker ]; then echo ready; else touch marker; echo waiting; fi"
           retry:
             times: 5
             interval: 10ms

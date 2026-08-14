@@ -761,19 +761,23 @@ func TestMigrationGuide_SnippetsAreExecutedExcerpts(t *testing.T) {
 }
 
 // TestMigrationGuide_PinsMatchWorkflow keeps the versions the migration guide
-// names in lockstep with the versions the MigrationParity workflow installs.
-// The guide's claim is "verified against Bats-core v1.14.0 and ShellSpec
-// 0.28.1"; that is only true while the workflow pins those same releases.
+// names in lockstep with what the MigrationParity workflow installs. The
+// workflow fetches by immutable commit ID (a tag can move) and keeps the
+// release label in a comment; the guide's claim "verified against Bats-core
+// v1.14.0 and ShellSpec 0.28.1" is only true while all three stay together.
 func TestMigrationGuide_PinsMatchWorkflow(t *testing.T) {
 	t.Parallel()
 	guide := readDoc(t, "website/content/migrate.md")
 	workflow := readDoc(t, ".github/workflows/migration.yml")
-	for _, pin := range []struct{ name, workflowRef, guideRef string }{
-		{"Bats", "--branch v1.14.0 https://github.com/bats-core/bats-core.git", "Bats-core v1.14.0"},
-		{"ShellSpec", "--branch 0.28.1 https://github.com/shellspec/shellspec.git", "ShellSpec 0.28.1"},
+	for _, pin := range []struct{ name, sha, label, guideRef string }{
+		{"Bats", "eb7f42f8d608ac693d7a4b67474f6714ea68cfc5", "v1.14.0", "Bats-core v1.14.0"},
+		{"ShellSpec", "90e48c950239f3b8a9fdfa3e869592872c77b981", "0.28.1", "ShellSpec 0.28.1"},
 	} {
-		if !strings.Contains(workflow, pin.workflowRef) {
-			t.Errorf("migration.yml no longer pins %s as %q; update the guide and this test together", pin.name, pin.workflowRef)
+		if !strings.Contains(workflow, pin.sha) {
+			t.Errorf("migration.yml no longer pins %s to commit %s; update the SHA, the label comment, and the guide together", pin.name, pin.sha)
+		}
+		if !strings.Contains(workflow, pin.label) {
+			t.Errorf("migration.yml no longer labels the %s pin as %s; the release label must stay next to the commit ID", pin.name, pin.label)
 		}
 		if !strings.Contains(guide, pin.guideRef) {
 			t.Errorf("migrate.md no longer names %q; the guide must state the exact release the parity workflow runs", pin.guideRef)
@@ -784,8 +788,10 @@ func TestMigrationGuide_PinsMatchWorkflow(t *testing.T) {
 // TestMigration_HermeticRunGreen executes every migrated spec behind the
 // migration guide through the real engine, on every platform the unit tests
 // cover — the Linux-only parity workflow proves the Bats/ShellSpec side, this
-// proves the atago side everywhere else. OS-gated scenarios may skip, but
-// nothing may fail or error.
+// proves the atago side everywhere else. Each scenario is checked
+// individually: gated scenarios may skip, but a suite-level "passed" that
+// hides a flaky, xfail, or xpass scenario is not good enough for the suites a
+// guide points at.
 func TestMigration_HermeticRunGreen(t *testing.T) {
 	t.Parallel()
 	paths, err := filepath.Glob("test/e2e/migration/*.atago.yaml")
@@ -801,7 +807,15 @@ func TestMigration_HermeticRunGreen(t *testing.T) {
 			}
 			res := engine.New().Run(context.Background(), s, path)
 			if res.Status != engine.StatusPassed && res.Status != engine.StatusSkipped {
-				t.Errorf("status = %s, want passed (or skipped by an OS gate): %+v", res.Status, res.Scenarios)
+				t.Errorf("status = %s, want passed (or skipped by a gate): %+v", res.Status, res.Scenarios)
+			}
+			if len(res.Scenarios) == 0 {
+				t.Error("spec produced no scenario results")
+			}
+			for _, sc := range res.Scenarios {
+				if sc.Status != engine.StatusPassed && sc.Status != engine.StatusSkipped {
+					t.Errorf("scenario %q: status = %s, want passed or skipped", sc.Name, sc.Status)
+				}
 			}
 		})
 	}

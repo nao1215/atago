@@ -10,9 +10,10 @@ version: "1"
 # runn:      no per-CLI file fixtures.
 #
 # atago replaces imperative setup/teardown with a declarative `fixture` step
-# that seeds an input file into the scenario's isolated temp workdir. There is
-# NO teardown to write: every scenario runs in a fresh temp dir that atago
-# removes automatically. `file` assertions inspect what the command produced.
+# that seeds an input file into the scenario's isolated temp workdir. For
+# scratch files there is no teardown to write: every scenario runs in a fresh
+# temp dir that atago removes automatically (`teardown:` steps exist for
+# external state). `file` assertions inspect what the command produced.
 suite:
   name: migration / fixtures — setup files, generated files, JSON
 
