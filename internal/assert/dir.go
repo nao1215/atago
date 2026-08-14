@@ -102,7 +102,7 @@ func resolveDirRoot(workdir, declared, dirPath string) (string, error) {
 		// target exists is not a question a spec may put to the filesystem outside
 		// the workdir. Judging it by its declared target keeps the containment
 		// rule from depending on whether the target happens to exist.
-		if target, ok := security.LinkTarget(dirPath); ok && !security.WithinResolvedRoot(workdir, target) {
+		if target, escapes := security.LinkChainEscapes(workdir, dirPath); escapes {
 			return "", escapesWorkdirError(declared, target)
 		}
 		return dirPath, nil

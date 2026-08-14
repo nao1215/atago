@@ -170,6 +170,50 @@ func TestResolve_DanglingAncestorJudgedByItsDeclaredTarget(t *testing.T) {
 	}
 }
 
+// TestResolve_DanglingChainJudgedByItsWholeChain closes the one-hop reading of
+// the rule above. Only the END of a chain says where a path goes: `hop ->
+// escape` with `escape -> /outside/absent` looks in-root for one hop, and a
+// check that stops there accepts a path the program under test completes into a
+// host directory at will. A hop that leaves the root is refused wherever in the
+// chain it sits, because the kernel resolves through that location.
+func TestResolve_DanglingChainJudgedByItsWholeChain(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink creation is not reliably available on Windows CI")
+	}
+	t.Parallel()
+	root := t.TempDir()
+	if err := os.Symlink(filepath.Join(t.TempDir(), "absent"), filepath.Join(root, "escape")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("escape", filepath.Join(root, "hop")); err != nil {
+		t.Fatal(err)
+	}
+	// A chain that stays inside the root the whole way is ordinary and must keep
+	// resolving, and a cycle must be answered rather than followed forever.
+	if err := os.Symlink("latest", filepath.Join(root, "current")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("releases/v3", filepath.Join(root, "latest")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("b", filepath.Join(root, "a")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("a", filepath.Join(root, "b")); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := ResolveWorkdirPath("fixture path", root, "hop/out.txt"); err == nil {
+		t.Error("a chain whose far end leaves the root must be refused")
+	}
+	if _, err := ResolveWorkdirPath("fixture path", root, "current/out.txt"); err != nil {
+		t.Errorf("a dangling chain that stays inside the root must still resolve: %v", err)
+	}
+	if _, err := ResolveWorkdirPath("fixture path", root, "a/out.txt"); err != nil {
+		t.Errorf("a link cycle inside the root must be answered, not refused: %v", err)
+	}
+}
+
 // TestResolve_RootBehindASymlink is the macOS spelling case. CI resolves the
 // scenario workdir under /var and /tmp, which sit behind /private, so an
 // ancestor EvalSymlinks resolved comes back in a spelling the root itself is

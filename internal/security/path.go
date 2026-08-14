@@ -83,17 +83,56 @@ func escapingAncestor(root, dest string) (string, bool) {
 		// target keeps containment from depending on that timing. Anything else
 		// unresolvable is an absent directory — ordinary, and the caller's own
 		// error to report — so keep walking up to a component that does resolve.
-		if target, ok := LinkTarget(dir); ok && !WithinResolvedRoot(root, target) {
+		if target, escapes := LinkChainEscapes(root, dir); escapes {
 			return target, true
 		}
 	}
 	return "", false
 }
 
-// LinkTarget reports where a symlink points, as a cleaned path. A relative
+// maxLinkHops bounds how far a chain of declared symlink targets is followed. A
+// chain this long is a cycle in practice, and the kernel bounds its own
+// resolution the same way (ELOOP after SYMLOOP_MAX hops).
+const maxLinkHops = 40
+
+// LinkChainEscapes reports where the symlink at p leads, when following its
+// declared targets leaves root at any hop. A path that is not a symlink, or
+// whose chain stays inside root the whole way, does not escape.
+//
+// The chain matters because only its far end says where a path really goes:
+// `escape -> alias` with `alias -> /outside` looks in-root for one hop, and a
+// check that stops there accepts a path the program under test completes into a
+// host directory whenever it likes. Every hop is judged, not only the last one —
+// a chain that steps outside and back names a location outside root that the
+// program controls, and the kernel resolves through it.
+//
+// This works on declared targets rather than EvalSymlinks so it answers for a
+// DANGLING chain too, which is the case that matters: whether a target exists
+// yet is a race the program under test wins, so containment must not depend on
+// it. A cycle runs out of hops and reports no escape, which is correct — a
+// cyclic link resolves to nothing on any OS, so it can never reach outside.
+func LinkChainEscapes(root, p string) (string, bool) {
+	target, ok := linkTarget(p)
+	if !ok {
+		return "", false
+	}
+	for range maxLinkHops {
+		if !WithinResolvedRoot(root, target) {
+			return target, true
+		}
+		next, ok := linkTarget(target)
+		if !ok {
+			return "", false
+		}
+		target = next
+	}
+	return "", false
+}
+
+// linkTarget reports where a symlink points, as a cleaned path. A relative
 // target resolves against the directory holding the link, the way the kernel
 // resolves it. Anything that is not a symlink reports false.
-func LinkTarget(p string) (string, bool) {
+func linkTarget(p string) (string, bool) {
 	target, err := os.Readlink(p)
 	if err != nil {
 		return "", false

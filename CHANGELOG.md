@@ -58,8 +58,9 @@ and this project follows [Semantic Versioning](https://semver.org/).
   directory — all while the run stayed green. The leaf refusal that was already
   in place saw none of it. Ancestors now face the same containment test the
   declared path does, with the rules `dir:` already follows: a dangling link is
-  judged by its declared target so the answer does not depend on whether that
-  target exists yet, either spelling of a root that itself sits behind a symlink
+  judged by its declared target — to the far end of a chain, since only the end
+  says where a path goes — so the answer does not depend on whether that target
+  exists yet, either spelling of a root that itself sits behind a symlink
   is accepted (macOS puts CI's workdirs behind `/private`), and a link that stays
   inside the root keeps resolving. A path that is merely absent is untouched, so
   `exists: false` still answers.
