@@ -9,7 +9,7 @@ problem well; several of them shaped how atago thinks about testing. This page
 exists to answer one practical question — *which tool owns which layer* — not
 to rank projects.
 
-Compared releases, checked on **2026-08-14** against each project's official
+Compared releases, checked on 2026-08-14 against each project's official
 documentation and release pages (linked under [Sources](#sources)):
 
 | Tool | Release compared | Released |
@@ -22,7 +22,7 @@ documentation and release pages (linked under [Sources](#sources)):
 | [runn](https://github.com/k1LoW/runn) | v1.9.4 | 2026-06-30 |
 | [venom](https://github.com/ovh/venom) | v1.3.0 | 2026-01-06 |
 
-In the tables below, **—** means the compared release does not provide the
+In the tables below, — means the compared release does not provide the
 feature itself, as far as its official documentation shows. If we got
 something wrong, please
 [open an issue](https://github.com/nao1215/atago/issues) — this page is meant
@@ -33,16 +33,16 @@ to stay accurate, not flattering.
 atago does not compete with these, and where their layer is the system under
 test, they are the better choice:
 
-- **[runn](https://github.com/k1LoW/runn)** owns scenario-based **API
-  testing**. If the system under test is an HTTP/gRPC server, runn's
+- [runn](https://github.com/k1LoW/runn) owns scenario-based API
+  testing. If the system under test is an HTTP/gRPC server, runn's
   runners, OpenAPI awareness, and Go test-helper integration are built for
   exactly that. atago points the other way: the CLI is the product, and
   servers appear only as peers the CLI talks to.
-- **[venom](https://github.com/ovh/venom)** owns **platform integration
-  suites** — one test reaching across HTTP, gRPC, Kafka, AMQP, SQL, Redis,
+- [venom](https://github.com/ovh/venom) owns platform integration
+  suites — one test reaching across HTTP, gRPC, Kafka, AMQP, SQL, Redis,
   and more through its executor catalog.
-- **[goss](https://github.com/goss-org/goss)** owns **server state
-  validation**: asserting that packages, services, ports, users, and mounts
+- [goss](https://github.com/goss-org/goss) owns server state
+  validation: asserting that packages, services, ports, users, and mounts
   on a host are what they should be, and serving that as a health endpoint.
   Its `command` resource does check exit status and output, but validating a
   provisioned machine is a different job from testing a CLI you are
@@ -64,6 +64,7 @@ commander v2.5.0.
 | Ships as | single binary | shell scripts (needs Bash) | shell scripts (needs a POSIX shell) | single binary |
 | System under test | any executable | anything Bash can drive | shell scripts, functions, and commands | any executable |
 | Windows | native, incl. ConPTY terminals | via Bash ports (e.g. Git Bash) | Git Bash, msys2, cygwin | native |
+| CI setup on GitHub Actions | [setup-atago](https://github.com/nao1215/setup-atago): prebuilt binary, checksum-verified, Linux/macOS/Windows | [bats-action](https://github.com/bats-core/bats-action): installs Bats and its libraries | — (install script) | — (binary download) |
 | Editor completion for the test format | JSON Schema | — | — | — |
 | Record a first test from a real run | `atago record`, incl. `--pty` | — | — | `commander add` |
 | Generate docs from tests | `atago doc` / `explain` / `list` | — | — | — |
@@ -119,18 +120,18 @@ commander v2.5.0.
 
 An honest table needs the reverse direction spelled out:
 
-- **Bats** is the standard for testing Bash code, with over a decade of
+- Bats is the standard for testing Bash code, with over a decade of
   history, active releases, and an ecosystem (bats-assert, bats-file,
   bats-mock, bats-detik) that atago has no equivalent of. If your tests *are*
   shell code — sourcing scripts, calling functions — Bats runs them
   in-process; a black-box runner cannot.
-- **ShellSpec** is the most featureful shell unit-testing framework:
+- ShellSpec is the most featureful shell unit-testing framework:
   function and command mocking, parameterized examples, built-in parallel
   runs, and kcov coverage. When shell scripts are the product, it is the
   stronger tool; its released feature set has been stable since 2021.
-- **commander** shares atago's YAML approach in a smaller package, and has
+- commander shares atago's YAML approach in a smaller package, and has
   XML assertions and a first-class docker execution node, which atago lacks.
-- **goss / runn / venom** own their layers outright, as described
+- goss / runn / venom own their layers outright, as described
   [above](#tools-that-own-a-different-layer).
 
 atago is also the youngest project on this page and still pre-1.0. The spec

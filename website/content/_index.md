@@ -6,7 +6,7 @@ atago tests real CLI behavior from plain YAML: commands, files, snapshots, servi
 
 ![atago running a spec suite](/img/demo.gif)
 
-## Try it in 30 seconds
+## First run
 
 No install, no fictional binary — if you have Go, paste this. It records a real run of a command you already have, then replays it as a test:
 

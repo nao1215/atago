@@ -6,7 +6,7 @@ description: Side-by-side mappings from Bats and ShellSpec tests to atago specs.
 
 Bats and ShellSpec are mature, well-designed frameworks, and if they fit your
 suite there is no reason to leave. This guide is for one specific situation:
-the thing under test is a **compiled binary** and the shell code around it
+the thing under test is a compiled binary and the shell code around it
 exists only to run that binary and inspect what happened. That layer is
 atago's job, and the mappings below show what each familiar construct becomes.
 
@@ -15,8 +15,8 @@ live at [test/e2e/migration](https://github.com/nao1215/atago/blob/main/test/e2e
 next to the migrated atago specs, and the
 [MigrationParity workflow](https://github.com/nao1215/atago/blob/main/.github/workflows/migration.yml)
 runs all three on every pull request and on every push to `main`: the
-originals under pinned **Bats-core v1.14.0**
-and **ShellSpec 0.28.1**, the migrations under the freshly built atago binary.
+originals under pinned Bats-core v1.14.0
+and ShellSpec 0.28.1, the migrations under the freshly built atago binary.
 A snippet you read here is an excerpt of a file CI ran.
 
 For a feature-by-feature table (including what Bats and ShellSpec do that
@@ -448,13 +448,13 @@ for each.
 Migrate the black-box layer, not everything. Bats and ShellSpec remain the
 right tool for what they were built for:
 
-- **Unit tests of shell functions.** Both frameworks run shell code
+- Unit tests of shell functions. Both frameworks run shell code
   in-process and assert on it directly. atago only ever executes a program,
   so it cannot see inside your shell scripts.
-- **Mocking shell internals.** ShellSpec's function and command mocks have no
+- Mocking shell internals. ShellSpec's function and command mocks have no
   atago equivalent — atago's mocks are external HTTP servers, a different
   axis.
-- **Coverage of shell scripts.** ShellSpec measures kcov coverage for shell
+- Coverage of shell scripts. ShellSpec measures kcov coverage for shell
   code; a black-box runner cannot.
 
 If your repository has both kinds of tests, keeping ShellSpec for the shell

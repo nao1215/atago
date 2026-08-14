@@ -4,7 +4,7 @@ title: Getting started
 description: Record a real run of your CLI, read the spec atago wrote, and keep it as a test — then assert on files, snapshots, interactive prompts, and server peers.
 ---
 
-## Try it in 30 seconds
+## First run
 
 Before installing anything, prove the loop against a command you already have. If you have Go, paste this — it records a real run and replays it as a test:
 

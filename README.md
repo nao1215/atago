@@ -20,7 +20,7 @@ Documentation: **https://nao1215.github.io/atago/**
 
 ![demo](./doc/img/demo.gif)
 
-## Try it in 30 seconds
+## First run
 
 No install, no fictional binary — if you have Go, paste this. It records a real
 run of a command you already have, then replays it as a test:
