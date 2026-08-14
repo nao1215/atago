@@ -56,6 +56,17 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Every confined read, write, and stat is now bound to an `os.Root` at its
+  containment root, so containment holds at the moment of the operation instead
+  of relying on the pathname check that ran before it. The lexical checks (and
+  the ancestor-symlink resolution added earlier) refuse an escape that is already
+  in place, but a program under test can swap a directory component for a symlink
+  in the window between the check and the read or write; `os.Root` resolves every
+  component through the root's own descriptor and refuses one that leaves the
+  root, closing that race for the file/pdf/image assertions, `fixture:`,
+  `run.stdout_to`/`stderr_to`, `http.body_to`, and the snapshot reader and
+  writer. A symlink at the leaf is still refused outright and a non-regular leaf
+  (a FIFO) is still refused by kind, so the existing contract is unchanged.
 - The box a failing `screen:` assertion draws around the terminal screen is now
   measured in display columns. It counted bytes first and runes after, and
   neither is what a terminal draws: a CJK character or an emoji is one rune and

@@ -88,7 +88,7 @@ func Write(f *spec.Fixture, workdir, specDir string) error {
 	// escape) — WriteConfinedFile handles the rest of the policy: the untrusted
 	// program under test may have planted a symlink at dest pointing outside the
 	// workdir, and writing must not follow it (TOCTOU, issue #16).
-	if err := security.WriteConfinedFile(dest, data); err != nil {
+	if err := security.WriteConfinedFile(workdir, dest, data); err != nil {
 		return fmt.Errorf("fixture %q: %w", f.File, err)
 	}
 	if err := applyMode(f, dest); err != nil {

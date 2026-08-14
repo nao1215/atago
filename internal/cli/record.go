@@ -148,8 +148,9 @@ non-goal for now — write those steps by hand.
 		}
 	}
 	if *snap {
-		golden := filepath.Join(filepath.Dir(*out), filepath.FromSlash(opts.SnapshotPath))
-		if err := snapshot.Update(golden, res.Stdout, snapshot.Options{Workdir: workdir}); err != nil {
+		outDir := filepath.Dir(*out)
+		golden := filepath.Join(outDir, filepath.FromSlash(opts.SnapshotPath))
+		if err := snapshot.Update(outDir, golden, res.Stdout, snapshot.Options{Workdir: workdir}); err != nil {
 			fmt.Fprintf(stderr, "atago record: could not write snapshot golden: %v\n", err)
 			return ExitExec
 		}

@@ -154,9 +154,10 @@ func (r *Runner) Run(ctx context.Context, actions []spec.CDPAction, workdir stri
 	// on disk before the scenario's file/image assertions read them (#50).
 	for _, s := range shots {
 		// s.path was confined to the workdir when the task was built; the confined
-		// write creates its parents and refuses to follow a symlink the page under
-		// test may have planted at the target (issue #16).
-		if err := security.WriteConfinedFile(s.path, *s.buf); err != nil {
+		// write creates its parents, refuses to follow a symlink the page under
+		// test may have planted at the target (issue #16), and binds the write to
+		// the workdir so an ancestor swapped for a link cannot redirect it (#430).
+		if err := security.WriteConfinedFile(workdir, s.path, *s.buf); err != nil {
 			return nil, fmt.Errorf("cdp screenshot: writing %q: %w", s.path, err)
 		}
 	}
