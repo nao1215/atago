@@ -107,6 +107,62 @@ func TestGenerate_EscapesVariableReferences(t *testing.T) {
 	}
 }
 
+// TestGenerate_ObservedStderrIsAnchored pins what a recording says about a
+// stream the tool actually wrote to. Only an EMPTY stderr produced an assert, so
+// recording the case a CLI author most wants pinned — `mytool --bad-flag`, whose
+// whole observable behavior is a diagnostic on stderr — generated a spec that
+// asserted the exit code and nothing else, silently dropping the message. A
+// non-empty stderr now gets the same first-line anchor stdout has always had.
+func TestGenerate_ObservedStderrIsAnchored(t *testing.T) {
+	t.Parallel()
+	out, err := Generate(Observation{
+		Command:  "mytool --bad-flag",
+		ExitCode: 2,
+		Stderr:   []byte("\nerror: unknown flag --bad-flag\nusage: mytool [options]\n"),
+	}, Options{SuiteName: "mytool"})
+	if err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+	got := string(out)
+	for _, want := range []string{
+		"exit_code: 2",
+		"stderr:",
+		`contains: "error: unknown flag --bad-flag"`,
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("generated spec missing %q:\n%s", want, got)
+		}
+	}
+	// The empty assert belongs only to a stream that really was empty.
+	if strings.Contains(got, "empty: true") {
+		t.Errorf("a non-empty stderr must not be asserted empty:\n%s", got)
+	}
+	if _, lerr := loader.LoadBytes("g.atago.yaml", out); lerr != nil {
+		t.Fatalf("generated spec does not load: %v\n%s", lerr, out)
+	}
+}
+
+// TestGenerate_RedrawingStderrIsNotAnchored keeps the anchor above from turning
+// a progress bar into a failing assertion. A line carrying an escape or a
+// carriage return is a redraw — different on the very next run — so anchoring on
+// one would hand the author a generated spec that is red on arrival, which is
+// worse than saying nothing about the stream.
+func TestGenerate_RedrawingStderrIsNotAnchored(t *testing.T) {
+	t.Parallel()
+	for _, stderr := range []string{
+		"[===>      ] 42%\r[=====>    ] 61%\r",
+		"\x1b[32mbuilding\x1b[0m 3/7",
+	} {
+		out, err := Generate(Observation{Command: "build", ExitCode: 0, Stderr: []byte(stderr)}, Options{SuiteName: "b"})
+		if err != nil {
+			t.Fatalf("Generate(%q): %v", stderr, err)
+		}
+		if got := string(out); strings.Contains(got, "stderr:") {
+			t.Errorf("a redrawing stderr must not be anchored (%q):\n%s", stderr, got)
+		}
+	}
+}
+
 // TestGenerate_EdgeShapes proves generation stays valid across observed
 // shapes: empty output, non-zero exit, noisy stderr, shell mode, file cap,
 // and hostile strings that must not break YAML structure.

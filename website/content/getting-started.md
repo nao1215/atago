@@ -19,7 +19,7 @@ go run github.com/nao1215/atago@latest run demo.atago.yaml
 PASSED  1 scenario: 1 passed, 0 failed, 0 errored, 0 skipped
 ```
 
-Open `demo.atago.yaml`: `record` captured the exit code, the version line on stdout, and an empty stderr, so you have a real test to tighten rather than YAML written from scratch. Swap `git --version` for any command you have (`go version`, `jq --version`, `ls -la`). Then [install atago](/install/) and point it at your own tool.
+Open `demo.atago.yaml`: `record` captured the exit code, the version line on stdout, and an empty stderr — a tool that writes a diagnostic there gets that first line anchored instead — so you have a real test to tighten rather than YAML written from scratch. Swap `git --version` for any command you have (`go version`, `jq --version`, `ls -la`). Then [install atago](/install/) and point it at your own tool.
 
 ## Start from a real run
 
