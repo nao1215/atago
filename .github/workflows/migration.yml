@@ -1,0 +1,69 @@
+name: MigrationParity
+
+# Proof behind the website's migration guide (/migrate/): the original Bats
+# and ShellSpec suites under test/e2e/migration/{bats,shellspec} and the
+# migrated atago specs beside them describe the same behavior, so all three
+# must pass. The originals run under pinned releases of Bats and ShellSpec —
+# the exact versions the guide says it was verified against — and the
+# migrations run under the freshly built atago binary. If either side stops
+# passing, the guide has drifted from reality and this workflow says so.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  parity:
+    # Fixed distro for the same reason thirdparty.yml uses one: a pinned tool
+    # comparison must not move when ubuntu-latest rolls over.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: "go.mod"
+
+      - name: Install Bats (pinned)
+        # The release the migration guide is written against. Bump this and
+        # website/content/migrate.md together.
+        run: |
+          git clone --depth 1 --branch v1.14.0 https://github.com/bats-core/bats-core.git "$RUNNER_TEMP/bats-core"
+          sudo "$RUNNER_TEMP/bats-core/install.sh" /usr/local
+
+      - name: Install ShellSpec (pinned)
+        # The release the migration guide is written against. Bump this and
+        # website/content/migrate.md together.
+        run: |
+          git clone --depth 1 --branch 0.28.1 https://github.com/shellspec/shellspec.git "$RUNNER_TEMP/shellspec"
+          sudo make -C "$RUNNER_TEMP/shellspec" install PREFIX=/usr/local
+
+      - name: Run the original Bats suite
+        run: bats test/e2e/migration/bats
+
+      - name: Run the original Bats suite filtered by tag
+        # The selection mapping (test_tags= / --filter-tags <-> tags: / --tag)
+        # must hold under filtering too, not only in a full run.
+        run: bats --filter-tags smoke test/e2e/migration/bats
+
+      - name: Run the original ShellSpec suite
+        working-directory: test/e2e/migration/shellspec
+        run: shellspec
+
+      - name: Build atago
+        run: go build -o ./dist/atago .
+
+      - name: Run the migrated atago specs
+        run: ./dist/atago run ./test/e2e/migration
+
+      - name: Run the migrated atago specs filtered by tag
+        run: ./dist/atago run --tag smoke ./test/e2e/migration

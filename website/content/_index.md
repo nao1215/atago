@@ -45,6 +45,8 @@ Pick the tool that owns your layer:
 
 If the server or the platform is the system under test, use runn or venom. atago points the other way: the CLI is the product, and HTTP, database, SSH, gRPC, browser, and mock servers appear only as peers your CLI talks to.
 
+A [feature-by-feature comparison](/comparison/) states the versions compared and its sources, and the [migration guide](/migrate/) maps Bats and ShellSpec constructs to atago one-to-one — every mapping runs in CI, originals and migrations both.
+
 ## Record, don't write
 
 The first spec comes from a real run: `atago record -- <command>` executes the tool once and writes a spec from what it observed — exit code, output, created files. Interactive tools record too: `record --pty` runs in a real terminal, you drive one session by hand, and the keystrokes become a replayable expect/send script, with password prompts masked into `${env:...}` placeholders automatically. Then you edit YAML, not write it from scratch.

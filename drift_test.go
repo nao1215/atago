@@ -695,3 +695,114 @@ func TestExamples_HermeticRunGreen(t *testing.T) {
 		})
 	}
 }
+
+// migrationFenceRe captures each fenced code block in the migration guide with
+// its language tag, so every excerpt can be checked against the file family it
+// claims to come from.
+var migrationFenceRe = regexp.MustCompile("(?s)```([a-z]+)\n(.*?)```")
+
+// migrationSourceFamilies maps a fence language in migrate.md to the committed
+// parity files its excerpts must be verbatim substrings of: ```bash is the Bats
+// suite, ```sh the ShellSpec suite, ```yaml the migrated atago specs. ```shell
+// blocks are free-form command lines and are not checked.
+func migrationSourceFamilies(t *testing.T) map[string][]string {
+	t.Helper()
+	families := map[string][]string{}
+	for lang, glob := range map[string]string{
+		"bash": "test/e2e/migration/bats/*.bats",
+		"sh":   "test/e2e/migration/shellspec/spec/*_spec.sh",
+		"yaml": "test/e2e/migration/*.atago.yaml",
+	} {
+		paths, err := filepath.Glob(glob)
+		if err != nil || len(paths) == 0 {
+			t.Fatalf("glob %s: %v (found %d files)", glob, err, len(paths))
+		}
+		families[lang] = paths
+	}
+	return families
+}
+
+// TestMigrationGuide_SnippetsAreExecutedExcerpts keeps the website's migration
+// guide honest: every Bats, ShellSpec, and atago snippet it shows must be a
+// verbatim excerpt of a committed file under test/e2e/migration/ — the files
+// the MigrationParity workflow actually runs. A snippet edited only in the
+// guide, or a parity file that drifts away from the guide, fails here instead
+// of quietly turning the page into fiction.
+func TestMigrationGuide_SnippetsAreExecutedExcerpts(t *testing.T) {
+	t.Parallel()
+	doc := readDoc(t, "website/content/migrate.md")
+	families := migrationSourceFamilies(t)
+	blocks := migrationFenceRe.FindAllStringSubmatch(doc, -1)
+	if len(blocks) == 0 {
+		t.Fatal("website/content/migrate.md contains no fenced code blocks")
+	}
+	checked := 0
+	for i, m := range blocks {
+		lang, body := m[1], m[2]
+		paths, guarded := families[lang]
+		if !guarded {
+			continue
+		}
+		checked++
+		found := false
+		for _, path := range paths {
+			if strings.Contains(readDoc(t, path), body) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("migrate.md block %d (```%s) is not a verbatim excerpt of any %s parity file:\n%s", i, lang, lang, body)
+		}
+	}
+	if checked == 0 {
+		t.Error("migrate.md has no bats/shellspec/atago snippets to guard; the fence languages may have drifted")
+	}
+}
+
+// TestMigrationGuide_PinsMatchWorkflow keeps the versions the migration guide
+// names in lockstep with the versions the MigrationParity workflow installs.
+// The guide's claim is "verified against Bats-core v1.14.0 and ShellSpec
+// 0.28.1"; that is only true while the workflow pins those same releases.
+func TestMigrationGuide_PinsMatchWorkflow(t *testing.T) {
+	t.Parallel()
+	guide := readDoc(t, "website/content/migrate.md")
+	workflow := readDoc(t, ".github/workflows/migration.yml")
+	for _, pin := range []struct{ name, workflowRef, guideRef string }{
+		{"Bats", "--branch v1.14.0 https://github.com/bats-core/bats-core.git", "Bats-core v1.14.0"},
+		{"ShellSpec", "--branch 0.28.1 https://github.com/shellspec/shellspec.git", "ShellSpec 0.28.1"},
+	} {
+		if !strings.Contains(workflow, pin.workflowRef) {
+			t.Errorf("migration.yml no longer pins %s as %q; update the guide and this test together", pin.name, pin.workflowRef)
+		}
+		if !strings.Contains(guide, pin.guideRef) {
+			t.Errorf("migrate.md no longer names %q; the guide must state the exact release the parity workflow runs", pin.guideRef)
+		}
+	}
+}
+
+// TestMigration_HermeticRunGreen executes every migrated spec behind the
+// migration guide through the real engine, on every platform the unit tests
+// cover — the Linux-only parity workflow proves the Bats/ShellSpec side, this
+// proves the atago side everywhere else. OS-gated scenarios may skip, but
+// nothing may fail or error.
+func TestMigration_HermeticRunGreen(t *testing.T) {
+	t.Parallel()
+	paths, err := filepath.Glob("test/e2e/migration/*.atago.yaml")
+	if err != nil || len(paths) == 0 {
+		t.Fatalf("glob migration specs: %v (found %d files)", err, len(paths))
+	}
+	for _, path := range paths {
+		t.Run(path, func(t *testing.T) {
+			t.Parallel()
+			s, err := loader.Load(path)
+			if err != nil {
+				t.Fatalf("load: %v", err)
+			}
+			res := engine.New().Run(context.Background(), s, path)
+			if res.Status != engine.StatusPassed && res.Status != engine.StatusSkipped {
+				t.Errorf("status = %s, want passed (or skipped by an OS gate): %+v", res.Status, res.Scenarios)
+			}
+		})
+	}
+}

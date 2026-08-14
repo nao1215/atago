@@ -7,6 +7,18 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Two website pages: a [comparison](https://nao1215.github.io/atago/comparison/)
+  with Bats-core v1.14.0, ShellSpec 0.28.1, commander v2.5.0, goss v0.4.10,
+  runn v1.9.4, and venom v1.3.0 (versions stated, sourced from official
+  documentation), and a [migration guide](https://nao1215.github.io/atago/migrate/)
+  mapping Bats and ShellSpec constructs to atago one-to-one. The guide is backed
+  by executable parity suites under `test/e2e/migration/` — the original Bats
+  and ShellSpec tests plus the migrated specs — run by the new MigrationParity
+  workflow under pinned releases of both tools, and drift tests keep every
+  snippet on the guide a verbatim excerpt of a file CI ran.
+
 ### Fixed
 
 - A pty step or `record --pty` no longer loses the output of a command that
