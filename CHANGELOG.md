@@ -28,9 +28,10 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
-- `atago record --pty` now notes in the generated spec's header when a send has
-  no expect before it. The recorder anchors a send on the plain text that
-  preceded it, but a full-screen TUI that redraws with pure cursor addressing
+- `atago record --pty` now notes in the generated spec's header when a send that
+  follows another send has no expect before it (an unanchored first send stays
+  silent, having no prior send to race). The recorder anchors a send on the plain
+  text that preceded it, but a full-screen TUI that redraws with pure cursor addressing
   prints no text to anchor on, so two sends end up back to back — and on replay
   they are written as fast as the engine can, where a program that drains
   typeahead on a mode switch reads the first and drops the second. The comment
