@@ -71,6 +71,37 @@ scenarios:
             path: taken.atago.yaml
             contains: precious
 
+  - name: an observed stderr diagnostic is anchored, not dropped
+    skip:
+      os: windows
+    steps:
+      # A failing tool's whole observable behavior is its diagnostic and its exit
+      # code. Only an EMPTY stderr used to produce an assert, so recording this
+      # generated a spec that pinned the exit code and silently dropped the
+      # message — the one thing the author wanted.
+      - run:
+          shell: true
+          command: "${atago} record --shell --out diag.atago.yaml -- 'echo \"error: unknown flag\" >&2; exit 2'"
+      - assert:
+          exit_code: 0
+          file:
+            path: diag.atago.yaml
+            contains:
+              - "exit_code: 2"
+              - "stderr:"
+              - "error: unknown flag"
+      - assert:
+          file:
+            path: diag.atago.yaml
+            not_contains: "empty: true"
+      # The round-trip: replaying the generated spec passes.
+      - run:
+          command: ${atago} run diag.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "1 passed"
+
   - name: created files become exists asserts (shell mode)
     skip:
       os: windows
