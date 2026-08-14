@@ -99,6 +99,24 @@ func TestRenderScreen_WideCharactersOccupyTwoColumns(t *testing.T) {
 	}
 }
 
+// TestRenderScreen_PreservesGraphemeClusters is the #437 regression: a grapheme
+// cluster is one cell on the terminal and must render whole. Keeping only the
+// leading rune returned the base emoji alone for a ZWJ sequence, so a screen
+// text match on the real cluster could never succeed. A precomposed accent
+// (U+00E9) is a single rune and was never affected; a DECOMPOSED
+// base-plus-combining-mark is reduced to its base by the emulator upstream,
+// which is out of atago's hands, so it is not asserted here.
+func TestRenderScreen_PreservesGraphemeClusters(t *testing.T) {
+	t.Parallel()
+	// A woman-technologist ZWJ sequence: woman + ZWJ + laptop, one cluster over
+	// one cell.
+	const dev = "\U0001F469\u200d\U0001F4BB"
+	got := RenderScreen([]byte(dev+"\r\n"), &spec.PTY{Rows: 3, Cols: 20})
+	if got != dev {
+		t.Errorf("RenderScreen(%q) = %q, want the whole cluster %q", dev, got, dev)
+	}
+}
+
 // TestRenderScreen_TrailingNormalization proves per-line trailing whitespace
 // and trailing blank rows are stripped so snapshots stay stable.
 func TestRenderScreen_TrailingNormalization(t *testing.T) {
@@ -368,7 +386,7 @@ func TestRenderScreenCells_TracksColorsAndAttributes(t *testing.T) {
 	// to the SGR code.
 	for i, r := range "ERROR" {
 		c := cells[0][i]
-		if c.Rune != r || c.FG != 1 || !c.Bold {
+		if c.Content != string(r) || c.FG != 1 || !c.Bold {
 			t.Errorf("cell (1,%d) = %+v, want %q bold red", i+1, c, r)
 		}
 	}
@@ -384,11 +402,11 @@ func TestRenderScreenCells_TracksColorsAndAttributes(t *testing.T) {
 		}
 	}
 
-	// The alignment law: the text is exactly the cells' runes, row for row.
+	// The alignment law: the text is exactly the cells' content, row for row.
 	for y, line := range strings.Split(text, "\n") {
 		var b strings.Builder
 		for _, c := range cells[y] {
-			b.WriteRune(c.Rune)
+			b.WriteString(c.Content)
 		}
 		if got := strings.TrimRight(b.String(), " \t"); got != line {
 			t.Errorf("row %d: text %q, cells %q", y+1, line, got)

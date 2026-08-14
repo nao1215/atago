@@ -56,6 +56,14 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- A `screen:` assertion now keeps a grapheme cluster whole. The rendered screen
+  stored only the leading rune of each cell, so a ZWJ emoji sequence (a
+  woman-technologist, a flag) rendered as its first emoji and a
+  `screen: contains:` on the real cluster could never match; the `attrs:` matcher
+  compared its query rune-by-rune against one cell per cluster and could not line
+  up either. Cells now carry the full cluster and the matcher compares clusters,
+  so both see complete text. A decomposed base-plus-combining-mark is still
+  reduced to its base by the emulator upstream, which atago does not control.
 - A `screen:` assertion now renders wide characters (CJK, emoji) at their true
   two-column width. The screen emulator stored one column per rune, so a label a
   program positioned with cursor addressing after a Japanese string landed two

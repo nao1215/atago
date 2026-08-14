@@ -3,6 +3,8 @@ package assert
 import (
 	"fmt"
 
+	"github.com/rivo/uniseg"
+
 	"github.com/nao1215/atago/internal/runner"
 	"github.com/nao1215/atago/internal/spec"
 )
@@ -48,7 +50,10 @@ func checkOneScreenAttr(a *spec.ScreenAttr, res *runner.Result) *CheckResult {
 		rows = rows[a.Row-1 : a.Row]
 	}
 
-	text := []rune(a.Text)
+	// Match by grapheme cluster, not by rune: the query text and the screen cells
+	// each hold one cluster per cell, so a ZWJ emoji or a base-plus-combining
+	// sequence lines up cell-for-cluster (#437).
+	text := splitGraphemes(a.Text)
 	if len(text) == 0 {
 		return fail("the entry names no text to check", borderedScreen(string(res.Screen)))
 	}
@@ -57,7 +62,7 @@ func checkOneScreenAttr(a *spec.ScreenAttr, res *runner.Result) *CheckResult {
 	var nearest string
 	for _, row := range rows {
 		for start := 0; start+len(text) <= len(row); start++ {
-			if !runesMatch(row[start:start+len(text)], text) {
+			if !graphemesMatch(row[start:start+len(text)], text) {
 				continue
 			}
 			found = true
@@ -83,14 +88,29 @@ func checkOneScreenAttr(a *spec.ScreenAttr, res *runner.Result) *CheckResult {
 		borderedScreen(string(res.Screen)))
 }
 
-// runesMatch reports whether the cells spell exactly want.
-func runesMatch(cells []runner.ScreenCell, want []rune) bool {
-	for i, r := range want {
-		if cells[i].Rune != r {
+// graphemesMatch reports whether the cells spell exactly want, one cluster per
+// cell.
+func graphemesMatch(cells []runner.ScreenCell, want []string) bool {
+	for i, g := range want {
+		if cells[i].Content != g {
 			return false
 		}
 	}
 	return true
+}
+
+// splitGraphemes breaks s into grapheme clusters, the same unit a screen cell
+// holds, so a query naming a ZWJ emoji or a combining sequence matches one cell
+// rather than being compared rune-by-rune against a single cell.
+func splitGraphemes(s string) []string {
+	var out []string
+	state := -1
+	for len(s) > 0 {
+		var cluster string
+		cluster, s, _, state = uniseg.FirstGraphemeClusterInString(s, state)
+		out = append(out, cluster)
+	}
+	return out
 }
 
 // firstAttrMismatch returns a description of the first way the cells fail the

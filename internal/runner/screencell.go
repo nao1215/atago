@@ -9,8 +9,11 @@ package runner
 // It lives here rather than in the pty runner because runner.Result carries it
 // and the pty runner imports this package, not the other way round.
 type ScreenCell struct {
-	// Rune is the character drawn in this cell.
-	Rune rune
+	// Content is the grapheme cluster drawn in this cell — usually a single rune,
+	// but a base plus combining marks or a ZWJ emoji sequence is one cluster in
+	// one cell, kept whole so a `screen:` text match or an `attrs:` query naming it
+	// lines up cell-for-cluster (#437).
+	Content string
 	// FG and BG are the emulator's colors: 0..15 for the ANSI palette, 16..255
 	// for the xterm palette, and DefaultColor for "the terminal's own", which is
 	// what makes an uncolored screen assertable.

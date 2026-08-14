@@ -134,7 +134,7 @@ func renderScreenCells(transcript []byte, p *spec.PTY, resizes []screenResize) (
 	// A wide character occupies two columns: the first holds the grapheme, the
 	// second is a continuation cell (Width 0). The continuation is dropped so one
 	// logical cell holds one grapheme — the text row reads "日本語", not "日 本 語",
-	// and the attrs matcher keeps matching one cell per rune of its query text.
+	// and the attrs matcher keeps matching one cell per grapheme of its query text.
 	curCols, curRows := term.Width(), term.Height()
 	grid := make([][]runner.ScreenCell, 0, curRows)
 	for y := 0; y < curRows; y++ {
@@ -153,7 +153,7 @@ func renderScreenCells(transcript []byte, p *spec.PTY, resizes []screenResize) (
 	for i, row := range grid {
 		var b strings.Builder
 		for _, c := range row {
-			b.WriteRune(c.Rune)
+			b.WriteString(c.Content)
 		}
 		lines[i] = strings.TrimRight(b.String(), " \t")
 	}
@@ -168,19 +168,18 @@ func renderScreenCells(transcript []byte, p *spec.PTY, resizes []screenResize) (
 }
 
 // glyphCell converts one emulator cell into the cell the assertion layer reads.
-// A cell the program never wrote carries empty content, which renders as a space
-// — matching what the screen shows — and is not a character anyone asserts on.
-// Only the first rune of the grapheme cluster is kept in Rune, so the attrs
-// matcher matches one cell per rune of its query text; the plain-text screen is
-// built from the same runes.
+// The whole grapheme cluster the cell holds is kept — a ZWJ emoji sequence is one
+// cluster in one cell — so the plain-text screen and the attrs matcher both see
+// complete text rather than only the leading rune (#437). A cell the program
+// never wrote carries a space, matching what the screen shows.
 func glyphCell(c *uv.Cell) runner.ScreenCell {
-	r := ' '
-	if c.Content != "" {
-		r, _ = utf8.DecodeRuneInString(c.Content)
+	content := c.Content
+	if content == "" {
+		content = " "
 	}
 	attrs := c.Style.Attrs
 	return runner.ScreenCell{
-		Rune:      r,
+		Content:   content,
 		FG:        colorToIndex(c.Style.Fg),
 		BG:        colorToIndex(c.Style.Bg),
 		Bold:      attrs&uv.AttrBold != 0,
