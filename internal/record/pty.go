@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/nao1215/atago/internal/buildinfo"
@@ -389,44 +390,65 @@ func endsWithNewline(b []byte) bool {
 	return len(b) > 0 && (b[len(b)-1] == '\r' || b[len(b)-1] == '\n')
 }
 
-// stableLine returns the conservative literal an expect/contains anchors on: the
-// longest run of plain text on the last visible line of the transcript that
-// carries no ANSI sequence or control byte (#69). The returned run is a VERBATIM
-// substring of the raw transcript — ANSI sequences are turned into a delimiter,
-// not stripped and concatenated — so an anchor built from it actually matches the
-// raw pty stdout the replay compares against. Stripping ANSI and joining the
-// visible text (the old behavior) produced an anchor with mid-line color codes
-// removed that was never a substring of the raw output, so a colored prompt made
-// the generated spec fail on replay.
+// stableLine returns the conservative literal an expect/contains anchors on: a
+// run of plain text near the end of the transcript that carries no ANSI
+// sequence or control byte (#69). The returned run is a VERBATIM substring of
+// the raw transcript — ANSI sequences are turned into a delimiter, not stripped
+// and concatenated — so an anchor built from it actually matches the raw pty
+// stdout the replay compares against. Stripping ANSI and joining the visible
+// text (the old behavior) produced an anchor with mid-line color codes removed
+// that was never a substring of the raw output, so a colored prompt made the
+// generated spec fail on replay.
+//
+// Among the candidate runs, the latest one carrying a letter or digit wins. A
+// full-screen TUI's last painted line is often a decorative rule (fzf's
+// "3/3 ─────" info line, a status bar), and the longest run on it is the
+// repeated punctuation — an anchor that matches ANY redraw and says nothing
+// about the state the following send depends on; a recorded fzf session
+// anchored every expect on the same run of box-drawing characters. The
+// decorative run is kept only as the fallback when the output says nothing
+// better.
 func stableLine(output []byte) string {
 	// Replace ANSI/OSC sequences with a NUL so the plain text on either side stays
 	// contiguous and verbatim; fold CR so a redraw does not merge lines.
 	s := ansiPattern.ReplaceAllString(string(output), "\x00")
 	s = strings.ReplaceAll(s, "\r", "\n")
 	best := ""
+	bestInformative := ""
 	for _, line := range strings.Split(s, "\n") {
-		if run := longestPlainRun(line); run != "" {
+		run, informative := plainRuns(line)
+		if run != "" {
 			best = run
 		}
+		if informative != "" {
+			bestInformative = informative
+		}
+	}
+	if bestInformative != "" {
+		return bestInformative
 	}
 	return best
 }
 
-// longestPlainRun returns the longest run of line that contains no C0 control
-// byte (the NUL standing in for an ANSI sequence, a tab, or any other) and no
-// byte that is not valid UTF-8, trimmed of surrounding whitespace. Each such run
+// plainRuns returns the longest run of line that contains no C0 control byte
+// (the NUL standing in for an ANSI sequence, a tab, or any other) and no byte
+// that is not valid UTF-8, trimmed of surrounding whitespace — plus the longest
+// such run that also carries a letter or digit (empty when none does). Each run
 // existed verbatim in the raw output, which is what lets an expect built from it
 // match the replayed transcript. A rune-by-rune scan silently turned an invalid
 // byte into U+FFFD, so a Latin-1 prompt yielded an anchor that appears nowhere in
 // the output and an expect that could never match — the session then hung until
-// its timeout. Such a byte now breaks the run, and the anchor is the longest
-// valid stretch around it.
-func longestPlainRun(line string) string {
-	best := ""
+// its timeout. Such a byte breaks the run, and the anchor is the longest valid
+// stretch around it.
+func plainRuns(line string) (best, bestInformative string) {
 	var cur strings.Builder
 	flush := func() {
-		if t := strings.TrimSpace(cur.String()); len(t) > len(best) {
+		t := strings.TrimSpace(cur.String())
+		if len(t) > len(best) {
 			best = t
+		}
+		if len(t) > len(bestInformative) && hasLetterOrDigit(t) {
+			bestInformative = t
 		}
 		cur.Reset()
 	}
@@ -440,5 +462,16 @@ func longestPlainRun(line string) string {
 		cur.WriteRune(r)
 	}
 	flush()
-	return best
+	return best, bestInformative
+}
+
+// hasLetterOrDigit reports whether s carries at least one letter or digit — the
+// signal that a run describes program state rather than decoration.
+func hasLetterOrDigit(s string) bool {
+	for _, r := range s {
+		if unicode.IsLetter(r) || unicode.IsNumber(r) {
+			return true
+		}
+	}
+	return false
 }

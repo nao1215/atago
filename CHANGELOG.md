@@ -26,6 +26,17 @@ and this project follows [Semantic Versioning](https://semver.org/).
   workflow under pinned releases of both tools, and drift tests keep every
   snippet on the guide a verbatim excerpt of a file CI ran.
 
+### Changed
+
+- `record --pty` now anchors a generated expect on the latest output run
+  carrying a letter or digit, keeping a purely decorative run only as the
+  fallback. A full-screen TUI's last painted line is often a decorative rule
+  (fzf's "3/3 ─────" info line, a status bar), so every expect of a recorded
+  fzf session anchored on the same run of box-drawing characters — an anchor
+  that matches any redraw and can release the next send before the state it
+  depends on is on screen. The same recording now anchors on the match counts
+  ("3/3", then "1/3" once the query applied).
+
 ### Fixed
 
 - `record --pty` no longer masks every keystroke of a full-screen TUI session
