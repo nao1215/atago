@@ -347,6 +347,52 @@ func TestStableLine(t *testing.T) {
 	}
 }
 
+// TestStableLine_PrefersInformativeAnchor pins the anchor rule for full-screen
+// TUIs: the last painted line is often a decorative rule (fzf's "3/3 ─────"
+// info line, a status bar), and the longest plain run on it is the repeated
+// punctuation — an anchor that matches ANY redraw and says nothing about the
+// state the following send depends on. A recorded fzf session anchored every
+// expect on the same run of box-drawing characters. The anchor now prefers the
+// latest run carrying a letter or digit, and falls back to the decorative run
+// only when the output has nothing better.
+func TestStableLine_PrefersInformativeAnchor(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{
+			// The count and the rule share the fzf-style info line, split by the
+			// color change: prefer the count over the longer rule.
+			name: "digit run beats a longer box-drawing run on the same line",
+			in:   "apple\r\nbanana\r\n\x1b[33m3/3\x1b[2m ─────────────────\x1b[0m ",
+			want: "3/3",
+		},
+		{
+			// The last plain-bearing line is purely decorative: reach back to the
+			// latest line that says something.
+			name: "an earlier informative line beats a trailing decorative one",
+			in:   "banana\r\n\x1b[2m──────────\x1b[0m ",
+			want: "banana",
+		},
+		{
+			// Nothing informative anywhere: the decorative run is still an anchor.
+			name: "punctuation-only output keeps its run as the fallback",
+			in:   "\x1b[2J\x1b[H> ",
+			want: ">",
+		},
+	}
+	for _, tt := range tests {
+		if got := stableLine([]byte(tt.in)); got != tt.want {
+			t.Errorf("%s: stableLine(%q) = %q, want %q", tt.name, tt.in, got, tt.want)
+		}
+		if got := stableLine([]byte(tt.in)); got != "" && !strings.Contains(tt.in, got) {
+			t.Errorf("%s: stableLine(%q) = %q, which is NOT a substring of the raw transcript", tt.name, tt.in, got)
+		}
+	}
+}
+
 // TestStableLine_AnchorIsRawSubstring is a regression for the pty round-trip law
 // (#30/#69): the anchor an expect/contains is built from must be a verbatim
 // substring of the RAW transcript the replay matches against. Stripping ANSI and
