@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-80 suites · 517 scenarios
+80 suites · 520 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -457,9 +457,12 @@
   - [Unix XDG family — write config, read it back, inspect it under the workdir](#scenario-unix-xdg-family--write-config-read-it-back-inspect-it-under-the-workdir)
   - [Windows APPDATA family — write config, read it back, inspect it under the workdir](#scenario-windows-appdata-family--write-config-read-it-back-inspect-it-under-the-workdir)
   - [cwd anchors the run, but sandbox_home stays at the workdir ROOT (Unix)](#scenario-cwd-anchors-the-run-but-sandbox_home-stays-at-the-workdir-root-unix)
-- [atago self-hosting / security](#atago-self-hosting--security) — 3 scenarios
+- [atago self-hosting / security](#atago-self-hosting--security) — 6 scenarios
   - [declared secrets are masked in failure output](#scenario-declared-secrets-are-masked-in-failure-output)
   - [a file assertion path may not escape the scenario workdir](#scenario-a-file-assertion-path-may-not-escape-the-scenario-workdir)
+  - [a file assertion may not read through a symlinked directory](#scenario-a-file-assertion-may-not-read-through-a-symlinked-directory)
+  - [a redirect may not write through a symlinked directory](#scenario-a-redirect-may-not-write-through-a-symlinked-directory)
+  - [a symlinked directory inside the workdir still resolves](#scenario-a-symlinked-directory-inside-the-workdir-still-resolves)
   - [a snapshot path may not escape the spec directory](#scenario-a-snapshot-path-may-not-escape-the-spec-directory)
 - [atago self-hosting / selection](#atago-self-hosting--selection) — 3 scenarios
   - [--filter runs only matching scenarios](#scenario---filter-runs-only-matching-scenarios)
@@ -8887,6 +8890,92 @@ ${atago} run escape.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `escapes the scenario workdir`
+### Scenario: a file assertion may not read through a symlinked directory
+_skipped on Windows_
+#### Given
+- Fixture file `link_read.atago.yaml` is created.
+#### Inputs
+_Fixture `link_read.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: read through the link
+    steps:
+      - run:
+          command: ln -s .. escape
+      - assert:
+          file:
+            path: escape/anything.txt
+            exists: false
+```
+#### When
+```shell
+${atago} run link_read.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `escapes the scenario workdir`
+### Scenario: a redirect may not write through a symlinked directory
+_skipped on Windows_
+#### Given
+- Fixture file `link_write.atago.yaml` is created.
+#### Inputs
+_Fixture `link_write.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: write through the link
+    steps:
+      - run:
+          command: ln -s .. escape
+      - run:
+          shell: true
+          command: echo planted
+          stdout_to: escape/planted.txt
+```
+#### When
+```shell
+${atago} run link_write.atago.yaml
+```
+#### Then
+- exit code is `4`
+- stdout contains `escapes the scenario workdir`
+### Scenario: a symlinked directory inside the workdir still resolves
+_skipped on Windows_
+#### Given
+- Fixture file `link_ok.atago.yaml` is created.
+#### Inputs
+_Fixture `link_ok.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: read and write through an in-workdir link
+    steps:
+      - run:
+          command: mkdir real
+      - run:
+          command: ln -s real alias
+      - run:
+          shell: true
+          command: echo through the alias
+          stdout_to: alias/out.txt
+      - assert:
+          file:
+            path: real/out.txt
+            contains: through the alias
+```
+#### When
+```shell
+${atago} run link_ok.atago.yaml
+```
+#### Then
+- exit code is `0`
 ### Scenario: a snapshot path may not escape the spec directory
 #### Given
 - Fixture file `snap_escape.atago.yaml` is created.

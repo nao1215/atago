@@ -102,7 +102,7 @@ func resolveDirRoot(workdir, declared, dirPath string) (string, error) {
 		// target exists is not a question a spec may put to the filesystem outside
 		// the workdir. Judging it by its declared target keeps the containment
 		// rule from depending on whether the target happens to exist.
-		if target, ok := declaredLinkTarget(dirPath); ok && !withinResolvedWorkdir(workdir, target) {
+		if target, escapes := security.LinkChainEscapes(workdir, dirPath); escapes {
 			return "", escapesWorkdirError(declared, target)
 		}
 		return dirPath, nil
@@ -110,40 +110,10 @@ func resolveDirRoot(workdir, declared, dirPath string) (string, error) {
 	if resolved == dirPath {
 		return dirPath, nil
 	}
-	if !withinResolvedWorkdir(workdir, resolved) {
+	if !security.WithinResolvedRoot(workdir, resolved) {
 		return "", escapesWorkdirError(declared, resolved)
 	}
 	return resolved, nil
-}
-
-// declaredLinkTarget reports where a symlink points, as an absolute path. A
-// relative target resolves against the directory holding the link, the way the
-// kernel would. Anything that is not a symlink reports false.
-func declaredLinkTarget(p string) (string, bool) {
-	target, err := os.Readlink(p)
-	if err != nil {
-		return "", false
-	}
-	if !filepath.IsAbs(target) {
-		target = filepath.Join(filepath.Dir(p), target)
-	}
-	return filepath.Clean(target), true
-}
-
-// withinResolvedWorkdir reports whether p stays inside the scenario workdir.
-//
-// The workdir can itself sit behind a symlink — macOS puts /tmp behind
-// /private/tmp and /var behind /private/var — and p arrives in either spelling:
-// a path EvalSymlinks resolved takes the resolved form, while a dangling link's
-// declared target keeps the form the link was written with. Both spellings name
-// the same directory, so containment holds if either does; a path outside the
-// workdir is inside neither.
-func withinResolvedWorkdir(workdir, p string) bool {
-	if security.WithinRoot(workdir, p) {
-		return true
-	}
-	resolved, err := filepath.EvalSymlinks(workdir)
-	return err == nil && security.WithinRoot(resolved, p)
 }
 
 func escapesWorkdirError(declared, target string) error {

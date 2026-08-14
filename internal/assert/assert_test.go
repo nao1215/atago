@@ -1031,6 +1031,42 @@ func TestCheck_File_SymlinkEscapeRejected(t *testing.T) {
 	}
 }
 
+// TestCheck_File_SymlinkedAncestorEscapeRejected is the same disclosure one
+// directory up. The leaf refusal above only sees a link AT the target, so a
+// program under test that turned a directory component into a link — `ln -s /etc
+// escape` — handed the assertion a path that compares as in-workdir and names a
+// host file. The read must be refused, and nothing about the host file may reach
+// the report.
+func TestCheck_File_SymlinkedAncestorEscapeRejected(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink creation is not reliably available on Windows CI")
+	}
+	t.Parallel()
+	workdir := t.TempDir()
+	outside := t.TempDir()
+	if err := os.WriteFile(filepath.Join(outside, "secret.txt"), []byte("top-secret"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(workdir, "escape")); err != nil {
+		t.Fatal(err)
+	}
+	for _, a := range []*spec.Assert{
+		{File: &spec.FileAssert{Path: "escape/secret.txt", Contains: spec.StringList{"top-secret"}}},
+		{File: &spec.FileAssert{Path: "escape/secret.txt", Exists: ptrBool(true)}},
+		// A size bound reads only the metadata, but the size of a host file is a
+		// disclosure too, so it must be refused on the same grounds.
+		{File: &spec.FileAssert{Path: "escape/secret.txt", MinSize: int64p(1)}},
+	} {
+		got := Check(a, nil, Env{Workdir: workdir})
+		if got.OK {
+			t.Errorf("%+v was answered through a symlinked ancestor pointing out of the workdir", a.File)
+		}
+		if strings.Contains(got.Actual, "top-secret") || strings.Contains(string(got.ArtifactActual), "top-secret") {
+			t.Errorf("the out-of-root secret leaked into the result: %+v", got)
+		}
+	}
+}
+
 // TestCheck_Snapshot_TraversalRejected proves a relative snapshot path may not
 // escape the spec directory.
 func TestCheck_Snapshot_TraversalRejected(t *testing.T) {

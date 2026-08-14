@@ -47,6 +47,23 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Every workdir- and spec-scoped path is now checked against a symlink at a
+  DIRECTORY component, not only at the leaf. The containment check was lexical,
+  so it compared path components and could not see that `escape/secret.txt`
+  names a host file once the program under test has run `ln -s /etc escape` —
+  and each path-taking key inherited the hole from the one resolver behind them.
+  A `file:` assertion read the host file into the report and a `size:` bound
+  disclosed its length; `fixture:`, `run.stdout_to`/`stderr_to`, `http.body_to`,
+  and the snapshot writer created files, and whole directory trees, in the host
+  directory — all while the run stayed green. The leaf refusal that was already
+  in place saw none of it. Ancestors now face the same containment test the
+  declared path does, with the rules `dir:` already follows: a dangling link is
+  judged by its declared target — to the far end of a chain, since only the end
+  says where a path goes — so the answer does not depend on whether that target
+  exists yet, either spelling of a root that itself sits behind a symlink
+  is accepted (macOS puts CI's workdirs behind `/private`), and a link that stays
+  inside the root keeps resolving. A path that is merely absent is untouched, so
+  `exists: false` still answers.
 - A `dir:` assertion whose `path:` is a symlink to a directory now reads the
   same tree in every mode. `filepath.WalkDir` lstats its root, so the recursive
   and snapshot modes walked the link itself and saw an empty tree, while the

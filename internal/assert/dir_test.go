@@ -160,6 +160,12 @@ func TestCheckDir_DanglingSymlinkedRootJudgedByItsTarget(t *testing.T) {
 			if err := os.Symlink("releases/v3", filepath.Join(wd, "latest")); err != nil {
 				t.Fatal(err)
 			}
+			// A chain: only its far end says where the path goes, so judging the
+			// first hop alone would accept this one — "hop" points at an in-workdir
+			// name, and that name is the link out.
+			if err := os.Symlink("escape", filepath.Join(wd, "hop")); err != nil {
+				t.Fatal(err)
+			}
 			if tc.symlinkedDir {
 				alias := filepath.Join(base, "alias")
 				if err := os.Symlink("real", alias); err != nil {
@@ -170,6 +176,9 @@ func TestCheckDir_DanglingSymlinkedRootJudgedByItsTarget(t *testing.T) {
 
 			if cr := checkDirOK(t, wd, &spec.DirAssert{Path: "escape", Exists: ptrBool(false)}); cr.OK {
 				t.Error("a dangling link out of the workdir must be refused, not answered")
+			}
+			if cr := checkDirOK(t, wd, &spec.DirAssert{Path: "hop", Exists: ptrBool(false)}); cr.OK {
+				t.Error("a dangling chain whose far end leaves the workdir must be refused too")
 			}
 			if cr := checkDirOK(t, wd, &spec.DirAssert{Path: "latest", Exists: ptrBool(false)}); !cr.OK {
 				t.Errorf("a dangling link inside the workdir must still answer: %+v", cr)
