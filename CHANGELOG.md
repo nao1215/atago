@@ -9,6 +9,13 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Third-party E2E suite for [OpenFGA](https://openfga.dev/), in
+  `test/e2e/thirdparty/openfga/`, in parity with the `fga` CLI's own
+  integration tests: local `fga model test` runs (glob patterns, the
+  store-file reference containment contract with its `--allow-external-files`
+  opt-in, the type-count limit) and a real `openfga` server driven through
+  store creation, JSON/JSONL tuple writes and deletes (including a
+  conditional tuple), and `store import` — each response asserted as JSON.
 - Two website pages: a [comparison](https://nao1215.github.io/atago/comparison/)
   with Bats-core v1.14.0, ShellSpec 0.28.1, commander v2.5.0, goss v0.4.10,
   runn v1.9.4, and venom v1.3.0 (versions stated, sourced from official

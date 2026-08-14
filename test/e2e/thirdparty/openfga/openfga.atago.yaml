@@ -1,0 +1,435 @@
+version: "1"
+
+suite:
+  name: openfga (fine-grained authorization CLI and server)
+  description: |
+    [OpenFGA](https://openfga.dev/) is a relationship-based authorization
+    system: the `fga` CLI authors and tests authorization models, and the
+    `openfga` server answers the queries. The scenarios keep parity with the
+    CLI's own integration suite, in two halves.
+
+    The local half needs no server: `fga model test` runs a store file's
+    checks in-process, resolves `**` glob patterns, keeps a store file's
+    `model_file`/`tuple_file` references contained to the store file's
+    directory unless `--allow-external-files` says otherwise, and enforces
+    the type-count limit with a diagnostic naming the configured bound.
+
+    The server half boots a real `openfga` on scenario-owned ports and
+    drives the full authoring flow over its API: creating a store (JSON
+    out), writing and deleting relationship tuples from JSON and JSONL
+    files (including a conditional tuple), the `--hide-imported-tuples`
+    counts-only report, and `store import` building a store, a model, and
+    tuples from one file.
+
+# Install (pinned pseudo-version; the file-containment contract is newer than
+# the latest tagged release): see .github/workflows/thirdparty.yml. Each server
+# scenario binds its own port pair so the suite runs under the default scenario
+# concurrency.
+
+permissions:
+  network:
+    allow: [127.0.0.1]
+
+scenarios:
+  - name: version prints something sane
+    only:
+      command: fga --version
+    steps:
+      - run:
+          command: fga --version
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "fga version"
+
+  - name: model test runs a local store file without a server
+    only:
+      command: fga --version
+    steps:
+      - fixture:
+          file: tests/fixtures/basic-model.fga
+          content: |
+            model
+              schema 1.1
+
+            type user
+
+            type group
+              relations
+                define owner: [user, user with inOfficeIP]
+
+            condition inOfficeIP(ip_addr: ipaddress) {
+              ip_addr.in_cidr("192.168.0.0/24")
+            }
+      - fixture:
+          file: tests/fixtures/basic-tuples.json
+          content: |
+            [
+                {
+                    "user": "user:anne",
+                    "relation": "owner",
+                    "object": "group:foo"
+                }
+            ]
+      - fixture:
+          file: tests/fixtures/basic-store.fga.yaml
+          content: |
+            name: Basic Store
+            model_file: basic-model.fga
+            tuple_file: basic-tuples.json
+            tests:
+              - name: test-1
+                check:
+                  - user: user:anne
+                    object: group:foo
+                    assertions:
+                      owner: true
+      # The same store file resolves through a ./-prefixed path, a bare
+      # relative path, and a ** glob pattern (the CLI expands the glob itself;
+      # no shell is involved).
+      - run:
+          command: fga model test --tests ./tests/fixtures/basic-store.fga.yaml
+      - assert:
+          exit_code: 0
+          stderr:
+            contains:
+              - "# Test Summary #"
+              - "Tests 1/1 passing"
+      - run:
+          command: fga model test --tests tests/fixtures/basic-store.fga.yaml
+      - assert:
+          exit_code: 0
+          stderr:
+            contains: "# Test Summary #"
+      - run:
+          command: fga model test --tests tests/**/*-store.fga.yaml
+      - assert:
+          exit_code: 0
+          stderr:
+            contains: "# Test Summary #"
+
+  - name: a store file's references are contained to its directory
+    only:
+      command: fga --version
+    steps:
+      - fixture:
+          file: tests/fixtures/basic-model.fga
+          content: |
+            model
+              schema 1.1
+
+            type user
+
+            type group
+              relations
+                define owner: [user]
+      - fixture:
+          file: tests/fixtures/basic-tuples.json
+          content: |
+            [
+                {
+                    "user": "user:anne",
+                    "relation": "owner",
+                    "object": "group:foo"
+                }
+            ]
+      # This store file reaches OUTSIDE its own directory (../) for its model
+      # and tuples.
+      - fixture:
+          file: tests/fixtures/relative-path/relative-path-store.fga.yaml
+          content: |
+            name: Relative Path Store
+            model_file: ../basic-model.fga
+            tuple_file: ../basic-tuples.json
+            tests:
+              - name: test-1
+                check:
+                  - user: user:anne
+                    object: group:foo
+                    assertions:
+                      owner: true
+      # And this one attempts a path traversal to an arbitrary host file.
+      - fixture:
+          file: tests/fixtures/traversal/traversal-store.fga.yaml
+          content: |
+            name: Traversal Store
+            model_file: ../../../../../../../../etc/hosts
+            tuples: []
+            tests: []
+      # Escaping the store file's directory is allowed only by explicit opt-in.
+      - run:
+          command: fga model test --tests tests/fixtures/relative-path/relative-path-store.fga.yaml --allow-external-files
+      - assert:
+          exit_code: 0
+          stderr:
+            contains: "# Test Summary #"
+      - run:
+          command: fga model test --tests tests/fixtures/relative-path/relative-path-store.fga.yaml
+      - assert:
+          exit_code: 1
+          stderr:
+            contains: "is not accessible within"
+      - run:
+          command: fga model test --tests tests/fixtures/traversal/traversal-store.fga.yaml
+      - assert:
+          exit_code: 1
+          stderr:
+            contains: "is not accessible within"
+
+  - name: the type-count limit fails loudly and a sufficient limit passes
+    only:
+      command: fga --version
+    steps:
+      - fixture:
+          file: tests/fixtures/many-types-model.fga
+          content: |
+            model
+              schema 1.1
+
+            type user
+
+            type resource1
+              relations
+                define owner: [user]
+
+            type resource2
+              relations
+                define owner: [user]
+
+            type resource3
+              relations
+                define owner: [user]
+
+            type resource4
+              relations
+                define owner: [user]
+
+            type resource5
+              relations
+                define owner: [user]
+      - fixture:
+          file: tests/fixtures/many-types.fga.yaml
+          content: |
+            name: Many Types Store
+            model_file: many-types-model.fga
+            tests:
+              - name: test-owner-check
+                tuples:
+                  - user: user:anne
+                    relation: owner
+                    object: resource1:doc1
+                check:
+                  - user: user:anne
+                    object: resource1:doc1
+                    assertions:
+                      owner: true
+      # Six types against a limit of five: the diagnostic names the bound.
+      - run:
+          command: fga model test --tests tests/fixtures/many-types.fga.yaml --max-types-per-authorization-model 5
+      - assert:
+          exit_code: 1
+          stderr:
+            contains: "exceeds the allowed limit of 5"
+      - run:
+          command: fga model test --tests tests/fixtures/many-types.fga.yaml --max-types-per-authorization-model 10
+      - assert:
+          exit_code: 0
+          stderr:
+            contains: "# Test Summary #"
+
+  - name: store create returns the new store as JSON
+    only:
+      command: fga --version && openfga version
+    services:
+      - name: openfga
+        command: openfga run --http-addr 127.0.0.1:18230 --grpc-addr 127.0.0.1:18231 --metrics-enabled=false --log-level warn
+        ready:
+          port: "127.0.0.1:18230"
+          timeout: 30s
+    steps:
+      - run:
+          command: fga store create --name "FGA Demo Store" --api-url http://127.0.0.1:18230
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              - { path: "$.store.name", equals: "FGA Demo Store" }
+              - { path: "$.store.id", matches: "^[A-Z0-9]+$" }
+
+  - name: tuples write and delete against a live store
+    only:
+      command: fga --version && openfga version
+    services:
+      - name: openfga
+        command: openfga run --http-addr 127.0.0.1:18232 --grpc-addr 127.0.0.1:18233 --metrics-enabled=false --log-level warn
+        ready:
+          port: "127.0.0.1:18232"
+          timeout: 30s
+    steps:
+      - fixture:
+          file: tests/fixtures/basic-model.fga
+          content: |
+            model
+              schema 1.1
+
+            type user
+
+            type group
+              relations
+                define owner: [user, user with inOfficeIP]
+
+            condition inOfficeIP(ip_addr: ipaddress) {
+              ip_addr.in_cidr("192.168.0.0/24")
+            }
+      - fixture:
+          file: tests/fixtures/basic-tuples.json
+          content: |
+            [
+                {
+                    "user": "user:anne",
+                    "relation": "owner",
+                    "object": "group:foo"
+                }
+            ]
+      - fixture:
+          file: tests/fixtures/basic-tuples.jsonl
+          content: |
+            {"user": "user:bob", "relation": "owner", "object": "group:foo", "condition": {"name": "inOfficeIP", "context": {"ip_addr": "10.0.0.1"}}}
+      # Provision the store and model the tuples are written against, capturing
+      # both ids for the calls below.
+      - run:
+          command: fga store create --name integration-test-store --api-url http://127.0.0.1:18232
+      - store:
+          name: store_id
+          from:
+            stdout:
+              json:
+                path: "$.store.id"
+      - run:
+          command: fga model write --file=./tests/fixtures/basic-model.fga --store-id=${store_id} --api-url http://127.0.0.1:18232
+      - store:
+          name: model_id
+          from:
+            stdout:
+              json:
+                path: "$.authorization_model_id"
+      # Write from a JSON tuple file, one tuple per request.
+      - run:
+          command: fga tuple write --file=./tests/fixtures/basic-tuples.json --max-tuples-per-write=1 --max-parallel-requests=1 --store-id=${store_id} --model-id=${model_id} --api-url http://127.0.0.1:18232
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              - { path: "$.successful[0].user", equals: "user:anne" }
+              - { path: "$.successful_count", equals: 1 }
+              - { path: "$.failed_count", equals: 0 }
+      # Write from JSONL, carrying a condition with its context.
+      - run:
+          command: fga tuple write --file=./tests/fixtures/basic-tuples.jsonl --max-tuples-per-write=1 --max-parallel-requests=1 --store-id=${store_id} --model-id=${model_id} --api-url http://127.0.0.1:18232
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              - { path: "$.successful[0].user", equals: "user:bob" }
+              - { path: "$.successful[0].condition.name", equals: "inOfficeIP" }
+      # Delete the JSON file's tuples again.
+      - run:
+          command: fga tuple delete --file=./tests/fixtures/basic-tuples.json --max-tuples-per-write=1 --max-parallel-requests=1 --store-id=${store_id} --model-id=${model_id} --api-url http://127.0.0.1:18232
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              path: "$.successful[0].user"
+              equals: "user:anne"
+      # --hide-imported-tuples reports the counts and omits the tuple list.
+      - run:
+          command: fga tuple write --file=./tests/fixtures/basic-tuples.json --hide-imported-tuples --store-id=${store_id} --model-id=${model_id} --api-url http://127.0.0.1:18232
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              - { path: "$.total_count", equals: 1 }
+              - { path: "$.successful_count", equals: 1 }
+              - { path: "$.failed_count", equals: 0 }
+
+  - name: store import builds a store, a model, and tuples from one file
+    only:
+      command: fga --version && openfga version
+    services:
+      - name: openfga
+        command: openfga run --http-addr 127.0.0.1:18234 --grpc-addr 127.0.0.1:18235 --metrics-enabled=false --log-level warn
+        ready:
+          port: "127.0.0.1:18234"
+          timeout: 30s
+    steps:
+      - fixture:
+          file: tests/fixtures/basic-model.fga
+          content: |
+            model
+              schema 1.1
+
+            type user
+
+            type group
+              relations
+                define owner: [user]
+      - fixture:
+          file: tests/fixtures/basic-tuples.json
+          content: |
+            [
+                {
+                    "user": "user:anne",
+                    "relation": "owner",
+                    "object": "group:foo"
+                }
+            ]
+      - fixture:
+          file: tests/fixtures/basic-store.fga.yaml
+          content: |
+            name: Basic Store
+            model_file: basic-model.fga
+            tuple_file: basic-tuples.json
+            tests:
+              - name: test-1
+                check:
+                  - user: user:anne
+                    object: group:foo
+                    assertions:
+                      owner: true
+      - fixture:
+          file: tests/fixtures/relative-path/relative-path-store.fga.yaml
+          content: |
+            name: Relative Path Store
+            model_file: ../basic-model.fga
+            tuple_file: ../basic-tuples.json
+            tests:
+              - name: test-1
+                check:
+                  - user: user:anne
+                    object: group:foo
+                    assertions:
+                      owner: true
+      - run:
+          command: fga store import --file=./tests/fixtures/basic-store.fga.yaml --max-parallel-requests=1 --max-tuples-per-write=1 --api-url http://127.0.0.1:18234
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              - { path: "$.store.name", equals: "Basic Store" }
+              - { path: "$.model.authorization_model_id", matches: "^[A-Z0-9]+$" }
+      # The same containment contract as model test: reaching outside the store
+      # file's directory needs the explicit opt-in.
+      - run:
+          command: fga store import --file=./tests/fixtures/relative-path/relative-path-store.fga.yaml --allow-external-files --api-url http://127.0.0.1:18234
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              path: "$.store.name"
+              equals: "Relative Path Store"
+      - run:
+          command: fga store import --file=./tests/fixtures/relative-path/relative-path-store.fga.yaml --api-url http://127.0.0.1:18234
+      - assert:
+          exit_code: 1
+          stderr:
+            contains: "is not accessible within"

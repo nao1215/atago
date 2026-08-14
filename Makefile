@@ -142,6 +142,7 @@ docs: ## Regenerate the committed behavior docs under doc/e2e/ from the specs
 	./dist/$(APP) doc --out doc/e2e/transfersh.md  ./test/e2e/thirdparty/transfersh
 	./dist/$(APP) doc --out doc/e2e/gotify.md      ./test/e2e/thirdparty/gotify
 	./dist/$(APP) doc --out doc/e2e/grafana.md     ./test/e2e/thirdparty/grafana
+	./dist/$(APP) doc --out doc/e2e/openfga.md     ./test/e2e/thirdparty/openfga
 	./dist/$(APP) doc --out doc/e2e/gup.md         ./test/e2e/tools/gup
 	./dist/$(APP) doc --out doc/e2e/sqly.md        ./test/e2e/tools/sqly
 	./dist/$(APP) doc --out doc/e2e/truss.md       ./test/e2e/tools/truss
