@@ -14,6 +14,7 @@ require (
 	github.com/jhump/protoreflect/v2 v2.0.0-beta.2
 	github.com/k1LoW/grpcstub v0.26.5
 	github.com/lib/pq v1.12.3
+	github.com/mattn/go-runewidth v0.0.19
 	github.com/mattn/go-shellwords v1.0.13
 	github.com/nao1215/markdown v0.13.0
 	github.com/ohler55/ojg v1.28.4
@@ -49,7 +50,6 @@ require (
 	github.com/karrick/godirwalk v1.17.0 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
-	github.com/mattn/go-runewidth v0.0.19 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/olekukonko/cat v0.0.0-20250911104152-50322a0618f6 // indirect
 	github.com/olekukonko/errors v1.1.0 // indirect

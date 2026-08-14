@@ -67,6 +67,41 @@ scenarios:
           stdout:
             contains: "1 failed"
 
+  # A failing screen assert frames the screen so the reader can see where each
+  # row ends. The frame is drawn in DISPLAY COLUMNS: the Japanese row below is
+  # seven runes and fourteen columns, and measuring it in runes closed the box at
+  # eight and left that row hanging outside it. Both rows must end at the same
+  # "|", which is what the two literals here pin.
+  - name: a failing screen assert frames a CJK screen squarely
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: inner.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: screen assert that must fail
+                steps:
+                  - pty:
+                      shell: true
+                      command: 'printf "abcdefgh\r\n日本語メニュー\r\n"'
+                      rows: 4
+                      cols: 20
+                  - assert:
+                      screen:
+                        contains: "NOT ON THIS SCREEN"
+      - run:
+          command: ${atago} run inner.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - "| abcdefgh       |"
+              - "| 日本語メニュー |"
+
   # A REAL third-party TUI pager: less -X keeps its output on the primary screen,
   # so after quitting the rendered screen still shows the file. (less using the
   # alternate screen would restore a blank primary screen on exit — documented in

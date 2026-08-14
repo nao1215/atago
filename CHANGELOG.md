@@ -47,6 +47,15 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- The box a failing `screen:` assertion draws around the terminal screen is now
+  measured in display columns. It counted bytes first and runes after, and
+  neither is what a terminal draws: a CJK character or an emoji is one rune and
+  two columns, so a Japanese TUI — one of the screens this assertion exists to
+  check — came out with its rows hanging past a border closed half a screen
+  early. Box drawing stays one column, which is what the terminals TUIs run in
+  give it, and the measure ignores the host locale: go-runewidth reads `LANG` at
+  init and would otherwise frame the same screen one way on a CJK machine and
+  another in CI.
 - Every workdir- and spec-scoped path is now checked against a symlink at a
   DIRECTORY component, not only at the leaf. The containment check was lexical,
   so it compared path components and could not see that `escape/secret.txt`

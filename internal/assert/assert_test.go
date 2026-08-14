@@ -13,7 +13,8 @@ import (
 	"strings"
 	"testing"
 	"time"
-	"unicode/utf8"
+
+	"github.com/mattn/go-runewidth"
 
 	"github.com/nao1215/atago/internal/fsdelta"
 	"github.com/nao1215/atago/internal/runner"
@@ -1120,29 +1121,78 @@ func TestCheck_File_ExistsUnreadable(t *testing.T) {
 	}
 }
 
-// TestBorderedScreen_MultibyteAligns is a regression test for a width bug in the
-// screen-assert failure box: it measured line width and padding in bytes, so a
-// rendered TUI screen containing box-drawing characters (─│┌, 3 bytes each) or
-// CJK text produced a ragged right border — exactly the screens atago's pty/TUI
-// assertions exist to check. Every framed content row must have the same rune
-// width so the closing "|" column lines up.
+// TestBorderedScreen_MultibyteAligns is a regression test for the width of the
+// screen-assert failure box. It measured lines in bytes first and then in runes,
+// and neither is what a terminal draws: a CJK character or an emoji is one rune
+// and takes TWO columns, so a Japanese TUI — one of the screens this assertion
+// exists to check — still came out with a right border that wanders. The box is
+// read in a terminal, so the only measure that lines it up is display width.
 func TestBorderedScreen_MultibyteAligns(t *testing.T) {
 	t.Parallel()
-	// An ASCII line and a multibyte line of different byte lengths but knowable
-	// rune widths. Byte-based padding would give these rows different rune widths.
-	screen := "abc\n日本\n┌──┐"
-	out := borderedScreen(screen)
-
-	lines := strings.Split(out, "\n")
-	if len(lines) < 3 {
-		t.Fatalf("bordered output has too few lines:\n%s", out)
+	// The expected block is written out in full rather than measured with the
+	// same helper the code under test uses, which would agree with any measure it
+	// picked. Read this in a monospace terminal: every "|" is in one column.
+	//
+	// "日本語" is three runes and six columns, "ok 🎉!" six runes and seven; a
+	// rune-based measure boxes this screen to seven columns instead of nine and
+	// lets both rows spill past the border.
+	for _, tt := range []struct {
+		name   string
+		screen string
+		want   string
+	}{
+		{
+			name:   "a CJK row is the widest",
+			screen: "abc\n日本語",
+			want: "" +
+				"+--------+\n" +
+				"| abc    |\n" +
+				"| 日本語 |\n" +
+				"+--------+",
+		},
+		{
+			name:   "box drawing counts one column, emoji two",
+			screen: "┌───────┐\nok 🎉!\nplain",
+			want: "" +
+				"+-----------+\n" +
+				"| ┌───────┐ |\n" +
+				"| ok 🎉!    |\n" +
+				"| plain     |\n" +
+				"+-----------+",
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := borderedScreen(tt.screen); got != tt.want {
+				t.Errorf("borderedScreen(%q) =\n%s\nwant\n%s", tt.screen, got, tt.want)
+			}
+		})
 	}
-	// The top bar sets the box width; every subsequent row (content rows and the
-	// bottom bar) must match it rune-for-rune.
-	want := utf8.RuneCountInString(lines[0])
-	for i, l := range lines {
-		if got := utf8.RuneCountInString(l); got != want {
-			t.Errorf("row %d rune width = %d, want %d (ragged border)\nrow: %q\nfull:\n%s", i, got, want, l, out)
+}
+
+// TestDisplayWidth_IgnoresTheHostLocale pins the measure against go-runewidth's
+// package default, which reads LANG at init and switches ambiguous-width
+// characters to two columns under a CJK locale. Taking that default would frame
+// the same screen one way on a Japanese laptop and another in CI, and box
+// drawing — what a TUI is built from — is exactly the ambiguous class it moves.
+// This test does not run in parallel: it flips that global to prove it is not
+// consulted.
+func TestDisplayWidth_IgnoresTheHostLocale(t *testing.T) {
+	restore := runewidth.DefaultCondition.EastAsianWidth
+	runewidth.DefaultCondition.EastAsianWidth = true
+	t.Cleanup(func() { runewidth.DefaultCondition.EastAsianWidth = restore })
+
+	for _, tt := range []struct {
+		in   string
+		want int
+	}{
+		{in: "abc", want: 3},
+		{in: "┌──┐", want: 4}, // ambiguous: one column in the terminals TUIs run in
+		{in: "日本", want: 4},   // wide, not ambiguous: two columns either way
+		{in: "🎉", want: 2},
+	} {
+		if got := displayWidth(tt.in); got != tt.want {
+			t.Errorf("displayWidth(%q) = %d, want %d (the host locale must not change it)", tt.in, got, tt.want)
 		}
 	}
 }
