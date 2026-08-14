@@ -102,6 +102,25 @@ scenarios:
               - "| abcdefgh       |"
               - "| 日本語メニュー |"
 
+  # A wide character occupies two terminal columns, so a label the program
+  # positions with cursor addressing after a Japanese string sits flush against
+  # it. "日本語" is three characters and six columns; the label is written at
+  # column 7 (\x1b[1;7H) and must land immediately after, with no gap — the gap a
+  # one-column-per-rune renderer would leave (#432).
+  - name: a screen assert sees wide characters at their true width
+    skip:
+      os: windows
+    steps:
+      - pty:
+          shell: true
+          command: 'printf "\033[2J\033[1;1H日本語\033[1;7H[OK]"'
+          rows: 3
+          cols: 20
+      - assert:
+          screen:
+            contains: "日本語[OK]"
+            not_contains: "日本語 [OK]"
+
   # A REAL third-party TUI pager: less -X keeps its output on the primary screen,
   # so after quitting the rendered screen still shows the file. (less using the
   # alternate screen would restore a blank primary screen on exit — documented in

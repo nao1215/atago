@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nao1215/atago/internal/runner"
 	"github.com/nao1215/atago/internal/spec"
 )
 
@@ -40,6 +41,61 @@ func TestRenderScreen_CursorMovementAndClear(t *testing.T) {
 	}
 	if strings.Contains(got, "garbage") {
 		t.Errorf("screen = %q, must not contain pre-clear content", got)
+	}
+}
+
+// TestRenderScreen_WideCharactersOccupyTwoColumns is the #432 regression: a wide
+// character (CJK, emoji) takes two terminal columns, so cursor addressing after
+// it and wrapping at the right margin depend on the emulator modeling that width.
+// The previous emulator stored one column per rune, so a label positioned with
+// absolute cursor addressing after a Japanese string landed two columns early and
+// a wide row did not wrap where the terminal wraps it. Each case below is what a
+// real terminal shows.
+func TestRenderScreen_WideCharactersOccupyTwoColumns(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name       string
+		transcript string
+		rows, cols int
+		want       string
+	}{
+		{
+			// "日本語" is three characters and SIX columns, so a label the program
+			// positions at column 7 (\x1b[1;7H) sits flush against it, not after a
+			// three-column gap.
+			name:       "cursor addressing after a wide string is not shifted",
+			transcript: "\x1b[2J\x1b[1;1H日本語\x1b[1;7H[OK]",
+			rows:       3, cols: 20,
+			want: "日本語[OK]",
+		},
+		{
+			// Overwriting the SECOND column of a wide character blanks it: writing
+			// `x` at column 2, inside "日", leaves the terminal showing " x" where
+			// "日" was, then the rest. A one-column-per-rune model would instead
+			// replace the wrong character.
+			name:       "overwriting a wide character's second column blanks it",
+			transcript: "\x1b[2J\x1b[1;1H日本語\x1b[1;2Hx",
+			rows:       2, cols: 20,
+			want: " x本語",
+		},
+		{
+			// "ab🎉" is columns 1-2 (ab) and 3-4 (the emoji), so text positioned at
+			// column 5 follows it with no gap.
+			name:       "an emoji is two columns wide",
+			transcript: "\x1b[2J\x1b[1;1Hab🎉\x1b[1;5Hcd",
+			rows:       2, cols: 20,
+			want: "ab🎉cd",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := RenderScreen([]byte(tt.transcript), &spec.PTY{Rows: tt.rows, Cols: tt.cols})
+			if got != tt.want {
+				t.Errorf("RenderScreen(%q) = %q, want %q", tt.transcript, got, tt.want)
+			}
+		})
 	}
 }
 
@@ -304,18 +360,20 @@ func TestRenderScreenCells_TracksColorsAndAttributes(t *testing.T) {
 	if len(cells) != 2 {
 		t.Fatalf("got %d cell rows, want 2 (text has %d lines)", len(cells), strings.Count(text, "\n")+1)
 	}
-	// Row 1: ERROR is bold red, " ok" is neither. The emulator reports index 9
-	// rather than 1 because a terminal draws bold text in the BRIGHT variant of
-	// its color — the assertion layer accounts for that, this render does not
-	// hide it.
+	// Row 1: ERROR is bold red, " ok" is neither. The emulator stores the color
+	// the program emitted — index 1 (red) — with bold as its own attribute, rather
+	// than folding bold into a bright index. A terminal still DRAWS bold red in the
+	// bright variant, and the assertion layer accounts for that (colorMatches
+	// widens `red` toward `bright-red` under bold); the stored color stays faithful
+	// to the SGR code.
 	for i, r := range "ERROR" {
 		c := cells[0][i]
-		if c.Rune != r || c.FG != 9 || !c.Bold {
-			t.Errorf("cell (1,%d) = %+v, want %q bold bright-red", i+1, c, r)
+		if c.Rune != r || c.FG != 1 || !c.Bold {
+			t.Errorf("cell (1,%d) = %+v, want %q bold red", i+1, c, r)
 		}
 	}
 	for i := len("ERROR"); i < len("ERROR ok"); i++ {
-		if c := cells[0][i]; c.Bold || c.FG == 9 {
+		if c := cells[0][i]; c.Bold || c.FG != runner.DefaultColor {
 			t.Errorf("cell (1,%d) = %+v, want unstyled", i+1, c)
 		}
 	}
