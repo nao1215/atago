@@ -50,7 +50,8 @@ and this project follows [Semantic Versioning](https://semver.org/).
   and could not see through a link the program under test planted, so a `path:`
   naming a link out of the workdir passed it and the directory outside was
   listed. The resolved path now faces the same containment test, and a link that
-  escapes the workdir is refused.
+  escapes the workdir is refused — a dangling one by its declared target, so the
+  rule does not depend on whether that target happens to exist.
 - `record --pty` no longer masks every keystroke of a full-screen TUI session
   (fzf, vim, htop) as an `${env:ATAGO_SECRET_n}` placeholder. A TUI's raw mode
   clears ECHO and ICANON together, and the recorder treated ECHO alone as a

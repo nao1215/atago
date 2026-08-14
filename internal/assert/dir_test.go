@@ -126,6 +126,31 @@ func TestCheckDir_SymlinkedRootMayNotEscapeTheWorkdir(t *testing.T) {
 	}
 }
 
+// TestCheckDir_DanglingSymlinkedRootJudgedByItsTarget keeps the containment rule
+// from depending on whether a link's target happens to exist. A dangling link
+// out of the workdir resolves to nothing, so `exists: false` would otherwise
+// pass — and passing tells the spec author that the external path is absent,
+// which is a question about the filesystem outside the workdir. A dangling link
+// that stays inside (a `latest ->` pointing at a release not built yet) is
+// ordinary and must still answer.
+func TestCheckDir_DanglingSymlinkedRootJudgedByItsTarget(t *testing.T) {
+	wd := t.TempDir()
+	outside := filepath.Join(t.TempDir(), "absent")
+	if err := os.Symlink(outside, filepath.Join(wd, "escape")); err != nil {
+		t.Skipf("symlinks unsupported on this platform: %v", err)
+	}
+	if err := os.Symlink("releases/v3", filepath.Join(wd, "latest")); err != nil {
+		t.Fatal(err)
+	}
+
+	if cr := checkDirOK(t, wd, &spec.DirAssert{Path: "escape", Exists: ptrBool(false)}); cr.OK {
+		t.Error("a dangling link out of the workdir must be refused, not answered")
+	}
+	if cr := checkDirOK(t, wd, &spec.DirAssert{Path: "latest", Exists: ptrBool(false)}); !cr.OK {
+		t.Errorf("a dangling link inside the workdir must still answer: %+v", cr)
+	}
+}
+
 // TestCheckDir_BrokenSymlinkMembership pins that contains/not_contains judge
 // membership by the directory entry, not by whether the link target resolves. A
 // dangling symlink is a real dirent, so not_contains must FAIL (the file was

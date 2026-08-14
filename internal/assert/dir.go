@@ -95,25 +95,55 @@ func checkDir(d *spec.DirAssert, env Env) *CheckResult {
 func resolveDirRoot(workdir, declared, dirPath string) (string, error) {
 	resolved, rerr := filepath.EvalSymlinks(dirPath)
 	if rerr != nil {
-		// Nothing to resolve (the path is missing, or the link dangles). Not an
-		// error here: the stat in checkDir reports it in the assertion's own words,
-		// and exists:false expects exactly this.
-		return dirPath, nil //nolint:nilerr // the caller's stat gives the better message
+		// Nothing resolvable: the path is missing, or it is a link whose target
+		// is. A missing path is ordinary — the stat in checkDir reports it in the
+		// assertion's own words, and exists:false expects exactly this. A DANGLING
+		// link is different: it still declares where it points, and whether that
+		// target exists is not a question a spec may put to the filesystem outside
+		// the workdir. Judging it by its declared target keeps the containment
+		// rule from depending on whether the target happens to exist.
+		if target, ok := declaredLinkTarget(dirPath); ok && !withinResolvedWorkdir(workdir, target) {
+			return "", escapesWorkdirError(declared, target)
+		}
+		return dirPath, nil
 	}
 	if resolved == dirPath {
 		return dirPath, nil
 	}
-	// Resolve the root too before comparing. A scenario workdir can itself sit
-	// behind a symlink (macOS puts /tmp behind /private/tmp), and testing a
-	// resolved path against an unresolved root would reject every path there.
-	root := workdir
-	if r, rerr := filepath.EvalSymlinks(workdir); rerr == nil {
-		root = r
-	}
-	if !security.WithinRoot(root, resolved) {
-		return "", fmt.Errorf("assert.dir.path %q resolves through a symlink to %q, which escapes the scenario workdir", declared, resolved)
+	if !withinResolvedWorkdir(workdir, resolved) {
+		return "", escapesWorkdirError(declared, resolved)
 	}
 	return resolved, nil
+}
+
+// declaredLinkTarget reports where a symlink points, as an absolute path. A
+// relative target resolves against the directory holding the link, the way the
+// kernel would. Anything that is not a symlink reports false.
+func declaredLinkTarget(p string) (string, bool) {
+	target, err := os.Readlink(p)
+	if err != nil {
+		return "", false
+	}
+	if !filepath.IsAbs(target) {
+		target = filepath.Join(filepath.Dir(p), target)
+	}
+	return filepath.Clean(target), true
+}
+
+// withinResolvedWorkdir reports whether p stays inside the scenario workdir. The
+// workdir is resolved first: it can itself sit behind a symlink (macOS puts
+// /tmp behind /private/tmp), and testing a resolved path against an unresolved
+// root would reject every path there.
+func withinResolvedWorkdir(workdir, p string) bool {
+	root := workdir
+	if r, err := filepath.EvalSymlinks(workdir); err == nil {
+		root = r
+	}
+	return security.WithinRoot(root, p)
+}
+
+func escapesWorkdirError(declared, target string) error {
+	return fmt.Errorf("assert.dir.path %q resolves through a symlink to %q, which escapes the scenario workdir", declared, target)
 }
 
 func checkDirExists(d *spec.DirAssert, info os.FileInfo, statErr error) *CheckResult {
