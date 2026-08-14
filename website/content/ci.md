@@ -11,7 +11,7 @@ atago run --ci --retry-failed 2 ./specs          # keep CI green, report instabi
 atago run --repeat 20 --filter "race prone" ./specs   # flake detection
 ```
 
-A known bug you have not fixed yet belongs in CI too. A scenario with `expect_fail:` is reported **XFAIL** when it fails — the run stays green, and the reproduction keeps executing on every commit instead of rotting in a directory CI never runs. The day the bug is fixed it becomes **XPASS** and the run turns red, which is what gets the spec promoted into the guarded suite. An execution error is still an error, so a spec that stops running is never mistaken for a bug that is still there.
+A known bug you have not fixed yet belongs in CI too. A scenario with `expect_fail:` is reported XFAIL when it fails — the run stays green, and the reproduction keeps executing on every commit instead of rotting in a directory CI never runs. The day the bug is fixed it becomes XPASS and the run turns red, which is what gets the spec promoted into the guarded suite. An execution error is still an error, so a spec that stops running is never mistaken for a bug that is still there.
 
 ```shell
 atago run --ci ./specs                 # an XPASS fails the build: promote the spec

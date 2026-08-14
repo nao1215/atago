@@ -53,7 +53,7 @@ The first spec comes from a real run: `atago record -- <command>` executes the t
 
 ## A known bug can live in CI
 
-`expect_fail:` marks a scenario that documents a bug you have not fixed yet. It keeps running on every commit — so the reproduction cannot rot the way a second, CI-excluded directory of "known bug" specs does — and an expected failure keeps the run green. The day it starts passing, the run turns **red**: the fix landed, and the spec has to be promoted into the suite that guards against a regression. An execution error stays an error, so a spec that stops running at all is never mistaken for a bug that is still there.
+`expect_fail:` marks a scenario that documents a bug you have not fixed yet. It keeps running on every commit — so the reproduction cannot rot the way a second, CI-excluded directory of "known bug" specs does — and an expected failure keeps the run green. The day it starts passing, the run turns red: the fix landed, and the spec has to be promoted into the suite that guards against a regression. An execution error stays an error, so a spec that stops running at all is never mistaken for a bug that is still there.
 
 ## Snapshots built for CLI output
 
