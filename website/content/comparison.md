@@ -64,6 +64,7 @@ commander v2.5.0.
 | Ships as | single binary | shell scripts (needs Bash) | shell scripts (needs a POSIX shell) | single binary |
 | System under test | any executable | anything Bash can drive | shell scripts, functions, and commands | any executable |
 | Windows | native, incl. ConPTY terminals | via Bash ports (e.g. Git Bash) | Git Bash, msys2, cygwin | native |
+| CI setup on GitHub Actions | [setup-atago](https://github.com/nao1215/setup-atago): prebuilt binary, checksum-verified, Linux/macOS/Windows | [bats-action](https://github.com/bats-core/bats-action): installs Bats and its libraries | — (install script) | — (binary download) |
 | Editor completion for the test format | JSON Schema | — | — | — |
 | Record a first test from a real run | `atago record`, incl. `--pty` | — | — | `commander add` |
 | Generate docs from tests | `atago doc` / `explain` / `list` | — | — | — |
