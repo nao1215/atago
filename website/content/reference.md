@@ -51,7 +51,7 @@ links (like [step](#spec-step)) is documented in its own section rather than
 repeated inline.
 
 All keys belong to spec format version `1` — the only format version so far;
-`version: "1"` is the first line of every spec. **Since** is the atago release
+`version: "1"` is the first line of every spec. The Since column is the atago release
 that introduced the key (`unreleased` = merged to main, not yet in a tagged
 release).
 
@@ -119,8 +119,8 @@ The report and manifest outputs have schemas too: [report.schema.json](https://g
 
 | Code | Meaning                   |
 |------|---------------------------|
-| `0`  | no unexpected failures — every scenario passed, was skipped, or was an **XFAIL** (an `expect_fail:` scenario that failed as declared) |
-| `1`  | one or more failed (including an **XPASS**: an `expect_fail:` scenario that passed, unless `--allow-xpass`) |
+| `0`  | no unexpected failures — every scenario passed, was skipped, or was an XFAIL (an `expect_fail:` scenario that failed as declared) |
+| `1`  | one or more failed (including an XPASS: an `expect_fail:` scenario that passed, unless `--allow-xpass`) |
 | `2`  | spec error (YAML syntax or schema/semantic validation) |
 | `3`  | CLI-invocation error (unknown subcommand, bad flag, or no matching spec files) |
 | `4`  | execution error           |

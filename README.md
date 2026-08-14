@@ -16,7 +16,7 @@
 
 atago tests real CLI behavior from plain YAML: commands, files, snapshots, services, and interactive terminals. It runs your actual binary — in any language — and asserts what a user observes. No test code, no shell DSL.
 
-Documentation: **https://nao1215.github.io/atago/**
+Documentation: https://nao1215.github.io/atago/
 
 ![demo](./doc/img/demo.gif)
 
@@ -273,7 +273,7 @@ ssh       run a command on a remote host over SSH (edit host/user first)
 
 ## Examples
 
-Every feature has a commented, runnable spec under [examples/](examples/), tested in CI on Linux, macOS, and Windows. The **[cookbook](https://nao1215.github.io/atago/cookbook/)** collects 50+ copyable recipes for common jobs — converting images, driving prompts and TUIs, simulating API failures offline, proving idempotency — and indexes every spec by task and by feature.
+Every feature has a commented, runnable spec under [examples/](examples/), tested in CI on Linux, macOS, and Windows. The [cookbook](https://nao1215.github.io/atago/cookbook/) collects 50+ copyable recipes for common jobs — converting images, driving prompts and TUIs, simulating API failures offline, proving idempotency — and indexes every spec by task and by feature.
 
 Selection flags compose with any spec: `--filter NAME` (repeatable, and comma-separated for OR — `--filter a,b` or `--filter a --filter b` runs scenarios whose name contains `a` or `b`), `--tag T` and `--skip-tag T` (tags match exactly, not by substring — `atago list` shows the available tags), `--parallel N`, `--fail-fast` (stops at the first outcome that fails the run), and `--rerun-failed`. Flags may be written before, after, or between the paths. While authoring, `--verbose` traces every command, capture, and assertion verdict — for passing scenarios too.
 
