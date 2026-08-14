@@ -2,7 +2,8 @@ package assert
 
 import (
 	"strings"
-	"unicode/utf8"
+
+	"github.com/mattn/go-runewidth"
 
 	"github.com/nao1215/atago/internal/runner"
 	"github.com/nao1215/atago/internal/spec"
@@ -38,15 +39,17 @@ func checkScreen(sa *spec.ScreenAssert, res *runner.Result, env Env) *CheckResul
 }
 
 // borderedScreen frames the rendered screen so trailing spaces and width are
-// visible in failure output. Width and padding are measured in runes, not bytes:
-// a pty/TUI screen routinely contains box-drawing characters (─│┌, 3 bytes each)
-// and CJK text, and a byte-based measure would pad those rows short and produce a
-// ragged right border in exactly the screens this assertion exists to check.
+// visible in failure output. Width and padding are measured in DISPLAY COLUMNS,
+// which is what the terminal the box is read in actually draws: a pty/TUI screen
+// routinely carries box-drawing characters (─│┌, 3 bytes and 1 column each), CJK
+// text and emoji (1 rune and 2 columns each), and measuring in bytes or in runes
+// pads those rows to the wrong place — a right border that wanders, in exactly
+// the screens this assertion exists to check.
 func borderedScreen(screen string) string {
 	lines := strings.Split(screen, "\n")
 	width := 0
 	for _, l := range lines {
-		if n := utf8.RuneCountInString(l); n > width {
+		if n := displayWidth(l); n > width {
 			width = n
 		}
 	}
@@ -54,8 +57,28 @@ func borderedScreen(screen string) string {
 	bar := "+" + strings.Repeat("-", width+2) + "+"
 	b.WriteString(bar + "\n")
 	for _, l := range lines {
-		b.WriteString("| " + l + strings.Repeat(" ", width-utf8.RuneCountInString(l)) + " |\n")
+		b.WriteString("| " + l + strings.Repeat(" ", width-displayWidth(l)) + " |\n")
 	}
 	b.WriteString(bar)
 	return b.String()
+}
+
+// screenWidth measures display columns with EastAsianWidth off, deliberately
+// rather than by taking the package default.
+//
+// go-runewidth reads the host locale at init and turns that flag ON under a CJK
+// locale, which would make the width of a failure box depend on the developer's
+// LANG — the same screen framed one way on a Japanese laptop and another in CI.
+// A report atago prints has to read the same everywhere. Off is also the right
+// answer: the flag governs the AMBIGUOUS-width characters, which is where box
+// drawing lives (─│┌), and every terminal a TUI is drawn in gives those one
+// column. CJK and emoji are Wide, not ambiguous, so they still count two.
+var screenWidth = &runewidth.Condition{StrictEmojiNeutral: true}
+
+// displayWidth reports how many terminal columns s occupies. A wide character
+// (CJK, emoji) takes two, a combining mark takes none, and everything else takes
+// one — the same table a terminal lays a line out with, so a box drawn to this
+// measure closes where the text ends.
+func displayWidth(s string) int {
+	return screenWidth.StringWidth(s)
 }
