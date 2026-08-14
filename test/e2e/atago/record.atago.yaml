@@ -347,6 +347,43 @@ scenarios:
           stdout:
             contains: "ATAGO_SECRET_1 is not set"
 
+  - name: a raw-mode (TUI) keystroke is recorded literally, not as a secret
+    skip:
+      os: windows
+    steps:
+      # A full-screen TUI's raw mode clears ECHO and ICANON together. Tagging
+      # secret input by ECHO alone turned every keystroke of a recorded TUI
+      # session into an ${env:ATAGO_SECRET_n} placeholder — a spec that replays
+      # nothing. Only a canonical (line-mode) prompt with echo off is a password
+      # prompt; this raw-mode stand-in announces READY after entering raw mode,
+      # reads one keystroke, and exits.
+      - pty:
+          shell: true
+          command: '${atago} record --pty --out tui.atago.yaml -- sh -c ''stty -icanon -echo min 1 time 0; printf READY; head -c 1 >/dev/null; stty sane; echo BYE'''
+          timeout: 20s
+          session:
+            - expect: "READY"
+            - send: "j"
+            - expect: "BYE"
+      - assert:
+          exit_code: 0
+      # The keystroke replays literally; no secret placeholder is generated.
+      - assert:
+          file:
+            path: tui.atago.yaml
+            contains: '- send: "j"'
+      - assert:
+          file:
+            path: tui.atago.yaml
+            not_contains: "ATAGO_SECRET"
+      # The round-trip: replaying the generated spec passes.
+      - run:
+          command: ${atago} run tui.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "1 passed"
+
   - name: record --pty of a never-exiting program times out instead of hanging
     skip:
       os: windows

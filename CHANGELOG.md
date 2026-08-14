@@ -21,6 +21,14 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- `record --pty` no longer masks every keystroke of a full-screen TUI session
+  (fzf, vim, htop) as an `${env:ATAGO_SECRET_n}` placeholder. A TUI's raw mode
+  clears ECHO and ICANON together, and the recorder treated ECHO alone as a
+  password prompt, so a recorded TUI session replayed nothing. Secret masking now
+  requires the termios state of an actual password prompt — echo off while
+  canonical (line) input stays on, as with `read -s`, sudo, and ssh — and
+  raw-mode keystrokes are recorded literally, so a recorded TUI session
+  round-trips green.
 - A pty step or `record --pty` no longer loses the output of a command that
   prints and exits at once. macOS discards whatever the terminal still holds the
   moment its last slave handle closes — a read already parked in the kernel comes

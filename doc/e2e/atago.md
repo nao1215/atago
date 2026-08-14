@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-80 suites · 513 scenarios
+80 suites · 514 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -393,7 +393,7 @@
   - [a pty step drives the atago binary directly with no shell](#scenario-a-pty-step-drives-the-atago-binary-directly-with-no-shell)
   - [a pty drives atago running an inner spec to a green result](#scenario-a-pty-drives-atago-running-an-inner-spec-to-a-green-result)
   - [a never-matching expect fails and names the pattern in the transcript](#scenario-a-never-matching-expect-fails-and-names-the-pattern-in-the-transcript)
-- [atago self-hosting / record (spec skeleton from an observed run)](#atago-self-hosting--record-spec-skeleton-from-an-observed-run) — 14 scenarios
+- [atago self-hosting / record (spec skeleton from an observed run)](#atago-self-hosting--record-spec-skeleton-from-an-observed-run) — 15 scenarios
   - [record then run round-trips green](#scenario-record-then-run-round-trips-green)
   - [refusing to overwrite without --force](#scenario-refusing-to-overwrite-without---force)
   - [record --pty refuses an existing --out before driving the session](#scenario-record---pty-refuses-an-existing---out-before-driving-the-session)
@@ -407,6 +407,7 @@
   - [a prompt with regex metacharacters is escaped in the generated expect](#scenario-a-prompt-with-regex-metacharacters-is-escaped-in-the-generated-expect)
   - [recorded text containing dollar-brace round-trips as literal text](#scenario-recorded-text-containing-dollar-brace-round-trips-as-literal-text)
   - [a recorded secret placeholder replays green with the env set and is guarded when unset](#scenario-a-recorded-secret-placeholder-replays-green-with-the-env-set-and-is-guarded-when-unset)
+  - [a raw-mode (TUI) keystroke is recorded literally, not as a secret](#scenario-a-raw-mode-tui-keystroke-is-recorded-literally-not-as-a-secret)
   - [record --pty of a never-exiting program times out instead of hanging](#scenario-record---pty-of-a-never-exiting-program-times-out-instead-of-hanging)
 - [atago self-hosting / report formats agree on outcomes](#atago-self-hosting--report-formats-agree-on-outcomes) — 7 scenarios
   - [json report carries per-scenario verdicts and a failures array](#scenario-json-report-carries-per-scenario-verdicts-and-a-failures-array)
@@ -7651,6 +7652,19 @@ ${atago} run sec.atago.yaml
 - after `${atago} run sec.atago.yaml`:
   - exit code is `4`
   - stdout contains `ATAGO_SECRET_1 is not set`
+### Scenario: a raw-mode (TUI) keystroke is recorded literally, not as a secret
+_skipped on Windows_
+#### When
+```shell
+# interactive (pty): ${atago} record --pty --out tui.atago.yaml -- sh -c 'stty -icanon -echo min 1 time 0; printf READY; head -c 1 >/dev/null; stty sane; echo BYE'
+${atago} run tui.atago.yaml
+```
+#### Then
+- exit code is `0`
+- file `tui.atago.yaml` contains `- send: "j"`
+- file `tui.atago.yaml` does not contain `ATAGO_SECRET`
+- exit code is `0`
+- stdout contains `1 passed`
 ### Scenario: record --pty of a never-exiting program times out instead of hanging
 _skipped on Windows_
 #### When

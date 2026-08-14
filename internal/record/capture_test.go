@@ -67,6 +67,181 @@ func capturePipes(t *testing.T) (in *os.File, out *os.File) {
 	return inR, outW
 }
 
+// capturePipesMarker is capturePipes plus a synchronization point: its drain
+// scans the output stream for marker and closes the returned channel the first
+// time it appears. A test that must type only AFTER the child has changed the
+// terminal's state (raw mode, echo off) waits on the channel instead of
+// sleeping, so the echo-state tag the recorder attaches to the input is
+// deterministic. It also returns the input pipe's write end so the test can
+// type. The teardown order is the same one capturePipes documents (#406).
+func capturePipesMarker(t *testing.T, marker string) (in, inWrite, out *os.File, seen <-chan struct{}) {
+	t.Helper()
+	inR, inW, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("input pipe: %v", err)
+	}
+	outR, outW, err := os.Pipe()
+	if err != nil {
+		_ = inR.Close()
+		_ = inW.Close()
+		t.Fatalf("output pipe: %v", err)
+	}
+	found := make(chan struct{})
+	drained := make(chan struct{})
+	go func() {
+		defer close(drained)
+		var window []byte
+		buf := make([]byte, 4096)
+		notified := false
+		for {
+			n, rerr := outR.Read(buf)
+			if n > 0 && !notified {
+				window = append(window, buf[:n]...)
+				if strings.Contains(string(window), marker) {
+					notified = true
+					close(found)
+				}
+			}
+			if rerr != nil {
+				return
+			}
+		}
+	}()
+	t.Cleanup(func() {
+		_ = outW.Close() // the drain now reaches EOF
+		_ = inR.Close()
+		_ = inW.Close()
+		select {
+		case <-drained:
+			_ = outR.Close()
+		case <-time.After(drainTeardownGrace):
+			t.Errorf("the output drain did not finish %s after its write end closed: "+
+				"something still holds the pipe open, and closing the read end would hang", drainTeardownGrace)
+		}
+	})
+	return inR, inW, outW, found
+}
+
+// waitMarker bounds the wait for a capturePipesMarker channel so a child that
+// never prints its marker fails the test by name instead of wedging it.
+func waitMarker(t *testing.T, seen <-chan struct{}, what string) {
+	t.Helper()
+	select {
+	case <-seen:
+	case <-time.After(15 * time.Second):
+		t.Fatalf("child never printed its %s marker", what)
+	}
+}
+
+// inputSegments collects the input bursts of a recording in order.
+func inputSegments(rec PTYRecording) []PTYSegment {
+	var in []PTYSegment
+	for _, seg := range rec.Segments {
+		if seg.Input != nil {
+			in = append(in, seg)
+		}
+	}
+	return in
+}
+
+// TestCapturePTY_RawModeKeystrokeIsNotSecret is a regression test for recorded
+// TUI sessions: a full-screen program's raw mode (fzf, vim, htop) clears ECHO
+// and ICANON together, and tagging input by ECHO alone turned every keystroke
+// of a recorded TUI session into an ${env:ATAGO_SECRET_n} placeholder — a spec
+// that replays nothing. Only a canonical (line-mode) prompt with echo off is a
+// password prompt; a raw-mode keystroke must be recorded literally.
+func TestCapturePTY_RawModeKeystrokeIsNotSecret(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("stty and termios echo state are POSIX; a ConPTY exposes no echo state at all")
+	}
+	inR, inW, outW, ready := capturePipesMarker(t, "READY")
+
+	// A TUI stand-in: enter raw-ish mode (echo and canonical input both off),
+	// announce READY, read one keystroke, restore the terminal, and exit.
+	const cmd = "stty -icanon -echo min 1 time 0; printf READY; head -c 1 >/dev/null; stty sane; echo BYE"
+	recCh := make(chan PTYRecording, 1)
+	errCh := make(chan error, 1)
+	go func() {
+		rec, err := CapturePTY(cmd, true, inR, outW, 30*time.Second)
+		recCh <- rec
+		errCh <- err
+	}()
+
+	waitMarker(t, ready, "raw-mode")
+	if _, err := inW.WriteString("j"); err != nil {
+		t.Fatalf("typing into the recorder: %v", err)
+	}
+
+	rec := <-recCh
+	if err := <-errCh; err != nil {
+		t.Fatalf("CapturePTY() error = %v", err)
+	}
+	inputs := inputSegments(rec)
+	if len(inputs) != 1 {
+		t.Fatalf("input segments = %d, want 1 (%+v)", len(inputs), rec.Segments)
+	}
+	if inputs[0].EchoOff {
+		t.Errorf("a raw-mode (TUI) keystroke was tagged as secret input")
+	}
+	generated, err := GeneratePTY(rec, Options{SuiteName: "tui"})
+	if err != nil {
+		t.Fatalf("GeneratePTY: %v", err)
+	}
+	if strings.Contains(string(generated), "ATAGO_SECRET") {
+		t.Errorf("a raw-mode (TUI) keystroke was rendered as a secret placeholder:\n%s", generated)
+	}
+	if !strings.Contains(string(generated), `- send: "j"`) {
+		t.Errorf("the recorded keystroke should replay literally:\n%s", generated)
+	}
+}
+
+// TestCapturePTY_CanonicalEchoOffInputIsSecret pins the password half of the
+// same distinction: a canonical prompt that disables echo (read -s, sudo, ssh)
+// must still mask what was typed, before and after the raw-mode fix.
+func TestCapturePTY_CanonicalEchoOffInputIsSecret(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("stty and termios echo state are POSIX; a ConPTY exposes no echo state at all")
+	}
+	inR, inW, outW, ready := capturePipesMarker(t, "Password:")
+
+	const cmd = "stty -echo; printf 'Password: '; read pw; stty echo; echo OK"
+	recCh := make(chan PTYRecording, 1)
+	errCh := make(chan error, 1)
+	go func() {
+		rec, err := CapturePTY(cmd, true, inR, outW, 30*time.Second)
+		recCh <- rec
+		errCh <- err
+	}()
+
+	waitMarker(t, ready, "prompt")
+	const secret = "hunter2-super-secret"
+	if _, err := inW.WriteString(secret + "\n"); err != nil {
+		t.Fatalf("typing into the recorder: %v", err)
+	}
+
+	rec := <-recCh
+	if err := <-errCh; err != nil {
+		t.Fatalf("CapturePTY() error = %v", err)
+	}
+	inputs := inputSegments(rec)
+	if len(inputs) != 1 {
+		t.Fatalf("input segments = %d, want 1 (%+v)", len(inputs), rec.Segments)
+	}
+	if !inputs[0].EchoOff {
+		t.Errorf("a canonical echo-off (password) burst was not tagged as secret")
+	}
+	generated, err := GeneratePTY(rec, Options{SuiteName: "login"})
+	if err != nil {
+		t.Fatalf("GeneratePTY: %v", err)
+	}
+	if strings.Contains(string(generated), secret) {
+		t.Fatalf("SECRET LEAKED into the generated spec:\n%s", generated)
+	}
+	if !strings.Contains(string(generated), "${env:ATAGO_SECRET_1}") {
+		t.Errorf("expected an ${env:...} placeholder for the password:\n%s", generated)
+	}
+}
+
 // TestCapturePTY_RecordsOutputAndExit drives the whole capture path with a
 // self-exiting command and no interactive input: start the child in a real pty
 // (POSIX) / ConPTY (Windows), drain its output into the recording, and reap its
