@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-80 suites · 516 scenarios
+80 suites · 517 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -395,10 +395,11 @@
   - [a pty step drives the atago binary directly with no shell](#scenario-a-pty-step-drives-the-atago-binary-directly-with-no-shell)
   - [a pty drives atago running an inner spec to a green result](#scenario-a-pty-drives-atago-running-an-inner-spec-to-a-green-result)
   - [a never-matching expect fails and names the pattern in the transcript](#scenario-a-never-matching-expect-fails-and-names-the-pattern-in-the-transcript)
-- [atago self-hosting / record (spec skeleton from an observed run)](#atago-self-hosting--record-spec-skeleton-from-an-observed-run) — 15 scenarios
+- [atago self-hosting / record (spec skeleton from an observed run)](#atago-self-hosting--record-spec-skeleton-from-an-observed-run) — 16 scenarios
   - [record then run round-trips green](#scenario-record-then-run-round-trips-green)
   - [refusing to overwrite without --force](#scenario-refusing-to-overwrite-without---force)
   - [record --pty refuses an existing --out before driving the session](#scenario-record---pty-refuses-an-existing---out-before-driving-the-session)
+  - [an observed stderr diagnostic is anchored, not dropped](#scenario-an-observed-stderr-diagnostic-is-anchored-not-dropped)
   - [created files become exists asserts (shell mode)](#scenario-created-files-become-exists-asserts-shell-mode)
   - [snapshot mode writes a golden the run then matches](#scenario-snapshot-mode-writes-a-golden-the-run-then-matches)
   - [no command is a usage error](#scenario-no-command-is-a-usage-error)
@@ -7561,6 +7562,21 @@ ${atago} record --pty --out taken.atago.yaml -- echo hi
 - exit code is `3`
 - stderr contains `use --force to overwrite`
 - file `taken.atago.yaml` contains `precious`
+### Scenario: an observed stderr diagnostic is anchored, not dropped
+_skipped on Windows_
+#### When
+```shell
+${atago} record --shell --out diag.atago.yaml -- 'echo "error: unknown flag" >&2; exit 2'
+${atago} run diag.atago.yaml
+```
+#### Then
+- after `${atago} record --shell --out diag.atago.yaml -- 'echo "error: unknown flag" >&2; exit 2'`:
+  - exit code is `0`
+  - file `diag.atago.yaml` contains `exit_code: 2`, `stderr:`, `error: unknown flag`
+  - file `diag.atago.yaml` does not contain `empty: true`
+- after `${atago} run diag.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `1 passed`
 ### Scenario: created files become exists asserts (shell mode)
 _skipped on Windows_
 #### When

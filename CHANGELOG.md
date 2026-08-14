@@ -28,6 +28,14 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- `atago record` now anchors an observed stderr the way it has always anchored
+  stdout: on its first non-empty line. Only an EMPTY stderr produced an assert
+  before, so recording the case a CLI author most wants pinned — a failing run
+  whose whole observable behavior is a diagnostic on stderr — generated a spec
+  that asserted the exit code and silently dropped the message. A first line
+  carrying an escape or a carriage return is still left alone: that is a
+  progress bar or a redrawing status line, and anchoring on one would hand the
+  author a generated spec that is red on arrival.
 - `record --pty` now anchors a generated expect on the latest output run
   carrying a letter or digit, keeping a purely decorative run only as the
   fallback. A full-screen TUI's last painted line is often a decorative rule

@@ -86,10 +86,16 @@ func Generate(obs Observation, opts Options) ([]byte, error) {
 		anchor := maskWorkdir(escapeVarRefs(firstLine(obs.Stdout)), opts.Workdir)
 		fmt.Fprintf(&b, "            contains: %s # first non-empty line, trimmed\n", yamlScalar(anchor))
 	}
-	if len(obs.Stderr) == 0 {
+	switch {
+	case len(obs.Stderr) == 0:
 		b.WriteString("      - assert:\n")
 		b.WriteString("          stderr:\n")
 		b.WriteString("            empty: true\n")
+	case stderrAnchor(obs.Stderr) != "":
+		b.WriteString("      - assert:\n")
+		b.WriteString("          stderr:\n")
+		anchor := maskWorkdir(escapeVarRefs(stderrAnchor(obs.Stderr)), opts.Workdir)
+		fmt.Fprintf(&b, "            contains: %s # first non-empty line, trimmed\n", yamlScalar(anchor))
 	}
 
 	files := obs.CreatedFiles
@@ -175,6 +181,21 @@ func maskWorkdir(s, workdir string) string {
 		return s
 	}
 	return strings.ReplaceAll(s, workdir, "${workdir}")
+}
+
+// stderrAnchor returns the literal a generated stderr assert anchors on: the
+// first non-empty line, unless that line carries an escape or a carriage return.
+// Those are the marks of a progress bar or a redrawing status line — text that
+// differs on the very next run — and anchoring on one would hand the author a
+// generated spec that is red on arrival, which is worse than saying nothing
+// about the stream. A diagnostic, a warning, or a usage line has neither, and is
+// exactly what the author wants pinned.
+func stderrAnchor(stream []byte) string {
+	line := firstLine(stream)
+	if strings.ContainsAny(line, "\x1b\r") {
+		return ""
+	}
+	return line
 }
 
 // firstLine returns the first non-empty line, trimmed.

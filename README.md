@@ -37,7 +37,8 @@ PASSED  1 scenario: 1 passed, 0 failed, 0 errored, 0 skipped
 ```
 
 `record` runs `git --version` once and writes a spec from what it observed — the
-exit code, the version line on stdout, an empty stderr. `run` replays it. Open
+exit code, the version line on stdout, an empty stderr (a tool that writes a
+diagnostic there gets that first line anchored instead). `run` replays it. Open
 `demo.atago.yaml` and you have a real test you can tighten, not YAML you wrote
 from scratch. (Swap `git --version` for any command you have: `go version`,
 `jq --version`, `ls -la`.)
