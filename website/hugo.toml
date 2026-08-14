@@ -36,6 +36,16 @@ pageRef = "/cookbook"
 weight = 30
 
 [[menus.main]]
+name = "Compare"
+pageRef = "/comparison"
+weight = 38
+
+[[menus.main]]
+name = "Migrate"
+pageRef = "/migrate"
+weight = 42
+
+[[menus.main]]
 name = "CI"
 pageRef = "/ci"
 weight = 50

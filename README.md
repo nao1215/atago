@@ -64,6 +64,8 @@ Pick the tool that owns your layer:
 
 If the server or the platform is the system under test, use runn or venom. atago points the other way: the CLI is the product, and HTTP, database, SSH, gRPC, browser, and mock servers appear only as peers your CLI talks to.
 
+A [feature-by-feature comparison](https://nao1215.github.io/atago/comparison/) states the versions compared and its sources, and the [migration guide](https://nao1215.github.io/atago/migrate/) maps Bats and ShellSpec constructs to atago one-to-one — every mapping runs in CI, originals and migrations both.
+
 ## Install
 
 ```shell

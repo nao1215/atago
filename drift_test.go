@@ -695,3 +695,128 @@ func TestExamples_HermeticRunGreen(t *testing.T) {
 		})
 	}
 }
+
+// migrationFenceRe captures each fenced code block in the migration guide with
+// its language tag, so every excerpt can be checked against the file family it
+// claims to come from.
+var migrationFenceRe = regexp.MustCompile("(?s)```([a-z]+)\n(.*?)```")
+
+// migrationSourceFamilies maps a fence language in migrate.md to the committed
+// parity files its excerpts must be verbatim substrings of: ```bash is the Bats
+// suite, ```sh the ShellSpec suite, ```yaml the migrated atago specs. ```shell
+// blocks are free-form command lines and are not checked.
+func migrationSourceFamilies(t *testing.T) map[string][]string {
+	t.Helper()
+	families := map[string][]string{}
+	for lang, glob := range map[string]string{
+		"bash": "test/e2e/migration/bats/*.bats",
+		"sh":   "test/e2e/migration/shellspec/spec/*_spec.sh",
+		"yaml": "test/e2e/migration/*.atago.yaml",
+	} {
+		paths, err := filepath.Glob(glob)
+		if err != nil || len(paths) == 0 {
+			t.Fatalf("glob %s: %v (found %d files)", glob, err, len(paths))
+		}
+		families[lang] = paths
+	}
+	return families
+}
+
+// TestMigrationGuide_SnippetsAreExecutedExcerpts keeps the website's migration
+// guide honest: every Bats, ShellSpec, and atago snippet it shows must be a
+// verbatim excerpt of a committed file under test/e2e/migration/ — the files
+// the MigrationParity workflow actually runs. A snippet edited only in the
+// guide, or a parity file that drifts away from the guide, fails here instead
+// of quietly turning the page into fiction.
+func TestMigrationGuide_SnippetsAreExecutedExcerpts(t *testing.T) {
+	t.Parallel()
+	doc := readDoc(t, "website/content/migrate.md")
+	families := migrationSourceFamilies(t)
+	blocks := migrationFenceRe.FindAllStringSubmatch(doc, -1)
+	if len(blocks) == 0 {
+		t.Fatal("website/content/migrate.md contains no fenced code blocks")
+	}
+	checked := 0
+	for i, m := range blocks {
+		lang, body := m[1], m[2]
+		paths, guarded := families[lang]
+		if !guarded {
+			continue
+		}
+		checked++
+		found := false
+		for _, path := range paths {
+			if strings.Contains(readDoc(t, path), body) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("migrate.md block %d (```%s) is not a verbatim excerpt of any %s parity file:\n%s", i, lang, lang, body)
+		}
+	}
+	if checked == 0 {
+		t.Error("migrate.md has no bats/shellspec/atago snippets to guard; the fence languages may have drifted")
+	}
+}
+
+// TestMigrationGuide_PinsMatchWorkflow keeps the versions the migration guide
+// names in lockstep with what the MigrationParity workflow installs. The
+// workflow fetches by immutable commit ID (a tag can move) and keeps the
+// release label in a comment; the guide's claim "verified against Bats-core
+// v1.14.0 and ShellSpec 0.28.1" is only true while all three stay together.
+func TestMigrationGuide_PinsMatchWorkflow(t *testing.T) {
+	t.Parallel()
+	guide := readDoc(t, "website/content/migrate.md")
+	workflow := readDoc(t, ".github/workflows/migration.yml")
+	for _, pin := range []struct{ name, sha, label, guideRef string }{
+		{"Bats", "eb7f42f8d608ac693d7a4b67474f6714ea68cfc5", "v1.14.0", "Bats-core v1.14.0"},
+		{"ShellSpec", "90e48c950239f3b8a9fdfa3e869592872c77b981", "0.28.1", "ShellSpec 0.28.1"},
+	} {
+		if !strings.Contains(workflow, pin.sha) {
+			t.Errorf("migration.yml no longer pins %s to commit %s; update the SHA, the label comment, and the guide together", pin.name, pin.sha)
+		}
+		if !strings.Contains(workflow, pin.label) {
+			t.Errorf("migration.yml no longer labels the %s pin as %s; the release label must stay next to the commit ID", pin.name, pin.label)
+		}
+		if !strings.Contains(guide, pin.guideRef) {
+			t.Errorf("migrate.md no longer names %q; the guide must state the exact release the parity workflow runs", pin.guideRef)
+		}
+	}
+}
+
+// TestMigration_HermeticRunGreen executes every migrated spec behind the
+// migration guide through the real engine, on every platform the unit tests
+// cover — the Linux-only parity workflow proves the Bats/ShellSpec side, this
+// proves the atago side everywhere else. Each scenario is checked
+// individually: gated scenarios may skip, but a suite-level "passed" that
+// hides a flaky, xfail, or xpass scenario is not good enough for the suites a
+// guide points at.
+func TestMigration_HermeticRunGreen(t *testing.T) {
+	t.Parallel()
+	paths, err := filepath.Glob("test/e2e/migration/*.atago.yaml")
+	if err != nil || len(paths) == 0 {
+		t.Fatalf("glob migration specs: %v (found %d files)", err, len(paths))
+	}
+	for _, path := range paths {
+		t.Run(path, func(t *testing.T) {
+			t.Parallel()
+			s, err := loader.Load(path)
+			if err != nil {
+				t.Fatalf("load: %v", err)
+			}
+			res := engine.New().Run(context.Background(), s, path)
+			if res.Status != engine.StatusPassed && res.Status != engine.StatusSkipped {
+				t.Errorf("status = %s, want passed (or skipped by a gate): %+v", res.Status, res.Scenarios)
+			}
+			if len(res.Scenarios) == 0 {
+				t.Error("spec produced no scenario results")
+			}
+			for _, sc := range res.Scenarios {
+				if sc.Status != engine.StatusPassed && sc.Status != engine.StatusSkipped {
+					t.Errorf("scenario %q: status = %s, want passed or skipped", sc.Name, sc.Status)
+				}
+			}
+		})
+	}
+}
