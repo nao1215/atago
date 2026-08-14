@@ -11,19 +11,37 @@ import (
 // cellsFor builds a one-row screen from a string, applying style to the cells
 // covering want (its first occurrence) and leaving the rest default.
 func cellsFor(text, want string, style func(*runner.ScreenCell)) *runner.Result {
-	runes := []rune(text)
-	row := make([]runner.ScreenCell, len(runes))
-	start := strings.Index(text, want)
-	for i, r := range runes {
-		row[i] = runner.ScreenCell{Rune: r, FG: spec.DefaultScreenColor, BG: spec.DefaultScreenColor + 1}
+	clusters := splitGraphemes(text)
+	row := make([]runner.ScreenCell, len(clusters))
+	for i, g := range clusters {
+		row[i] = runner.ScreenCell{Content: g, FG: spec.DefaultScreenColor, BG: spec.DefaultScreenColor + 1}
 	}
-	if start >= 0 && want != "" {
-		from := len([]rune(text[:start]))
-		for i := from; i < from+len([]rune(want)); i++ {
-			style(&row[i])
+	if want != "" {
+		if from := graphemeIndex(clusters, splitGraphemes(want)); from >= 0 {
+			for i := from; i < from+len(splitGraphemes(want)); i++ {
+				style(&row[i])
+			}
 		}
 	}
 	return &runner.Result{IsPTY: true, Screen: []byte(text), ScreenCells: [][]runner.ScreenCell{row}}
+}
+
+// graphemeIndex returns the cluster index at which sub first appears in clusters,
+// or -1. It mirrors how the matcher slides a cluster window over a row.
+func graphemeIndex(clusters, sub []string) int {
+	for start := 0; start+len(sub) <= len(clusters); start++ {
+		match := true
+		for i, g := range sub {
+			if clusters[start+i] != g {
+				match = false
+				break
+			}
+		}
+		if match {
+			return start
+		}
+	}
+	return -1
 }
 
 // TestCheckScreenAttrs covers the matcher's contract (#382): colors and
@@ -143,13 +161,36 @@ func TestCheckScreenAttrs_AnyOccurrenceSatisfies(t *testing.T) {
 	t.Parallel()
 	// Two "ok"s: the first plain, the second green.
 	row := []runner.ScreenCell{}
-	for _, r := range "ok ok" {
-		row = append(row, runner.ScreenCell{Rune: r, FG: spec.DefaultScreenColor})
+	for _, g := range splitGraphemes("ok ok") {
+		row = append(row, runner.ScreenCell{Content: g, FG: spec.DefaultScreenColor})
 	}
 	row[3].FG, row[4].FG = 2, 2
 	res := &runner.Result{IsPTY: true, Screen: []byte("ok ok"), ScreenCells: [][]runner.ScreenCell{row}}
 
 	if cr := checkScreenAttrs([]spec.ScreenAttr{{Text: "ok", FG: "green"}}, res); !cr.OK {
 		t.Errorf("a later matching occurrence should satisfy the entry: %s", cr.Hint)
+	}
+}
+
+// TestCheckScreenAttrs_GraphemeCluster pins that a query naming a multi-rune
+// grapheme cluster (a ZWJ emoji) matches the single cell that holds it and checks
+// that cell's styling (#437). A rune-by-rune comparison could never line up: the
+// query has several runes, the cell one cluster.
+func TestCheckScreenAttrs_GraphemeCluster(t *testing.T) {
+	t.Parallel()
+	const dev = "\U0001F469\u200d\U0001F4BB" // woman + ZWJ + laptop, one cluster
+	row := []runner.ScreenCell{
+		{Content: "a", FG: spec.DefaultScreenColor},
+		{Content: dev, FG: 1, Bold: true},
+		{Content: "b", FG: spec.DefaultScreenColor},
+	}
+	res := &runner.Result{IsPTY: true, Screen: []byte("a" + dev + "b"), ScreenCells: [][]runner.ScreenCell{row}}
+
+	if cr := checkScreenAttrs([]spec.ScreenAttr{{Text: dev, FG: "red", Bold: boolp(true)}}, res); !cr.OK {
+		t.Errorf("a ZWJ emoji cluster should match its cell and check its style: %s", cr.Hint)
+	}
+	// A wrong style on that cluster must still fail, not be passed over.
+	if cr := checkScreenAttrs([]spec.ScreenAttr{{Text: dev, FG: "green"}}, res); cr.OK {
+		t.Error("a mismatched color on the cluster cell must fail")
 	}
 }
