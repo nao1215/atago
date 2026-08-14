@@ -133,21 +133,48 @@ func TestCheckDir_SymlinkedRootMayNotEscapeTheWorkdir(t *testing.T) {
 // which is a question about the filesystem outside the workdir. A dangling link
 // that stays inside (a `latest ->` pointing at a release not built yet) is
 // ordinary and must still answer.
+//
+// It runs the same pair twice: once against the workdir as given, and once
+// against the same directory reached through a symlink. The second spelling is
+// what CI runs on macOS, where /var and /tmp sit behind /private — a dangling
+// link's declared target keeps the unresolved spelling, so comparing it only
+// against the RESOLVED root refused a link that never left the workdir.
 func TestCheckDir_DanglingSymlinkedRootJudgedByItsTarget(t *testing.T) {
-	wd := t.TempDir()
-	outside := filepath.Join(t.TempDir(), "absent")
-	if err := os.Symlink(outside, filepath.Join(wd, "escape")); err != nil {
-		t.Skipf("symlinks unsupported on this platform: %v", err)
-	}
-	if err := os.Symlink("releases/v3", filepath.Join(wd, "latest")); err != nil {
-		t.Fatal(err)
-	}
+	for _, tc := range []struct {
+		name         string
+		symlinkedDir bool
+	}{
+		{name: "workdir as given"},
+		{name: "workdir reached through a symlink", symlinkedDir: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			base := t.TempDir()
+			wd := filepath.Join(base, "real")
+			if err := os.Mkdir(wd, 0o750); err != nil {
+				t.Fatal(err)
+			}
+			outside := filepath.Join(t.TempDir(), "absent")
+			if err := os.Symlink(outside, filepath.Join(wd, "escape")); err != nil {
+				t.Skipf("symlinks unsupported on this platform: %v", err)
+			}
+			if err := os.Symlink("releases/v3", filepath.Join(wd, "latest")); err != nil {
+				t.Fatal(err)
+			}
+			if tc.symlinkedDir {
+				alias := filepath.Join(base, "alias")
+				if err := os.Symlink("real", alias); err != nil {
+					t.Fatal(err)
+				}
+				wd = alias
+			}
 
-	if cr := checkDirOK(t, wd, &spec.DirAssert{Path: "escape", Exists: ptrBool(false)}); cr.OK {
-		t.Error("a dangling link out of the workdir must be refused, not answered")
-	}
-	if cr := checkDirOK(t, wd, &spec.DirAssert{Path: "latest", Exists: ptrBool(false)}); !cr.OK {
-		t.Errorf("a dangling link inside the workdir must still answer: %+v", cr)
+			if cr := checkDirOK(t, wd, &spec.DirAssert{Path: "escape", Exists: ptrBool(false)}); cr.OK {
+				t.Error("a dangling link out of the workdir must be refused, not answered")
+			}
+			if cr := checkDirOK(t, wd, &spec.DirAssert{Path: "latest", Exists: ptrBool(false)}); !cr.OK {
+				t.Errorf("a dangling link inside the workdir must still answer: %+v", cr)
+			}
+		})
 	}
 }
 

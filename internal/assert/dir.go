@@ -130,16 +130,20 @@ func declaredLinkTarget(p string) (string, bool) {
 	return filepath.Clean(target), true
 }
 
-// withinResolvedWorkdir reports whether p stays inside the scenario workdir. The
-// workdir is resolved first: it can itself sit behind a symlink (macOS puts
-// /tmp behind /private/tmp), and testing a resolved path against an unresolved
-// root would reject every path there.
+// withinResolvedWorkdir reports whether p stays inside the scenario workdir.
+//
+// The workdir can itself sit behind a symlink — macOS puts /tmp behind
+// /private/tmp and /var behind /private/var — and p arrives in either spelling:
+// a path EvalSymlinks resolved takes the resolved form, while a dangling link's
+// declared target keeps the form the link was written with. Both spellings name
+// the same directory, so containment holds if either does; a path outside the
+// workdir is inside neither.
 func withinResolvedWorkdir(workdir, p string) bool {
-	root := workdir
-	if r, err := filepath.EvalSymlinks(workdir); err == nil {
-		root = r
+	if security.WithinRoot(workdir, p) {
+		return true
 	}
-	return security.WithinRoot(root, p)
+	resolved, err := filepath.EvalSymlinks(workdir)
+	return err == nil && security.WithinRoot(resolved, p)
 }
 
 func escapesWorkdirError(declared, target string) error {
