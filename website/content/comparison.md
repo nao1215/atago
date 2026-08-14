@@ -116,6 +116,43 @@ commander v2.5.0.
 | Coverage of shell scripts | — | — | kcov integration built in | — |
 | Report formats | console / JSON / JUnit / GHA / TAP | pretty / TAP / TAP13 / JUnit | documentation / TAP / JUnit / custom | — |
 
+## Other tools you might be weighing
+
+Adjacent tools that come up in the same search, each with an honest placement
+(versions in this section checked on 2026-08-14):
+
+- [aruba](https://github.com/cucumber/aruba) (v2.4.1) — CLI testing from the
+  Cucumber family, driven from Cucumber-Ruby, RSpec, or Minitest. Same layer
+  as atago, different axis: Gherkin scenarios read well, and you implement or
+  reuse Ruby step definitions to make them run, where atago's YAML executes
+  without glue code. If your team already writes Gherkin, aruba is the
+  natural home.
+- expect — the classic Tcl tool for scripting interactive programs, and the
+  ancestor of every expect/send API including atago's `pty:`. Still fine for
+  one-off automation; a spec runner adds assertions, isolation, and reporting
+  around the same idea.
+- [cram](https://github.com/aiiie/cram) and its fork
+  [prysk](https://github.com/prysk/prysk) (0.20.0) — snapshot testing for
+  command lines in `.t` files, the closest relatives of atago's `snapshot:`.
+  They pin whole session transcripts; atago separates snapshots from
+  structured asserts and normalizes volatile output.
+- [testscript](https://github.com/rogpeppe/go-internal) (v1.15.0) — the
+  txtar-based script runner extracted from `cmd/go`'s own tests, and the Go
+  ecosystem's default for testing CLIs inside `go test`. Running in-process
+  with your Go tests is its strength; atago runs any binary from outside, in
+  any language.
+- [shUnit2](https://github.com/kward/shunit2) (v2.1.8) — xUnit for shell
+  scripts, in the same family as Bats and ShellSpec; the
+  [migration guide](/migrate/)'s mappings apply the same way.
+- [trycmd](https://github.com/assert-rs/trycmd) (v0.15.2) — snapshot-tests
+  CLIs from Markdown files inside Rust's `cargo test`; roughly the Rust
+  counterpart to testscript.
+- General-purpose test frameworks — Cucumber itself, Jest, Vitest, pytest,
+  and their peers own code-level testing for whatever language your CLI is
+  written in. They can drive a CLI through a subprocess helper, but that
+  helper is code you write and maintain. Jest's snapshot testing in
+  particular is prior art for atago's `snapshot:`.
+
 ## Where the others are the better choice
 
 An honest table needs the reverse direction spelled out:
