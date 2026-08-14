@@ -20,13 +20,13 @@ func checkSnapshot(desc, label, snapPath string, data []byte, env Env) *CheckRes
 	opt := snapshot.Options{Workdir: env.Workdir, Secrets: env.Secrets, Scrub: env.Scrub}
 
 	if env.UpdateSnapshots {
-		if err := snapshot.Update(path, data, opt); err != nil {
+		if err := snapshot.Update(env.SpecDir, path, data, opt); err != nil {
 			return &CheckResult{Desc: desc, Hint: fmt.Sprintf("could not write snapshot %q: %v", snapPath, err)}
 		}
 		return pass(desc + " (updated)")
 	}
 
-	ok, expected, actual, err := snapshot.Compare(path, data, opt)
+	ok, expected, actual, err := snapshot.Compare(env.SpecDir, path, data, opt)
 	switch {
 	case errors.Is(err, snapshot.ErrMissing):
 		return &CheckResult{

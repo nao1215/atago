@@ -203,13 +203,14 @@ func location(got string, off int) string {
 // need the bytes in memory to have an opinion about them. A directory fails
 // with the same phrasing exists: uses — a directory has a size, but it is not
 // the file the assertion is about.
-func checkFileSize(f *spec.FileAssert, path string) *CheckResult {
+func checkFileSize(f *spec.FileAssert, root, path string) *CheckResult {
 	desc := fmt.Sprintf("assert file %q size %s", f.Path, sizeBounds(f).phrase())
 	// StatNoFollow, not os.Stat: a program under test can plant a symlink at the
 	// assertion target, and following it would report the size of a host file
 	// outside the workdir — the same disclosure ReadFileNoFollow refuses on the
-	// read path (issue #16).
-	info, err := security.StatNoFollow(path)
+	// read path (issue #16). Binding it to the workdir refuses an ancestor swapped
+	// for a link too (issue #430).
+	info, err := security.StatNoFollow(root, path)
 	if err != nil {
 		return &CheckResult{
 			Desc:     desc,

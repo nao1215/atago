@@ -179,11 +179,12 @@ func isComponentBoundary(c byte) bool {
 	return c == '/' || c == '\\' || c <= ' '
 }
 
-// Compare normalizes actual and checks it against the stored snapshot at path.
-// It returns the normalized expected and actual text for diffing. If the
-// snapshot does not exist it returns ErrMissing.
-func Compare(path string, actual []byte, opt Options) (ok bool, expected, actualNorm string, err error) {
-	stored, rerr := security.ReadFileNoFollow(path)
+// Compare normalizes actual and checks it against the stored snapshot at path,
+// which lives under root (the spec directory). It returns the normalized expected
+// and actual text for diffing. If the snapshot does not exist it returns
+// ErrMissing.
+func Compare(root, path string, actual []byte, opt Options) (ok bool, expected, actualNorm string, err error) {
+	stored, rerr := security.ReadFileNoFollow(root, path)
 	if rerr != nil {
 		if os.IsNotExist(rerr) {
 			return false, "", string(Normalize(actual, opt)), ErrMissing
@@ -200,12 +201,14 @@ func Compare(path string, actual []byte, opt Options) (ok bool, expected, actual
 	return expected == actualNorm, expected, actualNorm, nil
 }
 
-// Update writes the normalized actual output to path, creating parent dirs.
-func Update(path string, actual []byte, opt Options) error {
+// Update writes the normalized actual output to path, creating parent dirs. path
+// is confined to root (the spec directory).
+func Update(root, path string, actual []byte, opt Options) error {
 	// path is resolved against the SPEC directory (security.ResolveSpecPath), not
-	// the scenario workdir, so this takes the resolved-path form of the confined
-	// write rather than the workdir-shaped one. The rest of the policy — create
-	// parents, refuse a symlink the program under test may have planted at the
-	// target (issue #16), one file mode — is the same.
-	return security.WriteConfinedFile(path, Normalize(actual, opt))
+	// the scenario workdir, so this passes the spec directory as the confinement
+	// root. The rest of the policy — create parents, refuse a symlink the program
+	// under test may have planted at the target (issue #16), bind the write to the
+	// root so an ancestor swapped for a link cannot redirect it (issue #430), one
+	// file mode — is the same.
+	return security.WriteConfinedFile(root, path, Normalize(actual, opt))
 }

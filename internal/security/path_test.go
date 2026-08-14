@@ -238,6 +238,67 @@ func TestResolve_RootBehindASymlink(t *testing.T) {
 	}
 }
 
+// TestConfinedIO_EnforcedAtTheOperation proves the confinement is bound to the
+// read, write, and stat themselves, not to an earlier pathname check. Each helper
+// is handed a path whose ANCESTOR is a symlink escaping the root and does NO
+// lexical pre-check of its own here — the os.Root the operation runs through is
+// what refuses the escape (issue #430), so a program under test that swaps an
+// ancestor for a link after the caller's check cannot redirect the I/O. An
+// in-root ancestor link is still followed, and a leaf link is still refused.
+func TestConfinedIO_EnforcedAtTheOperation(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink creation is not reliably available on Windows CI")
+	}
+	t.Parallel()
+	root := t.TempDir()
+	outside := t.TempDir()
+	if err := os.WriteFile(filepath.Join(outside, "secret.txt"), []byte("top-secret"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	// The program under test plants `escape -> <outside>` inside the root.
+	if err := os.Symlink(outside, filepath.Join(root, "escape")); err != nil {
+		t.Fatal(err)
+	}
+
+	esc := filepath.Join(root, "escape", "secret.txt")
+	if data, err := ReadFileNoFollow(root, esc); err == nil {
+		t.Errorf("ReadFileNoFollow read %q through an escaping ancestor; want refusal", data)
+	}
+	if _, err := StatNoFollow(root, esc); err == nil {
+		t.Error("StatNoFollow reported metadata through an escaping ancestor; want refusal")
+	}
+	if err := WriteConfinedFile(root, filepath.Join(root, "escape", "planted.txt"), []byte("pwned")); err == nil {
+		t.Error("WriteConfinedFile wrote through an escaping ancestor; want refusal")
+	}
+	if _, err := os.Lstat(filepath.Join(outside, "planted.txt")); err == nil {
+		t.Error("a file was created in the host directory through the escaping ancestor")
+	}
+
+	// An in-root ancestor link is ordinary and must keep resolving.
+	if err := os.Mkdir(filepath.Join(root, "real"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "real", "f.txt"), []byte("ok"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("real", filepath.Join(root, "alias")); err != nil {
+		t.Fatal(err)
+	}
+	if data, err := ReadFileNoFollow(root, filepath.Join(root, "alias", "f.txt")); err != nil || string(data) != "ok" {
+		t.Errorf("read through an in-root ancestor link = %q, %v; want %q", data, err, "ok")
+	}
+
+	// A symlink AT the leaf is still refused even when it stays inside the root:
+	// a link the program planted where an output was expected is never read
+	// through (issue #16), independent of where it points.
+	if err := os.Symlink(filepath.Join(root, "real", "f.txt"), filepath.Join(root, "leaf")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ReadFileNoFollow(root, filepath.Join(root, "leaf")); err == nil {
+		t.Error("ReadFileNoFollow followed an in-root leaf symlink; the leaf must be refused")
+	}
+}
+
 // TestReadFileNoFollow verifies a leaf symlink pointing outside the root is
 // refused (issue #16): the untrusted program under test could plant such a link
 // at an assertion/snapshot read target to disclose an arbitrary host file. A
@@ -253,7 +314,7 @@ func TestReadFileNoFollow(t *testing.T) {
 	if err := os.WriteFile(regular, []byte("in-root"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if got, err := ReadFileNoFollow(regular); err != nil || string(got) != "in-root" {
+	if got, err := ReadFileNoFollow(root, regular); err != nil || string(got) != "in-root" {
 		t.Fatalf("ReadFileNoFollow(regular) = %q, %v; want %q, nil", got, err, "in-root")
 	}
 
@@ -266,7 +327,7 @@ func TestReadFileNoFollow(t *testing.T) {
 	if err := os.Symlink(secret, link); err != nil {
 		t.Fatal(err)
 	}
-	got, err := ReadFileNoFollow(link)
+	got, err := ReadFileNoFollow(root, link)
 	if err == nil {
 		t.Fatalf("ReadFileNoFollow followed the symlink and read %q; want error", got)
 	}
@@ -290,7 +351,8 @@ func TestReadFileNoFollow_RefusesANamedPipe(t *testing.T) {
 		t.Skip("mkfifo not available")
 	}
 	t.Parallel()
-	pipe := filepath.Join(t.TempDir(), "pipe")
+	root := t.TempDir()
+	pipe := filepath.Join(root, "pipe")
 	if out, err := exec.CommandContext(t.Context(), bin, pipe).CombinedOutput(); err != nil {
 		t.Skipf("mkfifo: %v (%s)", err, out)
 	}
@@ -301,7 +363,7 @@ func TestReadFileNoFollow_RefusesANamedPipe(t *testing.T) {
 	}
 	done := make(chan result, 1)
 	go func() {
-		data, err := ReadFileNoFollow(pipe)
+		data, err := ReadFileNoFollow(root, pipe)
 		done <- result{data, err}
 	}()
 	select {
@@ -317,11 +379,11 @@ func TestReadFileNoFollow_RefusesANamedPipe(t *testing.T) {
 	}
 }
 
-// TestWriteFileNoFollow verifies a leaf symlink at the write target is refused
-// (so a redirect/snapshot write cannot clobber a host file through a link the
-// program under test planted), while a fresh write and an overwrite of a plain
-// regular file both succeed.
-func TestWriteFileNoFollow(t *testing.T) {
+// TestWriteConfinedFile_NoFollow verifies a leaf symlink at the write target is
+// refused (so a redirect/snapshot write cannot clobber a host file through a link
+// the program under test planted), while a fresh write and an overwrite of a
+// plain regular file both succeed.
+func TestWriteConfinedFile_NoFollow(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("symlink creation is not reliably available on Windows CI")
 	}
@@ -329,10 +391,10 @@ func TestWriteFileNoFollow(t *testing.T) {
 	root := t.TempDir()
 
 	fresh := filepath.Join(root, "out.txt")
-	if err := WriteFileNoFollow(fresh, []byte("v1"), 0o600); err != nil {
+	if err := WriteConfinedFile(root, fresh, []byte("v1")); err != nil {
 		t.Fatalf("fresh write: %v", err)
 	}
-	if err := WriteFileNoFollow(fresh, []byte("v2"), 0o600); err != nil {
+	if err := WriteConfinedFile(root, fresh, []byte("v2")); err != nil {
 		t.Fatalf("overwrite of regular file: %v", err)
 	}
 	if got, err := os.ReadFile(fresh); err != nil || string(got) != "v2" {
@@ -348,16 +410,16 @@ func TestWriteFileNoFollow(t *testing.T) {
 	if err := os.Symlink(victim, link); err != nil {
 		t.Fatal(err)
 	}
-	if err := WriteFileNoFollow(link, []byte("pwned"), 0o600); err == nil {
-		t.Fatal("WriteFileNoFollow wrote through the symlink; want error")
+	if err := WriteConfinedFile(root, link, []byte("pwned")); err == nil {
+		t.Fatal("WriteConfinedFile wrote through the symlink; want error")
 	}
 	if got, _ := os.ReadFile(victim); string(got) != "original" {
 		t.Errorf("host file was modified through the symlink: %q", got)
 	}
 }
 
-// TestWriteFileNoFollow_ConcurrentIdenticalContent is the regression for #250:
-// several parallel scenarios that share one golden file call WriteFileNoFollow
+// TestWriteConfinedFile_ConcurrentIdenticalContent is the regression for #250:
+// several parallel scenarios that share one golden file call the confined write
 // on the same path with byte-identical content (e.g. matrix rows producing the
 // same output under --update-snapshots). The old non-atomic
 // Lstat→Remove→OpenFile(O_EXCL) sequence raced — one goroutine's Remove hit the
@@ -365,7 +427,7 @@ func TestWriteFileNoFollow(t *testing.T) {
 // another had just created — so an update failed nondeterministically even
 // though every writer produced the same bytes. An atomic write must let every
 // concurrent identical write succeed and leave the expected content behind.
-func TestWriteFileNoFollow_ConcurrentIdenticalContent(t *testing.T) {
+func TestWriteConfinedFile_ConcurrentIdenticalContent(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	dest := filepath.Join(root, "shared.golden")
@@ -378,7 +440,7 @@ func TestWriteFileNoFollow_ConcurrentIdenticalContent(t *testing.T) {
 	for i := range writers {
 		wg.Go(func() {
 			<-start // release all goroutines at once to maximize contention
-			errs[i] = WriteFileNoFollow(dest, content, 0o600)
+			errs[i] = WriteConfinedFile(root, dest, content)
 		})
 	}
 	close(start)
@@ -534,10 +596,10 @@ func TestWriteConfinedFile(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	dest := filepath.Join(root, "golden", "out.snap")
-	if err := WriteConfinedFile(dest, []byte("v1")); err != nil {
+	if err := WriteConfinedFile(root, dest, []byte("v1")); err != nil {
 		t.Fatalf("first write: %v", err)
 	}
-	if err := WriteConfinedFile(dest, []byte("v2")); err != nil {
+	if err := WriteConfinedFile(root, dest, []byte("v2")); err != nil {
 		t.Fatalf("overwrite: %v", err)
 	}
 	got, err := os.ReadFile(dest)

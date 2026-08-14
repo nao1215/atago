@@ -34,7 +34,7 @@ func checkFile(f *spec.FileAssert, env Env) (out *CheckResult) {
 		}
 	}()
 	read := func(label, p string) ([]byte, *CheckResult) {
-		data, cr := readFile(label, p)
+		data, cr := readFile(label, env.Workdir, p)
 		if cr == nil {
 			fileData = data
 		}
@@ -47,7 +47,7 @@ func checkFile(f *spec.FileAssert, env Env) (out *CheckResult) {
 	// first because a wrong size explains a content mismatch better than the
 	// other way round, and when nothing else is set they are the whole assertion.
 	if f.HasSize() {
-		if cr := checkFileSize(f, path); !cr.OK || !f.HasContentMatcher() {
+		if cr := checkFileSize(f, env.Workdir, path); !cr.OK || !f.HasContentMatcher() {
 			return cr
 		}
 	}
@@ -197,7 +197,7 @@ func checkFile(f *spec.FileAssert, env Env) (out *CheckResult) {
 		}
 		// The comparison file is read plainly (not via read): the failure artifact
 		// is the file under test, and the other file is carried as ArtifactExpected.
-		other, cr := readFile(*f.EqualsFile, otherPath)
+		other, cr := readFile(*f.EqualsFile, env.Workdir, otherPath)
 		if cr != nil {
 			return cr
 		}
@@ -225,7 +225,7 @@ func checkFile(f *spec.FileAssert, env Env) (out *CheckResult) {
 	case f.Snapshot != "":
 		// Read plainly so fileData stays nil: checkSnapshot shapes its own
 		// (normalized) artifact, and the deferred hook must not overwrite it.
-		data, cr := readFile(f.Path, path)
+		data, cr := readFile(f.Path, env.Workdir, path)
 		if cr != nil {
 			return cr
 		}
@@ -236,11 +236,13 @@ func checkFile(f *spec.FileAssert, env Env) (out *CheckResult) {
 	}
 }
 
-func readFile(label, path string) ([]byte, *CheckResult) {
+func readFile(label, root, path string) ([]byte, *CheckResult) {
 	// The program under test may have planted a symlink at the assertion target
 	// pointing outside the workdir; reading through it would disclose an arbitrary
-	// host file into the report/artifacts, so refuse to follow it (issue #16).
-	data, err := security.ReadFileNoFollow(path)
+	// host file into the report/artifacts, so refuse to follow it (issue #16), and
+	// bind the read to the workdir so an ancestor swapped for a link cannot
+	// redirect it either (issue #430).
+	data, err := security.ReadFileNoFollow(root, path)
 	if err != nil {
 		return nil, &CheckResult{
 			Desc:     fmt.Sprintf("assert file %q", label),

@@ -219,13 +219,13 @@ func TestCompareAndUpdate(t *testing.T) {
 	path := filepath.Join(dir, "snapshots", "out.txt")
 
 	// Missing snapshot.
-	ok, _, _, err := Compare(path, []byte("hello\n"), Options{})
+	ok, _, _, err := Compare(dir, path, []byte("hello\n"), Options{})
 	if ok || !errors.Is(err, ErrMissing) {
 		t.Fatalf("Compare(missing) = ok %v err %v, want ErrMissing", ok, err)
 	}
 
 	// Update writes the normalized content and creates parent dirs.
-	if err := Update(path, []byte("\x1b[1mhello\x1b[0m\n"), Options{}); err != nil {
+	if err := Update(dir, path, []byte("\x1b[1mhello\x1b[0m\n"), Options{}); err != nil {
 		t.Fatalf("Update() error = %v", err)
 	}
 	stored, _ := os.ReadFile(path)
@@ -234,13 +234,13 @@ func TestCompareAndUpdate(t *testing.T) {
 	}
 
 	// Compare now matches (actual gets normalized too).
-	ok, _, _, err = Compare(path, []byte("\x1b[31mhello\x1b[0m\n"), Options{})
+	ok, _, _, err = Compare(dir, path, []byte("\x1b[31mhello\x1b[0m\n"), Options{})
 	if err != nil || !ok {
 		t.Fatalf("Compare(match) = ok %v err %v, want ok", ok, err)
 	}
 
 	// A real difference fails.
-	ok, exp, act, err := Compare(path, []byte("goodbye\n"), Options{})
+	ok, exp, act, err := Compare(dir, path, []byte("goodbye\n"), Options{})
 	if err != nil || ok {
 		t.Fatalf("Compare(diff) = ok %v err %v, want not ok", ok, err)
 	}
@@ -269,7 +269,7 @@ func TestCompare_CRLFGolden(t *testing.T) {
 	if err := os.WriteFile(path, []byte("hello\r\nworld\r\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	ok, _, _, err := Compare(path, []byte("hello\nworld\n"), Options{})
+	ok, _, _, err := Compare(dir, path, []byte("hello\nworld\n"), Options{})
 	if err != nil {
 		t.Fatalf("Compare error = %v", err)
 	}
