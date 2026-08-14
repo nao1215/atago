@@ -2,10 +2,14 @@ package ptyrun
 
 import (
 	"bytes"
+	"image/color"
+	"io"
 	"strings"
 	"unicode/utf8"
 
-	"github.com/hinshun/vt10x"
+	uv "github.com/charmbracelet/ultraviolet"
+	"github.com/charmbracelet/x/ansi"
+	"github.com/charmbracelet/x/vt"
 
 	"github.com/nao1215/atago/internal/runner"
 	"github.com/nao1215/atago/internal/spec"
@@ -18,12 +22,21 @@ type screenResize struct {
 	rows, cols int
 }
 
-// RenderScreen replays a pty transcript through a vt10x terminal emulator and
-// returns the final rendered screen as plain text (#27): what the user
-// actually SEES after every cursor move, overwrite, and erase — the signal a
-// raw transcript scatters across redraws. Trailing whitespace is stripped per
-// line and trailing blank lines are dropped; colors and attributes are out of
-// scope in v1.
+// RenderScreen replays a pty transcript through a terminal emulator and returns
+// the final rendered screen as plain text (#27): what the user actually SEES
+// after every cursor move, overwrite, and erase — the signal a raw transcript
+// scatters across redraws. Trailing whitespace is stripped per line and trailing
+// blank lines are dropped.
+//
+// A wide character (CJK, emoji) occupies two terminal columns, so cursor
+// addressing after it depends on the emulator modeling that width. The x/vt
+// emulator does; a program that positions a label just past a Japanese string
+// with `\x1b[row;colH` lands it where the terminal put it, not two columns early,
+// and overwriting one half of a wide cell blanks it the way a terminal does
+// (#432). One edge remains upstream: a wide character that must AUTOWRAP at the
+// right margin (no explicit newline, the char straddling the last column) is
+// dropped rather than carried to the next line. TUIs position with cursor
+// addressing and explicit newlines, which render correctly.
 func RenderScreen(transcript []byte, p *spec.PTY) string {
 	return renderScreenResized(transcript, p, nil)
 }
@@ -59,7 +72,36 @@ func renderScreenCells(transcript []byte, p *spec.PTY, resizes []screenResize) (
 	if p.Cols > 0 {
 		cols = p.Cols
 	}
-	term := vt10x.New(vt10x.WithSize(cols, rows))
+	term := vt.NewEmulator(cols, rows)
+
+	// The emulator answers a device query in the transcript (a program's `\x1b[6n`
+	// cursor-position report, DA1) and even a resize by writing the reply to an
+	// internal pipe meant for the child's stdin. This render has no child, so
+	// nothing would drain that pipe and the very next Write or Resize would block
+	// forever. A goroutine drains and discards the replies for the emulator's
+	// lifetime.
+	//
+	// It is closed by shutting the pipe's WRITE end directly (InputPipe returns it)
+	// rather than by Emulator.Close: Close also flips an unsynchronized `closed`
+	// flag that Read reads, which the race detector flags. Closing the pipe writer
+	// EOFs the blocked Read through io.Pipe's own synchronization and leaves that
+	// flag untouched.
+	drainDone := make(chan struct{})
+	go func() {
+		defer close(drainDone)
+		buf := make([]byte, 4096)
+		for {
+			if _, err := term.Read(buf); err != nil {
+				return
+			}
+		}
+	}()
+	defer func() {
+		if pw, ok := term.InputPipe().(*io.PipeWriter); ok {
+			_ = pw.Close()
+		}
+		<-drainDone
+	}()
 
 	// Offsets must be ascending and inside the transcript for the translation
 	// to mean anything; a recorded offset can be neither when the screen is
@@ -77,28 +119,35 @@ func renderScreenCells(transcript []byte, p *spec.PTY, resizes []screenResize) (
 	for i, r := range resizes {
 		cut := min(max(cuts[i], at), len(sanitized))
 		writeTranscript(term, sanitized[at:cut])
-		// vt10x takes cols first; getting that backwards silently transposes
-		// every frame after a resize.
+		// Resize takes width (cols) first; getting that backwards silently
+		// transposes every frame after a resize.
 		term.Resize(r.cols, r.rows)
 		at = cut
 	}
 	writeTranscript(term, sanitized[at:])
 
-	// Read the grid out of the emulator once, under its own lock, and build both
-	// views from it. term.String() is not consulted at all: two independent reads
-	// of the same state could disagree about a cell, and the whole value of the
-	// attribute matchers is that a row number means the same thing in both.
-	curCols, curRows := term.Size()
+	// Read the grid out of the emulator once and build both views from it. The
+	// emulator's own String() is not consulted: two independent reads of the same
+	// state could disagree about a cell, and the whole value of the attribute
+	// matchers is that a row number means the same thing in both.
+	//
+	// A wide character occupies two columns: the first holds the grapheme, the
+	// second is a continuation cell (Width 0). The continuation is dropped so one
+	// logical cell holds one grapheme — the text row reads "日本語", not "日 本 語",
+	// and the attrs matcher keeps matching one cell per rune of its query text.
+	curCols, curRows := term.Width(), term.Height()
 	grid := make([][]runner.ScreenCell, 0, curRows)
-	term.Lock()
 	for y := 0; y < curRows; y++ {
 		row := make([]runner.ScreenCell, 0, curCols)
 		for x := 0; x < curCols; x++ {
-			row = append(row, glyphCell(term.Cell(x, y)))
+			c := term.CellAt(x, y)
+			if c == nil || c.Width == 0 {
+				continue
+			}
+			row = append(row, glyphCell(c))
 		}
 		grid = append(grid, row)
 	}
-	term.Unlock()
 
 	lines := make([]string, len(grid))
 	for i, row := range grid {
@@ -118,49 +167,58 @@ func renderScreenCells(transcript []byte, p *spec.PTY, resizes []screenResize) (
 	return strings.Join(lines[:end], "\n"), grid[:end]
 }
 
-// vt10x attribute bits, mirrored here because the package does not export them.
-// The set is what its parser actually tracks; anything outside it (dim,
-// strikethrough) is absent from ScreenCell rather than reported as false.
-const (
-	vtAttrReverse   = 1 << 0
-	vtAttrUnderline = 1 << 1
-	vtAttrBold      = 1 << 2
-	vtAttrItalic    = 1 << 4
-	vtAttrBlink     = 1 << 5
-)
-
-// glyphCell converts one emulator glyph into the cell the assertion layer reads.
-// A cell the program never wrote carries NUL, which is not a character anyone
-// asserts on — it renders as a space, matching what the screen shows.
-func glyphCell(g vt10x.Glyph) runner.ScreenCell {
-	r := g.Char
-	if r == 0 {
-		r = ' '
+// glyphCell converts one emulator cell into the cell the assertion layer reads.
+// A cell the program never wrote carries empty content, which renders as a space
+// — matching what the screen shows — and is not a character anyone asserts on.
+// Only the first rune of the grapheme cluster is kept in Rune, so the attrs
+// matcher matches one cell per rune of its query text; the plain-text screen is
+// built from the same runes.
+func glyphCell(c *uv.Cell) runner.ScreenCell {
+	r := ' '
+	if c.Content != "" {
+		r, _ = utf8.DecodeRuneInString(c.Content)
 	}
+	attrs := c.Style.Attrs
 	return runner.ScreenCell{
 		Rune:      r,
-		FG:        uint32(g.FG),
-		BG:        uint32(g.BG),
-		Bold:      g.Mode&vtAttrBold != 0,
-		Italic:    g.Mode&vtAttrItalic != 0,
-		Underline: g.Mode&vtAttrUnderline != 0,
-		Reverse:   g.Mode&vtAttrReverse != 0,
-		Blink:     g.Mode&vtAttrBlink != 0,
+		FG:        colorToIndex(c.Style.Fg),
+		BG:        colorToIndex(c.Style.Bg),
+		Bold:      attrs&uv.AttrBold != 0,
+		Italic:    attrs&uv.AttrItalic != 0,
+		Underline: c.Style.Underline != uv.UnderlineNone,
+		Reverse:   attrs&uv.AttrReverse != 0,
+		Blink:     attrs&(uv.AttrBlink|uv.AttrRapidBlink) != 0,
 	}
 }
 
-// writeTranscript feeds the transcript to the emulator, containing panics
-// from vt10x's escape parser. The transcript is arbitrary bytes chosen by the
-// program under test, and unmaintained vt10x runs strconv.Atoi over CSI
-// parameters and feeds the result straight into slice arithmetic — a crash
-// there must not take down the whole atago process mid-suite. The known-bad
-// shapes are defused up front by sanitizeTranscript, which preserves the rest
-// of the frame; this recover is the backstop for whatever shape the fuzzer has
-// not met yet. On panic the screen state built so far still renders — vt10x
-// mutates cells as it parses and releases its lock via defer during unwind —
+// colorToIndex maps an emulator color to atago's palette-index model (#382): a
+// cell with no color set reads as DefaultColor, an ANSI (0..15) or xterm-256
+// (0..255) color keeps its index, and a 24-bit color is quantized to the nearest
+// xterm-256 index — atago's screen model has no truecolor slot, and quantizing
+// keeps a truecolor cell assertable rather than dropping its color entirely.
+func colorToIndex(c color.Color) uint32 {
+	switch v := c.(type) {
+	case nil:
+		return runner.DefaultColor
+	case ansi.BasicColor:
+		return uint32(v)
+	case ansi.IndexedColor:
+		return uint32(v)
+	default:
+		return uint32(ansi.Convert256(c))
+	}
+}
+
+// writeTranscript feeds the transcript to the emulator, containing any panic
+// from its escape parser. The transcript is arbitrary bytes chosen by the
+// program under test, and a crash there must not take down the whole atago
+// process mid-suite. The shapes that make an emulator loop for minutes on an
+// enormous CSI count are defused up front by sanitizeTranscript, which preserves
+// the rest of the frame; this recover is the backstop for whatever shape the
+// fuzzer has not met yet. On panic the screen state built so far still renders,
 // so the assertion compares against everything drawn before the malformed
 // sequence.
-func writeTranscript(term vt10x.Terminal, transcript []byte) {
+func writeTranscript(term *vt.Emulator, transcript []byte) {
 	defer func() { _ = recover() }()
 	_, _ = term.Write(transcript)
 }
@@ -274,7 +332,7 @@ scan:
 		// tracking exactly the parameter bytes vt10x will accumulate.
 		body := make([]byte, 0, 16)
 		var controls []byte // side-effect control codes seen inside the sequence
-		hasMinus, hasWideRune := false, false
+		hasMinus, hasWideRune, hasMidMarker := false, false, false
 		finalByte := byte(0)
 		k := j + 1
 		for k < len(b) {
@@ -298,7 +356,7 @@ scan:
 			if r == 0x18 || r == 0x1a {
 				// CAN/SUB reset the parameter buffer but STAY in CSI state.
 				body = body[:0]
-				hasMinus, hasWideRune = false, false
+				hasMinus, hasWideRune, hasMidMarker = false, false, false
 				k += sz
 				continue
 			}
@@ -331,6 +389,15 @@ scan:
 			if c == '-' {
 				hasMinus = true
 			}
+			// A private-marker byte (< = > ?) is well-formed only as the FIRST
+			// parameter byte (CSI ? 25 h, CSI < 0 ; 0 M). One that appears after a
+			// parameter has begun makes the sequence malformed — a conformant
+			// terminal ignores it — and x/vt's parser handles the malformed shape
+			// (CSI 999 ? 999 ? 999 X) in time quadratic in the parameters, seconds
+			// for a few thousand. Drop it like a negative parameter.
+			if c >= '<' && c <= '?' && len(body) > 0 {
+				hasMidMarker = true
+			}
 			body = append(body, c)
 			k += sz
 		}
@@ -338,7 +405,7 @@ scan:
 		case finalByte == 0:
 			// Truncated trailing CSI: it can never dispatch, copy verbatim.
 			out = append(out, b[i:k]...)
-		case hasMinus || hasWideRune:
+		case hasMinus || hasWideRune || hasMidMarker:
 			// Malformed parameters: a conformant terminal ignores the whole
 			// sequence, so drop it — replaying only the control codes it
 			// carried — and keep the surrounding frame intact.
@@ -364,9 +431,14 @@ scan:
 	return out, translated
 }
 
-// clampDigitRuns rewrites every digit run longer than maxCSIParamDigits to
-// all-nines of that width, bounding the work a loop-per-count CSI handler can
-// be asked to do while leaving every legitimate parameter untouched.
+// clampDigitRuns truncates every digit run longer than maxCSIParamDigits to its
+// first maxCSIParamDigits digits, bounding the value a loop-per-count CSI handler
+// can be asked to iterate while leaving every legitimate parameter untouched.
+//
+// Truncating rather than replacing with all-nines matters: a zero-padded run
+// ("00000") is the harmless value 0, and rewriting it to 9999 would MANUFACTURE
+// an expensive count out of nothing — which is exactly how a fuzzer turned
+// "\x1b[00000?...X" into a multi-second render.
 func clampDigitRuns(body []byte) []byte {
 	out := make([]byte, 0, len(body))
 	for i := 0; i < len(body); {
@@ -381,7 +453,7 @@ func clampDigitRuns(body []byte) []byte {
 			j++
 		}
 		if j-i > maxCSIParamDigits {
-			out = append(out, bytes.Repeat([]byte{'9'}, maxCSIParamDigits)...)
+			out = append(out, body[i:i+maxCSIParamDigits]...)
 		} else {
 			out = append(out, body[i:j]...)
 		}

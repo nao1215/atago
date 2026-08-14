@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-80 suites · 521 scenarios
+80 suites · 522 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -578,11 +578,12 @@
   - [a session outlived by its program says so instead of blaming the clock](#scenario-a-session-outlived-by-its-program-says-so-instead-of-blaming-the-clock)
   - [an expect that never matches still reports the pattern, not the quit advice](#scenario-an-expect-that-never-matches-still-reports-the-pattern-not-the-quit-advice)
   - [a timeout that expires before the process starts is still a timeout](#scenario-a-timeout-that-expires-before-the-process-starts-is-still-a-timeout)
-- [atago self-hosting / tui](#atago-self-hosting--tui) — 5 scenarios
+- [atago self-hosting / tui](#atago-self-hosting--tui) — 6 scenarios
   - [a pty step exports a usable TERM by default](#scenario-a-pty-step-exports-a-usable-term-by-default)
   - [an explicit TERM overrides the default](#scenario-an-explicit-term-overrides-the-default)
   - [an expect does not re-match a consumed pattern](#scenario-an-expect-does-not-re-match-a-consumed-pattern)
   - [a failing screen assert frames a CJK screen squarely](#scenario-a-failing-screen-assert-frames-a-cjk-screen-squarely)
+  - [a screen assert sees wide characters at their true width](#scenario-a-screen-assert-sees-wide-characters-at-their-true-width)
   - [less -X renders a real pager onto the screen](#scenario-less--x-renders-a-real-pager-onto-the-screen)
 - [atago self-hosting / variable resolution semantics](#atago-self-hosting--variable-resolution-semantics) — 7 scenarios
   - [a doubled dollar keeps the braces literal](#scenario-a-doubled-dollar-keeps-the-braces-literal)
@@ -11263,6 +11264,14 @@ ${atago} run inner.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `| abcdefgh       |`, `| 日本語メニュー |`
+### Scenario: a screen assert sees wide characters at their true width
+_skipped on Windows_
+#### When
+```shell
+# interactive (pty): printf "\033[2J\033[1;1H日本語\033[1;7H[OK]"
+```
+#### Then
+- rendered screen contains `日本語[OK]`, does not contain `日本語 [OK]`
 ### Scenario: less -X renders a real pager onto the screen
 _only when `command -v less` succeeds · skipped on Windows_
 #### Given

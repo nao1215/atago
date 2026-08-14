@@ -56,6 +56,21 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- A `screen:` assertion now renders wide characters (CJK, emoji) at their true
+  two-column width. The screen emulator stored one column per rune, so a label a
+  program positioned with cursor addressing after a Japanese string landed two
+  columns early — `screen: contains: "日本語[OK]"` failed against a program drawing
+  exactly that — and overwriting one half of a wide cell replaced the wrong
+  character. atago now renders through the maintained `charmbracelet/x/vt`
+  emulator, which models cell width, so cursor addressing after wide text and
+  overwriting a wide cell both match the terminal. ASCII and box-drawing render
+  as before. One edge remains upstream: a wide character that must AUTOWRAP at the
+  right margin (no explicit newline) is dropped rather than carried to the next
+  line; TUIs position with cursor addressing and explicit newlines, which are
+  correct. The colors a cell carries are now the exact SGR codes the program
+  emitted — a bold red cell reads as red with the bold attribute, not a
+  pre-brightened index — and the `attrs:` matcher already accounts for bold
+  brightening, so `fg: red` next to `bold: true` still matches.
 - Every confined read, write, and stat is now bound to an `os.Root` at its
   containment root, so containment holds at the moment of the operation instead
   of relying on the pathname check that ran before it. The lexical checks (and

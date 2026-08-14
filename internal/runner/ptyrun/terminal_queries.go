@@ -13,6 +13,16 @@ type writerFunc func([]byte) (int, error)
 
 func (f writerFunc) Write(p []byte) (int, error) { return f(p) }
 
+// writeQueryTerminal feeds a chunk to the query emulator, containing any panic
+// from its escape parser so a malformed sequence during a live session cannot
+// take down the run. This emulator only tracks state to answer device-attribute
+// and cursor-position probes; the screen a `screen:` assertion reads is rendered
+// separately by renderScreenCells.
+func writeQueryTerminal(term vt10x.Terminal, chunk []byte) {
+	defer func() { _ = recover() }()
+	_, _ = term.Write(chunk)
+}
+
 // vt102DA1 is a conservative primary device-attributes reply. atago's screen
 // emulator is xterm-ish enough for ordinary TUIs, but it does not implement a
 // modern terminal's full feature matrix; replying as a plain VT102-class device
@@ -63,7 +73,7 @@ func (t *terminalQueries) resize(rows, cols int) {
 
 func (t *terminalQueries) consume(chunk []byte) {
 	t.mu.Lock()
-	writeTranscript(t.term, chunk)
+	writeQueryTerminal(t.term, chunk)
 	t.mu.Unlock()
 	for range t.da1.consume(chunk) {
 		_, _ = t.w.Write([]byte(vt102DA1))
