@@ -129,7 +129,7 @@ func CapturePTY(command string, shell bool, in, out *os.File, timeout time.Durat
 		for {
 			n, rerr := in.Read(buf)
 			if n > 0 {
-				echoOff := echoDisabled(master)
+				echoOff := secretPromptActive(master)
 				mu.Lock()
 				rec.AppendInput(buf[:n], echoOff)
 				mu.Unlock()
@@ -183,25 +183,30 @@ func CapturePTY(command string, shell bool, in, out *os.File, timeout time.Durat
 	return rec, nil
 }
 
-// echoDisabled reports whether the pty's terminal echo is currently off — the
-// signal of a password prompt, whose typed bytes must not be recorded (#69).
-// Asking through ControlFD rather than master.Fd() is what keeps this poll
-// harmless: Fd() would take the master out of the runtime poller and leave its
-// reads blocking in read(2), where closing the terminal can no longer interrupt
-// them — and this runs on every prompt.
-func echoDisabled(master *os.File) bool {
-	off := false
+// secretPromptActive reports whether the pty is in the termios state of a
+// password prompt — echo off while canonical (line) input stays on, the state
+// read -s, sudo, and ssh put a terminal in — whose typed bytes must not be
+// recorded (#69). ECHO alone is not the signal: a full-screen TUI's raw mode
+// (fzf, vim, htop) clears ECHO and ICANON together, and treating that as
+// secret turned every keystroke of a recorded TUI session into an
+// ${env:ATAGO_SECRET_n} placeholder — a spec that replays nothing. Asking
+// through ControlFD rather than master.Fd() is what keeps this poll harmless:
+// Fd() would take the master out of the runtime poller and leave its reads
+// blocking in read(2), where closing the terminal can no longer interrupt
+// them — and this runs on every keystroke burst.
+func secretPromptActive(master *os.File) bool {
+	secret := false
 	if err := ptyrun.ControlFD(master, func(fd int) error {
 		t, terr := unix.IoctlGetTermios(fd, ioctlGetTermios)
 		if terr != nil {
 			return terr
 		}
-		off = t.Lflag&unix.ECHO == 0
+		secret = t.Lflag&unix.ECHO == 0 && t.Lflag&unix.ICANON != 0
 		return nil
 	}); err != nil {
 		return false
 	}
-	return off
+	return secret
 }
 
 // exitCode extracts a process exit code from cmd.Wait's error (0 on success,
