@@ -39,6 +39,18 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- A `dir:` assertion whose `path:` is a symlink to a directory now reads the
+  same tree in every mode. `filepath.WalkDir` lstats its root, so the recursive
+  and snapshot modes walked the link itself and saw an empty tree, while the
+  non-recursive matchers followed it and read the real contents — one assertion
+  giving two answers. The snapshot case was the worst of it: `--update-snapshots`
+  wrote an empty golden, and an empty golden matches an empty walk forever, so
+  the assertion stayed green whatever the directory later held. The same
+  resolution closes the confinement hole underneath: the path check is lexical
+  and could not see through a link the program under test planted, so a `path:`
+  naming a link out of the workdir passed it and the directory outside was
+  listed. The resolved path now faces the same containment test, and a link that
+  escapes the workdir is refused.
 - `record --pty` no longer masks every keystroke of a full-screen TUI session
   (fzf, vim, htop) as an `${env:ATAGO_SECRET_n}` placeholder. A TUI's raw mode
   clears ECHO and ICANON together, and the recorder treated ECHO alone as a

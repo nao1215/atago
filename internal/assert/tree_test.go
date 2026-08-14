@@ -310,6 +310,90 @@ func TestCheckDir_SnapshotNewlineNameNoFalseMatch(t *testing.T) {
 	}
 }
 
+// TestCheckDir_SymlinkedRootAgreesAcrossModes is a regression for a dir assert
+// that disagreed with itself. filepath.WalkDir Lstats its root, so a `path:`
+// that is itself a symlink to a directory walked as one non-directory entry and
+// produced an EMPTY tree: `recursive:` reported "(no paths)" for a populated
+// directory while the non-recursive matchers (os.ReadDir follows the link) saw
+// the real contents. A program that publishes a `latest -> releases/v2` link is
+// the ordinary case, and every mode has to read the same tree.
+func TestCheckDir_SymlinkedRootAgreesAcrossModes(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("creating a directory symlink needs elevation on Windows")
+	}
+	t.Parallel()
+	wd := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(wd, "releases", "v2", "assets"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(wd, "releases", "v2", "app.bin"), []byte("bin"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(wd, "releases", "v2", "assets", "app.css"), []byte("css"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join("releases", "v2"), filepath.Join(wd, "latest")); err != nil {
+		t.Fatal(err)
+	}
+
+	// The non-recursive matchers already read through the link; recursive must
+	// reach the same conclusion, nested path included.
+	if cr := checkDirOK(t, wd, &spec.DirAssert{Path: "latest", Contains: []string{"app.bin"}}); !cr.OK {
+		t.Fatalf("non-recursive contains through a symlinked root failed: %+v", cr)
+	}
+	if cr := checkDirOK(t, wd, &spec.DirAssert{Path: "latest", Recursive: true, Contains: []string{"assets/app.css"}}); !cr.OK {
+		t.Errorf("recursive contains through a symlinked root failed: %+v", cr)
+	}
+	if cr := checkDirOK(t, wd, &spec.DirAssert{Path: "latest", Recursive: true, Count: ptrInt(2)}); !cr.OK {
+		t.Errorf("recursive count through a symlinked root failed: %+v", cr)
+	}
+}
+
+// TestCheckDir_SymlinkedRootSnapshotIsNotEmpty pins the worst symptom of the
+// same defect: --update-snapshots through a symlinked root wrote an EMPTY
+// golden, and an empty golden matches an empty walk forever — so the assertion
+// stayed green no matter what the directory later held. A golden has to describe
+// the tree, and a change to that tree has to break it.
+func TestCheckDir_SymlinkedRootSnapshotIsNotEmpty(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("creating a directory symlink needs elevation on Windows")
+	}
+	t.Parallel()
+	wd := t.TempDir()
+	specDir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(wd, "real"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(wd, "real", "inside.txt"), []byte("data"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("real", filepath.Join(wd, "link")); err != nil {
+		t.Fatal(err)
+	}
+	d := &spec.DirAssert{Path: "link", Snapshot: "link_tree"}
+
+	if cr := checkDir(d, Env{Workdir: wd, SpecDir: specDir, UpdateSnapshots: true}); !cr.OK {
+		t.Fatalf("update through a symlinked root failed: %+v", cr)
+	}
+	golden, err := os.ReadFile(filepath.Join(specDir, "link_tree"))
+	if err != nil {
+		t.Fatalf("read golden: %v", err)
+	}
+	if !strings.Contains(string(golden), "inside.txt") {
+		t.Fatalf("golden does not describe the tree behind the link:\n%q", golden)
+	}
+	if cr := checkDir(d, Env{Workdir: wd, SpecDir: specDir}); !cr.OK {
+		t.Fatalf("compare after update failed: %+v", cr)
+	}
+	// The golden must react to the tree it describes.
+	if err := os.WriteFile(filepath.Join(wd, "real", "added.txt"), []byte("more"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if cr := checkDir(d, Env{Workdir: wd, SpecDir: specDir}); cr.OK {
+		t.Error("a file added behind the symlinked root did not break the snapshot")
+	}
+}
+
 // TestCheckDir_SnapshotRoundTrip proves record → green compare → mutation
 // diff naming exactly the changed path (#25).
 func TestCheckDir_SnapshotRoundTrip(t *testing.T) {

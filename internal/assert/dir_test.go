@@ -100,6 +100,32 @@ func TestCheckDir_PathConfinement(t *testing.T) {
 	}
 }
 
+// TestCheckDir_SymlinkedRootMayNotEscapeTheWorkdir pins the confinement this
+// assertion documents. The path check is lexical, so it cannot see through a
+// symlink the program under test planted: `path:` pointing at a link out of the
+// workdir passed the check, and os.ReadDir then followed it and listed a
+// directory the spec has no business reading. Resolving the link before the
+// containment test closes that, and an in-workdir link stays allowed.
+func TestCheckDir_SymlinkedRootMayNotEscapeTheWorkdir(t *testing.T) {
+	wd := t.TempDir()
+	outside := t.TempDir()
+	if err := os.WriteFile(filepath.Join(outside, "secret.txt"), []byte("s"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(wd, "escape")); err != nil {
+		t.Skipf("symlinks unsupported on this platform: %v", err)
+	}
+	for _, d := range []*spec.DirAssert{
+		{Path: "escape", Contains: []string{"secret.txt"}},
+		{Path: "escape", Recursive: true, Contains: []string{"secret.txt"}},
+		{Path: "escape", Count: ptrInt(1)},
+	} {
+		if cr := checkDirOK(t, wd, d); cr.OK {
+			t.Errorf("reading %+v through a symlink out of the workdir must be rejected", d)
+		}
+	}
+}
+
 // TestCheckDir_BrokenSymlinkMembership pins that contains/not_contains judge
 // membership by the directory entry, not by whether the link target resolves. A
 // dangling symlink is a real dirent, so not_contains must FAIL (the file was
