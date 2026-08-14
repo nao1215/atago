@@ -64,6 +64,10 @@ func escapeManifestField(s string) string {
 // across platforms. Symlinks are recorded, never traversed; an ignored
 // directory prunes its whole subtree; an entry that is not a regular file is
 // recorded by kind and never opened.
+//
+// dirPath must already have its own symlinks resolved (checkDir does this via
+// resolveDirRoot): filepath.WalkDir Lstats its root, so a root that is still a
+// symlink walks as one non-directory entry and yields an empty tree.
 func walkTree(dirPath string, ignore []string) ([]treeEntry, error) {
 	var out []treeEntry
 	err := filepath.WalkDir(dirPath, func(p string, d fs.DirEntry, err error) error {

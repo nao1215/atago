@@ -22,6 +22,10 @@ func checkDir(d *spec.DirAssert, env Env) *CheckResult {
 	if err != nil {
 		return &CheckResult{Desc: fmt.Sprintf("assert dir %q", d.Path), Hint: err.Error()}
 	}
+	dirPath, err = resolveDirRoot(env.Workdir, d.Path, dirPath)
+	if err != nil {
+		return &CheckResult{Desc: fmt.Sprintf("assert dir %q", d.Path), Hint: err.Error()}
+	}
 
 	// Existence is checked first: every other constraint needs the directory to be
 	// present and readable. When exists:false is asserted, a missing directory is
@@ -69,6 +73,81 @@ func checkDir(d *spec.DirAssert, env Env) *CheckResult {
 		return cr
 	}
 	return pass(fmt.Sprintf("assert dir %q", d.Path))
+}
+
+// resolveDirRoot follows a symlinked directory path and puts the result through
+// the same containment test the declared path faced.
+//
+// Two defects meet here. filepath.WalkDir Lstats its root, so a `path:` that is
+// itself a symlink to a directory walked as a single non-directory entry:
+// `recursive:` reported an empty tree for a populated directory, and `snapshot:`
+// wrote an empty golden that then matched forever no matter what the directory
+// held — while the non-recursive matchers, whose os.ReadDir does follow the
+// link, read the real contents. One assertion, two answers. And the containment
+// check is lexical, so it cannot see through a link the program under test
+// planted: a `path:` naming a link out of the workdir passed it, and the
+// directory outside was listed despite the confinement this file promises.
+//
+// Resolving the root settles both: every mode reads the same tree, and the tree
+// it reads is inside the workdir. Only the ROOT is resolved — walkTree still
+// records the links inside the tree without traversing them, which is what keeps
+// a link cycle out of the walk.
+func resolveDirRoot(workdir, declared, dirPath string) (string, error) {
+	resolved, rerr := filepath.EvalSymlinks(dirPath)
+	if rerr != nil {
+		// Nothing resolvable: the path is missing, or it is a link whose target
+		// is. A missing path is ordinary — the stat in checkDir reports it in the
+		// assertion's own words, and exists:false expects exactly this. A DANGLING
+		// link is different: it still declares where it points, and whether that
+		// target exists is not a question a spec may put to the filesystem outside
+		// the workdir. Judging it by its declared target keeps the containment
+		// rule from depending on whether the target happens to exist.
+		if target, ok := declaredLinkTarget(dirPath); ok && !withinResolvedWorkdir(workdir, target) {
+			return "", escapesWorkdirError(declared, target)
+		}
+		return dirPath, nil
+	}
+	if resolved == dirPath {
+		return dirPath, nil
+	}
+	if !withinResolvedWorkdir(workdir, resolved) {
+		return "", escapesWorkdirError(declared, resolved)
+	}
+	return resolved, nil
+}
+
+// declaredLinkTarget reports where a symlink points, as an absolute path. A
+// relative target resolves against the directory holding the link, the way the
+// kernel would. Anything that is not a symlink reports false.
+func declaredLinkTarget(p string) (string, bool) {
+	target, err := os.Readlink(p)
+	if err != nil {
+		return "", false
+	}
+	if !filepath.IsAbs(target) {
+		target = filepath.Join(filepath.Dir(p), target)
+	}
+	return filepath.Clean(target), true
+}
+
+// withinResolvedWorkdir reports whether p stays inside the scenario workdir.
+//
+// The workdir can itself sit behind a symlink — macOS puts /tmp behind
+// /private/tmp and /var behind /private/var — and p arrives in either spelling:
+// a path EvalSymlinks resolved takes the resolved form, while a dangling link's
+// declared target keeps the form the link was written with. Both spellings name
+// the same directory, so containment holds if either does; a path outside the
+// workdir is inside neither.
+func withinResolvedWorkdir(workdir, p string) bool {
+	if security.WithinRoot(workdir, p) {
+		return true
+	}
+	resolved, err := filepath.EvalSymlinks(workdir)
+	return err == nil && security.WithinRoot(resolved, p)
+}
+
+func escapesWorkdirError(declared, target string) error {
+	return fmt.Errorf("assert.dir.path %q resolves through a symlink to %q, which escapes the scenario workdir", declared, target)
 }
 
 func checkDirExists(d *spec.DirAssert, info os.FileInfo, statErr error) *CheckResult {

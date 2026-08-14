@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-80 suites · 515 scenarios
+80 suites · 517 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -101,10 +101,12 @@
   - [explain shows that the command runs more than once](#scenario-explain-shows-that-the-command-runs-more-than-once)
   - [deterministic next to retry is a load error](#scenario-deterministic-next-to-retry-is-a-load-error)
   - [a single run and an unknown observable are load errors](#scenario-a-single-run-and-an-unknown-observable-are-load-errors)
-- [atago self-hosting / dir assertion](#atago-self-hosting--dir-assertion) — 9 scenarios
+- [atago self-hosting / dir assertion](#atago-self-hosting--dir-assertion) — 11 scenarios
   - [directory/tree assertions cover a multi-file generator](#scenario-directorytree-assertions-cover-a-multi-file-generator)
   - [a missing directory can be asserted absent](#scenario-a-missing-directory-can-be-asserted-absent)
   - [a dangling symlink is a present directory entry (membership uses Lstat)](#scenario-a-dangling-symlink-is-a-present-directory-entry-membership-uses-lstat)
+  - [a symlinked directory reads the same in every dir mode](#scenario-a-symlinked-directory-reads-the-same-in-every-dir-mode)
+  - [a dir path that resolves out of the workdir is refused](#scenario-a-dir-path-that-resolves-out-of-the-workdir-is-refused)
   - [a failed dir assert lists what the directory actually holds](#scenario-a-failed-dir-assert-lists-what-the-directory-actually-holds)
   - [a failed count assert lists the entries it counted](#scenario-a-failed-count-assert-lists-the-entries-it-counted)
   - [a failed recursive assert lists the walked tree](#scenario-a-failed-recursive-assert-lists-the-walked-tree)
@@ -2415,6 +2417,49 @@ mkdir -p linkdir && ln -s /nonexistent-target-xyz linkdir/planted
 #### Then
 - exit code is `0`
 - dir `linkdir` contains `planted`, does not contain `never-planted`
+### Scenario: a symlinked directory reads the same in every dir mode
+_skipped on Windows_
+#### When
+```shell
+mkdir -p releases/v2/assets && echo bin > releases/v2/app.bin && echo css > releases/v2/assets/app.css && ln -s releases/v2 latest
+```
+#### Then
+- exit code is `0`
+- dir `latest` contains `app.bin`
+- dir `latest` contains `assets/app.css`, (recursive)
+- dir `latest` has 2 entries, (recursive)
+### Scenario: a dir path that resolves out of the workdir is refused
+_skipped on Windows_
+#### Given
+- Fixture file `escaping.atago.yaml` is created.
+#### Inputs
+_Fixture `escaping.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: escaping dir assert
+scenarios:
+  - name: read outside the workdir through a link
+    steps:
+      - run:
+          shell: true
+          command: ln -s /etc escape
+      - assert:
+          dir:
+            path: escape
+            contains: [hosts]
+```
+#### When
+```shell
+ln -s /etc escape
+${atago} run escaping.atago.yaml
+```
+#### Then
+- after `ln -s /etc escape`:
+  - exit code is `0`
+- after `${atago} run escaping.atago.yaml`:
+  - exit code is `1`
+  - stdout contains `escapes the scenario workdir`
 ### Scenario: a failed dir assert lists what the directory actually holds
 #### Given
 - Fixture file `listing.atago.yaml` is created.

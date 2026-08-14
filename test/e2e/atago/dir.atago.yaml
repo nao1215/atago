@@ -51,6 +51,70 @@ scenarios:
             contains: [planted]
             not_contains: [never-planted]
 
+  - name: a symlinked directory reads the same in every dir mode
+    skip: {os: windows}
+    steps:
+      # A program that publishes `latest -> releases/v2` is the ordinary case.
+      # filepath.WalkDir lstats its root, so the recursive and snapshot modes
+      # used to walk the link itself and see an EMPTY tree while the
+      # non-recursive matchers read the real contents — one assertion giving two
+      # answers, and a snapshot golden that stayed green whatever the directory
+      # later held.
+      - run:
+          shell: true
+          command: mkdir -p releases/v2/assets && echo bin > releases/v2/app.bin && echo css > releases/v2/assets/app.css && ln -s releases/v2 latest
+      - assert:
+          exit_code: 0
+      - assert:
+          dir:
+            path: latest
+            contains: [app.bin]
+      - assert:
+          dir:
+            path: latest
+            recursive: true
+            contains: [assets/app.css]
+      - assert:
+          dir:
+            path: latest
+            recursive: true
+            count: 2
+
+  - name: a dir path that resolves out of the workdir is refused
+    skip: {os: windows}
+    steps:
+      # The path check is lexical, so it cannot see through a link the program
+      # under test planted: `path:` naming a link out of the workdir passed it,
+      # and the directory outside was listed anyway. Resolving the root before
+      # the containment test closes that.
+      - run:
+          shell: true
+          command: ln -s /etc escape
+      - assert:
+          exit_code: 0
+      - fixture:
+          file: escaping.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: escaping dir assert
+            scenarios:
+              - name: read outside the workdir through a link
+                steps:
+                  - run:
+                      shell: true
+                      command: ln -s /etc escape
+                  - assert:
+                      dir:
+                        path: escape
+                        contains: [hosts]
+      - run:
+          command: ${atago} run escaping.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: "escapes the scenario workdir"
+
   - name: a failed dir assert lists what the directory actually holds
     steps:
       - fixture:
