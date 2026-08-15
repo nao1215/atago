@@ -84,6 +84,54 @@ scoops:
     license: MIT
     commit_msg_template: "chore(scoop): update the bucket manifest for {{ .Tag }}"
 
+# winget distribution for Windows. The Windows archives are already zips, which
+# winget installs as a portable package, so `winget install nao1215.atago` puts
+# atago.exe on PATH without an installer. GoReleaser writes the three manifests
+# (version, installer, locale) to a branch on nao1215/winget-pkgs — a fork of
+# the community repository — and opens the pull request against
+# microsoft/winget-pkgs, so a tag is still the only manual step. Skipped by
+# `--skip=publish` (release-smoke) and, via `skip_upload: auto`, on pre-release
+# tags, which the community repository does not accept.
+winget:
+  - name: atago
+    package_identifier: nao1215.atago
+    publisher: nao1215
+    publisher_url: "https://github.com/nao1215"
+    publisher_support_url: "https://github.com/nao1215/atago/issues"
+    homepage: "https://github.com/nao1215/atago"
+    short_description: "Tests CLI behavior from plain YAML: exit codes, output, files, snapshots, and interactive terminals (PTY/TUI)"
+    description: |
+      atago runs a command-line program the way a user does and checks what
+      actually happened: the exit code, stdout and stderr, the files and
+      directories the run created or changed, golden snapshots, and interactive
+      terminal sessions driven through a real PTY. Scenarios are plain YAML, so
+      a test suite needs no test framework and no shell scripting.
+    license: MIT
+    license_url: "https://github.com/nao1215/atago/blob/main/LICENSE"
+    copyright: "Copyright (c) 2026 Naohiro CHIKAMATSU"
+    release_notes_url: "https://github.com/nao1215/atago/releases/tag/{{ .Tag }}"
+    tags:
+      - cli
+      - testing
+      - e2e
+      - end-to-end
+      - yaml
+      - tui
+      - golang
+    skip_upload: auto
+    repository:
+      owner: nao1215
+      name: winget-pkgs
+      branch: "atago-{{ .Version }}"
+      token: "{{ .Env.WINGET_GITHUB_TOKEN }}"
+      pull_request:
+        enabled: true
+        draft: false
+        base:
+          owner: microsoft
+          name: winget-pkgs
+          branch: master
+
 dockers_v2:
   - images:
       - "ghcr.io/nao1215/atago"

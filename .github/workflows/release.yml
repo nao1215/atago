@@ -56,6 +56,10 @@ jobs:
           # Tap-scoped token so the Homebrew cask can be pushed to
           # nao1215/homebrew-tap (#79). Only used by the publish step on a real tag.
           TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
+          # Fork-scoped token so the winget manifests can be pushed to
+          # nao1215/winget-pkgs and the pull request opened against
+          # microsoft/winget-pkgs. Also only used on a real tag.
+          WINGET_GITHUB_TOKEN: ${{ secrets.WINGET_GITHUB_TOKEN }}
 
       - name: Attest build provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
