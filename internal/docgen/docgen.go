@@ -333,49 +333,63 @@ func clearedEnvBullet(passEnv []string) string {
 func commands(steps []spec.Step, expand func(string) string) []string {
 	var out []string
 	for i := range steps {
-		step := &steps[i]
-		switch step.Kind() {
-		case spec.StepRun:
-			out = append(out, expand(step.Run.Command))
-		case spec.StepHTTP:
-			if step.HTTP != nil {
-				out = append(out, fmt.Sprintf("# HTTP %s %s", step.HTTP.Method, expand(step.HTTP.Path)))
-			}
-		case spec.StepQuery:
-			if step.Query != nil {
-				out = append(out, fmt.Sprintf("# SQL via %s: %s", step.Query.Runner, expand(step.Query.SQL)))
-			}
-		case spec.StepGRPC:
-			if step.GRPC != nil {
-				out = append(out, fmt.Sprintf("# gRPC %s via %s", step.GRPC.Method, step.GRPC.Runner))
-			}
-		case spec.StepPTY:
-			if step.PTY != nil {
-				out = append(out, fmt.Sprintf("# interactive (pty): %s", expand(step.PTY.Command)))
-			}
-		case spec.StepCDP:
-			if step.CDP != nil {
-				out = append(out, "# CDP via "+step.CDP.Runner+": "+cdpActions(step.CDP))
-			}
-		case spec.StepStore:
-			if step.Store != nil {
-				out = append(out, fmt.Sprintf("# capture ${%s} from %s", step.Store.Name, storeSourceLabel(step.Store)))
-			}
-		case spec.StepSignal:
-			if step.Signal != nil {
-				line := fmt.Sprintf("# send SIG%s to service %s", spec.NormalizeSignalName(step.Signal.Signal), expand(step.Signal.Service))
-				if step.Signal.Wait != nil {
-					timeout := step.Signal.Wait.Timeout
-					if timeout == "" {
-						timeout = "5s"
-					}
-					line += fmt.Sprintf(" and wait up to %s for exit", timeout)
-				}
-				out = append(out, line)
-			}
+		if line, ok := commandLine(&steps[i], expand); ok {
+			out = append(out, line)
 		}
 	}
 	return out
+}
+
+// commandLine renders one step's "When" line; ok is false for a step kind that
+// contributes nothing (fixtures, asserts).
+func commandLine(step *spec.Step, expand func(string) string) (string, bool) {
+	switch step.Kind() {
+	case spec.StepRun:
+		return expand(step.Run.Command), true
+	case spec.StepHTTP:
+		if step.HTTP != nil {
+			return fmt.Sprintf("# HTTP %s %s", step.HTTP.Method, expand(step.HTTP.Path)), true
+		}
+	case spec.StepQuery:
+		if step.Query != nil {
+			return fmt.Sprintf("# SQL via %s: %s", step.Query.Runner, expand(step.Query.SQL)), true
+		}
+	case spec.StepGRPC:
+		if step.GRPC != nil {
+			return fmt.Sprintf("# gRPC %s via %s", step.GRPC.Method, step.GRPC.Runner), true
+		}
+	case spec.StepPTY:
+		if step.PTY != nil {
+			return fmt.Sprintf("# interactive (pty): %s", expand(step.PTY.Command)), true
+		}
+	case spec.StepCDP:
+		if step.CDP != nil {
+			return "# CDP via " + step.CDP.Runner + ": " + cdpActions(step.CDP), true
+		}
+	case spec.StepStore:
+		if step.Store != nil {
+			return fmt.Sprintf("# capture ${%s} from %s", step.Store.Name, storeSourceLabel(step.Store)), true
+		}
+	case spec.StepSignal:
+		if step.Signal != nil {
+			return signalLine(step.Signal, expand), true
+		}
+	}
+	return "", false
+}
+
+// signalLine renders a signal step's "When" line, naming the wait budget when
+// the step also waits for the service to exit.
+func signalLine(sg *spec.Signal, expand func(string) string) string {
+	line := fmt.Sprintf("# send SIG%s to service %s", spec.NormalizeSignalName(sg.Signal), expand(sg.Service))
+	if sg.Wait != nil {
+		timeout := sg.Wait.Timeout
+		if timeout == "" {
+			timeout = "5s"
+		}
+		line += fmt.Sprintf(" and wait up to %s for exit", timeout)
+	}
+	return line
 }
 
 // storeSourceLabel names where a store step reads its value from.
