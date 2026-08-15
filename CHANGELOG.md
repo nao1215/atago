@@ -7,6 +7,8 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-08-15
+
 ### Added
 
 - Third-party E2E suite for [OpenFGA](https://openfga.dev/), in
@@ -56,6 +58,15 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- A `file:` assertion's `exists:` and `executable:` matchers now stat their
+  target without following a symlink, bound to the scenario workdir — the same
+  rule the read path (`contains:`/`equals:`) and `size:` already apply. A
+  program under test could plant a symlink at the assertion target and have
+  `exists: true` or `executable: true` answered with the existence or execute
+  bit of a HOST file outside the workdir; the same assert family refused to
+  READ through that link, so one planted link made the assertion disagree with
+  itself. A symlink at the target is now refused outright for all of them, and
+  a plainly missing file still answers `exists: false`.
 - The live terminal that answers a program's device queries during a `pty`
   session (DA1, cursor-position and status reports) now runs the incoming bytes
   through the same CSI sanitizer the screen render uses, carried across read
