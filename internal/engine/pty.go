@@ -52,33 +52,7 @@ func (e *Engine) runPTY(ctx context.Context, p *spec.PTY, st *store.Store, scena
 	if len(p.Session) > 0 {
 		c.Session = make([]spec.PTYAction, len(p.Session))
 		for i, a := range p.Session {
-			na := spec.PTYAction{Expect: st.Expand(a.Expect)}
-			if a.Send != nil {
-				cs := *a.Send
-				// Only verbatim text gets ${name} expansion; named keys are
-				// fixed byte sequences (#26).
-				if cs.Text != nil {
-					txt := st.Expand(*cs.Text)
-					cs.Text = &txt
-				}
-				// A paste carries author-written text like any other send, so it
-				// gets the same expansion (#378).
-				if cs.Paste != nil {
-					pasted := st.Expand(*cs.Paste)
-					cs.Paste = &pasted
-				}
-				na.Send = &cs
-			}
-			// A resize carries only integers, so it needs no expansion — but it
-			// still has to be carried into the copy the runner drives (#379).
-			na.Resize = a.Resize
-			if a.Exec != nil {
-				ce := *a.Exec
-				ce.Command = st.Expand(a.Exec.Command)
-				na.Exec = &ce
-			}
-			na.ExpectScreen = spec.WalkPTYExpectScreenStrings(a.ExpectScreen, st.Expand)
-			c.Session[i] = na
+			c.Session[i] = expandPTYAction(a, st)
 		}
 	}
 	// sandbox_home (#71) redirects the pty child's home under ${workdir}/.atago-home.
@@ -91,6 +65,39 @@ func (e *Engine) runPTY(ctx context.Context, p *spec.PTY, st *store.Store, scena
 		sandbox = s
 	}
 	return ptyrun.Run(ctx, &c, workdir, runnercmd.BuildEnv(c.Env, c.ClearEnvEnabled(), c.PassEnv, sandbox))
+}
+
+// expandPTYAction returns a's copy with every author-written string run
+// through ${name} expansion, leaving the runner's copy independent of the
+// spec's.
+func expandPTYAction(a spec.PTYAction, st *store.Store) spec.PTYAction {
+	na := spec.PTYAction{Expect: st.Expand(a.Expect)}
+	if a.Send != nil {
+		cs := *a.Send
+		// Only verbatim text gets ${name} expansion; named keys are
+		// fixed byte sequences (#26).
+		if cs.Text != nil {
+			txt := st.Expand(*cs.Text)
+			cs.Text = &txt
+		}
+		// A paste carries author-written text like any other send, so it
+		// gets the same expansion (#378).
+		if cs.Paste != nil {
+			pasted := st.Expand(*cs.Paste)
+			cs.Paste = &pasted
+		}
+		na.Send = &cs
+	}
+	// A resize carries only integers, so it needs no expansion — but it
+	// still has to be carried into the copy the runner drives (#379).
+	na.Resize = a.Resize
+	if a.Exec != nil {
+		ce := *a.Exec
+		ce.Command = st.Expand(a.Exec.Command)
+		na.Exec = &ce
+	}
+	na.ExpectScreen = spec.WalkPTYExpectScreenStrings(a.ExpectScreen, st.Expand)
+	return na
 }
 
 // checkPTYSessionResolved reports the first session entry whose send text or
