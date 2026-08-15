@@ -10,6 +10,18 @@ import (
 	"github.com/nao1215/atago/internal/spec"
 )
 
+// RenderScreen renders a transcript's final screen as plain text. It is
+// test-only sugar over renderScreenCells, which production calls directly.
+func RenderScreen(transcript []byte, p *spec.PTY) string {
+	return renderScreenResized(transcript, p, nil)
+}
+
+// renderScreenResized is RenderScreen with mid-session resizes (#379).
+func renderScreenResized(transcript []byte, p *spec.PTY, resizes []screenResize) string {
+	text, _ := renderScreenCells(transcript, p, resizes)
+	return text
+}
+
 // TestRenderScreen_OverwriteAndErase proves the emulator's whole value (#27):
 // a line overwritten with \r shows only its FINAL text on the screen, while
 // the raw transcript would contain both versions.

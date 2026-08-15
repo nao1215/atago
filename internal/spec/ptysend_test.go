@@ -6,6 +6,11 @@ import (
 	"testing"
 )
 
+// SendText is sugar for authoring the scalar send form in Go literals. It
+// lives in a test file because production code always builds a PTYSend by
+// decoding YAML; only tests construct one directly.
+func SendText(s string) *PTYSend { return &PTYSend{Text: &s} }
+
 // TestPTYKeySequences_GoldenTable pins the exact bytes each named key
 // transmits (#26) — the documented contract TUI specs rely on.
 func TestPTYKeySequences_GoldenTable(t *testing.T) {
