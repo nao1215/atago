@@ -25,24 +25,7 @@ func downloadAction(clickSelector, destDir string, name *string) chromedp.Action
 			return fmt.Errorf("cdp download: %w", err)
 		}
 
-		willBegin := make(chan string, 1)
-		done := make(chan string, 1)
-		chromedp.ListenTarget(ctx, func(ev any) {
-			switch e := ev.(type) {
-			case *browser.EventDownloadWillBegin:
-				select {
-				case willBegin <- e.SuggestedFilename:
-				default:
-				}
-			case *browser.EventDownloadProgress:
-				if e.State == browser.DownloadProgressStateCompleted {
-					select {
-					case done <- e.GUID:
-					default:
-					}
-				}
-			}
-		})
+		willBegin, done := listenDownloadEvents(ctx)
 
 		// AllowAndName saves each download under its GUID in destDir and emits the
 		// progress events we listen for.
@@ -64,22 +47,7 @@ func downloadAction(clickSelector, destDir string, name *string) chromedp.Action
 			return fmt.Errorf("cdp download: timed out waiting for the download to finish: %w", ctx.Err())
 		}
 
-		// The suggested filename is captured from the will-begin event; fall back to
-		// the GUID when the browser did not provide one. filepath.Base defends
-		// against a server-suggested name containing path separators.
-		suggested := guid
-		select {
-		case s := <-willBegin:
-			if s != "" {
-				suggested = s
-			}
-		default:
-		}
-		final := filepath.Base(suggested)
-		if final == "." || final == "/" || final == "" {
-			final = guid
-		}
-
+		final := downloadFinalName(guid, willBegin)
 		src := filepath.Join(destDir, guid)
 		dst := filepath.Join(destDir, final)
 		if src != dst {
@@ -90,4 +58,50 @@ func downloadAction(clickSelector, destDir string, name *string) chromedp.Action
 		*name = final
 		return nil
 	})
+}
+
+// listenDownloadEvents subscribes to the target's download events: willBegin
+// receives the server-suggested filename, done the GUID of a completed
+// download. Both channels are buffered so the listener never blocks the event
+// loop.
+func listenDownloadEvents(ctx context.Context) (willBegin, done chan string) {
+	willBegin = make(chan string, 1)
+	done = make(chan string, 1)
+	chromedp.ListenTarget(ctx, func(ev any) {
+		switch e := ev.(type) {
+		case *browser.EventDownloadWillBegin:
+			select {
+			case willBegin <- e.SuggestedFilename:
+			default:
+			}
+		case *browser.EventDownloadProgress:
+			if e.State == browser.DownloadProgressStateCompleted {
+				select {
+				case done <- e.GUID:
+				default:
+				}
+			}
+		}
+	})
+	return willBegin, done
+}
+
+// downloadFinalName picks the deterministic base name for a completed
+// download: the suggested filename captured from the will-begin event, falling
+// back to the GUID when the browser did not provide one. filepath.Base defends
+// against a server-suggested name containing path separators.
+func downloadFinalName(guid string, willBegin <-chan string) string {
+	suggested := guid
+	select {
+	case s := <-willBegin:
+		if s != "" {
+			suggested = s
+		}
+	default:
+	}
+	final := filepath.Base(suggested)
+	if final == "." || final == "/" || final == "" {
+		final = guid
+	}
+	return final
 }
