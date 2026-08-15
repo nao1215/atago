@@ -120,25 +120,7 @@ commander v2.5.0.
 
 ## The terminal layer: TUI applications
 
-[TUI Test](https://github.com/microsoft/tui-test) from Microsoft is the closest
-tool to atago on the axis atago is usually picked for — driving a real terminal
-and asserting on what a full-screen program drew. It deserves a careful look
-rather than a footnote, and if the terminal is the whole of what you are
-testing, it may well be the better fit.
-
-The columns below are atago v0.20.1 and TUI Test 0.0.4, its current stable
-release. Note that TUI Test is mid-rewrite: 0.0.4 is the TypeScript framework
-described here, while [0.1.0-beta.1](https://github.com/microsoft/tui-test/releases/tag/0.1.0-beta.1)
-(2026-08-10) is a Rust rewrite with a different shape — a session-driving CLI
-plus Rust, Python, and Node libraries, with the test-file format and suite
-runner gone from the CLI surface and a stated focus on AI agents driving a live
-terminal. The beta adds exit-code and command-output assertions, always-on
-[asciinema](https://asciinema.org/) recording, SVG screenshots, a live monitor
-view, and per-cell inspection. If you are choosing today, read the beta's
-README as well: the table below will be out of date the moment that line ships
-stable.
-
-### Driving and asserting on a terminal
+[TUI Test](https://github.com/microsoft/tui-test) from Microsoft is the closest tool to atago at driving a real terminal. Columns are atago v0.20.1 and TUI Test 0.0.4; [0.1.0-beta.1](https://github.com/microsoft/tui-test/releases/tag/0.1.0-beta.1) is a Rust rewrite with a different shape, so read its README too.
 
 | | atago v0.20.1 | TUI Test 0.0.4 |
 |---|---|---|
@@ -160,28 +142,8 @@ stable.
 | Windows | native, ConPTY | supported (Bun on macOS/Linux only) |
 | Shells driven | any executable, shell or not | cmd, Windows PowerShell, PowerShell, bash, git-bash, fish, zsh, xonsh |
 
-### Where each one is the better choice
-
-TUI Test is terminal-first: its world is the rendered screen, and it is very
-good at that. Its traces are a genuinely better debugging story than anything
-atago has — a full replay of what the terminal received, which is exactly what
-you want when a test fails only on someone else's machine. If your project is
-already a Node codebase, its tests are TypeScript next to your other tests,
-with the editor support and refactoring that brings, and Microsoft is behind
-it.
-
-atago is CLI-first, and the terminal is one surface among several. In 0.0.4 a
-test asserts on what the screen shows; there is no exit-code matcher, and no
-assertions about files the program wrote, the exact set of paths a run touched,
-a mock HTTP server it called, or a background service it needed. atago covers
-those in the same YAML file as the `pty:` session, so one scenario can drive a
-TUI and then check what it left on disk. atago also needs no host language or
-package manager — a single binary and a YAML file — which matters when the
-program under test is not written in JavaScript.
-
-Put plainly: if the terminal screen is the product, look hard at TUI Test. If
-the terminal is one of several things your CLI does, atago covers the rest of
-them without a second tool.
+Where atago loses: TUI Test replays a failing session from a trace, which atago
+cannot do, and its tests are TypeScript beside the rest of a Node project.
 
 ## Other tools you might be weighing
 
@@ -237,10 +199,8 @@ An honest table needs the reverse direction spelled out:
   XML assertions and a first-class docker execution node, which atago lacks.
 - goss / runn / venom own their layers outright, as described
   [above](#tools-that-own-a-different-layer).
-- TUI Test is the stronger choice when the terminal screen is the
-  product and your project is already a Node codebase, and its trace replay
-  beats anything atago offers for diagnosing a failure that only reproduces
-  elsewhere. See [the terminal layer](#the-terminal-layer-tui-applications).
+- TUI Test replays a failing terminal session from a trace, which atago
+  cannot do. See [the terminal layer](#the-terminal-layer-tui-applications).
 
 atago is also the youngest project on this page and still pre-1.0. The spec
 format is versioned and every feature ships with a runnable, CI-tested
