@@ -5,7 +5,7 @@ go 1.26
 require (
 	github.com/bmatcuk/doublestar/v4 v4.10.0
 	github.com/charmbracelet/ultraviolet v0.0.0-20260303162955-0b88c25f3fff
-	github.com/charmbracelet/x/ansi v0.11.7
+	github.com/charmbracelet/x/ansi v0.11.8
 	github.com/charmbracelet/x/vt v0.0.0-20260813141921-f091cedeaf78
 	github.com/chromedp/cdproto v0.0.0-20260714215040-dc233986426f
 	github.com/chromedp/chromedp v0.16.0
@@ -17,7 +17,7 @@ require (
 	github.com/jhump/protoreflect/v2 v2.0.0-beta.2
 	github.com/k1LoW/grpcstub v0.26.5
 	github.com/lib/pq v1.12.3
-	github.com/mattn/go-runewidth v0.0.23
+	github.com/mattn/go-runewidth v0.0.24
 	github.com/mattn/go-shellwords v1.0.13
 	github.com/nao1215/markdown v0.13.0
 	github.com/ohler55/ojg v1.28.4
