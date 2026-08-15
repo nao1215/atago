@@ -85,25 +85,7 @@ func explainSuiteBlock(b *strings.Builder, label string, steps []spec.Step) {
 }
 
 func explainScenario(b *strings.Builder, sc *spec.Scenario) {
-	fmt.Fprintf(b, "\nScenario: %s", sc.Name)
-	if len(sc.Tags) > 0 {
-		fmt.Fprintf(b, "  [tags: %s]", strings.Join(sc.Tags, ", "))
-	}
-	if sc.Only != nil && sc.Only.OS != "" {
-		fmt.Fprintf(b, "  [only os=%s]", sc.Only.OS)
-	}
-	if sc.Skip != nil && sc.Skip.OS != "" {
-		fmt.Fprintf(b, "  [skip os=%s]", sc.Skip.OS)
-	}
-	// A reviewer must see which scenarios are documentation of a known bug
-	// rather than guarantees, or a suite reads as promising more than it does.
-	if sc.ExpectFail != nil {
-		fmt.Fprintf(b, "  [expect_fail: %s]", sc.ExpectFail.Reason)
-		if sc.ExpectFail.Issue != "" {
-			fmt.Fprintf(b, " [%s]", sc.ExpectFail.Issue)
-		}
-	}
-	b.WriteByte('\n')
+	explainScenarioHeading(b, sc)
 
 	var fixtures, commands, expects, stores, services []string
 	vars := map[string]bool{}
@@ -123,95 +105,10 @@ func explainScenario(b *strings.Builder, sc *spec.Scenario) {
 	for i := range sc.Steps {
 		step := &sc.Steps[i]
 		// Variable references are collected by the shared spec walk so explain and
-		// manifest never disagree about which ${name}s a step uses; the switch
+		// manifest never disagree about which ${name}s a step uses; the bucketing
 		// below only formats the human-facing summary lines.
 		spec.CollectStepVars(vars, step)
-		switch step.Kind() {
-		case spec.StepFixture:
-			fixtures = append(fixtures, describeFixture(step.Fixture))
-		case spec.StepRun:
-			commands = append(commands, describeRun(step.Run))
-		case spec.StepAssert:
-			expects = append(expects, describeAsserts(step.Assert)...)
-		case spec.StepStore:
-			if step.Store != nil {
-				stores = append(stores, step.Store.Name)
-			}
-		case spec.StepHTTP:
-			if step.HTTP != nil {
-				commands = append(commands, fmt.Sprintf("HTTP %s %s", step.HTTP.Method, step.HTTP.Path))
-			}
-		case spec.StepQuery:
-			if step.Query != nil {
-				commands = append(commands, fmt.Sprintf("SQL query via %s: %s", step.Query.Runner, step.Query.SQL))
-			}
-		case spec.StepGRPC:
-			if step.GRPC != nil {
-				commands = append(commands, fmt.Sprintf("gRPC %s via %s", step.GRPC.Method, step.GRPC.Runner))
-			}
-		case spec.StepPTY:
-			if step.PTY != nil {
-				desc := fmt.Sprintf("interactive (pty): %s  [%d session actions]", step.PTY.Command, len(step.PTY.Session))
-				if step.PTY.ClearEnvEnabled() {
-					note := "  (cleared environment"
-					if len(step.PTY.PassEnv) > 0 {
-						note += ", passes: " + strings.Join(step.PTY.PassEnv, ", ")
-					}
-					desc += note + ")"
-				}
-				if step.PTY.SandboxHomeEnabled() {
-					desc += "  (isolated home)"
-				}
-				commands = append(commands, desc)
-				var keys []string
-				for _, a := range step.PTY.Session {
-					if a.Send == nil || a.Send.Key == "" {
-						continue
-					}
-					// A repeat says how many presses it stands for, so a
-					// reviewer sees "left x16" rather than a single "left"
-					// hiding sixteen of them (#377).
-					if a.Send.Times > 1 {
-						keys = append(keys, fmt.Sprintf("%s x%d", a.Send.Key, a.Send.Times))
-						continue
-					}
-					keys = append(keys, a.Send.Key)
-				}
-				if len(keys) > 0 {
-					commands[len(commands)-1] += "  [keys: " + strings.Join(keys, ", ") + "]"
-				}
-				// A resize changes what the program draws, so a reviewer reading
-				// the summary should see it (#379).
-				var resizes []string
-				for _, a := range step.PTY.Session {
-					if a.Resize != nil {
-						resizes = append(resizes, fmt.Sprintf("%dx%d", a.Resize.Rows, a.Resize.Cols))
-					}
-				}
-				if len(resizes) > 0 {
-					commands[len(commands)-1] += "  [resizes: " + strings.Join(resizes, ", ") + "]"
-				}
-				// A session that runs commands on the HOST is the one thing a
-				// reviewer must not have to read the YAML to discover (#380).
-				var execs []string
-				for _, a := range step.PTY.Session {
-					if a.Exec != nil {
-						execs = append(execs, a.Exec.Command)
-					}
-				}
-				if len(execs) > 0 {
-					commands[len(commands)-1] += "  [runs on the host: " + strings.Join(execs, "; ") + "]"
-				}
-			}
-		case spec.StepCDP:
-			if step.CDP != nil {
-				commands = append(commands, spec.CDPActionSummary(step.CDP))
-			}
-		case spec.StepSignal:
-			if step.Signal != nil {
-				commands = append(commands, describeSignal(step.Signal))
-			}
-		}
+		bucketScenarioStep(step, &fixtures, &commands, &expects, &stores)
 	}
 
 	// Teardown steps always run after the scenario — summarize them separately
@@ -220,26 +117,7 @@ func explainScenario(b *strings.Builder, sc *spec.Scenario) {
 	for i := range sc.Teardown {
 		step := &sc.Teardown[i]
 		spec.CollectStepVars(vars, step)
-		switch step.Kind() {
-		case spec.StepRun:
-			teardown = append(teardown, describeRun(step.Run))
-		case spec.StepHTTP:
-			teardown = append(teardown, fmt.Sprintf("HTTP %s %s", step.HTTP.Method, step.HTTP.Path))
-		case spec.StepQuery:
-			teardown = append(teardown, fmt.Sprintf("SQL query via %s: %s", step.Query.Runner, step.Query.SQL))
-		case spec.StepGRPC:
-			teardown = append(teardown, fmt.Sprintf("gRPC %s via %s", step.GRPC.Method, step.GRPC.Runner))
-		case spec.StepCDP:
-			teardown = append(teardown, spec.CDPActionSummary(step.CDP))
-		case spec.StepFixture:
-			teardown = append(teardown, describeFixture(step.Fixture))
-		case spec.StepAssert:
-			teardown = append(teardown, describeAsserts(step.Assert)...)
-		case spec.StepStore:
-			teardown = append(teardown, "store "+step.Store.Name)
-		case spec.StepSignal:
-			teardown = append(teardown, describeSignal(step.Signal))
-		}
+		teardown = append(teardown, describeTeardownStep(step)...)
 	}
 
 	// Generated artifacts and security notes come from the shared spec model, so
@@ -257,6 +135,154 @@ func explainScenario(b *strings.Builder, sc *spec.Scenario) {
 	if security := spec.SecurityNotes(sc); len(security) > 0 {
 		writeList(b, "⚠ Security notes", security)
 	}
+}
+
+// bucketScenarioStep files one scenario step's summary line under the section
+// it belongs to: fixtures, commands, expects, or stores.
+func bucketScenarioStep(step *spec.Step, fixtures, commands, expects, stores *[]string) {
+	switch step.Kind() {
+	case spec.StepFixture:
+		*fixtures = append(*fixtures, describeFixture(step.Fixture))
+	case spec.StepRun:
+		*commands = append(*commands, describeRun(step.Run))
+	case spec.StepAssert:
+		*expects = append(*expects, describeAsserts(step.Assert)...)
+	case spec.StepStore:
+		if step.Store != nil {
+			*stores = append(*stores, step.Store.Name)
+		}
+	case spec.StepHTTP:
+		if step.HTTP != nil {
+			*commands = append(*commands, fmt.Sprintf("HTTP %s %s", step.HTTP.Method, step.HTTP.Path))
+		}
+	case spec.StepQuery:
+		if step.Query != nil {
+			*commands = append(*commands, fmt.Sprintf("SQL query via %s: %s", step.Query.Runner, step.Query.SQL))
+		}
+	case spec.StepGRPC:
+		if step.GRPC != nil {
+			*commands = append(*commands, fmt.Sprintf("gRPC %s via %s", step.GRPC.Method, step.GRPC.Runner))
+		}
+	case spec.StepPTY:
+		if step.PTY != nil {
+			*commands = append(*commands, describePTY(step.PTY))
+		}
+	case spec.StepCDP:
+		if step.CDP != nil {
+			*commands = append(*commands, spec.CDPActionSummary(step.CDP))
+		}
+	case spec.StepSignal:
+		if step.Signal != nil {
+			*commands = append(*commands, describeSignal(step.Signal))
+		}
+	}
+}
+
+// explainScenarioHeading writes the scenario's title line: its name, tags, OS
+// gates, and the expect_fail marker. A reviewer must see which scenarios are
+// documentation of a known bug rather than guarantees, or a suite reads as
+// promising more than it does.
+func explainScenarioHeading(b *strings.Builder, sc *spec.Scenario) {
+	fmt.Fprintf(b, "\nScenario: %s", sc.Name)
+	if len(sc.Tags) > 0 {
+		fmt.Fprintf(b, "  [tags: %s]", strings.Join(sc.Tags, ", "))
+	}
+	if sc.Only != nil && sc.Only.OS != "" {
+		fmt.Fprintf(b, "  [only os=%s]", sc.Only.OS)
+	}
+	if sc.Skip != nil && sc.Skip.OS != "" {
+		fmt.Fprintf(b, "  [skip os=%s]", sc.Skip.OS)
+	}
+	if sc.ExpectFail != nil {
+		fmt.Fprintf(b, "  [expect_fail: %s]", sc.ExpectFail.Reason)
+		if sc.ExpectFail.Issue != "" {
+			fmt.Fprintf(b, " [%s]", sc.ExpectFail.Issue)
+		}
+	}
+	b.WriteByte('\n')
+}
+
+// describePTY renders a one-line summary of an interactive pty step: the
+// command, its isolation notes, and the session's keys, resizes, and host
+// execs.
+func describePTY(p *spec.PTY) string {
+	desc := fmt.Sprintf("interactive (pty): %s  [%d session actions]", p.Command, len(p.Session))
+	if p.ClearEnvEnabled() {
+		note := "  (cleared environment"
+		if len(p.PassEnv) > 0 {
+			note += ", passes: " + strings.Join(p.PassEnv, ", ")
+		}
+		desc += note + ")"
+	}
+	if p.SandboxHomeEnabled() {
+		desc += "  (isolated home)"
+	}
+	var keys []string
+	for _, a := range p.Session {
+		if a.Send == nil || a.Send.Key == "" {
+			continue
+		}
+		// A repeat says how many presses it stands for, so a reviewer sees
+		// "left x16" rather than a single "left" hiding sixteen of them (#377).
+		if a.Send.Times > 1 {
+			keys = append(keys, fmt.Sprintf("%s x%d", a.Send.Key, a.Send.Times))
+			continue
+		}
+		keys = append(keys, a.Send.Key)
+	}
+	if len(keys) > 0 {
+		desc += "  [keys: " + strings.Join(keys, ", ") + "]"
+	}
+	// A resize changes what the program draws, so a reviewer reading the
+	// summary should see it (#379).
+	var resizes []string
+	for _, a := range p.Session {
+		if a.Resize != nil {
+			resizes = append(resizes, fmt.Sprintf("%dx%d", a.Resize.Rows, a.Resize.Cols))
+		}
+	}
+	if len(resizes) > 0 {
+		desc += "  [resizes: " + strings.Join(resizes, ", ") + "]"
+	}
+	// A session that runs commands on the HOST is the one thing a reviewer
+	// must not have to read the YAML to discover (#380).
+	var execs []string
+	for _, a := range p.Session {
+		if a.Exec != nil {
+			execs = append(execs, a.Exec.Command)
+		}
+	}
+	if len(execs) > 0 {
+		desc += "  [runs on the host: " + strings.Join(execs, "; ") + "]"
+	}
+	return desc
+}
+
+// describeTeardownStep renders a teardown step's summary lines. Unlike the
+// scenario body, whose steps are bucketed into Commands/Expects/Fixtures,
+// teardown is one flat list — cleanup reads in execution order.
+func describeTeardownStep(step *spec.Step) []string {
+	switch step.Kind() {
+	case spec.StepRun:
+		return []string{describeRun(step.Run)}
+	case spec.StepHTTP:
+		return []string{fmt.Sprintf("HTTP %s %s", step.HTTP.Method, step.HTTP.Path)}
+	case spec.StepQuery:
+		return []string{fmt.Sprintf("SQL query via %s: %s", step.Query.Runner, step.Query.SQL)}
+	case spec.StepGRPC:
+		return []string{fmt.Sprintf("gRPC %s via %s", step.GRPC.Method, step.GRPC.Runner)}
+	case spec.StepCDP:
+		return []string{spec.CDPActionSummary(step.CDP)}
+	case spec.StepFixture:
+		return []string{describeFixture(step.Fixture)}
+	case spec.StepAssert:
+		return describeAsserts(step.Assert)
+	case spec.StepStore:
+		return []string{"store " + step.Store.Name}
+	case spec.StepSignal:
+		return []string{describeSignal(step.Signal)}
+	}
+	return nil
 }
 
 // describeService renders a one-line summary of a background service and how its
