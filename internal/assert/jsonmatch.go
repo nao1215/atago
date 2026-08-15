@@ -366,45 +366,15 @@ func valuesEqual(node, want any) bool {
 	// operand keeps number/numeric-string equality while making string-vs-string
 	// byte-exact.
 	if isNumericKind(node) || isNumericKind(want) {
-		// Prefer exact integer comparison. Two distinct integers beyond 2^53 (a
-		// JSON id, or a value beyond int64 that decodes as json.Number) round to
-		// the same float64, so a float compare would report them equal. big.Int
-		// keeps every digit.
-		if ni, ok := toBigInt(node); ok {
-			if wi, ok := toBigInt(want); ok {
-				return ni.Cmp(wi) == 0
-			}
-		}
-		if nf, ok := toFloat(node); ok {
-			if wf, ok := toFloat(want); ok {
-				return nf == wf
-			}
+		if eq, ok := numericEqual(node, want); ok {
+			return eq
 		}
 	}
 	switch n := node.(type) {
 	case map[string]any:
-		w, ok := want.(map[string]any)
-		if !ok || len(n) != len(w) {
-			return false
-		}
-		for k, nv := range n {
-			wv, present := w[k]
-			if !present || !valuesEqual(nv, wv) {
-				return false
-			}
-		}
-		return true
+		return mapValuesEqual(n, want)
 	case []any:
-		w, ok := want.([]any)
-		if !ok || len(n) != len(w) {
-			return false
-		}
-		for i := range n {
-			if !valuesEqual(n[i], w[i]) {
-				return false
-			}
-		}
-		return true
+		return sliceValuesEqual(n, want)
 	case string:
 		// A non-numeric node vs a string is a string match (the string-vs-number
 		// case was already handled by the numeric branch above). Comparing by
@@ -420,6 +390,59 @@ func valuesEqual(node, want any) bool {
 		return want == nil
 	}
 	return fmt.Sprintf("%v", node) == fmt.Sprintf("%v", want)
+}
+
+// numericEqual compares two values numerically. ok is false when neither the
+// exact-integer nor the float comparison applied (one side is not a number in
+// any usable shape), telling valuesEqual to fall through to the structural
+// rules. Exact integer comparison is preferred: two distinct integers beyond
+// 2^53 (a JSON id, or a value beyond int64 that decodes as json.Number) round
+// to the same float64, so a float compare would report them equal. big.Int
+// keeps every digit.
+func numericEqual(node, want any) (eq, ok bool) {
+	if ni, o := toBigInt(node); o {
+		if wi, o := toBigInt(want); o {
+			return ni.Cmp(wi) == 0, true
+		}
+	}
+	if nf, o := toFloat(node); o {
+		if wf, o := toFloat(want); o {
+			return nf == wf, true
+		}
+	}
+	return false, false
+}
+
+// mapValuesEqual compares a JSON object with the expected value, key-order
+// independent (#40): want must be an object with the same keys, every value
+// equal.
+func mapValuesEqual(n map[string]any, want any) bool {
+	w, ok := want.(map[string]any)
+	if !ok || len(n) != len(w) {
+		return false
+	}
+	for k, nv := range n {
+		wv, present := w[k]
+		if !present || !valuesEqual(nv, wv) {
+			return false
+		}
+	}
+	return true
+}
+
+// sliceValuesEqual compares a JSON array with the expected value elementwise,
+// in order.
+func sliceValuesEqual(n []any, want any) bool {
+	w, ok := want.([]any)
+	if !ok || len(n) != len(w) {
+		return false
+	}
+	for i := range n {
+		if !valuesEqual(n[i], w[i]) {
+			return false
+		}
+	}
+	return true
 }
 
 // isNumericKind reports whether v is a genuine number (not an arbitrary numeric

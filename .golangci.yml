@@ -13,10 +13,12 @@ linters:
     - errorlint
     - gocheckcompilerdirectives
     - gochecknoinits
+    - gocognit
     - gosec
     - govet
     - ineffassign
     - misspell
+    - nestif
     - nilerr
     - noctx
     - nolintlint
@@ -29,6 +31,12 @@ linters:
     - wastedassign
     - whitespace
   settings:
+    # The 2026-08 refactoring series brought every production function under
+    # these bounds; the linters keep the next hot spot from growing back.
+    gocognit:
+      min-complexity: 30
+    nestif:
+      min-complexity: 5
     errcheck:
       disable-default-exclusions: false
       check-type-assertions: true
@@ -58,6 +66,12 @@ linters:
       # spec text; gosec's G304/G101 are noise there.
       - linters:
           - gosec
+        path: _test\.go
+      # Table-driven tests and fuzz harnesses are long by nature; the
+      # complexity bounds are a production-code contract.
+      - linters:
+          - gocognit
+          - nestif
         path: _test\.go
     paths:
       - third_party$

@@ -193,6 +193,34 @@ func checkDirRecursive(d *spec.DirAssert, dirPath string) *CheckResult {
 	// "what does the tree actually hold?".
 	listing := treeListing(entries)
 
+	if cr := checkTreeContains(d, present, listing); cr != nil {
+		return cr
+	}
+
+	if d.Count != nil && files != *d.Count {
+		return dirCountFailure(d, files, fmt.Sprintf("exactly %d files in the tree", *d.Count), listing)
+	}
+	if d.MinCount != nil && files < *d.MinCount {
+		return dirCountFailure(d, files, fmt.Sprintf("at least %d files in the tree", *d.MinCount), listing)
+	}
+	if d.MaxCount != nil && files > *d.MaxCount {
+		return dirCountFailure(d, files, fmt.Sprintf("at most %d files in the tree", *d.MaxCount), listing)
+	}
+
+	if d.Glob != "" && !treeGlobMatches(d.Glob, entries) {
+		return &CheckResult{
+			Desc:     fmt.Sprintf("assert dir %q glob %q", d.Path, d.Glob),
+			Expected: fmt.Sprintf("at least one tree entry matching %q", d.Glob),
+			Actual:   listing,
+			Hint:     fmt.Sprintf("no entry under %q matched glob %q (recursive)", d.Path, d.Glob),
+		}
+	}
+	return nil
+}
+
+// checkTreeContains enforces contains/not_contains over the walked tree's
+// path set. nil means both lists hold.
+func checkTreeContains(d *spec.DirAssert, present map[string]bool, listing string) *CheckResult {
 	for _, child := range d.Contains {
 		if !present[path.Clean(filepath.ToSlash(child))] {
 			return &CheckResult{
@@ -213,41 +241,24 @@ func checkDirRecursive(d *spec.DirAssert, dirPath string) *CheckResult {
 			}
 		}
 	}
-
-	if d.Count != nil && files != *d.Count {
-		return dirCountFailure(d, files, fmt.Sprintf("exactly %d files in the tree", *d.Count), listing)
-	}
-	if d.MinCount != nil && files < *d.MinCount {
-		return dirCountFailure(d, files, fmt.Sprintf("at least %d files in the tree", *d.MinCount), listing)
-	}
-	if d.MaxCount != nil && files > *d.MaxCount {
-		return dirCountFailure(d, files, fmt.Sprintf("at most %d files in the tree", *d.MaxCount), listing)
-	}
-
-	if d.Glob != "" {
-		matched := false
-		for _, e := range entries {
-			if ok, _ := path.Match(d.Glob, e.rel); ok {
-				matched = true
-				break
-			}
-			if !strings.Contains(d.Glob, "/") {
-				if ok, _ := path.Match(d.Glob, path.Base(e.rel)); ok {
-					matched = true
-					break
-				}
-			}
-		}
-		if !matched {
-			return &CheckResult{
-				Desc:     fmt.Sprintf("assert dir %q glob %q", d.Path, d.Glob),
-				Expected: fmt.Sprintf("at least one tree entry matching %q", d.Glob),
-				Actual:   listing,
-				Hint:     fmt.Sprintf("no entry under %q matched glob %q (recursive)", d.Path, d.Glob),
-			}
-		}
-	}
 	return nil
+}
+
+// treeGlobMatches reports whether any walked entry matches the glob — against
+// its tree-relative path, or (for a glob with no separator) its base name, so
+// "*.log" finds a log anywhere in the tree.
+func treeGlobMatches(glob string, entries []treeEntry) bool {
+	for _, e := range entries {
+		if ok, _ := path.Match(glob, e.rel); ok {
+			return true
+		}
+		if !strings.Contains(glob, "/") {
+			if ok, _ := path.Match(glob, path.Base(e.rel)); ok {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // checkDirSnapshot compares (or updates) the tree's golden manifest (#25).
