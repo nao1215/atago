@@ -22,11 +22,11 @@ type screenResize struct {
 	rows, cols int
 }
 
-// RenderScreen replays a pty transcript through a terminal emulator and returns
-// the final rendered screen as plain text (#27): what the user actually SEES
-// after every cursor move, overwrite, and erase — the signal a raw transcript
-// scatters across redraws. Trailing whitespace is stripped per line and trailing
-// blank lines are dropped.
+// renderScreenCells is the one renderer: it replays a pty transcript through a
+// terminal emulator (#27) — producing what the user actually SEES after every
+// cursor move, overwrite, and erase, the signal a raw transcript scatters
+// across redraws. Trailing whitespace is stripped per line and trailing blank
+// lines are dropped.
 //
 // A wide character (CJK, emoji) occupies two terminal columns, so cursor
 // addressing after it depends on the emulator modeling that width. The x/vt
@@ -37,15 +37,11 @@ type screenResize struct {
 // right margin (no explicit newline, the char straddling the last column) is
 // dropped rather than carried to the next line. TUIs position with cursor
 // addressing and explicit newlines, which render correctly.
-func RenderScreen(transcript []byte, p *spec.PTY) string {
-	return renderScreenResized(transcript, p, nil)
-}
-
-// renderScreenResized is RenderScreen for a session that changed size while it
-// ran (#379): the transcript is replayed in pieces, resizing the emulator at
-// each recorded boundary, so every part of the frame is drawn under the size it
-// was actually produced under. With no resizes it is one piece and behaves
-// exactly as before.
+//
+// For a session that changed size while it ran (#379), the transcript is
+// replayed in pieces, resizing the emulator at each recorded boundary, so every
+// part of the frame is drawn under the size it was actually produced under.
+// With no resizes it is one piece.
 //
 // The whole transcript is sanitized ONCE and the pieces are cut from the result.
 // Sanitizing each raw piece separately would be a different thing entirely: a
@@ -53,12 +49,8 @@ func RenderScreen(transcript []byte, p *spec.PTY) string {
 // parser reassembles it on the far side — which is how a clamped repeat count
 // gets back its quadrillion steps. sanitizeTranscriptMarks translates the
 // offsets instead, landing every cut on a boundary between whole units.
-func renderScreenResized(transcript []byte, p *spec.PTY, resizes []screenResize) string {
-	text, _ := renderScreenCells(transcript, p, resizes)
-	return text
-}
-
-// renderScreenCells is the one renderer: it replays the transcript and returns
+//
+// It returns
 // BOTH the plain-text screen and the same screen with its colors and attributes
 // (#382). The text is derived from the cells rather than from the emulator's own
 // String(), so `attrs:` and the text matchers can never disagree about what is

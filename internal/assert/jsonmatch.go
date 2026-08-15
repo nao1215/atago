@@ -97,29 +97,9 @@ func parseJSON(data []byte) (v any, err error) {
 	return oj.Parse(data)
 }
 
-// checkJSON parses data as JSON, selects nodes with a JSONPath, and applies the
-// configured matcher.
-func checkJSON(desc, name string, data []byte, j *spec.JSONAssert) *CheckResult {
-	parsed, cr := parseDoc(desc, name, data, false)
-	if cr != nil {
-		return cr
-	}
-	return applyJSONMatch(desc, parsed, j)
-}
-
-// checkYAML parses data as YAML and applies the same JSONPath matcher logic as
-// checkJSON, since a YAML document decodes to the same generic value model
-// (maps/slices/scalars) that the JSONPath engine walks (issue #9).
-func checkYAML(desc, name string, data []byte, j *spec.JSONAssert) *CheckResult {
-	parsed, cr := parseDoc(desc, name, data, true)
-	if cr != nil {
-		return cr
-	}
-	return applyJSONMatch(desc, parsed, j)
-}
-
 // applyJSONMatch selects nodes from an already-decoded generic value with a
-// JSONPath and applies the configured matcher. Shared by checkJSON/checkYAML.
+// JSONPath and applies the configured matcher. Callers parse with parseDoc
+// first, choosing JSON or YAML.
 func applyJSONMatch(desc string, parsed any, j *spec.JSONAssert) *CheckResult {
 	expr, err := jp.ParseString(j.Path)
 	if err != nil {

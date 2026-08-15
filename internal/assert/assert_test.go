@@ -28,6 +28,27 @@ func strp(s string) *string   { return &s }
 func boolp(b bool) *bool      { return &b }
 func f64p(f float64) *float64 { return &f }
 
+// checkJSON parses data as JSON, selects nodes with a JSONPath, and applies the
+// configured matcher. It is test-only sugar over parseDoc+applyJSONMatch:
+// production reaches the same pair through checkJSONChecks.
+func checkJSON(desc, name string, data []byte, j *spec.JSONAssert) *CheckResult {
+	parsed, cr := parseDoc(desc, name, data, false)
+	if cr != nil {
+		return cr
+	}
+	return applyJSONMatch(desc, parsed, j)
+}
+
+// checkYAML is checkJSON for a YAML document, which decodes to the same generic
+// value model (maps/slices/scalars) that the JSONPath engine walks (issue #9).
+func checkYAML(desc, name string, data []byte, j *spec.JSONAssert) *CheckResult {
+	parsed, cr := parseDoc(desc, name, data, true)
+	if cr != nil {
+		return cr
+	}
+	return applyJSONMatch(desc, parsed, j)
+}
+
 func TestCheck_ExitCode(t *testing.T) {
 	t.Parallel()
 	res := &runner.Result{ExitCode: 2}
