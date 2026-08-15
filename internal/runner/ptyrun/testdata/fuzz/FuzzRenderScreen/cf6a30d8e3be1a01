@@ -1,0 +1,4 @@
+go test fuzz v1
+[]byte("\xd10̎")
+int(84)
+int(-45)
