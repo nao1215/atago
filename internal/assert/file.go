@@ -67,7 +67,7 @@ func checkFile(f *spec.FileAssert, env Env) (out *CheckResult) {
 
 	switch {
 	case f.Exists != nil:
-		return checkFileExists(f, path)
+		return checkFileExists(f, env.Workdir, path)
 
 	case f.Contains != nil:
 		data, cr := read(f.Path, path)
@@ -84,7 +84,7 @@ func checkFile(f *spec.FileAssert, env Env) (out *CheckResult) {
 		return checkFileNotContains(f, data)
 
 	case f.Executable != nil:
-		return checkFileExecutable(f, path)
+		return checkFileExecutable(f, env.Workdir, path)
 
 	case f.Equals != nil:
 		data, cr := read(f.Path, path)
@@ -124,12 +124,18 @@ func checkFile(f *spec.FileAssert, env Env) (out *CheckResult) {
 }
 
 // checkFileExists evaluates exists:true/false against a stat of path.
-func checkFileExists(f *spec.FileAssert, path string) *CheckResult {
+func checkFileExists(f *spec.FileAssert, root, path string) *CheckResult {
 	desc := fmt.Sprintf("assert file %q exists: %t", f.Path, *f.Exists)
-	info, err := os.Stat(path)
+	// StatNoFollow, not os.Stat: a program under test can plant a symlink at the
+	// assertion target, and following it would report whether a host file OUTSIDE
+	// the workdir exists — the metadata twin of the disclosure ReadFileNoFollow
+	// refuses on the read path (issue #16), and the same rule checkFileSize
+	// already applies. Binding it to the workdir refuses an ancestor swapped for
+	// a link too (issue #430).
+	info, err := security.StatNoFollow(root, path)
 	// Only a genuine "not exist" result participates in exists:true/false.
-	// Permission, I/O, and other stat failures are surfaced as an error so
-	// users do not debug a "missing file" that is really unreadable (#39).
+	// Permission, I/O, symlink-refusal, and other stat failures are surfaced as
+	// an error so users do not debug a "missing file" that is really unreadable (#39).
 	if err != nil && !os.IsNotExist(err) {
 		return &CheckResult{
 			Desc:     desc,
@@ -190,9 +196,11 @@ func checkFileNotContains(f *spec.FileAssert, data []byte) *CheckResult {
 }
 
 // checkFileExecutable evaluates executable:true/false against path's mode bits.
-func checkFileExecutable(f *spec.FileAssert, path string) *CheckResult {
+func checkFileExecutable(f *spec.FileAssert, root, path string) *CheckResult {
 	desc := fmt.Sprintf("assert file %q executable: %t", f.Path, *f.Executable)
-	info, statErr := os.Stat(path)
+	// StatNoFollow for the same reason as checkFileExists: the execute bit of a
+	// host file outside the workdir is not this assertion's to report.
+	info, statErr := security.StatNoFollow(root, path)
 	if statErr != nil {
 		return &CheckResult{
 			Desc:     desc,
