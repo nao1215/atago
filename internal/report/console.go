@@ -60,31 +60,7 @@ func writeDetail(b *strings.Builder, color bool, suite, specPath string, sc *eng
 	where := specSuffix(specPath)
 	switch sc.Status {
 	case engine.StatusFailed:
-		var lastRun *runner.Result
-		for _, step := range sc.Steps {
-			// Track the most recent run result BEFORE rendering this step's
-			// checks: a run step's own retry `until` checks assert against that
-			// step's result, and every failure block names THAT command.
-			if step.Run != nil {
-				lastRun = step.Run
-			}
-			for _, ck := range step.Checks {
-				if ck == nil || ck.OK {
-					continue
-				}
-				fmt.Fprintf(b, "\n%s %s / %s%s\n", colorize(color, cRed+cBold, "FAILED:"), suite, sc.Name, where)
-				writeCheckFailure(b, color, ck, commandOf(lastRun))
-				writeFailureStreams(b, ck, lastRun)
-				// Keep console output compact: reference the durable payloads by path
-				// rather than dumping them inline (#48).
-				if len(ck.ArtifactFiles) > 0 {
-					fmt.Fprintf(b, "\nArtifacts:\n")
-					for _, a := range ck.ArtifactFiles {
-						fmt.Fprintf(b, "  %s: %s\n", a.Role, a.Path)
-					}
-				}
-			}
-		}
+		writeFailedChecks(b, color, suite, where, sc)
 	case engine.StatusXPass:
 		// The loud one. A known bug that is no longer there means the fix landed
 		// and the scenario has to move into the suite that guards against a
@@ -97,43 +73,12 @@ func writeDetail(b *strings.Builder, color bool, suite, specPath string, sc *eng
 		fmt.Fprintf(b, "\n%s %s / %s%s\n", colorize(color, cYellow+cBold, "XFAIL:"), suite, sc.Name, where)
 		fmt.Fprintf(b, "\n%s\n", indent(expectFailNarrative(sc.ExpectFail, false)))
 	case engine.StatusError:
-		for _, step := range sc.Steps {
-			if step.ErrMsg == "" {
-				continue
-			}
-			// A setup-phase error comes from before any numbered step ran; rendering
-			// it as "step 0 ()" is misleading. Use the phase label — distinguishing a
-			// suite.setup failure from service readiness so neither is mislabeled — so
-			// every report format agrees.
-			var phase string
-			if isSetupError(step) {
-				phase = setupPhaseLabelFor(step)
-			} else {
-				phase = fmt.Sprintf("step %d (%s)", step.Index, step.Kind)
-			}
-			fmt.Fprintf(b, "\n%s %s / %s%s\n  %s: %s\n",
-				colorize(color, cRed+cBold, "ERROR:"), suite, sc.Name, where, phase, step.ErrMsg)
-		}
+		writeErroredSteps(b, color, suite, where, sc)
 	}
 	// A failed teardown never flips the verdict — the steps decide that — but
 	// incomplete cleanup of external resources must stay loud.
 	if sc.TeardownFailed() {
-		for _, step := range sc.Teardown {
-			for _, ck := range step.Checks {
-				if ck == nil || ck.OK {
-					continue
-				}
-				fmt.Fprintf(b, "\n%s %s / %s%s\n", colorize(color, cYellow+cBold, "TEARDOWN FAILED:"), suite, sc.Name, where)
-				fmt.Fprintf(b, "\nStep:\n  %s\n", ck.Desc)
-				if ck.Hint != "" {
-					fmt.Fprintf(b, "\nHint:\n  %s\n", ck.Hint)
-				}
-			}
-			if step.ErrMsg != "" {
-				fmt.Fprintf(b, "\n%s %s / %s%s\n  teardown step %d (%s): %s\n",
-					colorize(color, cYellow+cBold, "TEARDOWN FAILED:"), suite, sc.Name, where, step.Index, step.Kind, step.ErrMsg)
-			}
-		}
+		writeTeardownFailures(b, color, suite, where, sc)
 	}
 	// Reference any preserved background-service logs by path (#51), keeping the
 	// console compact instead of dumping the captured output inline.
@@ -141,6 +86,79 @@ func writeDetail(b *strings.Builder, color bool, suite, specPath string, sc *eng
 		fmt.Fprintf(b, "\nService logs:\n")
 		for _, sl := range sc.ServiceLogs {
 			fmt.Fprintf(b, "  %s: %s\n", sl.Name, sl.Path)
+		}
+	}
+}
+
+// writeFailedChecks prints one FAILED block per failing check of a failed
+// scenario.
+func writeFailedChecks(b *strings.Builder, color bool, suite, where string, sc *engine.ScenarioResult) {
+	var lastRun *runner.Result
+	for _, step := range sc.Steps {
+		// Track the most recent run result BEFORE rendering this step's
+		// checks: a run step's own retry `until` checks assert against that
+		// step's result, and every failure block names THAT command.
+		if step.Run != nil {
+			lastRun = step.Run
+		}
+		for _, ck := range step.Checks {
+			if ck == nil || ck.OK {
+				continue
+			}
+			fmt.Fprintf(b, "\n%s %s / %s%s\n", colorize(color, cRed+cBold, "FAILED:"), suite, sc.Name, where)
+			writeCheckFailure(b, color, ck, commandOf(lastRun))
+			writeFailureStreams(b, ck, lastRun)
+			// Keep console output compact: reference the durable payloads by path
+			// rather than dumping them inline (#48).
+			if len(ck.ArtifactFiles) > 0 {
+				fmt.Fprintf(b, "\nArtifacts:\n")
+				for _, a := range ck.ArtifactFiles {
+					fmt.Fprintf(b, "  %s: %s\n", a.Role, a.Path)
+				}
+			}
+		}
+	}
+}
+
+// writeErroredSteps prints one ERROR block per step that carries an error
+// message.
+func writeErroredSteps(b *strings.Builder, color bool, suite, where string, sc *engine.ScenarioResult) {
+	for _, step := range sc.Steps {
+		if step.ErrMsg == "" {
+			continue
+		}
+		// A setup-phase error comes from before any numbered step ran; rendering
+		// it as "step 0 ()" is misleading. Use the phase label — distinguishing a
+		// suite.setup failure from service readiness so neither is mislabeled — so
+		// every report format agrees.
+		var phase string
+		if isSetupError(step) {
+			phase = setupPhaseLabelFor(step)
+		} else {
+			phase = fmt.Sprintf("step %d (%s)", step.Index, step.Kind)
+		}
+		fmt.Fprintf(b, "\n%s %s / %s%s\n  %s: %s\n",
+			colorize(color, cRed+cBold, "ERROR:"), suite, sc.Name, where, phase, step.ErrMsg)
+	}
+}
+
+// writeTeardownFailures prints one TEARDOWN FAILED block per failing teardown
+// check or errored teardown step.
+func writeTeardownFailures(b *strings.Builder, color bool, suite, where string, sc *engine.ScenarioResult) {
+	for _, step := range sc.Teardown {
+		for _, ck := range step.Checks {
+			if ck == nil || ck.OK {
+				continue
+			}
+			fmt.Fprintf(b, "\n%s %s / %s%s\n", colorize(color, cYellow+cBold, "TEARDOWN FAILED:"), suite, sc.Name, where)
+			fmt.Fprintf(b, "\nStep:\n  %s\n", ck.Desc)
+			if ck.Hint != "" {
+				fmt.Fprintf(b, "\nHint:\n  %s\n", ck.Hint)
+			}
+		}
+		if step.ErrMsg != "" {
+			fmt.Fprintf(b, "\n%s %s / %s%s\n  teardown step %d (%s): %s\n",
+				colorize(color, cYellow+cBold, "TEARDOWN FAILED:"), suite, sc.Name, where, step.Index, step.Kind, step.ErrMsg)
 		}
 	}
 }
