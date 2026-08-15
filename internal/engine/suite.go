@@ -108,13 +108,12 @@ func (e *Engine) newSuiteRuntime(s *spec.Spec, specDir, fixturesDir string) (*su
 // The returned bool reports whether every step succeeded.
 func (e *Engine) runSuiteSteps(ctx context.Context, steps []spec.Step, rt *suiteRuntime, rc runConfig, stopOnFailure bool, label string) ([]StepResult, bool) {
 	var out []StepResult
-	var current *runner.Result
+	x := &suiteStepper{e: e, rt: rt, rc: rc, label: label}
 	ok := true
 
 	for i := range steps {
 		step := &steps[i]
 		sr := StepResult{Index: i, Kind: step.Kind()}
-		failed := false
 
 		if ctx.Err() != nil {
 			sr.ErrMsg = fmt.Sprintf("run canceled: %v", ctx.Err())
@@ -122,96 +121,7 @@ func (e *Engine) runSuiteSteps(ctx context.Context, steps []spec.Step, rt *suite
 			return out, false
 		}
 
-		switch step.Kind() {
-		case spec.StepFixture:
-			if err := fixture.Write(expandFixture(rt.st, step.Fixture), rt.dir, rc.specDir); err != nil {
-				sr.ErrMsg = err.Error()
-				failed = true
-			}
-		case spec.StepRun:
-			// Same unresolved/leaked-${name} guard the scenario path enforces, so a
-			// typo in suite.setup errors with the explained diagnostic instead of
-			// leaking the literal reference into argv (#243).
-			if msg := runRefGuard(rt.st, step.Run, rc.runners); msg != "" {
-				sr.ErrMsg = msg
-				failed = true
-				break
-			}
-			run := mergeScenarioEnv(resolvableEnv(rt.st, rt.env), expandRun(rt.st, step.Run), rt.st)
-			r, untilChecks, err := e.runStep(ctx, run, rt.st, rt.dir, rc.specDir, rc, rt.sshConns, nil) // suite setup/teardown steps carry no changes assert
-			if err != nil {
-				sr.ErrMsg = err.Error()
-				failed = true
-				break
-			}
-			current = r
-			sr.Run = maskResult(rc.masker, r)
-			if len(untilChecks) > 0 {
-				// recordChecks masks secrets in the check payloads and writes any
-				// --artifacts-dir sidecars, exactly as the scenario path does — the
-				// suite path used to set sr.Checks raw and leak both (#243).
-				e.recordChecks(rc.masker, untilChecks, suiteArtifactScope(rc, label), i)
-				sr.Checks = untilChecks
-				if !assert.AllOK(untilChecks) {
-					failed = true
-				}
-			}
-		case spec.StepStore:
-			val, err := extractValue(expandStore(rt.st, step.Store), current, rt.dir)
-			if err != nil {
-				sr.ErrMsg = err.Error()
-				failed = true
-			} else {
-				rt.set(step.Store.Name, val)
-			}
-		case spec.StepAssert:
-			crs := assert.CheckAll(expandAssert(rt.st, step.Assert), current, assert.Env{
-				Workdir:         rt.dir,
-				SpecDir:         rc.specDir,
-				UpdateSnapshots: e.UpdateSnapshots,
-				Secrets:         rc.masker.MaskBytes,
-				Scrub:           rc.scrubber.Apply,
-				MockRecords: func(name string) ([]mockrunner.Record, bool) {
-					for _, m := range rt.mocks {
-						if m.Name() == name {
-							return m.Records(), true
-						}
-					}
-					return nil, false
-				},
-			})
-			e.recordChecks(rc.masker, crs, suiteArtifactScope(rc, label), i)
-			sr.Checks = crs
-			if !assert.AllOK(crs) {
-				failed = true
-			}
-		case spec.StepService:
-			proc, captured, err := servicerunner.Start(ctx, expandService(rt.st, resolvableEnv(rt.st, rt.env), step.Service), rt.dir)
-			if proc != nil {
-				rt.services = append(rt.services, proc)
-			}
-			if err != nil {
-				sr.ErrMsg = err.Error()
-				failed = true
-				break
-			}
-			if step.Service.Ready != nil && step.Service.Ready.Store != "" {
-				rt.set(step.Service.Ready.Store, captured)
-			}
-		case spec.StepMockServer:
-			ms, err := mockrunner.Start(ctx, step.MockServer, rc.specDir)
-			if err != nil {
-				sr.ErrMsg = err.Error()
-				failed = true
-				break
-			}
-			rt.mocks = append(rt.mocks, ms)
-			rt.set(ms.Name()+".url", ms.URL())
-			rt.set(ms.Name()+".port", ms.Port())
-		default:
-			sr.ErrMsg = fmt.Sprintf("%s steps are not allowed at suite level", step.Kind())
-			failed = true
-		}
+		failed := x.exec(ctx, step, i, &sr)
 
 		sr.ErrMsg = rc.masker.Mask(sr.ErrMsg)
 		out = append(out, sr)
@@ -223,6 +133,130 @@ func (e *Engine) runSuiteSteps(ctx context.Context, steps []spec.Step, rt *suite
 		}
 	}
 	return out, ok
+}
+
+// suiteStepper executes one suite-level block's steps, threading the latest
+// run result between them the way scenario steps do (store/assert read the
+// most recent run).
+type suiteStepper struct {
+	e       *Engine
+	rt      *suiteRuntime
+	rc      runConfig
+	label   string
+	current *runner.Result
+}
+
+// exec dispatches one suite step to its kind's executor and reports failure.
+func (x *suiteStepper) exec(ctx context.Context, step *spec.Step, i int, sr *StepResult) (failed bool) {
+	switch step.Kind() {
+	case spec.StepFixture:
+		if err := fixture.Write(expandFixture(x.rt.st, step.Fixture), x.rt.dir, x.rc.specDir); err != nil {
+			sr.ErrMsg = err.Error()
+			return true
+		}
+		return false
+	case spec.StepRun:
+		return x.execRun(ctx, step, i, sr)
+	case spec.StepStore:
+		val, err := extractValue(expandStore(x.rt.st, step.Store), x.current, x.rt.dir)
+		if err != nil {
+			sr.ErrMsg = err.Error()
+			return true
+		}
+		x.rt.set(step.Store.Name, val)
+		return false
+	case spec.StepAssert:
+		return x.execAssert(step, i, sr)
+	case spec.StepService:
+		return x.execService(ctx, step, sr)
+	case spec.StepMockServer:
+		return x.execMockServer(ctx, step, sr)
+	default:
+		sr.ErrMsg = fmt.Sprintf("%s steps are not allowed at suite level", step.Kind())
+		return true
+	}
+}
+
+// execRun runs one suite-level command and folds its retry `until` checks.
+func (x *suiteStepper) execRun(ctx context.Context, step *spec.Step, i int, sr *StepResult) bool {
+	// Same unresolved/leaked-${name} guard the scenario path enforces, so a
+	// typo in suite.setup errors with the explained diagnostic instead of
+	// leaking the literal reference into argv (#243).
+	if msg := runRefGuard(x.rt.st, step.Run, x.rc.runners); msg != "" {
+		sr.ErrMsg = msg
+		return true
+	}
+	run := mergeScenarioEnv(resolvableEnv(x.rt.st, x.rt.env), expandRun(x.rt.st, step.Run), x.rt.st)
+	r, untilChecks, err := x.e.runStep(ctx, run, x.rt.st, x.rt.dir, x.rc.specDir, x.rc, x.rt.sshConns, nil) // suite setup/teardown steps carry no changes assert
+	if err != nil {
+		sr.ErrMsg = err.Error()
+		return true
+	}
+	x.current = r
+	sr.Run = maskResult(x.rc.masker, r)
+	if len(untilChecks) > 0 {
+		// recordChecks masks secrets in the check payloads and writes any
+		// --artifacts-dir sidecars, exactly as the scenario path does — the
+		// suite path used to set sr.Checks raw and leak both (#243).
+		x.e.recordChecks(x.rc.masker, untilChecks, suiteArtifactScope(x.rc, x.label), i)
+		sr.Checks = untilChecks
+		if !assert.AllOK(untilChecks) {
+			return true
+		}
+	}
+	return false
+}
+
+// execAssert checks one suite-level assert against the latest run result.
+func (x *suiteStepper) execAssert(step *spec.Step, i int, sr *StepResult) bool {
+	crs := assert.CheckAll(expandAssert(x.rt.st, step.Assert), x.current, assert.Env{
+		Workdir:         x.rt.dir,
+		SpecDir:         x.rc.specDir,
+		UpdateSnapshots: x.e.UpdateSnapshots,
+		Secrets:         x.rc.masker.MaskBytes,
+		Scrub:           x.rc.scrubber.Apply,
+		MockRecords: func(name string) ([]mockrunner.Record, bool) {
+			for _, m := range x.rt.mocks {
+				if m.Name() == name {
+					return m.Records(), true
+				}
+			}
+			return nil, false
+		},
+	})
+	x.e.recordChecks(x.rc.masker, crs, suiteArtifactScope(x.rc, x.label), i)
+	sr.Checks = crs
+	return !assert.AllOK(crs)
+}
+
+// execService starts one suite-level background service and records it for
+// LIFO shutdown even when startup fails partway.
+func (x *suiteStepper) execService(ctx context.Context, step *spec.Step, sr *StepResult) bool {
+	proc, captured, err := servicerunner.Start(ctx, expandService(x.rt.st, resolvableEnv(x.rt.st, x.rt.env), step.Service), x.rt.dir)
+	if proc != nil {
+		x.rt.services = append(x.rt.services, proc)
+	}
+	if err != nil {
+		sr.ErrMsg = err.Error()
+		return true
+	}
+	if step.Service.Ready != nil && step.Service.Ready.Store != "" {
+		x.rt.set(step.Service.Ready.Store, captured)
+	}
+	return false
+}
+
+// execMockServer starts one suite-level mock server and exposes its address.
+func (x *suiteStepper) execMockServer(ctx context.Context, step *spec.Step, sr *StepResult) bool {
+	ms, err := mockrunner.Start(ctx, step.MockServer, x.rc.specDir)
+	if err != nil {
+		sr.ErrMsg = err.Error()
+		return true
+	}
+	x.rt.mocks = append(x.rt.mocks, ms)
+	x.rt.set(ms.Name()+".url", ms.URL())
+	x.rt.set(ms.Name()+".port", ms.Port())
+	return false
 }
 
 // suiteSetupFailure summarizes a failed setup block for the per-scenario error.
