@@ -285,7 +285,7 @@ func (d *sessionDriver) waitExpect(ctx context.Context, re *regexp.Regexp, patte
 func (d *sessionDriver) waitExpectScreen(ctx context.Context, es *spec.PTYExpectScreen) *sessionOutcome {
 	waitCtx, cancelWait := sessionWaitContext(ctx, es.Timeout)
 	defer cancelWait()
-	matched := false
+	var matched bool
 	stable := &stability{need: parsePositiveDuration(es.StableFor)}
 	scannedTo := -1 // transcript length at the last render; -1 forces one
 	for {

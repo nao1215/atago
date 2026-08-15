@@ -359,11 +359,11 @@ func escDecider(b []byte, i int) (j int, restart bool) {
 // malformation flags that make a conformant terminal ignore the sequence, and
 // where the scan ended.
 type csiScan struct {
-	body     []byte // the parameter bytes vt10x will Atoi
-	controls []byte // side-effect control codes seen inside the sequence
+	body                                []byte // the parameter bytes vt10x will Atoi
+	controls                            []byte // side-effect control codes seen inside the sequence
 	hasMinus, hasWideRune, hasMidMarker bool
-	finalByte byte // 0 when the sequence is truncated at end of input
-	end       int  // index just past the sequence
+	finalByte                           byte // 0 when the sequence is truncated at end of input
+	end                                 int  // index just past the sequence
 	// abortedByESC reports an ESC inside the CSI: it restarts escape parsing
 	// at end, and the sequence so far can never dispatch.
 	abortedByESC bool
