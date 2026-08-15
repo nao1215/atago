@@ -22,7 +22,7 @@ import (
 )
 
 // teardownInterruptTimeout bounds teardown execution after the run itself was
-// cancelled (Ctrl-C / SIGTERM): cleanup of external resources still runs, but a
+// canceled (Ctrl-C / SIGTERM): cleanup of external resources still runs, but a
 // hung teardown cannot keep an interrupted process alive indefinitely.
 const teardownInterruptTimeout = 30 * time.Second
 
@@ -281,7 +281,7 @@ func (p *scenarioPool) stopped() bool {
 }
 
 // produce feeds selected scenario indices until fail-fast stops scheduling or
-// the run is cancelled (Ctrl-C / SIGTERM). On cancellation it stops scheduling
+// the run is canceled (Ctrl-C / SIGTERM). On cancellation it stops scheduling
 // new scenarios; in-flight scenarios stop at their next step via ctx.Err().
 func (p *scenarioPool) produce(ctx context.Context, selected []int, jobs chan<- int) {
 	defer close(jobs)
@@ -313,7 +313,7 @@ func (p *scenarioPool) work(ctx context.Context, jobs <-chan int) {
 			// The global semaphore is shared across every suite in the run.
 			// On Ctrl-C, slots free up only as in-flight scenarios unwind, so
 			// waiting for one here would both stall shutdown and then run a
-			// scenario the user already cancelled. Bail instead; the scenario
+			// scenario the user already canceled. Bail instead; the scenario
 			// is reported as "skipped after interrupt".
 			select {
 			case e.Sem <- struct{}{}:
