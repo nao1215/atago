@@ -54,28 +54,38 @@ func checkMock(m *spec.MockAssert, env Env) *CheckResult {
 		}
 	}
 
-	if m.Header != nil || m.Body != nil {
-		if len(matched) == 0 {
-			// Count: 0 with matchers is contradictory; the validator rejects it,
-			// but stay safe for direct API users.
-			return &CheckResult{Desc: desc, Hint: "header/body matchers need at least one matching request"}
-		}
-		last := matched[len(matched)-1]
-		if m.Header != nil {
-			if cr := checkHeaderValue(m.Header, last.Header.Get(m.Header.Name), "recorded request"); !cr.OK {
-				return cr
-			}
-		}
-		if m.Body != nil {
-			if cr := checkStream("mock request body", m.Body, last.Body, true, env); !cr.OK {
-				return cr
-			}
-		}
+	if cr := checkMockRequestMatchers(m, desc, matched, env); cr != nil {
+		return cr
 	}
 	if m.Count != nil {
 		return pass(fmt.Sprintf("assert mock %q received %s", m.Name, plural.Count(*m.Count, "request", "requests")))
 	}
 	return pass(desc + " received a matching request")
+}
+
+// checkMockRequestMatchers applies the header/body matchers to the LAST
+// matching recorded request. It returns nil when they hold (or none are set).
+func checkMockRequestMatchers(m *spec.MockAssert, desc string, matched []mock.Record, env Env) *CheckResult {
+	if m.Header == nil && m.Body == nil {
+		return nil
+	}
+	if len(matched) == 0 {
+		// Count: 0 with matchers is contradictory; the validator rejects it,
+		// but stay safe for direct API users.
+		return &CheckResult{Desc: desc, Hint: "header/body matchers need at least one matching request"}
+	}
+	last := matched[len(matched)-1]
+	if m.Header != nil {
+		if cr := checkHeaderValue(m.Header, last.Header.Get(m.Header.Name), "recorded request"); !cr.OK {
+			return cr
+		}
+	}
+	if m.Body != nil {
+		if cr := checkStream("mock request body", m.Body, last.Body, true, env); !cr.OK {
+			return cr
+		}
+	}
+	return nil
 }
 
 // mockFilterLabel names the path/method filter for Expected lines.
