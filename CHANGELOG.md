@@ -7,6 +7,10 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Windows installs through winget: `winget install nao1215.atago`. A stable tagged release pushes the generated manifests to a fork of the community repository and opens the pull request against microsoft/winget-pkgs, so the package tracks releases without a separate manual submission. A pre-release tag opens nothing, since the community repository takes stable versions only. The Windows archives are zips, which winget installs as a portable package — `atago.exe` lands on PATH with no installer to run.
+
 ## [0.20.0] - 2026-08-15
 
 ### Added
