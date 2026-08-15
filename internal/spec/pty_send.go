@@ -70,49 +70,63 @@ func (p *PTYSend) UnmarshalYAML(node ast.Node) error {
 		return fail("send must be a string or {key: <name>} (e.g. {key: enter})")
 	}
 	for k, v := range raw {
-		switch k {
-		case "key":
-			str, ok := v.(string)
-			if !ok {
-				return fail("send.key must be a string")
-			}
-			p.Key = strings.ToLower(strings.TrimSpace(str))
-		case "times":
-			// The range check lives here rather than in the loader because this
-			// is the only layer that can still tell an authored `times: 0` from
-			// an omitted one — the decoded field is a plain int, so by the time
-			// validation runs the two are the same value.
-			n, ok := asInt(v)
-			if !ok {
-				return fail("send.times must be an integer (e.g. {key: left, times: 16})")
-			}
-			if n < 1 {
-				return fail("send.times must be at least 1 (got %d); omit it for a single press", n)
-			}
-			if n > MaxPTYSendTimes {
-				return fail("send.times must not exceed %d (got %d)", MaxPTYSendTimes, n)
-			}
-			p.Times = n
-		case "paste":
-			str, ok := v.(string)
-			if !ok {
-				return fail("send.paste must be a string")
-			}
-			p.Paste = &str
-		case "mouse":
-			var mouse PTYMouse
-			raw, ok := v.(map[string]any)
-			if !ok {
-				return fail("send.mouse must be a mapping (e.g. {mouse: {row: 5, col: 12}})")
-			}
-			if err := decodeMouse(raw, &mouse, fail); err != nil {
-				return err
-			}
-			p.Mouse = &mouse
-		default:
-			return fail("send: unknown key %q (accepted: key, times, paste, mouse)", k)
+		if err := p.decodeSendField(k, v, fail); err != nil {
+			return err
 		}
 	}
+	return p.checkSendShape(fail)
+}
+
+// decodeSendField decodes one key of the send mapping, rejecting unknown keys.
+func (p *PTYSend) decodeSendField(k string, v any, fail func(string, ...any) error) error {
+	switch k {
+	case "key":
+		str, ok := v.(string)
+		if !ok {
+			return fail("send.key must be a string")
+		}
+		p.Key = strings.ToLower(strings.TrimSpace(str))
+	case "times":
+		// The range check lives here rather than in the loader because this
+		// is the only layer that can still tell an authored `times: 0` from
+		// an omitted one — the decoded field is a plain int, so by the time
+		// validation runs the two are the same value.
+		n, ok := asInt(v)
+		if !ok {
+			return fail("send.times must be an integer (e.g. {key: left, times: 16})")
+		}
+		if n < 1 {
+			return fail("send.times must be at least 1 (got %d); omit it for a single press", n)
+		}
+		if n > MaxPTYSendTimes {
+			return fail("send.times must not exceed %d (got %d)", MaxPTYSendTimes, n)
+		}
+		p.Times = n
+	case "paste":
+		str, ok := v.(string)
+		if !ok {
+			return fail("send.paste must be a string")
+		}
+		p.Paste = &str
+	case "mouse":
+		var mouse PTYMouse
+		raw, ok := v.(map[string]any)
+		if !ok {
+			return fail("send.mouse must be a mapping (e.g. {mouse: {row: 5, col: 12}})")
+		}
+		if err := decodeMouse(raw, &mouse, fail); err != nil {
+			return err
+		}
+		p.Mouse = &mouse
+	default:
+		return fail("send: unknown key %q (accepted: key, times, paste, mouse)", k)
+	}
+	return nil
+}
+
+// checkSendShape enforces the mapping form's one-of rule (key/paste/mouse) and
+// that times only ever qualifies a named key.
+func (p *PTYSend) checkSendShape(fail func(string, ...any) error) error {
 	if countSet(p.Key != "", p.Paste != nil, p.Mouse != nil) > 1 {
 		return fail("send: set exactly one of {key: <name>}, {paste: <text>}, or {mouse: {...}}")
 	}
