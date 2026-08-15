@@ -64,91 +64,118 @@ func validate(s *spec.Spec) []string {
 
 	// Suite services are legal signal targets from any scenario (#23), and
 	// suite mock servers are legal mock-assert targets (#24).
-	suiteServiceNames := map[string]bool{}
-	suiteMockNames := map[string]bool{}
-	for i := range s.Suite.Setup {
-		if svc := s.Suite.Setup[i].Service; svc != nil && svc.Name != "" {
-			suiteServiceNames[svc.Name] = true
-		}
-		if ms := s.Suite.Setup[i].MockServer; ms != nil && ms.Name != "" {
-			suiteMockNames[ms.Name] = true
-		}
-	}
+	suiteServiceNames, suiteMockNames := suiteResourceNames(s)
 
 	seen := make(map[string]bool, len(s.Scenarios))
 	for i := range s.Scenarios {
-		sc := &s.Scenarios[i]
-		where := fmt.Sprintf("scenarios[%d]", i)
-		if sc.Name == "" {
-			add("%s.name is required", where)
-		} else {
-			if c := firstControlChar(sc.Name); c != "" {
-				add("%s.name must not contain the control character %s (it breaks list output and generated docs)", where, c)
-			}
-			if seen[sc.Name] {
-				add("duplicate scenario name %q", sc.Name)
-			}
-			seen[sc.Name] = true
-			where = fmt.Sprintf("scenario %q", sc.Name)
-		}
-		validateCondition(add, where, "skip", sc.Skip)
-		validateCondition(add, where, "only", sc.Only)
-		validateExpectFail(add, where, sc.ExpectFail)
-		validateServices(add, where, sc.Services)
-		serviceNames := maps.Clone(suiteServiceNames)
-		for j := range sc.Services {
-			if sc.Services[j].Name != "" {
-				serviceNames[sc.Services[j].Name] = true
-			}
-		}
-		mockNames := maps.Clone(suiteMockNames)
-		validateMockServers(add, where, sc.MockServers, mockNames)
-		if len(sc.Steps) == 0 {
-			add("%s: steps must contain at least one step", where)
-			continue
-		}
-		// A screen assert renders a pty step's terminal (#27) and a duration
-		// assert bounds the immediately preceding measurable step (#31):
-		// reject placements no step could feed.
-		ptySeen := false
-		prevMeasurable := false
-		prevRunOrPTY := false
-		for j := range sc.Steps {
-			sw := fmt.Sprintf("%s.steps[%d]", where, j)
-			st := &sc.Steps[j]
-			if st.Kind() == spec.StepPTY {
-				ptySeen = true
-			}
-			if st.Assert != nil && st.Assert.Screen != nil && !ptySeen {
-				add("%s.assert.screen requires a preceding pty step (the screen is the pty step's rendered terminal)", sw)
-			}
-			if st.Assert != nil && st.Assert.Duration != nil && !prevMeasurable {
-				add("%s.assert.duration requires an immediately preceding run/http/query/grpc/pty step (the step whose wall-clock time it bounds)", sw)
-			}
-			// changes bounds the workdir delta of the immediately preceding
-			// run/pty step (#70): reject a placement no such step feeds.
-			if st.Assert != nil && st.Assert.Changes != nil && !prevRunOrPTY {
-				add("%s.assert.changes requires an immediately preceding run/pty step (the step whose workdir delta it pins); combine it with the assert block directly after the step (one assert may set exit_code, stdout, and changes together)", sw)
-			}
-			validateStep(add, sw, st, s.Runners, serviceNames, mockNames)
-			prevMeasurable = measurableStep(st.Kind())
-			prevRunOrPTY = st.Kind() == spec.StepRun || st.Kind() == spec.StepPTY
-		}
-		for j := range sc.Teardown {
-			tw := fmt.Sprintf("%s.teardown[%d]", where, j)
-			st := &sc.Teardown[j]
-			if st.Assert != nil && st.Assert.Screen != nil && !ptySeen {
-				add("%s.assert.screen requires a pty step in the scenario", tw)
-			}
-			// The workdir delta is only tracked around Steps, so a changes assert
-			// in teardown could never be fed (#70).
-			if st.Assert != nil && st.Assert.Changes != nil {
-				add("%s.assert.changes is not supported in teardown (the workdir delta is tracked only around the scenario's steps)", tw)
-			}
-			validateStep(add, tw, st, s.Runners, serviceNames, mockNames)
-		}
+		validateScenario(add, s, i, seen, suiteServiceNames, suiteMockNames)
 	}
 	return errs
+}
+
+// suiteResourceNames collects the names of services and mock servers declared
+// in suite.setup, which every scenario may target.
+func suiteResourceNames(s *spec.Spec) (services, mocks map[string]bool) {
+	services = map[string]bool{}
+	mocks = map[string]bool{}
+	for i := range s.Suite.Setup {
+		if svc := s.Suite.Setup[i].Service; svc != nil && svc.Name != "" {
+			services[svc.Name] = true
+		}
+		if ms := s.Suite.Setup[i].MockServer; ms != nil && ms.Name != "" {
+			mocks[ms.Name] = true
+		}
+	}
+	return services, mocks
+}
+
+// validateScenario checks one scenario: its identity, gates, services, and
+// every step and teardown step. seen tracks scenario names across the suite
+// for the duplicate check.
+func validateScenario(add func(string, ...any), s *spec.Spec, i int, seen, suiteServiceNames, suiteMockNames map[string]bool) {
+	sc := &s.Scenarios[i]
+	where := fmt.Sprintf("scenarios[%d]", i)
+	if sc.Name == "" {
+		add("%s.name is required", where)
+	} else {
+		if c := firstControlChar(sc.Name); c != "" {
+			add("%s.name must not contain the control character %s (it breaks list output and generated docs)", where, c)
+		}
+		if seen[sc.Name] {
+			add("duplicate scenario name %q", sc.Name)
+		}
+		seen[sc.Name] = true
+		where = fmt.Sprintf("scenario %q", sc.Name)
+	}
+	validateCondition(add, where, "skip", sc.Skip)
+	validateCondition(add, where, "only", sc.Only)
+	validateExpectFail(add, where, sc.ExpectFail)
+	validateServices(add, where, sc.Services)
+	serviceNames := maps.Clone(suiteServiceNames)
+	for j := range sc.Services {
+		if sc.Services[j].Name != "" {
+			serviceNames[sc.Services[j].Name] = true
+		}
+	}
+	mockNames := maps.Clone(suiteMockNames)
+	validateMockServers(add, where, sc.MockServers, mockNames)
+	if len(sc.Steps) == 0 {
+		add("%s: steps must contain at least one step", where)
+		return
+	}
+	ptySeen := validateScenarioSteps(add, where, sc, s.Runners, serviceNames, mockNames)
+	validateScenarioTeardown(add, where, sc, s.Runners, serviceNames, mockNames, ptySeen)
+}
+
+// validateScenarioSteps checks the scenario's steps in order, enforcing the
+// placement rules that tie an assert to the step that feeds it. It reports
+// whether the scenario contains a pty step, which teardown asserts may render.
+func validateScenarioSteps(add func(string, ...any), where string, sc *spec.Scenario, runners map[string]spec.Runner, serviceNames, mockNames map[string]bool) (ptySeen bool) {
+	// A screen assert renders a pty step's terminal (#27) and a duration
+	// assert bounds the immediately preceding measurable step (#31):
+	// reject placements no step could feed.
+	prevMeasurable := false
+	prevRunOrPTY := false
+	for j := range sc.Steps {
+		sw := fmt.Sprintf("%s.steps[%d]", where, j)
+		st := &sc.Steps[j]
+		if st.Kind() == spec.StepPTY {
+			ptySeen = true
+		}
+		if st.Assert != nil && st.Assert.Screen != nil && !ptySeen {
+			add("%s.assert.screen requires a preceding pty step (the screen is the pty step's rendered terminal)", sw)
+		}
+		if st.Assert != nil && st.Assert.Duration != nil && !prevMeasurable {
+			add("%s.assert.duration requires an immediately preceding run/http/query/grpc/pty step (the step whose wall-clock time it bounds)", sw)
+		}
+		// changes bounds the workdir delta of the immediately preceding
+		// run/pty step (#70): reject a placement no such step feeds.
+		if st.Assert != nil && st.Assert.Changes != nil && !prevRunOrPTY {
+			add("%s.assert.changes requires an immediately preceding run/pty step (the step whose workdir delta it pins); combine it with the assert block directly after the step (one assert may set exit_code, stdout, and changes together)", sw)
+		}
+		validateStep(add, sw, st, runners, serviceNames, mockNames)
+		prevMeasurable = measurableStep(st.Kind())
+		prevRunOrPTY = st.Kind() == spec.StepRun || st.Kind() == spec.StepPTY
+	}
+	return ptySeen
+}
+
+// validateScenarioTeardown checks the scenario's teardown steps, whose asserts
+// may render a pty screen but can never be fed a workdir delta.
+func validateScenarioTeardown(add func(string, ...any), where string, sc *spec.Scenario, runners map[string]spec.Runner, serviceNames, mockNames map[string]bool, ptySeen bool) {
+	for j := range sc.Teardown {
+		tw := fmt.Sprintf("%s.teardown[%d]", where, j)
+		st := &sc.Teardown[j]
+		if st.Assert != nil && st.Assert.Screen != nil && !ptySeen {
+			add("%s.assert.screen requires a pty step in the scenario", tw)
+		}
+		// The workdir delta is only tracked around Steps, so a changes assert
+		// in teardown could never be fed (#70).
+		if st.Assert != nil && st.Assert.Changes != nil {
+			add("%s.assert.changes is not supported in teardown (the workdir delta is tracked only around the scenario's steps)", tw)
+		}
+		validateStep(add, tw, st, runners, serviceNames, mockNames)
+	}
 }
 
 // validateSuiteTimeout checks the suite-level default step timeout (#17).

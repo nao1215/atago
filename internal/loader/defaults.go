@@ -32,28 +32,26 @@ func applyDefaults(s *spec.Spec) {
 			}
 		}
 		if d.Run != nil {
-			for j := range sc.Steps {
-				if sc.Steps[j].Run != nil {
-					mergeRunDefaults(d.Run, sc.Steps[j].Run, s.Runners)
-				}
-				// A pty step carries the same environment surface as a run step
-				// (env/clear_env/pass_env/sandbox_home), so defaults.run layers
-				// that shared subset onto it too (#77) — without it, a shared
-				// sandbox_home would leave pty children on the host home.
-				if sc.Steps[j].PTY != nil {
-					mergePTYDefaults(d.Run, sc.Steps[j].PTY)
-				}
-			}
+			mergeStepRunDefaults(d.Run, sc.Steps, s.Runners)
 			// Teardown steps are steps too: shared run defaults (shell, env, ...)
 			// apply so cleanup does not need to re-declare them.
-			for j := range sc.Teardown {
-				if sc.Teardown[j].Run != nil {
-					mergeRunDefaults(d.Run, sc.Teardown[j].Run, s.Runners)
-				}
-				if sc.Teardown[j].PTY != nil {
-					mergePTYDefaults(d.Run, sc.Teardown[j].PTY)
-				}
-			}
+			mergeStepRunDefaults(d.Run, sc.Teardown, s.Runners)
+		}
+	}
+}
+
+// mergeStepRunDefaults layers defaults.run beneath every run and pty step in
+// one step list. A pty step carries the same environment surface as a run step
+// (env/clear_env/pass_env/sandbox_home), so defaults.run layers that shared
+// subset onto it too (#77) — without it, a shared sandbox_home would leave pty
+// children on the host home.
+func mergeStepRunDefaults(def *spec.Run, steps []spec.Step, runners map[string]spec.Runner) {
+	for j := range steps {
+		if steps[j].Run != nil {
+			mergeRunDefaults(def, steps[j].Run, runners)
+		}
+		if steps[j].PTY != nil {
+			mergePTYDefaults(def, steps[j].PTY)
 		}
 	}
 }
