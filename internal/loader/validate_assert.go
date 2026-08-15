@@ -141,35 +141,8 @@ func validateStream(add func(string, ...any), where string, s *spec.StreamAssert
 	validateStringList(add, where, "contains", s.Contains)
 	validateStringList(add, where, "not_contains", s.NotContains)
 
-	// A count bound needs exactly one countable matcher to count (#396).
-	// contains and matches both compose freely without it, so the ambiguity only
-	// appears once a bound is written, and it has to be refused there rather
-	// than resolved by a precedence rule nobody would remember.
 	if s.HasCount() {
-		validateCountBounds(add, where, s.Count, s.MinCount, s.MaxCount)
-		countable := 0
-		if s.Contains != nil {
-			countable++
-			if len(s.Contains) > 1 {
-				add("%s: count applies to one substring; contains lists %d (write one assert per substring)", where, len(s.Contains))
-			}
-		}
-		if s.Matches != nil {
-			countable++
-		}
-		switch {
-		case countable == 0:
-			add("%s: count/min_count/max_count need a contains or matches matcher to count", where)
-		case countable > 1:
-			add("%s: count/min_count/max_count need exactly one countable matcher, but both contains and matches are set", where)
-		}
-		// The other text matchers stay meaningful next to a count, but the
-		// whole-stream ones do not: `equals` already pins every byte.
-		for _, m := range matchers {
-			if streamExclusiveMatchers[m] {
-				add("%s: count/min_count/max_count cannot be combined with %s", where, m)
-			}
-		}
+		validateStreamCount(add, where, s, matchers)
 	}
 
 	if s.Line != nil {
@@ -180,6 +153,38 @@ func validateStream(add func(string, ...any), where string, s *spec.StreamAssert
 		// text matchers — json/snapshot operate on the whole document.
 		if len(s.JSON) > 0 || len(s.YAML) > 0 || s.Snapshot != "" {
 			add("%s.line cannot be combined with json/yaml/snapshot (use contains/matches/equals/empty)", where)
+		}
+	}
+}
+
+// validateStreamCount checks a stream assert's occurrence bounds (#396). A
+// count bound needs exactly one countable matcher to count; contains and
+// matches both compose freely without it, so the ambiguity only appears once a
+// bound is written, and it has to be refused there rather than resolved by a
+// precedence rule nobody would remember.
+func validateStreamCount(add func(string, ...any), where string, s *spec.StreamAssert, matchers []string) {
+	validateCountBounds(add, where, s.Count, s.MinCount, s.MaxCount)
+	countable := 0
+	if s.Contains != nil {
+		countable++
+		if len(s.Contains) > 1 {
+			add("%s: count applies to one substring; contains lists %d (write one assert per substring)", where, len(s.Contains))
+		}
+	}
+	if s.Matches != nil {
+		countable++
+	}
+	switch {
+	case countable == 0:
+		add("%s: count/min_count/max_count need a contains or matches matcher to count", where)
+	case countable > 1:
+		add("%s: count/min_count/max_count need exactly one countable matcher, but both contains and matches are set", where)
+	}
+	// The other text matchers stay meaningful next to a count, but the
+	// whole-stream ones do not: `equals` already pins every byte.
+	for _, m := range matchers {
+		if streamExclusiveMatchers[m] {
+			add("%s: count/min_count/max_count cannot be combined with %s", where, m)
 		}
 	}
 }

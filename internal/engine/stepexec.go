@@ -234,25 +234,7 @@ func (x *scenarioRun) execStep(ctx context.Context, steps []spec.Step, i int, st
 			status = StatusError
 		}
 	case spec.StepRun:
-		if msg := runRefGuard(x.st, step.Run, x.rc.runners); msg != "" {
-			sr.ErrMsg = msg
-			return sr, StatusError, false
-		}
-		run := mergeScenarioEnv(x.scEnv, expandRun(x.st, step.Run), x.st)
-		r, untilChecks, err := x.e.runStep(ctx, run, x.st, x.workdir, x.specDir, x.rc, x.sshConns, beforeAttempt)
-		if err != nil {
-			sr.ErrMsg = err.Error()
-			return sr, StatusError, isPolicyViolation(err)
-		}
-		// Assertions run against the real result (current); the copy kept for
-		// reporting is masked so secrets never reach logs/reports.
-		x.adopt(&sr, r)
-		if x.recordUntil(&sr, i, untilChecks) == StatusFailed {
-			status = StatusFailed
-		}
-		if ck := timeoutKillCheck(r, steps, i); ck != nil {
-			status = x.fail(&sr, i, ck)
-		}
+		return x.execRunStep(ctx, steps, i, step, beforeAttempt)
 	case spec.StepAssert:
 		crs := assert.CheckAll(expandAssert(x.st, step.Assert), x.current, assert.Env{
 			Workdir:         x.workdir,
@@ -300,21 +282,7 @@ func (x *scenarioRun) execStep(ctx context.Context, steps []spec.Step, i int, st
 		}
 		x.adopt(&sr, r)
 	case spec.StepPTY:
-		r, ef, err := x.e.runPTY(ctx, step.PTY, x.st, x.scEnv, x.workdir)
-		if err != nil {
-			sr.ErrMsg = err.Error()
-			return sr, StatusError, false
-		}
-		x.adopt(&sr, r)
-		if ef != nil {
-			// A never-matching expect fails like an assertion: the pattern
-			// and the transcript excerpt land in the failure block.
-			status = x.fail(&sr, i, ptyExpectCheck(ef))
-		} else if ck := timeoutKillCheck(r, steps, i); ck != nil {
-			// No expect failed, so nothing else would notice that the program
-			// never exited before the session timeout killed it.
-			status = x.fail(&sr, i, ck)
-		}
+		return x.execPTYStep(ctx, steps, i, step)
 	case spec.StepCDP:
 		r, err := x.e.runCDP(ctx, expandCDP(x.st, step.CDP), x.workdir, x.st, x.rc, x.browserConns)
 		if err != nil {
@@ -336,6 +304,56 @@ func (x *scenarioRun) execStep(ctx context.Context, steps []spec.Step, i int, st
 		status = StatusError
 	}
 	return sr, status, secViolation
+}
+
+// execRunStep executes one run step: the ${name} guard, the command itself,
+// its retry `until` checks, and the silent-timeout-kill check.
+func (x *scenarioRun) execRunStep(ctx context.Context, steps []spec.Step, i int, step *spec.Step, beforeAttempt func()) (StepResult, Status, bool) {
+	sr := StepResult{Index: i, Kind: step.Kind()}
+	status := StatusPassed
+	if msg := runRefGuard(x.st, step.Run, x.rc.runners); msg != "" {
+		sr.ErrMsg = msg
+		return sr, StatusError, false
+	}
+	run := mergeScenarioEnv(x.scEnv, expandRun(x.st, step.Run), x.st)
+	r, untilChecks, err := x.e.runStep(ctx, run, x.st, x.workdir, x.specDir, x.rc, x.sshConns, beforeAttempt)
+	if err != nil {
+		sr.ErrMsg = err.Error()
+		return sr, StatusError, isPolicyViolation(err)
+	}
+	// Assertions run against the real result (current); the copy kept for
+	// reporting is masked so secrets never reach logs/reports.
+	x.adopt(&sr, r)
+	if x.recordUntil(&sr, i, untilChecks) == StatusFailed {
+		status = StatusFailed
+	}
+	if ck := timeoutKillCheck(r, steps, i); ck != nil {
+		status = x.fail(&sr, i, ck)
+	}
+	return sr, status, false
+}
+
+// execPTYStep executes one interactive pty step and folds an expect failure or
+// a silent session-timeout kill into the step's checks.
+func (x *scenarioRun) execPTYStep(ctx context.Context, steps []spec.Step, i int, step *spec.Step) (StepResult, Status, bool) {
+	sr := StepResult{Index: i, Kind: step.Kind()}
+	status := StatusPassed
+	r, ef, err := x.e.runPTY(ctx, step.PTY, x.st, x.scEnv, x.workdir)
+	if err != nil {
+		sr.ErrMsg = err.Error()
+		return sr, StatusError, false
+	}
+	x.adopt(&sr, r)
+	if ef != nil {
+		// A never-matching expect fails like an assertion: the pattern
+		// and the transcript excerpt land in the failure block.
+		status = x.fail(&sr, i, ptyExpectCheck(ef))
+	} else if ck := timeoutKillCheck(r, steps, i); ck != nil {
+		// No expect failed, so nothing else would notice that the program
+		// never exited before the session timeout killed it.
+		status = x.fail(&sr, i, ck)
+	}
+	return sr, status, false
 }
 
 // runSteps executes the scenario steps after the leading fixtures, scanning the
@@ -444,64 +462,13 @@ func isSSHRunner(name string, runners map[string]spec.Runner) bool {
 // until passes or the attempt budget is spent; the last attempt's result is what
 // later steps observe.
 func (e *Engine) runStep(ctx context.Context, run *spec.Run, st *store.Store, workdir, specDir string, rc runConfig, sshConns map[string]*sshrunner.Runner, beforeAttempt func()) (*runner.Result, []*assert.CheckResult, error) {
-	// A run step naming an ssh runner executes remotely; otherwise it
-	// runs locally via the cmd runner. The runner is resolved once (not per
-	// retry attempt) so the timeout precedence below sees the pristine authored
-	// step value.
-	remote := false
-	var runnerTimeout string
-	if run.Runner != "" {
-		rdef, ok := rc.runners[run.Runner]
-		if !ok {
-			return nil, nil, fmt.Errorf("run step references unknown runner %q", run.Runner)
-		}
-		switch rdef.Type {
-		case "ssh":
-			remote = true
-		case "cmd", "":
-			// Layer the runner's cwd beneath the step's own value; the step
-			// wins. run is the caller's expanded copy, so mutating it is safe;
-			// cwd gets the same use-time ${name} expansion as the other runner
-			// families' fields.
-			if run.Cwd == "" {
-				run.Cwd = st.Expand(rdef.Cwd)
-			}
-			runnerTimeout = rdef.Timeout
-		default:
-			return nil, nil, fmt.Errorf("runner %q (type %q) cannot run a command step; use a step matching its type", run.Runner, rdef.Type)
-		}
-	}
-	if !remote {
-		// Resolve the effective timeout across all five levels (#17) and
-		// remember which level supplied it so a timeout kill can name the knob
-		// in its hint. Remote (ssh) runs apply only the step's own explicit
-		// timeout below — the other levels shape local execution, and the ssh
-		// runner's dial-time timeout already bounds every remote command.
-		run.Timeout, run.TimeoutSource = resolveTimeout(run.Timeout, runnerTimeout, rc.defaultsRunTimeout, rc.suiteTimeout)
-	} else if run.Timeout != "" {
-		run.TimeoutSource = "run.timeout"
+	remote, err := resolveRunTarget(run, st, rc)
+	if err != nil {
+		return nil, nil, err
 	}
 	exec := func(ctx context.Context) (*runner.Result, error) {
 		if remote {
-			conn, err := sshConn(run.Runner, st, rc, sshConns)
-			if err != nil {
-				return nil, err
-			}
-			// The loader whitelists `timeout` on ssh run steps because it is
-			// honored remotely — so honor it: the step's own timeout arrives at
-			// the runner as a context deadline and takes precedence over the
-			// runner-level timeout applied inside conn.Run.
-			if run.Timeout != "" {
-				d, _ := time.ParseDuration(run.Timeout) // validated at load time
-				var cancel context.CancelFunc
-				ctx, cancel = context.WithTimeout(ctx, d)
-				defer cancel()
-			}
-			r, err := conn.Run(ctx, run.Command)
-			if r != nil && r.TimedOut && r.TimeoutSource == "" {
-				r.TimeoutSource = run.TimeoutSource
-			}
-			return r, err
+			return runRemote(ctx, run, st, rc, sshConns)
 		}
 		return e.cmd.Run(ctx, run, workdir)
 	}
@@ -530,6 +497,68 @@ func (e *Engine) runStep(ctx context.Context, run *spec.Run, st *store.Store, wo
 	}
 	env := assert.Env{Workdir: workdir, SpecDir: specDir, UpdateSnapshots: e.UpdateSnapshots, Secrets: rc.masker.MaskBytes, Scrub: rc.scrubber.Apply}
 	return pollUntil(ctx, run.Retry, st, env, exec, beforeAttempt)
+}
+
+// resolveRunTarget decides whether a run step executes remotely and settles
+// its effective cwd and timeout. The runner is resolved once (not per retry
+// attempt) so the timeout precedence sees the pristine authored step value.
+// run is the caller's expanded copy, so mutating it is safe.
+func resolveRunTarget(run *spec.Run, st *store.Store, rc runConfig) (remote bool, err error) {
+	var runnerTimeout string
+	if run.Runner != "" {
+		rdef, ok := rc.runners[run.Runner]
+		if !ok {
+			return false, fmt.Errorf("run step references unknown runner %q", run.Runner)
+		}
+		switch rdef.Type {
+		case "ssh":
+			remote = true
+		case "cmd", "":
+			// Layer the runner's cwd beneath the step's own value; the step
+			// wins. cwd gets the same use-time ${name} expansion as the other
+			// runner families' fields.
+			if run.Cwd == "" {
+				run.Cwd = st.Expand(rdef.Cwd)
+			}
+			runnerTimeout = rdef.Timeout
+		default:
+			return false, fmt.Errorf("runner %q (type %q) cannot run a command step; use a step matching its type", run.Runner, rdef.Type)
+		}
+	}
+	if !remote {
+		// Resolve the effective timeout across all five levels (#17) and
+		// remember which level supplied it so a timeout kill can name the knob
+		// in its hint. Remote (ssh) runs apply only the step's own explicit
+		// timeout — the other levels shape local execution, and the ssh
+		// runner's dial-time timeout already bounds every remote command.
+		run.Timeout, run.TimeoutSource = resolveTimeout(run.Timeout, runnerTimeout, rc.defaultsRunTimeout, rc.suiteTimeout)
+	} else if run.Timeout != "" {
+		run.TimeoutSource = "run.timeout"
+	}
+	return remote, nil
+}
+
+// runRemote executes one command over the step's ssh runner.
+func runRemote(ctx context.Context, run *spec.Run, st *store.Store, rc runConfig, sshConns map[string]*sshrunner.Runner) (*runner.Result, error) {
+	conn, err := sshConn(run.Runner, st, rc, sshConns)
+	if err != nil {
+		return nil, err
+	}
+	// The loader whitelists `timeout` on ssh run steps because it is
+	// honored remotely — so honor it: the step's own timeout arrives at
+	// the runner as a context deadline and takes precedence over the
+	// runner-level timeout applied inside conn.Run.
+	if run.Timeout != "" {
+		d, _ := time.ParseDuration(run.Timeout) // validated at load time
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, d)
+		defer cancel()
+	}
+	r, err := conn.Run(ctx, run.Command)
+	if r != nil && r.TimedOut && r.TimeoutSource == "" {
+		r.TimeoutSource = run.TimeoutSource
+	}
+	return r, err
 }
 
 // measurableForChanges reports whether a step kind produces a workdir delta a

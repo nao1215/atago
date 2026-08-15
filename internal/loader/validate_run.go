@@ -162,34 +162,45 @@ func shellMetachar(cmd string) string {
 			}
 			continue
 		}
-		switch c {
-		case '\'', '"':
+		if c == '\'' || c == '"' {
 			quote = c
-		case '`':
-			return "`"
-		case '|':
-			if i+1 < len(runes) && runes[i+1] == '|' {
-				return "||"
-			}
-			return "|"
-		case '&':
-			if i+1 < len(runes) && runes[i+1] == '&' {
-				return "&&"
-			}
-			// A lone `&` (background) is not in the guarded set; ignore it.
-		case ';':
-			return ";"
-		case '<':
-			return "<"
-		case '>':
-			if i+1 < len(runes) && runes[i+1] == '>' {
-				return ">>"
-			}
-			return ">"
-		case '$':
-			if i+1 < len(runes) && runes[i+1] == '(' {
-				return "$("
-			}
+			continue
+		}
+		if op := metacharAt(runes, i); op != "" {
+			return op
+		}
+	}
+	return ""
+}
+
+// metacharAt reports the guarded shell operator starting at runes[i], or ""
+// when the rune is ordinary. A lone `&` (background) is not in the guarded set.
+func metacharAt(runes []rune, i int) string {
+	next := func(r rune) bool { return i+1 < len(runes) && runes[i+1] == r }
+	switch runes[i] {
+	case '`':
+		return "`"
+	case '|':
+		if next('|') {
+			return "||"
+		}
+		return "|"
+	case '&':
+		if next('&') {
+			return "&&"
+		}
+	case ';':
+		return ";"
+	case '<':
+		return "<"
+	case '>':
+		if next('>') {
+			return ">>"
+		}
+		return ">"
+	case '$':
+		if next('(') {
+			return "$("
 		}
 	}
 	return ""

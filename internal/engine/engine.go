@@ -22,7 +22,7 @@ import (
 )
 
 // teardownInterruptTimeout bounds teardown execution after the run itself was
-// cancelled (Ctrl-C / SIGTERM): cleanup of external resources still runs, but a
+// canceled (Ctrl-C / SIGTERM): cleanup of external resources still runs, but a
 // hung teardown cannot keep an interrupted process alive indefinitely.
 const teardownInterruptTimeout = 30 * time.Second
 
@@ -129,24 +129,7 @@ func builtinVars() map[string]string {
 func (e *Engine) Run(ctx context.Context, s *spec.Spec, specPath string) *SuiteResult {
 	start := time.Now()
 	res := &SuiteResult{Suite: s.Suite.Name, SpecPath: specPath, Status: StatusPassed}
-	rc := runConfig{
-		specDir:      filepath.Dir(specPath),
-		fixturesDir:  absPath(s.FixturesDir),
-		specPath:     specPath,
-		masker:       security.NewMaskerForSpec(s),
-		scrubber:     newScrubber(s),
-		runners:      s.Runners,
-		allow:        allowedHosts(s),
-		suiteTimeout: s.Suite.Timeout,
-	}
-	if s.Defaults != nil && s.Defaults.Run != nil {
-		rc.defaultsRunTimeout = s.Defaults.Run.Timeout
-	}
-
-	workers := e.Parallel
-	if workers < 1 {
-		workers = 1
-	}
+	rc := newRunConfig(s, specPath)
 
 	selected := e.selectScenarios(s, specPath)
 
@@ -156,10 +139,7 @@ func (e *Engine) Run(ctx context.Context, s *spec.Spec, specPath string) *SuiteR
 	suiteRT, rtErr := e.newSuiteRuntime(s, rc.specDir, rc.fixturesDir)
 	if rtErr != nil {
 		res.Status = StatusError
-		for _, i := range selected {
-			res.Scenarios = append(res.Scenarios, ScenarioResult{Name: s.Scenarios[i].Name, Suite: s.Suite.Name, Status: StatusError,
-				Steps: []StepResult{{Kind: spec.StepNone, Setup: true, ErrMsg: suiteSetupLabel + ": " + rtErr.Error()}}})
-		}
+		res.Scenarios = e.errorSelected(s, selected, suiteSetupLabel+": "+rtErr.Error(), false)
 		res.Duration = time.Since(start)
 		return res
 	}
@@ -172,15 +152,7 @@ func (e *Engine) Run(ctx context.Context, s *spec.Spec, specPath string) *SuiteR
 			// named; none of their steps run. Teardown still runs: a partially
 			// executed setup may have created external state worth cleaning.
 			res.Status = StatusError
-			failure := suiteSetupFailure(res.Setup)
-			for _, i := range selected {
-				sr := ScenarioResult{Name: s.Scenarios[i].Name, Suite: s.Suite.Name, Status: StatusError,
-					Steps: []StepResult{{Kind: spec.StepNone, Setup: true, ErrMsg: failure}}}
-				if e.OnScenario != nil {
-					e.OnScenario(sr)
-				}
-				res.Scenarios = append(res.Scenarios, sr)
-			}
+			res.Scenarios = e.errorSelected(s, selected, suiteSetupFailure(res.Setup), true)
 			res.Teardown = e.runSuiteTeardown(ctx, s, suiteRT, rc)
 			res.Duration = time.Since(start)
 			return res
@@ -196,80 +168,7 @@ func (e *Engine) Run(ctx context.Context, s *spec.Spec, specPath string) *SuiteR
 		}()
 	}
 
-	results := make([]ScenarioResult, len(s.Scenarios))
-	done := make([]bool, len(s.Scenarios))
-	jobs := make(chan int)
-	var mu sync.Mutex // guards OnScenario, failStop, results/done writes from the emit path
-	failStop := false
-
-	// Producer: feed selected scenario indices until fail-fast stops scheduling or
-	// the run is cancelled (Ctrl-C / SIGTERM). On cancellation it stops scheduling
-	// new scenarios; in-flight scenarios stop at their next step via ctx.Err().
-	go func() {
-		defer close(jobs)
-		for _, i := range selected {
-			if ctx.Err() != nil {
-				return
-			}
-			mu.Lock()
-			stop := failStop
-			mu.Unlock()
-			if stop {
-				return
-			}
-			select {
-			case jobs <- i:
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-
-	var wg sync.WaitGroup
-	for w := 0; w < workers; w++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for idx := range jobs {
-				// A job may have been queued just before another worker tripped
-				// fail-fast; re-check so it is left as skipped rather than run.
-				mu.Lock()
-				stop := failStop
-				mu.Unlock()
-				if stop {
-					continue
-				}
-				if e.Sem != nil {
-					// The global semaphore is shared across every suite in the run.
-					// On Ctrl-C, slots free up only as in-flight scenarios unwind, so
-					// waiting for one here would both stall shutdown and then run a
-					// scenario the user already cancelled. Bail instead; the scenario
-					// is reported as "skipped after interrupt".
-					select {
-					case e.Sem <- struct{}{}:
-					case <-ctx.Done():
-						continue
-					}
-				}
-				sc := e.runScenarioWithPolicy(ctx, idx, &s.Scenarios[idx], rc)
-				sc.Suite = s.Suite.Name
-				if e.Sem != nil {
-					<-e.Sem
-				}
-				mu.Lock()
-				results[idx] = sc
-				done[idx] = true
-				if e.OnScenario != nil {
-					e.OnScenario(sc)
-				}
-				if e.FailFast && FailsRun(sc.Status, e.AllowFlaky, e.AllowXPass) {
-					failStop = true
-				}
-				mu.Unlock()
-			}
-		}()
-	}
-	wg.Wait()
+	results, done := e.runSelected(ctx, s, selected, rc)
 
 	// Build the report from the selected scenarios in definition order. Selected
 	// scenarios that never ran (stopped by fail-fast) are recorded as skipped.
@@ -292,6 +191,158 @@ func (e *Engine) Run(ctx context.Context, s *spec.Spec, specPath string) *SuiteR
 	}
 	res.Duration = time.Since(start)
 	return res
+}
+
+// newRunConfig derives the per-suite execution config from the spec.
+func newRunConfig(s *spec.Spec, specPath string) runConfig {
+	rc := runConfig{
+		specDir:      filepath.Dir(specPath),
+		fixturesDir:  absPath(s.FixturesDir),
+		specPath:     specPath,
+		masker:       security.NewMaskerForSpec(s),
+		scrubber:     newScrubber(s),
+		runners:      s.Runners,
+		allow:        allowedHosts(s),
+		suiteTimeout: s.Suite.Timeout,
+	}
+	if s.Defaults != nil && s.Defaults.Run != nil {
+		rc.defaultsRunTimeout = s.Defaults.Run.Timeout
+	}
+	return rc
+}
+
+// errorSelected marks every selected scenario as errored with the suite-setup
+// failure named, none of their steps having run. emit additionally streams each
+// result through OnScenario: a suite whose runtime never came up has no live
+// progress to reconcile, so that path stays silent.
+func (e *Engine) errorSelected(s *spec.Spec, selected []int, errMsg string, emit bool) []ScenarioResult {
+	out := make([]ScenarioResult, 0, len(selected))
+	for _, i := range selected {
+		sr := ScenarioResult{Name: s.Scenarios[i].Name, Suite: s.Suite.Name, Status: StatusError,
+			Steps: []StepResult{{Kind: spec.StepNone, Setup: true, ErrMsg: errMsg}}}
+		if emit && e.OnScenario != nil {
+			e.OnScenario(sr)
+		}
+		out = append(out, sr)
+	}
+	return out
+}
+
+// runSelected executes the selected scenarios on the worker pool and reports
+// which finished. results and done are indexed by scenario position in the
+// spec, so unrun entries are zero values with done[i] false.
+func (e *Engine) runSelected(ctx context.Context, s *spec.Spec, selected []int, rc runConfig) (results []ScenarioResult, done []bool) {
+	workers := e.Parallel
+	if workers < 1 {
+		workers = 1
+	}
+
+	pool := &scenarioPool{
+		e:       e,
+		s:       s,
+		rc:      rc,
+		results: make([]ScenarioResult, len(s.Scenarios)),
+		done:    make([]bool, len(s.Scenarios)),
+	}
+	jobs := make(chan int)
+	go pool.produce(ctx, selected, jobs)
+
+	var wg sync.WaitGroup
+	for w := 0; w < workers; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			pool.work(ctx, jobs)
+		}()
+	}
+	wg.Wait()
+	return pool.results, pool.done
+}
+
+// scenarioPool is the shared state of one suite's scenario workers: the
+// results/done slices they fill in, and the fail-fast flag that stops
+// scheduling.
+type scenarioPool struct {
+	e       *Engine
+	s       *spec.Spec
+	rc      runConfig
+	results []ScenarioResult
+	done    []bool
+
+	mu       sync.Mutex // guards OnScenario, failStop, results/done writes from the emit path
+	failStop bool
+}
+
+// stopped reports whether fail-fast has tripped.
+func (p *scenarioPool) stopped() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.failStop
+}
+
+// produce feeds selected scenario indices until fail-fast stops scheduling or
+// the run is canceled (Ctrl-C / SIGTERM). On cancellation it stops scheduling
+// new scenarios; in-flight scenarios stop at their next step via ctx.Err().
+func (p *scenarioPool) produce(ctx context.Context, selected []int, jobs chan<- int) {
+	defer close(jobs)
+	for _, i := range selected {
+		if ctx.Err() != nil {
+			return
+		}
+		if p.stopped() {
+			return
+		}
+		select {
+		case jobs <- i:
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+// work runs scenarios from jobs until the channel closes.
+func (p *scenarioPool) work(ctx context.Context, jobs <-chan int) {
+	e := p.e
+	for idx := range jobs {
+		// A job may have been queued just before another worker tripped
+		// fail-fast; re-check so it is left as skipped rather than run.
+		if p.stopped() {
+			continue
+		}
+		if e.Sem != nil {
+			// The global semaphore is shared across every suite in the run.
+			// On Ctrl-C, slots free up only as in-flight scenarios unwind, so
+			// waiting for one here would both stall shutdown and then run a
+			// scenario the user already canceled. Bail instead; the scenario
+			// is reported as "skipped after interrupt".
+			select {
+			case e.Sem <- struct{}{}:
+			case <-ctx.Done():
+				continue
+			}
+		}
+		sc := e.runScenarioWithPolicy(ctx, idx, &p.s.Scenarios[idx], p.rc)
+		sc.Suite = p.s.Suite.Name
+		if e.Sem != nil {
+			<-e.Sem
+		}
+		p.emit(idx, sc)
+	}
+}
+
+// emit records one finished scenario and trips fail-fast when its outcome
+// fails the run.
+func (p *scenarioPool) emit(idx int, sc ScenarioResult) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.results[idx] = sc
+	p.done[idx] = true
+	if p.e.OnScenario != nil {
+		p.e.OnScenario(sc)
+	}
+	if p.e.FailFast && FailsRun(sc.Status, p.e.AllowFlaky, p.e.AllowXPass) {
+		p.failStop = true
+	}
 }
 
 // selectScenarios returns the indices of scenarios that pass the filter/tag
