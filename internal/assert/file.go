@@ -67,151 +67,38 @@ func checkFile(f *spec.FileAssert, env Env) (out *CheckResult) {
 
 	switch {
 	case f.Exists != nil:
-		desc := fmt.Sprintf("assert file %q exists: %t", f.Path, *f.Exists)
-		info, err := os.Stat(path)
-		// Only a genuine "not exist" result participates in exists:true/false.
-		// Permission, I/O, and other stat failures are surfaced as an error so
-		// users do not debug a "missing file" that is really unreadable (#39).
-		if err != nil && !os.IsNotExist(err) {
-			return &CheckResult{
-				Desc:     desc,
-				Expected: fmt.Sprintf("stat-able file %q", f.Path),
-				Actual:   err.Error(),
-				Hint:     fmt.Sprintf("could not stat file %q: %v", f.Path, err),
-			}
-		}
-		// A directory is not the file this assertion is about. Counting it as one
-		// made `exists: true` pass for a tool that produced a directory where a
-		// file was expected — the assertion's whole job is to catch that.
-		if err == nil && info.IsDir() {
-			return &CheckResult{
-				Desc:     desc,
-				Expected: fmt.Sprintf("file %q exists=%t", f.Path, *f.Exists),
-				Actual:   fmt.Sprintf("%q is a directory", f.Path),
-				Hint:     fmt.Sprintf("%q exists but is a directory, not a file; use a dir: assertion for it", f.Path),
-			}
-		}
-		exists := err == nil
-		if exists == *f.Exists {
-			return pass(desc)
-		}
-		return &CheckResult{
-			Desc:     desc,
-			Expected: fmt.Sprintf("file %q exists=%t", f.Path, *f.Exists),
-			Actual:   fmt.Sprintf("exists=%t", exists),
-			Hint:     fmt.Sprintf("expected file %q to %s", f.Path, existence(*f.Exists)),
-		}
+		return checkFileExists(f, env.Workdir, path)
 
 	case f.Contains != nil:
 		data, cr := read(f.Path, path)
 		if cr != nil {
 			return cr
 		}
-		desc := fileContainsDesc(f.Path, f.Contains, true)
-		if sub, idx, missing := firstMissing(string(data), f.Contains); missing {
-			return &CheckResult{
-				Desc:     desc,
-				Expected: fmt.Sprintf("file %q contains %q", f.Path, sub),
-				Actual:   excerpt(string(data)),
-				Hint:     fmt.Sprintf("the substring %q%s was not present in %q", sub, elementLabel(idx, len(f.Contains)), f.Path),
-			}
-		}
-		return pass(desc)
+		return checkFileContains(f, data)
 
 	case f.NotContains != nil:
 		data, cr := read(f.Path, path)
 		if cr != nil {
 			return cr
 		}
-		desc := fileContainsDesc(f.Path, f.NotContains, false)
-		if sub, idx, present := firstPresent(string(data), f.NotContains); present {
-			return &CheckResult{
-				Desc:     desc,
-				Expected: fmt.Sprintf("file %q without %q", f.Path, sub),
-				Actual:   excerpt(string(data)),
-				Hint:     fmt.Sprintf("the substring %q%s was unexpectedly present in %q", sub, elementLabel(idx, len(f.NotContains)), f.Path),
-			}
-		}
-		return pass(desc)
+		return checkFileNotContains(f, data)
 
 	case f.Executable != nil:
-		info, statErr := os.Stat(path)
-		if statErr != nil {
-			return &CheckResult{
-				Desc:     fmt.Sprintf("assert file %q executable: %t", f.Path, *f.Executable),
-				Expected: fmt.Sprintf("readable file %q", f.Path),
-				Actual:   statErr.Error(),
-				Hint:     fmt.Sprintf("could not stat file %q", f.Path),
-			}
-		}
-		desc := fmt.Sprintf("assert file %q executable: %t", f.Path, *f.Executable)
-		// Every directory carries the execute bit, so reading it as "this is an
-		// executable" turned a tool that produced a directory into a passing
-		// executable check.
-		if info.IsDir() {
-			return &CheckResult{
-				Desc:     desc,
-				Expected: fmt.Sprintf("file %q executable=%t", f.Path, *f.Executable),
-				Actual:   fmt.Sprintf("%q is a directory", f.Path),
-				Hint:     fmt.Sprintf("%q is a directory, not an executable file; a directory's execute bit means it can be entered", f.Path),
-			}
-		}
-		isExec := info.Mode().Perm()&0o111 != 0
-		if isExec == *f.Executable {
-			return pass(desc)
-		}
-		return &CheckResult{
-			Desc:     desc,
-			Expected: fmt.Sprintf("file %q executable=%t", f.Path, *f.Executable),
-			Actual:   fmt.Sprintf("executable=%t (mode %s)", isExec, info.Mode().Perm()),
-			Hint:     fmt.Sprintf("expected file %q to %s executable", f.Path, executability(*f.Executable)),
-		}
+		return checkFileExecutable(f, env.Workdir, path)
 
 	case f.Equals != nil:
 		data, cr := read(f.Path, path)
 		if cr != nil {
 			return cr
 		}
-		// Byte-exact: no CRLF or trailing-newline normalization, unlike the stdout
-		// equals matcher. A round-trip test needs to prove the bytes are identical.
-		desc := fmt.Sprintf("assert file %q equals exact bytes", f.Path)
-		if string(data) == *f.Equals {
-			return pass(desc)
-		}
-		return &CheckResult{
-			Desc:             desc,
-			Expected:         excerpt(*f.Equals),
-			Actual:           excerpt(string(data)),
-			Hint:             fmt.Sprintf("file %q did not equal the expected bytes exactly (no CRLF/newline normalization)", f.Path),
-			ArtifactExpected: []byte(*f.Equals),
-		}
+		return checkFileEquals(f, data)
 
 	case f.EqualsFile != nil:
 		data, cr := read(f.Path, path)
 		if cr != nil {
 			return cr
 		}
-		otherPath, err := security.ResolveWorkdirPath("assert.file.equals_file", env.Workdir, *f.EqualsFile)
-		if err != nil {
-			return &CheckResult{Desc: fmt.Sprintf("assert file %q equals_file %q", f.Path, *f.EqualsFile), Hint: err.Error()}
-		}
-		// The comparison file is read plainly (not via read): the failure artifact
-		// is the file under test, and the other file is carried as ArtifactExpected.
-		other, cr := readFile(*f.EqualsFile, env.Workdir, otherPath)
-		if cr != nil {
-			return cr
-		}
-		desc := fmt.Sprintf("assert file %q equals file %q", f.Path, *f.EqualsFile)
-		if bytes.Equal(data, other) {
-			return pass(desc)
-		}
-		return &CheckResult{
-			Desc:             desc,
-			Expected:         fmt.Sprintf("bytes identical to %q", *f.EqualsFile),
-			Actual:           excerpt(string(data)),
-			Hint:             fmt.Sprintf("file %q is not byte-identical to %q (no CRLF/newline normalization)", f.Path, *f.EqualsFile),
-			ArtifactExpected: other,
-		}
+		return checkFileEqualsFile(f, data, env)
 
 	case len(f.JSON) > 0:
 		data, cr := read(f.Path, path)
@@ -233,6 +120,158 @@ func checkFile(f *spec.FileAssert, env Env) (out *CheckResult) {
 
 	default:
 		return &CheckResult{Desc: "assert file", Hint: "file assertion must set exists/contains/not_contains/executable/equals/equals_file/json/snapshot"}
+	}
+}
+
+// checkFileExists evaluates exists:true/false against a stat of path.
+func checkFileExists(f *spec.FileAssert, root, path string) *CheckResult {
+	desc := fmt.Sprintf("assert file %q exists: %t", f.Path, *f.Exists)
+	// StatNoFollow, not os.Stat: a program under test can plant a symlink at the
+	// assertion target, and following it would report whether a host file OUTSIDE
+	// the workdir exists — the metadata twin of the disclosure ReadFileNoFollow
+	// refuses on the read path (issue #16), and the same rule checkFileSize
+	// already applies. Binding it to the workdir refuses an ancestor swapped for
+	// a link too (issue #430).
+	info, err := security.StatNoFollow(root, path)
+	// Only a genuine "not exist" result participates in exists:true/false.
+	// Permission, I/O, symlink-refusal, and other stat failures are surfaced as
+	// an error so users do not debug a "missing file" that is really unreadable (#39).
+	if err != nil && !os.IsNotExist(err) {
+		return &CheckResult{
+			Desc:     desc,
+			Expected: fmt.Sprintf("stat-able file %q", f.Path),
+			Actual:   err.Error(),
+			Hint:     fmt.Sprintf("could not stat file %q: %v", f.Path, err),
+		}
+	}
+	// A directory is not the file this assertion is about. Counting it as one
+	// made `exists: true` pass for a tool that produced a directory where a
+	// file was expected — the assertion's whole job is to catch that.
+	if err == nil && info.IsDir() {
+		return &CheckResult{
+			Desc:     desc,
+			Expected: fmt.Sprintf("file %q exists=%t", f.Path, *f.Exists),
+			Actual:   fmt.Sprintf("%q is a directory", f.Path),
+			Hint:     fmt.Sprintf("%q exists but is a directory, not a file; use a dir: assertion for it", f.Path),
+		}
+	}
+	exists := err == nil
+	if exists == *f.Exists {
+		return pass(desc)
+	}
+	return &CheckResult{
+		Desc:     desc,
+		Expected: fmt.Sprintf("file %q exists=%t", f.Path, *f.Exists),
+		Actual:   fmt.Sprintf("exists=%t", exists),
+		Hint:     fmt.Sprintf("expected file %q to %s", f.Path, existence(*f.Exists)),
+	}
+}
+
+// checkFileContains requires every listed substring to appear in data.
+func checkFileContains(f *spec.FileAssert, data []byte) *CheckResult {
+	desc := fileContainsDesc(f.Path, f.Contains, true)
+	if sub, idx, missing := firstMissing(string(data), f.Contains); missing {
+		return &CheckResult{
+			Desc:     desc,
+			Expected: fmt.Sprintf("file %q contains %q", f.Path, sub),
+			Actual:   excerpt(string(data)),
+			Hint:     fmt.Sprintf("the substring %q%s was not present in %q", sub, elementLabel(idx, len(f.Contains)), f.Path),
+		}
+	}
+	return pass(desc)
+}
+
+// checkFileNotContains requires every listed substring to be absent from data.
+func checkFileNotContains(f *spec.FileAssert, data []byte) *CheckResult {
+	desc := fileContainsDesc(f.Path, f.NotContains, false)
+	if sub, idx, present := firstPresent(string(data), f.NotContains); present {
+		return &CheckResult{
+			Desc:     desc,
+			Expected: fmt.Sprintf("file %q without %q", f.Path, sub),
+			Actual:   excerpt(string(data)),
+			Hint:     fmt.Sprintf("the substring %q%s was unexpectedly present in %q", sub, elementLabel(idx, len(f.NotContains)), f.Path),
+		}
+	}
+	return pass(desc)
+}
+
+// checkFileExecutable evaluates executable:true/false against path's mode bits.
+func checkFileExecutable(f *spec.FileAssert, root, path string) *CheckResult {
+	desc := fmt.Sprintf("assert file %q executable: %t", f.Path, *f.Executable)
+	// StatNoFollow for the same reason as checkFileExists: the execute bit of a
+	// host file outside the workdir is not this assertion's to report.
+	info, statErr := security.StatNoFollow(root, path)
+	if statErr != nil {
+		return &CheckResult{
+			Desc:     desc,
+			Expected: fmt.Sprintf("readable file %q", f.Path),
+			Actual:   statErr.Error(),
+			Hint:     fmt.Sprintf("could not stat file %q", f.Path),
+		}
+	}
+	// Every directory carries the execute bit, so reading it as "this is an
+	// executable" turned a tool that produced a directory into a passing
+	// executable check.
+	if info.IsDir() {
+		return &CheckResult{
+			Desc:     desc,
+			Expected: fmt.Sprintf("file %q executable=%t", f.Path, *f.Executable),
+			Actual:   fmt.Sprintf("%q is a directory", f.Path),
+			Hint:     fmt.Sprintf("%q is a directory, not an executable file; a directory's execute bit means it can be entered", f.Path),
+		}
+	}
+	isExec := info.Mode().Perm()&0o111 != 0
+	if isExec == *f.Executable {
+		return pass(desc)
+	}
+	return &CheckResult{
+		Desc:     desc,
+		Expected: fmt.Sprintf("file %q executable=%t", f.Path, *f.Executable),
+		Actual:   fmt.Sprintf("executable=%t (mode %s)", isExec, info.Mode().Perm()),
+		Hint:     fmt.Sprintf("expected file %q to %s executable", f.Path, executability(*f.Executable)),
+	}
+}
+
+// checkFileEquals compares data to the expected literal byte-exactly: no CRLF
+// or trailing-newline normalization, unlike the stdout equals matcher. A
+// round-trip test needs to prove the bytes are identical.
+func checkFileEquals(f *spec.FileAssert, data []byte) *CheckResult {
+	desc := fmt.Sprintf("assert file %q equals exact bytes", f.Path)
+	if string(data) == *f.Equals {
+		return pass(desc)
+	}
+	return &CheckResult{
+		Desc:             desc,
+		Expected:         excerpt(*f.Equals),
+		Actual:           excerpt(string(data)),
+		Hint:             fmt.Sprintf("file %q did not equal the expected bytes exactly (no CRLF/newline normalization)", f.Path),
+		ArtifactExpected: []byte(*f.Equals),
+	}
+}
+
+// checkFileEqualsFile compares data byte-exactly to another workdir file.
+func checkFileEqualsFile(f *spec.FileAssert, data []byte, env Env) *CheckResult {
+	otherPath, err := security.ResolveWorkdirPath("assert.file.equals_file", env.Workdir, *f.EqualsFile)
+	if err != nil {
+		return &CheckResult{Desc: fmt.Sprintf("assert file %q equals_file %q", f.Path, *f.EqualsFile), Hint: err.Error()}
+	}
+	// The comparison file is read plainly (not via checkFile's read): the failure
+	// artifact is the file under test, and the other file is carried as
+	// ArtifactExpected.
+	other, cr := readFile(*f.EqualsFile, env.Workdir, otherPath)
+	if cr != nil {
+		return cr
+	}
+	desc := fmt.Sprintf("assert file %q equals file %q", f.Path, *f.EqualsFile)
+	if bytes.Equal(data, other) {
+		return pass(desc)
+	}
+	return &CheckResult{
+		Desc:             desc,
+		Expected:         fmt.Sprintf("bytes identical to %q", *f.EqualsFile),
+		Actual:           excerpt(string(data)),
+		Hint:             fmt.Sprintf("file %q is not byte-identical to %q (no CRLF/newline normalization)", f.Path, *f.EqualsFile),
+		ArtifactExpected: other,
 	}
 }
 

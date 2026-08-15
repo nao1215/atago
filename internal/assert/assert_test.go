@@ -1053,6 +1053,37 @@ func TestCheck_File_SymlinkEscapeRejected(t *testing.T) {
 	}
 }
 
+// TestCheck_File_SymlinkMetadataNotAnswered closes the metadata half of the
+// leaf-symlink rule: contains/equals already refuse to READ through a workdir
+// symlink pointing outside the root, and file.size refuses to stat through one
+// (checkFileSize uses StatNoFollow), but exists/executable answered via os.Stat
+// — following the link and reporting whether a HOST file exists or carries the
+// execute bit. Both must refuse the symlink the way the read and size paths do,
+// so one assert family never disagrees with itself about the same planted link.
+func TestCheck_File_SymlinkMetadataNotAnswered(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink creation is not reliably available on Windows CI")
+	}
+	t.Parallel()
+	workdir := t.TempDir()
+	secret := filepath.Join(t.TempDir(), "secret.sh")
+	if err := os.WriteFile(secret, []byte("#!/bin/sh\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(secret, filepath.Join(workdir, "leak.sh")); err != nil {
+		t.Fatal(err)
+	}
+	for _, a := range []*spec.Assert{
+		{File: &spec.FileAssert{Path: "leak.sh", Exists: ptrBool(true)}},
+		{File: &spec.FileAssert{Path: "leak.sh", Executable: ptrBool(true)}},
+	} {
+		got := Check(a, nil, Env{Workdir: workdir})
+		if got.OK {
+			t.Errorf("%+v was answered through a workdir symlink pointing outside the root", a.File)
+		}
+	}
+}
+
 // TestCheck_File_SymlinkedAncestorEscapeRejected is the same disclosure one
 // directory up. The leaf refusal above only sees a link AT the target, so a
 // program under test that turned a directory component into a link — `ln -s /etc

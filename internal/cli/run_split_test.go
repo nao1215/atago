@@ -124,7 +124,7 @@ func TestFinishRun_RerunMatchedNothingKeepsLedger(t *testing.T) {
 			Status:   engine.StatusPassed,
 		}}
 
-		if got := finishRun(opts, suiteResults, []error{nil}, nil, 5*time.Millisecond, context.Background()); got != ExitConfig {
+		if got := finishRun(context.Background(), opts, suiteResults, []error{nil}, nil, 5*time.Millisecond); got != ExitConfig {
 			t.Fatalf("exit = %d, want %d (stderr=%s)", got, ExitConfig, errb.String())
 		}
 		if !strings.Contains(errb.String(), "no recorded failing scenarios matched the current specs") {
@@ -160,7 +160,7 @@ func TestFinishRun_CIEmptySelectionExitsConfig(t *testing.T) {
 			Status:   engine.StatusPassed,
 		}}
 
-		if got := finishRun(opts, suiteResults, []error{nil}, nil, 5*time.Millisecond, context.Background()); got != ExitConfig {
+		if got := finishRun(context.Background(), opts, suiteResults, []error{nil}, nil, 5*time.Millisecond); got != ExitConfig {
 			t.Fatalf("exit = %d, want %d (stderr=%s)", got, ExitConfig, errb.String())
 		}
 		s := errb.String()
@@ -185,7 +185,7 @@ func TestFinishRun_InterruptedWithoutResultsSkipsReport(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	if got := finishRun(opts, []*engine.SuiteResult{nil}, []error{nil}, nil, 5*time.Millisecond, ctx); got != ExitExec {
+	if got := finishRun(ctx, opts, []*engine.SuiteResult{nil}, []error{nil}, nil, 5*time.Millisecond); got != ExitExec {
 		t.Fatalf("exit = %d, want %d (stderr=%s)", got, ExitExec, errb.String())
 	}
 	if out.Len() != 0 {
@@ -206,11 +206,11 @@ func TestFinishRun_IncompleteResultSlicesReturnInternal(t *testing.T) {
 		stderr: &errb,
 	}
 
-	if got := finishRun(opts, []*engine.SuiteResult{{
+	if got := finishRun(context.Background(), opts, []*engine.SuiteResult{{
 		Suite:    "one",
 		SpecPath: "one.atago.yaml",
 		Status:   engine.StatusPassed,
-	}}, []error{nil}, nil, 5*time.Millisecond, context.Background()); got != ExitInternal {
+	}}, []error{nil}, nil, 5*time.Millisecond); got != ExitInternal {
 		t.Fatalf("exit = %d, want %d (stderr=%s)", got, ExitInternal, errb.String())
 	}
 	if out.Len() != 0 {
@@ -243,7 +243,7 @@ func TestFinishRun_ReportWriteFailureReturnsInternal(t *testing.T) {
 			}},
 		}}
 
-		if got := finishRun(opts, suiteResults, []error{nil}, nil, 5*time.Millisecond, context.Background()); got != ExitInternal {
+		if got := finishRun(context.Background(), opts, suiteResults, []error{nil}, nil, 5*time.Millisecond); got != ExitInternal {
 			t.Fatalf("exit = %d, want %d (stderr=%s)", got, ExitInternal, errb.String())
 		}
 		if !strings.Contains(errb.String(), "failed to write report: boom") {

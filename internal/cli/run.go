@@ -156,7 +156,7 @@ func runCmd(label string, args []string, stdout, stderr io.Writer) int {
 	suiteResults, loadErrs := runSpecs(ctx, eng, paths)
 	elapsed := time.Since(start)
 
-	return finishRun(opts, suiteResults, loadErrs, progress, elapsed, ctx)
+	return finishRun(ctx, opts, suiteResults, loadErrs, progress, elapsed)
 }
 
 // parseRunFlags parses and validates `atago run`'s flags into a runOptions. The
