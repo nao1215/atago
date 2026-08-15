@@ -284,7 +284,6 @@ func sanitizeTranscriptMarks(b []byte, marks []int) ([]byte, []int) {
 		}
 	}
 	i := 0
-scan:
 	for i < len(b) {
 		flushMarks(i)
 		if b[i] != 0x1b {
@@ -292,25 +291,12 @@ scan:
 			i++
 			continue
 		}
-		// ESC: find the rune that decides the escape kind, looking through the
-		// bytes vt10x's Write/handleControlCodes make transparent.
-		j := i + 1
-		for j < len(b) {
-			r, sz := utf8.DecodeRune(b[j:])
-			switch {
-			case r == utf8.RuneError && sz == 1:
-				j++ // invalid byte: dropped by Write before the parser sees it.
-				continue
-			case r == 0x1b:
-				// A second ESC restarts escape parsing: the first is inert.
-				out = append(out, b[i:j]...)
-				i = j
-				continue scan
-			case r < 0x20 || r == 0x7f:
-				j += sz // control code: handled out-of-band, escape state kept.
-				continue
-			}
-			break
+		j, restart := escDecider(b, i)
+		if restart {
+			// A second ESC restarts escape parsing: the first is inert.
+			out = append(out, b[i:j]...)
+			i = j
+			continue
 		}
 		if j >= len(b) || b[j] != '[' {
 			// Not a CSI (or a truncated trailing ESC): copy the ESC and rescan
@@ -319,100 +305,21 @@ scan:
 			i++
 			continue
 		}
-		// CSI body: scan effective runes until the final byte (0x40..0x7E),
-		// tracking exactly the parameter bytes vt10x will accumulate.
-		body := make([]byte, 0, 16)
-		var controls []byte // side-effect control codes seen inside the sequence
-		hasMinus, hasWideRune, hasMidMarker := false, false, false
-		finalByte := byte(0)
-		k := j + 1
-		for k < len(b) {
-			r, sz := utf8.DecodeRune(b[k:])
-			if r == utf8.RuneError && sz == 1 {
-				k++ // transparent to vt10x's parser, transparent to the scan.
-				continue
-			}
-			if r == 0x1b {
-				// ESC restarts escape parsing: the sequence so far can never
-				// dispatch, so drop its parameter bytes — copying them verbatim
-				// would leave an OPEN CSI in the output if the aborting escape
-				// later gets dropped as malformed, and then ordinary text (say a
-				// final-range 'Z') would finalize the stale parameters into a
-				// quadrillion-step CBT (found by FuzzRenderScreen). Only the
-				// embedded control codes vt10x already executed are kept.
-				out = append(out, controls...)
-				i = k
-				continue scan
-			}
-			if r == 0x18 || r == 0x1a {
-				// CAN/SUB reset the parameter buffer but STAY in CSI state.
-				body = body[:0]
-				hasMinus, hasWideRune, hasMidMarker = false, false, false
-				k += sz
-				continue
-			}
-			if r < 0x20 || r == 0x7f {
-				// Other control codes are transparent to the CSI state but DO
-				// execute (tab, CR, LF move the cursor mid-sequence); remember
-				// them so a dropped sequence still replays its side effects.
-				controls = append(controls, byte(r&0x7f)) // r < 0x20 or == 0x7f here
-				k += sz
-				continue
-			}
-			if r > 0x7e {
-				// vt10x truncates the rune to its low byte — nonsense that can
-				// even finalize the sequence. Mirror the boundary, drop later.
-				hasWideRune = true
-				if low := byte(r & 0xff); low >= 0x40 && low <= 0x7e {
-					finalByte = low
-					k += sz
-					break
-				}
-				k += sz
-				continue
-			}
-			c := byte(r)
-			if c >= 0x40 && c <= 0x7e {
-				finalByte = c
-				k += sz
-				break
-			}
-			if c == '-' {
-				hasMinus = true
-			}
-			// A private-marker byte (< = > ?) is well-formed only as the FIRST
-			// parameter byte (CSI ? 25 h, CSI < 0 ; 0 M). One that appears after a
-			// parameter has begun makes the sequence malformed — a conformant
-			// terminal ignores it — and x/vt's parser handles the malformed shape
-			// (CSI 999 ? 999 ? 999 X) in time quadratic in the parameters, seconds
-			// for a few thousand. Drop it like a negative parameter.
-			if c >= '<' && c <= '?' && len(body) > 0 {
-				hasMidMarker = true
-			}
-			body = append(body, c)
-			k += sz
+		sc := scanCSIBody(b, j+1)
+		if sc.abortedByESC {
+			// ESC restarts escape parsing: the sequence so far can never
+			// dispatch, so drop its parameter bytes — copying them verbatim
+			// would leave an OPEN CSI in the output if the aborting escape
+			// later gets dropped as malformed, and then ordinary text (say a
+			// final-range 'Z') would finalize the stale parameters into a
+			// quadrillion-step CBT (found by FuzzRenderScreen). Only the
+			// embedded control codes vt10x already executed are kept.
+			out = append(out, sc.controls...)
+			i = sc.end
+			continue
 		}
-		switch {
-		case finalByte == 0:
-			// Truncated trailing CSI: it can never dispatch, copy verbatim.
-			out = append(out, b[i:k]...)
-		case hasMinus || hasWideRune || hasMidMarker:
-			// Malformed parameters: a conformant terminal ignores the whole
-			// sequence, so drop it — replaying only the control codes it
-			// carried — and keep the surrounding frame intact.
-			out = append(out, controls...)
-		case len(clampDigitRuns(body)) != len(body):
-			// An oversized repeat count: replay embedded control codes, then
-			// re-emit the sequence with the digit runs clamped.
-			out = append(out, controls...)
-			out = append(out, 0x1b, '[')
-			out = append(out, clampDigitRuns(body)...)
-			out = append(out, finalByte)
-		default:
-			// Clean sequence: byte-for-byte, side-effect bytes included.
-			out = append(out, b[i:k]...)
-		}
-		i = k
+		out = emitCSI(out, b, i, sc)
+		i = sc.end
 	}
 	// Anything still pending sat at or past the end of the transcript.
 	for next < len(marks) {
@@ -420,6 +327,139 @@ scan:
 		next++
 	}
 	return out, translated
+}
+
+// escDecider finds the rune that decides the kind of the escape opened at
+// b[i] (an ESC), looking through the bytes vt10x's Write/handleControlCodes
+// make transparent: lone invalid-UTF-8 bytes are dropped by Write before the
+// parser sees them, and control codes are handled out-of-band with escape
+// state kept. restart reports a second ESC at j, which restarts escape
+// parsing and makes the first ESC inert.
+func escDecider(b []byte, i int) (j int, restart bool) {
+	j = i + 1
+	for j < len(b) {
+		r, sz := utf8.DecodeRune(b[j:])
+		switch {
+		case r == utf8.RuneError && sz == 1:
+			j++
+			continue
+		case r == 0x1b:
+			return j, true
+		case r < 0x20 || r == 0x7f:
+			j += sz
+			continue
+		}
+		break
+	}
+	return j, false
+}
+
+// csiScan is one CSI sequence as vt10x's parser will see it: the parameter
+// bytes it will accumulate, the control codes it executes mid-sequence, the
+// malformation flags that make a conformant terminal ignore the sequence, and
+// where the scan ended.
+type csiScan struct {
+	body                                []byte // the parameter bytes vt10x will Atoi
+	controls                            []byte // side-effect control codes seen inside the sequence
+	hasMinus, hasWideRune, hasMidMarker bool
+	finalByte                           byte // 0 when the sequence is truncated at end of input
+	end                                 int  // index just past the sequence
+	// abortedByESC reports an ESC inside the CSI: it restarts escape parsing
+	// at end, and the sequence so far can never dispatch.
+	abortedByESC bool
+}
+
+// scanCSIBody scans the CSI body starting at start (just past "ESC ["),
+// walking effective runes until the final byte (0x40..0x7E) and tracking
+// exactly the parameter bytes vt10x will accumulate.
+func scanCSIBody(b []byte, start int) csiScan {
+	sc := csiScan{body: make([]byte, 0, 16)}
+	k := start
+	for k < len(b) {
+		r, sz := utf8.DecodeRune(b[k:])
+		if r == utf8.RuneError && sz == 1 {
+			k++ // transparent to vt10x's parser, transparent to the scan.
+			continue
+		}
+		if r == 0x1b {
+			sc.abortedByESC = true
+			break
+		}
+		if r == 0x18 || r == 0x1a {
+			// CAN/SUB reset the parameter buffer but STAY in CSI state.
+			sc.body = sc.body[:0]
+			sc.hasMinus, sc.hasWideRune, sc.hasMidMarker = false, false, false
+			k += sz
+			continue
+		}
+		if r < 0x20 || r == 0x7f {
+			// Other control codes are transparent to the CSI state but DO
+			// execute (tab, CR, LF move the cursor mid-sequence); remember
+			// them so a dropped sequence still replays its side effects.
+			sc.controls = append(sc.controls, byte(r&0x7f)) // r < 0x20 or == 0x7f here
+			k += sz
+			continue
+		}
+		if r > 0x7e {
+			// vt10x truncates the rune to its low byte — nonsense that can
+			// even finalize the sequence. Mirror the boundary, drop later.
+			sc.hasWideRune = true
+			if low := byte(r & 0xff); low >= 0x40 && low <= 0x7e {
+				sc.finalByte = low
+				k += sz
+				break
+			}
+			k += sz
+			continue
+		}
+		c := byte(r)
+		if c >= 0x40 && c <= 0x7e {
+			sc.finalByte = c
+			k += sz
+			break
+		}
+		if c == '-' {
+			sc.hasMinus = true
+		}
+		// A private-marker byte (< = > ?) is well-formed only as the FIRST
+		// parameter byte (CSI ? 25 h, CSI < 0 ; 0 M). One that appears after a
+		// parameter has begun makes the sequence malformed — a conformant
+		// terminal ignores it — and x/vt's parser handles the malformed shape
+		// (CSI 999 ? 999 ? 999 X) in time quadratic in the parameters, seconds
+		// for a few thousand. Drop it like a negative parameter.
+		if c >= '<' && c <= '?' && len(sc.body) > 0 {
+			sc.hasMidMarker = true
+		}
+		sc.body = append(sc.body, c)
+		k += sz
+	}
+	sc.end = k
+	return sc
+}
+
+// emitCSI appends the scanned sequence (opened at b[i]) to out in the shape
+// vt10x can safely replay.
+func emitCSI(out, b []byte, i int, sc csiScan) []byte {
+	switch {
+	case sc.finalByte == 0:
+		// Truncated trailing CSI: it can never dispatch, copy verbatim.
+		return append(out, b[i:sc.end]...)
+	case sc.hasMinus || sc.hasWideRune || sc.hasMidMarker:
+		// Malformed parameters: a conformant terminal ignores the whole
+		// sequence, so drop it — replaying only the control codes it
+		// carried — and keep the surrounding frame intact.
+		return append(out, sc.controls...)
+	case len(clampDigitRuns(sc.body)) != len(sc.body):
+		// An oversized repeat count: replay embedded control codes, then
+		// re-emit the sequence with the digit runs clamped.
+		out = append(out, sc.controls...)
+		out = append(out, 0x1b, '[')
+		out = append(out, clampDigitRuns(sc.body)...)
+		return append(out, sc.finalByte)
+	default:
+		// Clean sequence: byte-for-byte, side-effect bytes included.
+		return append(out, b[i:sc.end]...)
+	}
 }
 
 // clampDigitRuns truncates every digit run longer than maxCSIParamDigits to its

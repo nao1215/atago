@@ -6,6 +6,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/nao1215/atago/internal/spec"
+	"github.com/rivo/uniseg"
 )
 
 // FuzzRenderScreen attacks the vt100 screen-rendering path (#27). RenderScreen
@@ -21,8 +22,9 @@ import (
 //   - line budget: vt10x.State.String emits exactly `rows` rows, and
 //     RenderScreen only strips trailing blank rows, so the rendered screen
 //     never has MORE than `rows` lines;
-//   - column budget: String emits exactly `cols` runes per row and RenderScreen
-//     only TrimRights each line, so every rendered line is at most `cols` runes
+//   - column budget: the emulator holds one grapheme cluster per cell (#437)
+//     across exactly `cols` cells per row, and RenderScreen only TrimRights
+//     each line, so every rendered line is at most `cols` grapheme clusters
 //     wide (matching TestRenderScreen_TruncatesAtCols);
 //   - valid UTF-8: the emulator drops invalid UTF-8 input bytes before they
 //     reach a cell and back-fills untouched cells with a space, so the returned
@@ -117,8 +119,13 @@ func FuzzRenderScreen(f *testing.F) {
 			t.Fatalf("screen has %d lines, exceeds rows=%d\ntranscript=%q cols=%d\nscreen=%q", len(lines), rows, transcript, cols, got)
 		}
 		for i, l := range lines {
-			if n := utf8.RuneCountInString(l); n > cols {
-				t.Fatalf("line %d is %d runes wide, exceeds cols=%d\ntranscript=%q rows=%d\nline=%q", i, n, cols, transcript, rows, l)
+			// Width is measured in grapheme clusters, not runes: since #437 a
+			// cell holds a whole cluster, so a combining mark shares its base's
+			// cell ("0" + U+030E is one column but two runes). Every cluster
+			// occupies at least one column, so cluster count ≤ cols is the
+			// invariant that survives both clusters and double-width cells.
+			if n := uniseg.GraphemeClusterCount(l); n > cols {
+				t.Fatalf("line %d is %d clusters wide, exceeds cols=%d\ntranscript=%q rows=%d\nline=%q", i, n, cols, transcript, rows, l)
 			}
 		}
 	})

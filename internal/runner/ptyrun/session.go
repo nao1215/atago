@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"regexp"
 	"syscall"
 	"time"
 
@@ -82,289 +83,347 @@ func driveSession(ctx context.Context, p *spec.PTY, proc ptyProcess) (*runner.Re
 	ctx, cancel := context.WithTimeout(ctx, budget)
 	defer cancel()
 
-	start := time.Now()
 	term := proc.trans
 	if term == nil {
 		term = startTranscriptDrain(proc.rw, p)
 	}
-	writeTerm := term.write
-	snapshot := term.snapshot
-	tailFrom := term.tailFrom
-	curLen := term.curLen
-	currentScreen := term.currentScreen
-
-	finish := func(timedOut bool, code int, ef *ExpectFailure) (*runner.Result, *ExpectFailure, error) {
-		// The child is reaped by now (see the note further down), so the runner's
-		// own slave handle has done its job: it kept the terminal from reaching
-		// its last close while output was still unread. Drop it here, because
-		// until it goes the reader has no EOF to end on and waitDrain would
-		// spend its whole grace waiting for one.
-		if proc.releaseTTY != nil {
-			proc.releaseTTY()
-		}
-		// Drain before closing: a fast-exiting child's final output may still sit
-		// in the pty buffer, and closing the master discards it. Once the last
-		// handle is gone the reader hits EOF and readDone closes on its own;
-		// drainGrace bounds the wait in case a descendant kept the terminal open.
-		term.waitDrain(proc.closeTerm, drainGrace)
-		tr := snapshot()
-		// A transcript atago knows is incomplete must not become a Result: an
-		// expect_screen compared against missing bytes is a confidently wrong
-		// verdict, and it would read as the spec's fault rather than atago's. So
-		// this outranks even a pending ExpectFailure — that expect may have failed
-		// only because the bytes never arrived.
-		//
-		// Every caller of finish has already reaped the child (the session loop
-		// receives proc.exit; abort and failHard kill and wait), so an end-of-
-		// session read error accepted here is by construction one that arrived
-		// after the child exited. That is why the reader can classify on the error
-		// alone without racing the exit.
-		rerr := term.readError()
-		if rerr != nil {
-			return nil, nil, fmt.Errorf(
-				"pty %q: the terminal transcript is incomplete — reading the terminal failed after %d bytes: %w",
-				p.Command, len(tr), rerr)
-		}
-		screenTextStr, screenCells := renderScreenCells(tr, p, term.snapshotResizes())
-		screenText := []byte(screenTextStr)
-		res := &runner.Result{
-			Command:  p.Command,
-			Stdout:   tr,
-			Duration: time.Since(start),
-			Workdir:  proc.dir,
-			TimedOut: timedOut,
-			IsPTY:    true,
-			// The rendered screen (#27) is derived from the same bytes, so screen
-			// asserts and transcript asserts never disagree about what happened.
-			// Replaying through the recorded size changes (#379) keeps that true
-			// for a session that resized: each part of the frame is drawn under
-			// the size it was produced under.
-			Screen: screenText,
-			// The same frame with its colors and attributes, for `attrs:` (#382).
-			ScreenCells: screenCells,
-		}
-		if timedOut {
-			res.ExitCode = -1
-		} else {
-			res.ExitCode = code
-		}
-		return res, ef, nil
-	}
-
-	// abort kills the tree and reaps it, then finishes as timed out.
-	abort := func(ef *ExpectFailure) (*runner.Result, *ExpectFailure, error) {
-		proc.kill()
-		<-proc.exit
-		return finish(true, -1, ef)
-	}
-
-	// failHard cleans up (kill, reap, close, drain) before surfacing a hard
-	// error, so a failed terminal write never leaks the child or goroutines.
-	failHard := func(err error) (*runner.Result, *ExpectFailure, error) {
-		proc.kill()
-		<-proc.exit
-		if proc.releaseTTY != nil {
-			proc.releaseTTY()
-		}
-		term.waitDrain(proc.closeTerm, 0)
-		return nil, nil, err
-	}
-
-	// canceledResult surfaces a parent-context cancellation (Ctrl-C / suite
-	// cancel) as a hard execution error, so the engine stops the scenario instead
-	// of asserting against a killed terminal — mirroring the cmd runner's
-	// cancel/timeout split (#30).
-	canceledResult := func() (*runner.Result, *ExpectFailure, error) {
-		return failHard(fmt.Errorf("pty %q canceled: %w", p.Command, ctx.Err()))
-	}
+	d := &sessionDriver{p: p, proc: proc, term: term, start: time.Now()}
 
 	// Drive the session in order. expect polls the transcript; expect_screen
 	// polls the rendered screen; send writes to the terminal; an empty send
 	// transmits EOF (^D).
-	//
-	// matchOffset is the byte index just past the previously matched expect: each
-	// expect scans only transcript[matchOffset:], so a pattern that recurs (any
-	// shell prompt) waits for its NEXT occurrence instead of matching the stale
-	// earlier one.
-	matchOffset := 0
 	for i, a := range p.Session {
-		if expects[i] != nil {
-			matched := false
-			scannedTo := -1 // transcript length at the last scan; -1 forces one
-			for {
-				if n := curLen(); n != scannedTo {
-					tail, m := tailFrom(matchOffset)
-					scannedTo = m
-					if loc := expects[i].FindIndex(tail); loc != nil {
-						matchOffset += loc[1]
-						matched = true
-						break
-					}
-				}
-				select {
-				case <-ctx.Done():
-					// One last check: bytes may have landed in the final poll
-					// window before the deadline fired.
-					tail, _ := tailFrom(matchOffset)
-					if loc := expects[i].FindIndex(tail); loc != nil {
-						matchOffset += loc[1]
-						matched = true
-					}
-				case <-time.After(pollInterval):
-					continue
-				}
-				break
-			}
-			if !matched {
-				// A parent-context cancellation is an execution error that must stop
-				// the scenario; only a genuine session-budget timeout
-				// (DeadlineExceeded) becomes an ExpectFailure.
-				if errors.Is(ctx.Err(), context.Canceled) {
-					return canceledResult()
-				}
-				return abort(&ExpectFailure{Pattern: a.Expect, Transcript: string(snapshot())})
-			}
-			continue
+		var out *sessionOutcome
+		switch {
+		case expects[i] != nil:
+			out = d.waitExpect(ctx, expects[i], a.Expect)
+		case a.ExpectScreen != nil:
+			out = d.waitExpectScreen(ctx, a.ExpectScreen)
+		case a.Exec != nil:
+			out = d.runExec(ctx, i, a.Exec)
+		case a.Resize != nil:
+			out = d.applyResize(i, a.Resize)
+		case a.Send != nil:
+			out = d.send(i, a.Send)
 		}
-		if a.ExpectScreen != nil {
-			waitCtx, cancelWait := sessionWaitContext(ctx, a.ExpectScreen.Timeout)
-			matched := false
-			var stableSince time.Time
-			stableFor := parsePositiveDuration(a.ExpectScreen.StableFor)
-			scannedTo := -1 // transcript length at the last render; -1 forces one
-			for {
-				if n := curLen(); n != scannedTo {
-					scannedTo = n
-					screen, cells := currentScreen()
-					cr := checkRenderedScreen(a.ExpectScreen, screen, cells)
-					if cr.OK {
-						if stableFor <= 0 {
-							matched = true
-							break
-						}
-						if stableSince.IsZero() {
-							stableSince = time.Now()
-						}
-						if time.Since(stableSince) >= stableFor {
-							matched = true
-							break
-						}
-					} else {
-						stableSince = time.Time{}
-					}
-				}
-				select {
-				case <-waitCtx.Done():
-					screen, cells := currentScreen()
-					cr := checkRenderedScreen(a.ExpectScreen, screen, cells)
-					if cr.OK {
-						if stableFor <= 0 {
-							matched = true
-						} else {
-							if stableSince.IsZero() {
-								stableSince = time.Now()
-							}
-							if time.Since(stableSince) >= stableFor {
-								matched = true
-							}
-						}
-					}
-				case <-time.After(pollInterval):
-					if !stableSince.IsZero() && stableFor > 0 && time.Since(stableSince) >= stableFor {
-						matched = true
-					}
-					if matched {
-						break
-					}
-					continue
-				}
-				break
-			}
-			cancelWait()
-			if !matched {
-				// A parent-context cancellation is an execution error that must stop
-				// the scenario; only a genuine wait timeout becomes a failed check.
-				if errors.Is(waitCtx.Err(), context.Canceled) || errors.Is(ctx.Err(), context.Canceled) {
-					return canceledResult()
-				}
-				screen, cells := currentScreen()
-				cr := checkRenderedScreen(a.ExpectScreen, screen, cells)
-				if cr.OK && stableFor > 0 {
-					cr = &assert.CheckResult{
-						Desc:           fmt.Sprintf("pty expect_screen stable for %s", stableFor),
-						Expected:       fmt.Sprintf("rendered screen to keep satisfying the matcher for %s", stableFor),
-						Actual:         string(screen),
-						Hint:           fmt.Sprintf("the rendered screen matched, but not continuously for %s before the timeout elapsed", stableFor),
-						ArtifactKind:   "screen",
-						ArtifactActual: screen,
-					}
-				}
-				return abort(&ExpectFailure{Check: cr})
-			}
-			continue
-		}
-		if a.Exec != nil {
-			// Blocking here is the contract: after this returns, the change the
-			// command made exists, so whatever the session waits for next is
-			// waiting on the program noticing it rather than on a race (#380).
-			if xerr := runSessionExec(ctx, a.Exec, proc.dir, proc.env); xerr != nil {
-				return failHard(fmt.Errorf("pty %q: session[%d]: %w", p.Command, i, xerr))
-			}
-			continue
-		}
-		if a.Resize != nil {
-			// Record the boundary before changing the size, so the replay that
-			// builds the rendered screen splits the transcript at the same point
-			// the real terminal did (#379).
-			term.markResize(a.Resize.Rows, a.Resize.Cols)
-			if rerr := proc.resize(a.Resize.Rows, a.Resize.Cols); rerr != nil {
-				return failHard(fmt.Errorf("pty %q: session[%d] resize to %dx%d: %w",
-					p.Command, i, a.Resize.Rows, a.Resize.Cols, rerr))
-			}
-			continue
-		}
-		if a.Send != nil {
-			// A paste is only a paste if the program asked for one. Without the
-			// mode, the markers arrive as ordinary characters and the failure
-			// surfaces somewhere far away — as a REPL executing a pasted block
-			// line by line, or as "[200~" typed into a prompt — so refuse here,
-			// where the mistake is (#378).
-			if a.Send.Paste != nil && !term.modeEnabled(decsetBracketedPaste) {
-				return failHard(fmt.Errorf(
-					"pty %q: session[%d] sends a paste, but the program has not enabled bracketed paste "+
-						"(it never wrote ESC [?2004h, or turned the mode back off). "+
-						"Programs that do not distinguish a paste from typing take a plain send instead; "+
-						"if this one does enable the mode, wait for it with an expect or expect_screen before pasting",
-					p.Command, i))
-			}
-			// A mouse event only means something to a program that asked to be
-			// told about the mouse, and in the encoding atago speaks (#381).
-			if a.Send.Mouse != nil {
-				if merr := checkMouseMode(term, p.Command, i); merr != nil {
-					return failHard(merr)
-				}
-			}
-			// Bytes resolves named keys to their xterm sequences, wraps a paste
-			// in its markers, and keeps the historical rule that an empty
-			// verbatim send transmits EOF (^D).
-			if _, werr := writeTerm(a.Send.Bytes()); werr != nil {
-				return failHard(fmt.Errorf("pty: send: %w", werr))
-			}
+		if out != nil {
+			return out.res, out.ef, out.err
 		}
 	}
 
 	// Session complete: wait for the child to exit within the budget.
 	select {
 	case code := <-proc.exit:
-		return finish(false, code, nil)
+		out := d.finish(false, code, nil)
+		return out.res, out.ef, out.err
 	case <-ctx.Done():
 		// A parent cancellation is a hard error; a session-budget timeout is a
 		// normal timed-out result (#30).
 		if errors.Is(ctx.Err(), context.Canceled) {
-			return canceledResult()
+			out := d.canceled(ctx)
+			return out.res, out.ef, out.err
 		}
-		return abort(nil)
+		out := d.abort(nil)
+		return out.res, out.ef, out.err
 	}
+}
+
+// sessionOutcome is how a sessionDriver step ends the session: the triple
+// driveSession returns. A nil *sessionOutcome from a step handler means the
+// session continues with the next action.
+type sessionOutcome struct {
+	res *runner.Result
+	ef  *ExpectFailure
+	err error
+}
+
+// sessionDriver holds the state one pty session's actions share: the process
+// handles, the transcript drain, and the match offset that makes each expect
+// wait for its NEXT occurrence.
+type sessionDriver struct {
+	p     *spec.PTY
+	proc  ptyProcess
+	term  *transcriptDrain
+	start time.Time
+	// matchOffset is the byte index just past the previously matched expect:
+	// each expect scans only transcript[matchOffset:], so a pattern that recurs
+	// (any shell prompt) waits for its NEXT occurrence instead of matching the
+	// stale earlier one.
+	matchOffset int
+}
+
+// finish shapes the session's Result after the child has been reaped.
+func (d *sessionDriver) finish(timedOut bool, code int, ef *ExpectFailure) *sessionOutcome {
+	// The child is reaped by now (see the note further down), so the runner's
+	// own slave handle has done its job: it kept the terminal from reaching
+	// its last close while output was still unread. Drop it here, because
+	// until it goes the reader has no EOF to end on and waitDrain would
+	// spend its whole grace waiting for one.
+	if d.proc.releaseTTY != nil {
+		d.proc.releaseTTY()
+	}
+	// Drain before closing: a fast-exiting child's final output may still sit
+	// in the pty buffer, and closing the master discards it. Once the last
+	// handle is gone the reader hits EOF and readDone closes on its own;
+	// drainGrace bounds the wait in case a descendant kept the terminal open.
+	d.term.waitDrain(d.proc.closeTerm, drainGrace)
+	tr := d.term.snapshot()
+	// A transcript atago knows is incomplete must not become a Result: an
+	// expect_screen compared against missing bytes is a confidently wrong
+	// verdict, and it would read as the spec's fault rather than atago's. So
+	// this outranks even a pending ExpectFailure — that expect may have failed
+	// only because the bytes never arrived.
+	//
+	// Every caller of finish has already reaped the child (the session loop
+	// receives proc.exit; abort and failHard kill and wait), so an end-of-
+	// session read error accepted here is by construction one that arrived
+	// after the child exited. That is why the reader can classify on the error
+	// alone without racing the exit.
+	rerr := d.term.readError()
+	if rerr != nil {
+		return &sessionOutcome{err: fmt.Errorf(
+			"pty %q: the terminal transcript is incomplete — reading the terminal failed after %d bytes: %w",
+			d.p.Command, len(tr), rerr)}
+	}
+	screenTextStr, screenCells := renderScreenCells(tr, d.p, d.term.snapshotResizes())
+	screenText := []byte(screenTextStr)
+	res := &runner.Result{
+		Command:  d.p.Command,
+		Stdout:   tr,
+		Duration: time.Since(d.start),
+		Workdir:  d.proc.dir,
+		TimedOut: timedOut,
+		IsPTY:    true,
+		// The rendered screen (#27) is derived from the same bytes, so screen
+		// asserts and transcript asserts never disagree about what happened.
+		// Replaying through the recorded size changes (#379) keeps that true
+		// for a session that resized: each part of the frame is drawn under
+		// the size it was produced under.
+		Screen: screenText,
+		// The same frame with its colors and attributes, for `attrs:` (#382).
+		ScreenCells: screenCells,
+	}
+	if timedOut {
+		res.ExitCode = -1
+	} else {
+		res.ExitCode = code
+	}
+	return &sessionOutcome{res: res, ef: ef}
+}
+
+// abort kills the tree and reaps it, then finishes as timed out.
+func (d *sessionDriver) abort(ef *ExpectFailure) *sessionOutcome {
+	d.proc.kill()
+	<-d.proc.exit
+	return d.finish(true, -1, ef)
+}
+
+// failHard cleans up (kill, reap, close, drain) before surfacing a hard
+// error, so a failed terminal write never leaks the child or goroutines.
+func (d *sessionDriver) failHard(err error) *sessionOutcome {
+	d.proc.kill()
+	<-d.proc.exit
+	if d.proc.releaseTTY != nil {
+		d.proc.releaseTTY()
+	}
+	d.term.waitDrain(d.proc.closeTerm, 0)
+	return &sessionOutcome{err: err}
+}
+
+// canceled surfaces a parent-context cancellation (Ctrl-C / suite cancel) as a
+// hard execution error, so the engine stops the scenario instead of asserting
+// against a killed terminal — mirroring the cmd runner's cancel/timeout split
+// (#30).
+func (d *sessionDriver) canceled(ctx context.Context) *sessionOutcome {
+	return d.failHard(fmt.Errorf("pty %q canceled: %w", d.p.Command, ctx.Err()))
+}
+
+// waitExpect polls the transcript past the previous match until re matches,
+// the session budget runs out, or the run is canceled. nil means matched.
+func (d *sessionDriver) waitExpect(ctx context.Context, re *regexp.Regexp, pattern string) *sessionOutcome {
+	matched := false
+	scannedTo := -1 // transcript length at the last scan; -1 forces one
+	for {
+		if n := d.term.curLen(); n != scannedTo {
+			tail, m := d.term.tailFrom(d.matchOffset)
+			scannedTo = m
+			if loc := re.FindIndex(tail); loc != nil {
+				d.matchOffset += loc[1]
+				matched = true
+				break
+			}
+		}
+		select {
+		case <-ctx.Done():
+			// One last check: bytes may have landed in the final poll
+			// window before the deadline fired.
+			tail, _ := d.term.tailFrom(d.matchOffset)
+			if loc := re.FindIndex(tail); loc != nil {
+				d.matchOffset += loc[1]
+				matched = true
+			}
+		case <-time.After(pollInterval):
+			continue
+		}
+		break
+	}
+	if !matched {
+		// A parent-context cancellation is an execution error that must stop
+		// the scenario; only a genuine session-budget timeout
+		// (DeadlineExceeded) becomes an ExpectFailure.
+		if errors.Is(ctx.Err(), context.Canceled) {
+			return d.canceled(ctx)
+		}
+		return d.abort(&ExpectFailure{Pattern: pattern, Transcript: string(d.term.snapshot())})
+	}
+	return nil
+}
+
+// waitExpectScreen polls the rendered screen until the matcher holds (and, with
+// stable_for, keeps holding), its wait times out, or the run is canceled. nil
+// means matched.
+func (d *sessionDriver) waitExpectScreen(ctx context.Context, es *spec.PTYExpectScreen) *sessionOutcome {
+	waitCtx, cancelWait := sessionWaitContext(ctx, es.Timeout)
+	defer cancelWait()
+	var matched bool
+	stable := &stability{need: parsePositiveDuration(es.StableFor)}
+	scannedTo := -1 // transcript length at the last render; -1 forces one
+	for {
+		if n := d.term.curLen(); n != scannedTo {
+			scannedTo = n
+			if matched = stable.observe(d.checkScreen(es).OK); matched {
+				break
+			}
+		}
+		select {
+		case <-waitCtx.Done():
+			// One last render: output may have landed in the final poll
+			// window before the deadline fired.
+			matched = stable.observe(d.checkScreen(es).OK)
+		case <-time.After(pollInterval):
+			// No new output this tick — but an already-matching screen may
+			// have just held still long enough to satisfy stable_for.
+			if !stable.heldWithoutRedraw() {
+				continue
+			}
+			matched = true
+		}
+		break
+	}
+	if matched {
+		return nil
+	}
+	// A parent-context cancellation is an execution error that must stop
+	// the scenario; only a genuine wait timeout becomes a failed check.
+	if errors.Is(waitCtx.Err(), context.Canceled) || errors.Is(ctx.Err(), context.Canceled) {
+		return d.canceled(ctx)
+	}
+	cr := d.checkScreen(es)
+	if cr.OK && stable.need > 0 {
+		screen, _ := d.term.currentScreen()
+		cr = &assert.CheckResult{
+			Desc:           fmt.Sprintf("pty expect_screen stable for %s", stable.need),
+			Expected:       fmt.Sprintf("rendered screen to keep satisfying the matcher for %s", stable.need),
+			Actual:         string(screen),
+			Hint:           fmt.Sprintf("the rendered screen matched, but not continuously for %s before the timeout elapsed", stable.need),
+			ArtifactKind:   "screen",
+			ArtifactActual: screen,
+		}
+	}
+	return d.abort(&ExpectFailure{Check: cr})
+}
+
+// checkScreen runs the expect_screen matcher against the current rendered
+// screen.
+func (d *sessionDriver) checkScreen(es *spec.PTYExpectScreen) *assert.CheckResult {
+	screen, cells := d.term.currentScreen()
+	return checkRenderedScreen(es, screen, cells)
+}
+
+// stability tracks an expect_screen stable_for window: the matcher must hold
+// continuously for `need` before the wait passes, absorbing redraw churn
+// without a blind sleep. A zero need degrades to "matched once".
+type stability struct {
+	need  time.Duration
+	since time.Time // when the screen started matching; zero while not matching
+}
+
+// observe feeds one matcher verdict and reports whether the wait is satisfied:
+// immediately for a plain match, or once the screen has matched continuously
+// for the window.
+func (s *stability) observe(ok bool) bool {
+	if !ok {
+		s.since = time.Time{}
+		return false
+	}
+	if s.need <= 0 {
+		return true
+	}
+	if s.since.IsZero() {
+		s.since = time.Now()
+	}
+	return time.Since(s.since) >= s.need
+}
+
+// heldWithoutRedraw reports whether a screen that already matched has now been
+// still (no new output to re-render) for the rest of the window.
+func (s *stability) heldWithoutRedraw() bool {
+	return s.need > 0 && !s.since.IsZero() && time.Since(s.since) >= s.need
+}
+
+// runExec runs a mid-session host command. Blocking here is the contract:
+// after this returns, the change the command made exists, so whatever the
+// session waits for next is waiting on the program noticing it rather than on
+// a race (#380).
+func (d *sessionDriver) runExec(ctx context.Context, i int, e *spec.PTYExec) *sessionOutcome {
+	if xerr := runSessionExec(ctx, e, d.proc.dir, d.proc.env); xerr != nil {
+		return d.failHard(fmt.Errorf("pty %q: session[%d]: %w", d.p.Command, i, xerr))
+	}
+	return nil
+}
+
+// applyResize changes the terminal size mid-session (#379). The boundary is
+// recorded before changing the size, so the replay that builds the rendered
+// screen splits the transcript at the same point the real terminal did.
+func (d *sessionDriver) applyResize(i int, r *spec.PTYResize) *sessionOutcome {
+	d.term.markResize(r.Rows, r.Cols)
+	if rerr := d.proc.resize(r.Rows, r.Cols); rerr != nil {
+		return d.failHard(fmt.Errorf("pty %q: session[%d] resize to %dx%d: %w",
+			d.p.Command, i, r.Rows, r.Cols, rerr))
+	}
+	return nil
+}
+
+// send writes one send payload to the terminal, first refusing a paste or a
+// mouse event the program never asked to receive.
+func (d *sessionDriver) send(i int, s *spec.PTYSend) *sessionOutcome {
+	// A paste is only a paste if the program asked for one. Without the
+	// mode, the markers arrive as ordinary characters and the failure
+	// surfaces somewhere far away — as a REPL executing a pasted block
+	// line by line, or as "[200~" typed into a prompt — so refuse here,
+	// where the mistake is (#378).
+	if s.Paste != nil && !d.term.modeEnabled(decsetBracketedPaste) {
+		return d.failHard(fmt.Errorf(
+			"pty %q: session[%d] sends a paste, but the program has not enabled bracketed paste "+
+				"(it never wrote ESC [?2004h, or turned the mode back off). "+
+				"Programs that do not distinguish a paste from typing take a plain send instead; "+
+				"if this one does enable the mode, wait for it with an expect or expect_screen before pasting",
+			d.p.Command, i))
+	}
+	// A mouse event only means something to a program that asked to be
+	// told about the mouse, and in the encoding atago speaks (#381).
+	if s.Mouse != nil {
+		if merr := checkMouseMode(d.term, d.p.Command, i); merr != nil {
+			return d.failHard(merr)
+		}
+	}
+	// Bytes resolves named keys to their xterm sequences, wraps a paste
+	// in its markers, and keeps the historical rule that an empty
+	// verbatim send transmits EOF (^D).
+	if _, werr := d.term.write(s.Bytes()); werr != nil {
+		return d.failHard(fmt.Errorf("pty: send: %w", werr))
+	}
+	return nil
 }
 
 // isSessionEnd reports whether a terminal read error is how a session ends
