@@ -10,32 +10,73 @@ import (
 	"github.com/nao1215/atago/internal/report"
 )
 
-func finishRun(opts *runOptions, suiteResults []*engine.SuiteResult, loadErrs []error, progress *report.Progress, elapsed time.Duration, ctx context.Context) int {
-	failIncomplete := func() int {
-		if progress != nil {
-			progress.Done()
-		}
-		fmt.Fprintln(opts.stderr, opts.label+": internal error: incomplete run results")
-		return ExitInternal
-	}
-
+func finishRun(ctx context.Context, opts *runOptions, suiteResults []*engine.SuiteResult, loadErrs []error, progress *report.Progress, elapsed time.Duration) int {
 	if len(suiteResults) != len(opts.paths) || len(loadErrs) != len(opts.paths) {
-		return failIncomplete()
+		return failIncomplete(opts, progress)
+	}
+	results, exit, loadFailures, ok := collectSuiteExits(opts, suiteResults, loadErrs)
+	if !ok {
+		return failIncomplete(opts, progress)
+	}
+	if progress != nil {
+		progress.Done()
 	}
 
-	results := make([]*engine.SuiteResult, 0, len(opts.paths))
-	exit := ExitOK
-	loadFailures := 0
+	exit = worseExit(exit, settleRerunLedger(ctx, opts, results))
+
+	// Every spec failed to load, or an interrupt skipped every suite before it
+	// produced a result. Don't print a misleading "0 scenarios" report — but a run
+	// that was interrupted before completing must never exit 0.
+	if len(results) == 0 {
+		if ctx.Err() != nil {
+			fmt.Fprintln(opts.stderr, opts.label+": interrupted")
+			return worseExit(exit, ExitExec)
+		}
+		return exit
+	}
+
+	exit = worseExit(exit, emptySelectionExit(ctx, opts, results))
+
+	if err := report.Render(opts.stdout, opts.format, results, report.WithLoadFailures(loadFailures), report.WithElapsed(elapsed), report.WithAllowFlaky(opts.allowFlaky), report.WithAllowXPass(opts.allowXPass)); err != nil {
+		fmt.Fprintf(opts.stderr, opts.label+": failed to write report: %v\n", err)
+		return worseExit(exit, ExitInternal)
+	}
+	// An interrupted run never reports success, even in the rare case where the
+	// signal landed between scenarios and every scheduled one was skipped: the run
+	// did not complete, so the exit code is at least an execution error (4).
+	if ctx.Err() != nil {
+		fmt.Fprintln(opts.stderr, opts.label+": interrupted")
+		exit = worseExit(exit, ExitExec)
+	}
+	return exit
+}
+
+// failIncomplete reports a result/path bookkeeping mismatch — a bug in atago,
+// never in the spec — and returns the internal-error exit code.
+func failIncomplete(opts *runOptions, progress *report.Progress) int {
+	if progress != nil {
+		progress.Done()
+	}
+	fmt.Fprintln(opts.stderr, opts.label+": internal error: incomplete run results")
+	return ExitInternal
+}
+
+// collectSuiteExits pairs each spec path with its load error or suite result,
+// printing load failures and folding every outcome into one exit code. ok is
+// false when the slices run dry early (a bookkeeping bug the caller reports).
+func collectSuiteExits(opts *runOptions, suiteResults []*engine.SuiteResult, loadErrs []error) (results []*engine.SuiteResult, exit, loadFailures int, ok bool) {
+	results = make([]*engine.SuiteResult, 0, len(opts.paths))
+	exit = ExitOK
 	remainingResults := suiteResults
 	remainingLoadErrs := loadErrs
 	for range opts.paths {
 		loadErr, nextLoadErrs, ok := shiftSlice(remainingLoadErrs)
 		if !ok {
-			return failIncomplete()
+			return nil, 0, 0, false
 		}
 		suiteResult, nextResults, ok := shiftSlice(remainingResults)
 		if !ok {
-			return failIncomplete()
+			return nil, 0, 0, false
 		}
 		remainingLoadErrs = nextLoadErrs
 		remainingResults = nextResults
@@ -53,10 +94,14 @@ func finishRun(opts *runOptions, suiteResults []*engine.SuiteResult, loadErrs []
 		results = append(results, suiteResult)
 		exit = worseExit(exit, exitForSuite(suiteResult, opts.allowFlaky, opts.allowXPass))
 	}
-	if progress != nil {
-		progress.Done()
-	}
+	return results, exit, loadFailures, true
+}
 
+// settleRerunLedger updates the last-failed ledger for a later `--rerun-failed`
+// (#64) and returns the exit contribution of a --rerun-failed that matched
+// nothing. The preservation invariants live with the ledger primitives in
+// rerun.go.
+func settleRerunLedger(ctx context.Context, opts *runOptions, results []*engine.SuiteResult) int {
 	// Scenarios that actually executed. A Select can exclude every scenario in a
 	// loaded suite — most importantly a --rerun-failed whose recorded scenario
 	// names no longer exist in the specs (renamed or removed while still broken).
@@ -72,20 +117,17 @@ func finishRun(opts *runOptions, suiteResults []*engine.SuiteResult, loadErrs []
 	// (already printed) are the real story, not a "renamed or removed" scenario.
 	// An active --filter/--tag/--skip-tag is excluded here: when the user's own
 	// selection is why nothing ran, blaming a rename/removal is wrong (and
-	// contradicts the selection warning below). The excluded failures are still
-	// preserved into the ledger via rerunPreserved above, so no work is lost.
-	rerunMatchedNothing := opts.rerunFailed && !opts.selectionActive() && len(results) > 0 && ranScenarios == 0 && ctx.Err() == nil
-	if rerunMatchedNothing {
+	// contradicts the empty-selection warning). The excluded failures are still
+	// preserved into the ledger via rerunPreserved, so no work is lost.
+	if opts.rerunFailed && !opts.selectionActive() && len(results) > 0 && ranScenarios == 0 && ctx.Err() == nil {
 		fmt.Fprintln(opts.stderr, opts.label+": warning: no recorded failing scenarios matched the current specs (renamed or removed?); the recorded failures were kept, not cleared")
-		exit = worseExit(exit, ExitConfig)
+		return ExitConfig
 	}
 
-	// Update the last-failed ledger for a later `--rerun-failed` (#64); the
-	// preservation invariants live with the ledger primitives in rerun.go. The
-	// ledger is left untouched when no suite loaded (prior state stays intact)
-	// and when a --rerun-failed matched nothing (its unmapped failures must
-	// survive).
-	if len(results) > 0 && !rerunMatchedNothing {
+	// The ledger is left untouched when no suite loaded (prior state stays
+	// intact); the matched-nothing case above returned before reaching here so
+	// its unmapped failures survive.
+	if len(results) > 0 {
 		// A --rerun-failed that matched only SOME of the recorded failures is the
 		// quiet version of the case above: the run reports fewer scenarios than
 		// were recorded, which reads as "the others are fixed". Say so before the
@@ -95,74 +137,55 @@ func finishRun(opts *runOptions, suiteResults []*engine.SuiteResult, loadErrs []
 		}
 		updateRerunLedger(opts.label, opts.stderr, results, opts.allowXPass)
 	}
+	return ExitOK
+}
 
-	// Every spec failed to load, or an interrupt skipped every suite before it
-	// produced a result. Don't print a misleading "0 scenarios" report — but a run
-	// that was interrupted before completing must never exit 0.
-	if len(results) == 0 {
-		if ctx.Err() != nil {
-			fmt.Fprintln(opts.stderr, opts.label+": interrupted")
-			return worseExit(exit, ExitExec)
-		}
-		return exit
+// emptySelectionExit handles a selection that matches nothing: interactively
+// this still exits 0 (nothing ran, nothing failed) but stays loud; under --ci
+// it is a hard config error so a typo'd --filter/--tag/--skip-tag cannot
+// silently disable the whole suite in a pipeline forever.
+func emptySelectionExit(ctx context.Context, opts *runOptions, results []*engine.SuiteResult) int {
+	if !opts.selectionActive() {
+		return ExitOK
 	}
-
-	// A selection that matches nothing: interactively this still exits 0 (nothing
-	// ran, nothing failed) but stays loud; under --ci it is a hard config error so
-	// a typo'd --filter/--tag/--skip-tag cannot silently disable the whole suite in
-	// a pipeline forever.
-	if opts.selectionActive() {
-		total := 0
-		for _, r := range results {
-			total += len(r.Scenarios)
-		}
-		// total == 0 here can only mean the selectors excluded every scenario, never
-		// that the specs were empty: the loader rejects a spec with no scenarios, and
-		// a selected-but-skipped scenario (os gate, skip step) still appears in
-		// res.Scenarios. So this is precisely the "selectors filtered everything"
-		// case the task must fail on, not "the specs had nothing to run".
-		if total == 0 && ctx.Err() == nil {
-			var sel []string
-			if len(opts.filter) > 0 {
-				sel = append(sel, fmt.Sprintf("--filter %q", strings.Join(opts.filter, ",")))
-			}
-			if len(opts.tag) > 0 {
-				sel = append(sel, fmt.Sprintf("--tag %q", strings.Join(opts.tag, ",")))
-			}
-			if len(opts.skipTag) > 0 {
-				sel = append(sel, fmt.Sprintf("--skip-tag %q", strings.Join(opts.skipTag, ",")))
-			}
-			tagActive := len(opts.tag) > 0 || len(opts.skipTag) > 0
-			// The note is selector-aware: --filter matches names by case-sensitive
-			// substring, but --tag/--skip-tag compare tags for EXACT equality
-			// (engine.hasAnyTag uses ==). A single "substring" note for tags would send
-			// users fixing the wrong thing, so name each selector's real rule.
-			note := selectorNoMatchNote(len(opts.filter) > 0, tagActive)
-			if opts.ci {
-				fmt.Fprintf(opts.stderr, opts.label+": no scenarios matched %s under --ci; refusing to exit 0 (an empty selection would silently disable the suite). %s. Run `atago list` to see available scenarios and tags.\n", strings.Join(sel, " "), note)
-				exit = worseExit(exit, ExitConfig)
-			} else {
-				hint := note
-				if tagActive {
-					hint += "; run `atago list` to see the available tags"
-				}
-				fmt.Fprintf(opts.stderr, opts.label+": warning: no scenarios matched %s (%s)\n", strings.Join(sel, " "), hint)
-			}
-		}
+	total := 0
+	for _, r := range results {
+		total += len(r.Scenarios)
 	}
-
-	if err := report.Render(opts.stdout, opts.format, results, report.WithLoadFailures(loadFailures), report.WithElapsed(elapsed), report.WithAllowFlaky(opts.allowFlaky), report.WithAllowXPass(opts.allowXPass)); err != nil {
-		fmt.Fprintf(opts.stderr, opts.label+": failed to write report: %v\n", err)
-		return worseExit(exit, ExitInternal)
+	// total == 0 here can only mean the selectors excluded every scenario, never
+	// that the specs were empty: the loader rejects a spec with no scenarios, and
+	// a selected-but-skipped scenario (os gate, skip step) still appears in
+	// res.Scenarios. So this is precisely the "selectors filtered everything"
+	// case the task must fail on, not "the specs had nothing to run".
+	if total > 0 || ctx.Err() != nil {
+		return ExitOK
 	}
-	// An interrupted run never reports success, even in the rare case where the
-	// signal landed between scenarios and every scheduled one was skipped: the run
-	// did not complete, so the exit code is at least an execution error (4).
-	if ctx.Err() != nil {
-		fmt.Fprintln(opts.stderr, opts.label+": interrupted")
-		exit = worseExit(exit, ExitExec)
+	var sel []string
+	if len(opts.filter) > 0 {
+		sel = append(sel, fmt.Sprintf("--filter %q", strings.Join(opts.filter, ",")))
 	}
-	return exit
+	if len(opts.tag) > 0 {
+		sel = append(sel, fmt.Sprintf("--tag %q", strings.Join(opts.tag, ",")))
+	}
+	if len(opts.skipTag) > 0 {
+		sel = append(sel, fmt.Sprintf("--skip-tag %q", strings.Join(opts.skipTag, ",")))
+	}
+	tagActive := len(opts.tag) > 0 || len(opts.skipTag) > 0
+	// The note is selector-aware: --filter matches names by case-sensitive
+	// substring, but --tag/--skip-tag compare tags for EXACT equality
+	// (engine.hasAnyTag uses ==). A single "substring" note for tags would send
+	// users fixing the wrong thing, so name each selector's real rule.
+	note := selectorNoMatchNote(len(opts.filter) > 0, tagActive)
+	if opts.ci {
+		fmt.Fprintf(opts.stderr, opts.label+": no scenarios matched %s under --ci; refusing to exit 0 (an empty selection would silently disable the suite). %s. Run `atago list` to see available scenarios and tags.\n", strings.Join(sel, " "), note)
+		return ExitConfig
+	}
+	hint := note
+	if tagActive {
+		hint += "; run `atago list` to see the available tags"
+	}
+	fmt.Fprintf(opts.stderr, opts.label+": warning: no scenarios matched %s (%s)\n", strings.Join(sel, " "), hint)
+	return ExitOK
 }
 
 func shiftSlice[T any](values []T) (T, []T, bool) {
