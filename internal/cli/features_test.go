@@ -784,6 +784,159 @@ func TestRerunFailed_FilterExcludedFailurePreserved(t *testing.T) {
 	})
 }
 
+// TestFailFast_UnrunScenarioKeepsRecordedFailure is a regression: --fail-fast
+// stops scheduling, so a scenario after the first red one never runs and is
+// reported as "skipped after fail-fast". The ledger read that skip as a verdict
+// and dropped the failure it had already recorded, so the next --rerun-failed
+// exited 0 with the scenario still broken.
+func TestFailFast_UnrunScenarioKeepsRecordedFailure(t *testing.T) {
+	dir := t.TempDir()
+	writeSpec(t, dir, "s.atago.yaml", twoFailingSpec)
+
+	withWorkdir(t, dir, func() {
+		var out, errb bytes.Buffer
+		// A full run records both alpha_fail and beta_fail.
+		if got := Main([]string{"run", "."}, &out, &errb); got != ExitFailures {
+			t.Fatalf("first run exit = %d, want %d (stderr=%s)", got, ExitFailures, errb.String())
+		}
+
+		// --parallel 1 makes fail-fast deterministic: alpha_fail turns the run red
+		// before beta_fail is ever scheduled.
+		out.Reset()
+		errb.Reset()
+		if got := Main([]string{"run", "--fail-fast", "--parallel", "1", "."}, &out, &errb); got != ExitFailures {
+			t.Fatalf("fail-fast run exit = %d, want %d (stderr=%s)", got, ExitFailures, errb.String())
+		}
+		st, err := loadRerunState()
+		if err != nil {
+			t.Fatal(err)
+		}
+		names := map[string]bool{}
+		for _, e := range st.Failed {
+			names[e.Scenario] = true
+		}
+		if !names["beta_fail"] {
+			t.Fatalf("ledger after a fail-fast run = %+v, want beta_fail preserved (never ran, so never re-verified)", st.Failed)
+		}
+
+		// Fix only alpha: the red-green loop must still be red, because beta was
+		// never re-verified.
+		writeSpec(t, dir, "s.atago.yaml", `version: "1"
+suite:
+  name: multi
+scenarios:
+  - name: alpha_fail
+    steps:
+      - run: {shell: true, command: "exit 0"}
+      - assert: {exit_code: 0}
+  - name: beta_fail
+    steps:
+      - run: {shell: true, command: "exit 1"}
+      - assert: {exit_code: 0}
+`)
+		out.Reset()
+		errb.Reset()
+		if got := Main([]string{"run", "--rerun-failed", "."}, &out, &errb); got != ExitFailures {
+			t.Fatalf("--rerun-failed exit = %d, want %d (beta_fail is still broken); stderr=%s", got, ExitFailures, errb.String())
+		}
+	})
+}
+
+// TestRerunFailed_FailFastUnrunEntryNotBlamedOnRename is a regression: a
+// recorded failure --fail-fast never got to still exists in the specs, so the
+// run must not blame a rename or a removal for it.
+func TestRerunFailed_FailFastUnrunEntryNotBlamedOnRename(t *testing.T) {
+	dir := t.TempDir()
+	writeSpec(t, dir, "s.atago.yaml", twoFailingSpec)
+
+	withWorkdir(t, dir, func() {
+		var out, errb bytes.Buffer
+		if got := Main([]string{"run", "."}, &out, &errb); got != ExitFailures {
+			t.Fatalf("first run exit = %d, want %d (stderr=%s)", got, ExitFailures, errb.String())
+		}
+		out.Reset()
+		errb.Reset()
+		if got := Main([]string{"run", "--rerun-failed", "--fail-fast", "--parallel", "1", "."}, &out, &errb); got != ExitFailures {
+			t.Fatalf("fail-fast rerun exit = %d, want %d (stderr=%s)", got, ExitFailures, errb.String())
+		}
+		if strings.Contains(errb.String(), "renamed or removed") {
+			t.Errorf("stderr blamed a rename/removal for a scenario --fail-fast never scheduled:\n%s", errb.String())
+		}
+	})
+}
+
+// TestRerunFailed_FailFastUnreachedSpecNotBlamedOnRename is the cross-spec half
+// of the case above: --fail-fast also stops scheduling whole spec files, and a
+// spec that was never loaded contributes no scenarios at all. Its recorded
+// failures are correctly kept, but calling them renamed or removed sends the
+// reader looking for a spec change that never happened.
+func TestRerunFailed_FailFastUnreachedSpecNotBlamedOnRename(t *testing.T) {
+	dir := t.TempDir()
+	writeSpec(t, dir, "a.atago.yaml", singleFailSpec("a", false))
+	writeSpec(t, dir, "b.atago.yaml", singleFailSpec("b", false))
+
+	withWorkdir(t, dir, func() {
+		var out, errb bytes.Buffer
+		if got := Main([]string{"run", "."}, &out, &errb); got != ExitFailures {
+			t.Fatalf("first run exit = %d, want %d (stderr=%s)", got, ExitFailures, errb.String())
+		}
+		// a.atago.yaml fails, so b.atago.yaml is never loaded.
+		out.Reset()
+		errb.Reset()
+		if got := Main([]string{"run", "--rerun-failed", "--fail-fast", "--parallel", "1", "."}, &out, &errb); got != ExitFailures {
+			t.Fatalf("fail-fast rerun exit = %d, want %d (stderr=%s)", got, ExitFailures, errb.String())
+		}
+		if strings.Contains(errb.String(), "renamed or removed") {
+			t.Errorf("stderr blamed a rename/removal for a spec --fail-fast never loaded:\n%s", errb.String())
+		}
+		st, err := loadRerunState()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(st.Failed) != 2 {
+			t.Errorf("ledger = %+v, want both failures kept (b was never re-verified)", st.Failed)
+		}
+	})
+}
+
+// TestRerunFailed_RenamedScenarioStillWarnsUnderFailFast guards the other side:
+// suppressing the warning for specs a fail-fast never reached must not suppress
+// it for a spec the run did load, where a recorded scenario really is gone.
+func TestRerunFailed_RenamedScenarioStillWarnsUnderFailFast(t *testing.T) {
+	dir := t.TempDir()
+	writeSpec(t, dir, "s.atago.yaml", twoFailingSpec)
+
+	withWorkdir(t, dir, func() {
+		var out, errb bytes.Buffer
+		if got := Main([]string{"run", "."}, &out, &errb); got != ExitFailures {
+			t.Fatalf("first run exit = %d, want %d (stderr=%s)", got, ExitFailures, errb.String())
+		}
+		// alpha_fail is renamed while still broken. The rerun loads the spec and
+		// runs beta_fail, so alpha_fail really has gone missing.
+		writeSpec(t, dir, "s.atago.yaml", `version: "1"
+suite:
+  name: multi
+scenarios:
+  - name: alpha_renamed
+    steps:
+      - run: {shell: true, command: "exit 1"}
+      - assert: {exit_code: 0}
+  - name: beta_fail
+    steps:
+      - run: {shell: true, command: "exit 1"}
+      - assert: {exit_code: 0}
+`)
+		out.Reset()
+		errb.Reset()
+		if got := Main([]string{"run", "--rerun-failed", "--fail-fast", "--parallel", "1", "."}, &out, &errb); got != ExitFailures {
+			t.Fatalf("rerun exit = %d, want %d (stderr=%s)", got, ExitFailures, errb.String())
+		}
+		if !strings.Contains(errb.String(), "renamed or removed") {
+			t.Errorf("stderr = %q, want the rename/removal warning for alpha_fail", errb.String())
+		}
+	})
+}
+
 // TestRerunFailed_FilterExcludesAllNoRenamedWarning is a regression: when a
 // user's own --filter excludes every recorded failure, the run must not blame a
 // rename/removal — that diagnostic is wrong and contradicts the filter warning.

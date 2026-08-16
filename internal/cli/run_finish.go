@@ -23,7 +23,7 @@ func finishRun(ctx context.Context, opts *runOptions, suiteResults []*engine.Sui
 		progress.Done()
 	}
 
-	exit = worseExit(exit, settleRerunLedger(ctx, opts, results))
+	exit = worseExit(exit, settleRerunLedger(ctx, opts, results, unreachedSpecs(opts.paths, suiteResults, loadErrs)))
 
 	// Every spec failed to load, or an interrupt skipped every suite before it
 	// produced a result. Don't print a misleading "0 scenarios" report — but a run
@@ -102,7 +102,21 @@ func collectSuiteExits(opts *runOptions, suiteResults []*engine.SuiteResult, loa
 // (#64) and returns the exit contribution of a --rerun-failed that matched
 // nothing. The preservation invariants live with the ledger primitives in
 // rerun.go.
-func settleRerunLedger(ctx context.Context, opts *runOptions, results []*engine.SuiteResult) int {
+// unreachedSpecs are the spec paths the run never loaded: --fail-fast stopped
+// scheduling after an earlier spec turned the run red, or an interrupt ended the
+// run first. They produced neither a suite result nor a load error, so the run
+// has nothing to say about the scenarios inside them.
+func unreachedSpecs(paths []string, suiteResults []*engine.SuiteResult, loadErrs []error) []string {
+	var out []string
+	for i, p := range paths {
+		if loadErrs[i] == nil && suiteResults[i] == nil {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+func settleRerunLedger(ctx context.Context, opts *runOptions, results []*engine.SuiteResult, unreached []string) int {
 	// Scenarios that actually executed. A Select can exclude every scenario in a
 	// loaded suite — most importantly a --rerun-failed whose recorded scenario
 	// names no longer exist in the specs (renamed or removed while still broken).
@@ -134,7 +148,7 @@ func settleRerunLedger(ctx context.Context, opts *runOptions, results []*engine.
 		// were recorded, which reads as "the others are fixed". Say so before the
 		// ledger is rewritten, while the prior entries are still readable.
 		if opts.rerunFailed && !opts.selectionActive() {
-			warnUnmatchedRerunEntries(opts.label, opts.stderr, results)
+			warnUnmatchedRerunEntries(opts.label, opts.stderr, results, unreached)
 		}
 		updateRerunLedger(opts.label, opts.stderr, results, opts.allowXPass)
 	}

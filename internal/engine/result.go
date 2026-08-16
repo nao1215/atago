@@ -97,6 +97,12 @@ type ScenarioResult struct {
 	Teardown   []StepResult
 	Duration   time.Duration
 	SkipReason string
+	// NotRun marks a scenario that was selected but never executed: --fail-fast
+	// stopped scheduling, or an interrupt ended the run before its turn came. It
+	// is reported as skipped, but that skip is a fact about the run, not a
+	// verdict on the scenario, so consumers that record what a run decided must
+	// leave its prior record alone.
+	NotRun bool
 	// SecurityViolation marks a scenario that errored because it breached the
 	// spec's security policy (e.g. a network-allowlist denial). It maps to exit
 	// code 6 rather than the generic execution-error code.

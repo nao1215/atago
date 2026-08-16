@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-81 suites · 607 scenarios
+81 suites · 609 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -517,10 +517,12 @@
   - [an exit_code failure states that the command printed nothing](#scenario-an-exit_code-failure-states-that-the-command-printed-nothing)
   - [a stdout failure points at stderr when the text is there](#scenario-a-stdout-failure-points-at-stderr-when-the-text-is-there)
   - [an empty stream that ended early says so in the failure block](#scenario-an-empty-stream-that-ended-early-says-so-in-the-failure-block)
-- [atago self-hosting / rerun-failed](#atago-self-hosting--rerun-failed) — 5 scenarios
+- [atago self-hosting / rerun-failed](#atago-self-hosting--rerun-failed) — 7 scenarios
   - [a failing run is recorded and rerun-failed selects only it](#scenario-a-failing-run-is-recorded-and-rerun-failed-selects-only-it)
   - [rerun-failed with nothing recorded is a no-op success](#scenario-rerun-failed-with-nothing-recorded-is-a-no-op-success)
   - [rerun-failed with a filter preserves the still-failing scenarios it did not run](#scenario-rerun-failed-with-a-filter-preserves-the-still-failing-scenarios-it-did-not-run)
+  - [a fail-fast run keeps the recorded failures it never got to](#scenario-a-fail-fast-run-keeps-the-recorded-failures-it-never-got-to)
+  - [a fail-fast run does not blame a rename for the spec it never loaded](#scenario-a-fail-fast-run-does-not-blame-a-rename-for-the-spec-it-never-loaded)
   - [rerun-failed names the recorded failures that no longer match](#scenario-rerun-failed-names-the-recorded-failures-that-no-longer-match)
   - [rerun-failed stays quiet when every recorded failure still exists](#scenario-rerun-failed-stays-quiet-when-every-recorded-failure-still-exists)
 - [atago self-hosting / retry until](#atago-self-hosting--retry-until) — 3 scenarios
@@ -10053,6 +10055,96 @@ ${atago} run --rerun-failed --filter red-a two.atago.yaml
   - exit code is `1`
 - after `${atago} run --rerun-failed --filter red-a two.atago.yaml`:
   - exit code is `1`
+  - file `.atago/last-failed.json` contains `red-a`, `red-b`
+### Scenario: a fail-fast run keeps the recorded failures it never got to
+#### Given
+- Fixture file `two.atago.yaml` is created.
+- Fixture file `two.atago.yaml` is created.
+#### Inputs
+_Fixture `two.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: two
+scenarios:
+  - name: red-a
+    steps:
+      - run: {shell: true, command: "exit 1"}
+      - assert: {exit_code: 0}
+  - name: red-b
+    steps:
+      - run: {shell: true, command: "exit 1"}
+      - assert: {exit_code: 0}
+```
+_Fixture `two.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: two
+scenarios:
+  - name: red-a
+    steps:
+      - run: {shell: true, command: "exit 0"}
+      - assert: {exit_code: 0}
+  - name: red-b
+    steps:
+      - run: {shell: true, command: "exit 1"}
+      - assert: {exit_code: 0}
+```
+#### When
+```shell
+${atago} run two.atago.yaml
+${atago} run --fail-fast --parallel 1 two.atago.yaml
+${atago} run --rerun-failed two.atago.yaml
+```
+#### Then
+- after `${atago} run two.atago.yaml`:
+  - exit code is `1`
+- after `${atago} run --fail-fast --parallel 1 two.atago.yaml`:
+  - exit code is `1`
+  - stdout contains `1 skipped`
+  - file `.atago/last-failed.json` contains `red-a`, `red-b`
+- after `${atago} run --rerun-failed two.atago.yaml`:
+  - exit code is `1`
+  - stdout contains `red-b`
+### Scenario: a fail-fast run does not blame a rename for the spec it never loaded
+#### Given
+- Fixture file `a.atago.yaml` is created.
+- Fixture file `b.atago.yaml` is created.
+#### Inputs
+_Fixture `a.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: a
+scenarios:
+  - name: red-a
+    steps:
+      - run: {shell: true, command: "exit 1"}
+      - assert: {exit_code: 0}
+```
+_Fixture `b.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: b
+scenarios:
+  - name: red-b
+    steps:
+      - run: {shell: true, command: "exit 1"}
+      - assert: {exit_code: 0}
+```
+#### When
+```shell
+${atago} run a.atago.yaml b.atago.yaml
+${atago} run --rerun-failed --fail-fast --parallel 1 a.atago.yaml b.atago.yaml
+```
+#### Then
+- after `${atago} run a.atago.yaml b.atago.yaml`:
+  - exit code is `1`
+- after `${atago} run --rerun-failed --fail-fast --parallel 1 a.atago.yaml b.atago.yaml`:
+  - exit code is `1`
+  - stderr does not contain `renamed or removed`
   - file `.atago/last-failed.json` contains `red-a`, `red-b`
 ### Scenario: rerun-failed names the recorded failures that no longer match
 #### Given

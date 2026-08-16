@@ -322,17 +322,26 @@ func applyRerunSelection(label string, stderr io.Writer, paths []string, eng *en
 // "the other one is fixed". The all-gone case is handled by the caller (it
 // verified nothing and exits non-zero); a partial mismatch stays a warning
 // because the entry survives for the next rerun.
-func warnUnmatchedRerunEntries(label string, stderr io.Writer, results []*engine.SuiteResult) {
+func warnUnmatchedRerunEntries(label string, stderr io.Writer, results []*engine.SuiteResult, unreached []string) {
 	prior, err := loadRerunState()
 	if err != nil || len(prior.Failed) == 0 {
 		return
 	}
-	executed := executedScenarioIDs(results)
+	// Selected, not executed: a recorded failure --fail-fast never got to does
+	// still exist in the specs, so blaming a rename would send the reader after
+	// a spec change that never happened. Same for a whole spec the run never
+	// loaded, which contributes no scenarios to compare against at all.
+	selected := selectedScenarioIDs(results)
+	skip := make(map[string]bool, len(unreached))
+	for _, p := range unreached {
+		skip[absClean(p)] = true
+	}
 	var unmatched []failedEntry
 	for _, e := range prior.Failed {
-		if !executed[canonicalScenarioID(e.SpecPath, e.Scenario)] {
-			unmatched = append(unmatched, e)
+		if selected[canonicalScenarioID(e.SpecPath, e.Scenario)] || skip[absClean(e.SpecPath)] {
+			continue
 		}
+		unmatched = append(unmatched, e)
 	}
 	if len(unmatched) == 0 {
 		return
@@ -354,15 +363,38 @@ func pluralScenarios(n int) string {
 	return fmt.Sprintf("%d recorded failing scenarios", n)
 }
 
-// executedScenarioIDs is the set of scenarios a run actually executed.
+// executedScenarioIDs is the set of scenarios a run actually executed, and so
+// the set whose ledger entries this run is entitled to rewrite.
+//
+// A selected scenario that never ran (NotRun) is deliberately left out:
+// counting its skip as a verdict cleared a failure the ledger had already
+// recorded, and the next --rerun-failed went green with the scenario still
+// broken.
 func executedScenarioIDs(results []*engine.SuiteResult) map[string]bool {
 	executed := map[string]bool{}
 	for _, r := range results {
 		for _, sc := range r.Scenarios {
+			if sc.NotRun {
+				continue
+			}
 			executed[canonicalScenarioID(r.SpecPath, sc.Name)] = true
 		}
 	}
 	return executed
+}
+
+// selectedScenarioIDs is the set of scenarios the run's selection matched,
+// whether or not each one got to run. It answers "does this scenario still
+// exist under these targets?", which is what the renamed-or-removed warning
+// asks, not executedScenarioIDs' "did this run decide a verdict for it?".
+func selectedScenarioIDs(results []*engine.SuiteResult) map[string]bool {
+	selected := map[string]bool{}
+	for _, r := range results {
+		for _, sc := range r.Scenarios {
+			selected[canonicalScenarioID(r.SpecPath, sc.Name)] = true
+		}
+	}
+	return selected
 }
 
 func updateRerunLedger(label string, stderr io.Writer, results []*engine.SuiteResult, allowXPass bool) {
