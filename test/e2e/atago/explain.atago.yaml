@@ -154,3 +154,50 @@ scenarios:
             contains:
               - 'file "out.txt" does not contain "secret-token"'
               - 'file "install.sh" is executable'
+
+  # explain's security notes named http, grpc, and a run whose command looks
+  # networky, and said nothing about the two runners that reach a host by
+  # construction: an ssh run appeared as a bare local command, and a query
+  # against a remote database appeared as nothing at all. Both are egress
+  # permissions.network governs, so the summary told a reviewer less than the
+  # policy already knew.
+  - name: explain names ssh and remote-database egress
+    steps:
+      - fixture:
+          file: remote.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: remote
+            runners:
+              box: {type: ssh, host: shell.example, user: deploy}
+              pg: {type: db, dsn: "postgres://u:p@db.example:5432/app"}
+              local: {type: db, dsn: "sqlite:${workdir}/a.db"}
+            scenarios:
+              - name: reaches two hosts and one file
+                steps:
+                  - run: {runner: box, command: uptime}
+                  - query: {runner: pg, sql: "SELECT 1"}
+                  - query: {runner: local, sql: "SELECT 2"}
+      - run:
+          command: ${atago} explain remote.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "network access (ssh box): uptime"
+              - "network access: SQL query via pg"
+            # The local runner still appears under Commands — it is a step the
+            # scenario runs — but never as egress: a file-backed database
+            # reaches no host, and saying it does would train a reader to skip
+            # the section.
+            not_contains: "network access: SQL query via local"
+      # The machine-readable summary is built from the same list, so it agrees.
+      - run:
+          command: ${atago} manifest remote.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              - path: "$.specs[0].scenarios[0].security[0]"
+                equals: "network access (ssh box): uptime"

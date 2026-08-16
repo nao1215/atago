@@ -73,73 +73,138 @@ func GeneratedArtifacts(sc *Scenario) []string {
 
 // SecurityNotes returns, in declaration order and de-duplicated, the
 // security-relevant operations a scenario performs: shell execution, network
-// access (via run/http/grpc), and browser automation. explain and manifest share
-// this so their machine- and human-facing security summaries stay identical
-// (#56).
-func SecurityNotes(sc *Scenario) []string {
-	var out []string
-	seen := map[string]bool{}
-	add := func(s string) {
-		if s != "" && !seen[s] {
-			seen[s] = true
-			out = append(out, s)
-		}
-	}
-	// A ${env:NAME} reference reads the invoking host environment — an input
-	// dependency worth surfacing for review alongside shell/network use.
-	addEnvRefs := func(fields ...string) {
-		for _, f := range fields {
-			for _, name := range VarRefs(f) {
-				if strings.HasPrefix(name, "env:") {
-					add("host environment read: ${" + name + "}")
-				}
-			}
-		}
-	}
-	// Values in sorted-key order: explain/doc/manifest output must stay
-	// deterministic, and Go map iteration is not.
-	envValues := func(m map[string]string) []string {
-		vals := make([]string, 0, len(m))
-		for _, k := range slices.Sorted(maps.Keys(m)) {
-			vals = append(vals, m[k])
-		}
-		return vals
-	}
+// access, and browser automation. explain and manifest share this so their
+// machine- and human-facing security summaries stay identical (#56).
+//
+// runners is the spec's runner table, because two of the five ways a scenario
+// reaches the network are properties of the runner rather than of the step: a
+// `run:` through an ssh runner logs into another machine, and a `query:`
+// through a db runner pointed at a server dials it. Both were silent here while
+// http and grpc were named, so the summary said less about a spec's egress than
+// permissions.network already enforced.
+func SecurityNotes(sc *Scenario, runners map[string]Runner) []string {
+	n := &noteSet{seen: map[string]bool{}}
 	for i := range sc.Services {
-		svc := &sc.Services[i]
-		if svc.ShellEnabled() {
-			add("shell execution enabled (service " + svc.Name + "): " + svc.Command)
-		}
-		if NetworkCommand.MatchString(svc.Command) {
-			add("network access (service " + svc.Name + "): " + svc.Command)
-		}
-		addEnvRefs(svc.Command)
-		addEnvRefs(envValues(svc.Env)...)
+		n.service(&sc.Services[i])
 	}
 	for i := range sc.Steps {
-		step := &sc.Steps[i]
-		switch step.Kind() {
-		case StepRun:
-			if step.Run.ShellEnabled() {
-				add("shell execution enabled: " + step.Run.Command)
+		n.step(&sc.Steps[i], runners)
+	}
+	return n.out
+}
+
+// noteSet accumulates the security notes in order, without repeats: two steps
+// enabling the shell on the same command say it once.
+type noteSet struct {
+	out  []string
+	seen map[string]bool
+}
+
+func (n *noteSet) add(s string) {
+	if s != "" && !n.seen[s] {
+		n.seen[s] = true
+		n.out = append(n.out, s)
+	}
+}
+
+// envRefs notes each ${env:NAME} reference in the given fields. Reading the
+// invoking host's environment is an input dependency worth surfacing for review
+// alongside shell and network use.
+func (n *noteSet) envRefs(fields ...string) {
+	for _, f := range fields {
+		for _, name := range VarRefs(f) {
+			if strings.HasPrefix(name, "env:") {
+				n.add("host environment read: ${" + name + "}")
 			}
-			if NetworkCommand.MatchString(step.Run.Command) {
-				add("network access: " + step.Run.Command)
-			}
-			addEnvRefs(step.Run.Command, step.Run.Stdin.Inline, step.Run.Stdin.File)
-			addEnvRefs(envValues(step.Run.Env)...)
-		case StepHTTP:
-			add("network access: HTTP request")
-			addEnvRefs(step.HTTP.Path, step.HTTP.Body)
-			addEnvRefs(envValues(step.HTTP.Header)...)
-		case StepQuery:
-			addEnvRefs(step.Query.SQL)
-		case StepGRPC:
-			add("network access: gRPC " + step.GRPC.Method)
-			addEnvRefs(envValues(step.GRPC.Header)...)
-		case StepCDP:
-			add("browser automation (CDP) via " + step.CDP.Runner)
 		}
 	}
-	return out
+}
+
+// envValues returns a map's values in sorted-key order: explain, doc, and
+// manifest output must stay deterministic, and Go map iteration is not.
+func envValues(m map[string]string) []string {
+	vals := make([]string, 0, len(m))
+	for _, k := range slices.Sorted(maps.Keys(m)) {
+		vals = append(vals, m[k])
+	}
+	return vals
+}
+
+func (n *noteSet) service(svc *Service) {
+	if svc.ShellEnabled() {
+		n.add("shell execution enabled (service " + svc.Name + "): " + svc.Command)
+	}
+	if NetworkCommand.MatchString(svc.Command) {
+		n.add("network access (service " + svc.Name + "): " + svc.Command)
+	}
+	n.envRefs(svc.Command)
+	n.envRefs(envValues(svc.Env)...)
+}
+
+func (n *noteSet) step(step *Step, runners map[string]Runner) {
+	switch step.Kind() {
+	case StepRun:
+		n.runStep(step.Run, runners)
+	case StepHTTP:
+		n.add("network access: HTTP request")
+		n.envRefs(step.HTTP.Path, step.HTTP.Body)
+		n.envRefs(envValues(step.HTTP.Header)...)
+	case StepQuery:
+		if remoteDatabase(runners[step.Query.Runner]) {
+			n.add("network access: SQL query via " + step.Query.Runner)
+		}
+		n.envRefs(step.Query.SQL)
+	case StepGRPC:
+		n.add("network access: gRPC " + step.GRPC.Method)
+		n.envRefs(envValues(step.GRPC.Header)...)
+	case StepCDP:
+		n.add("browser automation (CDP) via " + step.CDP.Runner)
+	}
+}
+
+func (n *noteSet) runStep(r *Run, runners map[string]Runner) {
+	if r.ShellEnabled() {
+		n.add("shell execution enabled: " + r.Command)
+	}
+	if NetworkCommand.MatchString(r.Command) {
+		n.add("network access: " + r.Command)
+	}
+	// An ssh runner does not need the command to look networky: the step runs
+	// on another host by construction, which a reader of a bare "uptime" line
+	// has no way to tell.
+	if runners[r.Runner].Type == "ssh" {
+		n.add("network access (ssh " + r.Runner + "): " + r.Command)
+	}
+	n.envRefs(r.Command, r.Stdin.Inline, r.Stdin.File)
+	n.envRefs(envValues(r.Env)...)
+}
+
+// remoteDatabase reports whether a db runner dials a server rather than opening
+// a local file.
+//
+// The test is deliberately coarse — sqlite is the one bundled driver that names
+// a path instead of a peer, so everything else is treated as remote. It answers
+// "should a reviewer be told this scenario talks to a database over the
+// network", where naming one that turns out to be local is a wasted line and
+// staying silent about a real one is the failure. The exact peer, which the
+// network allowlist needs, is resolved from the dsn by the db runner itself.
+func remoteDatabase(r Runner) bool {
+	if r.Type != "db" {
+		return false
+	}
+	if r.Driver != "" {
+		return r.Driver != "sqlite" && r.Driver != "sqlite3"
+	}
+	scheme, _, ok := strings.Cut(r.DSN, ":")
+	if !ok {
+		// A dsn with no scheme is a bare sqlite path (the loader requires an
+		// explicit driver for anything else).
+		return false
+	}
+	switch strings.ToLower(scheme) {
+	case "sqlite", "sqlite3":
+		return false
+	default:
+		return true
+	}
 }

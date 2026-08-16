@@ -39,7 +39,7 @@ func Explain(w io.Writer, s *spec.Spec, path string) error {
 	explainSuiteBlock(&b, "Suite teardown (always runs after the last scenario)", s.Suite.Teardown)
 
 	for i := range s.Scenarios {
-		explainScenario(&b, &s.Scenarios[i])
+		explainScenario(&b, &s.Scenarios[i], s.Runners)
 	}
 	_, err := io.WriteString(w, b.String())
 	return err
@@ -84,7 +84,7 @@ func explainSuiteBlock(b *strings.Builder, label string, steps []spec.Step) {
 	}
 }
 
-func explainScenario(b *strings.Builder, sc *spec.Scenario) {
+func explainScenario(b *strings.Builder, sc *spec.Scenario, runners map[string]spec.Runner) {
 	explainScenarioHeading(b, sc)
 
 	var fixtures, commands, expects, stores, services []string
@@ -132,7 +132,7 @@ func explainScenario(b *strings.Builder, sc *spec.Scenario) {
 	if used := spec.SortedKeys(vars); len(used) > 0 {
 		fmt.Fprintf(b, "  Variables used: %s\n", strings.Join(used, ", "))
 	}
-	if security := spec.SecurityNotes(sc); len(security) > 0 {
+	if security := spec.SecurityNotes(sc, runners); len(security) > 0 {
 		writeList(b, "⚠ Security notes", security)
 	}
 }
