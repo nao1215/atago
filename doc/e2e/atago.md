@@ -9110,7 +9110,7 @@ scenarios:
   - name: the program never produced this
     steps:
       - pty:
-          command: "sh -c 'echo ready; exit 0'"
+          command: "sh -c 'echo ready; sleep 30'"
           timeout: 4s
           session:
             - expect: "ready"
