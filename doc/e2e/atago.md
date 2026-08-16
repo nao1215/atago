@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-81 suites · 609 scenarios
+81 suites · 610 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -481,7 +481,7 @@
   - [a pty step drives the atago binary directly with no shell](#scenario-a-pty-step-drives-the-atago-binary-directly-with-no-shell)
   - [a pty drives atago running an inner spec to a green result](#scenario-a-pty-drives-atago-running-an-inner-spec-to-a-green-result)
   - [a never-matching expect fails and names the pattern in the transcript](#scenario-a-never-matching-expect-fails-and-names-the-pattern-in-the-transcript)
-- [atago self-hosting / record (spec skeleton from an observed run)](#atago-self-hosting--record-spec-skeleton-from-an-observed-run) — 16 scenarios
+- [atago self-hosting / record (spec skeleton from an observed run)](#atago-self-hosting--record-spec-skeleton-from-an-observed-run) — 17 scenarios
   - [record then run round-trips green](#scenario-record-then-run-round-trips-green)
   - [refusing to overwrite without --force](#scenario-refusing-to-overwrite-without---force)
   - [record --pty refuses an existing --out before driving the session](#scenario-record---pty-refuses-an-existing---out-before-driving-the-session)
@@ -492,6 +492,7 @@
   - [argv boundaries survive spaced arguments](#scenario-argv-boundaries-survive-spaced-arguments)
   - [a shell metacharacter argument stays one token](#scenario-a-shell-metacharacter-argument-stays-one-token)
   - [record --pty records a live session and the generated spec replays green](#scenario-record---pty-records-a-live-session-and-the-generated-spec-replays-green)
+  - [record --pty of a silent program anchors on nothing rather than on the echo](#scenario-record---pty-of-a-silent-program-anchors-on-nothing-rather-than-on-the-echo)
   - [record --pty of a no-input command yields a session-less spec that replays green](#scenario-record---pty-of-a-no-input-command-yields-a-session-less-spec-that-replays-green)
   - [a prompt with regex metacharacters is escaped in the generated expect](#scenario-a-prompt-with-regex-metacharacters-is-escaped-in-the-generated-expect)
   - [recorded text containing dollar-brace round-trips as literal text](#scenario-recorded-text-containing-dollar-brace-round-trips-as-literal-text)
@@ -9387,6 +9388,19 @@ ${atago} run generated.atago.yaml
 #### Then
 - exit code is `0`
 - file `generated.atago.yaml` contains `- pty:`, `- send:`
+- exit code is `0`
+- stdout contains `1 passed`
+### Scenario: record --pty of a silent program anchors on nothing rather than on the echo
+_skipped on Windows_
+#### When
+```shell
+# interactive (pty): ${atago} record --pty --out silent.atago.yaml -- sh -c 'read a; read b; echo done'
+${atago} run silent.atago.yaml
+```
+#### Then
+- exit code is `0`
+- file `silent.atago.yaml` does not contain `- expect:`
+- file `silent.atago.yaml` contains `no expect before`
 - exit code is `0`
 - stdout contains `1 passed`
 ### Scenario: record --pty of a no-input command yields a session-less spec that replays green

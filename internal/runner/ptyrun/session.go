@@ -188,9 +188,12 @@ const (
 	echoAbsent
 )
 
-// echoOf is what a terminal writes back when its line discipline echoes the
+// EchoOf is what a terminal writes back when its line discipline echoes the
 // bytes a send transmitted.
-func echoOf(sent []byte) []byte {
+//
+// It is exported because the recorder builds its expects by the same rule the
+// driver discounts matches by, and the two agreeing means one definition.
+func EchoOf(sent []byte) []byte {
 	return bytes.ReplaceAll(sent, []byte("\n"), []byte("\r\n"))
 }
 
@@ -552,7 +555,7 @@ func (d *sessionDriver) send(i int, s *spec.PTYSend) *sessionOutcome {
 	if _, werr := d.term.write(sent); werr != nil {
 		return d.failHard(diag.PTYFailed.Errorf("pty: send: %w", werr))
 	}
-	d.echoes = append(d.echoes, echoSpan{at: at, echo: echoOf(sent)})
+	d.echoes = append(d.echoes, echoSpan{at: at, echo: EchoOf(sent)})
 	return nil
 }
 

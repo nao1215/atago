@@ -13,6 +13,7 @@ import (
 
 	"github.com/nao1215/atago/internal/buildinfo"
 	"github.com/nao1215/atago/internal/loader"
+	"github.com/nao1215/atago/internal/runner/ptyrun"
 	"github.com/nao1215/atago/internal/spec"
 )
 
@@ -132,6 +133,9 @@ func GeneratePTY(rec PTYRecording, opts Options) ([]byte, error) {
 // trailing output (after the final input) for the closing assertion (#69).
 func renderSession(rec *PTYRecording) (lines []string, trailingOutput []byte, unanchored []int) {
 	var pending []byte
+	// echoed is what the terminal wrote back for the send just rendered: it leads
+	// the output that follows and is not the program's (see dropEcho).
+	var echoed []byte
 	secretN := 0
 	sendN := 0
 	for _, seg := range rec.Segments {
@@ -140,7 +144,7 @@ func renderSession(rec *PTYRecording) (lines []string, trailingOutput []byte, un
 			continue
 		}
 		hasAnchor := false
-		if anchor := stableLine(pending); anchor != "" {
+		if anchor := stableLine(dropEcho(pending, echoed)); anchor != "" {
 			lines = append(lines, fmt.Sprintf("            - expect: %s\n", yamlScalar(regexp.QuoteMeta(anchor))))
 			hasAnchor = true
 		}
@@ -153,9 +157,42 @@ func renderSession(rec *PTYRecording) (lines []string, trailingOutput []byte, un
 			unanchored = append(unanchored, sendN)
 		}
 		lines = append(lines, renderSend(seg, &secretN)...)
+		echoed = echoOfSend(seg)
 		pending = nil
 	}
-	return lines, pending, unanchored
+	return lines, dropEcho(pending, echoed), unanchored
+}
+
+// echoOfSend is what the terminal wrote back for one input burst, or nil when
+// it wrote nothing. Echo-off input (a password prompt) is never echoed by
+// definition; everything else is the burst as the replay will transmit it.
+func echoOfSend(seg PTYSegment) []byte {
+	if seg.EchoOff {
+		return nil
+	}
+	return ptyrun.EchoOf([]byte(literalSend(seg.Input)))
+}
+
+// dropEcho removes a leading echo from the output captured after a send, so an
+// anchor is built from what the PROGRAM said rather than from the keystrokes
+// atago is about to replay.
+//
+// An expect matching only its own echo is one the driver refuses (it asserts
+// that atago can type, not that the program answered), so anchoring on it
+// generated a spec that could not pass: a program reading several lines without
+// printing between them left the echo as the only text in front of the next
+// send, and the replay hung on that expect until its timeout.
+//
+// Position is the test, exactly as it is in the driver: the line discipline
+// writes the echo synchronously with the write, so it leads this output or it
+// is not there at all. A raw-mode program whose terminal echoed nothing keeps
+// every byte, and so does one that prints the input back itself — that copy
+// lands after the echo, not in front of it.
+func dropEcho(out, echo []byte) []byte {
+	if len(echo) == 0 {
+		return out
+	}
+	return bytes.TrimPrefix(out, echo)
 }
 
 // writeUnanchoredWarning notes, once in the header, every send that has no

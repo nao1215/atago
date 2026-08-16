@@ -677,7 +677,7 @@ func TestSessionDriver_EchoIsNotAMatch(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			d := &sessionDriver{
-				echoes: []echoSpan{{at: tt.sentAt, echo: echoOf([]byte(tt.sent))}},
+				echoes: []echoSpan{{at: tt.sentAt, echo: EchoOf([]byte(tt.sent))}},
 			}
 			transcript := []byte(tt.transcript)
 			d.locateEchoes(transcript)
@@ -706,8 +706,8 @@ func TestEchoOf(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			if got := string(echoOf([]byte(tt.sent))); got != tt.want {
-				t.Errorf("echoOf(%q) = %q, want %q", tt.sent, got, tt.want)
+			if got := string(EchoOf([]byte(tt.sent))); got != tt.want {
+				t.Errorf("EchoOf(%q) = %q, want %q", tt.sent, got, tt.want)
 			}
 		})
 	}
