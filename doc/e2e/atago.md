@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-81 suites · 618 scenarios
+81 suites · 619 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -417,10 +417,11 @@
   - [a single-row matrix expands to exactly one scenario](#scenario-a-single-row-matrix-expands-to-exactly-one-scenario)
   - [an empty matrix row list is a load-time error](#scenario-an-empty-matrix-row-list-is-a-load-time-error)
   - [rows that expand to the same name are rejected as duplicates](#scenario-rows-that-expand-to-the-same-name-are-rejected-as-duplicates)
-- [atago self-hosting / mock http server (offline API-client testing)](#atago-self-hosting--mock-http-server-offline-api-client-testing) — 3 scenarios
+- [atago self-hosting / mock http server (offline API-client testing)](#atago-self-hosting--mock-http-server-offline-api-client-testing) — 4 scenarios
   - [count, header, and body-json asserts pass against a real client](#scenario-count-header-and-body-json-asserts-pass-against-a-real-client)
   - [a failing count summarizes the recorded requests](#scenario-a-failing-count-summarizes-the-recorded-requests)
   - [an unknown mock name in an assert is a load-time error](#scenario-an-unknown-mock-name-in-an-assert-is-a-load-time-error)
+  - [a route that can never answer is a load-time error](#scenario-a-route-that-can-never-answer-is-a-load-time-error)
 - [atago self-hosting / combined stream matchers](#atago-self-hosting--combined-stream-matchers) — 6 scenarios
   - [contains and not_contains hold together](#scenario-contains-and-not_contains-hold-together)
   - [matches and not_matches hold together](#scenario-matches-and-not_matches-hold-together)
@@ -8266,6 +8267,52 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `not a declared mock server (declared: api)`
+### Scenario: a route that can never answer is a load-time error
+#### Given
+- Fixture file `dead.atago.yaml` is created.
+- Fixture file `query.atago.yaml` is created.
+#### Inputs
+_Fixture `dead.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: two routes for one pair
+    mock_servers:
+      - name: api
+        routes:
+          - {method: GET, path: /ping, status: 200, body: first}
+          - {method: get, path: /ping, status: 500, body: second}
+    steps:
+      - run: {command: echo hi}
+```
+_Fixture `query.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: a route declaring a query
+    mock_servers:
+      - name: api
+        routes:
+          - {method: GET, path: "/search?q=x", status: 200, body: hit}
+    steps:
+      - run: {command: echo hi}
+```
+#### When
+```shell
+${atago} run dead.atago.yaml
+${atago} run query.atago.yaml
+```
+#### Then
+- after `${atago} run dead.atago.yaml`:
+  - exit code is `2`
+  - stderr contains `duplicate route GET /ping`
+- after `${atago} run query.atago.yaml`:
+  - exit code is `2`
+  - stderr contains `must not contain a query string`
 ## atago self-hosting / combined stream matchers
 Source: `test/e2e/atago/multi_matcher.atago.yaml`
 ### Scenario: contains and not_contains hold together

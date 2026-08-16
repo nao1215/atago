@@ -125,3 +125,53 @@ scenarios:
           exit_code: 2
           stderr:
             contains: 'not a declared mock server (declared: api)'
+
+  # The server answers with the FIRST route whose method and path match, so a
+  # repeat of that pair is dead configuration: the spec declares a response it
+  # will never send. Method comparison is case-insensitive at serve time, which
+  # the check mirrors.
+  - name: a route that can never answer is a load-time error
+    steps:
+      - fixture:
+          file: dead.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: two routes for one pair
+                mock_servers:
+                  - name: api
+                    routes:
+                      - {method: GET, path: /ping, status: 200, body: first}
+                      - {method: get, path: /ping, status: 500, body: second}
+                steps:
+                  - run: {command: echo hi}
+      - run:
+          command: ${atago} run dead.atago.yaml
+      - assert:
+          exit_code: 2
+          stderr:
+            contains: "duplicate route GET /ping"
+      # Matching compares the request's path, which the server has already split
+      # from its query, so a declared query can never be part of a match.
+      - fixture:
+          file: query.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: a route declaring a query
+                mock_servers:
+                  - name: api
+                    routes:
+                      - {method: GET, path: "/search?q=x", status: 200, body: hit}
+                steps:
+                  - run: {command: echo hi}
+      - run:
+          command: ${atago} run query.atago.yaml
+      - assert:
+          exit_code: 2
+          stderr:
+            contains: "must not contain a query string"
