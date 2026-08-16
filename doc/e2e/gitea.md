@@ -20,6 +20,7 @@ just a JSON API that claims a repository exists.
 
 Source: `test/e2e/thirdparty/gitea/gitea.atago.yaml`
 ### Scenario: the binary reports its version
+_only when `gitea --version` succeeds_
 #### When
 ```shell
 gitea --version
@@ -28,6 +29,7 @@ gitea --version
 - exit code is `0`
 - stdout matches `/gitea version [0-9]+\.[0-9]+\.[0-9]+/`
 ### Scenario: the server boots from an authored app.ini and reports healthy
+_only when `gitea --version` succeeds_
 #### Given
 - Background service `gitea` is started: `gitea web --config app.ini`.
 - Fixture file `app.ini` is created.
@@ -68,6 +70,7 @@ ROOT = data/repos
   - HTTP status is `200`
   - body at `$.version` matches `/^[0-9]+\.[0-9]+\.[0-9]+/`
 ### Scenario: admin CLI, REST API, and a real git clone interoperate
+_only when `gitea --version` succeeds_
 #### Given
 - Background service `gitea` is started: `gitea web --config app.ini`.
 - Fixture file `app.ini` is created.

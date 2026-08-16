@@ -193,3 +193,92 @@ scenarios:
           exit_code: 0
           stdout:
             contains: PASSED
+
+  # A probe-first suite's gate belongs to the file, not to each scenario in it.
+  # Repeating `only:` per scenario is how a suite ends up with some scenarios
+  # gated and some not — and the ungated ones then error on a machine without
+  # the tool instead of skipping, which is noise rather than a result.
+  - name: defaults.scenario.only gates every scenario that states no gate
+    steps:
+      - fixture:
+          file: gated.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: gated
+            defaults:
+              scenario:
+                only:
+                  command: definitely-no-such-tool-xyz --version
+            scenarios:
+              - name: inherits the file gate
+                steps:
+                  - run: {command: "false"}
+                  - assert: {exit_code: 0}
+              - name: also inherits it
+                steps:
+                  - run: {command: "false"}
+                  - assert: {exit_code: 0}
+      - run: {command: "${atago} run gated.atago.yaml"}
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "2 skipped"
+
+  # A scenario that states its own gate means that one. Silently ANDing the
+  # file-level condition onto it would make the scenario's own line stop
+  # describing when it runs.
+  - name: a scenario's own gate replaces the default rather than combining
+    steps:
+      - fixture:
+          file: own.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: own
+            defaults:
+              scenario:
+                only:
+                  command: definitely-no-such-tool-xyz --version
+            scenarios:
+              - name: states its own gate and runs
+                only:
+                  command: "true"
+                steps:
+                  - run: {command: "true"}
+                  - assert: {exit_code: 0}
+              - name: takes the default and skips
+                steps:
+                  - run: {command: "false"}
+                  - assert: {exit_code: 0}
+      - run: {command: "${atago} run own.atago.yaml"}
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "1 passed"
+              - "1 skipped"
+
+  # The same for skip, so a file-wide platform exclusion is stated once.
+  - name: defaults.scenario.skip excludes every scenario that states no skip
+    steps:
+      - fixture:
+          file: skipped.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: skipped
+            defaults:
+              scenario:
+                skip:
+                  command: "true"
+            scenarios:
+              - name: inherits the file exclusion
+                steps:
+                  - run: {command: "false"}
+                  - assert: {exit_code: 0}
+      - run: {command: "${atago} run skipped.atago.yaml"}
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "1 skipped"

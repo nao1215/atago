@@ -15,6 +15,14 @@ suite:
     Durability gets its own attention: data written by one invocation must still
     be there for the next one, which is the whole reason to use a file-backed
     database rather than a pipe.
+defaults:
+  scenario:
+    # Every scenario here drives sqlite3. Without the program there is nothing to
+    # test, so the suite skips rather than erroring: a missing tool is not a
+    # result. The gate is declared once so no scenario can be left out of it.
+    only:
+      command: sqlite3 --version
+
 scenarios:
   - name: one-shot SQL creates, inserts, and counts in a single invocation
     steps:

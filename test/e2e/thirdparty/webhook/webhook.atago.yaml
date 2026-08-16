@@ -49,6 +49,14 @@ runners:
     base_url: http://127.0.0.1:18098
     timeout: 10s
 
+defaults:
+  scenario:
+    # Every scenario here drives webhook. Without the program there is nothing to
+    # test, so the suite skips rather than erroring: a missing tool is not a
+    # result. The gate is declared once so no scenario can be left out of it.
+    only:
+      command: webhook -version
+
 scenarios:
   - name: a post runs the command, returns its output, and writes its file
     services:

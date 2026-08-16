@@ -28,6 +28,7 @@ restore.
 
 Source: `test/e2e/thirdparty/restic/restic.atago.yaml`
 ### Scenario: version prints a semantic version
+_only when `restic version` succeeds_
 #### When
 ```shell
 restic version
@@ -36,6 +37,7 @@ restic version
 - exit code is `0`
 - stdout matches `/restic [0-9]+\.[0-9]+\.[0-9]+/`
 ### Scenario: init creates an encrypted repository on disk
+_only when `restic version` succeeds_
 #### When
 ```shell
 restic init
@@ -45,6 +47,7 @@ restic init
 - stdout contains `created restic repository`
 - dir `repo` exists, contains `config`, contains `keys`, contains `snapshots`
 ### Scenario: backup, list as JSON, and restore round-trip user data
+_only when `restic version` succeeds_
 #### Given
 - Fixture file `data/hello.txt` is created.
 - Fixture file `data/sub/notes.md` is created.
@@ -79,6 +82,7 @@ restic restore ${snap} --target restored
   - file `restored/data/hello.txt` contains `hello from atago`
   - file `restored/data/sub/notes.md` contains `# notes kept safe`
 ### Scenario: diff names exactly the file added between two snapshots
+_only when `restic version` succeeds_
 #### Given
 - Fixture file `data/base.txt` is created.
 - Fixture file `data/added-later.txt` is created.
@@ -110,6 +114,7 @@ restic diff ${first} ${second}
   - stdout contains `+    /data/added-later.txt`
   - stdout does not contain `/data/base.txt`
 ### Scenario: check reports a healthy repository as error-free
+_only when `restic version` succeeds_
 #### Given
 - Fixture file `data/precious.txt` is created.
 #### Inputs
@@ -128,6 +133,7 @@ restic check
   - exit code is `0`
   - stdout contains `no errors were found`
 ### Scenario: forget --keep-last 1 --prune drops the older snapshot
+_only when `restic version` succeeds_
 #### Given
 - Fixture file `data/gen.txt` is created.
 - Fixture file `data/gen.txt` is created.
@@ -156,6 +162,7 @@ restic snapshots --json
   - exit code is `0`
   - stdout at `$` has length 1
 ### Scenario: the wrong password cannot unlock the repository
+_only when `restic version` succeeds_
 #### Given
 - Environment variables are set: RESTIC_PASSWORD.
 #### When

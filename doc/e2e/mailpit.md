@@ -22,6 +22,7 @@ it.
 
 Source: `test/e2e/thirdparty/mailpit/mailpit.atago.yaml`
 ### Scenario: the binary reports its version
+_only when `mailpit version` succeeds_
 #### When
 ```shell
 mailpit version --no-release-check
@@ -30,6 +31,7 @@ mailpit version --no-release-check
 - exit code is `0`
 - stdout contains `mailpit`
 ### Scenario: a message sent over real SMTP is captured and readable via the API
+_only when `mailpit version` succeeds_
 #### Given
 - Background service `mailpit` is started: `mailpit --smtp 127.0.0.1:18170 --listen 127.0.0.1:18171 --database data.db`.
 - Fixture file `mail.txt` is created.
@@ -60,6 +62,7 @@ curl -s --url smtp://127.0.0.1:18170 --mail-from alice@example.test --mail-rcpt 
   - HTTP status is `200`
   - body at `$.Text` matches `/deploy pipeline completed successfully/`
 ### Scenario: full-text search finds exactly the matching message
+_only when `mailpit version` succeeds_
 #### Given
 - Background service `mailpit` is started: `mailpit --smtp 127.0.0.1:18172 --listen 127.0.0.1:18173 --database data.db`.
 - Fixture file `mail1.txt` is created.
@@ -94,6 +97,7 @@ curl -s --url smtp://127.0.0.1:18172 --mail-from ci@example.test --mail-rcpt tea
   - body at `$.messages_count` equals `1`
   - body at `$.messages[0].Subject` equals `nightly build report`
 ### Scenario: a MIME attachment survives delivery intact
+_only when `mailpit version` succeeds_
 #### Given
 - Background service `mailpit` is started: `mailpit --smtp 127.0.0.1:18174 --listen 127.0.0.1:18175 --database data.db`.
 - Fixture file `mail.txt` is created.
@@ -131,6 +135,7 @@ curl -s --url smtp://127.0.0.1:18174 --mail-from reports@example.test --mail-rcp
   - body at `$.Attachments` has length 1
   - body at `$.Attachments[0].FileName` equals `data.csv`
 ### Scenario: deleting all messages empties the mailbox
+_only when `mailpit version` succeeds_
 #### Given
 - Background service `mailpit` is started: `mailpit --smtp 127.0.0.1:18176 --listen 127.0.0.1:18177 --database data.db`.
 - Fixture file `mail.txt` is created.

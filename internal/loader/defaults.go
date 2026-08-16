@@ -25,6 +25,16 @@ func applyDefaults(s *spec.Spec) {
 		sc := &s.Scenarios[i]
 		if d.Scenario != nil {
 			sc.Env = mergeStringMap(d.Scenario.Env, sc.Env)
+			// A gate is taken whole rather than merged: a scenario that states
+			// its own condition means that one, and silently ANDing a
+			// file-level condition onto it would make the scenario's own line
+			// no longer describe when it runs.
+			if sc.Only == nil {
+				sc.Only = d.Scenario.Only
+			}
+			if sc.Skip == nil {
+				sc.Skip = d.Scenario.Skip
+			}
 		}
 		if d.Service != nil {
 			for j := range sc.Services {

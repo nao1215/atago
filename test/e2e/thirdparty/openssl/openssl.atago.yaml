@@ -17,6 +17,14 @@ suite:
     password must fail loudly, because a crypto tool that silently emits garbage
     on a bad key is worse than one that crashes. A self-signed certificate is
     checked to carry the subject that was requested.
+defaults:
+  scenario:
+    # Every scenario here drives openssl. Without the program there is nothing to
+    # test, so the suite skips rather than erroring: a missing tool is not a
+    # result. The gate is declared once so no scenario can be left out of it.
+    only:
+      command: openssl version
+
 scenarios:
   - name: sha256 digest of a fixed input is exact and stable
     steps:

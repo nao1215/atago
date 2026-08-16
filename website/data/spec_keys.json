@@ -70,6 +70,8 @@
   "defaults.run.timeout": "v0.1.0",
   "defaults.scenario": "v0.1.0",
   "defaults.scenario.env": "v0.1.0",
+  "defaults.scenario.only": "unreleased",
+  "defaults.scenario.skip": "unreleased",
   "defaults.service": "v0.1.0",
   "defaults.service.clear_env": "v0.3.0",
   "defaults.service.cwd": "v0.1.0",

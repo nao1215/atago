@@ -23,6 +23,7 @@ claiming the server came up.
 
 Source: `test/e2e/thirdparty/caddy/caddy.atago.yaml`
 ### Scenario: the standard module set is compiled in
+_only when `caddy version` succeeds_
 #### When
 ```shell
 caddy list-modules
@@ -31,6 +32,7 @@ caddy list-modules
 - exit code is `0`
 - stdout contains `http.handlers.file_server`, `http.handlers.static_response`
 ### Scenario: adapt turns a Caddyfile into canonical JSON
+_only when `caddy version` succeeds_
 #### Given
 - Fixture file `Caddyfile` is created.
 #### Inputs
@@ -47,6 +49,7 @@ caddy adapt --config Caddyfile
 - exit code is `0`
 - stdout at `$.apps.http.servers.srv0.listen[0]` equals `:18080`
 ### Scenario: fmt normalizes a messy Caddyfile in place
+_only when `caddy version` succeeds_
 #### Given
 - Fixture file `Caddyfile` is created.
 #### Inputs
@@ -64,6 +67,7 @@ caddy fmt --overwrite Caddyfile
 - exit code is `0`
 - file `Caddyfile` contains `respond "ok"`
 ### Scenario: validate rejects a broken Caddyfile
+_only when `caddy version` succeeds_
 #### Given
 - Fixture file `Caddyfile` is created.
 #### Inputs
@@ -80,6 +84,7 @@ caddy validate --config Caddyfile --adapter caddyfile
 - exit code is not `0`
 - stderr contains `no_such_directive_xyz`
 ### Scenario: a config-driven server boots from an authored Caddyfile
+_only when `caddy version` succeeds_
 #### Given
 - Background service `caddy` is started: `caddy run --config Caddyfile --adapter caddyfile`.
 - Fixture file `Caddyfile` is created.
@@ -101,6 +106,7 @@ respond "configured response" 200
 - HTTP status is `200`
 - body contains `configured response`
 ### Scenario: the file server serves fixtures over real HTTP
+_only when `caddy version` succeeds_
 #### Given
 - Background service `caddy` is started: `caddy file-server --listen 127.0.0.1:18080 --root site`.
 - Fixture file `site/index.html` is created.

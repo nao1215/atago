@@ -1232,3 +1232,72 @@ scenarios:
 		t.Errorf("run.shell = true, want unchanged false without defaults")
 	}
 }
+
+// TestApplyDefaults_ScenarioGate covers the file-level selection gate. A
+// probe-first suite states "these scenarios exist only where the tool is
+// installed" once, and a scenario that states its own condition keeps it: the
+// two are not combined, because a scenario's own `only:` line has to keep
+// describing when that scenario runs.
+func TestApplyDefaults_ScenarioGate(t *testing.T) {
+	t.Parallel()
+	src := `
+version: "1"
+suite:
+  name: gate
+defaults:
+  scenario:
+    only:
+      command: mytool --version
+    skip:
+      os: windows
+scenarios:
+  - name: takes both defaults
+    steps:
+      - run: {command: "true"}
+  - name: states its own only
+    only:
+      env: MYTOOL_HOME
+    steps:
+      - run: {command: "true"}
+  - name: states its own skip
+    skip:
+      os: darwin
+    steps:
+      - run: {command: "true"}
+`
+	s, err := LoadBytes("gate.atago.yaml", []byte(src))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	tests := []struct {
+		idx      int
+		wantOnly string
+		wantSkip string
+	}{
+		{idx: 0, wantOnly: "mytool --version", wantSkip: "windows"},
+		{idx: 1, wantOnly: "", wantSkip: "windows"},
+		{idx: 2, wantOnly: "mytool --version", wantSkip: "darwin"},
+	}
+	for _, tt := range tests {
+		sc := s.Scenarios[tt.idx]
+		gotOnly := ""
+		if sc.Only != nil {
+			gotOnly = sc.Only.Command
+		}
+		if gotOnly != tt.wantOnly {
+			t.Errorf("scenario %q only.command = %q, want %q", sc.Name, gotOnly, tt.wantOnly)
+		}
+		gotSkip := ""
+		if sc.Skip != nil {
+			gotSkip = sc.Skip.OS
+		}
+		if gotSkip != tt.wantSkip {
+			t.Errorf("scenario %q skip.os = %q, want %q", sc.Name, gotSkip, tt.wantSkip)
+		}
+	}
+	// The scenario that stated its own only: keeps it whole, rather than
+	// inheriting the default's command alongside its own env.
+	if s.Scenarios[1].Only == nil || s.Scenarios[1].Only.Env != "MYTOOL_HOME" {
+		t.Errorf("scenario 1 lost its own only: %+v", s.Scenarios[1].Only)
+	}
+}

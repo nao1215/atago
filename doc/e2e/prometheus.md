@@ -24,6 +24,7 @@ all had to work for the sample to be there.
 
 Source: `test/e2e/thirdparty/prometheus/prometheus.atago.yaml`
 ### Scenario: promtool accepts a valid config and rejects a broken one
+_only when `promtool --version` succeeds_
 #### Given
 - Fixture file `prometheus.yml` is created.
 - Fixture file `broken.yml` is created.
@@ -55,6 +56,7 @@ promtool check config broken.yml
   - exit code is not `0`
   - stderr contains `not a valid duration string`
 ### Scenario: promtool unit-tests an alerting rule
+_only when `promtool --version` succeeds_
 #### Given
 - Fixture file `rules.yml` is created.
 - Fixture file `rules_test.yml` is created.
@@ -108,6 +110,7 @@ promtool test rules rules_test.yml
   - exit code is `0`
   - stdout contains `SUCCESS`
 ### Scenario: the server boots from an authored config and answers the query API
+_only when `promtool --version` succeeds_
 #### Given
 - Background service `prometheus` is started: `prometheus --config.file=prometheus.yml --storage.tsdb.path=data --web.listen-address=127.0.0.1:18130`.
 - Fixture file `prometheus.yml` is created.
@@ -140,6 +143,7 @@ scrape_configs: []
   - HTTP status is `200`
   - body at `$.data.result[0].value[1]` equals `42`
 ### Scenario: a self-scrape is ingested and queryable as up == 1
+_only when `promtool --version` succeeds_
 #### Given
 - Background service `prometheus` is started: `prometheus --config.file=prometheus.yml --storage.tsdb.path=data --web.listen-address=127.0.0.1:18131`.
 - Fixture file `prometheus.yml` is created.

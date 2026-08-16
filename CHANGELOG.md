@@ -13,8 +13,14 @@ and this project follows [Semantic Versioning](https://semver.org/).
 - `atago explain ATG2201` prints what a code means without a browser — the same entry the website renders, from the same registry — and suggests a near-miss when the code is not one that exists. The JSON report carries the code as a `code` field on each failure, and a GitHub Actions error annotation puts it in the title where the annotations list shows it, so a dashboard or a CI job can group failures by cause instead of matching on prose.
 - An [error code reference](https://nao1215.github.io/atago/errors/), generated from the registry that defines the codes, listing what each one means, what causes it, and what to change. A code cannot exist without that documentation: registering it is the only way to create one, and registration refuses an entry that omits the explanation or the fix. A committed `doc/errors.md` is drift-guarded against the registry, and a coverage gate fails CI when a published code is not provoked by a scenario in atago's own E2E suite.
 
+### Added
+
+- `defaults.scenario.only` and `defaults.scenario.skip` state a suite's selection gate once instead of on every scenario. A probe-first suite exists only where the program it drives is installed, which is a property of the file rather than of each scenario in it, and repeating the condition is how a suite ends up with some scenarios gated and some not — the ungated ones then error on a machine without the tool instead of skipping. A scenario that states its own condition keeps it; the two are not combined.
+
 ### Bug Fixes
 
+- Twenty-one third-party suites now skip cleanly on a machine without the program they drive, instead of erroring through every scenario. They had no probe gate at all, so `atago run ./test/e2e/thirdparty` reported 17 errors here for tools that simply were not installed.
+- The lazygit suite asserts the shape of the version line rather than the exact release. Pinning the number coupled the scenario to the version the CI workflow installs, so it failed against any other build — a developer's own lazygit, or CI itself the moment the pin moved.
 - A `pty:` `expect:` no longer matches the terminal's echo of the `send:` before it. Sending a line and expecting a substring of it is the natural way to drive a prompt, and with ECHO on the typed text appears in the transcript, so the expect matched the keystrokes rather than the program's answer — passing whether the program was listening, busy, or already dead. atago refuses assertions that cannot fail while loading a spec (ATG2312); this was the same defect one layer down. Only a match lying entirely inside the echo is discounted, so a program that prints the input back keeps its own copy and the ordinary shape still works.
 
 ### Documentation

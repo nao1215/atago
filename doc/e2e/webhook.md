@@ -25,6 +25,7 @@ non-zero surfaces as a 500 instead of being reported as success.
 
 Source: `test/e2e/thirdparty/webhook/webhook.atago.yaml`
 ### Scenario: a post runs the command, returns its output, and writes its file
+_only when `webhook -version` succeeds_
 #### Given
 - Background service `webhook` is started: `webhook -hooks hooks.json -ip 127.0.0.1 -port 18094`.
 - Fixture file `handler.sh` is created.
@@ -63,6 +64,7 @@ _Fixture `hooks.json`:_
 - after `HTTP POST /hooks/nope`:
   - HTTP status is `404`
 ### Scenario: a trigger-rule gates execution and blocks it when unsatisfied
+_only when `webhook -version` succeeds_
 #### Given
 - Background service `webhook` is started: `webhook -hooks hooks.json -ip 127.0.0.1 -port 18095`.
 - Fixture file `handler.sh` is created.
@@ -106,6 +108,7 @@ _Fixture `hooks.json`:_
   - HTTP status is `200`
   - file `ran.txt` contains `executed`
 ### Scenario: an HMAC signature is verified against an independent oracle
+_only when `webhook -version` succeeds_
 #### Given
 - Background service `webhook` is started: `webhook -hooks hooks.json -ip 127.0.0.1 -port 18096`.
 - Fixture file `handler.sh` is created.
@@ -149,6 +152,7 @@ _Fixture `hooks.json`:_
   - HTTP status is `200`
   - file `ran.txt` contains `signed`
 ### Scenario: the http-methods allowlist rejects the wrong verb
+_only when `webhook -version` succeeds_
 #### Given
 - Background service `webhook` is started: `webhook -hooks hooks.json -ip 127.0.0.1 -port 18097`.
 - Fixture file `handler.sh` is created.
@@ -178,6 +182,7 @@ _Fixture `hooks.json`:_
 #### Then
 - HTTP status is `405`
 ### Scenario: a command that exits non-zero surfaces as a 500
+_only when `webhook -version` succeeds_
 #### Given
 - Background service `webhook` is started: `webhook -hooks hooks.json -ip 127.0.0.1 -port 18098`.
 - Fixture file `handler.sh` is created.

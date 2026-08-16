@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-81 suites · 604 scenarios
+81 suites · 607 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -85,13 +85,16 @@
 - [atago self-hosting / db runner](#atago-self-hosting--db-runner) — 2 scenarios
   - [query workflow (create, insert, select, row assert, value binding) passes](#scenario-query-workflow-create-insert-select-row-assert-value-binding-passes)
   - [a query against an undeclared runner fails validation (exit 2)](#scenario-a-query-against-an-undeclared-runner-fails-validation-exit-2)
-- [atago self-hosting / top-level defaults](#atago-self-hosting--top-level-defaults) — 6 scenarios
+- [atago self-hosting / top-level defaults](#atago-self-hosting--top-level-defaults) — 9 scenarios
   - [defaults.run.shell applies to every run step without repeating it](#scenario-defaultsrunshell-applies-to-every-run-step-without-repeating-it)
   - [defaults.scenario.env is merged and an explicit scenario env wins](#scenario-defaultsscenarioenv-is-merged-and-an-explicit-scenario-env-wins)
   - [defaults.run.sandbox_home governs a run step and a pty step alike (POSIX)](#scenario-defaultsrunsandbox_home-governs-a-run-step-and-a-pty-step-alike-posix)
   - [an unsupported defaults field is a load-time error (exit 2)](#scenario-an-unsupported-defaults-field-is-a-load-time-error-exit-2)
   - [defaults.run.env merges per key and a step env wins the collisions](#scenario-defaultsrunenv-merges-per-key-and-a-step-env-wins-the-collisions)
   - [a step opts out of defaults.run.shell with an explicit shell false](#scenario-a-step-opts-out-of-defaultsrunshell-with-an-explicit-shell-false)
+  - [defaults.scenario.only gates every scenario that states no gate](#scenario-defaultsscenarioonly-gates-every-scenario-that-states-no-gate)
+  - [a scenario's own gate replaces the default rather than combining](#scenario-a-scenarios-own-gate-replaces-the-default-rather-than-combining)
+  - [defaults.scenario.skip excludes every scenario that states no skip](#scenario-defaultsscenarioskip-excludes-every-scenario-that-states-no-skip)
 - [atago self-hosting / deterministic runs](#atago-self-hosting--deterministic-runs) — 8 scenarios
   - [a read-only command satisfies the default check](#scenario-a-read-only-command-satisfies-the-default-check)
   - [the asserts and store still describe the first run](#scenario-the-asserts-and-store-still-describe-the-first-run)
@@ -2299,6 +2302,94 @@ ${atago} run optout.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `PASSED`
+### Scenario: defaults.scenario.only gates every scenario that states no gate
+#### Given
+- Fixture file `gated.atago.yaml` is created.
+#### Inputs
+_Fixture `gated.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: gated
+defaults:
+  scenario:
+    only:
+      command: definitely-no-such-tool-xyz --version
+scenarios:
+  - name: inherits the file gate
+    steps:
+      - run: {command: "false"}
+      - assert: {exit_code: 0}
+  - name: also inherits it
+    steps:
+      - run: {command: "false"}
+      - assert: {exit_code: 0}
+```
+#### When
+```shell
+${atago} run gated.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout contains `2 skipped`
+### Scenario: a scenario's own gate replaces the default rather than combining
+#### Given
+- Fixture file `own.atago.yaml` is created.
+#### Inputs
+_Fixture `own.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: own
+defaults:
+  scenario:
+    only:
+      command: definitely-no-such-tool-xyz --version
+scenarios:
+  - name: states its own gate and runs
+    only:
+      command: "true"
+    steps:
+      - run: {command: "true"}
+      - assert: {exit_code: 0}
+  - name: takes the default and skips
+    steps:
+      - run: {command: "false"}
+      - assert: {exit_code: 0}
+```
+#### When
+```shell
+${atago} run own.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout contains `1 passed`, `1 skipped`
+### Scenario: defaults.scenario.skip excludes every scenario that states no skip
+#### Given
+- Fixture file `skipped.atago.yaml` is created.
+#### Inputs
+_Fixture `skipped.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: skipped
+defaults:
+  scenario:
+    skip:
+      command: "true"
+scenarios:
+  - name: inherits the file exclusion
+    steps:
+      - run: {command: "false"}
+      - assert: {exit_code: 0}
+```
+#### When
+```shell
+${atago} run skipped.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout contains `1 skipped`
 ## atago self-hosting / deterministic runs
 Source: `test/e2e/atago/deterministic.atago.yaml`
 ### Scenario: a read-only command satisfies the default check

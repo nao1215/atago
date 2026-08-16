@@ -47,6 +47,14 @@ runners:
     base_url: http://127.0.0.1:14140
     timeout: 10s
 
+defaults:
+  scenario:
+    # Every scenario here drives hugo. Without the program there is nothing to
+    # test, so the suite skips rather than erroring: a missing tool is not a
+    # result. The gate is declared once so no scenario can be left out of it.
+    only:
+      command: hugo version
+
 scenarios:
   - name: the home page lists the post
     steps:

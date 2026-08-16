@@ -14,6 +14,14 @@ suite:
     malformed input. That combination (silent on success, non-zero on garbage)
     is what makes it usable as a JSON check in a script, and both halves are
     pinned here.
+defaults:
+  scenario:
+    # Every scenario here drives jq. Without the program there is nothing to
+    # test, so the suite skips rather than erroring: a missing tool is not a
+    # result. The gate is declared once so no scenario can be left out of it.
+    only:
+      command: jq --version
+
 scenarios:
   - name: multibyte unicode passes through unchanged
     steps:

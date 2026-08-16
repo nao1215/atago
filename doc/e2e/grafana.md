@@ -20,6 +20,7 @@ accepted alongside it.
 
 Source: `test/e2e/thirdparty/grafana/grafana.atago.yaml`
 ### Scenario: the server boots and reports health and build info
+_only when `grafana --version` succeeds_
 #### Given
 - Background service `grafana` is started: `grafana server --homepath "$GF_PATHS_HOME"`.
 #### When
@@ -41,6 +42,7 @@ The 302 itself is the behavior under test, so the request is made with
 perfectly healthy login page and can no longer tell whether Grafana
 redirected at all.
 
+_only when `grafana --version` succeeds_
 #### Given
 - Background service `grafana` is started: `grafana server --homepath "$GF_PATHS_HOME"`.
 #### When
@@ -56,6 +58,7 @@ redirected at all.
 - after `HTTP GET /api/search`:
   - HTTP status is `401`
 ### Scenario: a dashboard and datasource lifecycle over the REST API
+_only when `grafana --version` succeeds_
 #### Given
 - Background service `grafana` is started: `grafana server --homepath "$GF_PATHS_HOME"`.
 #### When
