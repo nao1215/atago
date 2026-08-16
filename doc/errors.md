@@ -642,7 +642,7 @@ Exits 4. Since v0.21.0.
 
 ### ATG4302 — a service was addressed while it was not running
 
-A step signalled or otherwise acted on a service that had already exited, or had not been started. A service that ignores a stop signal and outlives its grace period is reported here too, since what follows is the same question: what is that process doing.
+A step signaled or otherwise acted on a service that had already exited, or had not been started. A service that ignores a stop signal and outlives its grace period is reported here too, since what follows is the same question: what is that process doing.
 
 Fix: Check whether the service exits on its own partway through the scenario, which its captured output usually shows. A service that will not stop on `TERM` may need `KILL`.
 

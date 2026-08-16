@@ -139,7 +139,7 @@ var (
 	// ServiceNotRunning is an operation on a service that is not up.
 	ServiceNotRunning = register(4302, "ServiceNotRunning", Entry{
 		Summary: "a service was addressed while it was not running",
-		Detail:  "A step signalled or otherwise acted on a service that had already exited, or had not been started. A service that ignores a stop signal and outlives its grace period is reported here too, since what follows is the same question: what is that process doing.",
+		Detail:  "A step signaled or otherwise acted on a service that had already exited, or had not been started. A service that ignores a stop signal and outlives its grace period is reported here too, since what follows is the same question: what is that process doing.",
 		Fix:     "Check whether the service exits on its own partway through the scenario, which its captured output usually shows. A service that will not stop on `TERM` may need `KILL`.",
 		Since:   execSince,
 	})
