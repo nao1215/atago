@@ -22,7 +22,7 @@ how a file arrives from a web form rather than from `curl`.
 
 Source: `test/e2e/thirdparty/transfersh/transfersh.atago.yaml`
 ### Scenario: the binary reports its version
-_only when `transfer.sh --help` succeeds_
+_only when `command -v transfer.sh` succeeds_
 #### When
 ```shell
 transfer.sh version
@@ -31,7 +31,7 @@ transfer.sh version
 - exit code is `0`
 - stdout contains `transfer.sh`
 ### Scenario: a binary upload round-trips byte-for-byte
-_only when `transfer.sh --help` succeeds_
+_only when `command -v transfer.sh` succeeds_
 #### Given
 - Background service `transfersh` is started: `transfer.sh --provider local --basedir storage --temp-path tmp --listener 127.0.0.1:18210`.
 - Fixture file `storage/.keep` is created.
@@ -56,7 +56,7 @@ cmp pixel.png downloaded.png
 #### Generated artifacts
 - `downloaded.png`
 ### Scenario: a browser-style multipart upload is accepted too
-_only when `transfer.sh --help` succeeds_
+_only when `command -v transfer.sh` succeeds_
 #### Given
 - Background service `transfersh` is started: `transfer.sh --provider local --basedir storage --temp-path tmp --listener 127.0.0.1:18211`.
 - Fixture file `storage/.keep` is created.
