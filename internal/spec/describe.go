@@ -4,6 +4,7 @@ import (
 	"maps"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -187,8 +188,16 @@ func (n *noteSet) runStep(r *Run, runners map[string]Runner) {
 	// An ssh runner does not need the command to look networky: the step runs
 	// on another host by construction, which a reader of a bare "uptime" line
 	// has no way to tell.
-	if runners[r.Runner].Type == "ssh" {
+	if rdef := runners[r.Runner]; rdef.Type == "ssh" {
 		n.add("network access (ssh " + r.Runner + "): " + r.Command)
+		// The loader refuses an ssh runner that decides neither way about
+		// host-key verification, which is how much the choice matters. Having
+		// forced the decision, the summary has to report which way it went —
+		// accepting whatever key the host presents is the point of the note,
+		// so a runner that does verify says nothing extra.
+		if rdef.InsecureHostKey {
+			n.add("ssh host key verification disabled (runner " + strconv.Quote(r.Runner) + ")")
+		}
 	}
 	n.envRefs(r.Command, r.Stdin.Inline, r.Stdin.File)
 	n.envRefs(envValues(r.Env)...)
