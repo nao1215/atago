@@ -53,7 +53,11 @@ scenarios:
           signal: HUP
       - run:
           shell: true
-          command: "for i in 1 2 3 4 5 6 7 8 9 10; do [ -f daemon.log ] && break; sleep 0.1; done; cat daemon.log"
+          # Wait for the CONTENT, not for the file. `>>` creates daemon.log
+          # before the handler's line reaches it, so polling with `-f` can break
+          # out on an empty file and cat nothing — rare on an idle machine, and
+          # the way this scenario failed on a loaded CI runner.
+          command: "for i in $(seq 1 100); do grep -q 'config reloaded' daemon.log 2>/dev/null && break; sleep 0.1; done; cat daemon.log"
       - assert:
           exit_code: 0
           stdout:
