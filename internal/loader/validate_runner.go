@@ -21,6 +21,12 @@ func validateRunners(add addFunc, runners map[string]spec.Runner) {
 			add(diag.NotAllowedValue, "%s.type %q is invalid (want cmd, http, db, ssh, grpc, or browser)", where, r.Type)
 			continue
 		}
+		// A runner's cwd is workdir-relative like a step's — except on ssh,
+		// where it names a directory on the remote host and the local workdir
+		// has nothing to say about it.
+		if r.Type != "ssh" {
+			workdirRelativeDir(add, where+".cwd", r.Cwd)
+		}
 		switch r.Type {
 		case "db":
 			if r.DSN == "" {

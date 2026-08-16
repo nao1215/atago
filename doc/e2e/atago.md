@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-81 suites · 616 scenarios
+81 suites · 617 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -383,7 +383,7 @@
 - [atago self-hosting / list](#atago-self-hosting--list) — 2 scenarios
   - [list surfaces suites, scenarios, tags, and gates](#scenario-list-surfaces-suites-scenarios-tags-and-gates)
   - [list --json is a stable machine contract](#scenario-list---json-is-a-stable-machine-contract)
-- [atago self-hosting / loader rejects malformed specs](#atago-self-hosting--loader-rejects-malformed-specs) — 17 scenarios
+- [atago self-hosting / loader rejects malformed specs](#atago-self-hosting--loader-rejects-malformed-specs) — 18 scenarios
   - [an empty scenario list is rejected](#scenario-an-empty-scenario-list-is-rejected)
   - [a wrong version string is rejected](#scenario-a-wrong-version-string-is-rejected)
   - [an unknown top-level field is rejected with its position](#scenario-an-unknown-top-level-field-is-rejected-with-its-position)
@@ -401,6 +401,7 @@
   - [a wrong-typed exit_code is rejected with its position and excerpt](#scenario-a-wrong-typed-exit_code-is-rejected-with-its-position-and-excerpt)
   - [a missing target names the reason without syscall noise](#scenario-a-missing-target-names-the-reason-without-syscall-noise)
   - [an empty directory says how to create a first spec](#scenario-an-empty-directory-says-how-to-create-a-first-spec)
+  - [a cwd that traverses out of the workdir is refused before running](#scenario-a-cwd-that-traverses-out-of-the-workdir-is-refused-before-running)
 - [atago self-hosting / manifest](#atago-self-hosting--manifest) — 2 scenarios
   - [manifest emits a stable JSON summary without running the spec](#scenario-manifest-emits-a-stable-json-summary-without-running-the-spec)
   - [manifest does not execute the spec's commands](#scenario-manifest-does-not-execute-the-specs-commands)
@@ -7822,6 +7823,51 @@ ${atago} run specs
 - after `${atago} run specs`:
   - exit code is `3`
   - stderr contains `no *.atago.yaml`, `specs`, `atago init`
+### Scenario: a cwd that traverses out of the workdir is refused before running
+#### Given
+- Fixture file `escape.atago.yaml` is created.
+- Fixture file `ok.atago.yaml` is created.
+#### Inputs
+_Fixture `escape.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: runs somewhere else
+    steps:
+      - run:
+          shell: true
+          command: pwd
+          cwd: "../../../.."
+```
+_Fixture `ok.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: runs in a sub-directory
+    steps:
+      - run: {shell: true, command: "mkdir -p sub"}
+      - run: {shell: true, command: "pwd", cwd: sub}
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: sub
+```
+#### When
+```shell
+${atago} run escape.atago.yaml
+${atago} run ok.atago.yaml
+```
+#### Then
+- after `${atago} run escape.atago.yaml`:
+  - exit code is `2`
+  - stderr contains `run.cwd`, `escapes the scenario workdir`
+- after `${atago} run ok.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `1 passed`
 ## atago self-hosting / manifest
 Source: `test/e2e/atago/manifest.atago.yaml`
 ### Scenario: manifest emits a stable JSON summary without running the spec

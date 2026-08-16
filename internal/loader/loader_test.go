@@ -1631,3 +1631,75 @@ scenarios:
 		})
 	}
 }
+
+// TestLoadBytes_CwdEscapesWorkdir is a regression: run.cwd is documented as a
+// working directory relative to the scenario workdir, and a `../` one walked
+// straight out of it — `cwd: ../../../../../..` ran the command at the
+// filesystem root. Nothing said so, and every assertion the scenario then made
+// (changes:, dir:, file:) still looked at the untouched sandbox, so a scenario
+// could act on the host and pass having done none of what it claimed. Other
+// workdir-relative fields have rejected the same traversal all along.
+func TestLoadBytes_CwdEscapesWorkdir(t *testing.T) {
+	t.Parallel()
+	bad := []struct {
+		name string
+		src  string
+	}{
+		{
+			name: "run step",
+			src:  "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo, cwd: \"../elsewhere\"}",
+		},
+		{
+			name: "bare parent",
+			src:  "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo, cwd: \"..\"}",
+		},
+		{
+			name: "traversal that re-enters",
+			src:  "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo, cwd: \"sub/../../out\"}",
+		},
+		{
+			name: "defaults.run",
+			src:  "version: \"1\"\nsuite:\n  name: x\ndefaults:\n  run: {cwd: \"../elsewhere\"}\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}",
+		},
+		{
+			name: "service",
+			src:  "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    services:\n      - {name: s, command: sleep 1, cwd: \"../elsewhere\"}\n    steps:\n      - run: {command: echo}",
+		},
+		{
+			name: "pty step",
+			src:  "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - pty: {command: cat, cwd: \"../elsewhere\"}",
+		},
+	}
+	for _, tt := range bad {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			_, err := LoadBytes("s.atago.yaml", []byte(tt.src))
+			if err == nil {
+				t.Fatalf("cwd escaping the workdir was accepted:\n%s", tt.src)
+			}
+			if !strings.Contains(err.Error(), "escapes the scenario workdir") {
+				t.Errorf("err = %v, want an escapes-the-scenario-workdir rejection", err)
+			}
+		})
+	}
+
+	// What must keep loading: a sub-directory, the workdir itself, and an
+	// absolute path, which is explicit in a way `../..` is not.
+	good := []struct {
+		name string
+		src  string
+	}{
+		{"sub-directory", "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo, cwd: sub}"},
+		{"nested sub-directory", "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo, cwd: \"a/b/c\"}"},
+		{"dot", "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo, cwd: \".\"}"},
+		{"re-entering traversal that stays inside", "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo, cwd: \"a/../b\"}"},
+	}
+	for _, tt := range good {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if _, err := LoadBytes("s.atago.yaml", []byte(tt.src)); err != nil {
+				t.Errorf("a workdir-relative cwd was rejected: %v\n%s", err, tt.src)
+			}
+		})
+	}
+}

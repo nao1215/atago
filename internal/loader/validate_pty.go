@@ -16,6 +16,7 @@ func validatePTY(add addFunc, where string, p *spec.PTY) {
 		add(diag.RequiredKey, "%s.pty.command is required", where)
 	}
 	positiveDuration(add, where+".pty.timeout", p.Timeout, "30s", "30s")
+	workdirRelativeDir(add, where+".pty.cwd", p.Cwd)
 	validateHermeticEnv(add, where+".pty", p.ClearEnv, p.PassEnv)
 	// A pty size is a uint16 on the wire; reject values the terminal cannot
 	// represent instead of silently truncating.

@@ -3,6 +3,7 @@ package loader
 import (
 	"fmt"
 	"maps"
+	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -463,6 +464,31 @@ func nonNegativeDuration(add addFunc, key, val, example string) {
 	}
 	if d < 0 {
 		add(diag.NegativeValue, "%s must not be negative (got %q); a wall-clock bound is never below zero", key, val)
+	}
+}
+
+// workdirRelativeDir checks a `cwd:` — the one path field a step hands to the
+// OS as a directory rather than opening as a file.
+//
+// A `../` one used to walk straight out of the scenario workdir: `cwd: ../../..`
+// ran the command wherever that landed, up to the filesystem root. The isolation
+// every scenario is built on assumes the command runs in its own temp
+// directory — `changes:` diffs it, and `dir:` and `file:` read it — so a step
+// running outside acted on the host while its assertions examined an untouched
+// sandbox, and passed having done none of what it claimed. Every other
+// workdir-relative field has rejected the same traversal all along.
+//
+// An absolute cwd is left alone. It is explicit in a way `../..` is not: the
+// author wrote a full path, the way a spec pointing a step at a checked-out
+// tree does. key is the fully-qualified field.
+func workdirRelativeDir(add addFunc, key, cwd string) {
+	// A leading "/" is absolute on every platform a spec is written for, and
+	// filepath.IsAbs additionally catches the Windows drive form.
+	if cwd == "" || strings.HasPrefix(cwd, "/") || filepath.IsAbs(cwd) {
+		return
+	}
+	if pathEscapesWorkdir(filepath.ToSlash(cwd)) {
+		add(diag.PathEscapesWorkdir, "%s %q escapes the scenario workdir (no ../ traversal)", key, cwd)
 	}
 }
 
