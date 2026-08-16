@@ -84,7 +84,7 @@
               "items": {
                 "type": "string"
               },
-              "description": "Hosts that scenarios may contact; egress to any other host is a policy violation (exit 6)."
+              "description": "Hosts that scenarios may contact; egress to any other host is a policy violation (exit 6). Enforced on http, grpc, ssh, and db egress, and on a cdp step's `navigate:` URLs — a page loaded from an allowed host may still fetch subresources from anywhere, which no `navigate:` action passes through (#486)."
             }
           },
           "description": "Network egress policy for the spec."

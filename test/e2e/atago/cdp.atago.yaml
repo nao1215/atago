@@ -237,3 +237,39 @@ scenarios:
           exit_code: 2
           stderr:
             contains: download requires a click selector
+
+  # #486: the schema says egress to a host the policy does not name is a policy
+  # violation, and http, grpc, ssh, and db all enforce it — a cdp step navigated
+  # wherever its spec said. The denial happens before Chrome is launched, so
+  # this scenario needs no browser.
+  - name: a navigate to a denied host is a policy violation (exit 6)
+    steps:
+      - fixture:
+          file: policy.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: browser
+            permissions:
+              network:
+                allow: ["allowed.example"]
+            runners:
+              web:
+                type: browser
+            scenarios:
+              - name: navigates to a host the policy does not name
+                steps:
+                  - cdp:
+                      runner: web
+                      actions:
+                        - navigate: https://denied.example/
+      - run:
+          command: ${atago} run policy.atago.yaml
+      - assert:
+          exit_code: 6
+          stdout:
+            contains:
+              - 'network policy denies host "denied.example"'
+              # The denial says which half of the browser it covers, so nobody
+              # reads exit 6 as a promise that the loaded page is confined too.
+              - "holds `navigate:` to the policy"
