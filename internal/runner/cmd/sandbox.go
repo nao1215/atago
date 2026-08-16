@@ -1,11 +1,12 @@
 package cmd
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/nao1215/atago/internal/diag"
 )
 
 // SandboxHomeDirName is the fixed directory created inside the scenario workdir
@@ -71,7 +72,7 @@ func EnsureSandboxHome(workdir string) (map[string]string, error) {
 	vars, dirs := SandboxHomeVars(runtime.GOOS, home)
 	for _, d := range dirs {
 		if err := os.MkdirAll(d, 0o755); err != nil { //nolint:gosec // the sandbox home lives inside the scenario workdir
-			return nil, fmt.Errorf("sandbox_home: %w", err)
+			return nil, diag.SandboxSetupFailed.Errorf("sandbox_home: %w", err)
 		}
 	}
 	return vars, nil

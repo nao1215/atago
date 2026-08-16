@@ -9,7 +9,6 @@ package grpc
 import (
 	"context"
 	"crypto/tls"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -25,6 +24,7 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/dynamicpb"
 
+	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/runner"
 )
 
@@ -48,7 +48,7 @@ type Runner struct {
 // dial until the first call).
 func Open(cfg Config) (*Runner, error) {
 	if strings.TrimSpace(cfg.Target) == "" {
-		return nil, errors.New("grpc runner requires a target")
+		return nil, diag.RunnerConfigIncomplete.Errorf("grpc runner requires a target")
 	}
 	var creds credentials.TransportCredentials
 	if cfg.TLS {
@@ -58,7 +58,7 @@ func Open(cfg Config) (*Runner, error) {
 	}
 	cc, err := grpc.NewClient(cfg.Target, grpc.WithTransportCredentials(creds))
 	if err != nil {
-		return nil, fmt.Errorf("grpc connect %s: %w", cfg.Target, err)
+		return nil, diag.ConnectFailed.Errorf("grpc connect %s: %w", cfg.Target, err)
 	}
 	return &Runner{cc: cc, timeout: cfg.Timeout}, nil
 }
@@ -88,7 +88,7 @@ func (r *Runner) Invoke(ctx context.Context, method string, header map[string]st
 	req := dynamicpb.NewMessage(md.Input())
 	if len(reqJSON) > 0 {
 		if err := protojson.Unmarshal(reqJSON, req); err != nil {
-			return nil, fmt.Errorf("encoding grpc request for %s: %w", method, err)
+			return nil, diag.PayloadFailed.Errorf("encoding grpc request for %s: %w", method, err)
 		}
 	}
 	if len(header) > 0 {
@@ -103,7 +103,7 @@ func (r *Runner) Invoke(ctx context.Context, method string, header map[string]st
 	invErr := r.cc.Invoke(ctx, "/"+service+"/"+methodName, req, res)
 	stat, ok := status.FromError(invErr)
 	if !ok {
-		return nil, fmt.Errorf("grpc invoke %s: %w", method, invErr)
+		return nil, diag.RemoteRejected.Errorf("grpc invoke %s: %w", method, invErr)
 	}
 	// OUR per-call deadline (run.timeout) or a cancel firing means the call never
 	// completed: a transport failure, not a captured status. status.FromError
@@ -118,7 +118,7 @@ func (r *Runner) Invoke(ctx context.Context, method string, header map[string]st
 	if stat.Code() == codes.OK {
 		b, err := protojson.MarshalOptions{UseProtoNames: true, EmitUnpopulated: true}.Marshal(res)
 		if err != nil {
-			return nil, fmt.Errorf("encoding grpc response for %s: %w", method, err)
+			return nil, diag.ResponseUnreadable.Errorf("encoding grpc response for %s: %w", method, err)
 		}
 		out.MessageJSON = b
 	} else {
@@ -162,7 +162,7 @@ func (r *Runner) resolveMethod(ctx context.Context, service, method string) (pro
 	defer refClient.Reset()
 	fd, err := refClient.FileContainingSymbol(protoreflect.FullName(service))
 	if err != nil {
-		return nil, fmt.Errorf("resolving grpc service %q via reflection (is server reflection enabled?): %w", service, err)
+		return nil, diag.RemoteRejected.Errorf("resolving grpc service %q via reflection (is server reflection enabled?): %w", service, err)
 	}
 	svcs := fd.Services()
 	for i := 0; i < svcs.Len(); i++ {
@@ -172,14 +172,14 @@ func (r *Runner) resolveMethod(ctx context.Context, service, method string) (pro
 		}
 		md := sd.Methods().ByName(protoreflect.Name(method))
 		if md == nil {
-			return nil, fmt.Errorf("grpc method %q not found in service %q", method, service)
+			return nil, diag.RemoteRejected.Errorf("grpc method %q not found in service %q", method, service)
 		}
 		if md.IsStreamingClient() || md.IsStreamingServer() {
-			return nil, fmt.Errorf("grpc method %q is streaming; only unary calls are supported", method)
+			return nil, diag.RemoteRejected.Errorf("grpc method %q is streaming; only unary calls are supported", method)
 		}
 		return md, nil
 	}
-	return nil, fmt.Errorf("grpc service %q not found in the reflected schema", service)
+	return nil, diag.RemoteRejected.Errorf("grpc service %q not found in the reflected schema", service)
 }
 
 // splitMethod parses "pkg.Service/Method" into its service and method parts. A
@@ -192,7 +192,7 @@ func splitMethod(method string) (string, string, error) {
 	m := strings.TrimPrefix(method, "/")
 	i := strings.IndexByte(m, '/')
 	if i <= 0 || i == len(m)-1 || strings.Contains(m[i+1:], "/") {
-		return "", "", fmt.Errorf("grpc method %q must be in the form pkg.Service/Method", method)
+		return "", "", diag.BadEndpoint.Errorf("grpc method %q must be in the form pkg.Service/Method", method)
 	}
 	return m[:i], m[i+1:], nil
 }

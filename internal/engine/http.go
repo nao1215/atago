@@ -3,11 +3,11 @@ package engine
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/url"
 	"time"
 
 	"github.com/nao1215/atago/internal/assert"
+	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/runner"
 	httprunner "github.com/nao1215/atago/internal/runner/http"
 	"github.com/nao1215/atago/internal/spec"
@@ -71,10 +71,10 @@ func resolveHTTPConfig(h *spec.HTTP, st *store.Store, rc runConfig) (httprunner.
 	if h.Runner != "" {
 		r, ok := rc.runners[h.Runner]
 		if !ok {
-			return cfg, fmt.Errorf("http step references unknown runner %q", h.Runner)
+			return cfg, diag.InternalError.Errorf("http step references unknown runner %q", h.Runner)
 		}
 		if r.Type != "http" {
-			return cfg, fmt.Errorf("runner %q is not an http runner (type %q)", h.Runner, r.Type)
+			return cfg, diag.InternalError.Errorf("runner %q is not an http runner (type %q)", h.Runner, r.Type)
 		}
 		cfg.BaseURL = st.Expand(r.BaseURL)
 		runnerTimeout = r.Timeout
@@ -85,7 +85,7 @@ func resolveHTTPConfig(h *spec.HTTP, st *store.Store, rc runConfig) (httprunner.
 	timeoutStr, _ := resolveTimeout("", runnerTimeout, rc.defaultsRunTimeout, rc.suiteTimeout)
 	d, err := time.ParseDuration(timeoutStr)
 	if err != nil {
-		return cfg, fmt.Errorf("runner %q has invalid timeout %q: %w", h.Runner, timeoutStr, err)
+		return cfg, diag.InternalError.Errorf("runner %q has invalid timeout %q: %w", h.Runner, timeoutStr, err)
 	}
 	cfg.Timeout = d
 	return cfg, nil

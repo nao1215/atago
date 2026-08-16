@@ -19,6 +19,7 @@ import (
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/knownhosts"
 
+	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/runner"
 )
 
@@ -52,7 +53,7 @@ type Runner struct {
 // Open dials the host and authenticates, returning a connected runner.
 func Open(cfg Config) (*Runner, error) {
 	if cfg.User == "" {
-		return nil, errors.New("ssh runner requires a user")
+		return nil, diag.RunnerConfigIncomplete.Errorf("ssh runner requires a user")
 	}
 	auth, err := authMethods(cfg)
 	if err != nil {
@@ -70,7 +71,7 @@ func Open(cfg Config) (*Runner, error) {
 	}
 	client, err := ssh.Dial("tcp", withDefaultPort(cfg.Addr), clientCfg)
 	if err != nil {
-		return nil, fmt.Errorf("ssh dial %s: %w", cfg.Addr, err)
+		return nil, diag.ConnectFailed.Errorf("ssh dial %s: %w", cfg.Addr, err)
 	}
 	return &Runner{client: client, timeout: cfg.Timeout}, nil
 }
@@ -84,7 +85,7 @@ func (r *Runner) Close() error { return r.client.Close() }
 func (r *Runner) Run(ctx context.Context, command string) (*runner.Result, error) {
 	sess, err := r.client.NewSession()
 	if err != nil {
-		return nil, fmt.Errorf("ssh session: %w", err)
+		return nil, diag.ConnectFailed.Errorf("ssh session: %w", err)
 	}
 	defer func() { _ = sess.Close() }()
 
@@ -183,11 +184,11 @@ func authMethods(cfg Config) ([]ssh.AuthMethod, error) {
 	if cfg.KeyFile != "" {
 		key, err := os.ReadFile(cfg.KeyFile)
 		if err != nil {
-			return nil, fmt.Errorf("reading ssh key %q: %w", cfg.KeyFile, err)
+			return nil, diag.StepFileUnusable.Errorf("reading ssh key %q: %w", cfg.KeyFile, err)
 		}
 		signer, err := ssh.ParsePrivateKey(key)
 		if err != nil {
-			return nil, fmt.Errorf("parsing ssh key %q: %w", cfg.KeyFile, err)
+			return nil, diag.StepFileUnusable.Errorf("parsing ssh key %q: %w", cfg.KeyFile, err)
 		}
 		methods = append(methods, ssh.PublicKeys(signer))
 	}
@@ -195,7 +196,7 @@ func authMethods(cfg Config) ([]ssh.AuthMethod, error) {
 		methods = append(methods, ssh.Password(cfg.Password))
 	}
 	if len(methods) == 0 {
-		return nil, errors.New("ssh runner requires a password or key_file")
+		return nil, diag.RunnerConfigIncomplete.Errorf("ssh runner requires a password or key_file")
 	}
 	return methods, nil
 }
@@ -203,13 +204,13 @@ func authMethods(cfg Config) ([]ssh.AuthMethod, error) {
 func hostKeyCallback(knownHosts string, insecure bool) (ssh.HostKeyCallback, error) {
 	if knownHosts == "" {
 		if !insecure {
-			return nil, errors.New("ssh runner requires known_hosts to verify the host key; set insecure_host_key: true to connect without verification (test/lab only)")
+			return nil, diag.RunnerConfigIncomplete.Errorf("ssh runner requires known_hosts to verify the host key; set insecure_host_key: true to connect without verification (test/lab only)")
 		}
 		return ssh.InsecureIgnoreHostKey(), nil //nolint:gosec // opt-in via insecure_host_key: disables checking for test infra
 	}
 	cb, err := knownhosts.New(knownHosts)
 	if err != nil {
-		return nil, fmt.Errorf("reading known_hosts %q: %w", knownHosts, err)
+		return nil, diag.StepFileUnusable.Errorf("reading known_hosts %q: %w", knownHosts, err)
 	}
 	return cb, nil
 }

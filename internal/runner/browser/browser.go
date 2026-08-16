@@ -9,7 +9,6 @@ package browser
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -18,6 +17,7 @@ import (
 	"github.com/chromedp/chromedp"
 	"github.com/chromedp/chromedp/kb"
 
+	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/runner"
 	"github.com/nao1215/atago/internal/security"
 	"github.com/nao1215/atago/internal/spec"
@@ -82,7 +82,7 @@ func Open(cfg Config) (*Runner, error) {
 	if err := chromedp.Run(browserCtx); err != nil {
 		browserStop()
 		allocCancel()
-		return nil, fmt.Errorf("launching headless browser: %w", err)
+		return nil, diag.ConnectFailed.Errorf("launching headless browser: %w", err)
 	}
 	return &Runner{
 		allocCtx:    allocCtx,
@@ -158,7 +158,7 @@ func (r *Runner) Run(ctx context.Context, actions []spec.CDPAction, workdir stri
 		// test may have planted at the target (issue #16), and binds the write to
 		// the workdir so an ancestor swapped for a link cannot redirect it (#430).
 		if err := security.WriteConfinedFile(workdir, s.path, *s.buf); err != nil {
-			return nil, fmt.Errorf("cdp screenshot: writing %q: %w", s.path, err)
+			return nil, diag.StepFileUnusable.Errorf("cdp screenshot: writing %q: %w", s.path, err)
 		}
 	}
 
@@ -241,7 +241,7 @@ func buildTasks(actions []spec.CDPAction, workdir string) (chromedp.Tasks, []cap
 				return nil, nil, nil, err
 			}
 			if _, statErr := os.Stat(file); statErr != nil {
-				return nil, nil, nil, fmt.Errorf("cdp action %d: upload file %q: %w", i, a.Upload.File, statErr)
+				return nil, nil, nil, diag.StepFileUnusable.Errorf("cdp action %d: upload file %q: %w", i, a.Upload.File, statErr)
 			}
 			tasks = append(tasks, chromedp.SetUploadFiles(a.Upload.Selector, []string{file}, chromedp.ByQuery))
 		case a.Download != nil:
@@ -276,11 +276,11 @@ func buildTasks(actions []spec.CDPAction, workdir string) (chromedp.Tasks, []cap
 			tasks = append(tasks, chromedp.Evaluate(a.Eval, j))
 			caps = append(caps, capture{js: j})
 		default:
-			return nil, nil, nil, fmt.Errorf("cdp action %d sets no recognized action", i)
+			return nil, nil, nil, diag.InternalError.Errorf("cdp action %d sets no recognized action", i)
 		}
 	}
 	if len(tasks) == 0 {
-		return nil, nil, nil, errors.New("cdp step has no actions")
+		return nil, nil, nil, diag.InternalError.Errorf("cdp step has no actions")
 	}
 	return tasks, caps, shots, nil
 }
@@ -325,5 +325,5 @@ func resolveKey(name string) (string, error) {
 	if len([]rune(name)) == 1 {
 		return name, nil
 	}
-	return "", fmt.Errorf("unsupported press key %q (use a single character or one of Enter/Tab/Escape/Backspace/Delete/Arrow*/Space)", name)
+	return "", diag.InputNotSupported.Errorf("unsupported press key %q (use a single character or one of Enter/Tab/Escape/Backspace/Delete/Arrow*/Space)", name)
 }

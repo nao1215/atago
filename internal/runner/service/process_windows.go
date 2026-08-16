@@ -4,13 +4,13 @@ package service
 
 import (
 	"context"
-	"errors"
 	"os/exec"
 	"strconv"
 	"sync"
 	"time"
 	"unsafe"
 
+	"github.com/nao1215/atago/internal/diag"
 	"golang.org/x/sys/windows"
 )
 
@@ -121,5 +121,5 @@ func (p *processCmd) killTree() {
 // to deliver. The loader accepts the step everywhere; execution reports a clear
 // error, mirroring the pty runner's contract.
 func (p *processCmd) signalByName(string) error {
-	return errors.New("signal steps are not supported on Windows (POSIX-only; gate the scenario with `skip: {os: windows}`)")
+	return diag.UnsupportedOnPlatform.Errorf("signal steps are not supported on Windows (POSIX-only; gate the scenario with `skip: {os: windows}`)")
 }

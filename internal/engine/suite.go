@@ -7,6 +7,7 @@ import (
 
 	"github.com/nao1215/atago/internal/artifact"
 	"github.com/nao1215/atago/internal/assert"
+	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/fixture"
 	"github.com/nao1215/atago/internal/runner"
 	mockrunner "github.com/nao1215/atago/internal/runner/mock"
@@ -80,7 +81,7 @@ func (e *Engine) newSuiteRuntime(s *spec.Spec, specDir, fixturesDir string) (*su
 	}
 	dir, err := os.MkdirTemp("", "atago-suite-")
 	if err != nil {
-		return nil, fmt.Errorf("could not create suite dir: %w", err)
+		return nil, diag.SandboxSetupFailed.Errorf("could not create suite dir: %w", err)
 	}
 	rt := &suiteRuntime{
 		dir:      dir,

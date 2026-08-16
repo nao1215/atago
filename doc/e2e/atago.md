@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-81 suites · 579 scenarios
+81 suites · 597 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -144,7 +144,7 @@
   - [file not_contains passes when the substring is absent](#scenario-file-not_contains-passes-when-the-substring-is-absent)
   - [not_contains fails when the substring is present](#scenario-not_contains-fails-when-the-substring-is-present)
   - [a shell metacharacter without shell is a load-time error](#scenario-a-shell-metacharacter-without-shell-is-a-load-time-error)
-- [atago self-hosting / every diagnostic code](#atago-self-hosting--every-diagnostic-code) — 57 scenarios
+- [atago self-hosting / every diagnostic code](#atago-self-hosting--every-diagnostic-code) — 75 scenarios
   - [ATG2001 is a spec file that cannot be read](#scenario-atg2001-is-a-spec-file-that-cannot-be-read)
   - [ATG2002 is a spec file with no YAML document in it](#scenario-atg2002-is-a-spec-file-with-no-yaml-document-in-it)
   - [ATG2003 is a document that is not valid YAML](#scenario-atg2003-is-a-document-that-is-not-valid-yaml)
@@ -202,6 +202,24 @@
   - [ATG3206 is a destination that cannot be written](#scenario-atg3206-is-a-destination-that-cannot-be-written)
   - [ATG3207 is atago's recorded state failing to load](#scenario-atg3207-is-atagos-recorded-state-failing-to-load)
   - [ATG6001 is a request to a host the network policy denies](#scenario-atg6001-is-a-request-to-a-host-the-network-policy-denies)
+  - [ATG4001 is a command line that cannot be split into arguments](#scenario-atg4001-is-a-command-line-that-cannot-be-split-into-arguments)
+  - [ATG4002 is a program that could not be started](#scenario-atg4002-is-a-program-that-could-not-be-started)
+  - [ATG4003 is an environment the step needs that could not be prepared](#scenario-atg4003-is-an-environment-the-step-needs-that-could-not-be-prepared)
+  - [ATG4004 is a file the step depends on that cannot be read](#scenario-atg4004-is-a-file-the-step-depends-on-that-cannot-be-read)
+  - [ATG4005 is a command run beside a terminal session that failed](#scenario-atg4005-is-a-command-run-beside-a-terminal-session-that-failed)
+  - [ATG4101 is a step that outlasted its timeout](#scenario-atg4101-is-a-step-that-outlasted-its-timeout)
+  - [ATG4102 is a service that never became ready](#scenario-atg4102-is-a-service-that-never-became-ready)
+  - [ATG4201 is a peer that could not be reached](#scenario-atg4201-is-a-peer-that-could-not-be-reached)
+  - [ATG4202 is a runner missing what it needs to connect](#scenario-atg4202-is-a-runner-missing-what-it-needs-to-connect)
+  - [ATG4203 is a peer that was reached and refused the request](#scenario-atg4203-is-a-peer-that-was-reached-and-refused-the-request)
+  - [ATG4204 is an address atago cannot make sense of](#scenario-atg4204-is-an-address-atago-cannot-make-sense-of)
+  - [ATG4301 is a service that failed before it became ready](#scenario-atg4301-is-a-service-that-failed-before-it-became-ready)
+  - [ATG4302 is a service addressed after it exited](#scenario-atg4302-is-a-service-addressed-after-it-exited)
+  - [ATG4403 is output that could not be captured](#scenario-atg4403-is-output-that-could-not-be-captured)
+  - [ATG4406 is input the program is not set up to receive](#scenario-atg4406-is-input-the-program-is-not-set-up-to-receive)
+  - [ATG4501 is a store step with no result behind it](#scenario-atg4501-is-a-store-step-with-no-result-behind-it)
+  - [ATG4502 is a store selector that found nothing](#scenario-atg4502-is-a-store-selector-that-found-nothing)
+  - [ATG4505 is a variable the step expands that is not defined](#scenario-atg4505-is-a-variable-the-step-expands-that-is-not-defined)
 - [atago self-hosting / exit_code in-set matcher](#atago-self-hosting--exit_code-in-set-matcher) — 4 scenarios
   - [a listed exit code passes](#scenario-a-listed-exit-code-passes)
   - [an unlisted exit code fails and the output lists the set](#scenario-an-unlisted-exit-code-fails-and-the-output-lists-the-set)
@@ -4347,6 +4365,413 @@ ${atago} run denied.atago.yaml
 #### Then
 - exit code is `6`
 - stdout contains `ATG6001`
+### Scenario: ATG4001 is a command line that cannot be split into arguments
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+
+scenarios:
+  - name: a
+    steps:
+      - run: {command: "echo 'unclosed"}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `4`
+- stdout contains `ATG4001`
+### Scenario: ATG4002 is a program that could not be started
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+
+scenarios:
+  - name: a
+    steps:
+      - run: {command: definitely-no-such-binary-xyz}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `4`
+- stdout contains `ATG4002`
+### Scenario: ATG4003 is an environment the step needs that could not be prepared
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+
+scenarios:
+  - name: a
+    steps:
+      - run: {command: cat, stdin: {file: never-created.txt}}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `4`
+- stdout contains `ATG4003`
+### Scenario: ATG4004 is a file the step depends on that cannot be read
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+
+suite:
+  name: x
+  setup:
+    - mock_server: {name: m, routes: [{method: POST, path: /p, status: 200}]}
+runners: {api: {type: http, base_url: "${m.url}"}}
+scenarios:
+  - name: a
+    steps:
+      - http: {runner: api, method: POST, path: /p, body_file: never-created.bin}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `4`
+- stdout contains `ATG4004`
+### Scenario: ATG4005 is a command run beside a terminal session that failed
+_skipped on Windows_
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+
+scenarios:
+  - name: a
+    steps:
+      - pty: {command: cat, timeout: 20s, session: [{exec: {command: "false"}}]}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `4`
+- stdout contains `ATG4005`
+### Scenario: ATG4101 is a step that outlasted its timeout
+_skipped on Windows_
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+
+scenarios:
+  - name: a
+    steps:
+      - pty: {command: cat, timeout: 20s, session: [{exec: {command: "sleep 5", timeout: 300ms}}]}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `4`
+- stdout contains `ATG4101`
+### Scenario: ATG4102 is a service that never became ready
+_skipped on Windows_
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+
+scenarios:
+  - name: a
+    services:
+      - {name: s, command: "sleep 30", ready: {port: "127.0.0.1:59991", timeout: 1s}}
+    steps:
+      - run: {command: echo}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `4`
+- stdout contains `ATG4102`
+### Scenario: ATG4201 is a peer that could not be reached
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+
+runners: {api: {type: http, base_url: "http://127.0.0.1:1"}}
+scenarios:
+  - name: a
+    steps:
+      - http: {runner: api, method: GET, path: /}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `4`
+- stdout contains `ATG4201`
+### Scenario: ATG4202 is a runner missing what it needs to connect
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+
+runners: {r: {type: ssh, host: "127.0.0.1:22", user: u, password: p}}
+scenarios:
+  - name: a
+    steps:
+      - run: {runner: r, command: echo}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `4`
+- stdout contains `ATG4202`
+### Scenario: ATG4203 is a peer that was reached and refused the request
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+
+runners: {db: {type: db, dsn: "sqlite://:memory:"}}
+scenarios:
+  - name: a
+    steps:
+      - query: {runner: db, sql: "SELECT * FROM no_such_table"}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `4`
+- stdout contains `ATG4203`
+### Scenario: ATG4204 is an address atago cannot make sense of
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+
+runners: {db: {type: db, dsn: "weird://x"}}
+scenarios:
+  - name: a
+    steps:
+      - query: {runner: db, sql: "SELECT 1"}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `4`
+- stdout contains `ATG4204`
+### Scenario: ATG4301 is a service that failed before it became ready
+_skipped on Windows_
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+
+scenarios:
+  - name: a
+    services:
+      - {name: s, command: "true", ready: {port: "127.0.0.1:59992", timeout: 5s}}
+    steps:
+      - run: {command: echo}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `4`
+- stdout contains `ATG4301`
+### Scenario: ATG4302 is a service addressed after it exited
+_skipped on Windows_
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+
+scenarios:
+  - name: a
+    services:
+      - {name: s, command: "sleep 1", ready: {delay: 100ms}}
+    steps:
+      - run: {command: "sleep 2"}
+      - signal: {service: s, signal: TERM}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `4`
+- stdout contains `ATG4302`
+### Scenario: ATG4403 is output that could not be captured
+_skipped on Windows_
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+
+scenarios:
+  - name: a
+    steps:
+      - run: {command: "sleep 4 &", shell: true, timeout: 30s}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `4`
+- stdout contains `ATG4403`
+### Scenario: ATG4406 is input the program is not set up to receive
+_skipped on Windows_
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+
+scenarios:
+  - name: a
+    steps:
+      - pty: {command: cat, timeout: 20s, session: [{send: {mouse: {row: 1, col: 1}}}]}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `4`
+- stdout contains `ATG4406`
+### Scenario: ATG4501 is a store step with no result behind it
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+
+scenarios:
+  - name: a
+    steps:
+      - run: {command: echo}
+      - store: {name: v, from: {body: {trim: true}}}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `4`
+- stdout contains `ATG4501`
+### Scenario: ATG4502 is a store selector that found nothing
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+
+scenarios:
+  - name: a
+    steps:
+      - run: {command: echo}
+      - store: {name: v, from: {stdout: {matches: "no-such-text-anywhere"}}}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `4`
+- stdout contains `ATG4502`
+### Scenario: ATG4505 is a variable the step expands that is not defined
+_skipped on Windows_
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+
+scenarios:
+  - name: a
+    steps:
+      - pty:
+          command: cat
+          timeout: 20s
+          session:
+            - send: "${env:ATAGO_DEFINITELY_UNSET_XYZ}"
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `4`
+- stdout contains `ATG4505`
 ## atago self-hosting / exit_code in-set matcher
 Source: `test/e2e/atago/exit_code_in.atago.yaml`
 ### Scenario: a listed exit code passes

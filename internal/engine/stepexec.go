@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/nao1215/atago/internal/assert"
+	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/fixture"
 	"github.com/nao1215/atago/internal/fsdelta"
 	"github.com/nao1215/atago/internal/runner"
@@ -508,7 +509,7 @@ func resolveRunTarget(run *spec.Run, st *store.Store, rc runConfig) (remote bool
 	if run.Runner != "" {
 		rdef, ok := rc.runners[run.Runner]
 		if !ok {
-			return false, fmt.Errorf("run step references unknown runner %q", run.Runner)
+			return false, diag.InternalError.Errorf("run step references unknown runner %q", run.Runner)
 		}
 		switch rdef.Type {
 		case "ssh":
@@ -522,7 +523,7 @@ func resolveRunTarget(run *spec.Run, st *store.Store, rc runConfig) (remote bool
 			}
 			runnerTimeout = rdef.Timeout
 		default:
-			return false, fmt.Errorf("runner %q (type %q) cannot run a command step; use a step matching its type", run.Runner, rdef.Type)
+			return false, diag.InternalError.Errorf("runner %q (type %q) cannot run a command step; use a step matching its type", run.Runner, rdef.Type)
 		}
 	}
 	if !remote {

@@ -8,6 +8,7 @@ import (
 
 	"github.com/chromedp/cdproto/browser"
 	"github.com/chromedp/chromedp"
+	"github.com/nao1215/atago/internal/diag"
 )
 
 // downloadAction returns a chromedp action that captures a click-triggered
@@ -33,18 +34,18 @@ func downloadAction(clickSelector, destDir string, name *string) chromedp.Action
 			WithDownloadPath(destDir).
 			WithEventsEnabled(true).
 			Do(ctx); err != nil {
-			return fmt.Errorf("cdp download: enabling downloads: %w", err)
+			return diag.BrowserActionFailed.Errorf("cdp download: enabling downloads: %w", err)
 		}
 
 		if err := chromedp.Click(clickSelector, chromedp.ByQuery).Do(ctx); err != nil {
-			return fmt.Errorf("cdp download: clicking %q: %w", clickSelector, err)
+			return diag.BrowserActionFailed.Errorf("cdp download: clicking %q: %w", clickSelector, err)
 		}
 
 		var guid string
 		select {
 		case guid = <-done:
 		case <-ctx.Done():
-			return fmt.Errorf("cdp download: timed out waiting for the download to finish: %w", ctx.Err())
+			return diag.StepTimeout.Errorf("cdp download: timed out waiting for the download to finish: %w", ctx.Err())
 		}
 
 		final := downloadFinalName(guid, willBegin)
@@ -52,7 +53,7 @@ func downloadAction(clickSelector, destDir string, name *string) chromedp.Action
 		dst := filepath.Join(destDir, final)
 		if src != dst {
 			if err := os.Rename(src, dst); err != nil {
-				return fmt.Errorf("cdp download: naming the downloaded file: %w", err)
+				return diag.StepFileUnusable.Errorf("cdp download: naming the downloaded file: %w", err)
 			}
 		}
 		*name = final

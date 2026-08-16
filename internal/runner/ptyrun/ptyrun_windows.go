@@ -4,11 +4,11 @@ package ptyrun
 
 import (
 	"context"
-	"errors"
-	"fmt"
-	runnercmd "github.com/nao1215/atago/internal/runner/cmd"
 	"os/exec"
 	"strconv"
+
+	"github.com/nao1215/atago/internal/diag"
+	runnercmd "github.com/nao1215/atago/internal/runner/cmd"
 
 	"github.com/nao1215/atago/internal/conpty"
 	"github.com/nao1215/atago/internal/runner"
@@ -23,7 +23,7 @@ import (
 // later — an older host gets one clear execution error (exit 4).
 func Run(ctx context.Context, p *spec.PTY, workdir string, env []string) (*runner.Result, *ExpectFailure, error) {
 	if !conpty.IsAvailable() {
-		return nil, nil, errors.New("pty steps need ConPTY, which requires Windows 10 version 1809 or later (gate the scenario with `skip: {os: windows}` for older hosts)")
+		return nil, nil, diag.UnsupportedOnPlatform.Errorf("pty steps need ConPTY, which requires Windows 10 version 1809 or later (gate the scenario with `skip: {os: windows}` for older hosts)")
 	}
 
 	cmdLine, err := conpty.CommandLine(p.Command, p.Shell != nil && *p.Shell)
@@ -49,7 +49,7 @@ func Run(ctx context.Context, p *spec.PTY, workdir string, env []string) (*runne
 	// from exactly that set.
 	cpty, err := conpty.Start(cmdLine, dir, env, rows, cols)
 	if err != nil {
-		return nil, nil, fmt.Errorf("pty: start %q: %w", p.Command, err)
+		return nil, nil, diag.CommandNotStarted.Errorf("pty: start %q: %w", p.Command, err)
 	}
 
 	pid := cpty.Pid()

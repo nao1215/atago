@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/runner"
 
 	_ "github.com/go-sql-driver/mysql" // mysql driver (pure Go)
@@ -39,7 +40,7 @@ type Config struct {
 // driver.
 func Resolve(driver, dsn string) (Config, error) {
 	if strings.TrimSpace(dsn) == "" {
-		return Config{}, fmt.Errorf("db runner requires a dsn")
+		return Config{}, diag.RunnerConfigIncomplete.Errorf("db runner requires a dsn")
 	}
 	drv, err := resolveDriver(driver, dsn)
 	if err != nil {
@@ -63,7 +64,7 @@ type Runner struct {
 func Open(cfg Config) (*Runner, error) {
 	db, err := sql.Open(cfg.Driver, cfg.DataSource)
 	if err != nil {
-		return nil, fmt.Errorf("opening %s database: %w", cfg.Driver, err)
+		return nil, diag.ConnectFailed.Errorf("opening %s database: %w", cfg.Driver, err)
 	}
 	// A scenario runs its queries sequentially against its own pool, so a single
 	// connection is sufficient — and it is required for correctness with an
@@ -90,7 +91,7 @@ func (r *Runner) Query(ctx context.Context, query string) (*runner.Result, error
 	if isRowReturning(query) {
 		rows, err := r.db.QueryContext(ctx, query)
 		if err != nil {
-			return nil, fmt.Errorf("query failed: %w", err)
+			return nil, diag.RemoteRejected.Errorf("query failed: %w", err)
 		}
 		defer func() { _ = rows.Close() }()
 		data, err := rowsToJSON(rows)
@@ -98,14 +99,14 @@ func (r *Runner) Query(ctx context.Context, query string) (*runner.Result, error
 			return nil, err
 		}
 		if err := rows.Err(); err != nil {
-			return nil, fmt.Errorf("reading rows: %w", err)
+			return nil, diag.ResponseUnreadable.Errorf("reading rows: %w", err)
 		}
 		return &runner.Result{Command: query, IsDB: true, RowsJSON: data, Duration: time.Since(start)}, nil
 	}
 
 	res, err := r.db.ExecContext(ctx, query)
 	if err != nil {
-		return nil, fmt.Errorf("exec failed: %w", err)
+		return nil, diag.CommandNotStarted.Errorf("exec failed: %w", err)
 	}
 	affected, _ := res.RowsAffected() // not all drivers report it; best effort
 	return &runner.Result{Command: query, IsDB: true, RowsJSON: []byte("[]"), RowsAffected: affected, Duration: time.Since(start)}, nil
@@ -117,7 +118,7 @@ func (r *Runner) Query(ctx context.Context, query string) (*runner.Result, error
 func rowsToJSON(rows *sql.Rows) ([]byte, error) {
 	cols, err := rows.Columns()
 	if err != nil {
-		return nil, fmt.Errorf("reading columns: %w", err)
+		return nil, diag.ResponseUnreadable.Errorf("reading columns: %w", err)
 	}
 	out := make([]map[string]any, 0)
 	for rows.Next() {
@@ -127,7 +128,7 @@ func rowsToJSON(rows *sql.Rows) ([]byte, error) {
 			ptrs[i] = &vals[i]
 		}
 		if err := rows.Scan(ptrs...); err != nil {
-			return nil, fmt.Errorf("scanning row: %w", err)
+			return nil, diag.ResponseUnreadable.Errorf("scanning row: %w", err)
 		}
 		m := make(map[string]any, len(cols))
 		for i, c := range cols {
@@ -307,13 +308,13 @@ func resolveDriver(driver, dsn string) (string, error) {
 	if strings.TrimSpace(driver) == "" {
 		drv := driverForScheme(schemeOf(dsn))
 		if drv == "" {
-			return "", fmt.Errorf("cannot infer db driver from dsn %q; set runner.driver to sqlite, postgres, or mysql", dsn)
+			return "", diag.BadEndpoint.Errorf("cannot infer db driver from dsn %q; set runner.driver to sqlite, postgres, or mysql", dsn)
 		}
 		return drv, nil
 	}
 	drv := canonicalDriver(driver)
 	if drv == "" {
-		return "", fmt.Errorf("unsupported runner.driver %q; use sqlite, postgres, or mysql (aliases: sqlite3, postgresql, pgx)", driver)
+		return "", diag.BadEndpoint.Errorf("unsupported runner.driver %q; use sqlite, postgres, or mysql (aliases: sqlite3, postgresql, pgx)", driver)
 	}
 	return drv, nil
 }
@@ -327,7 +328,7 @@ func ValidateDriver(driver string) error {
 		return nil
 	}
 	if canonicalDriver(driver) == "" {
-		return fmt.Errorf("unsupported runner.driver %q; use sqlite, postgres, or mysql (aliases: sqlite3, postgresql, pgx)", driver)
+		return diag.BadEndpoint.Errorf("unsupported runner.driver %q; use sqlite, postgres, or mysql (aliases: sqlite3, postgresql, pgx)", driver)
 	}
 	return nil
 }
@@ -392,7 +393,7 @@ func dataSource(driver, dsn string) (string, error) {
 func mysqlNativeDSN(raw string) (string, error) {
 	u, err := url.Parse(raw)
 	if err != nil {
-		return "", fmt.Errorf("invalid mysql dsn %q: %w", raw, err)
+		return "", diag.BadEndpoint.Errorf("invalid mysql dsn %q: %w", raw, err)
 	}
 	var b strings.Builder
 	if u.User != nil {

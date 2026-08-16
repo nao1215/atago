@@ -546,10 +546,37 @@ func TestE2E_EveryCodeIsProvoked(t *testing.T) {
 		}
 	}
 	for _, e := range diag.All() {
-		if !provoked[e.Code] {
-			t.Errorf("%s (%s) is a published code that no scenario in %s provokes; add one to error_codes.atago.yaml", e.Code, e.Name, dir)
+		if provoked[e.Code] {
+			if _, exempt := unprovokableFromASpec[e.Code]; exempt {
+				t.Errorf("%s (%s) is listed as unprovokable from a spec, but a scenario in %s provokes it; remove the exemption", e.Code, e.Name, dir)
+			}
+			continue
 		}
+		if _, exempt := unprovokableFromASpec[e.Code]; exempt {
+			continue
+		}
+		t.Errorf("%s (%s) is a published code that no scenario in %s provokes; add one to error_codes.atago.yaml", e.Code, e.Name, dir)
 	}
+}
+
+// unprovokableFromASpec lists the codes no spec can reach, each with the reason.
+// Everything else must be provoked by a scenario, and the gate above also fails
+// when a code listed here turns out to be reachable after all — so the list
+// shrinks as the ways to provoke them appear, and never quietly grows stale.
+//
+// This is the one place the coverage gate can be escaped, which is why it is a
+// table of prose rather than a flag: adding a code here is a claim a reviewer
+// can disagree with.
+var unprovokableFromASpec = map[diag.Code]string{
+	diag.RunInterrupted:        "needs a signal delivered to atago itself mid-run, which a scenario cannot arrange for its own runner",
+	diag.MockServerFailed:      "needs the mock server's port to be taken, and a spec cannot pin the port it binds",
+	diag.PTYFailed:             "needs the kernel to refuse a pseudo-terminal; every shape a spec can ask for is rejected by the loader first",
+	diag.InputNotSupported:     "the key and signal vocabularies are validated while loading, so a spec never reaches the runtime check",
+	diag.UnsupportedOnPlatform: "only raised on Windows, where the scenarios that would provoke it are the ones being refused",
+	diag.BrowserActionFailed:   "needs a real browser, which the hermetic self-hosted suite deliberately does not start",
+	diag.PayloadFailed:         "needs a value that will not marshal, which YAML cannot express",
+	diag.ResponseUnreadable:    "needs a peer that answers with a malformed body, which the mock server will not produce",
+	diag.InternalError:         "is unreachable by construction: every state it guards is refused while loading",
 }
 
 // assertedText collects the strings a spec's stream assertions compare

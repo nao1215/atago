@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/nao1215/atago/internal/assert"
+	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/runner"
 	"github.com/nao1215/atago/internal/spec"
 )
@@ -76,7 +77,7 @@ type ptyProcess struct {
 func driveSession(ctx context.Context, p *spec.PTY, proc ptyProcess) (*runner.Result, *ExpectFailure, error) {
 	expects, err := compileSession(p.Session)
 	if err != nil {
-		return nil, nil, fmt.Errorf("pty: invalid expect regexp: %w", err)
+		return nil, nil, diag.InternalError.Errorf("pty: invalid expect regexp: %w", err)
 	}
 
 	budget := sessionTimeout(p)
@@ -181,8 +182,7 @@ func (d *sessionDriver) finish(timedOut bool, code int, ef *ExpectFailure) *sess
 	// alone without racing the exit.
 	rerr := d.term.readError()
 	if rerr != nil {
-		return &sessionOutcome{err: fmt.Errorf(
-			"pty %q: the terminal transcript is incomplete — reading the terminal failed after %d bytes: %w",
+		return &sessionOutcome{err: diag.CaptureFailed.Errorf("pty %q: the terminal transcript is incomplete — reading the terminal failed after %d bytes: %w",
 			d.p.Command, len(tr), rerr)}
 	}
 	screenTextStr, screenCells := renderScreenCells(tr, d.p, d.term.snapshotResizes())
@@ -235,7 +235,7 @@ func (d *sessionDriver) failHard(err error) *sessionOutcome {
 // against a killed terminal — mirroring the cmd runner's cancel/timeout split
 // (#30).
 func (d *sessionDriver) canceled(ctx context.Context) *sessionOutcome {
-	return d.failHard(fmt.Errorf("pty %q canceled: %w", d.p.Command, ctx.Err()))
+	return d.failHard(diag.RunInterrupted.Errorf("pty %q canceled: %w", d.p.Command, ctx.Err()))
 }
 
 // waitExpect polls the transcript past the previous match until re matches,
@@ -388,7 +388,7 @@ func (d *sessionDriver) runExec(ctx context.Context, i int, e *spec.PTYExec) *se
 func (d *sessionDriver) applyResize(i int, r *spec.PTYResize) *sessionOutcome {
 	d.term.markResize(r.Rows, r.Cols)
 	if rerr := d.proc.resize(r.Rows, r.Cols); rerr != nil {
-		return d.failHard(fmt.Errorf("pty %q: session[%d] resize to %dx%d: %w",
+		return d.failHard(diag.PTYFailed.Errorf("pty %q: session[%d] resize to %dx%d: %w",
 			d.p.Command, i, r.Rows, r.Cols, rerr))
 	}
 	return nil
@@ -403,11 +403,10 @@ func (d *sessionDriver) send(i int, s *spec.PTYSend) *sessionOutcome {
 	// line by line, or as "[200~" typed into a prompt — so refuse here,
 	// where the mistake is (#378).
 	if s.Paste != nil && !d.term.modeEnabled(decsetBracketedPaste) {
-		return d.failHard(fmt.Errorf(
-			"pty %q: session[%d] sends a paste, but the program has not enabled bracketed paste "+
-				"(it never wrote ESC [?2004h, or turned the mode back off). "+
-				"Programs that do not distinguish a paste from typing take a plain send instead; "+
-				"if this one does enable the mode, wait for it with an expect or expect_screen before pasting",
+		return d.failHard(diag.TerminalModeMismatch.Errorf("pty %q: session[%d] sends a paste, but the program has not enabled bracketed paste "+
+			"(it never wrote ESC [?2004h, or turned the mode back off). "+
+			"Programs that do not distinguish a paste from typing take a plain send instead; "+
+			"if this one does enable the mode, wait for it with an expect or expect_screen before pasting",
 			d.p.Command, i))
 	}
 	// A mouse event only means something to a program that asked to be
@@ -421,7 +420,7 @@ func (d *sessionDriver) send(i int, s *spec.PTYSend) *sessionOutcome {
 	// in its markers, and keeps the historical rule that an empty
 	// verbatim send transmits EOF (^D).
 	if _, werr := d.term.write(s.Bytes()); werr != nil {
-		return d.failHard(fmt.Errorf("pty: send: %w", werr))
+		return d.failHard(diag.PTYFailed.Errorf("pty: send: %w", werr))
 	}
 	return nil
 }

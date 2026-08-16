@@ -17,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/security"
 	"github.com/nao1215/atago/internal/spec"
 )
@@ -54,7 +55,7 @@ type Server struct {
 func Start(ctx context.Context, ms *spec.MockServer, specDir string) (*Server, error) {
 	lis, err := (&net.ListenConfig{}).Listen(ctx, "tcp", "127.0.0.1:0")
 	if err != nil {
-		return nil, fmt.Errorf("mock server %q: listen: %w", ms.Name, err)
+		return nil, diag.MockServerFailed.Errorf("mock server %q: listen: %w", ms.Name, err)
 	}
 	s := &Server{name: ms.Name, specDir: specDir, routes: ms.Routes, lis: lis}
 	s.srv = &http.Server{Handler: s, ReadHeaderTimeout: 10 * time.Second}
@@ -166,7 +167,7 @@ func routePayload(rt *spec.MockRoute, specDir string) (body []byte, contentType 
 	case rt.JSON != nil:
 		b, err := json.Marshal(rt.JSON)
 		if err != nil {
-			return nil, "", fmt.Errorf("route %s %s: marshal json: %w", rt.Method, rt.Path, err)
+			return nil, "", diag.MockServerFailed.Errorf("route %s %s: marshal json: %w", rt.Method, rt.Path, err)
 		}
 		return b, "application/json", nil
 	case rt.BodyFile != "":
@@ -176,7 +177,7 @@ func routePayload(rt *spec.MockRoute, specDir string) (body []byte, contentType 
 		}
 		b, err := os.ReadFile(abs) //nolint:gosec // confined to the spec directory above
 		if err != nil {
-			return nil, "", fmt.Errorf("route %s %s: %w", rt.Method, rt.Path, err)
+			return nil, "", diag.MockServerFailed.Errorf("route %s %s: %w", rt.Method, rt.Path, err)
 		}
 		return b, "", nil
 	default:

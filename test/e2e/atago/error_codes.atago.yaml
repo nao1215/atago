@@ -875,3 +875,348 @@ scenarios:
       - assert:
           exit_code: 6
           stdout: {contains: "ATG6001"}
+
+  # --- ATG4xxx: execution ---------------------------------------------------
+
+  - name: ATG4001 is a command line that cannot be split into arguments
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+
+            scenarios:
+              - name: a
+                steps:
+                  - run: {command: "echo 'unclosed"}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 4
+          stdout: {contains: "ATG4001"}
+
+  - name: ATG4002 is a program that could not be started
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+
+            scenarios:
+              - name: a
+                steps:
+                  - run: {command: definitely-no-such-binary-xyz}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 4
+          stdout: {contains: "ATG4002"}
+
+  - name: ATG4003 is an environment the step needs that could not be prepared
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+
+            scenarios:
+              - name: a
+                steps:
+                  - run: {command: cat, stdin: {file: never-created.txt}}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 4
+          stdout: {contains: "ATG4003"}
+
+  - name: ATG4004 is a file the step depends on that cannot be read
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+
+            suite:
+              name: x
+              setup:
+                - mock_server: {name: m, routes: [{method: POST, path: /p, status: 200}]}
+            runners: {api: {type: http, base_url: "${m.url}"}}
+            scenarios:
+              - name: a
+                steps:
+                  - http: {runner: api, method: POST, path: /p, body_file: never-created.bin}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 4
+          stdout: {contains: "ATG4004"}
+
+  - name: ATG4005 is a command run beside a terminal session that failed
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+
+            scenarios:
+              - name: a
+                steps:
+                  - pty: {command: cat, timeout: 20s, session: [{exec: {command: "false"}}]}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 4
+          stdout: {contains: "ATG4005"}
+
+  - name: ATG4101 is a step that outlasted its timeout
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+
+            scenarios:
+              - name: a
+                steps:
+                  - pty: {command: cat, timeout: 20s, session: [{exec: {command: "sleep 5", timeout: 300ms}}]}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 4
+          stdout: {contains: "ATG4101"}
+
+  - name: ATG4102 is a service that never became ready
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+
+            scenarios:
+              - name: a
+                services:
+                  - {name: s, command: "sleep 30", ready: {port: "127.0.0.1:59991", timeout: 1s}}
+                steps:
+                  - run: {command: echo}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 4
+          stdout: {contains: "ATG4102"}
+
+  - name: ATG4201 is a peer that could not be reached
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+
+            runners: {api: {type: http, base_url: "http://127.0.0.1:1"}}
+            scenarios:
+              - name: a
+                steps:
+                  - http: {runner: api, method: GET, path: /}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 4
+          stdout: {contains: "ATG4201"}
+
+  - name: ATG4202 is a runner missing what it needs to connect
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+
+            runners: {r: {type: ssh, host: "127.0.0.1:22", user: u, password: p}}
+            scenarios:
+              - name: a
+                steps:
+                  - run: {runner: r, command: echo}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 4
+          stdout: {contains: "ATG4202"}
+
+  - name: ATG4203 is a peer that was reached and refused the request
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+
+            runners: {db: {type: db, dsn: "sqlite://:memory:"}}
+            scenarios:
+              - name: a
+                steps:
+                  - query: {runner: db, sql: "SELECT * FROM no_such_table"}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 4
+          stdout: {contains: "ATG4203"}
+
+  - name: ATG4204 is an address atago cannot make sense of
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+
+            runners: {db: {type: db, dsn: "weird://x"}}
+            scenarios:
+              - name: a
+                steps:
+                  - query: {runner: db, sql: "SELECT 1"}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 4
+          stdout: {contains: "ATG4204"}
+
+  - name: ATG4301 is a service that failed before it became ready
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+
+            scenarios:
+              - name: a
+                services:
+                  - {name: s, command: "true", ready: {port: "127.0.0.1:59992", timeout: 5s}}
+                steps:
+                  - run: {command: echo}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 4
+          stdout: {contains: "ATG4301"}
+
+  - name: ATG4302 is a service addressed after it exited
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+
+            scenarios:
+              - name: a
+                services:
+                  - {name: s, command: "sleep 1", ready: {delay: 100ms}}
+                steps:
+                  - run: {command: "sleep 2"}
+                  - signal: {service: s, signal: TERM}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 4
+          stdout: {contains: "ATG4302"}
+
+  - name: ATG4403 is output that could not be captured
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+
+            scenarios:
+              - name: a
+                steps:
+                  - run: {command: "sleep 4 &", shell: true, timeout: 30s}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 4
+          stdout: {contains: "ATG4403"}
+
+  - name: ATG4406 is input the program is not set up to receive
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+
+            scenarios:
+              - name: a
+                steps:
+                  - pty: {command: cat, timeout: 20s, session: [{send: {mouse: {row: 1, col: 1}}}]}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 4
+          stdout: {contains: "ATG4406"}
+
+  - name: ATG4501 is a store step with no result behind it
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+
+            scenarios:
+              - name: a
+                steps:
+                  - run: {command: echo}
+                  - store: {name: v, from: {body: {trim: true}}}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 4
+          stdout: {contains: "ATG4501"}
+
+  - name: ATG4502 is a store selector that found nothing
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+
+            scenarios:
+              - name: a
+                steps:
+                  - run: {command: echo}
+                  - store: {name: v, from: {stdout: {matches: "no-such-text-anywhere"}}}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 4
+          stdout: {contains: "ATG4502"}
+
+  - name: ATG4505 is a variable the step expands that is not defined
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+
+            scenarios:
+              - name: a
+                steps:
+                  - pty:
+                      command: cat
+                      timeout: 20s
+                      session:
+                        - send: "${env:ATAGO_DEFINITELY_UNSET_XYZ}"
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 4
+          stdout: {contains: "ATG4505"}
