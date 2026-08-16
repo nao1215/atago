@@ -11,8 +11,17 @@ name: ThirdParty
 # pinned deliberately: `go install` legs pin a module version (integrity still
 # comes from the Go checksum database), and raw binary-download legs pin a
 # version + SHA256 because a CDN download has no implicit integrity check.
+#
+# It also runs on every push to main, so a regression in the pty/TUI engine is
+# found minutes after it lands rather than at the next nightly. It deliberately
+# does NOT gate pull requests: one run in five fails for reasons that have
+# nothing to do with the change under review — a CDN hiccup installing one of
+# 44 programs, or a real terminal UI missing its budget on a loaded runner — and
+# a gate that cries wolf at that rate teaches people to merge past it.
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
   schedule:
     # 06:30 UTC daily, after the dogfood matrix.
     - cron: "30 6 * * *"
