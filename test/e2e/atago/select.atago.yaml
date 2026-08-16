@@ -75,3 +75,50 @@ scenarios:
           exit_code: 0
           stdout:
             contains: "1 passed"
+
+  # A tag list is a set, so repeating an entry selects nothing extra — but the
+  # generated docs count occurrences, so a scenario listing `smoke` twice made
+  # the suite summary claim two scenarios carry it, and `atago list` printed
+  # "smoke,smoke" beside the scenario.
+  - name: a repeated tag on one scenario is a load-time error
+    steps:
+      - fixture:
+          file: duptag.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: tagged twice
+                tags: [smoke, smoke]
+                steps:
+                  - run: {shell: true, command: "true"}
+      - run:
+          command: ${atago} run duptag.atago.yaml
+      - assert:
+          exit_code: 2
+          stderr:
+            contains: 'duplicate tag "smoke"'
+      # The same tag on two different scenarios is the ordinary case: the docs
+      # then say "smoke (2)" about two scenarios, which is true.
+      - fixture:
+          file: shared.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: first
+                tags: [smoke]
+                steps:
+                  - run: {shell: true, command: "true"}
+              - name: second
+                tags: [smoke]
+                steps:
+                  - run: {shell: true, command: "true"}
+      - run:
+          command: ${atago} doc shared.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "`smoke` (2)"

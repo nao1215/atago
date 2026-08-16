@@ -1745,3 +1745,26 @@ func TestLoadBytes_EveryBuiltinIsReserved(t *testing.T) {
 		t.Errorf("a non-builtin name was rejected: %v", err)
 	}
 }
+
+// TestLoadBytes_DuplicateTag is a regression: a tag list is a set, so repeating
+// an entry selects nothing extra — but `atago doc` counts tag occurrences, so a
+// scenario listing `smoke` twice made the summary read "smoke (2)" over a suite
+// where one scenario carries it. `atago list` showed "smoke,smoke" beside it.
+func TestLoadBytes_DuplicateTag(t *testing.T) {
+	t.Parallel()
+	src := "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    tags: [smoke, smoke, slow]\n    steps:\n      - run: {command: echo}"
+	_, err := LoadBytes("s.atago.yaml", []byte(src))
+	if err == nil {
+		t.Fatal("a repeated tag was accepted")
+	}
+	if !strings.Contains(err.Error(), `duplicate tag "smoke"`) {
+		t.Errorf("err = %v, want a duplicate-tag rejection", err)
+	}
+
+	// Distinct tags, and the same tag on two different scenarios, are the
+	// ordinary case and must keep loading.
+	ok := "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    tags: [smoke, slow]\n    steps:\n      - run: {command: echo}\n  - name: b\n    tags: [smoke]\n    steps:\n      - run: {command: echo}"
+	if _, err := LoadBytes("s.atago.yaml", []byte(ok)); err != nil {
+		t.Errorf("distinct tags were rejected: %v", err)
+	}
+}
