@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-81 suites · 623 scenarios
+81 suites · 625 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -83,9 +83,11 @@
   - [an unsatisfiable size range is a load error](#scenario-an-unsatisfiable-size-range-is-a-load-error)
   - [a size bound refuses to stat through a planted symlink](#scenario-a-size-bound-refuses-to-stat-through-a-planted-symlink)
   - [a size bound next to exists false is a load error](#scenario-a-size-bound-next-to-exists-false-is-a-load-error)
-- [atago self-hosting / db runner](#atago-self-hosting--db-runner) — 2 scenarios
+- [atago self-hosting / db runner](#atago-self-hosting--db-runner) — 4 scenarios
   - [query workflow (create, insert, select, row assert, value binding) passes](#scenario-query-workflow-create-insert-select-row-assert-value-binding-passes)
   - [a query against an undeclared runner fails validation (exit 2)](#scenario-a-query-against-an-undeclared-runner-fails-validation-exit-2)
+  - [a hostaddr dsn is held to the network policy (exit 6)](#scenario-a-hostaddr-dsn-is-held-to-the-network-policy-exit-6)
+  - [a quoted host is compared to the allowlist without its quotes](#scenario-a-quoted-host-is-compared-to-the-allowlist-without-its-quotes)
 - [atago self-hosting / top-level defaults](#atago-self-hosting--top-level-defaults) — 10 scenarios
   - [defaults.run.shell applies to every run step without repeating it](#scenario-defaultsrunshell-applies-to-every-run-step-without-repeating-it)
   - [defaults.scenario.env is merged and an explicit scenario env wins](#scenario-defaultsscenarioenv-is-merged-and-an-explicit-scenario-env-wins)
@@ -2162,6 +2164,70 @@ ${atago} run norunner.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `is not declared`
+### Scenario: a hostaddr dsn is held to the network policy (exit 6)
+#### Given
+- Fixture file `hostaddr.atago.yaml` is created.
+#### Inputs
+_Fixture `hostaddr.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner-hostaddr
+  timeout: 10s
+permissions:
+  network:
+    allow: ["db.allowed.example"]
+runners:
+  store:
+    type: db
+    driver: postgres
+    dsn: "hostaddr=127.0.0.1 port=1 user=u dbname=app sslmode=disable"
+scenarios:
+  - name: reaches an address the policy never named
+    steps:
+      - query:
+          runner: store
+          sql: "SELECT 1"
+```
+#### When
+```shell
+${atago} run hostaddr.atago.yaml
+```
+#### Then
+- exit code is `6`
+- stdout contains `network policy denies host "127.0.0.1"`
+### Scenario: a quoted host is compared to the allowlist without its quotes
+#### Given
+- Fixture file `quoted.atago.yaml` is created.
+#### Inputs
+_Fixture `quoted.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner-quoted
+  timeout: 10s
+permissions:
+  network:
+    allow: ["127.0.0.1"]
+runners:
+  store:
+    type: db
+    driver: postgres
+    dsn: "host='127.0.0.1' port=1 user=u dbname=app sslmode=disable"
+scenarios:
+  - name: the allowlisted host connects (and fails as a connection)
+    steps:
+      - query:
+          runner: store
+          sql: "SELECT 1"
+```
+#### When
+```shell
+${atago} run quoted.atago.yaml
+```
+#### Then
+- exit code is `4`
+- stdout does not contain `network policy denies`
 ## atago self-hosting / top-level defaults
 Source: `test/e2e/atago/defaults.atago.yaml`
 ### Scenario: defaults.run.shell applies to every run step without repeating it
