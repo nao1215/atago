@@ -170,7 +170,7 @@
             },
             "cwd": {
               "type": "string",
-              "description": "Default working directory for every run step."
+              "description": "Default working directory for every run step. Precedence: step > runner > defaults.run."
             },
             "timeout": {
               "type": "string",
@@ -306,7 +306,7 @@
             },
             "cwd": {
               "type": "string",
-              "description": "Working directory for commands run through this runner, relative to the scenario workdir."
+              "description": "Working directory for commands run through this runner, relative to the scenario workdir. Beaten by a step's own `cwd`, and beats `defaults.run.cwd`."
             },
             "timeout": {
               "type": "string",

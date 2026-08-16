@@ -111,6 +111,47 @@ scenarios:
 	}
 }
 
+// TestApplyDefaults_RunnerCwdBeatsDefaults is a regression for #498: a step
+// naming a cmd runner that declares its own cwd must be left cwd-less by the
+// merge, so the engine's runner layering still supplies it. Filling
+// defaults.run.cwd here would erase the runner value and invert the documented
+// step > runner > defaults.run precedence.
+func TestApplyDefaults_RunnerCwdBeatsDefaults(t *testing.T) {
+	t.Parallel()
+	src := `
+version: "1"
+suite:
+  name: sample
+runners:
+  located:
+    type: cmd
+    cwd: from-runner
+  bare:
+    type: cmd
+defaults:
+  run:
+    cwd: from-defaults
+scenarios:
+  - name: cwd precedence
+    steps:
+      - run: {runner: located, command: echo hi}
+      - run: {runner: located, cwd: from-step, command: echo hi}
+      - run: {runner: bare, command: echo hi}
+      - run: {command: echo hi}
+`
+	s, err := LoadBytes("sample.atago.yaml", []byte(src))
+	if err != nil {
+		t.Fatalf("LoadBytes() error = %v", err)
+	}
+	steps := s.Scenarios[0].Steps
+	want := []string{"", "from-step", "from-defaults", "from-defaults"}
+	for i, w := range want {
+		if got := steps[i].Run.Cwd; got != w {
+			t.Errorf("step %d cwd = %q, want %q", i, got, w)
+		}
+	}
+}
+
 // TestApplyDefaults_ExplicitShellFalseWins proves an authored `shell: false`
 // beats a defaulted `shell: true` — the documented "an explicitly authored
 // value always wins" rule holds for booleans too (Shell is a *bool so unset
