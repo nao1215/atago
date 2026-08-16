@@ -155,3 +155,30 @@ func TestRunHost(t *testing.T) {
 		})
 	}
 }
+
+// TestSecurityNotes_InsecureHostKey is a regression: the loader refuses an ssh
+// runner that decides neither way about host-key verification, which is how
+// much the choice matters — and then the security summary said nothing about
+// which way it was decided. A reviewer reading it to see what a spec does was
+// told the scenario reaches another host, but not that it accepts whatever key
+// that host presents.
+func TestSecurityNotes_InsecureHostKey(t *testing.T) {
+	t.Parallel()
+	runners := map[string]Runner{
+		"loose":  {Type: "ssh", Host: "h.example", User: "u", InsecureHostKey: true},
+		"strict": {Type: "ssh", Host: "h.example", User: "u", KnownHosts: "known_hosts"},
+	}
+	sc := &Scenario{Steps: []Step{
+		{Run: &Run{Runner: "loose", Command: "uptime"}},
+		{Run: &Run{Runner: "strict", Command: "uname"}},
+	}}
+	got := strings.Join(SecurityNotes(sc, runners), "\n")
+	if !strings.Contains(got, `ssh host key verification disabled (runner "loose")`) {
+		t.Errorf("security notes do not mention the disabled host-key check:\n%s", got)
+	}
+	// A runner that verifies says nothing extra: the note is about the opt-out,
+	// and one line per ordinary runner would train a reader to skip the section.
+	if strings.Contains(got, `"strict"`) {
+		t.Errorf("security notes flag a runner that does verify:\n%s", got)
+	}
+}

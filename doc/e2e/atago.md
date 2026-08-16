@@ -5701,7 +5701,10 @@ version: "1"
 suite:
   name: remote
 runners:
-  box: {type: ssh, host: shell.example, user: deploy}
+  # insecure_host_key is an explicit opt-out of a verification the
+  # loader otherwise refuses to let a spec skip, so the summary has
+  # to say which way the decision went.
+  box: {type: ssh, host: shell.example, user: deploy, password: x, insecure_host_key: true}
   # Single-quoted: a double-quoted YAML scalar processes escapes, and
   # ${workdir} on Windows expands to a backslash path whose \A and \T
   # are not valid ones. explain never opens the database, so a plain
@@ -5712,8 +5715,8 @@ scenarios:
   - name: reaches two hosts and one file
     steps:
       - run: {runner: box, command: uptime}
-      - query: {runner: pg, sql: "SELECT 1"}
-      - query: {runner: local, sql: "SELECT 2"}
+      - query: {runner
+… (truncated)
 ```
 #### When
 ```shell
@@ -5724,7 +5727,7 @@ ${atago} doc remote.atago.yaml
 #### Then
 - after `${atago} explain remote.atago.yaml`:
   - exit code is `0`
-  - stdout contains `network access (ssh box): uptime`, `network access: SQL query via pg`, `uptime  (ssh box)`, does not contain `network access: SQL query via local`
+  - stdout contains `network access (ssh box): uptime`, `ssh host key verification disabled (runner "box")`, `network access: SQL query via pg`, `uptime  (ssh box)`, does not contain `network access: SQL query via local`
 - after `${atago} manifest remote.atago.yaml`:
   - exit code is `0`
   - stdout at `$.specs[0].scenarios[0].security[0]` equals `network access (ssh box): uptime`; at `$.specs[0].scenarios[0].steps[0].action` equals `run via ssh box: uptime`
