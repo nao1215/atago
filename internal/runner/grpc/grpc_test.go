@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"strings"
+
 	"github.com/k1LoW/grpcstub"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -168,5 +170,59 @@ func TestInvoke_RepeatedReflectionCallsSucceed(t *testing.T) {
 		if out.GRPCStatus != 0 {
 			t.Fatalf("invoke %d status = %d, want 0", i, out.GRPCStatus)
 		}
+	}
+}
+
+// TestReflectionFailure_BlamesTheRightThing is a regression: every failure on
+// the reflection path carried the same "(is server reflection enabled?)" hint,
+// including ones where no connection was ever established. Pointing a runner
+// with `tls: true` at a plaintext endpoint reported a reflection problem, and
+// the real cause — "authentication handshake failed" — sat behind it. The hint
+// belongs to the case it describes: the server answered and does not serve
+// reflection.
+func TestReflectionFailure_BlamesTheRightThing(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name     string
+		err      error
+		wantHint bool
+	}{
+		{
+			name:     "server does not serve reflection",
+			err:      status.Error(codes.Unimplemented, "unknown service grpc.reflection.v1.ServerReflection"),
+			wantHint: true,
+		},
+		{
+			name:     "symbol is absent from a server that does serve reflection",
+			err:      status.Error(codes.NotFound, `Symbol not found: pkg.Svc`),
+			wantHint: true,
+		},
+		{
+			name:     "tls handshake against a plaintext endpoint",
+			err:      status.Error(codes.Unavailable, `connection error: desc = "transport: authentication handshake failed: connection reset by peer"`),
+			wantHint: false,
+		},
+		{
+			name:     "nothing is listening",
+			err:      status.Error(codes.Unavailable, `connection error: desc = "transport: dial tcp 127.0.0.1:1: connect: connection refused"`),
+			wantHint: false,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			got := reflectionError("pkg.Svc", c.err).Error()
+			if !strings.Contains(got, "pkg.Svc") {
+				t.Errorf("error does not name the service: %s", got)
+			}
+			// The underlying error is always kept: it is the only thing that
+			// says what actually went wrong.
+			if !strings.Contains(got, c.err.Error()) {
+				t.Errorf("error drops its cause: %s", got)
+			}
+			if hasHint := strings.Contains(got, "server reflection enabled"); hasHint != c.wantHint {
+				t.Errorf("reflection hint present = %v, want %v: %s", hasHint, c.wantHint, got)
+			}
+		})
 	}
 }

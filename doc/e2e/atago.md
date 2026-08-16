@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-81 suites · 620 scenarios
+81 suites · 621 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -292,9 +292,10 @@
   - [repeat surfaces flakiness that a single run would miss](#scenario-repeat-surfaces-flakiness-that-a-single-run-would-miss)
   - [a gated-out scenario reports no repeat rate](#scenario-a-gated-out-scenario-reports-no-repeat-rate)
   - [repeat and retry-failed are mutually exclusive](#scenario-repeat-and-retry-failed-are-mutually-exclusive)
-- [atago self-hosting / grpc runner](#atago-self-hosting--grpc-runner) — 2 scenarios
+- [atago self-hosting / grpc runner](#atago-self-hosting--grpc-runner) — 3 scenarios
   - [a grpc runner without a target fails validation (exit 2)](#scenario-a-grpc-runner-without-a-target-fails-validation-exit-2)
   - [a grpc step naming an undeclared runner fails validation (exit 2)](#scenario-a-grpc-step-naming-an-undeclared-runner-fails-validation-exit-2)
+  - [an unreachable server is a connection failure, not a reflection question](#scenario-an-unreachable-server-is-a-connection-failure-not-a-reflection-question)
 - [atago self-hosting / hermetic environment (clear_env + pass_env)](#atago-self-hosting--hermetic-environment-clear_env--pass_env) — 5 scenarios
   - [clear_env drops inherited host variables](#scenario-clear_env-drops-inherited-host-variables)
   - [pass_env re-admits an allowlist of host variables](#scenario-pass_env-re-admits-an-allowlist-of-host-variables)
@@ -6277,6 +6278,31 @@ ${atago} run norunner.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `is not declared`
+### Scenario: an unreachable server is a connection failure, not a reflection question
+#### Given
+- Fixture file `dead.atago.yaml` is created.
+#### Inputs
+_Fixture `dead.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+runners:
+  rpc: {type: grpc, target: "127.0.0.1:1", timeout: 5s}
+scenarios:
+  - name: call a server that is not there
+    steps:
+      - grpc:
+          runner: rpc
+          method: pkg.Service/Method
+```
+#### When
+```shell
+${atago} run dead.atago.yaml
+```
+#### Then
+- exit code is `4`
+- stdout contains `the server could not be reached`, does not contain `server reflection enabled`
 ## atago self-hosting / hermetic environment (clear_env + pass_env)
 Source: `test/e2e/atago/hermetic_env.atago.yaml`
 ### Scenario: clear_env drops inherited host variables
