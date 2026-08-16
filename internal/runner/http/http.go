@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/runner"
 	"github.com/nao1215/atago/internal/security"
 	"github.com/nao1215/atago/internal/spec"
@@ -34,7 +35,7 @@ type PolicyError struct {
 }
 
 func (e *PolicyError) Error() string {
-	return fmt.Sprintf("network policy denies host %q (allowed: %s)", e.Host, strings.Join(e.Allow, ", "))
+	return diag.NetworkPolicyDenied.Annotate(fmt.Sprintf("network policy denies host %q (allowed: %s)", e.Host, strings.Join(e.Allow, ", ")))
 }
 
 // Config is the resolved configuration for an HTTP runner, derived from a named

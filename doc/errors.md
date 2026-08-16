@@ -12,7 +12,7 @@ Codes are being assigned one family at a time. The table says which families car
 | `ATG3xxx` | 3 | configuration error — the command line, its flags, or the spec files it selected | 14 codes |
 | `ATG4xxx` | 4 | execution error — a step could not be carried out | not yet |
 | `ATG5xxx` | 5 | internal error — a bug in atago | not yet |
-| `ATG6xxx` | 6 | security policy violation — atago refused an operation on policy grounds | not yet |
+| `ATG6xxx` | 6 | security policy violation — atago refused an operation on policy grounds | 1 codes |
 
 `ATG1xxx` is never assigned. Exit 1 means one or more scenarios failed, which is a result rather than an error.
 
@@ -77,6 +77,7 @@ Look a code up from the terminal with `atago explain ATG2201`, which prints this
 | [`ATG3205`](#atg3205--the-output-file-already-exists) | the output file already exists | 3 | v0.21.0 |
 | [`ATG3206`](#atg3206--a-destination-atago-was-asked-to-write-cannot-be-written) | a destination atago was asked to write cannot be written | 3 | v0.21.0 |
 | [`ATG3207`](#atg3207--atagos-recorded-state-from-a-previous-run-cannot-be-read) | atago's recorded state from a previous run cannot be read | 3 | v0.21.0 |
+| [`ATG6001`](#atg6001--a-request-targeted-a-host-the-specs-network-policy-does-not-allow) | a request targeted a host the spec's network policy does not allow | 6 | v0.21.0 |
 
 ## ATG2xxx — exit 2
 
@@ -505,4 +506,14 @@ Exits 3. Since v0.21.0.
 Fix: Delete the ledger and run the full suite once to record it again.
 
 Exits 3. Since v0.21.0.
+
+## ATG6xxx — exit 6
+
+### ATG6001 — a request targeted a host the spec's network policy does not allow
+
+The spec declares `permissions.network.allow`, and this request went somewhere else. The check covers HTTP, gRPC, and SSH alike, and an HTTP redirect is re-checked against the same list before it is followed — otherwise an allowed host could bounce a request to a denied one and the restriction would mean nothing. Comparison is exact on the host, or on host and port when the entry names one; there is no wildcard.
+
+Fix: Add the host to `permissions.network.allow` if the scenario is meant to reach it, or point the runner at a mock server or a scenario service instead. Removing the allowlist entirely turns the policy off, which is the default when no `permissions.network` block is declared.
+
+Exits 6. Since v0.21.0.
 
