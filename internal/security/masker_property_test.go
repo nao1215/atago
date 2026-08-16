@@ -51,11 +51,54 @@ func TestMasker_OverlappingSecrets(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			m := NewMasker([]string{tt.a, tt.b})
 			got := m.Mask(tt.text)
-			if strings.Contains(got, tt.a) {
-				t.Errorf("secret A %q survived: %q", tt.a, got)
+			for _, v := range []string{tt.a, tt.b} {
+				if strings.Contains(got, v) {
+					t.Errorf("secret %q survived: %q", v, got)
+				}
+				// A value declared with one line ending must also be masked
+				// where the program under test emitted the other, which is the
+				// case a PEM key hits: the crlf-form row declares LF and the
+				// text carries CRLF, so checking only the declared spelling
+				// would pass while the real bytes leaked.
+				crlf := strings.ReplaceAll(v, "\n", "\r\n")
+				if crlf != v && strings.Contains(got, crlf) {
+					t.Errorf("the CRLF form of secret %q survived: %q", v, got)
+				}
 			}
-			if strings.Contains(got, tt.b) {
-				t.Errorf("secret B %q survived: %q", tt.b, got)
+		})
+	}
+}
+
+// The minimum length is a real part of the contract — masking two-character
+// values would garble unrelated text — and the property tests above skip
+// everything below it, so on their own they would still pass if NewMasker
+// stopped masking entirely. This pins both sides of the boundary.
+func TestMasker_MinimumLength(t *testing.T) {
+	t.Parallel()
+	const marker = "|"
+	tests := map[string]struct {
+		value      string
+		wantMasked bool
+	}{
+		"empty":            {value: "", wantMasked: false},
+		"one below":        {value: strings.Repeat("a", minSecretLen-1), wantMasked: false},
+		"exactly minimum":  {value: strings.Repeat("b", minSecretLen), wantMasked: true},
+		"one above":        {value: strings.Repeat("c", minSecretLen+1), wantMasked: true},
+		"long":             {value: strings.Repeat("d", 200), wantMasked: true},
+		"multibyte at min": {value: "日本語", wantMasked: true}, // 9 bytes, 3 runes
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			if tt.value == "" {
+				return
+			}
+			m := NewMasker([]string{tt.value})
+			text := marker + tt.value + marker
+			masked := !strings.Contains(m.Mask(text), tt.value)
+			if masked != tt.wantMasked {
+				t.Errorf("value of %d bytes masked = %v, want %v (minSecretLen is %d)",
+					len(tt.value), masked, tt.wantMasked, minSecretLen)
 			}
 		})
 	}
