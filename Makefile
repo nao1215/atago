@@ -1,4 +1,4 @@
-.PHONY: build test coverage clean vet fmt lint tools release-smoke e2e thirdparty dogfood dogfood-iso8583tool dogfood-jose dogfood-career dogfood-gup dogfood-mimixbox dogfood-mobilepkg demo docs site website website-serve help
+.PHONY: build test test-race coverage clean vet fmt lint tools release-smoke e2e thirdparty dogfood dogfood-iso8583tool dogfood-jose dogfood-career dogfood-gup dogfood-mimixbox dogfood-mobilepkg demo docs site website website-serve help
 
 APP         = atago
 VERSION     = $(shell git describe --tags --always --dirty 2>/dev/null)
@@ -30,6 +30,9 @@ clean: ## Clean project artifacts
 test: ## Run tests with coverage output
 	env GOOS=$(GOOS) $(GO_TEST) -cover -coverpkg=./... -coverprofile=cover.out $(GO_PKGROOT)
 	$(GO_TOOL) cover -html=cover.out -o cover.html
+
+test-race: ## Run tests under the race detector (CGO required, so no CGO_ENABLED=0)
+	$(GO_TEST) -race -timeout 10m $(GO_PKGROOT)
 
 coverage: ## Combine unit + self-hosted E2E coverage into cover.out / cover.html (uses a `go build -cover` atago; scratch under .coverage/)
 	env PARALLEL=$(PARALLEL) bash ./scripts/coverage.sh
