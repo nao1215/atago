@@ -83,6 +83,10 @@ func validateMockServers(add addFunc, where string, servers []spec.MockServer, m
 // validateMockRoutes checks each canned route (#24): method+path required, at
 // most one payload source, sane status, parseable delay.
 func validateMockRoutes(add addFunc, where string, routes []spec.MockRoute) {
+	// A route is reached by the FIRST declaration whose method and path match,
+	// with the method compared case-insensitively — so a repeat of that pair is
+	// dead configuration, and the spec claims a response it will never send.
+	seen := map[string]bool{}
 	for i := range routes {
 		rt := &routes[i]
 		rw := fmt.Sprintf("%s.routes[%d]", where, i)
@@ -93,6 +97,19 @@ func validateMockRoutes(add addFunc, where string, routes []spec.MockRoute) {
 			add(diag.RequiredKey, "%s.path is required", rw)
 		} else if !strings.HasPrefix(rt.Path, "/") {
 			add(diag.BadFormat, "%s.path %q must start with \"/\"", rw, rt.Path)
+		} else if strings.Contains(rt.Path, "?") {
+			// Matching compares the request's path, which the server has already
+			// split from its query, so a declared query can never be part of a
+			// match. Serve on the path and assert the query with the mock
+			// target's own matchers instead.
+			add(diag.BadFormat, "%s.path %q must not contain a query string; matching ignores the query, so this route can never answer", rw, rt.Path)
+		}
+		if rt.Method != "" && rt.Path != "" {
+			key := strings.ToUpper(rt.Method) + " " + rt.Path
+			if seen[key] {
+				add(diag.DuplicateName, "%s: duplicate route %s; the first one declared always answers, so this one never does", rw, key)
+			}
+			seen[key] = true
 		}
 		payloads := 0
 		if rt.JSON != nil {

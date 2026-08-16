@@ -814,6 +814,46 @@ scenarios:
 			wantMsg: `duplicate mock server name "api"`,
 		},
 		{
+			// The mock serves the FIRST route whose method and path match, so a
+			// second one for the same pair never answers. Method comparison is
+			// case-insensitive at serve time, so GET and get are the same route.
+			name: "duplicate route never answers",
+			src: `
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: s
+    mock_servers:
+      - name: api
+        routes:
+          - {method: GET, path: /ping, status: 200, body: first}
+          - {method: get, path: /ping, status: 500, body: second}
+    steps:
+      - run: {command: echo hi}
+`,
+			wantMsg: `duplicate route GET /ping`,
+		},
+		{
+			// Matching compares the request's path, which never carries a query,
+			// so a route declaring one can never answer.
+			name: "route path carrying a query string",
+			src: `
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: s
+    mock_servers:
+      - name: api
+        routes:
+          - {method: GET, path: "/ping?a=1", status: 200, body: pong}
+    steps:
+      - run: {command: echo hi}
+`,
+			wantMsg: `must not contain a query string`,
+		},
+		{
 			name: "route with two payload sources",
 			src: `
 version: "1"
