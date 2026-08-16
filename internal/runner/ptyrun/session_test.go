@@ -655,17 +655,29 @@ func TestSessionDriver_EchoIsNotAMatch(t *testing.T) {
 			scanFrom: 0, pattern: `AB\r\nCD`, wantMatch: true,
 		},
 		"an identical earlier line is not the echo": {
-			// The echo is looked for at or after the send, so the earlier
+			// The echo can only be at the write's offset, so the earlier
 			// occurrence is the program's and matches.
 			sentAt: 5, sent: "ABC\n", transcript: "ABC\r\nABC\r\n",
 			scanFrom: 0, pattern: "ABC", wantMatch: true,
+		},
+		"a redraw containing what was sent is not the echo": {
+			// The shape that broke a real TUI suite: a program in raw mode
+			// (nothing echoed) draws the character it was just sent, further
+			// along than the write. Treating that as the echo left an expect
+			// waiting for text already on screen.
+			sentAt: 6, sent: ":", transcript: "ready\n\x1b[2J\x1b[H:prompt",
+			scanFrom: 0, pattern: ":", wantMatch: true,
+		},
+		"the echo sits exactly at the write": {
+			sentAt: 6, sent: ":", transcript: "ready\n:",
+			scanFrom: 6, pattern: ":", wantMatch: false,
 		},
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			d := &sessionDriver{
-				echoes: []echoSpan{{searchFrom: tt.sentAt, echo: echoOf([]byte(tt.sent)), at: -1}},
+				echoes: []echoSpan{{at: tt.sentAt, echo: echoOf([]byte(tt.sent))}},
 			}
 			transcript := []byte(tt.transcript)
 			d.locateEchoes(transcript)

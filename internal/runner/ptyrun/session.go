@@ -159,18 +159,34 @@ type sessionDriver struct {
 }
 
 // echoSpan is one send's echo: the bytes the terminal would write back, and
-// where in the transcript to start looking for them.
+// the transcript position they must occupy to be that echo.
 type echoSpan struct {
-	// searchFrom is the transcript length at the moment of the send, so the
-	// echo is looked for at or after it and an identical earlier line cannot be
-	// mistaken for it.
-	searchFrom int
+	// at is the transcript length at the moment of the send. The echo, if the
+	// terminal performs one, begins exactly here: the line discipline writes it
+	// synchronously with the write, before the program is scheduled to respond.
+	// Anything appearing later is the program's, however much it resembles what
+	// was sent.
+	at int
 	// echo is what the line discipline writes back: the sent bytes with each LF
 	// rendered as CRLF, which is what ONLCR does on the way out.
 	echo []byte
-	// at is where the echo was found, or -1 while it has not been.
-	at int
+	// state is whether the bytes at `at` have been examined yet, and what they
+	// turned out to be.
+	state echoState
 }
+
+// echoState is what is known about one send's echo.
+type echoState int
+
+const (
+	// echoPending means too few bytes have arrived at `at` to tell yet.
+	echoPending echoState = iota
+	// echoConfirmed means the transcript at `at` is exactly the echo.
+	echoConfirmed
+	// echoAbsent means it is not, so the terminal did not echo this send and
+	// nothing about it is discounted.
+	echoAbsent
+)
 
 // echoOf is what a terminal writes back when its line discipline echoes the
 // bytes a send transmitted.
@@ -178,20 +194,34 @@ func echoOf(sent []byte) []byte {
 	return bytes.ReplaceAll(sent, []byte("\n"), []byte("\r\n"))
 }
 
-// locateEchoes resolves where each pending send was echoed, given the
-// transcript so far. A span whose echo has not appeared stays unresolved and is
-// retried on the next poll; one that never appears simply never matches, which
-// is what happens when the mode is off (a password prompt, a raw-mode TUI) or
-// when the terminal renders it differently (ECHOCTL writes a control byte as
-// ^A).
+// locateEchoes decides, for each send, whether the terminal echoed it —
+// by looking only at the bytes sitting exactly where the write landed.
+//
+// Position is what separates an echo from the program's own output, and it is
+// the only thing that can: the two are identical bytes on the same stream. The
+// line discipline writes its echo synchronously with the write, so it is at the
+// write's offset or it does not exist. Searching further along would find any
+// later occurrence of the same text and call it an echo — which is how a TUI
+// redrawing the `:` it was just sent had its own output discounted, leaving an
+// expect waiting for something already on screen.
 func (d *sessionDriver) locateEchoes(transcript []byte) {
 	for i := range d.echoes {
 		e := &d.echoes[i]
-		if e.at >= 0 || len(e.echo) == 0 || e.searchFrom > len(transcript) {
+		if e.state != echoPending || len(e.echo) == 0 {
 			continue
 		}
-		if k := bytes.Index(transcript[e.searchFrom:], e.echo); k >= 0 {
-			e.at = e.searchFrom + k
+		if e.at+len(e.echo) > len(transcript) {
+			// Not enough has arrived to tell; a later poll decides. A prefix
+			// that already disagrees is decided now rather than waited on.
+			if !bytes.HasPrefix(e.echo, transcript[min(e.at, len(transcript)):]) {
+				e.state = echoAbsent
+			}
+			continue
+		}
+		if bytes.Equal(transcript[e.at:e.at+len(e.echo)], e.echo) {
+			e.state = echoConfirmed
+		} else {
+			e.state = echoAbsent
 		}
 	}
 }
@@ -212,7 +242,7 @@ func (d *sessionDriver) locateEchoes(transcript []byte) {
 // prints the line, and the printed one falls outside the echo span.
 func (d *sessionDriver) isEcho(from, to int) bool {
 	for _, e := range d.echoes {
-		if e.at < 0 {
+		if e.state != echoConfirmed {
 			continue
 		}
 		if from >= e.at && to <= e.at+len(e.echo) {
@@ -515,7 +545,7 @@ func (d *sessionDriver) send(i int, s *spec.PTYSend) *sessionOutcome {
 	if _, werr := d.term.write(sent); werr != nil {
 		return d.failHard(diag.PTYFailed.Errorf("pty: send: %w", werr))
 	}
-	d.echoes = append(d.echoes, echoSpan{searchFrom: d.term.curLen(), echo: echoOf(sent), at: -1})
+	d.echoes = append(d.echoes, echoSpan{at: d.term.curLen(), echo: echoOf(sent)})
 	return nil
 }
 
