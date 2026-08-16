@@ -5699,8 +5699,12 @@ suite:
   name: remote
 runners:
   box: {type: ssh, host: shell.example, user: deploy}
-  pg: {type: db, dsn: "postgres://u:p@db.example:5432/app"}
-  local: {type: db, dsn: "sqlite:${workdir}/a.db"}
+  # Single-quoted: a double-quoted YAML scalar processes escapes, and
+  # ${workdir} on Windows expands to a backslash path whose \A and \T
+  # are not valid ones. explain never opens the database, so a plain
+  # relative path says as much as an absolute one.
+  pg: {type: db, dsn: 'postgres://u:p@db.example:5432/app'}
+  local: {type: db, dsn: 'sqlite:a.db'}
 scenarios:
   - name: reaches two hosts and one file
     steps:
