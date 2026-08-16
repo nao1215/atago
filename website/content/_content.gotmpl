@@ -44,6 +44,22 @@
       "content" (dict "mediaType" "text/markdown" "value" $merged)) }}
 {{ end }}
 
+{{/* doc/errors.md -> /errors/ — the reference generated from the diagnostic
+     registry, so the published page cannot drift from the codes atago emits. */}}
+{{ with resources.Get "doc/errors.md" }}
+  {{ $md := .Content }}
+  {{ $md = replaceRE `\A# Error codes\n` "" $md }}
+  {{ $.AddPage (dict
+      "path" "errors"
+      "title" "Error codes"
+      "params" (dict
+        "seoTitle" "atago error codes — what each ATG code means and how to fix it"
+        "description" "Every error atago reports carries a searchable code. This is what each one means, what causes it, and what to change."
+        "toc" true
+        "filter" true)
+      "content" (dict "mediaType" "text/markdown" "value" $md)) }}
+{{ end }}
+
 {{/* doc/real-world.md -> /real-world/ (section index) */}}
 {{ with resources.Get "doc/real-world.md" }}
   {{ $md := .Content }}

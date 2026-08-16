@@ -95,8 +95,9 @@ dogfood-mimixbox: ## Full mimixbox applet e2e (builds + --full-installs applets;
 dogfood-mobilepkg: ## Full mobilepkg e2e (builds latest mobilepkg; set MOBILEPKG_REPO)
 	bash ./test/e2e/tools/mobilepkg/run.sh --parallel $(PARALLEL)
 
-docs: ## Regenerate the committed behavior docs under doc/e2e/ from the specs
+docs: ## Regenerate the committed behavior docs under doc/e2e/ and the error reference in doc/errors.md
 	env CGO_ENABLED=0 $(GO_BUILD) $(GO_LDFLAGS) -o ./dist/$(APP) .
+	env UPDATE_ERRORS=1 $(GO) test -run TestDocs_ErrorReferenceInSync .
 	./dist/$(APP) doc --out doc/e2e/atago.md      ./test/e2e/atago
 	./dist/$(APP) doc --out doc/e2e/actionlint.md  ./test/e2e/thirdparty/actionlint
 	./dist/$(APP) doc --out doc/e2e/aqua.md        ./test/e2e/thirdparty/aqua

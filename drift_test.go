@@ -12,10 +12,12 @@ import (
 	"testing"
 
 	"github.com/nao1215/atago/internal/cli"
+	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/docgen"
 	"github.com/nao1215/atago/internal/engine"
 	"github.com/nao1215/atago/internal/loader"
 	"github.com/nao1215/atago/internal/sitegen"
+	"github.com/nao1215/atago/internal/spec"
 )
 
 // This file holds the drift guards over committed generated artifacts: the
@@ -465,6 +467,117 @@ func TestSite_InSync(t *testing.T) {
 			t.Errorf("%s is out of date with the generator; regenerate with `make site`", name)
 		}
 	}
+}
+
+// TestDocs_ErrorReferenceInSync keeps the published error reference in lockstep
+// with the diagnostic registry that produces the codes. The registry is the
+// only place a code can be created, and this is what makes its documentation
+// arrive with it: a code added, reworded, or retired without regenerating the
+// page fails here. Regenerate with `make docs` (or `UPDATE_ERRORS=1 go test
+// -run TestDocs_ErrorReferenceInSync .`).
+func TestDocs_ErrorReferenceInSync(t *testing.T) {
+	const path = "doc/errors.md"
+	want := diag.Markdown()
+
+	if os.Getenv("UPDATE_ERRORS") == "1" {
+		if err := os.WriteFile(path, want, 0o600); err != nil {
+			t.Fatalf("write %s: %v", path, err)
+		}
+		return
+	}
+
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read %s: %v (run `make docs`)", path, err)
+	}
+	if !bytes.Equal(got, want) {
+		t.Errorf("%s is out of date with the diagnostic registry; regenerate with `make docs`", path)
+	}
+}
+
+// TestDocs_EveryCodeIsDocumented is the reader's side of the same guarantee:
+// whatever the generator does, the committed page has to name every code and
+// say what to do about it.
+func TestDocs_EveryCodeIsDocumented(t *testing.T) {
+	page := readDoc(t, "doc/errors.md")
+	for _, e := range diag.All() {
+		if !strings.Contains(page, e.Code.String()) {
+			t.Errorf("doc/errors.md does not mention %s (%s)", e.Code, e.Name)
+		}
+		if !strings.Contains(page, e.Fix) {
+			t.Errorf("doc/errors.md does not tell the reader how to fix %s (%s)", e.Code, e.Name)
+		}
+	}
+}
+
+// TestE2E_EveryCodeIsProvoked is the coverage gate over the diagnostic
+// registry: a published code must be produced by the real binary in a real
+// run, not merely written down. Registering a code therefore obliges you to
+// add the scenario that provokes it, in the same change.
+//
+// Documentation alone would let a code rot in place after the check that
+// raised it was deleted or reworded past the point of reaching it. The
+// scenarios live in test/e2e/atago/error_codes.atago.yaml; any spec in the
+// directory counts, so a code that already has a home elsewhere needs no
+// second one.
+func TestE2E_EveryCodeIsProvoked(t *testing.T) {
+	const dir = "test/e2e/atago"
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("read %s: %v", dir, err)
+	}
+	provoked := map[diag.Code]bool{}
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".yaml") && !strings.HasSuffix(e.Name(), ".yml") {
+			continue
+		}
+		path := filepath.Join(dir, e.Name())
+		s, lerr := loader.Load(path)
+		if lerr != nil {
+			t.Fatalf("load %s: %v", path, lerr)
+		}
+		// Only what a scenario ASSERTS counts. Scanning the file as text would
+		// let a scenario title or a comment mentioning a code satisfy the gate,
+		// which is the opposite of what it is for.
+		for _, text := range assertedText(s) {
+			for _, c := range diag.Codes(text) {
+				provoked[c] = true
+			}
+		}
+	}
+	for _, e := range diag.All() {
+		if !provoked[e.Code] {
+			t.Errorf("%s (%s) is a published code that no scenario in %s provokes; add one to error_codes.atago.yaml", e.Code, e.Name, dir)
+		}
+	}
+}
+
+// assertedText collects the strings a spec's stream assertions compare
+// against — the only place a diagnostic code can be claimed rather than merely
+// mentioned.
+func assertedText(s *spec.Spec) []string {
+	var out []string
+	collect := func(sa *spec.StreamAssert) {
+		if sa == nil {
+			return
+		}
+		out = append(out, []string(sa.Contains)...)
+		for _, p := range []*string{sa.Matches, sa.Equals} {
+			if p != nil {
+				out = append(out, *p)
+			}
+		}
+	}
+	for i := range s.Scenarios {
+		steps := append(append([]spec.Step{}, s.Scenarios[i].Steps...), s.Scenarios[i].Teardown...)
+		for j := range steps {
+			if a := steps[j].Assert; a != nil {
+				collect(a.Stdout)
+				collect(a.Stderr)
+			}
+		}
+	}
+	return out
 }
 
 var siteLinkRe = regexp.MustCompile(`\]\(([^)]+)\)`)

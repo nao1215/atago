@@ -348,6 +348,8 @@ atago manifest ./specs
 atago list ./specs
 ```
 
+Every error atago reports carries a code — `spec.yaml: ATG2201: suite.name is required` — whose first digit is the exit code, so `ATG2xxx` always exits 2. Codes are searchable and stable across rewordings of the message, and the [error reference](https://nao1215.github.io/atago/errors/) says what each one means and what to change. Assertion failures carry no code: exit 1 is a spec doing its job, not atago failing to do its own.
+
 Scenario names say what happens; an optional `description:` on the suite and on
 a scenario says why it matters. Both are prose for the reader of the generated
 Markdown — rendered under the matching heading, never expanded, and with no

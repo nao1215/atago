@@ -3,43 +3,44 @@ package loader
 import (
 	"fmt"
 
+	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/runner/db"
 	"github.com/nao1215/atago/internal/spec"
 )
 
 var validRunnerType = map[string]bool{"cmd": true, "http": true, "db": true, "ssh": true, "grpc": true, "browser": true}
 
-func validateRunners(add func(string, ...any), runners map[string]spec.Runner) {
+func validateRunners(add addFunc, runners map[string]spec.Runner) {
 	for name, r := range runners {
 		where := fmt.Sprintf("runner %q", name)
 		if r.Type == "" {
-			add("%s.type is required", where)
+			add(diag.RequiredKey, "%s.type is required", where)
 			continue
 		}
 		if !validRunnerType[r.Type] {
-			add("%s.type %q is invalid (want cmd, http, db, ssh, grpc, or browser)", where, r.Type)
+			add(diag.NotAllowedValue, "%s.type %q is invalid (want cmd, http, db, ssh, grpc, or browser)", where, r.Type)
 			continue
 		}
 		switch r.Type {
 		case "db":
 			if r.DSN == "" {
-				add("%s (db) requires a dsn", where)
+				add(diag.RequiredKey, "%s (db) requires a dsn", where)
 			}
 			// A declared driver is authoritative: reject an unsupported value here so
 			// a typo fails at load time instead of silently inferring from the dsn.
 			if err := db.ValidateDriver(r.Driver); err != nil {
-				add("%s: %v", where, err)
+				add(diag.ExclusiveKeys, "%s: %v", where, err)
 			}
 		case "ssh":
 			if r.Host == "" {
-				add("%s (ssh) requires a host", where)
+				add(diag.RequiredKey, "%s (ssh) requires a host", where)
 			}
 			if r.User == "" {
-				add("%s (ssh) requires a user", where)
+				add(diag.RequiredKey, "%s (ssh) requires a user", where)
 			}
 		case "grpc":
 			if r.Target == "" {
-				add("%s (grpc) requires a target", where)
+				add(diag.RequiredKey, "%s (grpc) requires a target", where)
 			}
 		case "browser":
 			// no required fields; a browser runner launches a local headless Chrome.
@@ -55,7 +56,7 @@ func validateRunners(add func(string, ...any), runners map[string]spec.Runner) {
 // cross-type fields (an http runner with ssh fields, a grpc runner with db
 // fields, ...) are rejected instead of silently accepted (#44). type/cwd/timeout
 // are common to every runner and intentionally absent here.
-func validateRunnerFields(add func(string, ...any), where string, r *spec.Runner) {
+func validateRunnerFields(add addFunc, where string, r *spec.Runner) {
 	type fieldOwner struct {
 		owner string
 		set   bool
@@ -79,7 +80,7 @@ func validateRunnerFields(add func(string, ...any), where string, r *spec.Runner
 	}
 	for _, f := range fields {
 		if f.set && f.owner != r.Type {
-			add("%s: %q cannot be set on a %s runner (it is a %s-runner field)", where, f.field, r.Type, f.owner)
+			add(diag.KeyNotHere, "%s: %q cannot be set on a %s runner (it is a %s-runner field)", where, f.field, r.Type, f.owner)
 		}
 	}
 }
