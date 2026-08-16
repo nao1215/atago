@@ -10,7 +10,7 @@ import (
 // buildScenario summarizes one (already matrix-expanded) scenario. Variable
 // references, generated artifacts, and security notes are collected across the
 // scenario's services and steps so tooling can see them without replaying the run.
-func buildScenario(sc *spec.Scenario, src SourceLocator) Scenario {
+func buildScenario(sc *spec.Scenario, src SourceLocator, runners map[string]spec.Runner) Scenario {
 	out := Scenario{
 		Name: sc.Name,
 		Tags: append([]string(nil), sc.Tags...),
@@ -55,7 +55,7 @@ func buildScenario(sc *spec.Scenario, src SourceLocator) Scenario {
 	// Generated artifacts and security notes come from the shared spec model, so
 	// the manifest and the human-facing explain/doc summaries never drift (#56).
 	out.Generates = spec.GeneratedArtifacts(sc)
-	out.Security = spec.SecurityNotes(sc)
+	out.Security = spec.SecurityNotes(sc, runners)
 	return out
 }
 

@@ -273,7 +273,7 @@ func buildSpec(in Input) Spec {
 	}
 	out.SuiteVariables = spec.SortedKeys(suiteVars)
 	for i := range s.Scenarios {
-		out.Scenarios = append(out.Scenarios, buildScenario(&s.Scenarios[i], in.Source))
+		out.Scenarios = append(out.Scenarios, buildScenario(&s.Scenarios[i], in.Source, s.Runners))
 	}
 	return out
 }
