@@ -13,10 +13,16 @@ import (
 // failures surface inline in the Actions UI. One `::error::` line per failed or
 // errored scenario, plus a final `::notice::` summary. Rendered by Render
 // (FormatGHA).
-func writeGHA(w io.Writer, results []*engine.SuiteResult, allowXPass bool) error {
+func writeGHA(w io.Writer, results []*engine.SuiteResult, allowXPass bool, loadFailures []LoadFailure) error {
 	var b strings.Builder
 	var agg engine.Counts
 	var total int
+	// A spec that never parsed produced no scenario to annotate, so annotate the
+	// file itself, as an error matching the non-zero exit.
+	for _, lf := range loadFailures {
+		fmt.Fprintf(&b, "::error title=%s::%s\n",
+			ghaEscapeProp(lf.SpecPath), ghaEscapeData("spec failed to load: "+oneLine(lf.Message)))
+	}
 	for _, res := range results {
 		for i := range res.Scenarios {
 			sc := &res.Scenarios[i]
@@ -80,8 +86,9 @@ func writeGHA(w io.Writer, results []*engine.SuiteResult, allowXPass bool) error
 		total += len(res.Scenarios)
 	}
 	fmt.Fprintf(&b, "::notice title=atago::%s\n", ghaEscapeData(fmt.Sprintf(
-		"%d scenarios: %d passed, %d failed, %d errored, %d skipped%s",
-		total, agg.Passed, agg.Failed, agg.Errored, agg.Skipped, flakySuffix(agg)+expectFailSuffix(agg))))
+		"%d scenarios: %d passed, %d failed, %d errored, %d skipped%s%s",
+		total, agg.Passed, agg.Failed, agg.Errored, agg.Skipped,
+		flakySuffix(agg)+expectFailSuffix(agg), loadFailureSuffix(len(loadFailures)))))
 	_, err := io.WriteString(w, b.String())
 	return err
 }

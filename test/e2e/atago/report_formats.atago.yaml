@@ -129,6 +129,90 @@ scenarios:
               - path: "$.suites[0].scenarios[0].status"
                 equals: "passed"
 
+  # A spec that never parsed runs no scenario, so it belongs to no suite result.
+  # Only the console summary used to hear about it, and every machine format
+  # rendered a green document for a run that exited 2.
+  - name: a spec that failed to load is named by every report format
+    steps:
+      - fixture:
+          file: good.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: good
+            scenarios:
+              - name: passes
+                steps:
+                  - run: {shell: true, command: "exit 0"}
+                  - assert: {exit_code: 0}
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: broken}
+            scenarios: [ this is not a scenario
+      - run:
+          command: ${atago} run --report json .
+      - assert:
+          exit_code: 2
+          stdout:
+            json:
+              - path: "$.load_failures[0].spec_path"
+                equals: "bad.atago.yaml"
+              - path: "$.suites[0].status"
+                equals: "passed"
+      - run:
+          command: ${atago} run --report junit .
+      - assert:
+          exit_code: 2
+          stdout:
+            contains:
+              - 'errors="1"'
+              - "bad.atago.yaml"
+      - run:
+          command: ${atago} run --report tap .
+      - assert:
+          exit_code: 2
+          stdout:
+            contains:
+              - "1..2"
+              - "not ok 1 - bad.atago.yaml"
+      - run:
+          command: ${atago} run --report gha .
+      - assert:
+          exit_code: 2
+          stdout:
+            contains:
+              - "::error title=bad.atago.yaml"
+              - "1 spec failed to load"
+
+  # Every spec failing to load used to write no document at all, leaving a machine
+  # consumer with empty output where it expected a result.
+  - name: a run whose specs all failed to load still reports them
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: broken}
+            scenarios: [ this is not a scenario
+      - run:
+          command: ${atago} run --report json .
+      - assert:
+          exit_code: 2
+          stdout:
+            json:
+              - path: "$.load_failures[0].spec_path"
+                equals: "bad.atago.yaml"
+      - run:
+          command: ${atago} run --report tap .
+      - assert:
+          exit_code: 2
+          stdout:
+            contains:
+              - "1..1"
+              - "not ok 1 - bad.atago.yaml"
+
   - name: an errored step is counted as an error, not a failure, across formats
     steps:
       - fixture:

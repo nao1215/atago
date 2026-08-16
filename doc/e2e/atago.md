@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-81 suites · 610 scenarios
+81 suites · 612 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -499,13 +499,15 @@
   - [a recorded secret placeholder replays green with the env set and is guarded when unset](#scenario-a-recorded-secret-placeholder-replays-green-with-the-env-set-and-is-guarded-when-unset)
   - [a raw-mode (TUI) keystroke is recorded literally, not as a secret](#scenario-a-raw-mode-tui-keystroke-is-recorded-literally-not-as-a-secret)
   - [record --pty of a never-exiting program times out instead of hanging](#scenario-record---pty-of-a-never-exiting-program-times-out-instead-of-hanging)
-- [atago self-hosting / report formats agree on outcomes](#atago-self-hosting--report-formats-agree-on-outcomes) — 7 scenarios
+- [atago self-hosting / report formats agree on outcomes](#atago-self-hosting--report-formats-agree-on-outcomes) — 9 scenarios
   - [json report carries per-scenario verdicts and a failures array](#scenario-json-report-carries-per-scenario-verdicts-and-a-failures-array)
   - [junit report tallies tests, failures, skipped, and errors](#scenario-junit-report-tallies-tests-failures-skipped-and-errors)
   - [tap report emits the plan, a not ok line, and a SKIP directive](#scenario-tap-report-emits-the-plan-a-not-ok-line-and-a-skip-directive)
   - [gha report annotates the failure and summarizes the counts](#scenario-gha-report-annotates-the-failure-and-summarizes-the-counts)
   - [console report prints the same counts in its summary line](#scenario-console-report-prints-the-same-counts-in-its-summary-line)
   - [an all-passing run reports a zero-failure suite and exits zero](#scenario-an-all-passing-run-reports-a-zero-failure-suite-and-exits-zero)
+  - [a spec that failed to load is named by every report format](#scenario-a-spec-that-failed-to-load-is-named-by-every-report-format)
+  - [a run whose specs all failed to load still reports them](#scenario-a-run-whose-specs-all-failed-to-load-still-reports-them)
   - [an errored step is counted as an error, not a failure, across formats](#scenario-an-errored-step-is-counted-as-an-error-not-a-failure-across-formats)
 - [atago self-hosting / reports](#atago-self-hosting--reports) — 10 scenarios
   - [JUnit report is XML with a testsuite and testcase](#scenario-junit-report-is-xml-with-a-testsuite-and-testcase)
@@ -9680,6 +9682,70 @@ ${atago} run --ci --report json allpass.atago.yaml
 #### Then
 - exit code is `0`
 - stdout at `$.suites[0].status` equals `passed`; at `$.suites[0].scenarios[0].status` equals `passed`
+### Scenario: a spec that failed to load is named by every report format
+#### Given
+- Fixture file `good.atago.yaml` is created.
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `good.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: good
+scenarios:
+  - name: passes
+    steps:
+      - run: {shell: true, command: "exit 0"}
+      - assert: {exit_code: 0}
+```
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: broken}
+scenarios: [ this is not a scenario
+```
+#### When
+```shell
+${atago} run --report json .
+${atago} run --report junit .
+${atago} run --report tap .
+${atago} run --report gha .
+```
+#### Then
+- after `${atago} run --report json .`:
+  - exit code is `2`
+  - stdout at `$.load_failures[0].spec_path` equals `bad.atago.yaml`; at `$.suites[0].status` equals `passed`
+- after `${atago} run --report junit .`:
+  - exit code is `2`
+  - stdout contains `errors="1"`, `bad.atago.yaml`
+- after `${atago} run --report tap .`:
+  - exit code is `2`
+  - stdout contains `1..2`, `not ok 1 - bad.atago.yaml`
+- after `${atago} run --report gha .`:
+  - exit code is `2`
+  - stdout contains `::error title=bad.atago.yaml`, `1 spec failed to load`
+### Scenario: a run whose specs all failed to load still reports them
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: broken}
+scenarios: [ this is not a scenario
+```
+#### When
+```shell
+${atago} run --report json .
+${atago} run --report tap .
+```
+#### Then
+- after `${atago} run --report json .`:
+  - exit code is `2`
+  - stdout at `$.load_failures[0].spec_path` equals `bad.atago.yaml`
+- after `${atago} run --report tap .`:
+  - exit code is `2`
+  - stdout contains `1..1`, `not ok 1 - bad.atago.yaml`
 ### Scenario: an errored step is counted as an error, not a failure, across formats
 #### Given
 - Fixture file `errored.atago.yaml` is created.
