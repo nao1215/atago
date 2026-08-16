@@ -108,7 +108,7 @@ func TestRender_Console_LoadFailures(t *testing.T) {
 	t.Run("mixed valid+invalid reads FAILED and counts the drop", func(t *testing.T) {
 		t.Parallel()
 		var b bytes.Buffer
-		if err := Render(&b, FormatConsole, allPassingResults(), WithLoadFailures(1)); err != nil {
+		if err := Render(&b, FormatConsole, allPassingResults(), WithLoadFailures(LoadFailure{SpecPath: "bad.atago.yaml", Message: "unreadable"})); err != nil {
 			t.Fatal(err)
 		}
 		out := b.String()
@@ -126,7 +126,11 @@ func TestRender_Console_LoadFailures(t *testing.T) {
 	t.Run("plural spec count", func(t *testing.T) {
 		t.Parallel()
 		var b bytes.Buffer
-		if err := Render(&b, FormatConsole, allPassingResults(), WithLoadFailures(3)); err != nil {
+		if err := Render(&b, FormatConsole, allPassingResults(), WithLoadFailures(
+			LoadFailure{SpecPath: "a.atago.yaml", Message: "unreadable"},
+			LoadFailure{SpecPath: "b.atago.yaml", Message: "unreadable"},
+			LoadFailure{SpecPath: "c.atago.yaml", Message: "unreadable"},
+		)); err != nil {
 			t.Fatal(err)
 		}
 		if out := b.String(); !strings.Contains(out, "3 specs failed to load") {

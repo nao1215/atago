@@ -36,16 +36,7 @@ func writeSummary(b *strings.Builder, color bool, c engine.Counts, total int, d 
 	if total == 1 {
 		plural = "scenario"
 	}
-	// Spec-load failures are not scenarios, so they get their own count in the
-	// tally line — otherwise the totals silently omit the dropped files (#120).
-	loadFail := ""
-	if loadFailures > 0 {
-		specPlural := "specs"
-		if loadFailures == 1 {
-			specPlural = "spec"
-		}
-		loadFail = fmt.Sprintf(", %d %s failed to load", loadFailures, specPlural)
-	}
+	loadFail := loadFailureSuffix(loadFailures)
 	fmt.Fprintf(b, "\n%s  %d %s: %d passed, %d failed, %d errored, %d skipped%s%s (%s)\n",
 		colorize(color, code+cBold, status), total, plural,
 		c.Passed, c.Failed, c.Errored, c.Skipped, flakySuffix(c)+expectFailSuffix(c), loadFail, d.Round(time.Millisecond))

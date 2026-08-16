@@ -20,6 +20,16 @@ const jsonSchemaVersion = "1"
 type jsonDocument struct {
 	SchemaVersion string       `json:"schema_version"`
 	Suites        []jsonReport `json:"suites"`
+	// LoadFailures are the spec files the run could not read (#120). They ran no
+	// scenario, so they appear in no suite above. Omitted when there are none, so
+	// an ordinary run's document is unchanged.
+	LoadFailures []jsonLoadFailure `json:"load_failures,omitempty"`
+}
+
+// jsonLoadFailure names one unreadable spec and why it could not be read.
+type jsonLoadFailure struct {
+	SpecPath string `json:"spec_path"`
+	Error    string `json:"error"`
 }
 
 // A machine-readable report carrying enough failure context

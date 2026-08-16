@@ -63,8 +63,22 @@ type junitSkipped struct {
 	Message string `xml:"message,attr"`
 }
 
-func buildJUnit(results []*engine.SuiteResult, allowXPass bool) junitTestsuites {
+func buildJUnit(results []*engine.SuiteResult, allowXPass bool, loadFailures []LoadFailure) junitTestsuites {
 	root := junitTestsuites{}
+	// A spec that never parsed belongs to no suite, so it gets one of its own
+	// carrying a single errored testcase — the shape a collection error takes in
+	// every other tool that produces JUnit XML.
+	for _, lf := range loadFailures {
+		root.Suites = append(root.Suites, junitTestsuite{
+			Name: lf.SpecPath, Tests: 1, Errors: 1,
+			Testcases: []junitTestcase{{
+				Name:  "load",
+				Error: &junitMessage{Message: "spec failed to load", Body: lf.Message},
+			}},
+		})
+		root.Tests++
+		root.Errors++
+	}
 	for _, res := range results {
 		ts := junitTestsuite{Name: res.Suite, Time: junitSeconds(res.Duration.Seconds())}
 		for i := range res.Scenarios {

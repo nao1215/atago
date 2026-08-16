@@ -13,9 +13,9 @@ import (
 // `ok`/`not ok` line per scenario across every suite, numbered from 1; failures
 // and errors carry a YAML diagnostic block, and skips use the `# SKIP` directive.
 // Rendered by Render (FormatTAP).
-func writeTAP(w io.Writer, results []*engine.SuiteResult) error {
+func writeTAP(w io.Writer, results []*engine.SuiteResult, loadFailures []LoadFailure) error {
 	var b strings.Builder
-	total := 0
+	total := len(loadFailures)
 	for _, res := range results {
 		total += len(res.Scenarios)
 		// A suite that errored before any scenario ran (#7) still contributes a
@@ -28,6 +28,13 @@ func writeTAP(w io.Writer, results []*engine.SuiteResult) error {
 	fmt.Fprintf(&b, "1..%d\n", total)
 
 	n := 0
+	// The unreadable specs lead the stream: they are what the run could not even
+	// begin.
+	for _, lf := range loadFailures {
+		n++
+		fmt.Fprintf(&b, "not ok %d - %s\n", n, tapInline(lf.SpecPath))
+		writeTAPDiagnostic(&b, "spec failed to load", lf.Message)
+	}
 	for _, res := range results {
 		for i := range res.Scenarios {
 			sc := &res.Scenarios[i]
