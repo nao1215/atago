@@ -191,6 +191,57 @@ scenarios:
 	}
 }
 
+// TestEngine_CwdPrecedence pins the documented step > runner > defaults.run
+// order for cwd (#498): a runner names a directory more specifically than a
+// suite-wide default does, so the runner's cwd must beat defaults.run.cwd
+// instead of being erased by it.
+func TestEngine_CwdPrecedence(t *testing.T) {
+	t.Parallel()
+	res := runSpec(t, `
+version: "1"
+suite:
+  name: s
+defaults:
+  run: {shell: true, cwd: from-defaults}
+runners:
+  located:
+    type: cmd
+    cwd: from-runner
+  bare:
+    type: cmd
+scenarios:
+  - name: runner cwd beats defaults.run.cwd
+    steps:
+      - fixture: {file: from-defaults/who.txt, content: defaults}
+      - fixture: {file: from-runner/who.txt, content: runner}
+      - fixture: {file: from-step/who.txt, content: step}
+      - run: {runner: located, command: `+catCmd()+` who.txt}
+      - assert: {exit_code: 0, stdout: {contains: runner}}
+  - name: step cwd beats both
+    steps:
+      - fixture: {file: from-defaults/who.txt, content: defaults}
+      - fixture: {file: from-runner/who.txt, content: runner}
+      - fixture: {file: from-step/who.txt, content: step}
+      - run: {runner: located, cwd: from-step, command: `+catCmd()+` who.txt}
+      - assert: {exit_code: 0, stdout: {contains: step}}
+  - name: defaults apply when no runner names a cwd
+    steps:
+      - fixture: {file: from-defaults/who.txt, content: defaults}
+      - fixture: {file: from-runner/who.txt, content: runner}
+      - run: {command: `+catCmd()+` who.txt}
+      - assert: {exit_code: 0, stdout: {contains: defaults}}
+  - name: defaults apply when the named runner declares no cwd
+    steps:
+      - fixture: {file: from-defaults/who.txt, content: defaults}
+      - fixture: {file: from-runner/who.txt, content: runner}
+      - run: {runner: bare, command: `+catCmd()+` who.txt}
+      - assert: {exit_code: 0, stdout: {contains: defaults}}
+`)
+	if res.Status != StatusPassed {
+		t.Fatalf("status = %s, want passed: %+v", res.Status, res.Scenarios)
+	}
+}
+
 // TestEngine_EnvInterpolation proves ${env:NAME} resolves from the host
 // environment (t.Setenv forbids t.Parallel): a set variable flows into a
 // command, and an unset one on a shell-less run errors naming the variable

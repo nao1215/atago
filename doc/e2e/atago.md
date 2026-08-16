@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-81 suites · 623 scenarios
+81 suites · 624 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -87,13 +87,14 @@
   - [a query against an undeclared runner fails validation (exit 2)](#scenario-a-query-against-an-undeclared-runner-fails-validation-exit-2)
   - [a hostaddr dsn is held to the network policy (exit 6)](#scenario-a-hostaddr-dsn-is-held-to-the-network-policy-exit-6)
   - [a quoted host is compared to the allowlist without its quotes](#scenario-a-quoted-host-is-compared-to-the-allowlist-without-its-quotes)
-- [atago self-hosting / top-level defaults](#atago-self-hosting--top-level-defaults) — 9 scenarios
+- [atago self-hosting / top-level defaults](#atago-self-hosting--top-level-defaults) — 10 scenarios
   - [defaults.run.shell applies to every run step without repeating it](#scenario-defaultsrunshell-applies-to-every-run-step-without-repeating-it)
   - [defaults.scenario.env is merged and an explicit scenario env wins](#scenario-defaultsscenarioenv-is-merged-and-an-explicit-scenario-env-wins)
   - [defaults.run.sandbox_home governs a run step and a pty step alike (POSIX)](#scenario-defaultsrunsandbox_home-governs-a-run-step-and-a-pty-step-alike-posix)
   - [an unsupported defaults field is a load-time error (exit 2)](#scenario-an-unsupported-defaults-field-is-a-load-time-error-exit-2)
   - [defaults.run.env merges per key and a step env wins the collisions](#scenario-defaultsrunenv-merges-per-key-and-a-step-env-wins-the-collisions)
   - [a step opts out of defaults.run.shell with an explicit shell false](#scenario-a-step-opts-out-of-defaultsrunshell-with-an-explicit-shell-false)
+  - [a runner's cwd beats defaults.run.cwd](#scenario-a-runners-cwd-beats-defaultsruncwd)
   - [defaults.scenario.only gates every scenario that states no gate](#scenario-defaultsscenarioonly-gates-every-scenario-that-states-no-gate)
   - [a scenario's own gate replaces the default rather than combining](#scenario-a-scenarios-own-gate-replaces-the-default-rather-than-combining)
   - [defaults.scenario.skip excludes every scenario that states no skip](#scenario-defaultsscenarioskip-excludes-every-scenario-that-states-no-skip)
@@ -2382,6 +2383,41 @@ ${atago} run optout.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `PASSED`
+### Scenario: a runner's cwd beats defaults.run.cwd
+#### Given
+- Fixture file `cwd.atago.yaml` is created.
+#### Inputs
+_Fixture `cwd.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: cwdprec
+defaults:
+  run:
+    shell: true
+    cwd: from-defaults
+runners:
+  located:
+    type: cmd
+    cwd: from-runner
+scenarios:
+  - name: the step lands in the runner's directory
+    steps:
+      - fixture: {file: from-defaults/keep, content: keep}
+      - fixture: {file: from-runner/keep, content: keep}
+      - run: {runner: located, command: "echo here > made.txt"}
+      - assert: {exit_code: 0}
+      - assert: {file: {path: from-runner/made.txt, exists: true}}
+      - assert: {file: {path: from-defaults/made.txt, exists: false}}
+… (truncated, 14 more lines)
+```
+#### When
+```shell
+${atago} run cwd.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout contains `3 passed`
 ### Scenario: defaults.scenario.only gates every scenario that states no gate
 #### Given
 - Fixture file `gated.atago.yaml` is created.
