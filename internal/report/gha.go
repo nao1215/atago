@@ -20,8 +20,11 @@ func writeGHA(w io.Writer, results []*engine.SuiteResult, allowXPass bool, loadF
 	// A spec that never parsed produced no scenario to annotate, so annotate the
 	// file itself, as an error matching the non-zero exit.
 	for _, lf := range loadFailures {
-		fmt.Fprintf(&b, "::error title=%s::%s\n",
-			ghaEscapeProp(lf.SpecPath), ghaEscapeData("spec failed to load: "+oneLine(lf.Message)))
+		// The one annotation that has a file to point at: `file=` puts it on the
+		// spec in the Actions UI, where a scenario failure has only a title.
+		fmt.Fprintf(&b, "::error file=%s,title=%s::%s\n",
+			ghaEscapeProp(lf.SpecPath), ghaEscapeProp(lf.SpecPath),
+			ghaEscapeData("spec failed to load: "+oneLine(lf.Message)))
 	}
 	for _, res := range results {
 		for i := range res.Scenarios {

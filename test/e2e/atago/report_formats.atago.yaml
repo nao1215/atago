@@ -183,7 +183,7 @@ scenarios:
           exit_code: 2
           stdout:
             contains:
-              - "::error title=bad.atago.yaml"
+              - "::error file=bad.atago.yaml,title=bad.atago.yaml"
               - "1 spec failed to load"
 
   # Every spec failing to load used to write no document at all, leaving a machine

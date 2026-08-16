@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -195,7 +196,9 @@ func Render(w io.Writer, f Format, results []*engine.SuiteResult, opts ...Option
 			doc.Suites = append(doc.Suites, buildJSON(res, o.allowXPass))
 		}
 		for _, lf := range o.loadFailures {
-			doc.LoadFailures = append(doc.LoadFailures, jsonLoadFailure{SpecPath: lf.SpecPath, Error: lf.Message})
+			// Forward slashes, like every other spec_path in the document: two
+			// fields naming files must not disagree about the separator on Windows.
+			doc.LoadFailures = append(doc.LoadFailures, jsonLoadFailure{SpecPath: filepath.ToSlash(lf.SpecPath), Error: lf.Message})
 		}
 		enc := json.NewEncoder(w)
 		enc.SetIndent("", "  ")

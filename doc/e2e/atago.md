@@ -9723,7 +9723,7 @@ ${atago} run --report gha .
   - stdout contains `1..2`, `not ok 1 - bad.atago.yaml`
 - after `${atago} run --report gha .`:
   - exit code is `2`
-  - stdout contains `::error title=bad.atago.yaml`, `1 spec failed to load`
+  - stdout contains `::error file=bad.atago.yaml,title=bad.atago.yaml`, `1 spec failed to load`
 ### Scenario: a run whose specs all failed to load still reports them
 #### Given
 - Fixture file `bad.atago.yaml` is created.
