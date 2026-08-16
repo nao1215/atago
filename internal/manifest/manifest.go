@@ -266,10 +266,10 @@ func buildSpec(in Input) Spec {
 	}
 	suiteVars := map[string]bool{}
 	for i := range s.Suite.Setup {
-		out.SuiteSetup = append(out.SuiteSetup, buildStep(i, &s.Suite.Setup[i], suiteVars))
+		out.SuiteSetup = append(out.SuiteSetup, buildStep(i, &s.Suite.Setup[i], suiteVars, s.Runners))
 	}
 	for i := range s.Suite.Teardown {
-		out.SuiteTeardown = append(out.SuiteTeardown, buildStep(i, &s.Suite.Teardown[i], suiteVars))
+		out.SuiteTeardown = append(out.SuiteTeardown, buildStep(i, &s.Suite.Teardown[i], suiteVars, s.Runners))
 	}
 	out.SuiteVariables = spec.SortedKeys(suiteVars)
 	for i := range s.Scenarios {
