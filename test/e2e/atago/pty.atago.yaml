@@ -472,6 +472,32 @@ scenarios:
           stdout:
             contains: loading
 
+  # A known limitation of the terminal emulator atago renders `screen:` with,
+  # kept in CI rather than in a comment nobody re-checks: once a wide character
+  # has filled the last column, autowrap is not armed, so `X` overwrites the
+  # second half of `本` instead of landing on the next line. A terminal shows
+  # `日本` and then `X` on row 2. The day the emulator learns to wrap, this turns
+  # XPASS and the run goes red, which is what gets the limitation retired.
+  - name: a wide character at the right margin does not autowrap yet
+    skip:
+      os: windows
+    expect_fail:
+      reason: "the emulator drops or clobbers a character that must autowrap after a wide one fills the last column"
+    steps:
+      - pty:
+          shell: true
+          command: "printf '日本X'; sleep 0.2"
+          rows: 5
+          cols: 4
+      - assert:
+          screen:
+            line: 1
+            equals: "日本"
+      - assert:
+          screen:
+            line: 2
+            equals: "X"
+
   - name: a screen snapshot round-trips through update and compare
     skip:
       os: windows
