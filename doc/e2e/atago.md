@@ -9402,7 +9402,6 @@ ${atago} run silent.atago.yaml
 #### Then
 - exit code is `0`
 - file `silent.atago.yaml` does not contain `- expect:`
-- file `silent.atago.yaml` contains `no expect before`
 - exit code is `0`
 - stdout contains `1 passed`
 ### Scenario: record --pty of a no-input command yields a session-less spec that replays green

@@ -247,19 +247,21 @@ scenarios:
                 contains: "x"
                 stable_for: 40ms
             - send: "y\n"
-            - expect: "2 send"
+            # The recorder's closing line, which does not name a send count:
+            # waiting on the count would race the same coalescing.
+            - expect: "wrote silent.atago.yaml"
       - assert:
           exit_code: 0
+      # No expect at all, whether the recorder saw the two lines as one input
+      # burst or two: it coalesces consecutive input, and which it captured
+      # depends on when its reader goroutine ran. The header warning that names
+      # an anchorless send therefore appears only in the two-burst case, and is
+      # pinned by a unit test instead of by this race.
       - assert:
           file:
             path: silent.atago.yaml
             not_contains:
               - "- expect:"
-      - assert:
-          file:
-            path: silent.atago.yaml
-            contains:
-              - "no expect before"
       # The round-trip: replaying the generated spec passes.
       - run:
           command: ${atago} run silent.atago.yaml
