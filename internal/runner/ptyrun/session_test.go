@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"syscall"
@@ -609,4 +610,93 @@ func TestDriveSession_MouseRequiresTracking(t *testing.T) {
 			t.Errorf("terminal received %q, want %q", got, want)
 		}
 	})
+}
+
+// TestSessionDriver_EchoIsNotAMatch covers the rule that keeps an expect
+// honest: a match that lies entirely inside the terminal's echo of a preceding
+// send is the scenario reading back its own keystrokes, not the program
+// answering, so it does not count. The program's own copy of the same text
+// does, which is what keeps a `cat`-shaped session working — the line
+// discipline echoes the line and the program prints it again.
+func TestSessionDriver_EchoIsNotAMatch(t *testing.T) {
+	t.Parallel()
+	tests := map[string]struct {
+		sentAt     int    // transcript length when the send happened
+		sent       string // bytes the send transmitted
+		transcript string // what the terminal produced, in full
+		scanFrom   int    // where this expect starts scanning
+		pattern    string // the expect
+		wantMatch  bool   // whether a real (non-echo) match exists
+	}{
+		"only the echo is present": {
+			sentAt: 7, sent: "ABC\n", transcript: "ready\r\nABC\r\n",
+			scanFrom: 7, pattern: "ABC", wantMatch: false,
+		},
+		"the program repeated the line": {
+			sentAt: 0, sent: "ABC\n", transcript: "ABC\r\nABC\r\n",
+			scanFrom: 0, pattern: "ABC", wantMatch: true,
+		},
+		"the program answered something else": {
+			sentAt: 0, sent: "name\n", transcript: "name\r\nhello-name\r\n",
+			scanFrom: 0, pattern: "hello-", wantMatch: true,
+		},
+		"echo has not arrived yet": {
+			sentAt: 0, sent: "ABC\n", transcript: "",
+			scanFrom: 0, pattern: "ABC", wantMatch: false,
+		},
+		"echo is off, so the text is the program's": {
+			// Nothing in the transcript equals the echo, so no span resolves
+			// and the match stands.
+			sentAt: 0, sent: "secret\n", transcript: "Password: ****\r\n",
+			scanFrom: 0, pattern: `\*\*\*\*`, wantMatch: true,
+		},
+		"a longer match spanning past the echo counts": {
+			sentAt: 0, sent: "AB\n", transcript: "AB\r\nCD\r\n",
+			scanFrom: 0, pattern: `AB\r\nCD`, wantMatch: true,
+		},
+		"an identical earlier line is not the echo": {
+			// The echo is looked for at or after the send, so the earlier
+			// occurrence is the program's and matches.
+			sentAt: 5, sent: "ABC\n", transcript: "ABC\r\nABC\r\n",
+			scanFrom: 0, pattern: "ABC", wantMatch: true,
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			d := &sessionDriver{
+				echoes: []echoSpan{{searchFrom: tt.sentAt, echo: echoOf([]byte(tt.sent)), at: -1}},
+			}
+			transcript := []byte(tt.transcript)
+			d.locateEchoes(transcript)
+			re := regexp.MustCompile(tt.pattern)
+			got := d.findReal(re, transcript[tt.scanFrom:], tt.scanFrom) != nil
+			if got != tt.wantMatch {
+				t.Errorf("match = %v, want %v (transcript %q, echo span %+v)", got, tt.wantMatch, tt.transcript, d.echoes[0])
+			}
+		})
+	}
+}
+
+// TestEchoOf pins the one translation the line discipline performs on the way
+// out: ONLCR renders each LF as CRLF, so the bytes a send transmitted are not
+// byte-for-byte what comes back.
+func TestEchoOf(t *testing.T) {
+	t.Parallel()
+	tests := map[string]struct{ sent, want string }{
+		"no newline":       {sent: "abc", want: "abc"},
+		"one newline":      {sent: "abc\n", want: "abc\r\n"},
+		"several newlines": {sent: "a\nb\n", want: "a\r\nb\r\n"},
+		"already crlf":     {sent: "a\r\n", want: "a\r\r\n"},
+		"empty":            {sent: "", want: ""},
+		"control byte":     {sent: "\x01", want: "\x01"},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			if got := string(echoOf([]byte(tt.sent))); got != tt.want {
+				t.Errorf("echoOf(%q) = %q, want %q", tt.sent, got, tt.want)
+			}
+		})
+	}
 }

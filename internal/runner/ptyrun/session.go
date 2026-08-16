@@ -1,6 +1,7 @@
 package ptyrun
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -151,6 +152,95 @@ type sessionDriver struct {
 	// (any shell prompt) waits for its NEXT occurrence instead of matching the
 	// stale earlier one.
 	matchOffset int
+	// echoes records what each send since the last match transmitted, so an
+	// expect can tell the terminal's echo of its own keystrokes apart from the
+	// program's answer.
+	echoes []echoSpan
+}
+
+// echoSpan is one send's echo: the bytes the terminal would write back, and
+// where in the transcript to start looking for them.
+type echoSpan struct {
+	// searchFrom is the transcript length at the moment of the send, so the
+	// echo is looked for at or after it and an identical earlier line cannot be
+	// mistaken for it.
+	searchFrom int
+	// echo is what the line discipline writes back: the sent bytes with each LF
+	// rendered as CRLF, which is what ONLCR does on the way out.
+	echo []byte
+	// at is where the echo was found, or -1 while it has not been.
+	at int
+}
+
+// echoOf is what a terminal writes back when its line discipline echoes the
+// bytes a send transmitted.
+func echoOf(sent []byte) []byte {
+	return bytes.ReplaceAll(sent, []byte("\n"), []byte("\r\n"))
+}
+
+// locateEchoes resolves where each pending send was echoed, given the
+// transcript so far. A span whose echo has not appeared stays unresolved and is
+// retried on the next poll; one that never appears simply never matches, which
+// is what happens when the mode is off (a password prompt, a raw-mode TUI) or
+// when the terminal renders it differently (ECHOCTL writes a control byte as
+// ^A).
+func (d *sessionDriver) locateEchoes(transcript []byte) {
+	for i := range d.echoes {
+		e := &d.echoes[i]
+		if e.at >= 0 || len(e.echo) == 0 || e.searchFrom > len(transcript) {
+			continue
+		}
+		if k := bytes.Index(transcript[e.searchFrom:], e.echo); k >= 0 {
+			e.at = e.searchFrom + k
+		}
+	}
+}
+
+// isEcho reports whether the transcript range [from,to) lies entirely inside
+// the echo of a send this expect has not yet passed.
+//
+// An expect that matches only its own keystrokes has asserted that atago can
+// type, not that the program answered: it passes whether the program is
+// listening, busy, or already dead. atago refuses assertions that cannot fail
+// while loading a spec (ATG2312), and this is the same defect one layer down,
+// reached by the natural way to drive a prompt — send a line, expect a
+// substring of it. The terminal is not lying, since with ECHO on typed input
+// does appear; it is the assertion that means nothing.
+//
+// Only a match wholly inside the echo is rejected. A program that repeats the
+// input itself keeps its copy: cat both echoes through the line discipline and
+// prints the line, and the printed one falls outside the echo span.
+func (d *sessionDriver) isEcho(from, to int) bool {
+	for _, e := range d.echoes {
+		if e.at < 0 {
+			continue
+		}
+		if from >= e.at && to <= e.at+len(e.echo) {
+			return true
+		}
+	}
+	return false
+}
+
+// findReal returns the first match in tail that is not a send's echo, as an
+// offset pair relative to tail, or nil when there is none yet. base is tail's
+// own offset in the transcript, since the echo spans are absolute.
+func (d *sessionDriver) findReal(re *regexp.Regexp, tail []byte, base int) []int {
+	for at := 0; at <= len(tail); {
+		loc := re.FindIndex(tail[at:])
+		if loc == nil {
+			return nil
+		}
+		from, to := at+loc[0], at+loc[1]
+		if !d.isEcho(base+from, base+to) {
+			return []int{from, to}
+		}
+		// Step past this occurrence and keep looking: the program's own copy
+		// may follow the echo. Advancing by one keeps an empty match from
+		// spinning.
+		at = from + 1
+	}
+	return nil
 }
 
 // finish shapes the session's Result after the child has been reaped.
@@ -245,9 +335,10 @@ func (d *sessionDriver) waitExpect(ctx context.Context, re *regexp.Regexp, patte
 	scannedTo := -1 // transcript length at the last scan; -1 forces one
 	for {
 		if n := d.term.curLen(); n != scannedTo {
+			d.locateEchoes(d.term.snapshot())
 			tail, m := d.term.tailFrom(d.matchOffset)
 			scannedTo = m
-			if loc := re.FindIndex(tail); loc != nil {
+			if loc := d.findReal(re, tail, d.matchOffset); loc != nil {
 				d.matchOffset += loc[1]
 				matched = true
 				break
@@ -257,8 +348,9 @@ func (d *sessionDriver) waitExpect(ctx context.Context, re *regexp.Regexp, patte
 		case <-ctx.Done():
 			// One last check: bytes may have landed in the final poll
 			// window before the deadline fired.
+			d.locateEchoes(d.term.snapshot())
 			tail, _ := d.term.tailFrom(d.matchOffset)
-			if loc := re.FindIndex(tail); loc != nil {
+			if loc := d.findReal(re, tail, d.matchOffset); loc != nil {
 				d.matchOffset += loc[1]
 				matched = true
 			}
@@ -419,9 +511,11 @@ func (d *sessionDriver) send(i int, s *spec.PTYSend) *sessionOutcome {
 	// Bytes resolves named keys to their xterm sequences, wraps a paste
 	// in its markers, and keeps the historical rule that an empty
 	// verbatim send transmits EOF (^D).
-	if _, werr := d.term.write(s.Bytes()); werr != nil {
+	sent := s.Bytes()
+	if _, werr := d.term.write(sent); werr != nil {
 		return d.failHard(diag.PTYFailed.Errorf("pty: send: %w", werr))
 	}
+	d.echoes = append(d.echoes, echoSpan{searchFrom: d.term.curLen(), echo: echoOf(sent), at: -1})
 	return nil
 }
 

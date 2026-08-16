@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-81 suites · 602 scenarios
+81 suites · 604 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -451,7 +451,7 @@
   - [explain names the manifest that applied](#scenario-explain-names-the-manifest-that-applied)
   - [a manifest pointing at a missing fixtures dir fails to load](#scenario-a-manifest-pointing-at-a-missing-fixtures-dir-fails-to-load)
   - [an unknown manifest key is rejected](#scenario-an-unknown-manifest-key-is-rejected)
-- [atago self-hosting / pty](#atago-self-hosting--pty) — 14 scenarios
+- [atago self-hosting / pty](#atago-self-hosting--pty) — 16 scenarios
   - [a pty step sees a terminal where a run step sees a pipe](#scenario-a-pty-step-sees-a-terminal-where-a-run-step-sees-a-pipe)
   - [a never-matching expect fails with the pattern in the block](#scenario-a-never-matching-expect-fails-with-the-pattern-in-the-block)
   - [named keys transmit their documented bytes and ctrl-c aborts](#scenario-named-keys-transmit-their-documented-bytes-and-ctrl-c-aborts)
@@ -466,6 +466,8 @@
   - [a screen snapshot round-trips through update and compare](#scenario-a-screen-snapshot-round-trips-through-update-and-compare)
   - [a screen assert without a pty step is a load-time error](#scenario-a-screen-assert-without-a-pty-step-is-a-load-time-error)
   - [a send referencing an undefined variable is an execution error, not typed literally](#scenario-a-send-referencing-an-undefined-variable-is-an-execution-error-not-typed-literally)
+  - [an expect does not match the echo of its own send](#scenario-an-expect-does-not-match-the-echo-of-its-own-send)
+  - [a program's own copy of the input still satisfies an expect](#scenario-a-programs-own-copy-of-the-input-still-satisfies-an-expect)
 - [atago self-hosting / pty (portable)](#atago-self-hosting--pty-portable) — 9 scenarios
   - [a pty step starts a command, captures its output, and reports exit 0](#scenario-a-pty-step-starts-a-command-captures-its-output-and-reports-exit-0)
   - [a pty step surfaces a command's non-zero exit code](#scenario-a-pty-step-surfaces-a-commands-non-zero-exit-code)
@@ -9003,6 +9005,42 @@ ${atago} run typo.atago.yaml
 #### Then
 - exit code is `4`
 - stdout contains `no variable with that name is defined`, `$${no_such_var}`
+### Scenario: an expect does not match the echo of its own send
+_skipped on Windows_
+#### Given
+- Fixture file `echo.atago.yaml` is created.
+#### Inputs
+_Fixture `echo.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: echo
+scenarios:
+  - name: the program never produced this
+    steps:
+      - pty:
+          command: "sh -c 'echo ready; exit 0'"
+          timeout: 4s
+          session:
+            - expect: "ready"
+            - send: "NEVER-PRODUCED-BY-THE-PROGRAM\n"
+            - expect: "NEVER-PRODUCED-BY-THE-PROGRAM"
+```
+#### When
+```shell
+${atago} run echo.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `pty expect /NEVER-PRODUCED-BY-THE-PROGRAM/`, `never appeared in the terminal transcript`
+### Scenario: a program's own copy of the input still satisfies an expect
+_skipped on Windows_
+#### When
+```shell
+# interactive (pty): cat
+```
+#### Then
+- exit code is `0`
 ## atago self-hosting / pty (portable)
 Source: `test/e2e/atago/pty_portable.atago.yaml`
 ### Scenario: a pty step starts a command, captures its output, and reports exit 0

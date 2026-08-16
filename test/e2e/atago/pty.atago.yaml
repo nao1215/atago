@@ -558,3 +558,56 @@ scenarios:
             contains:
               - "no variable with that name is defined"
               - "$${no_such_var}"
+
+  # An expect that matches only the terminal's echo of the send before it has
+  # asserted that atago can type, not that the program answered — and it passes
+  # whether the program is listening, busy, or already dead. The inner spec
+  # sends text to a program that has already exited, so the echo is the only
+  # possible source; it must fail rather than report a green scenario that
+  # tested nothing.
+  - name: an expect does not match the echo of its own send
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: echo.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: echo
+            scenarios:
+              - name: the program never produced this
+                steps:
+                  - pty:
+                      command: "sh -c 'echo ready; exit 0'"
+                      timeout: 4s
+                      session:
+                        - expect: "ready"
+                        - send: "NEVER-PRODUCED-BY-THE-PROGRAM\n"
+                        - expect: "NEVER-PRODUCED-BY-THE-PROGRAM"
+      - run:
+          command: ${atago} run echo.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - "pty expect /NEVER-PRODUCED-BY-THE-PROGRAM/"
+              - "never appeared in the terminal transcript"
+
+  # The other side of the same rule: a program that prints the line back keeps
+  # its own copy, so the ordinary shape — type a line, expect the answer — still
+  # works. `cat` produces the text twice (the line discipline echoes it and cat
+  # prints it); only the echo is discounted.
+  - name: a program's own copy of the input still satisfies an expect
+    skip:
+      os: windows
+    steps:
+      - pty:
+          command: cat
+          timeout: 15s
+          session:
+            - send: "ROUNDTRIP\n"
+            - expect: "ROUNDTRIP"
+            - send: ""
+      - assert:
+          exit_code: 0
