@@ -50,3 +50,30 @@ jobs:
         # stack with five minutes of job time left to flush it.
         shell: bash
         run: go test -v -timeout 5m -cover -coverprofile=coverage.out ./...
+
+  # Nothing was running the race detector, on a program whose whole job is
+  # supervising concurrent work: a scenario worker pool, a goroutine draining
+  # each pty, a semaphore shared across suites, and an atomic fail-stop. A data
+  # race in any of that would have surfaced as an unreproducible CI flake with
+  # nothing pointing at the cause. One leg is enough — a race is a property of
+  # the code, not of the OS or the toolchain version — and it costs seconds,
+  # because the detector's overhead lands on a suite that runs in under ten.
+  race:
+    name: Race detector
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1"
+
+      # -race needs cgo, so this is the one job that must not set
+      # CGO_ENABLED=0. -timeout 10m rather than the 5m above: every test runs
+      # instrumented here, so the margin over a real hang is the same.
+      - name: Run tests under the race detector
+        run: go test -v -race -timeout 10m ./...
