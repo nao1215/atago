@@ -399,6 +399,25 @@ scenarios:
               # `fg: default` is how "no color was set" is stated.
               - { text: plain, fg: default, bold: false }
               - { text: SELECTED, reverse: true, row: 2 }
+      # The rest of the vocabulary. Each of these was implemented and documented
+      # with nothing exercising it, so a regression in any one would have been
+      # invisible: the styles a TUI actually uses for emphasis, and a background
+      # color, which reads from a different cell field than `fg`.
+      - pty:
+          shell: true
+          command: "printf '\\033[3mITAL\\033[0m \\033[4mUNDER\\033[0m \\033[5mBLINK\\033[0m \\033[41mONRED\\033[0m\\r\\n'"
+          rows: 6
+          cols: 40
+      - assert:
+          screen:
+            attrs:
+              - { text: ITAL, italic: true }
+              - { text: UNDER, underline: true }
+              - { text: BLINK, blink: true }
+              - { text: ONRED, bg: red }
+              # Absence is a claim too, and `bg: default` is how "no background
+              # was set" is stated.
+              - { text: ITAL, underline: false, blink: false, bg: default }
       # A styling claim that does not hold fails, and the message says what was
       # found instead — without that, the feature would be a way to write
       # assertions that quietly pass.
@@ -427,6 +446,33 @@ scenarios:
           stdout:
             contains:
               - "fg=red (wanted green)"
+      # The same for a styling flag: a boolean claim that does not hold has to
+      # fail on its own, and name the flag rather than only the colors.
+      - fixture:
+          file: badflag.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: plain text is not italic
+                steps:
+                  - pty:
+                      shell: true
+                      command: "printf 'PLAIN\\r\\n'"
+                      rows: 4
+                      cols: 20
+                  - assert:
+                      screen:
+                        attrs:
+                          - {text: PLAIN, italic: true}
+      - run:
+          command: ${atago} run badflag.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - "italic"
 
   - name: an unknown key name is a load-time error listing the vocabulary
     steps:
