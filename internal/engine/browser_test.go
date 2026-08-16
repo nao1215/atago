@@ -269,6 +269,84 @@ scenarios:
 	}
 }
 
+// TestEngine_CDPNetworkPolicy is a regression for #486: `permissions.network`
+// says egress to an unlisted host is a policy violation, and http, grpc, ssh,
+// and db all enforce it — a `cdp:` step navigated wherever its spec said. The
+// denial happens before Chrome is launched, so this runs without a browser.
+func TestEngine_CDPNetworkPolicy(t *testing.T) {
+	t.Parallel()
+	src := `
+version: "1"
+suite:
+  name: browser
+permissions:
+  network:
+    allow:
+      - allowed.example
+runners:
+  web:
+    type: browser
+scenarios:
+  - name: navigates to a host the policy does not name
+    steps:
+      - cdp:
+          runner: web
+          actions:
+            - navigate: https://denied.example/
+`
+	res := runSpec(t, src)
+	if res.Status != StatusError {
+		t.Errorf("status = %s, want error", res.Status)
+	}
+	if !res.SecurityViolation {
+		t.Error("SecurityViolation = false, want true (denied host)")
+	}
+	got := res.Scenarios[0].Steps[0].ErrMsg
+	if !strings.Contains(got, `network policy denies host "denied.example"`) {
+		t.Errorf("err = %q, want a network policy denial naming the host", got)
+	}
+	// The denial must say what it did and did not check, so nobody reads it as
+	// a promise that the whole browser session is confined to the allowlist.
+	if !strings.Contains(got, "navigate") {
+		t.Errorf("err = %q, want it to say the check covers navigate actions", got)
+	}
+}
+
+// TestEngine_CDPNetworkPolicyAllows proves the check does not deny what it
+// should not: an allowlisted host passes (the failure that follows is Chrome's,
+// not the policy's), and a navigation that names no host at all — about:blank,
+// a file:// page, a data: URL — reaches no network and must run under any
+// allowlist.
+func TestEngine_CDPNetworkPolicyAllows(t *testing.T) {
+	t.Parallel()
+	for _, target := range []string{"https://allowed.example/", "about:blank", "data:text/html,<p>hi</p>"} {
+		src := `
+version: "1"
+suite:
+  name: browser
+permissions:
+  network:
+    allow:
+      - allowed.example
+runners:
+  web:
+    type: browser
+scenarios:
+  - name: allowed navigation
+    steps:
+      - cdp:
+          runner: web
+          actions:
+            - navigate: "` + target + `"
+`
+		res := runSpec(t, src)
+		if res.SecurityViolation {
+			t.Errorf("navigate %q: SecurityViolation = true, want false: %s",
+				target, res.Scenarios[0].Steps[0].ErrMsg)
+		}
+	}
+}
+
 // uploadDownloadServer serves a page that exercises the file-upload and download
 // CDP actions (#75): a file input that echoes the selected file's name, and a
 // link to an attachment endpoint that triggers a deterministic download.

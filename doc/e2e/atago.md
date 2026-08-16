@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-81 suites · 622 scenarios
+81 suites · 623 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -20,7 +20,7 @@
   - [dir.path expands a stored variable](#scenario-dirpath-expands-a-stored-variable)
   - [changes entries expand a stored variable](#scenario-changes-entries-expand-a-stored-variable)
   - [screen matcher expands a stored variable](#scenario-screen-matcher-expands-a-stored-variable)
-- [atago self-hosting / browser (cdp) runner](#atago-self-hosting--browser-cdp-runner) — 8 scenarios
+- [atago self-hosting / browser (cdp) runner](#atago-self-hosting--browser-cdp-runner) — 9 scenarios
   - [a cdp step with no actions fails validation (exit 2)](#scenario-a-cdp-step-with-no-actions-fails-validation-exit-2)
   - [a cdp step naming an undeclared runner fails validation (exit 2)](#scenario-a-cdp-step-naming-an-undeclared-runner-fails-validation-exit-2)
   - [a screenshot action without a path fails validation (exit 2)](#scenario-a-screenshot-action-without-a-path-fails-validation-exit-2)
@@ -29,6 +29,7 @@
   - [manifest surfaces the browser-runner configuration](#scenario-manifest-surfaces-the-browser-runner-configuration)
   - [an upload action without a file fails validation (exit 2)](#scenario-an-upload-action-without-a-file-fails-validation-exit-2)
   - [a download action without a click selector fails validation (exit 2)](#scenario-a-download-action-without-a-click-selector-fails-validation-exit-2)
+  - [a navigate to a denied host is a policy violation (exit 6)](#scenario-a-navigate-to-a-denied-host-is-a-policy-violation-exit-6)
 - [atago self-hosting / changes (workdir delta assertions)](#atago-self-hosting--changes-workdir-delta-assertions) — 21 scenarios
   - [a generator touches exactly the files it should (POSIX)](#scenario-a-generator-touches-exactly-the-files-it-should-posix)
   - [an unexpected creation breaks the exact contract (POSIX)](#scenario-an-unexpected-creation-breaks-the-exact-contract-posix)
@@ -1159,6 +1160,36 @@ ${atago} run baddownload.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `download requires a click selector`
+### Scenario: a navigate to a denied host is a policy violation (exit 6)
+#### Given
+- Fixture file `policy.atago.yaml` is created.
+#### Inputs
+_Fixture `policy.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: browser
+permissions:
+  network:
+    allow: ["allowed.example"]
+runners:
+  web:
+    type: browser
+scenarios:
+  - name: navigates to a host the policy does not name
+    steps:
+      - cdp:
+          runner: web
+          actions:
+            - navigate: https://denied.example/
+```
+#### When
+```shell
+${atago} run policy.atago.yaml
+```
+#### Then
+- exit code is `6`
+- stdout contains `network policy denies host "denied.example"`, `holds `navigate:` to the policy`
 ## atago self-hosting / changes (workdir delta assertions)
 Source: `test/e2e/atago/changes.atago.yaml`
 ### Scenario: a generator touches exactly the files it should (POSIX)
