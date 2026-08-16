@@ -230,6 +230,44 @@ scenarios:
           stdout:
             contains: "1 passed"
 
+  - name: record --pty of a silent program anchors on nothing rather than on the echo
+    skip:
+      os: windows
+    steps:
+      # `read a; read b` prints nothing between the two lines it reads, so the
+      # only text in front of the second send is the terminal echoing the first
+      # — not something the replay may anchor on. The outer expect_screen is the
+      # remedy the recorder's own warning suggests.
+      - pty:
+          command: '${atago} record --pty --out silent.atago.yaml -- sh -c ''read a; read b; echo done'''
+          timeout: 20s
+          session:
+            - send: "x\n"
+            - expect_screen:
+                contains: "x"
+                stable_for: 40ms
+            - send: "y\n"
+            - expect: "2 send"
+      - assert:
+          exit_code: 0
+      - assert:
+          file:
+            path: silent.atago.yaml
+            not_contains:
+              - "- expect:"
+      - assert:
+          file:
+            path: silent.atago.yaml
+            contains:
+              - "no expect before"
+      # The round-trip: replaying the generated spec passes.
+      - run:
+          command: ${atago} run silent.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "1 passed"
+
   - name: record --pty of a no-input command yields a session-less spec that replays green
     skip:
       os: windows

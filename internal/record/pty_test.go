@@ -486,6 +486,92 @@ func TestGeneratePTY_WarnsUnanchoredSends(t *testing.T) {
 	}
 }
 
+// TestGeneratePTY_NeverAnchorsOnItsOwnEcho pins the recorder against the
+// engine's rule that an expect matching only the send's own echo is refused: an
+// anchor built out of that echo is a spec that cannot pass. A program reading
+// several lines without printing between them made every anchor the echo.
+func TestGeneratePTY_NeverAnchorsOnItsOwnEcho(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name        string
+		segments    []PTYSegment
+		wantContain []string
+		wantAbsent  []string
+	}{
+		{
+			// `sh -c 'read a; read b; echo done'`: the only output between the two
+			// sends is the terminal echoing the first one.
+			name: "echo-only output between sends yields no expect",
+			segments: []PTYSegment{
+				inSeg("x\r"),
+				outSeg("x\r\n"),
+				inSeg("y\r"),
+				outSeg("y\r\ndone\r\n"),
+			},
+			wantContain: []string{"no expect", "2nd send", "done"},
+			wantAbsent:  []string{"- expect:"},
+		},
+		{
+			// The program answers after the echo.
+			name: "the program's answer is the anchor, not the echo before it",
+			segments: []PTYSegment{
+				outSeg("Name: "),
+				inSeg("alice\r"),
+				outSeg("alice\r\nHello alice\r\n"),
+				inSeg("bob\r"),
+				outSeg("bye\r\n"),
+			},
+			wantContain: []string{"expect: Hello alice"},
+			wantAbsent:  []string{"expect: alice\n"},
+		},
+		{
+			// Nothing but the echo after the last send: no program output to close on.
+			name: "a trailing echo is not a closing stdout anchor",
+			segments: []PTYSegment{
+				outSeg("Go: "),
+				inSeg("zzz\r"),
+				outSeg("zzz\r\n"),
+			},
+			wantAbsent: []string{"stdout:", "contains: zzz"},
+		},
+		{
+			// Raw mode: the terminal echoed nothing, so the output after the send
+			// is entirely the program's and stays available as an anchor.
+			name: "output that is not the echo is left alone",
+			segments: []PTYSegment{
+				outSeg("Go: "),
+				inSeg("j"),
+				outSeg("moved down\r\n"),
+				inSeg("q"),
+				outSeg("bye\r\n"),
+			},
+			wantContain: []string{"expect: moved down"},
+			wantAbsent:  []string{"no expect"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := GeneratePTY(PTYRecording{Command: "prog", Segments: tt.segments}, Options{SuiteName: "gen"})
+			if err != nil {
+				t.Fatalf("GeneratePTY: %v", err)
+			}
+			s := string(got)
+			for _, want := range tt.wantContain {
+				if !strings.Contains(s, want) {
+					t.Errorf("generated spec missing %q:\n%s", want, s)
+				}
+			}
+			for _, absent := range tt.wantAbsent {
+				if strings.Contains(s, absent) {
+					t.Errorf("generated spec unexpectedly contains %q:\n%s", absent, s)
+				}
+			}
+			loadGenerated(t, got)
+		})
+	}
+}
+
 // TestStableLine_AnchorIsRawSubstring is a regression for the pty round-trip law
 // (#30/#69): the anchor an expect/contains is built from must be a verbatim
 // substring of the RAW transcript the replay matches against. Stripping ANSI and
