@@ -1601,7 +1601,7 @@
                   },
                   "empty": {
                     "type": "boolean",
-                    "description": "Asserts the rendered screen is empty (`true`) or non-empty (`false`)."
+                    "description": "Asserts the rendered screen is empty (`true`) or non-empty (`false`). A screen carrying only whitespace counts as empty, which is what makes the check usable at all: a terminal pads every unwritten cell with spaces, so a blank screen is never zero bytes."
                   },
                   "contains": {
                     "$ref": "#/$defs/stringOrList",
@@ -2449,7 +2449,7 @@
         },
         "empty": {
           "type": "boolean",
-          "description": "Asserts the stream is empty (`true`) or non-empty (`false`)."
+          "description": "Asserts the stream is empty (`true`) or non-empty (`false`). A stream carrying only whitespace counts as empty, so a stray newline does not fail `empty: true`; `empty: false` therefore asserts the stream carried something legible, not that it carried bytes."
         },
         "contains": {
           "$ref": "#/$defs/stringOrList",
@@ -2520,7 +2520,7 @@
         },
         "empty": {
           "type": "boolean",
-          "description": "Asserts the stream is empty (`true`) or non-empty (`false`)."
+          "description": "Asserts the stream is empty (`true`) or non-empty (`false`). A stream carrying only whitespace counts as empty, so a stray newline does not fail `empty: true`; `empty: false` therefore asserts the stream carried something legible, not that it carried bytes."
         },
         "contains": {
           "$ref": "#/$defs/stringOrList",

@@ -13,6 +13,10 @@ and this project follows [Semantic Versioning](https://semver.org/).
 - `atago explain ATG2201` prints what a code means without a browser — the same entry the website renders, from the same registry — and suggests a near-miss when the code is not one that exists. The JSON report carries the code as a `code` field on each failure, and a GitHub Actions error annotation puts it in the title where the annotations list shows it, so a dashboard or a CI job can group failures by cause instead of matching on prose.
 - An [error code reference](https://nao1215.github.io/atago/errors/), generated from the registry that defines the codes, listing what each one means, what causes it, and what to change. A code cannot exist without that documentation: registering it is the only way to create one, and registration refuses an entry that omits the explanation or the fix. A committed `doc/errors.md` is drift-guarded against the registry, and a coverage gate fails CI when a published code is not provoked by a scenario in atago's own E2E suite.
 
+### Documentation
+
+- The spec reference now states what `empty:` measures. A stream or screen carrying only whitespace counts as empty, so a stray newline does not fail `empty: true` and `empty: false` asserts the output carried something legible rather than that it carried bytes. The behavior is unchanged and is what makes the check usable on a screen at all, since a terminal pads every unwritten cell with spaces; only the description was silent about it.
+
 ## [0.20.1] - 2026-08-15
 
 ### Added
