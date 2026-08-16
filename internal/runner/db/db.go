@@ -13,8 +13,10 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/runner"
@@ -33,13 +35,16 @@ type Config struct {
 	DataSource string
 	// Timeout bounds a single query; zero means no timeout.
 	Timeout time.Duration
-	// Host is the "host" or "host:port" the DSN dials, so the engine can hold a
-	// db connection to permissions.network.allow the way it already holds an
-	// http, grpc, or ssh one. It is empty when the DSN names no network peer —
-	// a sqlite file, a unix socket — and when the DSN leaves the peer implicit,
-	// because the host to check is the one the spec names, not one inferred
-	// from a driver's defaults.
-	Host string
+	// Hosts are the "host" or "host:port" peers the DSN may dial, so the engine
+	// can hold a db connection to permissions.network.allow the way it already
+	// holds an http, grpc, or ssh one. It is empty when the DSN names no network
+	// peer — a sqlite file, a unix socket — and when the DSN leaves the peer
+	// implicit, because the hosts to check are the ones the spec names, not ones
+	// inferred from a driver's defaults. It holds more than one entry when the
+	// DSN names more than one peer (a libpq failover list, or a host paired with
+	// a hostaddr): each is somewhere the driver may connect, so all of them must
+	// clear the policy (#497).
+	Hosts []string
 }
 
 // Resolve derives a Config from a runner's optional driver and its dsn. When
@@ -58,64 +63,184 @@ func Resolve(driver, dsn string) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	return Config{Driver: drv, DataSource: ds, Host: dsnHost(drv, dsn)}, nil
+	return Config{Driver: drv, DataSource: ds, Hosts: dsnHosts(drv, dsn)}, nil
 }
 
-// dsnHost returns the network peer a DSN dials, as "host" or "host:port", or ""
-// when it dials none.
+// dsnHosts returns every network peer a DSN may dial, each as "host" or
+// "host:port". It returns none when the DSN dials none.
 //
 // It reads the DSN the spec wrote rather than asking the driver, because the
 // answer is needed BEFORE opening: database/sql connects lazily, so by the time
 // a driver could report its peer the connection to the denied host has already
-// been made. Only an explicitly named host is returned — a sqlite path, a unix
-// socket, and a form that leaves the peer to the driver's default all yield ""
-// — so the check never denies a spec over a host the spec does not name.
-func dsnHost(driver, dsn string) string {
+// been made. Only explicitly named hosts are returned — a sqlite path, a unix
+// socket, and a form that leaves the peer to the driver's default all yield
+// nothing — so the check never denies a spec over a host the spec does not name.
+func dsnHosts(driver, dsn string) []string {
 	switch driver {
 	case "sqlite":
-		return "" // a file path, not a peer
+		return nil // a file path, not a peer
 	case "postgres":
 		if u, err := url.Parse(dsn); err == nil && u.Host != "" {
-			return u.Host
+			return []string{u.Host}
 		}
-		return keywordDSNHost(dsn)
+		return keywordDSNHosts(dsn)
 	case "mysql":
 		if strings.HasPrefix(dsn, "mysql://") {
-			if u, err := url.Parse(dsn); err == nil {
-				return u.Host
+			if u, err := url.Parse(dsn); err == nil && u.Host != "" {
+				return []string{u.Host}
 			}
-			return ""
+			return nil
 		}
-		return nativeMySQLHost(dsn)
+		return nonEmpty(nativeMySQLHost(dsn))
+	default:
+		return nil
+	}
+}
+
+// nonEmpty wraps a single host in a slice, or returns none for an empty one.
+func nonEmpty(host string) []string {
+	if host == "" {
+		return nil
+	}
+	return []string{host}
+}
+
+// keywordDSNHosts pulls every peer out of a libpq keyword/value DSN
+// ("host=db.example port=5432 user=u").
+//
+// Both `host` and `hostaddr` are read: they are alternative spellings of the
+// same peer, and when a DSN carries both, lib/pq dials the hostaddr and keeps
+// the host only as a name for authentication — so reading just one of them
+// leaves an address the policy never saw (#497). Each may also be a
+// comma-separated failover list, whose entries the driver tries in turn, with
+// `port` either a matching list or one port shared by all. An entry beginning
+// with '/' is a unix socket directory, which reaches no network.
+func keywordDSNHosts(dsn string) []string {
+	opts := keywordDSNOptions(dsn)
+	ports := splitDSNList(opts["port"])
+	var out []string
+	for _, key := range []string{"host", "hostaddr"} {
+		for i, host := range splitDSNList(opts[key]) {
+			if host == "" || strings.HasPrefix(host, "/") {
+				continue
+			}
+			if port := portAt(ports, i); port != "" {
+				host = net.JoinHostPort(host, port)
+			}
+			if !slices.Contains(out, host) {
+				out = append(out, host)
+			}
+		}
+	}
+	return out
+}
+
+// splitDSNList splits a libpq comma-separated value (a host or port failover
+// list) into its entries. An empty value is no entries rather than one empty.
+func splitDSNList(v string) []string {
+	if v == "" {
+		return nil
+	}
+	return strings.Split(v, ",")
+}
+
+// portAt returns the port libpq pairs with the i-th host: a single port applies
+// to every host, otherwise the ports line up with the hosts by position.
+func portAt(ports []string, i int) string {
+	switch {
+	case len(ports) == 1:
+		return ports[0]
+	case i < len(ports):
+		return ports[i]
 	default:
 		return ""
 	}
 }
 
-// keywordDSNHost pulls the host (and port) out of a libpq keyword/value DSN
-// ("host=db.example port=5432 user=u"). A host beginning with '/' is a unix
-// socket directory, which reaches no network.
-func keywordDSNHost(dsn string) string {
-	host, port := "", ""
-	for _, field := range strings.Fields(dsn) {
-		k, v, ok := strings.Cut(field, "=")
+// keywordDSNOptions tokenises a libpq keyword/value connection string into its
+// keyword/value pairs, lowercasing the keywords.
+//
+// It follows libpq's own syntax rather than splitting on whitespace: whitespace
+// may surround the '=', a value may be single-quoted (so that it can contain
+// spaces), and a backslash escapes the next character inside or outside the
+// quotes. Splitting on spaces instead both kept the quotes as part of the value
+// — denying a host the policy allowed — and mis-split the fields around a
+// legitimately quoted space (#497).
+//
+// A malformed tail is ignored: the driver reports a bad DSN far better than a
+// host extractor could, and the keywords already read are still worth checking.
+func keywordDSNOptions(dsn string) map[string]string {
+	opts := make(map[string]string)
+	s := &dsnScanner{r: []rune(dsn)}
+	for {
+		key, ok := s.keyword()
 		if !ok {
-			continue
+			return opts
 		}
-		switch strings.ToLower(k) {
-		case "host":
-			host = v
-		case "port":
-			port = v
+		value := s.value()
+		if key != "" {
+			opts[key] = value
 		}
 	}
-	if host == "" || strings.HasPrefix(host, "/") {
-		return ""
+}
+
+// dsnScanner walks a libpq keyword/value connection string token by token.
+type dsnScanner struct {
+	r []rune
+	i int
+}
+
+func (s *dsnScanner) skipSpace() {
+	for s.i < len(s.r) && unicode.IsSpace(s.r[s.i]) {
+		s.i++
 	}
-	if port != "" {
-		return net.JoinHostPort(host, port)
+}
+
+// keyword reads the next keyword and consumes the '=' that follows it. It
+// reports false at the end of the string, and for a keyword carrying no value —
+// which libpq rejects outright, so there is nothing further worth reading.
+func (s *dsnScanner) keyword() (string, bool) {
+	s.skipSpace()
+	start := s.i
+	for s.i < len(s.r) && s.r[s.i] != '=' && !unicode.IsSpace(s.r[s.i]) {
+		s.i++
 	}
-	return host
+	key := strings.ToLower(string(s.r[start:s.i]))
+	s.skipSpace()
+	if s.i >= len(s.r) || s.r[s.i] != '=' {
+		return "", false
+	}
+	s.i++
+	return key, true
+}
+
+// value reads the value after an '=': single-quoted, where a space is literal
+// and the value ends at the closing quote, or bare, where it ends at the next
+// space. A backslash escapes the next character in either form.
+func (s *dsnScanner) value() string {
+	s.skipSpace()
+	quoted := s.i < len(s.r) && s.r[s.i] == '\''
+	if quoted {
+		s.i++
+	}
+	var b strings.Builder
+	for s.i < len(s.r) {
+		c := s.r[s.i]
+		if quoted && c == '\'' {
+			s.i++ // the closing quote
+			break
+		}
+		if !quoted && unicode.IsSpace(c) {
+			break
+		}
+		if c == '\\' && s.i+1 < len(s.r) {
+			s.i++
+			c = s.r[s.i]
+		}
+		b.WriteRune(c)
+		s.i++
+	}
+	return b.String()
 }
 
 // nativeMySQLHost pulls the address out of a go-sql-driver native DSN
