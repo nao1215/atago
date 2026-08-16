@@ -93,11 +93,11 @@ func (e *Engine) newSuiteRuntime(s *spec.Spec, specDir, fixturesDir string) (*su
 	for k, v := range e.builtins {
 		rt.st.Set(k, v)
 	}
-	rt.set("suitedir", dir)
+	rt.set(store.BuiltinSuitedir, dir)
 	// Suite setup reads the same input directories scenarios do (#394).
-	rt.set("specdir", absPath(specDir))
+	rt.set(store.BuiltinSpecdir, absPath(specDir))
 	if fixturesDir != "" {
-		rt.set("fixtures", fixturesDir)
+		rt.set(store.BuiltinFixtures, fixturesDir)
 	}
 	return rt, nil
 }

@@ -2,25 +2,31 @@ package loader
 
 import (
 	"regexp"
+	"strings"
 
 	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/spec"
+	"github.com/nao1215/atago/internal/store"
 	"github.com/ohler55/ojg/jp"
 )
 
-// reservedVarNames are the built-in variables the engine seeds into every
-// scenario store (${atago} binary path, ${workdir}, ${suitedir}). A user store
-// or matrix variable that reuses one silently shadows it — pointing ${workdir}
-// outside the isolated temp dir while cleanup still targets the real one — so
-// the collision is rejected at load time.
-var reservedVarNames = map[string]bool{"atago": true, "workdir": true, "suitedir": true}
+// reservedVarName reports whether a user store or matrix variable would shadow
+// a built-in the engine seeds. Shadowing one is silent — it points ${workdir}
+// outside the isolated temp dir while cleanup still targets the real one, or
+// ${specdir} away from the files a step meant to read — so the collision is
+// rejected at load time. The names come from the store package rather than a
+// copy here: the copy listed three of the five.
+func reservedVarName(name string) bool { return store.IsBuiltin(name) }
+
+// builtinList names every reserved variable for an error message.
+func builtinList() string { return strings.Join(store.Builtins, "/") }
 
 func validateStore(add addFunc, where string, s *spec.Store) {
 	if s.Name == "" {
 		add(diag.RequiredKey, "%s.store.name is required", where)
 	}
-	if reservedVarNames[s.Name] {
-		add(diag.ReservedName, "%s.store.name %q shadows a built-in variable (atago/workdir/suitedir); choose another name", where, s.Name)
+	if reservedVarName(s.Name) {
+		add(diag.ReservedName, "%s.store.name %q shadows a built-in variable (%s); choose another name", where, s.Name, builtinList())
 	}
 	if s.From == nil {
 		add(diag.RequiredKey, "%s.store.from is required", where)
