@@ -105,6 +105,7 @@
         },
         "hint": {"type": "string"},
         "error": {"type": "string"},
+        "code": {"description": "The diagnostic code the error carries (e.g. ATG4201), when it has one. Assertion failures carry none.", "type": "string", "pattern": "^ATG[0-9]{4}$"},
         "artifacts": {
           "description": "Durable sidecar files written for a failed assertion when --artifacts-dir is set (#48); omitted when none.",
           "type": "array",

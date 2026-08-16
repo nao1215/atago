@@ -119,7 +119,7 @@ Commands:
   init        Scaffold a starter spec file (--template browser|cli|db|grpc|http|mock|services|ssh)
   record      Generate a spec skeleton from one observed command run (record -- <cmd>)
   list        List suites, scenarios, tags, and generated artifacts (--json)
-  explain     Describe what a spec does without running it
+  explain     Describe what a spec does without running it, or what an ATG code means
   doc         Generate Markdown documentation from specs
   manifest    Emit a stable machine-readable JSON summary of specs
   completion  Generate a shell completion script (bash|zsh|fish|powershell)

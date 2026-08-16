@@ -71,6 +71,41 @@ func Markdown() []byte {
 	return []byte(b.String())
 }
 
+// Text renders one entry the way `atago explain` prints it: the same registry
+// the published page is generated from, so a code cannot mean one thing in a
+// terminal and another in a browser.
+func Text(e Entry) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "%s  %s\n\n", e.Code, e.Summary)
+	b.WriteString(wrap(e.Detail, 76))
+	b.WriteString("\n\nFix\n")
+	b.WriteString(wrap(e.Fix, 76))
+	fmt.Fprintf(&b, "\n\nExits %d. Since %s.\n", e.Code.ExitCode(), e.Since)
+	fmt.Fprintf(&b, "https://nao1215.github.io/atago/errors/#%s\n", anchor(e))
+	return b.String()
+}
+
+// wrap breaks prose at width for a terminal. The registry stores each field as
+// one paragraph, since that is what Markdown wants; a terminal wants lines.
+func wrap(s string, width int) string {
+	var b strings.Builder
+	col := 0
+	for i, word := range strings.Fields(s) {
+		switch {
+		case i == 0:
+			col = len(word)
+		case col+1+len(word) > width:
+			b.WriteByte('\n')
+			col = len(word)
+		default:
+			b.WriteByte(' ')
+			col += 1 + len(word)
+		}
+		b.WriteString(word)
+	}
+	return b.String()
+}
+
 // entriesOf returns the entries belonging to one exit-code family, in order.
 func entriesOf(all []Entry, exit int) []Entry {
 	var out []Entry

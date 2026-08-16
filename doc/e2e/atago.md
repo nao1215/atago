@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-81 suites · 597 scenarios
+81 suites · 602 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -144,7 +144,7 @@
   - [file not_contains passes when the substring is absent](#scenario-file-not_contains-passes-when-the-substring-is-absent)
   - [not_contains fails when the substring is present](#scenario-not_contains-fails-when-the-substring-is-present)
   - [a shell metacharacter without shell is a load-time error](#scenario-a-shell-metacharacter-without-shell-is-a-load-time-error)
-- [atago self-hosting / every diagnostic code](#atago-self-hosting--every-diagnostic-code) — 75 scenarios
+- [atago self-hosting / every diagnostic code](#atago-self-hosting--every-diagnostic-code) — 80 scenarios
   - [ATG2001 is a spec file that cannot be read](#scenario-atg2001-is-a-spec-file-that-cannot-be-read)
   - [ATG2002 is a spec file with no YAML document in it](#scenario-atg2002-is-a-spec-file-with-no-yaml-document-in-it)
   - [ATG2003 is a document that is not valid YAML](#scenario-atg2003-is-a-document-that-is-not-valid-yaml)
@@ -220,6 +220,11 @@
   - [ATG4501 is a store step with no result behind it](#scenario-atg4501-is-a-store-step-with-no-result-behind-it)
   - [ATG4502 is a store selector that found nothing](#scenario-atg4502-is-a-store-selector-that-found-nothing)
   - [ATG4505 is a variable the step expands that is not defined](#scenario-atg4505-is-a-variable-the-step-expands-that-is-not-defined)
+  - [atago explain prints what a code means, offline](#scenario-atago-explain-prints-what-a-code-means-offline)
+  - [atago explain refuses a code nobody assigned, and suggests one](#scenario-atago-explain-refuses-a-code-nobody-assigned-and-suggests-one)
+  - [the JSON report carries the code as a field](#scenario-the-json-report-carries-the-code-as-a-field)
+  - [an assertion failure carries no code in the JSON report](#scenario-an-assertion-failure-carries-no-code-in-the-json-report)
+  - [a wrapped error reports one code, not two](#scenario-a-wrapped-error-reports-one-code-not-two)
 - [atago self-hosting / exit_code in-set matcher](#atago-self-hosting--exit_code-in-set-matcher) — 4 scenarios
   - [a listed exit code passes](#scenario-a-listed-exit-code-passes)
   - [an unlisted exit code fails and the output lists the set](#scenario-an-unlisted-exit-code-fails-and-the-output-lists-the-set)
@@ -4772,6 +4777,86 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `4`
 - stdout contains `ATG4505`
+### Scenario: atago explain prints what a code means, offline
+#### When
+```shell
+${atago} explain ATG2201
+```
+#### Then
+- exit code is `0`
+- stdout contains `ATG2201`, `a required key is missing`, `Fix`, `Exits 2.`
+### Scenario: atago explain refuses a code nobody assigned, and suggests one
+#### When
+```shell
+${atago} explain ATG2999
+```
+#### Then
+- exit code is `3`
+- stderr contains `ATG3102`, `unknown diagnostic code`, `did you mean`
+### Scenario: the JSON report carries the code as a field
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    steps:
+      - run: {command: definitely-no-such-binary-xyz}
+```
+#### When
+```shell
+${atago} run --report json bad.atago.yaml
+```
+#### Then
+- exit code is `4`
+- stdout at `$.suites[0].failures[0].code` equals `ATG4002`
+### Scenario: an assertion failure carries no code in the JSON report
+#### Given
+- Fixture file `fails.atago.yaml` is created.
+#### Inputs
+_Fixture `fails.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    steps:
+      - run: {command: "false"}
+      - assert: {exit_code: 0}
+```
+#### When
+```shell
+${atago} run --report json fails.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout does not contain `"code"`
+### Scenario: a wrapped error reports one code, not two
+_skipped on Windows_
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    services:
+      - {name: s, command: "sleep 30", ready: {port: "127.0.0.1:59993", timeout: 1s}}
+    steps:
+      - run: {command: echo}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `4`
+- stdout contains `ATG4102`, does not contain `ATG4301: service`
 ## atago self-hosting / exit_code in-set matcher
 Source: `test/e2e/atago/exit_code_in.atago.yaml`
 ### Scenario: a listed exit code passes
