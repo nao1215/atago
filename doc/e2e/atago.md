@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-81 suites · 613 scenarios
+81 suites · 614 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -286,9 +286,10 @@
   - [fixture.mtime pins the modification time](#scenario-fixturemtime-pins-the-modification-time)
   - [only.env skips when the variable is unset](#scenario-onlyenv-skips-when-the-variable-is-unset)
   - [skip.env runs when the variable is unset](#scenario-skipenv-runs-when-the-variable-is-unset)
-- [atago self-hosting / flaky tooling (--repeat, --retry-failed)](#atago-self-hosting--flaky-tooling---repeat---retry-failed) — 3 scenarios
+- [atago self-hosting / flaky tooling (--repeat, --retry-failed)](#atago-self-hosting--flaky-tooling---repeat---retry-failed) — 4 scenarios
   - [retry-failed recovers a flaky scenario and reports it loudly](#scenario-retry-failed-recovers-a-flaky-scenario-and-reports-it-loudly)
   - [repeat surfaces flakiness that a single run would miss](#scenario-repeat-surfaces-flakiness-that-a-single-run-would-miss)
+  - [a gated-out scenario reports no repeat rate](#scenario-a-gated-out-scenario-reports-no-repeat-rate)
   - [repeat and retry-failed are mutually exclusive](#scenario-repeat-and-retry-failed-are-mutually-exclusive)
 - [atago self-hosting / grpc runner](#atago-self-hosting--grpc-runner) — 2 scenarios
   - [a grpc runner without a target fails validation (exit 2)](#scenario-a-grpc-runner-without-a-target-fails-validation-exit-2)
@@ -6134,6 +6135,30 @@ ${atago} run --repeat 3 broken.atago.yaml
 - after `${atago} run --repeat 3 broken.atago.yaml`:
   - exit code is `1`
   - stdout contains `always fails: 0/3 passed`, `1 failed`
+### Scenario: a gated-out scenario reports no repeat rate
+#### Given
+- Fixture file `gated.atago.yaml` is created.
+#### Inputs
+_Fixture `gated.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: needs a variable nobody set
+    only: {env: ATAGO_E2E_NEVER_SET}
+    steps:
+      - run: {shell: true, command: exit 1}
+      - assert:
+          exit_code: 0
+```
+#### When
+```shell
+${atago} run --repeat 3 gated.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout contains `1 skipped`, does not contain `0/3 passed`
 ### Scenario: repeat and retry-failed are mutually exclusive
 #### Given
 - Fixture file `any.atago.yaml` is created.

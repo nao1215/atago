@@ -162,12 +162,17 @@ func writeRepeatRates(b *strings.Builder, color bool, res *engine.SuiteResult) {
 		if len(sc.Iterations) == 0 {
 			continue
 		}
-		passed := 0
-		for _, st := range sc.Iterations {
-			if st == engine.StatusPassed {
-				passed++
-			}
+		// A scenario an OS/env gate skipped every time ran nothing, so it has no
+		// rate: the summary already counts it as skipped, and a line here could
+		// only say "N/N passed" about executions that never happened.
+		if sc.Status == engine.StatusSkipped {
+			continue
 		}
+		// PassedIterations, not a second tally: it is what the fold classifies
+		// the repeat by and what the flake rate every machine format prints is
+		// built from, and it counts a gate skip as clean. Counting only
+		// StatusPassed here made the console line disagree with all of them.
+		passed := sc.PassedIterations()
 		// Color by the fold's verdict: all clean is green, a partial failure is
 		// flaky (yellow, green for the exit code), and an all-failed repeat is a
 		// deterministic red failure (#138).
