@@ -102,6 +102,110 @@ scenarios:
             path: .atago/last-failed.json
             contains: [red-a, red-b]
 
+  # --fail-fast stops scheduling, so the scenarios after the first red one are
+  # skipped without a verdict. Their recorded failures have to survive, or
+  # fixing the first one turns the next --rerun-failed green with the rest
+  # still broken.
+  - name: a fail-fast run keeps the recorded failures it never got to
+    steps:
+      - fixture:
+          file: two.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: two
+            scenarios:
+              - name: red-a
+                steps:
+                  - run: {shell: true, command: "exit 1"}
+                  - assert: {exit_code: 0}
+              - name: red-b
+                steps:
+                  - run: {shell: true, command: "exit 1"}
+                  - assert: {exit_code: 0}
+      - run:
+          command: ${atago} run two.atago.yaml
+      - assert:
+          exit_code: 1
+      # --parallel 1 makes fail-fast deterministic: red-a turns the run red
+      # before red-b is ever scheduled.
+      - run:
+          command: ${atago} run --fail-fast --parallel 1 two.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: "1 skipped"
+      - assert:
+          file:
+            path: .atago/last-failed.json
+            contains: [red-a, red-b]
+      # Fix only the scenario fail-fast did run. red-b was never re-verified, so
+      # the red-green loop must still be red.
+      - fixture:
+          file: two.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: two
+            scenarios:
+              - name: red-a
+                steps:
+                  - run: {shell: true, command: "exit 0"}
+                  - assert: {exit_code: 0}
+              - name: red-b
+                steps:
+                  - run: {shell: true, command: "exit 1"}
+                  - assert: {exit_code: 0}
+      - run:
+          command: ${atago} run --rerun-failed two.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: red-b
+
+  # --fail-fast stops scheduling whole spec files too, and a spec that was never
+  # loaded contributes no scenarios at all. Its recorded failures are kept, and
+  # calling them renamed or removed would send the reader after a spec change
+  # that never happened.
+  - name: a fail-fast run does not blame a rename for the spec it never loaded
+    steps:
+      - fixture:
+          file: a.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: a
+            scenarios:
+              - name: red-a
+                steps:
+                  - run: {shell: true, command: "exit 1"}
+                  - assert: {exit_code: 0}
+      - fixture:
+          file: b.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: b
+            scenarios:
+              - name: red-b
+                steps:
+                  - run: {shell: true, command: "exit 1"}
+                  - assert: {exit_code: 0}
+      - run:
+          command: ${atago} run a.atago.yaml b.atago.yaml
+      - assert:
+          exit_code: 1
+      - run:
+          command: ${atago} run --rerun-failed --fail-fast --parallel 1 a.atago.yaml b.atago.yaml
+      - assert:
+          exit_code: 1
+          stderr:
+            not_contains: "renamed or removed"
+      - assert:
+          file:
+            path: .atago/last-failed.json
+            contains: [red-a, red-b]
+
   # Renaming one broken scenario while fixing another leaves the rerun with
   # fewer scenarios than were recorded, which reads as "the rest are fixed".
   # The run has to say which recorded failure it did not verify.
