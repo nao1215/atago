@@ -342,4 +342,15 @@ jobs:
         # nothing but load: the TUI suites timed out waiting for a screen that
         # arrives promptly on a quiet machine. A regression still fails both
         # attempts; only a flake is absorbed, and the report names it.
-        run: ./dist/atago run --retry-failed 1 --allow-flaky "${{ matrix.program.dir }}"
+        run: |
+          set -o pipefail
+          ./dist/atago run --retry-failed 1 --allow-flaky "${{ matrix.program.dir }}" | tee run.log
+          # This leg installed the program, so a suite that ran nothing means
+          # the gate's `only:` probe is wrong. That failure is silent — the job
+          # stays green while testing nothing — and it lands on a scheduled
+          # workflow nobody watches, so it has to be caught here rather than
+          # noticed.
+          if grep -qE '^[A-Z]+ +[0-9]+ scenarios?: 0 passed' run.log; then
+            echo "::error::every scenario was skipped after installing ${{ matrix.program.name }}; the suite's only: probe does not match the installed binary"
+            exit 1
+          fi
