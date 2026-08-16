@@ -8,7 +8,6 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -18,6 +17,7 @@ import (
 	"time"
 
 	shellwords "github.com/mattn/go-shellwords"
+	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/runner"
 	"github.com/nao1215/atago/internal/security"
 	"github.com/nao1215/atago/internal/spec"
@@ -86,12 +86,12 @@ func (r *Runner) Run(ctx context.Context, run *spec.Run, workdir string) (*runne
 	// and a child that printed nothing produced the identical observation (#344).
 	stdout, err := newCapture()
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute %q: %w", run.Command, err)
+		return nil, diag.CommandNotStarted.Errorf("failed to execute %q: %w", run.Command, err)
 	}
 	defer stdout.close()
 	stderr, err := newCapture()
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute %q: %w", run.Command, err)
+		return nil, diag.CommandNotStarted.Errorf("failed to execute %q: %w", run.Command, err)
 	}
 	defer stderr.close()
 	cmd.Stdout = stdout.writer()
@@ -110,11 +110,11 @@ func (r *Runner) Run(ctx context.Context, run *spec.Run, workdir string) (*runne
 			return res, nil
 		}
 		if cerr := ctx.Err(); cerr != nil {
-			return nil, fmt.Errorf("run %q canceled: %w", run.Command, cerr)
+			return nil, diag.RunInterrupted.Errorf("run %q canceled: %w", run.Command, cerr)
 		}
 		// Could not start the process at all (not found, permission, ...). Same
 		// message the combined Run() path produced for this case.
-		return nil, fmt.Errorf("failed to execute %q: %w", run.Command, err)
+		return nil, diag.CommandNotStarted.Errorf("failed to execute %q: %w", run.Command, err)
 	}
 	// The child now holds the write ends; drop atago's copies or the read side
 	// never sees EOF at all, and the drains below would never finish.
@@ -201,7 +201,7 @@ func (r *Runner) Run(ctx context.Context, run *spec.Run, workdir string) (*runne
 	// instead of asserting against the killed result (issue #30).
 	if err := ctx.Err(); err != nil {
 		res.ExitCode = -1
-		return res, fmt.Errorf("run %q canceled: %w", run.Command, err)
+		return res, diag.RunInterrupted.Errorf("run %q canceled: %w", run.Command, err)
 	}
 
 	var exitErr *exec.ExitError
@@ -214,7 +214,7 @@ func (r *Runner) Run(ctx context.Context, run *spec.Run, workdir string) (*runne
 		// Could not start the process at all (not found, permission, ...). A
 		// process that DID run and failed only to be captured returned above, so
 		// this message never claims a command that ran never started.
-		return nil, fmt.Errorf("failed to execute %q: %w", run.Command, runErr)
+		return nil, diag.CommandNotStarted.Errorf("failed to execute %q: %w", run.Command, runErr)
 	}
 	return res, nil
 }
@@ -258,7 +258,7 @@ func captureFailure(command string, exitCode int, err error) error {
 	if errors.Is(err, exec.ErrWaitDelay) || errors.Is(err, errDrainDeadline) {
 		hint = "; a process it started outlived it and kept the pipes open — declare a long-running program with a `service:` step instead of backgrounding it inside a run step"
 	}
-	return fmt.Errorf("run %q exited with code %d but its output could not be captured: %w%s", command, exitCode, err, hint)
+	return diag.CaptureFailed.Errorf("run %q exited with code %d but its output could not be captured: %w%s", command, exitCode, err, hint)
 }
 
 // stdinReader builds the reader fed to the command's standard input (#18):
@@ -277,14 +277,14 @@ func stdinReader(run *spec.Run, workdir string) (io.Reader, error) {
 		}
 		data, err := os.ReadFile(abs) //nolint:gosec // confined to the scenario workdir above
 		if err != nil {
-			return nil, fmt.Errorf("run.stdin.file: %w", err)
+			return nil, diag.SandboxSetupFailed.Errorf("run.stdin.file: %w", err)
 		}
 		return bytes.NewReader(data), nil
 	case s.Base64 != "":
 		data, err := base64.StdEncoding.DecodeString(s.Base64)
 		if err != nil {
 			// Unreachable for loader-validated specs; kept for direct API users.
-			return nil, fmt.Errorf("run.stdin.base64: %w", err)
+			return nil, diag.SandboxSetupFailed.Errorf("run.stdin.base64: %w", err)
 		}
 		return bytes.NewReader(data), nil
 	case s.Inline != "":
@@ -334,10 +334,10 @@ func CommandLine(command string, shell bool) (string, []string, error) {
 	}
 	fields, err := splitArgv(command)
 	if err != nil {
-		return "", nil, fmt.Errorf("cannot parse command %q: %w", command, err)
+		return "", nil, diag.CommandUnparsable.Errorf("cannot parse command %q: %w", command, err)
 	}
 	if len(fields) == 0 {
-		return "", nil, fmt.Errorf("empty command")
+		return "", nil, diag.CommandUnparsable.Errorf("empty command")
 	}
 	return fields[0], fields[1:], nil
 }
@@ -401,10 +401,10 @@ func windowsFields(command string) ([]string, error) {
 		}
 	}
 	if inDouble {
-		return nil, fmt.Errorf("unclosed double quote")
+		return nil, diag.CommandUnparsable.Errorf("unclosed double quote")
 	}
 	if inSingle {
-		return nil, fmt.Errorf("unclosed single quote")
+		return nil, diag.CommandUnparsable.Errorf("unclosed single quote")
 	}
 	if started {
 		fields = append(fields, cur.String())
@@ -448,7 +448,7 @@ func parseTimeout(s string) (time.Duration, error) {
 	}
 	d, err := time.ParseDuration(s)
 	if err != nil {
-		return 0, fmt.Errorf("invalid timeout %q: %w", s, err)
+		return 0, diag.InternalError.Errorf("invalid timeout %q: %w", s, err)
 	}
 	return d, nil
 }

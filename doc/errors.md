@@ -10,8 +10,8 @@ Codes are being assigned one family at a time. The table says which families car
 |---|---|---|---|
 | `ATG2xxx` | 2 | spec error — the file could not be parsed, or does not describe a runnable suite | 39 codes |
 | `ATG3xxx` | 3 | configuration error — the command line, its flags, or the spec files it selected | 14 codes |
-| `ATG4xxx` | 4 | execution error — a step could not be carried out | not yet |
-| `ATG5xxx` | 5 | internal error — a bug in atago | not yet |
+| `ATG4xxx` | 4 | execution error — a step could not be carried out | 26 codes |
+| `ATG5xxx` | 5 | internal error — a bug in atago | 1 codes |
 | `ATG6xxx` | 6 | security policy violation — atago refused an operation on policy grounds | 1 codes |
 
 `ATG1xxx` is never assigned. Exit 1 means one or more scenarios failed, which is a result rather than an error.
@@ -77,6 +77,33 @@ Look a code up from the terminal with `atago explain ATG2201`, which prints this
 | [`ATG3205`](#atg3205--the-output-file-already-exists) | the output file already exists | 3 | v0.21.0 |
 | [`ATG3206`](#atg3206--a-destination-atago-was-asked-to-write-cannot-be-written) | a destination atago was asked to write cannot be written | 3 | v0.21.0 |
 | [`ATG3207`](#atg3207--atagos-recorded-state-from-a-previous-run-cannot-be-read) | atago's recorded state from a previous run cannot be read | 3 | v0.21.0 |
+| [`ATG4001`](#atg4001--a-command-line-could-not-be-split-into-arguments) | a command line could not be split into arguments | 4 | v0.21.0 |
+| [`ATG4002`](#atg4002--the-program-could-not-be-started) | the program could not be started | 4 | v0.21.0 |
+| [`ATG4003`](#atg4003--the-isolated-environment-for-the-step-could-not-be-prepared) | the isolated environment for the step could not be prepared | 4 | v0.21.0 |
+| [`ATG4004`](#atg4004--a-file-the-step-depends-on-could-not-be-read-or-written) | a file the step depends on could not be read or written | 4 | v0.21.0 |
+| [`ATG4005`](#atg4005--a-command-run-alongside-a-terminal-session-failed) | a command run alongside a terminal session failed | 4 | v0.21.0 |
+| [`ATG4101`](#atg4101--a-step-did-not-finish-within-its-timeout) | a step did not finish within its timeout | 4 | v0.21.0 |
+| [`ATG4102`](#atg4102--a-service-did-not-become-ready-within-its-timeout) | a service did not become ready within its timeout | 4 | v0.21.0 |
+| [`ATG4103`](#atg4103--the-run-was-interrupted-before-the-step-finished) | the run was interrupted before the step finished | 4 | v0.21.0 |
+| [`ATG4201`](#atg4201--a-peer-could-not-be-reached) | a peer could not be reached | 4 | v0.21.0 |
+| [`ATG4202`](#atg4202--a-runner-is-missing-something-it-needs-before-it-can-connect) | a runner is missing something it needs before it can connect | 4 | v0.21.0 |
+| [`ATG4203`](#atg4203--the-peer-was-reached-but-rejected-what-was-asked-of-it) | the peer was reached but rejected what was asked of it | 4 | v0.21.0 |
+| [`ATG4204`](#atg4204--an-address-or-connection-string-could-not-be-understood) | an address or connection string could not be understood | 4 | v0.21.0 |
+| [`ATG4301`](#atg4301--a-service-failed-before-it-became-ready) | a service failed before it became ready | 4 | v0.21.0 |
+| [`ATG4302`](#atg4302--a-service-was-addressed-while-it-was-not-running) | a service was addressed while it was not running | 4 | v0.21.0 |
+| [`ATG4303`](#atg4303--a-mock-server-could-not-be-started-or-could-not-answer) | a mock server could not be started or could not answer | 4 | v0.21.0 |
+| [`ATG4401`](#atg4401--a-pseudo-terminal-could-not-be-allocated-or-driven) | a pseudo-terminal could not be allocated or driven | 4 | v0.21.0 |
+| [`ATG4402`](#atg4402--atago-does-not-know-how-to-send-that-key-or-signal) | atago does not know how to send that key or signal | 4 | v0.21.0 |
+| [`ATG4403`](#atg4403--the-steps-output-could-not-be-captured) | the step's output could not be captured | 4 | v0.21.0 |
+| [`ATG4404`](#atg4404--the-step-is-not-supported-on-this-platform) | the step is not supported on this platform | 4 | v0.21.0 |
+| [`ATG4405`](#atg4405--a-browser-action-could-not-be-carried-out) | a browser action could not be carried out | 4 | v0.21.0 |
+| [`ATG4406`](#atg4406--the-session-sent-input-the-program-is-not-set-up-to-receive) | the session sent input the program is not set up to receive | 4 | v0.21.0 |
+| [`ATG4501`](#atg4501--a-store-step-has-no-result-to-capture-from) | a store step has no result to capture from | 4 | v0.21.0 |
+| [`ATG4502`](#atg4502--the-value-to-store-could-not-be-extracted) | the value to store could not be extracted | 4 | v0.21.0 |
+| [`ATG4503`](#atg4503--a-request-payload-could-not-be-built) | a request payload could not be built | 4 | v0.21.0 |
+| [`ATG4504`](#atg4504--the-peer-answered-with-something-that-could-not-be-read) | the peer answered with something that could not be read | 4 | v0.21.0 |
+| [`ATG4505`](#atg4505--a-variable-the-step-expands-is-not-defined) | a variable the step expands is not defined | 4 | v0.21.0 |
+| [`ATG5001`](#atg5001--atago-hit-a-state-it-does-not-handle) | atago hit a state it does not handle | 5 | v0.21.0 |
 | [`ATG6001`](#atg6001--a-request-targeted-a-host-the-specs-network-policy-does-not-allow) | a request targeted a host the spec's network policy does not allow | 6 | v0.21.0 |
 
 ## ATG2xxx — exit 2
@@ -506,6 +533,226 @@ Exits 3. Since v0.21.0.
 Fix: Delete the ledger and run the full suite once to record it again.
 
 Exits 3. Since v0.21.0.
+
+## ATG4xxx — exit 4
+
+### ATG4001 — a command line could not be split into arguments
+
+Without `shell: true`, atago splits the command itself using shell quoting rules rather than handing it to a shell, so that a spec means the same thing on every platform. An unbalanced quote leaves that split with no sensible answer. An empty command has the same problem for a different reason: there is nothing to run.
+
+Fix: Balance the quotes, or set `shell: true` on the step when the command genuinely needs a shell to interpret it (pipes, redirection, globbing).
+
+Exits 4. Since v0.21.0.
+
+### ATG4002 — the program could not be started
+
+The operating system refused to launch it. Almost always the executable is not on `PATH`, or is present but not marked executable. In CI this usually means the build step has not run, or the binary landed somewhere the run does not look.
+
+Fix: Check the program name and that it is on `PATH` for the run. A directory manifest's `subject:` block builds the binary under test before any scenario and puts it on `PATH`, which is the supported way to test something not installed system-wide.
+
+Exits 4. Since v0.21.0.
+
+### ATG4003 — the isolated environment for the step could not be prepared
+
+Before a step runs, atago builds what it runs inside: the scenario workdir, a suite scratch directory, a sandboxed `HOME` when one was asked for, and any stdin the step feeds in. One of those could not be created or read. A full or read-only temp filesystem is the usual cause.
+
+Fix: Check free space and permissions on the temp directory, and check any file the step names for its stdin.
+
+Exits 4. Since v0.21.0.
+
+### ATG4004 — a file the step depends on could not be read or written
+
+The step named a file it had to read — a request body, an upload, an SSH key, a known_hosts list, a readiness probe's target — or one it had to write, such as a screenshot or a download. The filesystem refused. A path relative to the scenario workdir that was never created is the usual cause, since each scenario starts in a fresh directory.
+
+Fix: Check the path, and check that whatever creates the file runs before the step that reads it. A `fixture:` step is the supported way to put a file into the scenario workdir.
+
+Exits 4. Since v0.21.0.
+
+### ATG4005 — a command run alongside a terminal session failed
+
+A `pty:` session's `exec:` runs a command beside the terminal, usually to cause the change the session is waiting to observe. It exited non-zero, so that change was not made and whatever the session expects next can never arrive.
+
+Fix: Run the command by hand to see why it fails. Its own output accompanies this message.
+
+Exits 4. Since v0.21.0.
+
+### ATG4101 — a step did not finish within its timeout
+
+The step was still running when its bound elapsed, so atago stopped it. Every step has a timeout, from the step's own `timeout:`, the suite's, or atago's default, because a test that hangs forever is worse than one that fails — CI notices the failure and never notices the hang.
+
+Fix: Raise `timeout:` if the work legitimately takes that long, or find out what the program is waiting for. A program waiting on input nobody sends is the usual cause: give the step a `stdin:`, or drive it as a `pty:` session.
+
+Exits 4. Since v0.21.0.
+
+### ATG4102 — a service did not become ready within its timeout
+
+The service was started and its readiness probe never succeeded before the bound elapsed. atago waits rather than racing, so that a scenario cannot pass or fail depending on how fast a machine happens to be. The service's own output is included with this message, because what it printed while failing to start is usually the whole answer.
+
+Fix: Read the service output above the message first. If the service is simply slow, raise `ready.timeout`; if the probe is wrong, check that `ready.port`, `ready.file`, or `ready.log` describes what the service actually does when it is up.
+
+Exits 4. Since v0.21.0.
+
+### ATG4103 — the run was interrupted before the step finished
+
+A `Ctrl-C` or `SIGTERM` reached atago, which stops scheduling new work and unwinds what is in flight: processes are stopped, services torn down, sessions closed, and partial results reported. The step that was running when the signal arrived reports this rather than a verdict, because it never reached one.
+
+Fix: Nothing, when the interruption was deliberate. In CI this usually means the job hit its own overall time limit, which is worth checking before the specs are.
+
+Exits 4. Since v0.21.0.
+
+### ATG4201 — a peer could not be reached
+
+An HTTP, database, SSH, gRPC, or browser connection failed to establish. The same code covers all of them because the reader's next move is the same: find out whether the thing being connected to is actually up and actually at that address. Connection refused means nothing is listening there; a timeout usually means a firewall or a wrong host.
+
+Fix: Check that the peer is running and that the runner's address matches. Where the peer is part of the test, declare it as a scenario `service:` so atago starts it and waits for readiness before the step runs.
+
+Exits 4. Since v0.21.0.
+
+### ATG4202 — a runner is missing something it needs before it can connect
+
+The runner declaration is short of a required piece: an SSH runner with no user or no credential, a database runner with no DSN, a gRPC runner with no target. SSH host-key verification belongs here too — a runner with no `known_hosts` is refused rather than connecting blind, since silently accepting any host key would make the check worthless.
+
+Fix: Complete the `runners:` entry with what the message names. For SSH, either point `known_hosts` at a real file or set `insecure_host_key: true` deliberately, for a throwaway host you control.
+
+Exits 4. Since v0.21.0.
+
+### ATG4203 — the peer was reached but rejected what was asked of it
+
+The connection worked and the request did not: a gRPC service or method that does not exist in the reflected schema, a method that streams where only unary calls are supported, a redirect chain that never settled. This is the peer disagreeing about what it offers, rather than a failure to reach it.
+
+Fix: Check the name against what the peer actually exposes. For gRPC, the message lists what reflection reported, which is the authoritative answer for the server actually running.
+
+Exits 4. Since v0.21.0.
+
+### ATG4204 — an address or connection string could not be understood
+
+A URL, DSN, or method name is malformed, or a driver could not be inferred from a DSN whose scheme atago does not recognize. A relative request path with no `base_url` on the runner is the same problem seen from the other side: there is not enough there to form an address.
+
+Fix: Correct the address to the form the message names. A database runner can also state its `driver:` explicitly rather than leaving it to be inferred.
+
+Exits 4. Since v0.21.0.
+
+### ATG4301 — a service failed before it became ready
+
+The service exited, or its readiness probe reported it unusable, before any step could depend on it. Unlike a readiness timeout this is not about waiting: the service made its answer clear early. Its captured output accompanies the message.
+
+Fix: Read the service's own output first — a bad configuration file or an occupied port is usually visible there.
+
+Exits 4. Since v0.21.0.
+
+### ATG4302 — a service was addressed while it was not running
+
+A step signalled or otherwise acted on a service that had already exited, or had not been started. A service that ignores a stop signal and outlives its grace period is reported here too, since what follows is the same question: what is that process doing.
+
+Fix: Check whether the service exits on its own partway through the scenario, which its captured output usually shows. A service that will not stop on `TERM` may need `KILL`.
+
+Exits 4. Since v0.21.0.
+
+### ATG4303 — a mock server could not be started or could not answer
+
+The mock server atago runs on the scenario's behalf failed to bind a port, or could not build the response a route declares. Unlike the services above, this is atago's own process, so the cause is either the environment refusing the port or the route being impossible to render.
+
+Fix: Check the route's declared response, and whether the port is already taken. Leaving the port unset lets atago choose a free one and expose it through the store.
+
+Exits 4. Since v0.21.0.
+
+### ATG4401 — a pseudo-terminal could not be allocated or driven
+
+A `pty:` step runs its program in a real terminal so that programs behaving differently when attached to one can be tested at all. Allocating that terminal, resizing it, or identifying it failed. A container with no `/dev/pts` mounted is the usual cause on Linux, and a terminal size outside what the kernel accepts is the usual cause everywhere.
+
+Fix: Check that the environment provides pseudo-terminals, and that any `rows`/`cols` are within range. In a container, mounting `/dev/pts` is what makes `pty:` steps possible.
+
+Exits 4. Since v0.21.0.
+
+### ATG4402 — atago does not know how to send that key or signal
+
+Named keys and signals come from a fixed vocabulary, so that a spec transmits the same bytes everywhere rather than depending on what a terminal happens to map. The name given is not in it.
+
+Fix: Use one of the names the message lists.
+
+Exits 4. Since v0.21.0.
+
+### ATG4403 — the step's output could not be captured
+
+The program ran but atago could not collect what it wrote. The usual cause is a program that leaves a child process holding the output pipe open after it exits: atago waits briefly and then reports this rather than blocking forever on a pipe nobody will close. Assertions on the output cannot be trusted when this happens, so the step errors instead of failing.
+
+Fix: Check for a background process the command leaves behind. Redirecting the child's output inside the command, or waiting for it before exiting, closes the pipe.
+
+Exits 4. Since v0.21.0.
+
+### ATG4404 — the step is not supported on this platform
+
+Some steps rest on facilities one platform has and another does not — POSIX signals being the clearest case. atago refuses rather than pretending, because a signal quietly not delivered would leave the scenario asserting against a program that never received it.
+
+Fix: Gate the scenario with `skip: {os: ...}` so it runs where the facility exists, or express the same intent with something portable.
+
+Exits 4. Since v0.21.0.
+
+### ATG4405 — a browser action could not be carried out
+
+A `cdp:` action failed against the page: a selector matching nothing, a click that never landed, a download the browser would not begin. The browser was running and reachable — this is about the page rather than the connection.
+
+Fix: Check the selector against the page as it is at that moment. A page still loading is the usual cause, and a `check:` action before the one that fails is how a scenario waits for it.
+
+Exits 4. Since v0.21.0.
+
+### ATG4406 — the session sent input the program is not set up to receive
+
+Mouse reporting and bracketed paste are modes a program turns on for itself, and a program that has not turned one on receives the bytes as ordinary keystrokes rather than as the event the session meant. atago refuses instead of sending them, because the result would be a scenario asserting against input the program interpreted as something else entirely.
+
+Fix: Wait for the program to enable the mode before sending: an `expect_screen:` on whatever it draws once it is ready is usually enough. A program that never enables it cannot be driven this way.
+
+Exits 4. Since v0.21.0.
+
+### ATG4501 — a store step has no result to capture from
+
+`store:` captures a value out of the step before it — a command's stdout, a response body, a query's rows — and no such step has run in this scenario yet. The usual cause is a store placed before the step it means to read, or after a step of a different kind.
+
+Fix: Move the store step directly after the step whose result it captures.
+
+Exits 4. Since v0.21.0.
+
+### ATG4502 — the value to store could not be extracted
+
+The source step ran, and the selector found nothing usable in it: a JSON path matching no value or several, a regexp that did not match, a body that is not the JSON it was read as. atago errors rather than storing an empty value, because an empty value would flow silently into every later step that expands it.
+
+Fix: Check the selector against what the step actually produced — `--verbose` prints each step's captured output, which is the quickest way to see it.
+
+Exits 4. Since v0.21.0.
+
+### ATG4503 — a request payload could not be built
+
+The step's body could not be encoded or assembled: a JSON value that will not marshal, a multipart form that could not be written, a gRPC message that does not fit the schema the peer reflected. Nothing was sent, so the peer never saw the request.
+
+Fix: Check the payload against the shape the peer expects. For gRPC, the reflected schema is what decides, not the local proto files.
+
+Exits 4. Since v0.21.0.
+
+### ATG4504 — the peer answered with something that could not be read
+
+A response arrived and could not be decoded — a body that is not the JSON it claims to be, a row that could not be scanned into a value, a gRPC message that will not unmarshal. The exchange succeeded at the transport level and failed at the content level.
+
+Fix: Look at the raw response, which `--verbose` prints. An HTML error page where JSON was expected is the most common version of this, and it usually means the request reached something other than the intended endpoint.
+
+Exits 4. Since v0.21.0.
+
+### ATG4505 — a variable the step expands is not defined
+
+The step referenced `${name}` or `${env:NAME}` and neither a stored value nor an environment variable of that name exists at that point. atago refuses rather than expanding to an empty string, which would silently send an empty password or an empty path and fail somewhere far from the cause.
+
+Fix: Set the environment variable, or add the `store:` step that defines the name before the step that reads it. `$${...}` writes a literal dollar-brace where no expansion is wanted.
+
+Exits 4. Since v0.21.0.
+
+## ATG5xxx — exit 5
+
+### ATG5001 — atago hit a state it does not handle
+
+This is a bug in atago. It means an invariant the code relies on did not hold — a step reaching a runner that cannot serve it, a generated document that could not be produced, a resource that should exist and does not. A spec cannot be at fault: everything a spec can get wrong is refused while loading, with an ATG2xxx code.
+
+Fix: Please report it at https://github.com/nao1215/atago/issues with the message, the atago version from `atago version`, and the spec if you can share it. There is no workaround to try first.
+
+Exits 5. Since v0.21.0.
 
 ## ATG6xxx — exit 6
 

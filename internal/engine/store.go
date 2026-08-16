@@ -1,7 +1,6 @@
 package engine
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"regexp"
@@ -10,6 +9,7 @@ import (
 	"github.com/ohler55/ojg/jp"
 	"github.com/ohler55/ojg/oj"
 
+	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/plural"
 	"github.com/nao1215/atago/internal/runner"
 	"github.com/nao1215/atago/internal/security"
@@ -22,12 +22,12 @@ import (
 func extractValue(sp *spec.Store, current *runner.Result, workdir string) (string, error) {
 	from := sp.From
 	if from == nil {
-		return "", fmt.Errorf("store %q: 'from' is required", sp.Name)
+		return "", diag.InternalError.Errorf("store %q: 'from' is required", sp.Name)
 	}
 	switch {
 	case from.Stdout != nil:
 		if current == nil {
-			return "", fmt.Errorf("store %q: no command has run in this scenario yet", sp.Name)
+			return "", diag.StoreSourceMissing.Errorf("store %q: no command has run in this scenario yet", sp.Name)
 		}
 		return extractStream(from.Stdout, current.Stdout)
 	case from.File != nil:
@@ -47,39 +47,39 @@ func extractValue(sp *spec.Store, current *runner.Result, workdir string) (strin
 		case len(from.File.JSON) > 0:
 			return jsonValue(data, from.File.JSON[0].Path)
 		default:
-			return "", fmt.Errorf("store %q: a file source needs a json or text selector", sp.Name)
+			return "", diag.InternalError.Errorf("store %q: a file source needs a json or text selector", sp.Name)
 		}
 	case from.Body != nil:
 		if current == nil || !current.IsHTTP {
-			return "", fmt.Errorf("store %q: no HTTP request has run in this scenario yet", sp.Name)
+			return "", diag.StoreSourceMissing.Errorf("store %q: no HTTP request has run in this scenario yet", sp.Name)
 		}
 		return extractStream(from.Body, current.Body)
 	case from.Header != "":
 		if current == nil || !current.IsHTTP {
-			return "", fmt.Errorf("store %q: no HTTP request has run in this scenario yet", sp.Name)
+			return "", diag.StoreSourceMissing.Errorf("store %q: no HTTP request has run in this scenario yet", sp.Name)
 		}
 		v := current.Header.Get(from.Header)
 		if v == "" {
-			return "", fmt.Errorf("store %q: response has no %q header", sp.Name, from.Header)
+			return "", diag.StoreExtractFailed.Errorf("store %q: response has no %q header", sp.Name, from.Header)
 		}
 		return v, nil
 	case from.Rows != nil:
 		if current == nil || !current.IsDB {
-			return "", fmt.Errorf("store %q: no query has run in this scenario yet", sp.Name)
+			return "", diag.StoreSourceMissing.Errorf("store %q: no query has run in this scenario yet", sp.Name)
 		}
 		return extractStream(from.Rows, current.RowsJSON)
 	case from.Message != nil:
 		if current == nil || !current.IsGRPC {
-			return "", fmt.Errorf("store %q: no gRPC call has run in this scenario yet", sp.Name)
+			return "", diag.StoreSourceMissing.Errorf("store %q: no gRPC call has run in this scenario yet", sp.Name)
 		}
 		return extractStream(from.Message, current.MessageJSON)
 	case from.Value != nil:
 		if current == nil || !current.IsCDP {
-			return "", fmt.Errorf("store %q: no cdp step has run in this scenario yet", sp.Name)
+			return "", diag.StoreSourceMissing.Errorf("store %q: no cdp step has run in this scenario yet", sp.Name)
 		}
 		return extractStream(from.Value, current.CDPValue)
 	default:
-		return "", fmt.Errorf("store %q: 'from' must set stdout, file, body, header, rows, message, or value", sp.Name)
+		return "", diag.InternalError.Errorf("store %q: 'from' must set stdout, file, body, header, rows, message, or value", sp.Name)
 	}
 }
 
@@ -99,7 +99,7 @@ func extractStream(s *spec.StreamAssert, data []byte) (string, error) {
 		}
 		return out, nil
 	default:
-		return "", fmt.Errorf("a stdout store source needs a json, matches, or trim selector")
+		return "", diag.InternalError.Errorf("a stdout store source needs a json, matches, or trim selector")
 	}
 }
 
@@ -111,7 +111,7 @@ func extractStream(s *spec.StreamAssert, data []byte) (string, error) {
 func parseJSON(data []byte) (v any, err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			v, err = nil, errors.New("the parser could not decode it")
+			v, err = nil, diag.StoreExtractFailed.Errorf("the parser could not decode it")
 		}
 	}()
 	return oj.Parse(data)
@@ -121,22 +121,22 @@ func parseJSON(data []byte) (v any, err error) {
 func jsonValue(data []byte, path string) (string, error) {
 	v, err := parseJSON(data)
 	if err != nil {
-		return "", fmt.Errorf("invalid JSON: %w", err)
+		return "", diag.StoreExtractFailed.Errorf("invalid JSON: %w", err)
 	}
 	expr, err := jp.ParseString(path)
 	if err != nil {
-		return "", fmt.Errorf("invalid JSON path %q: %w", path, err)
+		return "", diag.StoreExtractFailed.Errorf("invalid JSON path %q: %w", path, err)
 	}
 	nodes := expr.Get(v)
 	if len(nodes) != 1 {
-		return "", fmt.Errorf("JSON path %q selected %s, want exactly 1", path, plural.Count(len(nodes), "value", "values"))
+		return "", diag.StoreExtractFailed.Errorf("JSON path %q selected %s, want exactly 1", path, plural.Count(len(nodes), "value", "values"))
 	}
 	// Why: a JSON null selects exactly one node whose Go value is nil, and
 	// fmt.Sprint(nil) yields the literal string "<nil>". Storing that would leak
 	// a Go-ism into a user-visible variable and silently mask "the field was
 	// null" as a captured value. Surface it as a clean error instead.
 	if nodes[0] == nil {
-		return "", fmt.Errorf("JSON path %q selected a null value", path)
+		return "", diag.StoreExtractFailed.Errorf("JSON path %q selected a null value", path)
 	}
 	return fmt.Sprint(nodes[0]), nil
 }
@@ -146,11 +146,11 @@ func jsonValue(data []byte, path string) (string, error) {
 func regexValue(data []byte, pattern string) (string, error) {
 	re, err := regexp.Compile(pattern)
 	if err != nil {
-		return "", fmt.Errorf("invalid regexp %q: %w", pattern, err)
+		return "", diag.StoreExtractFailed.Errorf("invalid regexp %q: %w", pattern, err)
 	}
 	m := re.FindSubmatch(data)
 	if m == nil {
-		return "", fmt.Errorf("regexp %q did not match", pattern)
+		return "", diag.StoreExtractFailed.Errorf("regexp %q did not match", pattern)
 	}
 	if len(m) > 1 {
 		return string(m[1]), nil

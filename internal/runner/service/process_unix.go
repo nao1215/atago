@@ -4,10 +4,11 @@ package service
 
 import (
 	"context"
-	"fmt"
 	"os/exec"
 	"syscall"
 	"time"
+
+	"github.com/nao1215/atago/internal/diag"
 )
 
 // processCmd wraps an *exec.Cmd whose children are placed in their own process
@@ -52,7 +53,7 @@ var namedSignals = map[string]syscall.Signal{
 func (p *processCmd) signalByName(name string) error {
 	sig, ok := namedSignals[name]
 	if !ok {
-		return fmt.Errorf("unknown signal %q (accepted: TERM, INT, HUP, USR1, USR2, KILL)", name)
+		return diag.InputNotSupported.Errorf("unknown signal %q (accepted: TERM, INT, HUP, USR1, USR2, KILL)", name)
 	}
 	return signalGroup(p.cmd, sig)
 }

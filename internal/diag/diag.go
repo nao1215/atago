@@ -63,6 +63,17 @@ func (c Code) Annotate(msg string) string {
 	return c.String() + ": " + msg
 }
 
+// Errorf builds an error whose message carries the code, and is the form used
+// where diagnostics are raised as errors rather than collected as strings. It
+// forwards to [fmt.Errorf], so a `%w` in the format still wraps.
+//
+// Only the site that names the problem carries a code. A wrapper that adds
+// context to someone else's error — "service %q: %w" — leaves the code to the
+// error it wraps, so a message never accumulates two of them.
+func (c Code) Errorf(format string, args ...any) error {
+	return fmt.Errorf(c.String()+": "+format, args...)
+}
+
 // Entry is a code's published documentation.
 type Entry struct {
 	// Code is the diagnostic's identity.

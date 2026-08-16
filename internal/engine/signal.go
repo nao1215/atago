@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/nao1215/atago/internal/diag"
 	servicerunner "github.com/nao1215/atago/internal/runner/service"
 	"github.com/nao1215/atago/internal/spec"
 	"github.com/nao1215/atago/internal/store"
@@ -22,7 +23,7 @@ func runSignal(sg *spec.Signal, st *store.Store, scenarioServices, suiteServices
 	name := st.Expand(sg.Service)
 	proc := findServiceProc(name, scenarioServices, suiteServices)
 	if proc == nil {
-		return fmt.Errorf("signal step targets unknown service %q (no scenario or suite service with that name is running)", name)
+		return diag.ServiceNotRunning.Errorf("signal step targets unknown service %q (no scenario or suite service with that name is running)", name)
 	}
 	sigName := spec.NormalizeSignalName(sg.Signal)
 	if err := proc.Signal(sigName); err != nil {
@@ -39,7 +40,7 @@ func runSignal(sg *spec.Signal, st *store.Store, scenarioServices, suiteServices
 		}
 	}
 	if !proc.WaitExit(timeout) {
-		return fmt.Errorf("service %q did not exit within %s after SIG%s", name, timeout, sigName)
+		return diag.ServiceNotRunning.Errorf("service %q did not exit within %s after SIG%s", name, timeout, sigName)
 	}
 	return nil
 }

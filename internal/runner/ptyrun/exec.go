@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nao1215/atago/internal/diag"
 	runnercmd "github.com/nao1215/atago/internal/runner/cmd"
 	"github.com/nao1215/atago/internal/spec"
 )
@@ -75,16 +76,16 @@ func runSessionExec(ctx context.Context, e *spec.PTYExec, dir string, env []stri
 	detail := out.String()
 	switch {
 	case errors.Is(runCtx.Err(), context.DeadlineExceeded):
-		return fmt.Errorf("exec %q did not finish within %s%s", e.Command, timeout, execOutputSuffix(detail))
+		return diag.StepTimeout.Errorf("exec %q did not finish within %s%s", e.Command, timeout, execOutputSuffix(detail))
 	case errors.Is(ctx.Err(), context.Canceled):
-		return fmt.Errorf("exec %q was canceled after %s: %w", e.Command, time.Since(start).Round(time.Millisecond), ctx.Err())
+		return diag.StepTimeout.Errorf("exec %q was canceled after %s: %w", e.Command, time.Since(start).Round(time.Millisecond), ctx.Err())
 	}
 	var exitErr *exec.ExitError
 	if errors.As(runErr, &exitErr) {
-		return fmt.Errorf("exec %q exited %d, so the change the session waits for was not made%s",
+		return diag.SessionExecFailed.Errorf("exec %q exited %d, so the change the session waits for was not made%s",
 			e.Command, exitErr.ExitCode(), execOutputSuffix(detail))
 	}
-	return fmt.Errorf("exec %q could not run: %w%s", e.Command, runErr, execOutputSuffix(detail))
+	return diag.CommandNotStarted.Errorf("exec %q could not run: %w%s", e.Command, runErr, execOutputSuffix(detail))
 }
 
 func execOutputSuffix(detail string) string {

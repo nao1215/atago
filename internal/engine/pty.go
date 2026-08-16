@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/nao1215/atago/internal/assert"
+	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/runner"
 	runnercmd "github.com/nao1215/atago/internal/runner/cmd"
 	"github.com/nao1215/atago/internal/runner/ptyrun"
@@ -151,12 +152,10 @@ func unresolvedRefError(idx int, field, text string, st *store.Store) error {
 	}
 	name := names[0]
 	if envName, isEnv := strings.CutPrefix(name, "env:"); isEnv {
-		return fmt.Errorf(
-			"pty session entry %[1]d (%[2]s) references ${env:%[3]s}, but the environment variable %[3]s is not set; set it or write $${env:%[3]s} for the literal text",
+		return diag.VariableUnresolved.Errorf("pty session entry %[1]d (%[2]s) references ${env:%[3]s}, but the environment variable %[3]s is not set; set it or write $${env:%[3]s} for the literal text",
 			idx, field, envName)
 	}
-	return fmt.Errorf(
-		"pty session entry %[1]d (%[2]s) references ${%[3]s}, but no variable with that name is defined (builtins, matrix vars, store, ready.store, env:); define the variable or write $${%[3]s} for the literal text",
+	return diag.VariableUnresolved.Errorf("pty session entry %[1]d (%[2]s) references ${%[3]s}, but no variable with that name is defined (builtins, matrix vars, store, ready.store, env:); define the variable or write $${%[3]s} for the literal text",
 		idx, field, name)
 }
 

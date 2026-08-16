@@ -1,8 +1,9 @@
 package ptyrun
 
 import (
-	"fmt"
 	"strconv"
+
+	"github.com/nao1215/atago/internal/diag"
 )
 
 // DEC private modes atago tracks from the program's own output. A terminal
@@ -38,19 +39,17 @@ func checkMouseMode(term *transcriptDrain, command string, idx int) error {
 		term.modeEnabled(decsetMouseAny)
 	switch {
 	case !tracking:
-		return fmt.Errorf(
-			"pty %q: session[%d] sends a mouse event, but the program has not enabled mouse reporting "+
-				"(it never wrote ESC [?1000h, ESC [?1002h, or ESC [?1003h, or turned tracking back off). "+
-				"Programs that only read the keyboard want a key send instead; "+
-				"if this one does enable tracking, wait for it with an expect or expect_screen before clicking",
+		return diag.TerminalModeMismatch.Errorf("pty %q: session[%d] sends a mouse event, but the program has not enabled mouse reporting "+
+			"(it never wrote ESC [?1000h, ESC [?1002h, or ESC [?1003h, or turned tracking back off). "+
+			"Programs that only read the keyboard want a key send instead; "+
+			"if this one does enable tracking, wait for it with an expect or expect_screen before clicking",
 			command, idx)
 	case !term.modeEnabled(decsetMouseSGR):
-		return fmt.Errorf(
-			"pty %q: session[%d] sends a mouse event, but the program tracks the mouse in the legacy X10 "+
-				"encoding (it enabled tracking without ESC [?1006h). atago only sends SGR reports, whose "+
-				"coordinates are decimal and can address the whole screen; the X10 form packs them into "+
-				"single bytes and cannot. Modern TUI toolkits request SGR — please open an issue if you "+
-				"hit a real program that does not",
+		return diag.TerminalModeMismatch.Errorf("pty %q: session[%d] sends a mouse event, but the program tracks the mouse in the legacy X10 "+
+			"encoding (it enabled tracking without ESC [?1006h). atago only sends SGR reports, whose "+
+			"coordinates are decimal and can address the whole screen; the X10 form packs them into "+
+			"single bytes and cannot. Modern TUI toolkits request SGR — please open an issue if you "+
+			"hit a real program that does not",
 			command, idx)
 	}
 	return nil
