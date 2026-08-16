@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -328,37 +329,56 @@ func TestSkipQuotedEdges(t *testing.T) {
 	}
 }
 
-// TestDSNHost pins what the network allowlist is handed for each DSN form. The
+// TestDSNHosts pins what the network allowlist is handed for each DSN form. The
 // empty results matter as much as the rest: a DSN that names no peer must not
 // be denied, or a sqlite spec would stop running the moment a spec declared a
 // network policy.
-func TestDSNHost(t *testing.T) {
+func TestDSNHosts(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
-		name, driver, dsn, want string
+		name, driver, dsn string
+		want              []string
 	}{
-		{"sqlite scheme", "sqlite", "sqlite:./a.db", ""},
-		{"sqlite bare path", "sqlite", "/abs/path.db", ""},
-		{"sqlite memory", "sqlite", ":memory:", ""},
-		{"postgres url", "postgres", "postgres://u:p@db.example:5432/app", "db.example:5432"},
-		{"postgres url no port", "postgres", "postgres://u@db.example/app", "db.example"},
-		{"postgresql scheme", "postgres", "postgresql://u@db.example/app", "db.example"},
-		{"postgres keywords", "postgres", "host=db.example port=5432 user=u", "db.example:5432"},
-		{"postgres keywords no port", "postgres", "user=u host=db.example dbname=app", "db.example"},
-		{"postgres unix socket", "postgres", "host=/var/run/postgresql user=u", ""},
-		{"postgres keywords no host", "postgres", "user=u dbname=app", ""},
-		{"mysql url", "mysql", "mysql://u:p@db.example:3306/app", "db.example:3306"},
-		{"mysql native tcp", "mysql", "u:p@tcp(db.example:3306)/app", "db.example:3306"},
-		{"mysql native tcp uppercase", "mysql", "u:p@TCP(db.example:3306)/app", "db.example:3306"},
-		{"mysql native unix", "mysql", "u:p@unix(/tmp/mysql.sock)/app", ""},
-		{"mysql native no protocol", "mysql", "/app", ""},
-		{"mysql native password with at", "mysql", "u:p@ss@tcp(db.example:3306)/app", "db.example:3306"},
+		{"sqlite scheme", "sqlite", "sqlite:./a.db", nil},
+		{"sqlite bare path", "sqlite", "/abs/path.db", nil},
+		{"sqlite memory", "sqlite", ":memory:", nil},
+		{"postgres url", "postgres", "postgres://u:p@db.example:5432/app", []string{"db.example:5432"}},
+		{"postgres url no port", "postgres", "postgres://u@db.example/app", []string{"db.example"}},
+		{"postgresql scheme", "postgres", "postgresql://u@db.example/app", []string{"db.example"}},
+		{"postgres keywords", "postgres", "host=db.example port=5432 user=u", []string{"db.example:5432"}},
+		{"postgres keywords no port", "postgres", "user=u host=db.example dbname=app", []string{"db.example"}},
+		{"postgres unix socket", "postgres", "host=/var/run/postgresql user=u", nil},
+		{"postgres keywords no host", "postgres", "user=u dbname=app", nil},
+		// #497: hostaddr is an alternative spelling of the peer, and lib/pq
+		// dials it in preference to host when both are given — so neither key
+		// may be left unchecked.
+		{"pg hostaddr only", "postgres", "hostaddr=127.0.0.1 port=5432 user=u", []string{"127.0.0.1:5432"}},
+		{"pg host and hostaddr both checked", "postgres", "host=db.example hostaddr=127.0.0.1 user=u", []string{"db.example", "127.0.0.1"}},
+		// #497: libpq quoting. The quotes belong to the syntax, not to the
+		// host, and a quoted value may hold the spaces that used to mis-split
+		// the fields.
+		{"pg quoted host", "postgres", "host='db.example' port=5432 user=u", []string{"db.example:5432"}},
+		{"pg quoted spaced password keeps host", "postgres", "password='a b' host=db.example user=u", []string{"db.example"}},
+		{"pg escaped quote in value keeps host", "postgres", `password='a\'b' host=db.example user=u`, []string{"db.example"}},
+		{"pg spaces around equals", "postgres", "host = db.example port = 5432", []string{"db.example:5432"}},
+		// #497: libpq accepts a failover list; every entry is a peer the driver
+		// may reach, and a shared port applies to all of them.
+		{"pg host list", "postgres", "host=a.example,b.example port=5432 user=u", []string{"a.example:5432", "b.example:5432"}},
+		{"pg host list with per-host ports", "postgres", "host=a.example,b.example port=5432,5433", []string{"a.example:5432", "b.example:5433"}},
+		{"pg host list drops the socket entry", "postgres", "host=a.example,/var/run/postgresql", []string{"a.example"}},
+		{"mysql url", "mysql", "mysql://u:p@db.example:3306/app", []string{"db.example:3306"}},
+		{"mysql native tcp", "mysql", "u:p@tcp(db.example:3306)/app", []string{"db.example:3306"}},
+		{"mysql native tcp uppercase", "mysql", "u:p@TCP(db.example:3306)/app", []string{"db.example:3306"}},
+		{"mysql native unix", "mysql", "u:p@unix(/tmp/mysql.sock)/app", nil},
+		{"mysql native no protocol", "mysql", "/app", nil},
+		{"mysql native password with at", "mysql", "u:p@ss@tcp(db.example:3306)/app", []string{"db.example:3306"}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
-			if got := dsnHost(c.driver, c.dsn); got != c.want {
-				t.Errorf("dsnHost(%q, %q) = %q, want %q", c.driver, c.dsn, got, c.want)
+			got := dsnHosts(c.driver, c.dsn)
+			if !slices.Equal(got, c.want) {
+				t.Errorf("dsnHosts(%q, %q) = %v, want %v", c.driver, c.dsn, got, c.want)
 			}
 		})
 	}
@@ -372,14 +392,14 @@ func TestResolve_CarriesHost(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Resolve: %v", err)
 	}
-	if cfg.Host != "db.example:5432" {
-		t.Errorf("Config.Host = %q, want db.example:5432", cfg.Host)
+	if !slices.Equal(cfg.Hosts, []string{"db.example:5432"}) {
+		t.Errorf("Config.Hosts = %v, want [db.example:5432]", cfg.Hosts)
 	}
 	local, err := Resolve("", "sqlite:./a.db")
 	if err != nil {
 		t.Fatalf("Resolve(sqlite): %v", err)
 	}
-	if local.Host != "" {
-		t.Errorf("Config.Host = %q for a sqlite dsn, want empty", local.Host)
+	if len(local.Hosts) != 0 {
+		t.Errorf("Config.Hosts = %v for a sqlite dsn, want none", local.Hosts)
 	}
 }

@@ -166,6 +166,16 @@ func TestEngine_DBNetworkPolicyViolation(t *testing.T) {
 		{"mysql url", "mysql://u:p@denied.example:3306/app"},
 		{"mysql native", "u:p@tcp(denied.example:3306)/app"},
 		{"postgres keyword dsn", "host=denied.example port=5432 user=u dbname=app sslmode=disable"},
+		// #497: hostaddr is the address lib/pq dials, so a dsn that names only
+		// it must be denied like any other peer instead of slipping through as
+		// a dsn that names no host.
+		{"postgres hostaddr dsn", "hostaddr=127.0.0.1 port=1 user=u dbname=app sslmode=disable"},
+		// #497: a host beside a hostaddr is not a way to launder the address —
+		// lib/pq dials the hostaddr and keeps the host only as a name.
+		{"postgres allowed host with denied hostaddr", "host=db.allowed.example hostaddr=127.0.0.1 port=1 user=u sslmode=disable"},
+		// #497: a failover list must have every entry checked, not only the
+		// first one the driver would try.
+		{"postgres host failover list", "host=db.allowed.example,denied.example port=5432 user=u sslmode=disable"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -246,5 +256,45 @@ scenarios:
 	}
 	if res.SecurityViolation {
 		t.Error("SecurityViolation = true for a sqlite dsn, which contacts no host")
+	}
+}
+
+// TestEngine_DBNetworkPolicyAllowsQuotedHost is a regression for #497: libpq
+// lets a value be single-quoted, and the quotes belong to the dsn syntax rather
+// than to the host. Keeping them made the check compare "'db.allowed.example'"
+// against the allowlist and deny a host the policy names — so the spec failed
+// with a policy violation instead of the connection error it should have
+// reached.
+func TestEngine_DBNetworkPolicyAllowsQuotedHost(t *testing.T) {
+	t.Parallel()
+	src := `
+version: "1"
+suite:
+  name: db
+permissions:
+  network:
+    allow:
+      - db.allowed.example
+runners:
+  store:
+    type: db
+    driver: postgres
+    dsn: "host='db.allowed.example' port=5432 user=u dbname=app sslmode=disable"
+scenarios:
+  - name: quoted allowed host
+    steps:
+      - query:
+          runner: store
+          sql: "SELECT 1"
+`
+	res := runSpec(t, src)
+	if res.SecurityViolation {
+		t.Errorf("SecurityViolation = true for a quoted allowlisted host: %q",
+			res.Scenarios[0].Steps[0].ErrMsg)
+	}
+	// The connection itself is expected to fail (the host does not resolve);
+	// what matters is that it failed as a connection, not as a policy denial.
+	if got := res.Scenarios[0].Steps[0].ErrMsg; strings.Contains(got, "network policy denies") {
+		t.Errorf("err = %q, want no policy denial for an allowlisted host", got)
 	}
 }

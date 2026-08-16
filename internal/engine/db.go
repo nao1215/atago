@@ -36,8 +36,11 @@ func dbConn(name string, st *store.Store, rc runConfig, conns map[string]*dbrunn
 		// confined to permissions.network.allow just like HTTP, grpc, and ssh.
 		// Before the pool, because database/sql connects lazily — a check after
 		// it would run once the denied host had already been dialed.
-		if cfg.Host != "" {
-			if err := security.CheckHost(rc.allow, cfg.Host); err != nil {
+		// Every peer the dsn names is checked, not just the first: a libpq dsn
+		// can name a failover list, or a host beside the hostaddr the driver
+		// actually dials, and an unchecked one is a hole (#497).
+		for _, host := range cfg.Hosts {
+			if err := security.CheckHost(rc.allow, host); err != nil {
 				return nil, err
 			}
 		}
