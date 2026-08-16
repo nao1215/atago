@@ -17,19 +17,23 @@ suite:
     third-party assets.
 
 # Inputs are synthesized with `xc:` canvases, so no image files are committed
-# and every scenario is hermetic. Gate: only where ImageMagick 7 is installed.
+# and every scenario is hermetic. The tools are spelled `convert`, `identify`,
+# and `compare` rather than ImageMagick 7's unified `magick`: those names work
+# on both majors, and `magick` exists only on 7, which Ubuntu does not package.
+# Gating on a name the installed ImageMagick does not have is how this suite
+# skipped every scenario in CI while reporting green.
 scenarios:
   - name: a conversion writes the requested format and nothing else
     only:
-      command: magick -version
+      command: convert -version
     steps:
       - run:
-          command: magick -size 8x6 xc:red source.png
+          command: convert -size 8x6 xc:red source.png
       - assert:
           exit_code: 0
       - run:
           sandbox_home: true
-          command: magick source.png out.jpg
+          command: convert source.png out.jpg
       - assert:
           exit_code: 0
           # Exhaustive: the conversion produced exactly one new file, left the
@@ -48,15 +52,15 @@ scenarios:
 
   - name: resize honors the aspect ratio unless it is forced
     only:
-      command: magick -version
+      command: convert -version
     steps:
       - run:
-          command: magick -size 40x20 xc:white source.png
+          command: convert -size 40x20 xc:white source.png
       - assert:
           exit_code: 0
       # A bare geometry fits the image inside the box, keeping the 2:1 ratio.
       - run:
-          command: magick source.png -resize 20x20 fitted.png
+          command: convert source.png -resize 20x20 fitted.png
       - assert:
           exit_code: 0
           image:
@@ -65,7 +69,7 @@ scenarios:
             height: 10
       # A trailing "!" forces the exact geometry and breaks the ratio.
       - run:
-          command: magick source.png -resize 20x20! forced.png
+          command: convert source.png -resize 20x20! forced.png
       - assert:
           exit_code: 0
           image:
@@ -75,10 +79,10 @@ scenarios:
 
   - name: a 1x1 canvas survives the smallest possible conversion
     only:
-      command: magick -version
+      command: convert -version
     steps:
       - run:
-          command: magick -size 1x1 xc:black tiny.png
+          command: convert -size 1x1 xc:black tiny.png
       - assert:
           exit_code: 0
           image:
@@ -89,10 +93,10 @@ scenarios:
 
   - name: an alpha channel survives PNG but is dropped by JPEG
     only:
-      command: magick -version
+      command: convert -version
     steps:
       - run:
-          command: magick -size 8x6 xc:none transparent.png
+          command: convert -size 8x6 xc:none transparent.png
       - assert:
           exit_code: 0
           image:
@@ -101,7 +105,7 @@ scenarios:
             alpha: true
       # JPEG has no alpha channel: the flattened output must report none.
       - run:
-          command: magick transparent.png -background white -flatten flat.jpg
+          command: convert transparent.png -background white -flatten flat.jpg
       - assert:
           exit_code: 0
           image:
@@ -111,18 +115,18 @@ scenarios:
 
   - name: a PNG to PPM round trip restores the original pixels
     only:
-      command: magick -version
+      command: convert -version
     steps:
       - run:
-          command: magick -size 16x12 gradient:red-blue source.png
+          command: convert -size 16x12 gradient:red-blue source.png
       - assert:
           exit_code: 0
       - run:
-          command: magick source.png intermediate.ppm
+          command: convert source.png intermediate.ppm
       - assert:
           exit_code: 0
       - run:
-          command: magick intermediate.ppm restored.png
+          command: convert intermediate.ppm restored.png
       - assert:
           exit_code: 0
           # atago decodes both images and compares them pixel for pixel.
@@ -133,24 +137,24 @@ scenarios:
       # Independent oracle: ImageMagick's own comparison must agree that not a
       # single pixel differs (AE = absolute error count, exit 0 = identical).
       - run:
-          command: "magick compare -metric AE source.png restored.png null:"
+          command: "compare -metric AE source.png restored.png null:"
       - assert:
           exit_code: 0
 
   - name: comparing different images reports a nonzero difference
     only:
-      command: magick -version
+      command: convert -version
     steps:
       - run:
-          command: magick -size 8x6 xc:red red.png
+          command: convert -size 8x6 xc:red red.png
       - assert:
           exit_code: 0
       - run:
-          command: magick -size 8x6 xc:blue blue.png
+          command: convert -size 8x6 xc:blue blue.png
       - assert:
           exit_code: 0
       - run:
-          command: "magick compare -metric AE red.png blue.png null:"
+          command: "compare -metric AE red.png blue.png null:"
       - assert:
           # Every one of the 48 pixels differs, and compare says so on stderr.
           exit_code: 1
@@ -159,14 +163,14 @@ scenarios:
 
   - name: the JSON report describes the image it just wrote
     only:
-      command: magick -version
+      command: convert -version
     steps:
       - run:
-          command: magick -size 24x18 xc:red report.png
+          command: convert -size 24x18 xc:red report.png
       - assert:
           exit_code: 0
       - run:
-          command: "magick report.png json:"
+          command: "convert report.png json:"
       - assert:
           exit_code: 0
           stdout:
@@ -182,17 +186,17 @@ scenarios:
 
   - name: strip removes an embedded comment from the output bytes
     only:
-      command: magick -version
+      command: convert -version
     steps:
       - run:
-          command: magick -size 8x6 xc:red -set comment CONFIDENTIAL-MARK marked.png
+          command: convert -size 8x6 xc:red -set comment CONFIDENTIAL-MARK marked.png
       - assert:
           exit_code: 0
           file:
             path: marked.png
             contains: CONFIDENTIAL-MARK
       - run:
-          command: magick marked.png -strip stripped.png
+          command: convert marked.png -strip stripped.png
       - assert:
           exit_code: 0
       - assert:
@@ -209,10 +213,10 @@ scenarios:
 
   - name: a missing input fails without writing an output
     only:
-      command: magick -version
+      command: convert -version
     steps:
       - run:
-          command: magick no-such-input.png out.png
+          command: convert no-such-input.png out.png
       - assert:
           exit_code: 1
           stdout:
@@ -229,13 +233,13 @@ scenarios:
 
   - name: a corrupt input is rejected rather than converted
     only:
-      command: magick -version
+      command: convert -version
     steps:
       - fixture:
           file: broken.png
           content: "this is not a PNG at all\n"
       - run:
-          command: magick broken.png out.png
+          command: convert broken.png out.png
       - assert:
           exit_code: 1
           stdout:
@@ -253,14 +257,14 @@ scenarios:
   # format assertion is for.
   - name: an unknown output extension keeps the input encoding
     only:
-      command: magick -version
+      command: convert -version
     steps:
       - run:
-          command: magick -size 8x6 xc:red source.png
+          command: convert -size 8x6 xc:red source.png
       - assert:
           exit_code: 0
       - run:
-          command: magick source.png out.notaformat
+          command: convert source.png out.notaformat
       - assert:
           exit_code: 0
           image:
@@ -271,14 +275,14 @@ scenarios:
 
   - name: identify reads the dimensions back out of a written file
     only:
-      command: magick -version
+      command: convert -version
     steps:
       - run:
-          command: magick -size 37x11 xc:gray sized.png
+          command: convert -size 37x11 xc:gray sized.png
       - assert:
           exit_code: 0
       - run:
-          command: magick identify -format "%wx%h %m" sized.png
+          command: identify -format "%wx%h %m" sized.png
       - assert:
           exit_code: 0
           stdout:
@@ -286,10 +290,10 @@ scenarios:
 
   - name: identify on a missing file fails and prints nothing to stdout
     only:
-      command: magick -version
+      command: convert -version
     steps:
       - run:
-          command: magick identify absent.png
+          command: identify absent.png
       - assert:
           exit_code: 1
           stdout:

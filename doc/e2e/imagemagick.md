@@ -32,48 +32,48 @@ third-party assets.
 
 Source: `test/e2e/thirdparty/imagemagick/imagemagick.atago.yaml`
 ### Scenario: a conversion writes the requested format and nothing else
-_only when `magick -version` succeeds_
+_only when `convert -version` succeeds_
 #### Given
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 #### When
 ```shell
-magick -size 8x6 xc:red source.png
-magick source.png out.jpg
+convert -size 8x6 xc:red source.png
+convert source.png out.jpg
 ```
 #### Then
-- after `magick -size 8x6 xc:red source.png`:
+- after `convert -size 8x6 xc:red source.png`:
   - exit code is `0`
-- after `magick source.png out.jpg`:
+- after `convert source.png out.jpg`:
   - exit code is `0`
   - the step changed exactly created `out.jpg`, modified nothing, deleted nothing
   - image `out.jpg` is `jpeg`, width 8, height 6
 #### Generated artifacts
 - `out.jpg`
 ### Scenario: resize honors the aspect ratio unless it is forced
-_only when `magick -version` succeeds_
+_only when `convert -version` succeeds_
 #### When
 ```shell
-magick -size 40x20 xc:white source.png
-magick source.png -resize 20x20 fitted.png
-magick source.png -resize 20x20! forced.png
+convert -size 40x20 xc:white source.png
+convert source.png -resize 20x20 fitted.png
+convert source.png -resize 20x20! forced.png
 ```
 #### Then
-- after `magick -size 40x20 xc:white source.png`:
+- after `convert -size 40x20 xc:white source.png`:
   - exit code is `0`
-- after `magick source.png -resize 20x20 fitted.png`:
+- after `convert source.png -resize 20x20 fitted.png`:
   - exit code is `0`
   - image `fitted.png` width 20, height 10
-- after `magick source.png -resize 20x20! forced.png`:
+- after `convert source.png -resize 20x20! forced.png`:
   - exit code is `0`
   - image `forced.png` width 20, height 20
 #### Generated artifacts
 - `fitted.png`
 - `forced.png`
 ### Scenario: a 1x1 canvas survives the smallest possible conversion
-_only when `magick -version` succeeds_
+_only when `convert -version` succeeds_
 #### When
 ```shell
-magick -size 1x1 xc:black tiny.png
+convert -size 1x1 xc:black tiny.png
 ```
 #### Then
 - exit code is `0`
@@ -81,94 +81,94 @@ magick -size 1x1 xc:black tiny.png
 #### Generated artifacts
 - `tiny.png`
 ### Scenario: an alpha channel survives PNG but is dropped by JPEG
-_only when `magick -version` succeeds_
+_only when `convert -version` succeeds_
 #### When
 ```shell
-magick -size 8x6 xc:none transparent.png
-magick transparent.png -background white -flatten flat.jpg
+convert -size 8x6 xc:none transparent.png
+convert transparent.png -background white -flatten flat.jpg
 ```
 #### Then
-- after `magick -size 8x6 xc:none transparent.png`:
+- after `convert -size 8x6 xc:none transparent.png`:
   - exit code is `0`
   - image `transparent.png` is `png`, has alpha
-- after `magick transparent.png -background white -flatten flat.jpg`:
+- after `convert transparent.png -background white -flatten flat.jpg`:
   - exit code is `0`
   - image `flat.jpg` is `jpeg`, has no alpha
 #### Generated artifacts
 - `transparent.png`
 - `flat.jpg`
 ### Scenario: a PNG to PPM round trip restores the original pixels
-_only when `magick -version` succeeds_
+_only when `convert -version` succeeds_
 #### When
 ```shell
-magick -size 16x12 gradient:red-blue source.png
-magick source.png intermediate.ppm
-magick intermediate.ppm restored.png
-magick compare -metric AE source.png restored.png null:
+convert -size 16x12 gradient:red-blue source.png
+convert source.png intermediate.ppm
+convert intermediate.ppm restored.png
+compare -metric AE source.png restored.png null:
 ```
 #### Then
-- after `magick -size 16x12 gradient:red-blue source.png`:
+- after `convert -size 16x12 gradient:red-blue source.png`:
   - exit code is `0`
-- after `magick source.png intermediate.ppm`:
+- after `convert source.png intermediate.ppm`:
   - exit code is `0`
-- after `magick intermediate.ppm restored.png`:
+- after `convert intermediate.ppm restored.png`:
   - exit code is `0`
   - image `restored.png` similar to `source.png`
-- after `magick compare -metric AE source.png restored.png null:`:
+- after `compare -metric AE source.png restored.png null:`:
   - exit code is `0`
 #### Generated artifacts
 - `restored.png`
 ### Scenario: comparing different images reports a nonzero difference
-_only when `magick -version` succeeds_
+_only when `convert -version` succeeds_
 #### When
 ```shell
-magick -size 8x6 xc:red red.png
-magick -size 8x6 xc:blue blue.png
-magick compare -metric AE red.png blue.png null:
+convert -size 8x6 xc:red red.png
+convert -size 8x6 xc:blue blue.png
+compare -metric AE red.png blue.png null:
 ```
 #### Then
-- after `magick -size 8x6 xc:red red.png`:
+- after `convert -size 8x6 xc:red red.png`:
   - exit code is `0`
-- after `magick -size 8x6 xc:blue blue.png`:
+- after `convert -size 8x6 xc:blue blue.png`:
   - exit code is `0`
-- after `magick compare -metric AE red.png blue.png null:`:
+- after `compare -metric AE red.png blue.png null:`:
   - exit code is `1`
   - stderr contains `48`
 ### Scenario: the JSON report describes the image it just wrote
-_only when `magick -version` succeeds_
+_only when `convert -version` succeeds_
 #### When
 ```shell
-magick -size 24x18 xc:red report.png
-magick report.png json:
+convert -size 24x18 xc:red report.png
+convert report.png json:
 ```
 #### Then
-- after `magick -size 24x18 xc:red report.png`:
+- after `convert -size 24x18 xc:red report.png`:
   - exit code is `0`
-- after `magick report.png json:`:
+- after `convert report.png json:`:
   - exit code is `0`
   - stdout at `$[0].image.format` equals `PNG`; at `$[0].image.geometry.width` equals `24`; at `$[0].image.geometry.height` equals `18`; at `$[0].image.mimeType` equals `image/png`
 ### Scenario: strip removes an embedded comment from the output bytes
-_only when `magick -version` succeeds_
+_only when `convert -version` succeeds_
 #### When
 ```shell
-magick -size 8x6 xc:red -set comment CONFIDENTIAL-MARK marked.png
-magick marked.png -strip stripped.png
+convert -size 8x6 xc:red -set comment CONFIDENTIAL-MARK marked.png
+convert marked.png -strip stripped.png
 ```
 #### Then
-- after `magick -size 8x6 xc:red -set comment CONFIDENTIAL-MARK marked.png`:
+- after `convert -size 8x6 xc:red -set comment CONFIDENTIAL-MARK marked.png`:
   - exit code is `0`
   - file `marked.png` contains `CONFIDENTIAL-MARK`
-- after `magick marked.png -strip stripped.png`:
+- after `convert marked.png -strip stripped.png`:
   - exit code is `0`
   - file `stripped.png` does not contain `CONFIDENTIAL-MARK`
   - image `stripped.png` similar to `marked.png`
 #### Generated artifacts
 - `stripped.png`
 ### Scenario: a missing input fails without writing an output
-_only when `magick -version` succeeds_
+_only when `convert -version` succeeds_
 #### When
 ```shell
-magick no-such-input.png out.png
+convert no-such-input.png out.png
 ```
 #### Then
 - exit code is `1`
@@ -176,7 +176,7 @@ magick no-such-input.png out.png
 - stderr contains `no-such-input.png`
 - file `out.png` does not exist
 ### Scenario: a corrupt input is rejected rather than converted
-_only when `magick -version` succeeds_
+_only when `convert -version` succeeds_
 #### Given
 - Fixture file `broken.png` is created.
 #### Inputs
@@ -186,7 +186,7 @@ this is not a PNG at all
 ```
 #### When
 ```shell
-magick broken.png out.png
+convert broken.png out.png
 ```
 #### Then
 - exit code is `1`
@@ -194,38 +194,38 @@ magick broken.png out.png
 - stderr contains `broken.png`
 - file `out.png` does not exist
 ### Scenario: an unknown output extension keeps the input encoding
-_only when `magick -version` succeeds_
+_only when `convert -version` succeeds_
 #### When
 ```shell
-magick -size 8x6 xc:red source.png
-magick source.png out.notaformat
+convert -size 8x6 xc:red source.png
+convert source.png out.notaformat
 ```
 #### Then
-- after `magick -size 8x6 xc:red source.png`:
+- after `convert -size 8x6 xc:red source.png`:
   - exit code is `0`
-- after `magick source.png out.notaformat`:
+- after `convert source.png out.notaformat`:
   - exit code is `0`
   - image `out.notaformat` is `png`, width 8, height 6
 #### Generated artifacts
 - `out.notaformat`
 ### Scenario: identify reads the dimensions back out of a written file
-_only when `magick -version` succeeds_
+_only when `convert -version` succeeds_
 #### When
 ```shell
-magick -size 37x11 xc:gray sized.png
-magick identify -format "%wx%h %m" sized.png
+convert -size 37x11 xc:gray sized.png
+identify -format "%wx%h %m" sized.png
 ```
 #### Then
-- after `magick -size 37x11 xc:gray sized.png`:
+- after `convert -size 37x11 xc:gray sized.png`:
   - exit code is `0`
-- after `magick identify -format "%wx%h %m" sized.png`:
+- after `identify -format "%wx%h %m" sized.png`:
   - exit code is `0`
   - stdout equals an exact value
 ### Scenario: identify on a missing file fails and prints nothing to stdout
-_only when `magick -version` succeeds_
+_only when `convert -version` succeeds_
 #### When
 ```shell
-magick identify absent.png
+identify absent.png
 ```
 #### Then
 - exit code is `1`
