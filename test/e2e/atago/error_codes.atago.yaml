@@ -846,3 +846,32 @@ scenarios:
       - assert:
           exit_code: 3
           stderr: {contains: "ATG3207"}
+
+  # --- ATG60xx: security policy ---------------------------------------------
+
+  - name: ATG6001 is a request to a host the network policy denies
+    # A policy violation is reported inside the run's own report on stdout
+    # rather than as a startup diagnostic on stderr, because the run started
+    # and a scenario reached the refusal.
+    steps:
+      - fixture:
+          file: denied.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: denied}
+            permissions:
+              network:
+                allow:
+                  - allowed.example
+            runners:
+              api:
+                type: http
+                base_url: http://127.0.0.1:1
+            scenarios:
+              - name: reaches elsewhere
+                steps:
+                  - http: {runner: api, method: GET, path: /ping}
+      - run: {command: "${atago} run denied.atago.yaml"}
+      - assert:
+          exit_code: 6
+          stdout: {contains: "ATG6001"}

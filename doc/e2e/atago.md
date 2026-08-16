@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-81 suites · 578 scenarios
+81 suites · 579 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -144,7 +144,7 @@
   - [file not_contains passes when the substring is absent](#scenario-file-not_contains-passes-when-the-substring-is-absent)
   - [not_contains fails when the substring is present](#scenario-not_contains-fails-when-the-substring-is-present)
   - [a shell metacharacter without shell is a load-time error](#scenario-a-shell-metacharacter-without-shell-is-a-load-time-error)
-- [atago self-hosting / every diagnostic code](#atago-self-hosting--every-diagnostic-code) — 56 scenarios
+- [atago self-hosting / every diagnostic code](#atago-self-hosting--every-diagnostic-code) — 57 scenarios
   - [ATG2001 is a spec file that cannot be read](#scenario-atg2001-is-a-spec-file-that-cannot-be-read)
   - [ATG2002 is a spec file with no YAML document in it](#scenario-atg2002-is-a-spec-file-with-no-yaml-document-in-it)
   - [ATG2003 is a document that is not valid YAML](#scenario-atg2003-is-a-document-that-is-not-valid-yaml)
@@ -201,6 +201,7 @@
   - [ATG3205 is a write that would replace an existing file](#scenario-atg3205-is-a-write-that-would-replace-an-existing-file)
   - [ATG3206 is a destination that cannot be written](#scenario-atg3206-is-a-destination-that-cannot-be-written)
   - [ATG3207 is atago's recorded state failing to load](#scenario-atg3207-is-atagos-recorded-state-failing-to-load)
+  - [ATG6001 is a request to a host the network policy denies](#scenario-atg6001-is-a-request-to-a-host-the-network-policy-denies)
 - [atago self-hosting / exit_code in-set matcher](#atago-self-hosting--exit_code-in-set-matcher) — 4 scenarios
   - [a listed exit code passes](#scenario-a-listed-exit-code-passes)
   - [an unlisted exit code fails and the output lists the set](#scenario-an-unlisted-exit-code-fails-and-the-output-lists-the-set)
@@ -4318,6 +4319,34 @@ ${atago} run --rerun-failed ok.atago.yaml
 #### Then
 - exit code is `3`
 - stderr contains `ATG3207`
+### Scenario: ATG6001 is a request to a host the network policy denies
+#### Given
+- Fixture file `denied.atago.yaml` is created.
+#### Inputs
+_Fixture `denied.atago.yaml`:_
+```text
+version: "1"
+suite: {name: denied}
+permissions:
+  network:
+    allow:
+      - allowed.example
+runners:
+  api:
+    type: http
+    base_url: http://127.0.0.1:1
+scenarios:
+  - name: reaches elsewhere
+    steps:
+      - http: {runner: api, method: GET, path: /ping}
+```
+#### When
+```shell
+${atago} run denied.atago.yaml
+```
+#### Then
+- exit code is `6`
+- stdout contains `ATG6001`
 ## atago self-hosting / exit_code in-set matcher
 Source: `test/e2e/atago/exit_code_in.atago.yaml`
 ### Scenario: a listed exit code passes

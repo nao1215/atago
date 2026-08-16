@@ -26,8 +26,10 @@ import (
 // the spec errors it prints come from the loader with their codes already
 // attached; it raises only its own configuration diagnostics.
 var familyOf = map[string][]int{
-	"internal/loader": {2},
-	"internal/cli":    {3},
+	"internal/loader":      {2},
+	"internal/cli":         {3},
+	"internal/security":    {6},
+	"internal/runner/http": {6},
 }
 
 // TestCodes_AreReferenced is the guard against a code that exists only in the
