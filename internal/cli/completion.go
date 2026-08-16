@@ -28,13 +28,19 @@ var subcommandNames = []string{
 }
 
 // runFlags is the stable, sorted list of `atago run` flags surfaced to
-// completion. Keep it in sync with runCmd's FlagSet.
+// completion. It mirrors runCmd's FlagSet, and mirroring it by hand is how
+// --allow-flaky, --allow-xpass, and --profile went missing from every shell:
+// TestCompletion_RunFlagsMatchTheCommand now reads the command's own usage and
+// fails when the two disagree, so a flag added there cannot quietly skip this.
 var runFlags = []string{
+	"--allow-flaky",
+	"--allow-xpass",
 	"--artifacts-dir",
 	"--ci",
 	"--fail-fast",
 	"--filter",
 	"--parallel",
+	"--profile",
 	"--repeat",
 	"--report",
 	"--rerun-failed",

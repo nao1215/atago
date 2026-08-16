@@ -12,11 +12,14 @@ complete -c atago -n '__fish_use_subcommand' -a record
 complete -c atago -n '__fish_use_subcommand' -a run
 complete -c atago -n '__fish_use_subcommand' -a snapshot
 complete -c atago -n '__fish_use_subcommand' -a version
+complete -c atago -n '__fish_seen_subcommand_from run' -l allow-flaky
+complete -c atago -n '__fish_seen_subcommand_from run' -l allow-xpass
 complete -c atago -n '__fish_seen_subcommand_from run' -l artifacts-dir
 complete -c atago -n '__fish_seen_subcommand_from run' -l ci
 complete -c atago -n '__fish_seen_subcommand_from run' -l fail-fast
 complete -c atago -n '__fish_seen_subcommand_from run' -l filter
 complete -c atago -n '__fish_seen_subcommand_from run' -l parallel
+complete -c atago -n '__fish_seen_subcommand_from run' -l profile
 complete -c atago -n '__fish_seen_subcommand_from run' -l repeat
 complete -c atago -n '__fish_seen_subcommand_from run' -l report
 complete -c atago -n '__fish_seen_subcommand_from run' -l rerun-failed

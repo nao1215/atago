@@ -116,6 +116,60 @@ func TestCompletion_MissingArg(t *testing.T) {
 
 // TestCompletion_Golden guards the deterministic completion output so adding or
 // removing a subcommand/flag is an intentional, reviewable diff.
+// TestCompletion_RunFlagsMatchTheCommand is a regression: runFlags was a
+// hand-kept copy of the run command's flag set — its own comment said "keep it
+// in sync" — and three flags added later never reached it. `atago run
+// --allow-<TAB>` offered nothing, and --profile was invisible to every shell.
+// The command's own usage is the source of truth here, so the next flag that
+// skips the list fails this test rather than silently going missing.
+func TestCompletion_RunFlagsMatchTheCommand(t *testing.T) {
+	t.Parallel()
+	var out, errb bytes.Buffer
+	Main([]string{"run", "--help"}, &out, &errb)
+
+	real := map[string]bool{}
+	for _, line := range strings.Split(out.String()+errb.String(), "\n") {
+		rest, ok := strings.CutPrefix(line, "  -")
+		if !ok {
+			continue
+		}
+		name, _, _ := strings.Cut(rest, " ")
+		if name != "" {
+			real["--"+name] = true
+		}
+	}
+	if len(real) == 0 {
+		t.Fatalf("no flags parsed out of run --help:\n%s%s", out.String(), errb.String())
+	}
+
+	offered := map[string]bool{}
+	for _, f := range runFlags {
+		offered[f] = true
+	}
+	for f := range real {
+		if !offered[f] {
+			t.Errorf("`atago run` accepts %s but shell completion does not offer it", f)
+		}
+	}
+	for f := range offered {
+		if !real[f] {
+			t.Errorf("shell completion offers %s but `atago run` does not accept it", f)
+		}
+	}
+
+	// The subcommand list is the same kind of hand-kept copy, held to the same
+	// rule before it drifts the same way.
+	out.Reset()
+	errb.Reset()
+	Main([]string{"help"}, &out, &errb)
+	help := out.String() + errb.String()
+	for _, name := range subcommandNames {
+		if !strings.Contains(help, "\n  "+name+" ") {
+			t.Errorf("shell completion offers the %q subcommand but `atago help` does not list it", name)
+		}
+	}
+}
+
 func TestCompletion_Golden(t *testing.T) {
 	for _, shell := range []string{"bash", "zsh", "fish", "powershell"} {
 		script, ok := completionScript(shell)
