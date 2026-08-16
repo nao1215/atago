@@ -15,6 +15,11 @@
       "description": "One entry per suite run, regardless of how many suites were requested.",
       "type": "array",
       "items": {"$ref": "#/$defs/report"}
+    },
+    "load_failures": {
+      "description": "Spec files the run could not read (#120). They ran no scenario, so they appear in no suite above; omitted when there are none.",
+      "type": "array",
+      "items": {"$ref": "#/$defs/load_failure"}
     }
   },
   "$defs": {
@@ -41,6 +46,16 @@
           "description": "Flat list of failures across all scenarios; empty on success.",
           "type": "array",
           "items": {"$ref": "#/$defs/failure"}
+        },
+        "setup_failures": {
+          "description": "suite.setup steps that failed (#7). A setup failure also errors every scenario; omitted when setup was clean or absent.",
+          "type": "array",
+          "items": {"$ref": "#/$defs/failure"}
+        },
+        "teardown_failures": {
+          "description": "suite.teardown steps that failed (#7). Teardown outcomes never change the suite status, but incomplete cleanup stays visible; omitted when clean or absent.",
+          "type": "array",
+          "items": {"$ref": "#/$defs/failure"}
         }
       }
     },
@@ -58,6 +73,10 @@
         "skip_reason": {
           "description": "Present only for skipped scenarios.",
           "type": "string"
+        },
+        "expect_fail": {
+          "description": "The known bug the scenario declared with `expect_fail:` (#395). Present on xfail and xpass scenarios, so a dashboard can link the issue instead of re-reading the spec.",
+          "$ref": "#/$defs/expect_fail"
         },
         "attempts": {
           "description": "Execution count under --retry-failed (#29); status \"flaky\" means a re-run recovered.",
@@ -78,6 +97,24 @@
           "type": "array",
           "items": {"$ref": "#/$defs/service_log"}
         }
+      }
+    },
+    "load_failure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["spec_path", "error"],
+      "properties": {
+        "spec_path": {"type": "string"},
+        "error": {"type": "string"}
+      }
+    },
+    "expect_fail": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reason"],
+      "properties": {
+        "reason": {"description": "Why the scenario is expected to fail.", "type": "string"},
+        "issue": {"description": "The issue tracking the known bug, when the spec names one.", "type": "string"}
       }
     },
     "service_log": {
