@@ -1044,6 +1044,37 @@ func TestConsole_RepeatRates(t *testing.T) {
 	}
 }
 
+// TestConsole_RepeatRates_SkippedIterationsAreClean is a regression: the rate
+// line counted only StatusPassed, while the fold that decides the verdict and
+// the flake rate every machine format prints both count a skipped iteration as
+// clean. So a scenario an OS gate skipped every time reported "0/5 passed" — in
+// green, next to a summary saying zero failed — and a repeat that mixed passes
+// with gate skips understated its own rate.
+func TestConsole_RepeatRates_SkippedIterationsAreClean(t *testing.T) {
+	t.Parallel()
+	res := &engine.SuiteResult{
+		Suite:  "rp",
+		Status: engine.StatusPassed,
+		Scenarios: []engine.ScenarioResult{
+			// Gated out on this OS: it ran nothing, so it has no rate to report.
+			{Name: "windows-only", Status: engine.StatusSkipped, SkipReason: "only on os=windows",
+				Iterations: []engine.Status{engine.StatusSkipped, engine.StatusSkipped}},
+			// A probe that stopped applying partway: the passes and the skips are
+			// both clean, and only the failure is not.
+			{Name: "gate-then-run", Status: engine.StatusFlaky, Iterations: []engine.Status{
+				engine.StatusSkipped, engine.StatusPassed, engine.StatusFailed,
+			}},
+		},
+	}
+	out := render(t, FormatConsole, res)
+	if strings.Contains(out, "windows-only") {
+		t.Errorf("a scenario skipped on every iteration has no rate to report:\n%s", out)
+	}
+	if !strings.Contains(out, "REPEAT: gate-then-run: 2/3 passed") {
+		t.Errorf("rate line does not count a skipped iteration as clean:\n%s", out)
+	}
+}
+
 // TestRepeatFlaky_MessageAcrossFormats proves a --repeat flake (Iterations set,
 // zero retry Attempts) reports its flake RATE — not a "0 attempts" retry phrase
 // — in every machine format, so a partial-failure repeat reads correctly in
