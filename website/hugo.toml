@@ -56,6 +56,11 @@ pageRef = "/reference"
 weight = 60
 
 [[menus.main]]
+name = "Error codes"
+pageRef = "/errors"
+weight = 65
+
+[[menus.main]]
 name = "Real-world CLIs"
 pageRef = "/real-world"
 weight = 70
@@ -89,6 +94,10 @@ target = "assets/doc/examples.md"
 [[module.mounts]]
 source = "../doc/real-world.md"
 target = "assets/doc/real-world.md"
+
+[[module.mounts]]
+source = "../doc/errors.md"
+target = "assets/doc/errors.md"
 
 [[module.mounts]]
 source = "../schema/atago.schema.json"

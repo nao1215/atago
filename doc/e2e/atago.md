@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-80 suites · 522 scenarios
+81 suites · 563 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -144,6 +144,48 @@
   - [file not_contains passes when the substring is absent](#scenario-file-not_contains-passes-when-the-substring-is-absent)
   - [not_contains fails when the substring is present](#scenario-not_contains-fails-when-the-substring-is-present)
   - [a shell metacharacter without shell is a load-time error](#scenario-a-shell-metacharacter-without-shell-is-a-load-time-error)
+- [atago self-hosting / every spec-error diagnostic code](#atago-self-hosting--every-spec-error-diagnostic-code) — 41 scenarios
+  - [ATG2001 is a spec file that cannot be read](#scenario-atg2001-is-a-spec-file-that-cannot-be-read)
+  - [ATG2002 is a spec file with no YAML document in it](#scenario-atg2002-is-a-spec-file-with-no-yaml-document-in-it)
+  - [ATG2003 is a document that is not valid YAML](#scenario-atg2003-is-a-document-that-is-not-valid-yaml)
+  - [ATG2004 is an explicit YAML tag](#scenario-atg2004-is-an-explicit-yaml-tag)
+  - [ATG2005 is a key the schema does not define](#scenario-atg2005-is-a-key-the-schema-does-not-define)
+  - [ATG2006 is a value written in a shape its key cannot take](#scenario-atg2006-is-a-value-written-in-a-shape-its-key-cannot-take)
+  - [ATG2010 is an unsupported spec format version](#scenario-atg2010-is-an-unsupported-spec-format-version)
+  - [ATG2101 is a step that sets no action](#scenario-atg2101-is-a-step-that-sets-no-action)
+  - [ATG2102 is a step that sets more than one action](#scenario-atg2102-is-a-step-that-sets-more-than-one-action)
+  - [ATG2103 is a pair of keys that contradict each other](#scenario-atg2103-is-a-pair-of-keys-that-contradict-each-other)
+  - [ATG2104 is a group that takes exactly one member and got two](#scenario-atg2104-is-a-group-that-takes-exactly-one-member-and-got-two)
+  - [ATG2105 is a real key in a position where it means nothing](#scenario-atg2105-is-a-real-key-in-a-position-where-it-means-nothing)
+  - [ATG2106 is a block at the wrong level of the spec](#scenario-atg2106-is-a-block-at-the-wrong-level-of-the-spec)
+  - [ATG2107 is an assertion with no step to describe](#scenario-atg2107-is-an-assertion-with-no-step-to-describe)
+  - [ATG2108 is a key whose companion key is not set](#scenario-atg2108-is-a-key-whose-companion-key-is-not-set)
+  - [ATG2201 is a required key that is absent](#scenario-atg2201-is-a-required-key-that-is-absent)
+  - [ATG2202 is a list that must hold an entry and holds none](#scenario-atg2202-is-a-list-that-must-hold-an-entry-and-holds-none)
+  - [ATG2203 is a group that needs at least one member and got none](#scenario-atg2203-is-a-group-that-needs-at-least-one-member-and-got-none)
+  - [ATG2204 is a key present with an empty value](#scenario-atg2204-is-a-key-present-with-an-empty-value)
+  - [ATG2301 is a duration atago cannot read](#scenario-atg2301-is-a-duration-atago-cannot-read)
+  - [ATG2302 is a negative value where a negative means nothing](#scenario-atg2302-is-a-negative-value-where-a-negative-means-nothing)
+  - [ATG2303 is a value that must be positive and is not](#scenario-atg2303-is-a-value-that-must-be-positive-and-is-not)
+  - [ATG2304 is a number outside the range its key accepts](#scenario-atg2304-is-a-number-outside-the-range-its-key-accepts)
+  - [ATG2305 is a regular expression that does not compile](#scenario-atg2305-is-a-regular-expression-that-does-not-compile)
+  - [ATG2306 is a glob pattern that does not parse](#scenario-atg2306-is-a-glob-pattern-that-does-not-parse)
+  - [ATG2307 is a value outside a closed vocabulary](#scenario-atg2307-is-a-value-outside-a-closed-vocabulary)
+  - [ATG2308 is a range nothing could satisfy](#scenario-atg2308-is-a-range-nothing-could-satisfy)
+  - [ATG2309 is an absolute path where a relative one is required](#scenario-atg2309-is-an-absolute-path-where-a-relative-one-is-required)
+  - [ATG2310 is a path that climbs out of the workdir](#scenario-atg2310-is-a-path-that-climbs-out-of-the-workdir)
+  - [ATG2311 is a control character in a name](#scenario-atg2311-is-a-control-character-in-a-name)
+  - [ATG2312 is a matcher that could never fail](#scenario-atg2312-is-a-matcher-that-could-never-fail)
+  - [ATG2313 is a value in the wrong notation](#scenario-atg2313-is-a-value-in-the-wrong-notation)
+  - [ATG2401 is a runner the spec never declared](#scenario-atg2401-is-a-runner-the-spec-never-declared)
+  - [ATG2402 is a declared runner of the wrong type](#scenario-atg2402-is-a-declared-runner-of-the-wrong-type)
+  - [ATG2403 is a reference to something the spec never declared](#scenario-atg2403-is-a-reference-to-something-the-spec-never-declared)
+  - [ATG2404 is a stored value shadowing a built-in](#scenario-atg2404-is-a-stored-value-shadowing-a-built-in)
+  - [ATG2405 is a manifest path that resolves to nothing](#scenario-atg2405-is-a-manifest-path-that-resolves-to-nothing)
+  - [ATG2501 is two scenarios sharing a name](#scenario-atg2501-is-two-scenarios-sharing-a-name)
+  - [ATG2502 is a set listing the same entry twice](#scenario-atg2502-is-a-set-listing-the-same-entry-twice)
+  - [a code is added to the message rather than replacing it](#scenario-a-code-is-added-to-the-message-rather-than-replacing-it)
+  - [several problems each report their own code in one pass](#scenario-several-problems-each-report-their-own-code-in-one-pass)
 - [atago self-hosting / exit_code in-set matcher](#atago-self-hosting--exit_code-in-set-matcher) — 4 scenarios
   - [a listed exit code passes](#scenario-a-listed-exit-code-passes)
   - [an unlisted exit code fails and the output lists the set](#scenario-an-unlisted-exit-code-fails-and-the-output-lists-the-set)
@@ -3258,6 +3300,791 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `shell is not enabled`, `shell: true`, `stdout_to`
+## atago self-hosting / every spec-error diagnostic code
+Source: `test/e2e/atago/error_codes.atago.yaml`
+### Scenario: ATG2001 is a spec file that cannot be read
+_skipped on Windows_
+#### Given
+- Fixture file `broken.atago.yaml` is created.
+#### When
+```shell
+${atago} run .
+```
+#### Then
+- exit code is `2`
+- stderr contains `ATG2001`
+### Scenario: ATG2002 is a spec file with no YAML document in it
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+# only a comment
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `ATG2002`
+### Scenario: ATG2003 is a document that is not valid YAML
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+  suite: {name: x}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `ATG2003`
+### Scenario: ATG2004 is an explicit YAML tag
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: !!str x}
+scenarios: [{name: a, steps: [{run: {command: echo}}]}]
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `ATG2004`
+### Scenario: ATG2005 is a key the schema does not define
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenariosss: []
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `ATG2005`, `unknown field "scenariosss"`
+### Scenario: ATG2006 is a value written in a shape its key cannot take
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios: [{name: a, steps: [{assert: {stdout: hi}}]}]
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `ATG2006`
+### Scenario: ATG2010 is an unsupported spec format version
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "9"
+suite: {name: x}
+scenarios: [{name: a, steps: [{run: {command: echo}}]}]
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `ATG2010`
+### Scenario: ATG2101 is a step that sets no action
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios: [{name: a, steps: [{}]}]
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `ATG2101`
+### Scenario: ATG2102 is a step that sets more than one action
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    steps:
+      - run: {command: echo}
+        fixture: {file: f, content: c}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `ATG2102`
+### Scenario: ATG2103 is a pair of keys that contradict each other
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    steps:
+      - run: {command: echo}
+      - assert: {file: {path: f, size: 1, snapshot: s}}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `ATG2103`
+### Scenario: ATG2104 is a group that takes exactly one member and got two
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    steps:
+      - pty: {command: echo, session: [{expect: a, send: b}]}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `ATG2104`
+### Scenario: ATG2105 is a real key in a position where it means nothing
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+defaults: {run: {command: echo}}
+scenarios: [{name: a, steps: [{run: {command: echo}}]}]
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `ATG2105`
+### Scenario: ATG2106 is a block at the wrong level of the spec
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    steps:
+      - service: {name: s, command: "sleep 1"}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `ATG2106`
+### Scenario: ATG2107 is an assertion with no step to describe
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    steps:
+      - run: {command: echo}
+      - assert: {screen: {contains: hi}}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `ATG2107`
+### Scenario: ATG2108 is a key whose companion key is not set
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    steps:
+      - run: {command: echo}
+      - assert: {image: {path: f, max_diff: 0.5}}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `ATG2108`
+### Scenario: ATG2201 is a required key that is absent
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {}
+scenarios: [{name: a, steps: [{run: {command: echo}}]}]
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `ATG2201`
+### Scenario: ATG2202 is a list that must hold an entry and holds none
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios: []
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `ATG2202`
+### Scenario: ATG2203 is a group that needs at least one member and got none
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    steps:
+      - run: {command: echo}
+      - assert: {changes: {}}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `ATG2203`
+### Scenario: ATG2204 is a key present with an empty value
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    steps:
+      - run: {command: echo}
+      - assert: {file: {path: f, equals_file: ""}}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `ATG2204`
+### Scenario: ATG2301 is a duration atago cannot read
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x, timeout: "soon"}
+scenarios: [{name: a, steps: [{run: {command: echo}}]}]
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `ATG2301`
+### Scenario: ATG2302 is a negative value where a negative means nothing
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x, timeout: "-1s"}
+scenarios: [{name: a, steps: [{run: {command: echo}}]}]
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `ATG2302`
+### Scenario: ATG2303 is a value that must be positive and is not
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    services: [{name: s, command: "sleep 1", max_log_bytes: -1}]
+    steps:
+      - run: {command: echo}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `ATG2303`
+### Scenario: ATG2304 is a number outside the range its key accepts
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    steps:
+      - pty: {command: echo, session: [{expect: a}]}
+      - assert: {screen: {attrs: [{text: hi, bold: true, row: -1}]}}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `ATG2304`
+### Scenario: ATG2305 is a regular expression that does not compile
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    steps:
+      - run: {command: echo}
+      - assert: {stdout: {matches: "["}}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `ATG2305`
+### Scenario: ATG2306 is a glob pattern that does not parse
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    steps:
+      - run: {command: echo}
+      - assert: {dir: {path: ".", glob: "["}}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `ATG2306`
+### Scenario: ATG2307 is a value outside a closed vocabulary
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios: [{name: a, skip: {os: macos}, steps: [{run: {command: echo}}]}]
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `ATG2307`
+### Scenario: ATG2308 is a range nothing could satisfy
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    steps:
+      - run: {command: echo}
+      - assert: {file: {path: f, min_size: 10, max_size: 5}}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `ATG2308`
+### Scenario: ATG2309 is an absolute path where a relative one is required
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    steps:
+      - run: {command: echo}
+      - assert: {changes: {created: ["/tmp/x"]}}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `ATG2309`
+### Scenario: ATG2310 is a path that climbs out of the workdir
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    steps:
+      - run: {command: echo}
+      - assert: {changes: {created: ["../x"]}}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `ATG2310`
+### Scenario: ATG2311 is a control character in a name
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: "x\ty"}
+scenarios: [{name: a, steps: [{run: {command: echo}}]}]
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `ATG2311`
+### Scenario: ATG2312 is a matcher that could never fail
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    steps:
+      - run: {command: echo}
+      - assert: {stdout: {contains: ""}}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `ATG2312`
+### Scenario: ATG2313 is a value in the wrong notation
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    steps:
+      - fixture: {file: f, content: c, mode: "99"}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `ATG2313`
+### Scenario: ATG2401 is a runner the spec never declared
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    steps:
+      - http: {runner: api, method: GET, path: /}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `ATG2401`
+### Scenario: ATG2402 is a declared runner of the wrong type
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+runners: {api: {type: db, dsn: "sqlite://:memory:"}}
+scenarios:
+  - name: a
+    steps:
+      - http: {runner: api, method: GET, path: /}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `ATG2402`
+### Scenario: ATG2403 is a reference to something the spec never declared
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    steps:
+      - signal: {service: ghost, signal: TERM}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `ATG2403`
+### Scenario: ATG2404 is a stored value shadowing a built-in
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    steps:
+      - run: {command: echo}
+      - store: {name: workdir, from: {stdout: {matches: "x"}}}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `ATG2404`
+### Scenario: ATG2405 is a manifest path that resolves to nothing
+#### Given
+- Fixture file `atago.project.yaml` is created.
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `atago.project.yaml`:_
+```text
+fixtures_dir: nowhere
+```
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios: [{name: a, steps: [{run: {command: echo}}]}]
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `ATG2405`
+### Scenario: ATG2501 is two scenarios sharing a name
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios:
+  - {name: a, steps: [{run: {command: echo}}]}
+  - {name: a, steps: [{run: {command: echo}}]}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `ATG2501`
+### Scenario: ATG2502 is a set listing the same entry twice
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    steps:
+      - run: {command: echo}
+      - assert: {exit_code: {in: [0, 0]}}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `ATG2502`
+### Scenario: a code is added to the message rather than replacing it
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {}
+scenarios: [{name: a, steps: [{run: {command: echo}}]}]
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr matches `/ATG2201: suite\.name is required/`
+### Scenario: several problems each report their own code in one pass
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "9"
+suite: {name: x}
+scenarios:
+  - name: a
+    steps:
+      - run: {command: echo}
+      - assert: {stdout: {matches: "["}}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `ATG2010`, `ATG2305`
 ## atago self-hosting / exit_code in-set matcher
 Source: `test/e2e/atago/exit_code_in.atago.yaml`
 ### Scenario: a listed exit code passes

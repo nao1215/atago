@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/spec"
 )
 
@@ -14,11 +15,11 @@ import (
 // scenario-only shell-metacharacter hint (on the command) and the ssh-only
 // field checks, so the two call sites stay a single source of truth (their
 // only difference was those two additions).
-func validateRunStep(add func(string, ...any), where string, r *spec.Run, runners map[string]spec.Runner, full bool) {
+func validateRunStep(add addFunc, where string, r *spec.Run, runners map[string]spec.Runner, full bool) {
 	validateRunnerRef(add, where, "run", r.Runner, runners)
 	nonNegativeDuration(add, where+".run.timeout", r.Timeout, "30s")
 	if r.Command == "" {
-		add("%s.run.command is required", where)
+		add(diag.RequiredKey, "%s.run.command is required", where)
 	} else if full && !r.ShellEnabled() && !runnerIsSSH(r.Runner, runners) {
 		// Without shell, the command is tokenized into argv, so shell operators
 		// (redirects, pipes, sequencing, substitution) are not honored. Rather
@@ -27,7 +28,7 @@ func validateRunStep(add func(string, ...any), where string, r *spec.Run, runner
 		// as one string and the REMOTE login shell always interprets it, so
 		// metacharacters are honored there without any shell: opt-in.
 		if tok := shellMetachar(r.Command); tok != "" {
-			add("%s.run.command contains the shell metacharacter %q but shell is not enabled; "+
+			add(diag.KeyNeedsAnother, "%s.run.command contains the shell metacharacter %q but shell is not enabled; "+
 				"set `shell: true` to run it through a shell, split it into multiple `run` steps, "+
 				"or use `stdout_to` / `stderr_to` for redirection", where, tok)
 		}
@@ -44,7 +45,7 @@ func validateRunStep(add func(string, ...any), where string, r *spec.Run, runner
 // validateStdin checks a run step's stdin source (#18): the mapping form must
 // set exactly one of file/base64, and a base64 payload must decode — at load
 // time, so a typo fails with a positioned message instead of mid-run.
-func validateStdin(add func(string, ...any), where string, s spec.Stdin) {
+func validateStdin(add addFunc, where string, s spec.Stdin) {
 	if s.IsMapping() {
 		set := 0
 		if s.File != "" {
@@ -54,12 +55,12 @@ func validateStdin(add func(string, ...any), where string, s spec.Stdin) {
 			set++
 		}
 		if set != 1 {
-			add("%s.stdin must set exactly one of file/base64 (or be a plain string for inline text)", where)
+			add(diag.ChooseExactlyOne, "%s.stdin must set exactly one of file/base64 (or be a plain string for inline text)", where)
 		}
 	}
 	if s.Base64 != "" {
 		if _, err := base64.StdEncoding.DecodeString(s.Base64); err != nil {
-			add("%s.stdin.base64 is not valid base64: %v", where, err)
+			add(diag.BadFormat, "%s.stdin.base64 is not valid base64: %v", where, err)
 		}
 	}
 }
@@ -68,16 +69,16 @@ func validateStdin(add func(string, ...any), where string, s spec.Stdin) {
 // only meaningful when clear_env starts the environment empty, so an
 // allowlist without clear_env: true is authoring confusion and is rejected
 // instead of silently ignored. Empty variable names are rejected too.
-func validateHermeticEnv(add func(string, ...any), where string, clearEnv *bool, passEnv []string) {
+func validateHermeticEnv(add addFunc, where string, clearEnv *bool, passEnv []string) {
 	if len(passEnv) == 0 {
 		return
 	}
 	if clearEnv == nil || !*clearEnv {
-		add("%s.pass_env requires clear_env: true (pass_env selects host vars for a cleared environment)", where)
+		add(diag.KeyNeedsAnother, "%s.pass_env requires clear_env: true (pass_env selects host vars for a cleared environment)", where)
 	}
 	for i, name := range passEnv {
 		if name == "" {
-			add("%s.pass_env[%d] must not be an empty variable name", where, i)
+			add(diag.EmptyValue, "%s.pass_env[%d] must not be an empty variable name", where, i)
 		}
 	}
 }
@@ -97,7 +98,7 @@ func runnerIsSSH(name string, runners map[string]spec.Runner) bool {
 // dropped by the engine's remote path (it forwards only the command). Rejecting
 // them at load time turns a silent no-op into a clear error. timeout and retry
 // are honored remotely and are intentionally absent here.
-func validateSSHRunFields(add func(string, ...any), where string, r *spec.Run, runners map[string]spec.Runner) {
+func validateSSHRunFields(add addFunc, where string, r *spec.Run, runners map[string]spec.Runner) {
 	if !runnerIsSSH(r.Runner, runners) {
 		return
 	}
@@ -105,7 +106,7 @@ func validateSSHRunFields(add func(string, ...any), where string, r *spec.Run, r
 	// shell ALWAYS interprets the command string, so the knob has nothing to
 	// switch and an authored value only misleads.
 	if r.Shell != nil {
-		add("%s.run.shell has no effect on an ssh runner (the remote login shell always interprets the command)", where)
+		add(diag.KeyNotHere, "%s.run.shell has no effect on an ssh runner (the remote login shell always interprets the command)", where)
 	}
 	fields := []struct {
 		set   bool
@@ -122,7 +123,7 @@ func validateSSHRunFields(add func(string, ...any), where string, r *spec.Run, r
 	}
 	for _, f := range fields {
 		if f.set {
-			add("%s.run.%s has no effect on an ssh runner (the command runs remotely; only command/runner/timeout apply)", where, f.field)
+			add(diag.KeyNotHere, "%s.run.%s has no effect on an ssh runner (the command runs remotely; only command/runner/timeout apply)", where, f.field)
 		}
 	}
 }
@@ -208,16 +209,16 @@ func metacharAt(runes []rune, i int) string {
 
 // validateRetry validates a retry block; where already names the owning step
 // action (".run" or ".http") so messages read e.g. "steps[0].http.retry.times".
-func validateRetry(add func(string, ...any), where string, r *spec.Retry) {
+func validateRetry(add addFunc, where string, r *spec.Retry) {
 	if r == nil {
 		return
 	}
 	if r.Times < 1 {
-		add("%s.retry.times must be >= 1 (got %d)", where, r.Times)
+		add(diag.OutOfRange, "%s.retry.times must be >= 1 (got %d)", where, r.Times)
 	}
 	nonNegativeDuration(add, where+".retry.interval", r.Interval, "500ms")
 	if r.Until == nil {
-		add("%s.retry.until is required", where)
+		add(diag.RequiredKey, "%s.retry.until is required", where)
 		return
 	}
 	validateAssert(add, where+".retry.until", r.Until, nil)
@@ -227,37 +228,37 @@ func validateRetry(add func(string, ...any), where string, r *spec.Retry) {
 	// run/http result is never a pty. Neither can ever hold here, so the step
 	// would only ever exhaust its budget: reject them at load time instead.
 	if r.Until.Changes != nil {
-		add("%s.retry.until.changes cannot be satisfied in a retry condition (the workdir delta is computed only for a top-level assert directly after the step, never for the exec result a retry polls); move it to an assert after the step", where)
+		add(diag.KeyNotHere, "%s.retry.until.changes cannot be satisfied in a retry condition (the workdir delta is computed only for a top-level assert directly after the step, never for the exec result a retry polls); move it to an assert after the step", where)
 	}
 	if r.Until.Screen != nil {
-		add("%s.retry.until.screen cannot be satisfied in a retry condition (screen renders a pty step's terminal, and a run/http result is never a pty); move it to an assert after a pty step", where)
+		add(diag.KeyNotHere, "%s.retry.until.screen cannot be satisfied in a retry condition (screen renders a pty step's terminal, and a run/http result is never a pty); move it to an assert after a pty step", where)
 	}
 }
 
 // validateDeterministic checks the same-input-same-output claim (#398): a
 // satisfiable run count, observables atago knows how to compare, and no
 // combination whose meaning would be self-contradictory.
-func validateDeterministic(add func(string, ...any), where string, r *spec.Run) {
+func validateDeterministic(add addFunc, where string, r *spec.Run) {
 	d := r.Deterministic
 	if d == nil {
 		return
 	}
 	if d.Runs != 0 && d.Runs < 2 {
-		add("%s.deterministic.runs must be at least 2 — comparing one run against itself proves nothing (got %d)", where, d.Runs)
+		add(diag.OutOfRange, "%s.deterministic.runs must be at least 2 — comparing one run against itself proves nothing (got %d)", where, d.Runs)
 	}
 	if d.Runs > spec.MaxDeterministicRuns {
-		add("%s.deterministic.runs is capped at %d; a larger number is a benchmark, not a test (got %d)",
+		add(diag.OutOfRange, "%s.deterministic.runs is capped at %d; a larger number is a benchmark, not a test (got %d)",
 			where, spec.MaxDeterministicRuns, d.Runs)
 	}
 	seen := map[string]bool{}
 	for _, name := range d.Compare {
 		if !slices.Contains(spec.DeterministicObservables, name) {
-			add("%s.deterministic.compare has unknown observable %q; use one of %s",
+			add(diag.NotAllowedValue, "%s.deterministic.compare has unknown observable %q; use one of %s",
 				where, name, strings.Join(spec.DeterministicObservables, "/"))
 			continue
 		}
 		if seen[name] {
-			add("%s.deterministic.compare lists %q more than once", where, name)
+			add(diag.DuplicateEntry, "%s.deterministic.compare lists %q more than once", where, name)
 		}
 		seen[name] = true
 	}
@@ -265,6 +266,6 @@ func validateDeterministic(add func(string, ...any), where string, r *spec.Run) 
 	// command converge on a different answer, which is the very thing this
 	// claims will not happen.
 	if r.Retry != nil {
-		add("%s: deterministic cannot be combined with retry — retry re-runs until the answer CHANGES, deterministic asserts it does not", where)
+		add(diag.ExclusiveKeys, "%s: deterministic cannot be combined with retry — retry re-runs until the answer CHANGES, deterministic asserts it does not", where)
 	}
 }

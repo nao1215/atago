@@ -7,6 +7,11 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Diagnostic codes on spec errors. Every error atago raises while loading a spec now carries a stable, searchable code such as `ATG2201`, added to the message rather than replacing it, so the wording stays free to improve while `ATG2201` keeps meaning the same thing. The first digit is the exit code the run produces, making `ATG2xxx` a refinement of the exit contract rather than a second contract beside it. Assertion failures deliberately carry no code: exit 1 is a spec doing its job.
+- An [error code reference](https://nao1215.github.io/atago/errors/), generated from the registry that defines the codes, listing what each one means, what causes it, and what to change. A code cannot exist without that documentation: registering it is the only way to create one, and registration refuses an entry that omits the explanation or the fix. A committed `doc/errors.md` is drift-guarded against the registry, and a coverage gate fails CI when a published code is not provoked by a scenario in atago's own E2E suite.
+
 ## [0.20.1] - 2026-08-15
 
 ### Added
