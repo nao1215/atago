@@ -11029,10 +11029,10 @@ _skipped on Windows_
 #### When
 ```shell
 # send SIGHUP to service reloader
-for i in 1 2 3 4 5 6 7 8 9 10; do [ -f reload.log ] && break; sleep 0.1; done; cat reload.log
+for i in $(seq 1 100); do grep -q reloaded reload.log 2>/dev/null && break; sleep 0.1; done; cat reload.log
 ```
 #### Then
-- after `for i in 1 2 3 4 5 6 7 8 9 10; do [ -f reload.log ] && break; sleep 0.1; done; cat reload.log`:
+- after `for i in $(seq 1 100); do grep -q reloaded reload.log 2>/dev/null && break; sleep 0.1; done; cat reload.log`:
   - exit code is `0`
   - stdout contains `reloaded`
 ### Scenario: a wait timeout on a TERM-ignoring service fails with the documented message
