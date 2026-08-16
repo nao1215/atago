@@ -149,3 +149,102 @@ scenarios:
 		t.Errorf("scenario[1] = %s, want error (table should not exist in a fresh db)", res.Scenarios[1].Status)
 	}
 }
+
+// TestEngine_DBNetworkPolicyViolation is a regression: `permissions.network`
+// says egress to an unlisted host is a policy violation, and the http, grpc,
+// and ssh runners all check before dialing — the db runner did not. A `query:`
+// against a denied host resolved it and connected, reporting a plain connection
+// error (exit 4) if anything, so a spec could reach a database the policy was
+// written to keep it away from.
+func TestEngine_DBNetworkPolicyViolation(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name string
+		dsn  string
+	}{
+		{"postgres url", "postgres://u:p@denied.example:5432/app?sslmode=disable"},
+		{"mysql url", "mysql://u:p@denied.example:3306/app"},
+		{"mysql native", "u:p@tcp(denied.example:3306)/app"},
+		{"postgres keyword dsn", "host=denied.example port=5432 user=u dbname=app sslmode=disable"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			driver := "postgres"
+			if strings.Contains(tt.name, "mysql") {
+				driver = "mysql"
+			}
+			src := `
+version: "1"
+suite:
+  name: db
+permissions:
+  network:
+    allow:
+      - db.allowed.example
+runners:
+  store:
+    type: db
+    driver: ` + driver + `
+    dsn: "` + tt.dsn + `"
+scenarios:
+  - name: denied host
+    steps:
+      - query:
+          runner: store
+          sql: "SELECT 1"
+`
+			res := runSpec(t, src)
+			if res.Status != StatusError {
+				t.Errorf("status = %s, want error", res.Status)
+			}
+			if !res.SecurityViolation {
+				t.Error("SecurityViolation = false, want true (denied host)")
+			}
+			if got := res.Scenarios[0].Steps[0].ErrMsg; !strings.Contains(got, "network policy denies") {
+				t.Errorf("err = %q, want a network policy denial", got)
+			}
+		})
+	}
+}
+
+// TestEngine_DBNetworkPolicyAllowsLocalAndListed proves the check does not
+// deny what it should not: a sqlite dsn names a file rather than a host, so it
+// reaches no network at all and must run under any allowlist, and a listed host
+// is permitted.
+func TestEngine_DBNetworkPolicyAllowsLocalAndListed(t *testing.T) {
+	t.Parallel()
+	src := `
+version: "1"
+suite:
+  name: db
+permissions:
+  network:
+    allow:
+      - db.allowed.example
+runners:
+  store:
+    type: db
+    dsn: sqlite:${workdir}/app.db
+scenarios:
+  - name: a file-backed database is not egress
+    steps:
+      - query:
+          runner: store
+          sql: "CREATE TABLE t (a INTEGER)"
+      - query:
+          runner: store
+          sql: "SELECT * FROM t"
+      - assert:
+          rows:
+            json:
+              path: "$"
+              length: 0
+`
+	res := runSpec(t, src)
+	if res.Status != StatusPassed {
+		t.Fatalf("status = %s, want passed (sqlite reaches no host)", res.Status)
+	}
+	if res.SecurityViolation {
+		t.Error("SecurityViolation = true for a sqlite dsn, which contacts no host")
+	}
+}

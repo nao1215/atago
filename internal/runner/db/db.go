@@ -11,6 +11,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/url"
 	"strings"
 	"time"
@@ -32,6 +33,13 @@ type Config struct {
 	DataSource string
 	// Timeout bounds a single query; zero means no timeout.
 	Timeout time.Duration
+	// Host is the "host" or "host:port" the DSN dials, so the engine can hold a
+	// db connection to permissions.network.allow the way it already holds an
+	// http, grpc, or ssh one. It is empty when the DSN names no network peer —
+	// a sqlite file, a unix socket — and when the DSN leaves the peer implicit,
+	// because the host to check is the one the spec names, not one inferred
+	// from a driver's defaults.
+	Host string
 }
 
 // Resolve derives a Config from a runner's optional driver and its dsn. When
@@ -50,7 +58,85 @@ func Resolve(driver, dsn string) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	return Config{Driver: drv, DataSource: ds}, nil
+	return Config{Driver: drv, DataSource: ds, Host: dsnHost(drv, dsn)}, nil
+}
+
+// dsnHost returns the network peer a DSN dials, as "host" or "host:port", or ""
+// when it dials none.
+//
+// It reads the DSN the spec wrote rather than asking the driver, because the
+// answer is needed BEFORE opening: database/sql connects lazily, so by the time
+// a driver could report its peer the connection to the denied host has already
+// been made. Only an explicitly named host is returned — a sqlite path, a unix
+// socket, and a form that leaves the peer to the driver's default all yield ""
+// — so the check never denies a spec over a host the spec does not name.
+func dsnHost(driver, dsn string) string {
+	switch driver {
+	case "sqlite":
+		return "" // a file path, not a peer
+	case "postgres":
+		if u, err := url.Parse(dsn); err == nil && u.Host != "" {
+			return u.Host
+		}
+		return keywordDSNHost(dsn)
+	case "mysql":
+		if strings.HasPrefix(dsn, "mysql://") {
+			if u, err := url.Parse(dsn); err == nil {
+				return u.Host
+			}
+			return ""
+		}
+		return nativeMySQLHost(dsn)
+	default:
+		return ""
+	}
+}
+
+// keywordDSNHost pulls the host (and port) out of a libpq keyword/value DSN
+// ("host=db.example port=5432 user=u"). A host beginning with '/' is a unix
+// socket directory, which reaches no network.
+func keywordDSNHost(dsn string) string {
+	host, port := "", ""
+	for _, field := range strings.Fields(dsn) {
+		k, v, ok := strings.Cut(field, "=")
+		if !ok {
+			continue
+		}
+		switch strings.ToLower(k) {
+		case "host":
+			host = v
+		case "port":
+			port = v
+		}
+	}
+	if host == "" || strings.HasPrefix(host, "/") {
+		return ""
+	}
+	if port != "" {
+		return net.JoinHostPort(host, port)
+	}
+	return host
+}
+
+// nativeMySQLHost pulls the address out of a go-sql-driver native DSN
+// ("user:pass@tcp(db.example:3306)/app"). Only the tcp protocol reaches the
+// network; unix() is a socket, and a DSN naming no protocol leaves the peer to
+// the driver.
+func nativeMySQLHost(dsn string) string {
+	at := strings.LastIndex(dsn, "@")
+	rest := dsn
+	if at >= 0 {
+		rest = dsn[at+1:]
+	}
+	open := strings.Index(rest, "(")
+	close := strings.Index(rest, ")")
+	if open < 0 || close < open {
+		return ""
+	}
+	if !strings.EqualFold(rest[:open], "tcp") {
+		return ""
+	}
+	return rest[open+1 : close]
 }
 
 // Runner holds an open database/sql pool for one db runner.

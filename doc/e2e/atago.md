@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-81 suites · 614 scenarios
+81 suites · 616 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -300,8 +300,10 @@
   - [explicit env wins over a passed-through host variable](#scenario-explicit-env-wins-over-a-passed-through-host-variable)
   - [pass_env without clear_env is a load-time error](#scenario-pass_env-without-clear_env-is-a-load-time-error)
   - [unset host variables in pass_env are skipped, not an error](#scenario-unset-host-variables-in-pass_env-are-skipped-not-an-error)
-- [atago self-hosting / http runner](#atago-self-hosting--http-runner) — 2 scenarios
+- [atago self-hosting / http runner](#atago-self-hosting--http-runner) — 4 scenarios
   - [a denied host is a security policy violation (exit 6)](#scenario-a-denied-host-is-a-security-policy-violation-exit-6)
+  - [a db runner dialing a denied host is the same violation (exit 6)](#scenario-a-db-runner-dialing-a-denied-host-is-the-same-violation-exit-6)
+  - [a file-backed db runner is not egress](#scenario-a-file-backed-db-runner-is-not-egress)
   - [an http step with an undeclared runner fails validation (exit 2)](#scenario-an-http-step-with-an-undeclared-runner-fails-validation-exit-2)
 - [atago self-hosting / image](#atago-self-hosting--image) — 7 scenarios
   - [format, dimension and alpha assertions pass on a PNG](#scenario-format-dimension-and-alpha-assertions-pass-on-a-png)
@@ -6343,6 +6345,68 @@ ${atago} run denied.atago.yaml
 #### Then
 - exit code is `6`
 - stdout contains `network policy denies`
+### Scenario: a db runner dialing a denied host is the same violation (exit 6)
+#### Given
+- Fixture file `deniedb.atago.yaml` is created.
+#### Inputs
+_Fixture `deniedb.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: db
+permissions:
+  network:
+    allow:
+      - allowed.example
+runners:
+  store:
+    type: db
+    dsn: "postgres://u:p@denied.example:5432/app?sslmode=disable"
+scenarios:
+  - name: query against a non-allowlisted host
+    steps:
+      - query:
+          runner: store
+          sql: "SELECT 1"
+```
+#### When
+```shell
+${atago} run deniedb.atago.yaml
+```
+#### Then
+- exit code is `6`
+- stdout contains `network policy denies host "denied.example"`
+### Scenario: a file-backed db runner is not egress
+#### Given
+- Fixture file `localdb.atago.yaml` is created.
+#### Inputs
+_Fixture `localdb.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: db
+permissions:
+  network:
+    allow:
+      - allowed.example
+runners:
+  store:
+    type: db
+    dsn: sqlite:${workdir}/app.db
+scenarios:
+  - name: a local database still runs
+    steps:
+      - query:
+          runner: store
+          sql: "CREATE TABLE t (a INTEGER)"
+```
+#### When
+```shell
+${atago} run localdb.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout contains `1 passed`
 ### Scenario: an http step with an undeclared runner fails validation (exit 2)
 #### Given
 - Fixture file `norunner.atago.yaml` is created.

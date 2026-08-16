@@ -6,6 +6,7 @@ import (
 
 	"github.com/nao1215/atago/internal/runner"
 	dbrunner "github.com/nao1215/atago/internal/runner/db"
+	"github.com/nao1215/atago/internal/security"
 	"github.com/nao1215/atago/internal/spec"
 	"github.com/nao1215/atago/internal/store"
 )
@@ -31,6 +32,15 @@ func dbConn(name string, st *store.Store, rc runConfig, conns map[string]*dbrunn
 			return nil, err
 		}
 		cfg.Timeout = timeout
+		// Enforce the network allowlist before opening (issue #17): db egress is
+		// confined to permissions.network.allow just like HTTP, grpc, and ssh.
+		// Before the pool, because database/sql connects lazily — a check after
+		// it would run once the denied host had already been dialed.
+		if cfg.Host != "" {
+			if err := security.CheckHost(rc.allow, cfg.Host); err != nil {
+				return nil, err
+			}
+		}
 		return dbrunner.Open(cfg)
 	})
 }
