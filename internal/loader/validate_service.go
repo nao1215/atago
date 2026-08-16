@@ -45,7 +45,7 @@ func validateReady(add addFunc, where string, r *spec.Ready) {
 		}
 	}
 	if n > 1 {
-		add(diag.ChooseExactlyOne, "%s.ready: set only one of file/port/log/delay", where)
+		add(diag.ExclusiveKeys, "%s.ready: set only one of file/port/log/delay", where)
 	}
 	if r.Store != "" && r.File == "" {
 		add(diag.KeyNeedsAnother, "%s.ready.store requires file (the file whose content is captured)", where)

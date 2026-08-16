@@ -1,16 +1,18 @@
 # Error codes
 
-Every error atago reports carries a code, so a failure can be searched for, linked to, and branched on without matching on prose that is free to improve. Assertion failures are not errors in this sense and carry no code: a spec that fails is a spec doing its job, and its message already says what was expected and what happened.
+A coded error carries a name that can be searched for, linked to, and branched on, so the message beside it stays free to improve without breaking anyone. Assertion failures are not errors in this sense and carry no code: a spec that fails is a spec doing its job, and its message already says what was expected and what happened.
 
 A code is `ATG` followed by four digits, and the first of those digits is the exit status the run produced. Reading `ATG2103` tells you the process exited 2 before it tells you anything else.
 
-| Codes | Exit | Meaning |
-|---|---|---|
-| `ATG2xxx` | 2 | spec error — the file could not be parsed, or does not describe a runnable suite |
-| `ATG3xxx` | 3 | configuration error — the command line, its flags, or the spec files it selected |
-| `ATG4xxx` | 4 | execution error — a step could not be carried out |
-| `ATG5xxx` | 5 | internal error — a bug in atago |
-| `ATG6xxx` | 6 | security policy violation — atago refused an operation on policy grounds |
+Codes are being assigned one family at a time. The table says which families carry them today; an error from a family not yet covered still exits the same way and still says what went wrong, it just has no code to look up here yet.
+
+| Codes | Exit | Meaning | Assigned |
+|---|---|---|---|
+| `ATG2xxx` | 2 | spec error — the file could not be parsed, or does not describe a runnable suite | 39 codes |
+| `ATG3xxx` | 3 | configuration error — the command line, its flags, or the spec files it selected | not yet |
+| `ATG4xxx` | 4 | execution error — a step could not be carried out | not yet |
+| `ATG5xxx` | 5 | internal error — a bug in atago | not yet |
+| `ATG6xxx` | 6 | security policy violation — atago refused an operation on policy grounds | not yet |
 
 `ATG1xxx` is never assigned. Exit 1 means one or more scenarios failed, which is a result rather than an error.
 
@@ -132,7 +134,7 @@ Exits 2. Since v0.21.0.
 
 A step is one action so that ordering, timing, and failure are unambiguous: a step that both ran a command and made a request has no single answer for which one a `duration` bounds or which one an assertion followed. The usual cause is a second action indented into the previous step instead of starting a new one.
 
-Fix: Split the actions into separate list items under `steps:`, one `- ` per action.
+Fix: Split the actions into separate list items under `steps:`, one list item per action.
 
 Exits 2. Since v0.21.0.
 
@@ -370,7 +372,7 @@ Exits 2. Since v0.21.0.
 
 ### ATG2502 — a list repeats an entry that must appear once
 
-Some lists are sets: the exit codes `in` accepts, the observables `deterministic.compare` watches, the modifiers a key press carries. A repeat has no second meaning, so it is either a merge artefact or a value that was meant to be different.
+Some lists are sets: the exit codes `in` accepts, the observables `deterministic.compare` watches, the modifiers a key press carries. A repeat has no second meaning, so it is either a merge artifact or a value that was meant to be different.
 
 Fix: Remove the repeat, or change it to the value that was meant.
 

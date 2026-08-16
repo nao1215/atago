@@ -13,7 +13,7 @@ package diag
 //	ATG24xx  a name that does not resolve to anything the spec declares
 //	ATG25xx  identity — names that collide
 //
-// Numbers are left with gaps so a later code joins its neighbours. A retired
+// Numbers are left with gaps so a later code joins its neighbors. A retired
 // code is never reused: the registry records the version each shipped in, and
 // a number that once meant something else would make an old CI log lie.
 const specSince = "v0.21.0"
@@ -91,7 +91,7 @@ var (
 	StepManyActions = register(2102, "StepManyActions", Entry{
 		Summary: "a step sets more than one action",
 		Detail:  "A step is one action so that ordering, timing, and failure are unambiguous: a step that both ran a command and made a request has no single answer for which one a `duration` bounds or which one an assertion followed. The usual cause is a second action indented into the previous step instead of starting a new one.",
-		Fix:     "Split the actions into separate list items under `steps:`, one `- ` per action.",
+		Fix:     "Split the actions into separate list items under `steps:`, one list item per action.",
 		Since:   specSince,
 	})
 
@@ -344,7 +344,7 @@ var (
 	// DuplicateEntry is a list repeating something it must list once.
 	DuplicateEntry = register(2502, "DuplicateEntry", Entry{
 		Summary: "a list repeats an entry that must appear once",
-		Detail:  "Some lists are sets: the exit codes `in` accepts, the observables `deterministic.compare` watches, the modifiers a key press carries. A repeat has no second meaning, so it is either a merge artefact or a value that was meant to be different.",
+		Detail:  "Some lists are sets: the exit codes `in` accepts, the observables `deterministic.compare` watches, the modifiers a key press carries. A repeat has no second meaning, so it is either a merge artifact or a value that was meant to be different.",
 		Fix:     "Remove the repeat, or change it to the value that was meant.",
 		Since:   specSince,
 	})

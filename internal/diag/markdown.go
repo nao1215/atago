@@ -26,20 +26,26 @@ var families = []struct {
 func Markdown() []byte {
 	var b strings.Builder
 
-	b.WriteString("# Error codes\n\n")
-	b.WriteString("Every error atago reports carries a code, so a failure can be searched for, linked to, and branched on without matching on prose that is free to improve. Assertion failures are not errors in this sense and carry no code: a spec that fails is a spec doing its job, and its message already says what was expected and what happened.\n\n")
-	b.WriteString("A code is `ATG` followed by four digits, and the first of those digits is the exit status the run produced. Reading `ATG2103` tells you the process exited 2 before it tells you anything else.\n\n")
+	all := All()
 
-	b.WriteString("| Codes | Exit | Meaning |\n|---|---|---|\n")
+	b.WriteString("# Error codes\n\n")
+	b.WriteString("A coded error carries a name that can be searched for, linked to, and branched on, so the message beside it stays free to improve without breaking anyone. Assertion failures are not errors in this sense and carry no code: a spec that fails is a spec doing its job, and its message already says what was expected and what happened.\n\n")
+	b.WriteString("A code is `ATG` followed by four digits, and the first of those digits is the exit status the run produced. Reading `ATG2103` tells you the process exited 2 before it tells you anything else.\n\n")
+	b.WriteString("Codes are being assigned one family at a time. The table says which families carry them today; an error from a family not yet covered still exits the same way and still says what went wrong, it just has no code to look up here yet.\n\n")
+
+	b.WriteString("| Codes | Exit | Meaning | Assigned |\n|---|---|---|---|\n")
 	for _, f := range families {
-		fmt.Fprintf(&b, "| `%s` | %d | %s |\n", f.label, f.exit, f.meaning)
+		assigned := "not yet"
+		if n := len(entriesOf(all, f.exit)); n > 0 {
+			assigned = fmt.Sprintf("%d codes", n)
+		}
+		fmt.Fprintf(&b, "| `%s` | %d | %s | %s |\n", f.label, f.exit, f.meaning, assigned)
 	}
 	b.WriteString("\n")
 	b.WriteString("`ATG1xxx` is never assigned. Exit 1 means one or more scenarios failed, which is a result rather than an error.\n\n")
 	b.WriteString("Codes are grouped by what you have to fix rather than by where in atago the error was raised, so one code can be reported from several places when the answer is the same in all of them.\n\n")
 	b.WriteString("Look a code up from the terminal with `atago explain ATG2201`, which prints this same text without a browser.\n\n")
 
-	all := All()
 	b.WriteString("## Every code\n\n")
 	b.WriteString("| Code | Meaning | Exit | Since |\n|---|---|---|---|\n")
 	for _, e := range all {

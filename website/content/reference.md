@@ -129,4 +129,4 @@ The report and manifest outputs have schemas too: [report.schema.json](https://g
 
 `Ctrl-C`/`SIGTERM` stops the run cleanly: in-flight processes, services, and sessions are torn down, partial results are reported, and the run exits `4`.
 
-Every error atago reports also carries a diagnostic code such as `ATG2201`, whose first digit is the exit code above — so `ATG2xxx` always exits 2. The codes are searchable and stable across rewordings of the message; [Error codes](/errors/) lists what each one means and what to change. Assertion failures carry no code: exit 1 is a result, not an error.
+Errors also carry a diagnostic code such as `ATG2201`, whose first digit is the exit code above — so `ATG2xxx` always exits 2. The codes are searchable and stable across rewordings of the message; [Error codes](/errors/) lists what each one means, what to change, and which families carry codes today. Assertion failures carry none: exit 1 is a result, not an error.

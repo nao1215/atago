@@ -255,8 +255,13 @@ func validateBuild(add addFunc, where string, b *Build) {
 		add(diag.RequiredKey, "%s.command is required", where)
 	}
 	if b.Timeout != "" {
-		if d, err := time.ParseDuration(b.Timeout); err != nil || d <= 0 {
+		// Two different mistakes, and the reader fixes them differently: text
+		// that is not a duration at all, and a duration that parsed but leaves
+		// the build no time to run.
+		if d, err := time.ParseDuration(b.Timeout); err != nil {
 			add(diag.BadDuration, "%s.timeout must be a positive Go duration (got %q)", where, b.Timeout)
+		} else if d <= 0 {
+			add(diag.NonPositiveValue, "%s.timeout must be a positive Go duration (got %q)", where, b.Timeout)
 		}
 	}
 }

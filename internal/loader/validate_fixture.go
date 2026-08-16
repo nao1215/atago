@@ -26,7 +26,7 @@ func validateFixture(add addFunc, where string, f *spec.Fixture) {
 		n++
 	}
 	if n > 1 {
-		add(diag.ChooseExactlyOne, "%s.fixture: set only one of content, base64, from, or symlink", where)
+		add(diag.ExclusiveKeys, "%s.fixture: set only one of content, base64, from, or symlink", where)
 	}
 	if f.Symlink != "" && f.Mode != "" {
 		add(diag.ExclusiveKeys, "%s.fixture: mode cannot be applied to a symlink", where)
