@@ -27,6 +27,7 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Documentation
 
+- The wide-character limit of the `screen:` renderer is stated accurately and pinned by an expect_fail scenario in atago's own suite. Once a wide character has filled the last column the emulator does not arm autowrap, and the note called that "a dropped character" — it is more than that: `日本語` in five columns renders `日本`, and `日本X` in four renders `日 X`, where a terminal shows `日本` with `X` on the next row. Keeping the case in CI as an expected failure means the day the emulator learns to wrap, the scenario turns XPASS, the run goes red, and the limitation is retired instead of outliving its comment.
 - The spec reference now states what `empty:` measures. A stream or screen carrying only whitespace counts as empty, so a stray newline does not fail `empty: true` and `empty: false` asserts the output carried something legible rather than that it carried bytes. The behavior is unchanged and is what makes the check usable on a screen at all, since a terminal pads every unwritten cell with spaces; only the description was silent about it.
 
 ## [0.20.1] - 2026-08-15

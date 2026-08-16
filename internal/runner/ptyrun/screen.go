@@ -33,10 +33,18 @@ type screenResize struct {
 // emulator does; a program that positions a label just past a Japanese string
 // with `\x1b[row;colH` lands it where the terminal put it, not two columns early,
 // and overwriting one half of a wide cell blanks it the way a terminal does
-// (#432). One edge remains upstream: a wide character that must AUTOWRAP at the
-// right margin (no explicit newline, the char straddling the last column) is
-// dropped rather than carried to the next line. TUIs position with cursor
-// addressing and explicit newlines, which render correctly.
+// (#432).
+//
+// One edge remains upstream, and it is wider than "a dropped character": once a
+// wide character has filled the last column, AUTOWRAP is not armed, so whatever
+// comes next is written inside that row instead of on the following one. A wide
+// character that no longer fits is dropped (`日本語` in five columns renders
+// `日本`), and a narrow one overwrites the second half of the wide character
+// already there, blanking its first half — `日本X` in four columns renders
+// `日 X`, where a terminal shows `日本` and puts `X` on the next line. The
+// self-hosted suite carries this as an expect_fail scenario, so the day the
+// emulator learns to wrap it turns XPASS and this note comes out. TUIs position
+// with cursor addressing and explicit newlines, which render correctly.
 //
 // For a session that changed size while it ran (#379), the transcript is
 // replayed in pieces, resizing the emulator at each recorded boundary, so every
