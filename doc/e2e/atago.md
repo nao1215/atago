@@ -8982,6 +8982,7 @@ ${atago} run unasked_mouse.atago.yaml
 _skipped on Windows_
 #### Given
 - Fixture file `badattrs.atago.yaml` is created.
+- Fixture file `badflag.atago.yaml` is created.
 #### Inputs
 _Fixture `badattrs.atago.yaml`:_
 ```text
@@ -9001,15 +9002,40 @@ scenarios:
             attrs:
               - {text: ERROR, fg: green}
 ```
+_Fixture `badflag.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: plain text is not italic
+    steps:
+      - pty:
+          shell: true
+          command: "printf 'PLAIN\\r\\n'"
+          rows: 4
+          cols: 20
+      - assert:
+          screen:
+            attrs:
+              - {text: PLAIN, italic: true}
+```
 #### When
 ```shell
 # interactive (pty): printf '\033[1;31mERROR\033[0m plain\r\n\033[7mSELECTED\033[0m\r\n'
+# interactive (pty): printf '\033[3mITAL\033[0m \033[4mUNDER\033[0m \033[5mBLINK\033[0m \033[41mONRED\033[0m\r\n'
 ${atago} run badattrs.atago.yaml
+${atago} run badflag.atago.yaml
 ```
 #### Then
 - rendered screen contains `ERROR` and shows "ERROR" in bold red and shows "plain" in not bold default and shows "SELECTED" in reverse on row 2
-- exit code is `1`
-- stdout contains `fg=red (wanted green)`
+- rendered screen is checked and shows "ITAL" in italic and shows "UNDER" in underlined and shows "BLINK" in blinking and shows "ONRED" in on red and shows "ITAL" in not underlined not blinking on default
+- after `${atago} run badattrs.atago.yaml`:
+  - exit code is `1`
+  - stdout contains `fg=red (wanted green)`
+- after `${atago} run badflag.atago.yaml`:
+  - exit code is `1`
+  - stdout contains `italic`
 ### Scenario: an unknown key name is a load-time error listing the vocabulary
 #### Given
 - Fixture file `badkey.atago.yaml` is created.
