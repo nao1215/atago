@@ -2989,6 +2989,16 @@ in the session waits forever for a second occurrence. The session dies at
 `timeout` (default 30s) with the transcript in the failure, so read what the
 terminal actually showed.
 
+A fourth cause looks like the transcript disagreeing with the failure. An
+`expect` does not match the terminal's echo of the `send:` before it, so
+`send: "yes\n"` followed by `expect: "yes"` waits for the program to say it,
+not for your own keystrokes to appear. The echoed line is in the transcript,
+which is why the failure can look wrong at first glance. This is deliberate: an
+expect that matched its own send would pass whether the program was listening,
+busy, or already dead. Assert on something the program produces — its prompt,
+its answer, its next screen. A program that prints the input back, like a REPL
+echoing a command, keeps its own copy, so that still matches.
+
 ### A `screen:` assert sees a blank screen
 
 Most full-screen TUIs use the alternate screen buffer and restore the primary
