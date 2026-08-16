@@ -19,6 +19,7 @@ import (
 	"github.com/nao1215/atago/internal/scrub"
 	"github.com/nao1215/atago/internal/security"
 	"github.com/nao1215/atago/internal/spec"
+	"github.com/nao1215/atago/internal/store"
 )
 
 // teardownInterruptTimeout bounds teardown execution after the run itself was
@@ -118,7 +119,7 @@ func New() *Engine {
 func builtinVars() map[string]string {
 	m := make(map[string]string)
 	if exe, err := os.Executable(); err == nil {
-		m["atago"] = exe
+		m[store.BuiltinAtago] = exe
 	}
 	return m
 }

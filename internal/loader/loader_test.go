@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/goccy/go-yaml"
+
+	"github.com/nao1215/atago/internal/store"
 )
 
 func TestLoadBytes_Valid(t *testing.T) {
@@ -1701,5 +1703,45 @@ func TestLoadBytes_CwdEscapesWorkdir(t *testing.T) {
 				t.Errorf("a workdir-relative cwd was rejected: %v\n%s", err, tt.src)
 			}
 		})
+	}
+}
+
+// TestLoadBytes_EveryBuiltinIsReserved is a regression: the engine seeds five
+// variables into every scenario store, and the guard that stops a store or a
+// matrix key from shadowing one knew about three. A `store: {name: specdir}`
+// was accepted and silently redefined ${specdir} for the rest of the scenario,
+// so a later step reading a committed file through it read somewhere else —
+// while `store: {name: workdir}` was rejected with advice to pick another name.
+func TestLoadBytes_EveryBuiltinIsReserved(t *testing.T) {
+	t.Parallel()
+	for _, name := range store.Builtins {
+		t.Run("store "+name, func(t *testing.T) {
+			t.Parallel()
+			src := "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n      - store: {name: " + name + ", from: {stdout: {trim: true}}}"
+			_, err := LoadBytes("s.atago.yaml", []byte(src))
+			if err == nil {
+				t.Fatalf("store named %q was accepted; it shadows a built-in", name)
+			}
+			if !strings.Contains(err.Error(), "shadows a built-in variable") {
+				t.Errorf("err = %v, want a shadowing rejection", err)
+			}
+		})
+		t.Run("matrix "+name, func(t *testing.T) {
+			t.Parallel()
+			src := "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: \"m ${" + name + "}\"\n    matrix:\n      - { " + name + ": v }\n    steps:\n      - run: {command: echo}"
+			_, err := LoadBytes("s.atago.yaml", []byte(src))
+			if err == nil {
+				t.Fatalf("matrix key %q was accepted; it shadows a built-in", name)
+			}
+			if !strings.Contains(err.Error(), "shadows a built-in variable") {
+				t.Errorf("err = %v, want a shadowing rejection", err)
+			}
+		})
+	}
+
+	// A name that merely resembles one is still the author's to use.
+	src := "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n      - store: {name: workdir_path, from: {stdout: {trim: true}}}"
+	if _, err := LoadBytes("s.atago.yaml", []byte(src)); err != nil {
+		t.Errorf("a non-builtin name was rejected: %v", err)
 	}
 }

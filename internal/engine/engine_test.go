@@ -1678,3 +1678,39 @@ func TestResolveConn(t *testing.T) {
 		t.Fatalf("open error = %v", err)
 	}
 }
+
+// TestEngine_SeedsExactlyTheDocumentedBuiltins ties the names the engine seeds
+// to the list the loader refuses to let a spec shadow. The two were written out
+// separately and drifted: the loader knew three of the five, so a
+// `store: {name: specdir}` was accepted and silently redefined ${specdir} for
+// the rest of the scenario. A new built-in that skips store.Builtins now fails
+// here rather than becoming shadowable.
+func TestEngine_SeedsExactlyTheDocumentedBuiltins(t *testing.T) {
+	t.Parallel()
+	// Every built-in resolves inside a scenario; an unknown ${...} is a hard
+	// error, so a name the engine does not seed fails the run rather than
+	// expanding to nothing.
+	var b strings.Builder
+	b.WriteString("version: \"1\"\nsuite:\n  name: x\n  setup:\n    - run: {shell: true, command: \"echo setup\"}\nscenarios:\n  - name: a\n    steps:\n")
+	for _, name := range store.Builtins {
+		if name == store.BuiltinFixtures {
+			// ${fixtures} is seeded only when a directory manifest points at a
+			// committed tree, which this spec has none of.
+			continue
+		}
+		fmt.Fprintf(&b, "      - run: {shell: true, command: \"echo %s=${%s}\"}\n", name, name)
+	}
+	b.WriteString("      - assert: {exit_code: 0}\n")
+
+	res := runSpec(t, b.String())
+	if res.Status != StatusPassed {
+		t.Fatalf("status = %s, want passed — a documented built-in did not resolve:\n%+v", res.Status, res.Scenarios[0].Steps)
+	}
+	// And the guard holds in the other direction: the loader must reject a spec
+	// that binds any of them, so nothing the engine seeds can be shadowed.
+	for _, name := range store.Builtins {
+		if !store.IsBuiltin(name) {
+			t.Errorf("store.Builtins lists %q but IsBuiltin says otherwise", name)
+		}
+	}
+}
