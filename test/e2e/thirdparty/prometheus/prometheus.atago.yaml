@@ -41,8 +41,14 @@ defaults:
     # Every scenario here drives promtool. Without the program there is nothing to
     # test, so the suite skips rather than erroring: a missing tool is not a
     # result. The gate is declared once so no scenario can be left out of it.
+    #
+    # The probe asks whether the binary is on PATH rather than running it. A
+    # probe that gets the version flag wrong would skip the whole suite and
+    # leave CI green while testing nothing, which is the one failure mode a
+    # gate must not have — and this workflow runs on a schedule, so nobody
+    # would see it happen on a pull request.
     only:
-      command: promtool --version
+      command: command -v promtool && command -v prometheus
 
 scenarios:
   - name: promtool accepts a valid config and rejects a broken one
