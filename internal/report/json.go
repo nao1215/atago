@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 
 	"github.com/nao1215/atago/internal/assert"
+	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/engine"
 	"github.com/nao1215/atago/internal/spec"
 )
@@ -72,9 +73,13 @@ type jsonFailure struct {
 	Actual   string `json:"actual,omitempty"`
 	// Diff is the uncolored unified diff for multi-line equals/snapshot
 	// failures (#28) — additive, so schema_version stays "1".
-	Diff      string         `json:"diff,omitempty"`
-	Hint      string         `json:"hint,omitempty"`
-	Error     string         `json:"error,omitempty"`
+	Diff  string `json:"diff,omitempty"`
+	Hint  string `json:"hint,omitempty"`
+	Error string `json:"error,omitempty"`
+	// Code is the diagnostic code carried by Error, when it has one. It lets a
+	// consumer group failures by cause without matching on prose that is free
+	// to be reworded. An assertion failing carries none by design.
+	Code      string         `json:"code,omitempty"`
 	Artifacts []jsonArtifact `json:"artifacts,omitempty"`
 }
 
@@ -197,6 +202,7 @@ func suiteStepFailures(suite string, steps []engine.StepResult) []jsonFailure {
 				Scenario: suite,
 				Step:     stepPhase(step),
 				Error:    step.ErrMsg,
+				Code:     firstCode(step.ErrMsg),
 			})
 		}
 	}
@@ -228,6 +234,7 @@ func teardownFailuresOf(sc *engine.ScenarioResult) []jsonFailure {
 				Scenario: sc.Name,
 				Step:     stepPhase(step),
 				Error:    step.ErrMsg,
+				Code:     firstCode(step.ErrMsg),
 			})
 		}
 	}
@@ -265,6 +272,7 @@ func failuresOf(sc *engine.ScenarioResult) []jsonFailure {
 				Step:     stepPhase(step),
 				Command:  cmd,
 				Error:    step.ErrMsg,
+				Code:     firstCode(step.ErrMsg),
 			})
 		}
 	}
@@ -282,4 +290,15 @@ func jsonExpectFailOf(ef *spec.ExpectFail) *jsonExpectFail {
 		return nil
 	}
 	return &jsonExpectFail{Reason: ef.Reason, Issue: ef.Issue}
+}
+
+// firstCode returns the diagnostic code a message carries, or "" when it has
+// none. Assertion failures deliberately carry none: exit 1 is a spec doing its
+// job, so there is nothing for a consumer to branch on beyond the verdict.
+func firstCode(msg string) string {
+	codes := diag.Codes(msg)
+	if len(codes) == 0 {
+		return ""
+	}
+	return codes[0].String()
 }

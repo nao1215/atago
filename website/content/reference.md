@@ -12,7 +12,7 @@ description: atago subcommands, scenario selection flags, snapshot updating and 
 | `atago record` | run a command once and write a spec from what it observed (`--pty` for interactive sessions) |
 | `atago init` | scaffold a spec (`--template` for browser, cli, db, grpc, http, mock, services, ssh; `cli` is the default) |
 | `atago snapshot update` | record or refresh golden files |
-| `atago explain` | describe what a spec does without running it |
+| `atago explain` | describe what a spec does without running it, or what an `ATG` code means (`atago explain ATG2201`) |
 | `atago doc` | generate Markdown from specs, with fixtures and golden files inlined |
 | `atago manifest` | emit a stable JSON summary of specs for tooling |
 | `atago list` | show scenarios, tags, and artifacts |
@@ -129,4 +129,4 @@ The report and manifest outputs have schemas too: [report.schema.json](https://g
 
 `Ctrl-C`/`SIGTERM` stops the run cleanly: in-flight processes, services, and sessions are torn down, partial results are reported, and the run exits `4`.
 
-Errors also carry a diagnostic code such as `ATG2201`, whose first digit is the exit code above — so `ATG2xxx` always exits 2. The codes are searchable and stable across rewordings of the message; [Error codes](/errors/) lists what each one means, what to change, and which families carry codes today. Assertion failures carry none: exit 1 is a result, not an error.
+Errors also carry a diagnostic code such as `ATG2201`, whose first digit is the exit code above — so `ATG2xxx` always exits 2. The codes are searchable and stable across rewordings of the message; [Error codes](/errors/) lists what each one means, what to change, and which families carry codes today. Assertion failures carry none: exit 1 is a result, not an error. `atago explain ATG2201` prints the same entry without a browser, and the JSON report carries the code as a `code` field on each failure so a dashboard can group by cause.

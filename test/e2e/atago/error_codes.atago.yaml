@@ -1220,3 +1220,94 @@ scenarios:
       - assert:
           exit_code: 4
           stdout: {contains: "ATG4505"}
+
+  # --- looking a code up, and reporting it ----------------------------------
+
+  - name: atago explain prints what a code means, offline
+    steps:
+      - run: {command: "${atago} explain ATG2201"}
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "ATG2201"
+              - "a required key is missing"
+              # The entry says what to change, not only what went wrong.
+              - "Fix"
+              - "Exits 2."
+
+  - name: atago explain refuses a code nobody assigned, and suggests one
+    steps:
+      - run: {command: "${atago} explain ATG2999"}
+      - assert:
+          exit_code: 3
+          stderr:
+            contains:
+              - "ATG3102"
+              - "unknown diagnostic code"
+              - "did you mean"
+
+  - name: the JSON report carries the code as a field
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                steps:
+                  - run: {command: definitely-no-such-binary-xyz}
+      - run: {command: "${atago} run --report json bad.atago.yaml"}
+      - assert:
+          exit_code: 4
+          stdout:
+            json:
+              - path: "$.suites[0].failures[0].code"
+                equals: "ATG4002"
+
+  - name: an assertion failure carries no code in the JSON report
+    # Exit 1 is a spec doing its job. A code there would invite consumers to
+    # branch on one where they should be reading the diff.
+    steps:
+      - fixture:
+          file: fails.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                steps:
+                  - run: {command: "false"}
+                  - assert: {exit_code: 0}
+      - run: {command: "${atago} run --report json fails.atago.yaml"}
+      - assert:
+          exit_code: 1
+          stdout:
+            not_contains: '"code"'
+
+  - name: a wrapped error reports one code, not two
+    # A wrapper that adds context to someone else's error leaves the code to the
+    # error it wraps. The service readiness path is where this went wrong once:
+    # it reported its own code in front of the timeout's, so one failure carried
+    # two codes and neither was the whole answer.
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                services:
+                  - {name: s, command: "sleep 30", ready: {port: "127.0.0.1:59993", timeout: 1s}}
+                steps:
+                  - run: {command: echo}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 4
+          stdout:
+            contains: "ATG4102"
+            not_contains: "ATG4301: service"
