@@ -26,18 +26,6 @@ import (
 	"github.com/nao1215/atago/internal/spec"
 )
 
-// PolicyError reports that a request targeted a host the spec's
-// `permissions.network.allow` list does not permit. The engine
-// maps it to exit code 6 (security policy violation).
-type PolicyError struct {
-	Host  string
-	Allow []string
-}
-
-func (e *PolicyError) Error() string {
-	return diag.NetworkPolicyDenied.Annotate(fmt.Sprintf("network policy denies host %q (allowed: %s)", e.Host, strings.Join(e.Allow, ", ")))
-}
-
 // Config is the resolved configuration for an HTTP runner, derived from a named
 // `runners:` entry and the spec's network policy.
 type Config struct {
@@ -183,17 +171,13 @@ func (r *Runner) resolveURL(path string) (*url.URL, error) {
 	return u, nil
 }
 
-// checkPolicy enforces the network allowlist when one is configured.
+// checkPolicy enforces the network allowlist when one is configured. The rule
+// itself lives in security.CheckHost, which the gRPC and SSH runners also call:
+// one allowlist declared in one place has to mean one thing, and two copies of
+// the comparison would be free to drift into disagreeing about what "the same
+// host" is.
 func (r *Runner) checkPolicy(u *url.URL) error {
-	if len(r.allow) == 0 {
-		return nil
-	}
-	for _, a := range r.allow {
-		if a == u.Hostname() || a == u.Host {
-			return nil
-		}
-	}
-	return &PolicyError{Host: u.Hostname(), Allow: r.allow}
+	return security.CheckHost(r.allow, u.Host)
 }
 
 func isAbsURL(p string) bool {

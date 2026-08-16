@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nao1215/atago/internal/security"
 	"github.com/nao1215/atago/internal/spec"
 )
 
@@ -199,9 +200,9 @@ func TestRunner_Do_NetworkPolicyDenies(t *testing.T) {
 	if err == nil {
 		t.Fatal("Do() error = nil, want PolicyError")
 	}
-	var pe *PolicyError
+	var pe *security.PolicyError
 	if !errors.As(err, &pe) {
-		t.Fatalf("error = %T (%v), want *PolicyError", err, err)
+		t.Fatalf("error = %T (%v), want *security.PolicyError", err, err)
 	}
 }
 
@@ -249,9 +250,9 @@ func TestRunner_Do_RedirectToDeniedHostBlocked(t *testing.T) {
 	if err == nil {
 		t.Fatal("Do() error = nil, want the redirect to a denied host to be blocked")
 	}
-	var pe *PolicyError
+	var pe *security.PolicyError
 	if !errors.As(err, &pe) {
-		t.Fatalf("error = %T (%v), want *PolicyError", err, err)
+		t.Fatalf("error = %T (%v), want *security.PolicyError", err, err)
 	}
 	if reachedDenied {
 		t.Error("the denied host was reached: the network policy was bypassed via redirect")

@@ -2,7 +2,6 @@ package engine
 
 import (
 	"context"
-	"errors"
 	"net/url"
 	"time"
 
@@ -53,11 +52,10 @@ func (e *Engine) runHTTP(ctx context.Context, h *spec.HTTP, st *store.Store, rc 
 	cfg.Workdir = workdir
 	res, err := httprunner.New(cfg).Do(ctx, h)
 	if err != nil {
-		var pe *httprunner.PolicyError
-		if errors.As(err, &pe) {
-			return nil, true, err
-		}
-		return nil, false, err
+		// One detector for every runner: the http runner raises the same
+		// security.PolicyError the grpc and ssh paths do, so isPolicyViolation
+		// is what decides exit 6 for all of them.
+		return nil, isPolicyViolation(err), err
 	}
 	return res, false, nil
 }
