@@ -258,6 +258,46 @@ func TestCheck_Stream_EqualsTrailingNewline(t *testing.T) {
 	}
 }
 
+// TestCheck_StreamEmptyIgnoresWhitespace pins what `empty:` actually means: a
+// stream carrying nothing but whitespace counts as empty, and `empty: false`
+// therefore fails on it. A CLI that prints a stray newline or a run of spaces
+// on an otherwise-silent stream is quiet as far as a user is concerned, so
+// judging it by byte length would make `stderr: {empty: true}` fail for output
+// nobody can see. The trade is that `empty: false` cannot be used to prove a
+// stream carried bytes — only that it carried something legible.
+func TestCheck_StreamEmptyIgnoresWhitespace(t *testing.T) {
+	t.Parallel()
+	tests := map[string]struct {
+		out        string
+		wantEmpty  bool
+		wantFilled bool
+	}{
+		"no bytes at all":   {out: "", wantEmpty: true, wantFilled: false},
+		"one newline":       {out: "\n", wantEmpty: true, wantFilled: false},
+		"several newlines":  {out: "\n\n\n", wantEmpty: true, wantFilled: false},
+		"one space":         {out: " ", wantEmpty: true, wantFilled: false},
+		"spaces and tabs":   {out: " \t \t ", wantEmpty: true, wantFilled: false},
+		"crlf":              {out: "\r\n", wantEmpty: true, wantFilled: false},
+		"carriage return":   {out: "\r", wantEmpty: true, wantFilled: false},
+		"unicode space":     {out: " ", wantEmpty: true, wantFilled: false},
+		"text":              {out: "x", wantEmpty: false, wantFilled: true},
+		"text and newlines": {out: "\n x \n", wantEmpty: false, wantFilled: true},
+		"zero byte":         {out: "\x00", wantEmpty: false, wantFilled: true},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			res := &runner.Result{Stdout: []byte(tt.out)}
+			if got := Check(&spec.Assert{Stdout: &spec.StreamAssert{Empty: boolp(true)}}, res, Env{}); got.OK != tt.wantEmpty {
+				t.Errorf("empty: true on %q = %v, want %v (%s)", tt.out, got.OK, tt.wantEmpty, got.Hint)
+			}
+			if got := Check(&spec.Assert{Stdout: &spec.StreamAssert{Empty: boolp(false)}}, res, Env{}); got.OK != tt.wantFilled {
+				t.Errorf("empty: false on %q = %v, want %v (%s)", tt.out, got.OK, tt.wantFilled, got.Hint)
+			}
+		})
+	}
+}
+
 // TestCheck_ContainsList_FailureNamesElement verifies an array contains /
 // not_contains failure identifies which element failed, and that a single-element
 // list keeps the original (no "element N of M") failure phrasing.
