@@ -8,7 +8,7 @@ _atago() {
         prev="${COMP_WORDS[COMP_CWORD-1]}"
     }
     local commands="completion doc explain help init list manifest record run snapshot version"
-    local run_flags="--artifacts-dir --ci --fail-fast --filter --parallel --repeat --report --rerun-failed --retry-failed --skip-tag --tag --update-snapshots --verbose"
+    local run_flags="--allow-flaky --allow-xpass --artifacts-dir --ci --fail-fast --filter --parallel --profile --repeat --report --rerun-failed --retry-failed --skip-tag --tag --update-snapshots --verbose"
     if [ "${COMP_CWORD}" -eq 1 ]; then
         COMPREPLY=( $(compgen -W "${commands}" -- "${cur}") )
         return 0
