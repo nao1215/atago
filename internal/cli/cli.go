@@ -3,11 +3,15 @@
 package cli
 
 import (
+	"bytes"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/nao1215/atago/internal/buildinfo"
+	"github.com/nao1215/atago/internal/diag"
 )
 
 // Exit codes. These are part of the stable user-facing contract.
@@ -65,6 +69,7 @@ func Subcommands() []string {
 // Main is the CLI entry point. It returns the process exit code.
 func Main(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
+		fmt.Fprintf(stderr, "atago: %s\n\n", diag.UnknownCommand.Annotate("no subcommand given"))
 		usage(stderr)
 		return ExitConfig
 	}
@@ -82,7 +87,7 @@ func Main(args []string, stdout, stderr io.Writer) int {
 			return sc.run(rest, stdout, stderr)
 		}
 	}
-	fmt.Fprintf(stderr, "atago: unknown command %q\n\n", cmd)
+	fmt.Fprintf(stderr, "atago: %s\n\n", diag.UnknownCommand.Annotate(fmt.Sprintf("unknown command %q", cmd)))
 	usage(stderr)
 	return ExitConfig
 }
@@ -161,6 +166,75 @@ func wantsHelp(args []string) bool {
 // there the trailing arguments are another program's command line, and its
 // flags belong to it.
 func parseFlagsAnywhere(fs *flag.FlagSet, args []string) ([]string, error) {
+	// The FlagSet's own output is captured rather than left to reach the
+	// terminal directly, so the caller can put the diagnostic code in front of
+	// the message instead of after the usage block the failure triggers. What
+	// the user sees is unchanged apart from that ordering: reportFlagError
+	// replays everything the FlagSet wrote.
+	var captured bytes.Buffer
+	prev := fs.Output()
+	fs.SetOutput(&captured)
+	defer fs.SetOutput(prev)
+
+	operands, err := parseOperands(fs, args)
+	if err != nil {
+		return nil, &flagError{err: err, output: captured.String()}
+	}
+	return operands, nil
+}
+
+// flagError carries a flag-parsing failure together with everything the
+// FlagSet printed about it, so the caller decides the order and destination.
+type flagError struct {
+	err    error
+	output string
+}
+
+func (e *flagError) Error() string { return e.err.Error() }
+func (e *flagError) Unwrap() error { return e.err }
+
+// reportFlagError prints a flag-parsing failure: the coded message first, then
+// whatever usage the FlagSet produced. The FlagSet writes its message as a line
+// of its own before the usage, so dropping that exact line is what keeps the
+// message from appearing twice.
+func reportFlagError(label string, err error, stderr io.Writer) {
+	var fe *flagError
+	if !errors.As(err, &fe) {
+		fmt.Fprintf(stderr, "%s: %s\n", label, diag.UnknownOption.Annotate(err.Error()))
+		return
+	}
+	fmt.Fprintf(stderr, "%s: %s\n", label, diag.UnknownOption.Annotate(fe.err.Error()))
+	fmt.Fprint(stderr, strings.TrimPrefix(fe.output, fe.err.Error()+"\n"))
+}
+
+// replayFlagOutput writes what the FlagSet printed to w unchanged. It is the
+// help path, where the FlagSet's output is already what the user asked for.
+func replayFlagOutput(err error, w io.Writer) {
+	var fe *flagError
+	if errors.As(err, &fe) {
+		fmt.Fprint(w, fe.output)
+	}
+}
+
+// parseFlagsStrict parses args with fs, capturing the FlagSet's output the way
+// parseFlagsAnywhere does. `atago record` cannot use parseFlagsAnywhere — its
+// trailing arguments are another program's command line — but a bad flag
+// should read the same there as everywhere else.
+func parseFlagsStrict(fs *flag.FlagSet, args []string) error {
+	var captured bytes.Buffer
+	prev := fs.Output()
+	fs.SetOutput(&captured)
+	defer fs.SetOutput(prev)
+
+	if err := fs.Parse(args); err != nil {
+		return &flagError{err: err, output: captured.String()}
+	}
+	return nil
+}
+
+// parseOperands is parseFlagsAnywhere's loop, split out so the output capture
+// around it stays readable.
+func parseOperands(fs *flag.FlagSet, args []string) ([]string, error) {
 	var operands []string
 	for {
 		if err := fs.Parse(args); err != nil {
@@ -189,6 +263,7 @@ func snapshotCmd(args []string, stdout, stderr io.Writer) int {
 		return ExitOK
 	}
 	if len(args) == 0 || args[0] != "update" {
+		fmt.Fprintf(stderr, "atago snapshot: %s\n", diag.BadUsage.Annotate("update is the only subcommand"))
 		fmt.Fprintln(stderr, "Usage: atago snapshot update <path | dir>...")
 		return ExitConfig
 	}

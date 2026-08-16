@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/nao1215/atago/internal/buildinfo"
+	"github.com/nao1215/atago/internal/diag"
 )
 
 // starterSpec is the default scaffold written by `atago init` (the `cli`
@@ -405,6 +406,7 @@ func initCmd(args []string, stdout, stderr io.Writer) int {
 			printUsage(stdout)
 			return ExitOK
 		}
+		reportFlagError("atago init", err, stderr)
 		printUsage(stderr)
 		return ExitConfig
 	}
@@ -419,12 +421,12 @@ func initCmd(args []string, stdout, stderr io.Writer) int {
 
 	tmpl, ok := initTemplates[*template]
 	if !ok {
-		fmt.Fprintf(stderr, "atago init: unknown template %q (want %s)\n", *template, strings.Join(initTemplateNames(), ", "))
+		fmt.Fprintf(stderr, "atago init: %s\n", diag.BadOptionValue.Annotate(fmt.Sprintf("unknown template %q (want %s)", *template, strings.Join(initTemplateNames(), ", "))))
 		return ExitConfig
 	}
 
 	if len(operands) > 1 {
-		fmt.Fprintf(stderr, "atago init: too many paths — init writes one spec file, got %d (%s)\n", len(operands), strings.Join(operands, ", "))
+		fmt.Fprintf(stderr, "atago init: %s\n", diag.BadUsage.Annotate(fmt.Sprintf("too many paths — init writes one spec file, got %d (%s)", len(operands), strings.Join(operands, ", "))))
 		return ExitConfig
 	}
 	path := defaultInitFilename(*template)
@@ -433,7 +435,7 @@ func initCmd(args []string, stdout, stderr io.Writer) int {
 	}
 
 	if _, err := os.Stat(path); err == nil && !*force {
-		fmt.Fprintf(stderr, "atago init: %q already exists (use --force to overwrite)\n", path)
+		fmt.Fprintf(stderr, "atago init: %s\n", diag.OutputExists.Annotate(fmt.Sprintf("%q already exists (use --force to overwrite)", path)))
 		return ExitConfig
 	}
 

@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-81 suites · 563 scenarios
+81 suites · 578 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -144,7 +144,7 @@
   - [file not_contains passes when the substring is absent](#scenario-file-not_contains-passes-when-the-substring-is-absent)
   - [not_contains fails when the substring is present](#scenario-not_contains-fails-when-the-substring-is-present)
   - [a shell metacharacter without shell is a load-time error](#scenario-a-shell-metacharacter-without-shell-is-a-load-time-error)
-- [atago self-hosting / every spec-error diagnostic code](#atago-self-hosting--every-spec-error-diagnostic-code) — 41 scenarios
+- [atago self-hosting / every diagnostic code](#atago-self-hosting--every-diagnostic-code) — 56 scenarios
   - [ATG2001 is a spec file that cannot be read](#scenario-atg2001-is-a-spec-file-that-cannot-be-read)
   - [ATG2002 is a spec file with no YAML document in it](#scenario-atg2002-is-a-spec-file-with-no-yaml-document-in-it)
   - [ATG2003 is a document that is not valid YAML](#scenario-atg2003-is-a-document-that-is-not-valid-yaml)
@@ -186,6 +186,21 @@
   - [ATG2502 is a set listing the same entry twice](#scenario-atg2502-is-a-set-listing-the-same-entry-twice)
   - [a code is added to the message rather than replacing it](#scenario-a-code-is-added-to-the-message-rather-than-replacing-it)
   - [several problems each report their own code in one pass](#scenario-several-problems-each-report-their-own-code-in-one-pass)
+  - [ATG3001 is a subcommand atago does not have](#scenario-atg3001-is-a-subcommand-atago-does-not-have)
+  - [ATG3001 is also atago with no subcommand at all](#scenario-atg3001-is-also-atago-with-no-subcommand-at-all)
+  - [ATG3002 is a subcommand called in a shape it does not accept](#scenario-atg3002-is-a-subcommand-called-in-a-shape-it-does-not-accept)
+  - [ATG3101 is an option atago does not define](#scenario-atg3101-is-an-option-atago-does-not-define)
+  - [ATG3102 is an option given a value it does not accept](#scenario-atg3102-is-an-option-given-a-value-it-does-not-accept)
+  - [ATG3103 is an option whose companion option is not set](#scenario-atg3103-is-an-option-whose-companion-option-is-not-set)
+  - [ATG3104 is two options that contradict each other](#scenario-atg3104-is-two-options-that-contradict-each-other)
+  - [ATG3105 is a numeric option outside its range](#scenario-atg3105-is-a-numeric-option-outside-its-range)
+  - [ATG3201 is a path that cannot be reached](#scenario-atg3201-is-a-path-that-cannot-be-reached)
+  - [ATG3202 is a directory holding no specs](#scenario-atg3202-is-a-directory-holding-no-specs)
+  - [ATG3203 is a selection that matched nothing under --ci](#scenario-atg3203-is-a-selection-that-matched-nothing-under---ci)
+  - [ATG3204 is a rerun whose recorded failures no longer exist](#scenario-atg3204-is-a-rerun-whose-recorded-failures-no-longer-exist)
+  - [ATG3205 is a write that would replace an existing file](#scenario-atg3205-is-a-write-that-would-replace-an-existing-file)
+  - [ATG3206 is a destination that cannot be written](#scenario-atg3206-is-a-destination-that-cannot-be-written)
+  - [ATG3207 is atago's recorded state failing to load](#scenario-atg3207-is-atagos-recorded-state-failing-to-load)
 - [atago self-hosting / exit_code in-set matcher](#atago-self-hosting--exit_code-in-set-matcher) — 4 scenarios
   - [a listed exit code passes](#scenario-a-listed-exit-code-passes)
   - [an unlisted exit code fails and the output lists the set](#scenario-an-unlisted-exit-code-fails-and-the-output-lists-the-set)
@@ -3187,7 +3202,7 @@ ${atago} snapshot update no-such-spec.atago.yaml
 ```
 #### Then
 - exit code is `3`
-- stderr contains `atago snapshot update: cannot access`, does not contain `atago run:`
+- stderr contains `atago snapshot update: `, `cannot access`, does not contain `atago run:`
 ### Scenario: a json assertion on malformed input fails cleanly, without a crash
 #### Given
 - Fixture file `bad.atago.yaml` is created.
@@ -3300,7 +3315,7 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `shell is not enabled`, `shell: true`, `stdout_to`
-## atago self-hosting / every spec-error diagnostic code
+## atago self-hosting / every diagnostic code
 Source: `test/e2e/atago/error_codes.atago.yaml`
 ### Scenario: ATG2001 is a spec file that cannot be read
 _skipped on Windows_
@@ -4085,6 +4100,224 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `ATG2010`, `ATG2305`
+### Scenario: ATG3001 is a subcommand atago does not have
+#### When
+```shell
+${atago} frobnicate
+```
+#### Then
+- exit code is `3`
+- stderr contains `ATG3001`
+### Scenario: ATG3001 is also atago with no subcommand at all
+#### When
+```shell
+${atago}
+```
+#### Then
+- exit code is `3`
+- stderr contains `ATG3001`
+### Scenario: ATG3002 is a subcommand called in a shape it does not accept
+#### When
+```shell
+${atago} snapshot
+```
+#### Then
+- exit code is `3`
+- stderr contains `ATG3002`
+### Scenario: ATG3101 is an option atago does not define
+#### When
+```shell
+${atago} run --definitely-not-a-flag .
+```
+#### Then
+- exit code is `3`
+- stderr contains `ATG3101`, `flag provided but not defined`, `Usage: atago run`
+### Scenario: ATG3102 is an option given a value it does not accept
+#### Given
+- Fixture file `ok.atago.yaml` is created.
+#### Inputs
+_Fixture `ok.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios: [{name: a, steps: [{run: {command: echo}}]}]
+```
+#### When
+```shell
+${atago} run --report jnit ok.atago.yaml
+```
+#### Then
+- exit code is `3`
+- stderr contains `ATG3102`
+### Scenario: ATG3103 is an option whose companion option is not set
+#### When
+```shell
+${atago} doc --split-by-spec .
+```
+#### Then
+- exit code is `3`
+- stderr contains `ATG3103`
+### Scenario: ATG3104 is two options that contradict each other
+#### Given
+- Fixture file `ok.atago.yaml` is created.
+#### Inputs
+_Fixture `ok.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios: [{name: a, steps: [{run: {command: echo}}]}]
+```
+#### When
+```shell
+${atago} run --repeat 2 --retry-failed 1 ok.atago.yaml
+```
+#### Then
+- exit code is `3`
+- stderr contains `ATG3104`
+### Scenario: ATG3105 is a numeric option outside its range
+#### Given
+- Fixture file `ok.atago.yaml` is created.
+#### Inputs
+_Fixture `ok.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios: [{name: a, steps: [{run: {command: echo}}]}]
+```
+#### When
+```shell
+${atago} run --parallel -1 ok.atago.yaml
+```
+#### Then
+- exit code is `3`
+- stderr contains `ATG3105`
+### Scenario: ATG3201 is a path that cannot be reached
+#### When
+```shell
+${atago} run ./nowhere
+```
+#### Then
+- exit code is `3`
+- stderr contains `ATG3201`
+### Scenario: ATG3202 is a directory holding no specs
+#### When
+```shell
+${atago} run .
+```
+#### Then
+- exit code is `3`
+- stderr contains `ATG3202`
+### Scenario: ATG3203 is a selection that matched nothing under --ci
+#### Given
+- Fixture file `ok.atago.yaml` is created.
+#### Inputs
+_Fixture `ok.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios: [{name: a, steps: [{run: {command: echo}}]}]
+```
+#### When
+```shell
+${atago} run --ci --tag no-such-tag ok.atago.yaml
+```
+#### Then
+- exit code is `3`
+- stderr contains `ATG3203`
+### Scenario: ATG3204 is a rerun whose recorded failures no longer exist
+#### Given
+- Fixture file `ok.atago.yaml` is created.
+- Fixture file `ok.atago.yaml` is created.
+#### Inputs
+_Fixture `ok.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios:
+  - name: before
+    steps:
+      - run: {command: "false"}
+      - assert: {exit_code: 0}
+```
+_Fixture `ok.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios:
+  - name: after
+    steps:
+      - run: {command: echo}
+```
+#### When
+```shell
+${atago} run ok.atago.yaml
+${atago} run --rerun-failed ok.atago.yaml
+```
+#### Then
+- after `${atago} run ok.atago.yaml`:
+  - exit code is `1`
+- after `${atago} run --rerun-failed ok.atago.yaml`:
+  - exit code is `3`
+  - stderr contains `ATG3204`
+### Scenario: ATG3205 is a write that would replace an existing file
+#### Given
+- Fixture file `taken.atago.yaml` is created.
+#### Inputs
+_Fixture `taken.atago.yaml`:_
+```text
+already here
+```
+#### When
+```shell
+${atago} init taken.atago.yaml
+```
+#### Then
+- exit code is `3`
+- stderr contains `ATG3205`
+### Scenario: ATG3206 is a destination that cannot be written
+#### Given
+- Fixture file `occupied` is created.
+- Fixture file `ok.atago.yaml` is created.
+#### Inputs
+_Fixture `occupied`:_
+```text
+not a directory
+```
+_Fixture `ok.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios: [{name: a, steps: [{run: {command: echo}}]}]
+```
+#### When
+```shell
+${atago} run --artifacts-dir occupied ok.atago.yaml
+```
+#### Then
+- exit code is `3`
+- stderr contains `ATG3206`
+### Scenario: ATG3207 is atago's recorded state failing to load
+#### Given
+- Fixture file `.atago/last-failed.json` is created.
+- Fixture file `ok.atago.yaml` is created.
+#### Inputs
+_Fixture `.atago/last-failed.json`:_
+```text
+not json at all
+```
+_Fixture `ok.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios: [{name: a, steps: [{run: {command: echo}}]}]
+```
+#### When
+```shell
+${atago} run --rerun-failed ok.atago.yaml
+```
+#### Then
+- exit code is `3`
+- stderr contains `ATG3207`
 ## atago self-hosting / exit_code in-set matcher
 Source: `test/e2e/atago/exit_code_in.atago.yaml`
 ### Scenario: a listed exit code passes

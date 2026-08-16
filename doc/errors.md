@@ -9,7 +9,7 @@ Codes are being assigned one family at a time. The table says which families car
 | Codes | Exit | Meaning | Assigned |
 |---|---|---|---|
 | `ATG2xxx` | 2 | spec error — the file could not be parsed, or does not describe a runnable suite | 39 codes |
-| `ATG3xxx` | 3 | configuration error — the command line, its flags, or the spec files it selected | not yet |
+| `ATG3xxx` | 3 | configuration error — the command line, its flags, or the spec files it selected | 14 codes |
 | `ATG4xxx` | 4 | execution error — a step could not be carried out | not yet |
 | `ATG5xxx` | 5 | internal error — a bug in atago | not yet |
 | `ATG6xxx` | 6 | security policy violation — atago refused an operation on policy grounds | not yet |
@@ -63,6 +63,20 @@ Look a code up from the terminal with `atago explain ATG2201`, which prints this
 | [`ATG2405`](#atg2405--a-path-does-not-exist-or-is-not-the-kind-of-thing-the-key-needs) | a path does not exist, or is not the kind of thing the key needs | 2 | v0.21.0 |
 | [`ATG2501`](#atg2501--two-entries-in-the-same-spec-share-a-name) | two entries in the same spec share a name | 2 | v0.21.0 |
 | [`ATG2502`](#atg2502--a-list-repeats-an-entry-that-must-appear-once) | a list repeats an entry that must appear once | 2 | v0.21.0 |
+| [`ATG3001`](#atg3001--there-is-no-such-atago-subcommand) | there is no such atago subcommand | 3 | v0.21.0 |
+| [`ATG3002`](#atg3002--a-subcommand-was-called-in-a-shape-it-does-not-accept) | a subcommand was called in a shape it does not accept | 3 | v0.21.0 |
+| [`ATG3101`](#atg3101--the-command-line-sets-an-option-atago-does-not-define) | the command line sets an option atago does not define | 3 | v0.21.0 |
+| [`ATG3102`](#atg3102--an-option-was-given-a-value-it-does-not-accept) | an option was given a value it does not accept | 3 | v0.21.0 |
+| [`ATG3103`](#atg3103--an-option-needs-another-option-that-is-not-set) | an option needs another option that is not set | 3 | v0.21.0 |
+| [`ATG3104`](#atg3104--two-options-that-contradict-each-other-are-both-set) | two options that contradict each other are both set | 3 | v0.21.0 |
+| [`ATG3105`](#atg3105--a-numeric-option-is-outside-the-range-it-accepts) | a numeric option is outside the range it accepts | 3 | v0.21.0 |
+| [`ATG3201`](#atg3201--a-path-on-the-command-line-cannot-be-reached) | a path on the command line cannot be reached | 3 | v0.21.0 |
+| [`ATG3202`](#atg3202--no-spec-files-were-found-under-the-paths-given) | no spec files were found under the paths given | 3 | v0.21.0 |
+| [`ATG3203`](#atg3203--the-scenario-selection-matched-nothing-and---ci-refuses-to-call-that-success) | the scenario selection matched nothing, and --ci refuses to call that success | 3 | v0.21.0 |
+| [`ATG3204`](#atg3204--no-recorded-failing-scenario-matched-the-current-specs) | no recorded failing scenario matched the current specs | 3 | v0.21.0 |
+| [`ATG3205`](#atg3205--the-output-file-already-exists) | the output file already exists | 3 | v0.21.0 |
+| [`ATG3206`](#atg3206--a-destination-atago-was-asked-to-write-cannot-be-written) | a destination atago was asked to write cannot be written | 3 | v0.21.0 |
+| [`ATG3207`](#atg3207--atagos-recorded-state-from-a-previous-run-cannot-be-read) | atago's recorded state from a previous run cannot be read | 3 | v0.21.0 |
 
 ## ATG2xxx — exit 2
 
@@ -377,4 +391,118 @@ Some lists are sets: the exit codes `in` accepts, the observables `deterministic
 Fix: Remove the repeat, or change it to the value that was meant.
 
 Exits 2. Since v0.21.0.
+
+## ATG3xxx — exit 3
+
+### ATG3001 — there is no such atago subcommand
+
+The first argument names a subcommand, and this one is not in the inventory. Running atago with no arguments at all reports the same thing, since there is no default subcommand — a bare `atago` that started running specs would be a surprising thing for a tool that writes files.
+
+Fix: Run `atago help` for the list of subcommands.
+
+Exits 3. Since v0.21.0.
+
+### ATG3002 — a subcommand was called in a shape it does not accept
+
+The subcommand exists but its arguments are not what it takes: `atago snapshot` without `update`, `atago completion` without a shell to generate for, `atago record` with no command after the `--`, or `atago init` given several paths when it writes one file. This is about the arguments' shape rather than their values, which is why it is separate from an option given a value it does not accept.
+
+Fix: Run the subcommand with `--help` for its usage line.
+
+Exits 3. Since v0.21.0.
+
+### ATG3101 — the command line sets an option atago does not define
+
+The option is not one this subcommand takes. Options are per-subcommand, so a flag that works for `atago run` is not necessarily accepted by `atago doc`, and a flag from a newer atago than the one running produces this too.
+
+Fix: Check the option against the usage printed below the message, or run the subcommand with `--help`.
+
+Exits 3. Since v0.21.0.
+
+### ATG3102 — an option was given a value it does not accept
+
+The option exists and takes a value from a fixed vocabulary, and this value is not in it — a report format, a shell to generate completion for, a scaffolding template. atago refuses rather than falling back to a default, because a misspelled `--report jnit` that quietly produced console output would leave a CI job collecting a report file that was never written.
+
+Fix: Use one of the values the message lists.
+
+Exits 3. Since v0.21.0.
+
+### ATG3103 — an option needs another option that is not set
+
+Some options only mean something in company: `--split-by-spec` writes one file per spec and needs the `--out-dir` to write them into, and `--snapshot` on `record` writes a golden next to the spec, which needs `--out` to say where the spec is going.
+
+Fix: Add the option the message names, or drop the one that depends on it.
+
+Exits 3. Since v0.21.0.
+
+### ATG3104 — two options that contradict each other are both set
+
+The two options ask for incompatible things. `--repeat` and `--retry-failed` are the clearest pair: one re-runs scenarios to find out whether they flake, the other re-runs them so that flakiness does not fail the build, and a run cannot both detect and tolerate the same instability. `--out` and `--split-by-spec` disagree about whether the output is one file or many.
+
+Fix: Keep the option that expresses what you want and drop the other.
+
+Exits 3. Since v0.21.0.
+
+### ATG3105 — a numeric option is outside the range it accepts
+
+Counts are never negative. A negative `--parallel` would otherwise be clamped to sequential and exit 0, so the typo would run the suite in a way nobody asked for and report success; the same applies to `--repeat` and `--retry-failed`.
+
+Fix: Use zero or a positive number. Zero means atago's default for these options rather than none.
+
+Exits 3. Since v0.21.0.
+
+### ATG3201 — a path on the command line cannot be reached
+
+atago was pointed at a file or directory that does not exist, or that it is not allowed to look at. In CI this is usually a working directory that is not what the workflow assumed, or a checkout step that has not run yet.
+
+Fix: Check the path as spelled, and the directory the command runs from.
+
+Exits 3. Since v0.21.0.
+
+### ATG3202 — no spec files were found under the paths given
+
+The paths exist but hold no `*.atago.yaml` or `*.atago.yml` files. Directories are searched recursively, so this means there genuinely are none below them. Reporting success here would let a CI job that lost its specs go green forever.
+
+Fix: Point atago at the directory holding the specs, or run `atago init` to scaffold one. The file name matters: a spec must end in `.atago.yaml` or `.atago.yml`.
+
+Exits 3. Since v0.21.0.
+
+### ATG3203 — the scenario selection matched nothing, and --ci refuses to call that success
+
+Specs were found and loaded, but `--filter`, `--tag`, or `--skip-tag` selected none of their scenarios. Outside `--ci` this is a warning; under `--ci` it fails, because a selection that silently stops matching is how a suite disables itself without anyone noticing — a renamed tag keeps the build green while testing nothing. The two selectors match differently: `--filter` is a case-sensitive substring of the name, while `--tag` and `--skip-tag` compare tags for exact equality.
+
+Fix: Run `atago list` to see the scenario names and tags actually present, and correct the selector.
+
+Exits 3. Since v0.21.0.
+
+### ATG3204 — no recorded failing scenario matched the current specs
+
+`--rerun-failed` re-runs what failed last time, and none of the recorded names exist any more — they were renamed or removed since the run that recorded them. The recorded failures are kept rather than cleared, because the work they represent is still unverified, and exiting 0 here would report a green run that tested nothing.
+
+Fix: Run the full suite once to record failures against the current names, or drop the recorded state and start again.
+
+Exits 3. Since v0.21.0.
+
+### ATG3205 — the output file already exists
+
+`atago init` and `atago record` write a new spec, and neither overwrites one by default. Silently replacing a spec someone has edited is the kind of loss a tool should never cause without being asked.
+
+Fix: Choose another path, or pass `--force` to overwrite the existing file deliberately.
+
+Exits 3. Since v0.21.0.
+
+### ATG3206 — a destination atago was asked to write cannot be written
+
+The generated documentation, or the artifacts directory a run was told to use, could not be created or written. The artifacts directory is checked before the run starts rather than at the first failure: a directory that cannot be written would otherwise make every artifact write fail quietly, leaving a run that looks like it produced nothing to review when in fact nothing could be saved.
+
+Fix: Check that the parent directory exists and is writable, and that nothing else already occupies the path as a file.
+
+Exits 3. Since v0.21.0.
+
+### ATG3207 — atago's recorded state from a previous run cannot be read
+
+`--rerun-failed` reads a small ledger written by the previous run, and that file could not be read or decoded. A truncated or hand-edited ledger is the usual cause.
+
+Fix: Delete the ledger and run the full suite once to record it again.
+
+Exits 3. Since v0.21.0.
 

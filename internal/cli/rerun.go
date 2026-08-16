@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/engine"
 )
 
@@ -274,7 +275,7 @@ func collectFailures(results []*engine.SuiteResult, allowXPass bool) []failedEnt
 func applyRerunSelection(label string, stderr io.Writer, paths []string, eng *engine.Engine) (narrowed []string, exitNow int, done bool) {
 	state, lerr := loadRerunState()
 	if lerr != nil {
-		fmt.Fprintf(stderr, label+": cannot read %s: %v\n", rerunStatePath(), lerr)
+		fmt.Fprintf(stderr, "%s: %s\n", label, diag.StateUnreadable.Annotate(fmt.Sprintf("cannot read %s: %v", rerunStatePath(), lerr)))
 		return nil, ExitConfig, true
 	}
 	for i := range state.Failed {

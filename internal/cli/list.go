@@ -41,6 +41,7 @@ func listCmd(args []string, stdout, stderr io.Writer) int {
 			printUsage(stdout)
 			return ExitOK
 		}
+		reportFlagError("atago list", err, stderr)
 		printUsage(stderr)
 		return ExitConfig
 	}

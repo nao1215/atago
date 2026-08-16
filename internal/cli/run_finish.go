@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/engine"
 	"github.com/nao1215/atago/internal/report"
 )
@@ -120,7 +121,7 @@ func settleRerunLedger(ctx context.Context, opts *runOptions, results []*engine.
 	// contradicts the empty-selection warning). The excluded failures are still
 	// preserved into the ledger via rerunPreserved, so no work is lost.
 	if opts.rerunFailed && !opts.selectionActive() && len(results) > 0 && ranScenarios == 0 && ctx.Err() == nil {
-		fmt.Fprintln(opts.stderr, opts.label+": warning: no recorded failing scenarios matched the current specs (renamed or removed?); the recorded failures were kept, not cleared")
+		fmt.Fprintf(opts.stderr, "%s: %s\n", opts.label, diag.RerunNothingMatched.Annotate("no recorded failing scenarios matched the current specs (renamed or removed?); the recorded failures were kept, not cleared"))
 		return ExitConfig
 	}
 
@@ -177,7 +178,7 @@ func emptySelectionExit(ctx context.Context, opts *runOptions, results []*engine
 	// users fixing the wrong thing, so name each selector's real rule.
 	note := selectorNoMatchNote(len(opts.filter) > 0, tagActive)
 	if opts.ci {
-		fmt.Fprintf(opts.stderr, opts.label+": no scenarios matched %s under --ci; refusing to exit 0 (an empty selection would silently disable the suite). %s. Run `atago list` to see available scenarios and tags.\n", strings.Join(sel, " "), note)
+		fmt.Fprintf(opts.stderr, "%s: %s\n", opts.label, diag.EmptySelection.Annotate(fmt.Sprintf("no scenarios matched %s under --ci; refusing to exit 0 (an empty selection would silently disable the suite). %s. Run `atago list` to see available scenarios and tags.", strings.Join(sel, " "), note)))
 		return ExitConfig
 	}
 	hint := note

@@ -5,6 +5,8 @@ import (
 	"io"
 	"sort"
 	"strings"
+
+	"github.com/nao1215/atago/internal/diag"
 )
 
 // subcommandNames is the stable, sorted list of top-level subcommands that shell
@@ -58,13 +60,14 @@ func completionCmd(args []string, stdout, stderr io.Writer) int {
 		return ExitOK
 	}
 	if len(args) != 1 {
+		fmt.Fprintf(stderr, "atago completion: %s\n", diag.BadUsage.Annotate("no shell named"))
 		fmt.Fprintf(stderr, "Usage: atago completion <%s>\n", strings.Join(completionShells, "|"))
 		return ExitConfig
 	}
 	shell := args[0]
 	script, ok := completionScript(shell)
 	if !ok {
-		fmt.Fprintf(stderr, "atago completion: unknown shell %q (want %s)\n", shell, strings.Join(completionShells, ", "))
+		fmt.Fprintf(stderr, "atago completion: %s\n", diag.BadOptionValue.Annotate(fmt.Sprintf("unknown shell %q (want %s)", shell, strings.Join(completionShells, ", "))))
 		return ExitConfig
 	}
 	fmt.Fprint(stdout, script)
