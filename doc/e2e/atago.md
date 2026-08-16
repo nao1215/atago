@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-81 suites · 619 scenarios
+81 suites · 620 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -562,10 +562,11 @@
   - [a redirect may not write through a symlinked directory](#scenario-a-redirect-may-not-write-through-a-symlinked-directory)
   - [a symlinked directory inside the workdir still resolves](#scenario-a-symlinked-directory-inside-the-workdir-still-resolves)
   - [a snapshot path may not escape the spec directory](#scenario-a-snapshot-path-may-not-escape-the-spec-directory)
-- [atago self-hosting / selection](#atago-self-hosting--selection) — 3 scenarios
+- [atago self-hosting / selection](#atago-self-hosting--selection) — 4 scenarios
   - [--filter runs only matching scenarios](#scenario---filter-runs-only-matching-scenarios)
   - [--filter selects multiple scenarios with OR (comma and repeated)](#scenario---filter-selects-multiple-scenarios-with-or-comma-and-repeated)
   - [--skip-tag drops tagged scenarios](#scenario---skip-tag-drops-tagged-scenarios)
+  - [a repeated tag on one scenario is a load-time error](#scenario-a-repeated-tag-on-one-scenario-is-a-load-time-error)
 - [atago self-hosting / background services](#atago-self-hosting--background-services) — 8 scenarios
   - [file readiness captures a dynamic value into a variable](#scenario-file-readiness-captures-a-dynamic-value-into-a-variable)
   - [log readiness waits for a line on the service output](#scenario-log-readiness-waits-for-a-line-on-the-service-output)
@@ -11239,6 +11240,49 @@ ${atago} run --skip-tag slow tagged.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `1 passed`
+### Scenario: a repeated tag on one scenario is a load-time error
+#### Given
+- Fixture file `duptag.atago.yaml` is created.
+- Fixture file `shared.atago.yaml` is created.
+#### Inputs
+_Fixture `duptag.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: tagged twice
+    tags: [smoke, smoke]
+    steps:
+      - run: {shell: true, command: "true"}
+```
+_Fixture `shared.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: first
+    tags: [smoke]
+    steps:
+      - run: {shell: true, command: "true"}
+  - name: second
+    tags: [smoke]
+    steps:
+      - run: {shell: true, command: "true"}
+```
+#### When
+```shell
+${atago} run duptag.atago.yaml
+${atago} doc shared.atago.yaml
+```
+#### Then
+- after `${atago} run duptag.atago.yaml`:
+  - exit code is `2`
+  - stderr contains `duplicate tag "smoke"`
+- after `${atago} doc shared.atago.yaml`:
+  - exit code is `0`
+  - stdout contains ``smoke` (2)`
 ## atago self-hosting / background services
 Source: `test/e2e/atago/services.atago.yaml`
 ### Scenario: file readiness captures a dynamic value into a variable

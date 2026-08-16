@@ -115,6 +115,17 @@ func validateScenario(add addFunc, s *spec.Spec, i int, seen, suiteServiceNames,
 		seen[sc.Name] = true
 		where = fmt.Sprintf("scenario %q", sc.Name)
 	}
+	// A tag list is a set: --tag and --skip-tag ask whether a scenario carries
+	// one, so repeating an entry selects nothing extra. It is not harmless
+	// though — the generated docs count tag occurrences, so a scenario listing
+	// `smoke` twice made the summary claim two scenarios carry it.
+	tags := map[string]bool{}
+	for _, tag := range sc.Tags {
+		if tags[tag] {
+			add(diag.DuplicateName, "%s: duplicate tag %q; a tag list is a set, and the generated docs count it twice", where, tag)
+		}
+		tags[tag] = true
+	}
 	validateCondition(add, where, "skip", sc.Skip)
 	validateCondition(add, where, "only", sc.Only)
 	validateExpectFail(add, where, sc.ExpectFail)
