@@ -35,8 +35,8 @@ func Explain(w io.Writer, s *spec.Spec, path string) error {
 		fmt.Fprintf(&b, "Secrets declared: %s\n", strings.Join(s.Secrets, ", "))
 	}
 	fmt.Fprintf(&b, "Network policy: %s\n", networkPolicy(s))
-	explainSuiteBlock(&b, "Suite setup (runs once before any scenario)", s.Suite.Setup)
-	explainSuiteBlock(&b, "Suite teardown (always runs after the last scenario)", s.Suite.Teardown)
+	explainSuiteBlock(&b, "Suite setup (runs once before any scenario)", s.Suite.Setup, s.Runners)
+	explainSuiteBlock(&b, "Suite teardown (always runs after the last scenario)", s.Suite.Teardown, s.Runners)
 
 	for i := range s.Scenarios {
 		explainScenario(&b, &s.Scenarios[i], s.Runners)
@@ -58,7 +58,7 @@ func networkPolicy(s *spec.Spec) string {
 // explainSuiteBlock summarizes suite.setup / suite.teardown (#7) so a reviewer
 // sees the once-per-suite bootstrap (built helpers, suite-wide services,
 // cleanup) without reading YAML.
-func explainSuiteBlock(b *strings.Builder, label string, steps []spec.Step) {
+func explainSuiteBlock(b *strings.Builder, label string, steps []spec.Step, runners map[string]spec.Runner) {
 	if len(steps) == 0 {
 		return
 	}
@@ -67,7 +67,7 @@ func explainSuiteBlock(b *strings.Builder, label string, steps []spec.Step) {
 		step := &steps[i]
 		switch step.Kind() {
 		case spec.StepRun:
-			fmt.Fprintf(b, "  - %s\n", describeRun(step.Run))
+			fmt.Fprintf(b, "  - %s\n", describeRun(step.Run, runners))
 		case spec.StepService:
 			fmt.Fprintf(b, "  - start suite service %q: %s\n", step.Service.Name, step.Service.Command)
 		case spec.StepMockServer:
@@ -108,7 +108,7 @@ func explainScenario(b *strings.Builder, sc *spec.Scenario, runners map[string]s
 		// manifest never disagree about which ${name}s a step uses; the bucketing
 		// below only formats the human-facing summary lines.
 		spec.CollectStepVars(vars, step)
-		bucketScenarioStep(step, &fixtures, &commands, &expects, &stores)
+		bucketScenarioStep(step, &fixtures, &commands, &expects, &stores, runners)
 	}
 
 	// Teardown steps always run after the scenario — summarize them separately
@@ -117,7 +117,7 @@ func explainScenario(b *strings.Builder, sc *spec.Scenario, runners map[string]s
 	for i := range sc.Teardown {
 		step := &sc.Teardown[i]
 		spec.CollectStepVars(vars, step)
-		teardown = append(teardown, describeTeardownStep(step)...)
+		teardown = append(teardown, describeTeardownStep(step, runners)...)
 	}
 
 	// Generated artifacts and security notes come from the shared spec model, so
@@ -139,12 +139,12 @@ func explainScenario(b *strings.Builder, sc *spec.Scenario, runners map[string]s
 
 // bucketScenarioStep files one scenario step's summary line under the section
 // it belongs to: fixtures, commands, expects, or stores.
-func bucketScenarioStep(step *spec.Step, fixtures, commands, expects, stores *[]string) {
+func bucketScenarioStep(step *spec.Step, fixtures, commands, expects, stores *[]string, runners map[string]spec.Runner) {
 	switch step.Kind() {
 	case spec.StepFixture:
 		*fixtures = append(*fixtures, describeFixture(step.Fixture))
 	case spec.StepRun:
-		*commands = append(*commands, describeRun(step.Run))
+		*commands = append(*commands, describeRun(step.Run, runners))
 	case spec.StepAssert:
 		*expects = append(*expects, describeAsserts(step.Assert)...)
 	case spec.StepStore:
@@ -261,10 +261,10 @@ func describePTY(p *spec.PTY) string {
 // describeTeardownStep renders a teardown step's summary lines. Unlike the
 // scenario body, whose steps are bucketed into Commands/Expects/Fixtures,
 // teardown is one flat list — cleanup reads in execution order.
-func describeTeardownStep(step *spec.Step) []string {
+func describeTeardownStep(step *spec.Step, runners map[string]spec.Runner) []string {
 	switch step.Kind() {
 	case spec.StepRun:
-		return []string{describeRun(step.Run)}
+		return []string{describeRun(step.Run, runners)}
 	case spec.StepHTTP:
 		return []string{fmt.Sprintf("HTTP %s %s", step.HTTP.Method, step.HTTP.Path)}
 	case spec.StepQuery:
@@ -352,8 +352,13 @@ func describeFixture(f *spec.Fixture) string {
 	return fmt.Sprintf("%s (%s)", f.File, kind)
 }
 
-func describeRun(r *spec.Run) string {
+func describeRun(r *spec.Run, runners map[string]spec.Runner) string {
 	var notes []string
+	// Where it runs, when that is not here: every other step kind already says
+	// which runner carried it, and a bare command line read as local.
+	if host := spec.RunHost(r, runners); host != "" {
+		notes = append(notes, host)
+	}
 	if r.Timeout != "" {
 		notes = append(notes, "timeout "+r.Timeout)
 	}

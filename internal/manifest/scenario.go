@@ -38,7 +38,7 @@ func buildScenario(sc *spec.Scenario, src SourceLocator, runners map[string]spec
 
 	for i := range sc.Steps {
 		step := &sc.Steps[i]
-		st := buildStep(i, step, vars)
+		st := buildStep(i, step, vars, runners)
 		if src != nil {
 			st.Source = sourceFrom(src.StepPos(sc.SourceIndex, i))
 		}
@@ -48,7 +48,7 @@ func buildScenario(sc *spec.Scenario, src SourceLocator, runners map[string]spec
 	// Teardown steps share the step shape; their variable references count
 	// toward the scenario's referenced-variable set like any other step's.
 	for i := range sc.Teardown {
-		out.Teardown = append(out.Teardown, buildStep(i, &sc.Teardown[i], vars))
+		out.Teardown = append(out.Teardown, buildStep(i, &sc.Teardown[i], vars, runners))
 	}
 
 	out.Variables = spec.SortedKeys(vars)
@@ -80,7 +80,7 @@ func buildService(svc *spec.Service) Service {
 // buildStep reduces one step to its declarative fields and folds its variable
 // references into the scenario-level var set. Generated artifacts and security
 // notes are derived separately from the shared spec model (#56).
-func buildStep(index int, step *spec.Step, vars map[string]bool) Step {
+func buildStep(index int, step *spec.Step, vars map[string]bool, runners map[string]spec.Runner) Step {
 	st := Step{Index: index, Kind: string(step.Kind())}
 	spec.CollectStepVars(vars, step)
 	switch step.Kind() {
@@ -105,6 +105,11 @@ func buildStep(index int, step *spec.Step, vars map[string]bool) Step {
 		st.PassEnv = r.PassEnv
 		st.Runner = r.Runner
 		st.Action = "run " + r.Command
+		// The structured runner field already carries the name; the action line
+		// is prose, and read as a local command without this.
+		if host := spec.RunHost(r, runners); host != "" {
+			st.Action = "run via " + host + ": " + r.Command
+		}
 		if r.Retry != nil {
 			st.Retry = &Retry{Times: r.Retry.Times, Interval: r.Retry.Interval}
 		}

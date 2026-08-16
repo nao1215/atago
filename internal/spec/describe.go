@@ -18,6 +18,21 @@ func CDPActionSummary(c *CDP) string {
 	return "CDP via " + c.Runner + ": " + strings.Join(acts, " → ")
 }
 
+// RunHost names where a run step executes when that is not the machine running
+// atago: "ssh <runner>" for a command an ssh runner sends elsewhere, and "" for
+// anything local.
+//
+// explain, doc, and manifest share the decision because all three rendered a
+// remote command as a bare command line — `uptime` reads as something that ran
+// here, and every other step kind already says which runner carried it. Only
+// the decision is shared; each surface keeps its own phrasing.
+func RunHost(r *Run, runners map[string]Runner) string {
+	if r == nil || runners[r.Runner].Type != "ssh" {
+		return ""
+	}
+	return "ssh " + r.Runner
+}
+
 // SortedKeys returns the keys of a set in lexicographic order — the shared
 // helper behind the sorted variable/label lists in explain and manifest.
 func SortedKeys(m map[string]bool) []string {

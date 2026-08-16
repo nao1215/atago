@@ -191,6 +191,9 @@ scenarios:
             contains:
               - "network access (ssh box): uptime"
               - "network access: SQL query via pg"
+              # Every other step kind names the runner that carried it; a bare
+              # command line made an ssh run read as local.
+              - "uptime  (ssh box)"
             # The local runner still appears under Commands — it is a step the
             # scenario runs — but never as egress: a file-backed database
             # reaches no host, and saying it does would train a reader to skip
@@ -205,3 +208,11 @@ scenarios:
             json:
               - path: "$.specs[0].scenarios[0].security[0]"
                 equals: "network access (ssh box): uptime"
+              - path: "$.specs[0].scenarios[0].steps[0].action"
+                equals: "run via ssh box: uptime"
+      - run:
+          command: ${atago} doc remote.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "# ssh box: uptime"

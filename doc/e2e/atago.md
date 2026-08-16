@@ -5716,14 +5716,18 @@ scenarios:
 ```shell
 ${atago} explain remote.atago.yaml
 ${atago} manifest remote.atago.yaml
+${atago} doc remote.atago.yaml
 ```
 #### Then
 - after `${atago} explain remote.atago.yaml`:
   - exit code is `0`
-  - stdout contains `network access (ssh box): uptime`, `network access: SQL query via pg`, does not contain `network access: SQL query via local`
+  - stdout contains `network access (ssh box): uptime`, `network access: SQL query via pg`, `uptime  (ssh box)`, does not contain `network access: SQL query via local`
 - after `${atago} manifest remote.atago.yaml`:
   - exit code is `0`
-  - stdout at `$.specs[0].scenarios[0].security[0]` equals `network access (ssh box): uptime`
+  - stdout at `$.specs[0].scenarios[0].security[0]` equals `network access (ssh box): uptime`; at `$.specs[0].scenarios[0].steps[0].action` equals `run via ssh box: uptime`
+- after `${atago} doc remote.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `# ssh box: uptime`
 ## atago self-hosting / file equals and equals_file byte-equality (#155)
 Source: `test/e2e/atago/file_equals.atago.yaml`
 ### Scenario: equals_file passes for two byte-identical files

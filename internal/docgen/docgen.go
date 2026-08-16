@@ -94,11 +94,11 @@ func writeSuite(md *markdown.Markdown, src Source, outputDir string) {
 	// (#67). outputDir anchors relative links to embedded images.
 	specDir := filepath.Dir(src.Path)
 	for i := range s.Scenarios {
-		writeScenario(md, &s.Scenarios[i], specDir, outputDir)
+		writeScenario(md, &s.Scenarios[i], specDir, outputDir, s.Runners)
 	}
 }
 
-func writeScenario(md *markdown.Markdown, sc *spec.Scenario, specDir, outputDir string) {
+func writeScenario(md *markdown.Markdown, sc *spec.Scenario, specDir, outputDir string, runners map[string]spec.Runner) {
 	md.H3f("Scenario: %s", sc.Name)
 	writeDescription(md, sc.Description)
 	if meta := scenarioMeta(sc); meta != "" {
@@ -120,7 +120,7 @@ func writeScenario(md *markdown.Markdown, sc *spec.Scenario, specDir, outputDir 
 		writePreviews(md, inputs)
 	}
 
-	if cmds := commands(sc.Steps, expand); len(cmds) > 0 {
+	if cmds := commands(sc.Steps, expand, runners); len(cmds) > 0 {
 		md.H4("When")
 		md.CodeBlocks(markdown.SyntaxHighlightShell, strings.Join(cmds, "\n"))
 	}
@@ -129,7 +129,7 @@ func writeScenario(md *markdown.Markdown, sc *spec.Scenario, specDir, outputDir 
 
 	// Teardown always runs — pass, fail, error, or interrupt — so document the
 	// cleanup a scenario performs against external systems.
-	if td := commands(sc.Teardown, expand); len(td) > 0 {
+	if td := commands(sc.Teardown, expand, runners); len(td) > 0 {
 		md.H4("Finally (teardown, always runs)")
 		md.CodeBlocks(markdown.SyntaxHighlightShell, strings.Join(td, "\n"))
 	}
@@ -330,10 +330,10 @@ func clearedEnvBullet(passEnv []string) string {
 // just run steps, so HTTP/query/gRPC/CDP interactions are documented too (#41),
 // and store steps appear as comments so a later ${name} reference is explained
 // where it is born instead of appearing out of nowhere.
-func commands(steps []spec.Step, expand func(string) string) []string {
+func commands(steps []spec.Step, expand func(string) string, runners map[string]spec.Runner) []string {
 	var out []string
 	for i := range steps {
-		if line, ok := commandLine(&steps[i], expand); ok {
+		if line, ok := commandLine(&steps[i], expand, runners); ok {
 			out = append(out, line)
 		}
 	}
@@ -342,9 +342,15 @@ func commands(steps []spec.Step, expand func(string) string) []string {
 
 // commandLine renders one step's "When" line; ok is false for a step kind that
 // contributes nothing (fixtures, asserts).
-func commandLine(step *spec.Step, expand func(string) string) (string, bool) {
+func commandLine(step *spec.Step, expand func(string) string, runners map[string]spec.Runner) (string, bool) {
 	switch step.Kind() {
 	case spec.StepRun:
+		// A remote command is a comment like every other non-local step: it is
+		// not something a reader can paste into their own shell, and printing
+		// it bare made an ssh run indistinguishable from one that ran here.
+		if host := spec.RunHost(step.Run, runners); host != "" {
+			return fmt.Sprintf("# %s: %s", host, expand(step.Run.Command)), true
+		}
 		return expand(step.Run.Command), true
 	case spec.StepHTTP:
 		if step.HTTP != nil {

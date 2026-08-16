@@ -128,3 +128,30 @@ func TestSecurityNotes_RemoteRunnersAreNetworkAccess(t *testing.T) {
 		}
 	}
 }
+
+func TestRunHost(t *testing.T) {
+	t.Parallel()
+	runners := map[string]Runner{
+		"box":   {Type: "ssh", Host: "shell.example", User: "deploy"},
+		"local": {Type: "cmd"},
+	}
+	cases := []struct {
+		name string
+		run  *Run
+		want string
+	}{
+		{"ssh runner", &Run{Runner: "box", Command: "uptime"}, "ssh box"},
+		{"cmd runner", &Run{Runner: "local", Command: "uptime"}, ""},
+		{"no runner", &Run{Command: "uptime"}, ""},
+		{"unknown runner", &Run{Runner: "gone", Command: "uptime"}, ""},
+		{"nil run", nil, ""},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			if got := RunHost(c.run, runners); got != c.want {
+				t.Errorf("RunHost = %q, want %q", got, c.want)
+			}
+		})
+	}
+}
