@@ -36,6 +36,14 @@ runners:
     base_url: http://127.0.0.1:18131
     timeout: 10s
 
+defaults:
+  scenario:
+    # Every scenario here drives promtool. Without the program there is nothing to
+    # test, so the suite skips rather than erroring: a missing tool is not a
+    # result. The gate is declared once so no scenario can be left out of it.
+    only:
+      command: promtool --version
+
 scenarios:
   - name: promtool accepts a valid config and rejects a broken one
     steps:

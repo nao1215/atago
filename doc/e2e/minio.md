@@ -23,6 +23,7 @@ arrive in a form the client can understand.
 
 Source: `test/e2e/thirdparty/minio/minio.atago.yaml`
 ### Scenario: the server reports itself alive over the health API
+_only when `minio --version` succeeds_
 #### Given
 - Background service `minio` is started: `minio server data --address 127.0.0.1:18120`.
 #### When
@@ -36,6 +37,7 @@ Source: `test/e2e/thirdparty/minio/minio.atago.yaml`
 - after `HTTP GET /minio/health/ready`:
   - HTTP status is `200`
 ### Scenario: anonymous S3 access is denied with a proper S3 XML error
+_only when `minio --version` succeeds_
 #### Given
 - Background service `minio` is started: `minio server data --address 127.0.0.1:18121`.
 #### When
@@ -46,6 +48,7 @@ Source: `test/e2e/thirdparty/minio/minio.atago.yaml`
 - HTTP status is `403`
 - body contains `<Code>AccessDenied</Code>`
 ### Scenario: a full object lifecycle through the mc client
+_only when `minio --version` succeeds_
 #### Given
 - Background service `minio` is started: `minio server data --address 127.0.0.1:18122`.
 - Fixture file `upload.txt` is created.
@@ -90,6 +93,7 @@ mc ls lifecycle/atago-bucket
   - exit code is `0`
   - stdout is empty
 ### Scenario: bucket versioning can be enabled and reported
+_only when `minio --version` succeeds_
 #### Given
 - Background service `minio` is started: `minio server data --address 127.0.0.1:18123`.
 #### When
@@ -107,6 +111,7 @@ mc version info --json versioned/versioned
   - exit code is `0`
   - stdout at `$.versioning.status` equals `Enabled`
 ### Scenario: an anonymous download policy publishes a bucket read-only
+_only when `minio --version` succeeds_
 #### Given
 - Background service `minio` is started: `minio server data --address 127.0.0.1:18124`.
 - Fixture file `page.txt` is created.

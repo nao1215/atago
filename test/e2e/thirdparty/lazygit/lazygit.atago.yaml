@@ -20,7 +20,7 @@ suite:
 # only holds onto whatever the previous scenario left running, so the number is
 # staying where it was until that is understood.
 scenarios:
-  - name: version prints the pinned release
+  - name: version prints a semantic version
     only:
       command: lazygit --version
     steps:
@@ -29,7 +29,14 @@ scenarios:
       - assert:
           exit_code: 0
           stdout:
-            contains: version=0.63.1
+            # The shape, not the number. Pinning the exact release coupled this
+            # scenario to the version thirdparty.yml installs, so it failed
+            # against any other build — a developer's own lazygit, or CI itself
+            # the moment the pin moved. What is worth asserting is that lazygit
+            # reports a version at all, in the field-tagged form the rest of
+            # this suite reads.
+            matches: 'version=[0-9]+\.[0-9]+\.[0-9]+'
+            contains: "os="
 
   - name: opening a dirty repository shows unstaged changes and quits cleanly
     only:

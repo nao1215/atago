@@ -23,6 +23,7 @@ bytes that came back.
 
 Source: `test/e2e/thirdparty/gotify/gotify.atago.yaml`
 ### Scenario: the server reports health and version
+_only when `gotify --version` succeeds_
 #### Given
 - Background service `gotify` is started: `gotify`.
 - Fixture file `data/.keep` is created.
@@ -39,6 +40,7 @@ Source: `test/e2e/thirdparty/gotify/gotify.atago.yaml`
   - HTTP status is `200`
   - body at `$.version` matches `/^[0-9]+\.[0-9]+\.[0-9]+/`
 ### Scenario: an application pushes and the admin reads it back
+_only when `gotify --version` succeeds_
 #### Given
 - Background service `gotify` is started: `gotify`.
 - Fixture file `data/.keep` is created.
@@ -64,6 +66,7 @@ Source: `test/e2e/thirdparty/gotify/gotify.atago.yaml`
   - body at `$.messages` has length 1
   - body at `$.messages[0].priority` equals `5`
 ### Scenario: the app icon round-trips through a multipart upload
+_only when `gotify --version` succeeds_
 #### Given
 - Background service `gotify` is started: `gotify`.
 - Fixture file `data/.keep` is created.

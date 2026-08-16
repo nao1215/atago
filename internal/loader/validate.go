@@ -235,6 +235,13 @@ func validateDefaults(add addFunc, d *spec.Defaults) {
 		nonNegativeDuration(add, "defaults.run.timeout", r.Timeout, "30s")
 		validateHermeticEnv(add, "defaults.run", r.ClearEnv, r.PassEnv)
 	}
+	if scn := d.Scenario; scn != nil {
+		// The gates are validated here as well as on each scenario, so a
+		// malformed default fails even when every scenario states its own and
+		// the default is therefore never applied.
+		validateCondition(add, "defaults.scenario", "only", scn.Only)
+		validateCondition(add, "defaults.scenario", "skip", scn.Skip)
+	}
 	if sv := d.Service; sv != nil {
 		if sv.Name != "" {
 			add(diag.KeyNotHere, "defaults.service.name is not supported (each service names itself)")

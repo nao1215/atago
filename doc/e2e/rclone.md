@@ -27,6 +27,7 @@ local backend, which keeps every scenario hermetic.
 
 Source: `test/e2e/thirdparty/rclone/rclone.atago.yaml`
 ### Scenario: version prints a semantic version
+_only when `rclone version` succeeds_
 #### When
 ```shell
 rclone version
@@ -35,6 +36,7 @@ rclone version
 - exit code is `0`
 - stdout matches `/rclone v[0-9]+\.[0-9]+\.[0-9]+/`
 ### Scenario: copy replicates a tree and check certifies the replica
+_only when `rclone version` succeeds_
 #### Given
 - Fixture file `rclone.conf` is created.
 - Fixture file `src/hello.txt` is created.
@@ -63,6 +65,7 @@ rclone check src dst
   - exit code is `0`
   - stderr contains `0 differences found`
 ### Scenario: check fails loudly once the replica is corrupted
+_only when `rclone version` succeeds_
 #### Given
 - Fixture file `rclone.conf` is created.
 - Fixture file `src/hello.txt` is created.
@@ -86,6 +89,7 @@ rclone check src dst
   - exit code is not `0`
   - stderr contains `1 differences found`
 ### Scenario: lsjson emits a machine-readable listing
+_only when `rclone version` succeeds_
 #### Given
 - Fixture file `rclone.conf` is created.
 - Fixture file `src/hello.txt` is created.
@@ -116,6 +120,7 @@ rclone size --json src
   - exit code is `0`
   - stdout at `$.count` equals `2`
 ### Scenario: sync makes the destination mirror the source, deletions included
+_only when `rclone version` succeeds_
 #### Given
 - Fixture file `rclone.conf` is created.
 - Fixture file `src/keep.txt` is created.
@@ -137,6 +142,7 @@ rclone sync src dst
 - exit code is `0`
 - dir `dst` contains `keep.txt`, does not contain `extraneous.txt`
 ### Scenario: obscure and reveal round-trip a secret
+_only when `rclone version` succeeds_
 #### Given
 - Fixture file `rclone.conf` is created.
 #### When
@@ -152,6 +158,7 @@ rclone reveal ${obscured}
   - exit code is `0`
   - stdout equals an exact value
 ### Scenario: serve http publishes the tree over real HTTP
+_only when `rclone version` succeeds_
 #### Given
 - Background service `rclone-http` is started: `rclone serve http src --addr 127.0.0.1:18110`.
 - Fixture file `rclone.conf` is created.

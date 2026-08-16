@@ -24,6 +24,7 @@ endpoint is checked over HTTP alongside.
 
 Source: `test/e2e/thirdparty/nats/nats.atago.yaml`
 ### Scenario: the binary reports its version
+_only when `nats-server --version` succeeds_
 #### When
 ```shell
 nats-server --version
@@ -32,6 +33,7 @@ nats-server --version
 - exit code is `0`
 - stdout matches `/nats-server: v[0-9]+\.[0-9]+\.[0-9]+/`
 ### Scenario: the monitoring endpoint reports a healthy JetStream server
+_only when `nats-server --version` succeeds_
 #### Given
 - Background service `nats-server` is started: `nats-server -js -sd store -a 127.0.0.1 -p 18160 -m 18161`.
 #### When
@@ -48,6 +50,7 @@ nats-server --version
   - body at `$.version` matches `/^[0-9]+\.[0-9]+\.[0-9]+/`
   - body at `$.port` equals `18160`
 ### Scenario: request/reply round-trips through the broker
+_only when `nats-server --version` succeeds_
 #### Given
 - Background service `nats-server` is started: `nats-server -a 127.0.0.1 -p 18162`.
 - Background service `responder` is started: `nats -s nats://127.0.0.1:18162 reply help.please "OK I CAN HELP"`.
@@ -59,6 +62,7 @@ nats -s nats://127.0.0.1:18162 request help.please "help me"
 - exit code is `0`
 - stdout contains `OK I CAN HELP`
 ### Scenario: a JetStream stream persists, counts, and purges messages
+_only when `nats-server --version` succeeds_
 #### Given
 - Background service `nats-server` is started: `nats-server -js -sd store -a 127.0.0.1 -p 18163`.
 #### When
@@ -88,6 +92,7 @@ nats -s nats://127.0.0.1:18163 stream info ORDERS --json
   - exit code is `0`
   - stdout at `$.state.messages` equals `0`
 ### Scenario: the JetStream KV bucket stores and serves configuration
+_only when `nats-server --version` succeeds_
 #### Given
 - Background service `nats-server` is started: `nats-server -js -sd store -a 127.0.0.1 -p 18164`.
 #### When

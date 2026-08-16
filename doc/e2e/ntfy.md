@@ -24,6 +24,7 @@ access through the admin CLI, the same publish succeeds.
 
 Source: `test/e2e/thirdparty/ntfy/ntfy.atago.yaml`
 ### Scenario: the binary reports its version
+_only when `ntfy --version` succeeds_
 #### When
 ```shell
 ntfy --version
@@ -32,6 +33,7 @@ ntfy --version
 - exit code is `0`
 - stdout matches `/ntfy version [0-9]+\.[0-9]+\.[0-9]+/`
 ### Scenario: a published notification comes back through the JSON poll feed
+_only when `ntfy --version` succeeds_
 #### Given
 - Background service `ntfy` is started: `ntfy serve --listen-http 127.0.0.1:18180 --base-url http://127.0.0.1:18180 --cache-file data/cache.db`.
 - Fixture file `data/.keep` is created.
@@ -58,6 +60,7 @@ ntfy --version
   - HTTP status is `200`
   - body is empty
 ### Scenario: the bundled CLI publishes against the same server
+_only when `ntfy --version` succeeds_
 #### Given
 - Background service `ntfy` is started: `ntfy serve --listen-http 127.0.0.1:18181 --base-url http://127.0.0.1:18181 --cache-file data/cache.db`.
 - Fixture file `data/.keep` is created.
@@ -76,6 +79,7 @@ ntfy publish http://127.0.0.1:18181/atago-deploys "deploy two"
   - HTTP status is `200`
   - body contains `deploy one`, `deploy two`
 ### Scenario: deny-all access control locks a topic until a user is granted
+_only when `ntfy --version` succeeds_
 #### Given
 - Background service `ntfy` is started: `ntfy serve --listen-http 127.0.0.1:18182 --base-url http://127.0.0.1:18182 --cache-file data/cache.db --auth-file data/auth.db --auth-default-access deny-all`.
 - Fixture file `data/.keep` is created.

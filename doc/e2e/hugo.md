@@ -194,6 +194,7 @@ build-then-serve bootstrap every "run my app and test it" setup needs.
 
 Source: `test/e2e/thirdparty/hugo/hugo_server.atago.yaml`
 ### Scenario: the home page lists the post
+_only when `hugo version` succeeds_
 #### When
 ```shell
 # HTTP GET /
@@ -203,6 +204,7 @@ Source: `test/e2e/thirdparty/hugo/hugo_server.atago.yaml`
 - body contains `HOME`
 - body contains `/posts/hello/`
 ### Scenario: the post page renders its title
+_only when `hugo version` succeeds_
 #### When
 ```shell
 # HTTP GET /posts/hello/
@@ -211,6 +213,7 @@ Source: `test/e2e/thirdparty/hugo/hugo_server.atago.yaml`
 - HTTP status is `200`
 - body contains `<h1>Hello</h1>`
 ### Scenario: an unknown path is a 404
+_only when `hugo version` succeeds_
 #### When
 ```shell
 # HTTP GET /no/such/page/

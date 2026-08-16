@@ -203,7 +203,7 @@
         },
         "scenario": {
           "type": "object",
-          "description": "Scenario-level defaults. Only `env` is supported; it shallow-merges beneath each scenario's own env.",
+          "description": "Scenario-level defaults: the env every scenario shares, and the gate every scenario is selected by.",
           "additionalProperties": false,
           "properties": {
             "env": {
@@ -212,6 +212,14 @@
                 "type": "string"
               },
               "description": "Env map shallow-merged beneath every scenario's own `env`."
+            },
+            "only": {
+              "$ref": "#/$defs/condition",
+              "description": "Default selection gate: a scenario without its own `only:` runs only when this holds. Declaring a probe-first suite's gate once — `only: {command: mytool --version}` — is what keeps some scenarios in the file from being left ungated, which is how a suite ends up erroring on a machine without the tool instead of skipping. A scenario that states its own `only:` uses that one instead; the two are not combined."
+            },
+            "skip": {
+              "$ref": "#/$defs/condition",
+              "description": "Default exclusion gate: a scenario without its own `skip:` is skipped when this holds. A scenario that states its own `skip:` uses that one instead; the two are not combined."
             }
           }
         },

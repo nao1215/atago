@@ -71,11 +71,23 @@ type Defaults struct {
 	Service  *Service          `yaml:"service,omitempty"`
 }
 
-// ScenarioDefaults holds the scenario-level default fragments. Only `env` is
-// supported — the highest-value duplication — and it shallow-merges beneath each
-// scenario's own `env`.
+// ScenarioDefaults holds the scenario-level default fragments: the env every
+// scenario shares, and the gate every scenario is selected by.
+//
+// Env shallow-merges beneath each scenario's own `env`. Only and Skip are taken
+// whole by a scenario that does not state its own, which is what a probe-first
+// suite needs: "these scenarios exist only where the tool is installed" is a
+// property of the file, not of each scenario in it, and repeating it on every
+// scenario is how a suite ends up with some scenarios gated and some not — the
+// ungated ones then error on a machine without the tool instead of skipping.
 type ScenarioDefaults struct {
 	Env map[string]string `yaml:"env,omitempty"`
+	// Only is the default selection gate: a scenario without its own `only:`
+	// runs only when this condition holds.
+	Only *Condition `yaml:"only,omitempty"`
+	// Skip is the default exclusion gate: a scenario without its own `skip:` is
+	// skipped when this condition holds.
+	Skip *Condition `yaml:"skip,omitempty"`
 }
 
 // Suite groups scenarios under a name.

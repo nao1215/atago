@@ -64,6 +64,7 @@ checked to carry the subject that was requested.
 
 Source: `test/e2e/thirdparty/openssl/openssl.atago.yaml`
 ### Scenario: sha256 digest of a fixed input is exact and stable
+_only when `openssl version` succeeds_
 #### Given
 - Fixture file `msg.txt` is created.
 #### Inputs
@@ -79,6 +80,7 @@ openssl dgst -sha256 -r msg.txt
 - exit code is `0`
 - stdout contains `6e459fed18ddb06d57c8e9f0d000c302c7e01389926db6e89884bfbe91a2a5df`
 ### Scenario: base64 encode and decode round-trip via stdin
+_only when `openssl version` succeeds_
 #### Inputs
 _stdin for `openssl`:_
 ```text
@@ -99,6 +101,7 @@ openssl base64 -d
   - exit code is `0`
   - stdout contains `round-trip me`
 ### Scenario: rand -hex emits exactly the requested entropy
+_only when `openssl version` succeeds_
 #### When
 ```shell
 openssl rand -hex 16
@@ -107,6 +110,7 @@ openssl rand -hex 16
 - exit code is `0`
 - stdout matches `/^[0-9a-f]{32}\n?$/`
 ### Scenario: a generated private key is valid and yields its public half
+_only when `openssl version` succeeds_
 #### When
 ```shell
 openssl genpkey -algorithm ed25519 -out key.pem
@@ -124,6 +128,7 @@ openssl pkey -in key.pem -pubout -out pub.pem
   - exit code is `0`
   - file `pub.pem` contains `BEGIN PUBLIC KEY`
 ### Scenario: symmetric encryption round-trips and a wrong password fails loudly
+_only when `openssl version` succeeds_
 #### Given
 - Fixture file `secret.txt` is created.
 #### Inputs
@@ -151,6 +156,7 @@ openssl enc -d -aes-256-cbc -pbkdf2 -pass pass:wrong-password -in secret.enc -ou
 #### Generated artifacts
 - `secret.enc`
 ### Scenario: a self-signed certificate carries the requested subject
+_only when `openssl version` succeeds_
 #### When
 ```shell
 openssl req -x509 -newkey ed25519 -keyout ca.key -out ca.crt -nodes -days 1 -subj /CN=atago-test
@@ -167,6 +173,7 @@ openssl verify -CAfile ca.crt ca.crt
   - exit code is `0`
   - stdout contains `OK`
 ### Scenario: signing with the private key verifies with the public key
+_only when `openssl version` succeeds_
 #### Given
 - Fixture file `payload.txt` is created.
 - Fixture file `payload.txt` is created.

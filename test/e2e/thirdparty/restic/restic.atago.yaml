@@ -24,6 +24,11 @@ suite:
 
 defaults:
   scenario:
+    # Every scenario here drives restic. Without the program there is nothing to
+    # test, so the suite skips rather than erroring: a missing tool is not a
+    # result. The gate is declared once so no scenario can be left out of it.
+    only:
+      command: restic version
     env:
       RESTIC_PASSWORD: atago-e2e-pass
       RESTIC_REPOSITORY: repo

@@ -3,7 +3,7 @@
 1 suite · 21 scenarios
 ## Contents
 - [lazygit (third-party git TUI)](#lazygit-third-party-git-tui) — 21 scenarios
-  - [version prints the pinned release](#scenario-version-prints-the-pinned-release)
+  - [version prints a semantic version](#scenario-version-prints-a-semantic-version)
   - [opening a dirty repository shows unstaged changes and quits cleanly](#scenario-opening-a-dirty-repository-shows-unstaged-changes-and-quits-cleanly)
   - [opening from a nested repository path rejects the subdirectory as invalid](#scenario-opening-from-a-nested-repository-path-rejects-the-subdirectory-as-invalid)
   - [space stages the selected unstaged file](#scenario-space-stages-the-selected-unstaged-file)
@@ -36,7 +36,7 @@ reading git state afterwards. A TUI test that only looked at the screen
 would pass on a version that draws a commit it never made.
 
 Source: `test/e2e/thirdparty/lazygit/lazygit.atago.yaml`
-### Scenario: version prints the pinned release
+### Scenario: version prints a semantic version
 _only when `lazygit --version` succeeds_
 #### When
 ```shell
@@ -44,7 +44,7 @@ lazygit --version
 ```
 #### Then
 - exit code is `0`
-- stdout contains `version=0.63.1`
+- stdout contains `os=`, matches `/version=[0-9]+\.[0-9]+\.[0-9]+/`
 ### Scenario: opening a dirty repository shows unstaged changes and quits cleanly
 _only when `lazygit --version` succeeds · skipped on Windows_
 #### Given
