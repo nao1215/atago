@@ -272,7 +272,7 @@ func (x *scenarioRun) execStep(ctx context.Context, steps []spec.Step, i int, st
 		r, err := x.e.runQuery(ctx, step.Query, x.st, x.rc, x.dbConns)
 		if err != nil {
 			sr.ErrMsg = err.Error()
-			return sr, StatusError, false
+			return sr, StatusError, isPolicyViolation(err)
 		}
 		x.adopt(&sr, r)
 	case spec.StepGRPC:

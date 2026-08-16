@@ -21,7 +21,7 @@ const securitySince = "v0.21.0"
 // NetworkPolicyDenied is a request to a host outside the declared allowlist.
 var NetworkPolicyDenied = register(6001, "NetworkPolicyDenied", Entry{
 	Summary: "a request targeted a host the spec's network policy does not allow",
-	Detail:  "The spec declares `permissions.network.allow`, and this request went somewhere else. The check covers HTTP, gRPC, and SSH alike, and an HTTP redirect is re-checked against the same list before it is followed — otherwise an allowed host could bounce a request to a denied one and the restriction would mean nothing. Comparison is exact on the host, or on host and port when the entry names one; there is no wildcard.",
+	Detail:  "The spec declares `permissions.network.allow`, and this request went somewhere else. The check covers HTTP, gRPC, SSH, and db alike — a db runner is held to it before the pool opens, since database/sql connects lazily and a later check would run once the denied host had already been dialed, and a dsn naming no peer (a sqlite file, a unix socket) reaches no network and is never denied. An HTTP redirect is re-checked against the same list before it is followed — otherwise an allowed host could bounce a request to a denied one and the restriction would mean nothing. Comparison is exact on the host, or on host and port when the entry names one; there is no wildcard.",
 	Fix:     "Add the host to `permissions.network.allow` if the scenario is meant to reach it, or point the runner at a mock server or a scenario service instead. Removing the allowlist entirely turns the policy off, which is the default when no `permissions.network` block is declared.",
 	Since:   securitySince,
 })

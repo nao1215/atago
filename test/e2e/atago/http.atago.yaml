@@ -39,6 +39,70 @@ scenarios:
           stdout:
             contains: network policy denies
 
+  # The policy is a property of the spec, not of the http runner: a db runner
+  # dialing a host the allowlist does not name is the same violation. It used to
+  # be none — the query resolved the host and connected, so the only signal was
+  # whatever the connection did next.
+  - name: a db runner dialing a denied host is the same violation (exit 6)
+    steps:
+      - fixture:
+          file: deniedb.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: db
+            permissions:
+              network:
+                allow:
+                  - allowed.example
+            runners:
+              store:
+                type: db
+                dsn: "postgres://u:p@denied.example:5432/app?sslmode=disable"
+            scenarios:
+              - name: query against a non-allowlisted host
+                steps:
+                  - query:
+                      runner: store
+                      sql: "SELECT 1"
+      - run:
+          command: ${atago} run deniedb.atago.yaml
+      - assert:
+          exit_code: 6
+          stdout:
+            contains: 'network policy denies host "denied.example"'
+
+  # A sqlite dsn names a file, so it reaches no host and must keep running under
+  # a policy that names none of it.
+  - name: a file-backed db runner is not egress
+    steps:
+      - fixture:
+          file: localdb.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: db
+            permissions:
+              network:
+                allow:
+                  - allowed.example
+            runners:
+              store:
+                type: db
+                dsn: sqlite:${workdir}/app.db
+            scenarios:
+              - name: a local database still runs
+                steps:
+                  - query:
+                      runner: store
+                      sql: "CREATE TABLE t (a INTEGER)"
+      - run:
+          command: ${atago} run localdb.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "1 passed"
+
   - name: an http step with an undeclared runner fails validation (exit 2)
     steps:
       - fixture:

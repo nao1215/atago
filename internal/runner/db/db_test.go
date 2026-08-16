@@ -327,3 +327,59 @@ func TestSkipQuotedEdges(t *testing.T) {
 		t.Error("SELECT with doubled-quote literal should be row-returning")
 	}
 }
+
+// TestDSNHost pins what the network allowlist is handed for each DSN form. The
+// empty results matter as much as the rest: a DSN that names no peer must not
+// be denied, or a sqlite spec would stop running the moment a spec declared a
+// network policy.
+func TestDSNHost(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name, driver, dsn, want string
+	}{
+		{"sqlite scheme", "sqlite", "sqlite:./a.db", ""},
+		{"sqlite bare path", "sqlite", "/abs/path.db", ""},
+		{"sqlite memory", "sqlite", ":memory:", ""},
+		{"postgres url", "postgres", "postgres://u:p@db.example:5432/app", "db.example:5432"},
+		{"postgres url no port", "postgres", "postgres://u@db.example/app", "db.example"},
+		{"postgresql scheme", "postgres", "postgresql://u@db.example/app", "db.example"},
+		{"postgres keywords", "postgres", "host=db.example port=5432 user=u", "db.example:5432"},
+		{"postgres keywords no port", "postgres", "user=u host=db.example dbname=app", "db.example"},
+		{"postgres unix socket", "postgres", "host=/var/run/postgresql user=u", ""},
+		{"postgres keywords no host", "postgres", "user=u dbname=app", ""},
+		{"mysql url", "mysql", "mysql://u:p@db.example:3306/app", "db.example:3306"},
+		{"mysql native tcp", "mysql", "u:p@tcp(db.example:3306)/app", "db.example:3306"},
+		{"mysql native tcp uppercase", "mysql", "u:p@TCP(db.example:3306)/app", "db.example:3306"},
+		{"mysql native unix", "mysql", "u:p@unix(/tmp/mysql.sock)/app", ""},
+		{"mysql native no protocol", "mysql", "/app", ""},
+		{"mysql native password with at", "mysql", "u:p@ss@tcp(db.example:3306)/app", "db.example:3306"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			if got := dsnHost(c.driver, c.dsn); got != c.want {
+				t.Errorf("dsnHost(%q, %q) = %q, want %q", c.driver, c.dsn, got, c.want)
+			}
+		})
+	}
+}
+
+// TestResolve_CarriesHost proves the host travels on the Config the engine
+// checks, rather than being recomputed by the caller from the raw dsn.
+func TestResolve_CarriesHost(t *testing.T) {
+	t.Parallel()
+	cfg, err := Resolve("", "postgres://u@db.example:5432/app")
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+	if cfg.Host != "db.example:5432" {
+		t.Errorf("Config.Host = %q, want db.example:5432", cfg.Host)
+	}
+	local, err := Resolve("", "sqlite:./a.db")
+	if err != nil {
+		t.Fatalf("Resolve(sqlite): %v", err)
+	}
+	if local.Host != "" {
+		t.Errorf("Config.Host = %q for a sqlite dsn, want empty", local.Host)
+	}
+}
