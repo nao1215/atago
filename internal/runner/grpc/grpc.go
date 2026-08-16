@@ -162,7 +162,7 @@ func (r *Runner) resolveMethod(ctx context.Context, service, method string) (pro
 	defer refClient.Reset()
 	fd, err := refClient.FileContainingSymbol(protoreflect.FullName(service))
 	if err != nil {
-		return nil, diag.RemoteRejected.Errorf("resolving grpc service %q via reflection (is server reflection enabled?): %w", service, err)
+		return nil, reflectionError(service, err)
 	}
 	svcs := fd.Services()
 	for i := 0; i < svcs.Len(); i++ {
@@ -195,4 +195,21 @@ func splitMethod(method string) (string, string, error) {
 		return "", "", diag.BadEndpoint.Errorf("grpc method %q must be in the form pkg.Service/Method", method)
 	}
 	return m[:i], m[i+1:], nil
+}
+
+// reflectionError wraps a failed reflection lookup, asking about server
+// reflection only when the server was actually reached.
+//
+// The hint used to be unconditional, so a runner with `tls: true` aimed at a
+// plaintext endpoint reported a reflection problem and left the real cause —
+// "authentication handshake failed" — behind it, sending a reader to check a
+// server setting that had nothing to do with it. Unavailable is the code gRPC
+// uses when the connection never came up: refused, reset, handshake failed, no
+// route. Every other code means the server answered, and then "does it serve
+// reflection" is the right first question.
+func reflectionError(service string, err error) error {
+	if status.Code(err) == codes.Unavailable {
+		return diag.ConnectFailed.Errorf("resolving grpc service %q: the server could not be reached: %w", service, err)
+	}
+	return diag.RemoteRejected.Errorf("resolving grpc service %q via reflection (is server reflection enabled?): %w", service, err)
 }
