@@ -272,3 +272,53 @@ scenarios:
               - "no *.atago.yaml"
               - "specs"
               - "atago init"
+
+  # A cwd is documented as workdir-relative, and a `../` one used to run the
+  # command wherever it landed — at the filesystem root for enough of them —
+  # while every assertion still looked at the untouched sandbox. It is refused
+  # before the command runs, like every other workdir-relative path.
+  - name: a cwd that traverses out of the workdir is refused before running
+    steps:
+      - fixture:
+          file: escape.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: runs somewhere else
+                steps:
+                  - run:
+                      shell: true
+                      command: pwd
+                      cwd: "../../../.."
+      - run:
+          command: ${atago} run escape.atago.yaml
+      - assert:
+          exit_code: 2
+          stderr:
+            contains:
+              - "run.cwd"
+              - "escapes the scenario workdir"
+      # A sub-directory of the workdir is what cwd is for, and still loads.
+      - fixture:
+          file: ok.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: runs in a sub-directory
+                steps:
+                  - run: {shell: true, command: "mkdir -p sub"}
+                  - run: {shell: true, command: "pwd", cwd: sub}
+                  - assert:
+                      exit_code: 0
+                      stdout:
+                        contains: sub
+      - run:
+          command: ${atago} run ok.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "1 passed"

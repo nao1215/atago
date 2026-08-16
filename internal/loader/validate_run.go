@@ -33,6 +33,7 @@ func validateRunStep(add addFunc, where string, r *spec.Run, runners map[string]
 				"or use `stdout_to` / `stderr_to` for redirection", where, tok)
 		}
 	}
+	workdirRelativeDir(add, where+".run.cwd", r.Cwd)
 	validateHermeticEnv(add, where+".run", r.ClearEnv, r.PassEnv)
 	validateStdin(add, where+".run", r.Stdin)
 	validateRetry(add, where+".run", r.Retry)
