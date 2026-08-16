@@ -23,6 +23,44 @@
     }
   },
   "$defs": {
+    "expectFail": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reason"
+      ],
+      "properties": {
+        "reason": {
+          "description": "Why the scenario is expected to fail.",
+          "type": "string"
+        },
+        "issue": {
+          "description": "The issue tracking the known bug, when the spec names one.",
+          "type": "string"
+        }
+      }
+    },
+    "deterministic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "runs",
+        "compare"
+      ],
+      "properties": {
+        "runs": {
+          "description": "How many times the command is executed.",
+          "type": "integer"
+        },
+        "compare": {
+          "description": "The streams compared across runs (stdout, stderr, exit_code).",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
     "spec": {
       "type": "object",
       "additionalProperties": false,
@@ -39,6 +77,14 @@
         },
         "suite": {
           "description": "Suite name declared by the spec.",
+          "type": "string"
+        },
+        "project_path": {
+          "description": "Directory manifest (atago.project.yaml) that applied to this spec (#392); omitted when none did, so tooling can tell a spec carrying hidden configuration from one that does not.",
+          "type": "string"
+        },
+        "fixtures_dir": {
+          "description": "Committed fixture tree the project manifest pointed at (#394); omitted when none applied.",
           "type": "string"
         },
         "suite_timeout": {
@@ -200,6 +246,10 @@
         },
         "skip": {
           "$ref": "#/$defs/condition"
+        },
+        "expect_fail": {
+          "description": "The known bug the scenario declared with `expect_fail:` (#395): the scenario is expected to fail, and a passing run is reported as an unexpected pass.",
+          "$ref": "#/$defs/expectFail"
         },
         "services": {
           "type": "array",
@@ -378,6 +428,10 @@
         },
         "retry": {
           "$ref": "#/$defs/retry"
+        },
+        "deterministic": {
+          "description": "The step's same-input-same-output claim (#398), so a reviewer sees that the command is run more than once and what is compared.",
+          "$ref": "#/$defs/deterministic"
         },
         "source": {
           "$ref": "#/$defs/source"

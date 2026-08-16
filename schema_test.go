@@ -1,15 +1,20 @@
 package main
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/goccy/go-yaml"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 
+	"github.com/nao1215/atago/internal/engine"
 	"github.com/nao1215/atago/internal/loader"
 	"github.com/nao1215/atago/internal/manifest"
+	"github.com/nao1215/atago/internal/report"
 	"github.com/nao1215/atago/internal/spec"
 )
 
@@ -582,6 +587,121 @@ func TestReportExample_Conforms(t *testing.T) {
 	s := compileSchema(t, "schema/report.schema.json")
 	if err := s.Validate(readJSONAny(t, "schema/examples/report.example.json")); err != nil {
 		t.Errorf("report example does not conform to schema:\n%v", err)
+	}
+}
+
+// TestManifest_ExpectFailAndDeterministicConform builds a manifest for a spec
+// carrying the two features the committed example never exercises — a
+// scenario's `expect_fail:` and a step's `deterministic:` — and validates the
+// real output against the manifest schema. Both shipped in the writer without a
+// schema property, so a manifest that used them failed the schema atago
+// publishes for it (#496).
+func TestManifest_ExpectFailAndDeterministicConform(t *testing.T) {
+	src := `
+version: "1"
+suite:
+  name: known-bugs
+scenarios:
+  - name: a known bug
+    expect_fail:
+      reason: still broken
+      issue: "https://github.com/nao1215/atago/issues/496"
+    steps:
+      - run:
+          shell: true
+          command: "exit 1"
+          deterministic:
+            runs: 3
+            compare: [stdout, exit_code]
+      - assert: {exit_code: 0}
+`
+	s, err := loader.LoadBytes("xf.atago.yaml", []byte(src))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	doc := manifest.Build([]manifest.Input{{Spec: s, Path: "xf.atago.yaml"}})
+	blob, err := json.Marshal(doc)
+	if err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	}
+	var v any
+	if err := json.Unmarshal(blob, &v); err != nil {
+		t.Fatalf("unmarshal manifest: %v", err)
+	}
+	// The manifest must actually carry both fields, or the conformance check
+	// below would pass over a document that never exercised them.
+	sc := doc.Specs[0].Scenarios[0]
+	if sc.ExpectFail == nil {
+		t.Fatal("manifest scenario carries no expect_fail")
+	}
+	if sc.Steps[0].Deterministic == nil {
+		t.Fatal("manifest step carries no deterministic")
+	}
+	if err := compileSchema(t, "schema/manifest.schema.json").Validate(v); err != nil {
+		t.Errorf("expect_fail/deterministic manifest does not conform to schema:\n%v", err)
+	}
+}
+
+// TestReport_FeatureFieldsConform renders a real `--report json` document for
+// the three features the committed example never exercises — a spec that failed
+// to load, a suite whose setup failed, and a scenario declaring `expect_fail:` —
+// and validates it against the report schema. Each shipped in the writer without
+// a schema property, so any report using them failed the schema atago publishes
+// for editors and CI consumers (#496).
+func TestReport_FeatureFieldsConform(t *testing.T) {
+	specs := map[string]string{
+		"xf.atago.yaml": `
+version: "1"
+suite:
+  name: known-bug
+scenarios:
+  - name: a known bug
+    expect_fail:
+      reason: still broken
+      issue: "https://github.com/nao1215/atago/issues/496"
+    steps:
+      - run: {shell: true, command: "exit 1"}
+      - assert: {exit_code: 0}
+`,
+		"setup.atago.yaml": `
+version: "1"
+suite:
+  name: broken-setup
+  setup:
+    - run: {shell: true, command: "exit 1"}
+    - assert: {exit_code: 0}
+scenarios:
+  - name: never runs
+    steps:
+      - run: {shell: true, command: "echo hi"}
+`,
+	}
+	var results []*engine.SuiteResult
+	for _, path := range []string{"xf.atago.yaml", "setup.atago.yaml"} {
+		sp, err := loader.LoadBytes(path, []byte(specs[path]))
+		if err != nil {
+			t.Fatalf("load %s: %v", path, err)
+		}
+		results = append(results, engine.New().Run(context.Background(), sp, path))
+	}
+	var buf bytes.Buffer
+	if err := report.Render(&buf, report.FormatJSON, results,
+		report.WithLoadFailures(report.LoadFailure{SpecPath: "broken.atago.yaml", Message: "yaml: line 3: mapping values are not allowed"})); err != nil {
+		t.Fatalf("render json report: %v", err)
+	}
+	// Every field under test must really be in the document, or conformance
+	// would be asserted over a report that exercised none of them.
+	for _, want := range []string{`"load_failures"`, `"setup_failures"`, `"expect_fail"`} {
+		if !strings.Contains(buf.String(), want) {
+			t.Fatalf("rendered report carries no %s:\n%s", want, buf.String())
+		}
+	}
+	var v any
+	if err := json.Unmarshal(buf.Bytes(), &v); err != nil {
+		t.Fatalf("unmarshal report: %v", err)
+	}
+	if err := compileSchema(t, "schema/report.schema.json").Validate(v); err != nil {
+		t.Errorf("report does not conform to schema:\n%v", err)
 	}
 }
 
