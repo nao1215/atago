@@ -542,10 +542,17 @@ func (d *sessionDriver) send(i int, s *spec.PTYSend) *sessionOutcome {
 	// in its markers, and keeps the historical rule that an empty
 	// verbatim send transmits EOF (^D).
 	sent := s.Bytes()
+	// Where the echo will land has to be read BEFORE the write: the reader
+	// goroutine can append the echoed bytes as soon as the write returns, and
+	// reading the length afterwards then points past them, so the echo would
+	// never be recognized. Taking it first is also what makes the position
+	// meaningful — it is the boundary between what the terminal had already
+	// shown and what this send causes.
+	at := d.term.curLen()
 	if _, werr := d.term.write(sent); werr != nil {
 		return d.failHard(diag.PTYFailed.Errorf("pty: send: %w", werr))
 	}
-	d.echoes = append(d.echoes, echoSpan{at: d.term.curLen(), echo: echoOf(sent)})
+	d.echoes = append(d.echoes, echoSpan{at: at, echo: echoOf(sent)})
 	return nil
 }
 
