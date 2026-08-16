@@ -560,11 +560,15 @@ scenarios:
               - "$${no_such_var}"
 
   # An expect that matches only the terminal's echo of the send before it has
-  # asserted that atago can type, not that the program answered — and it passes
-  # whether the program is listening, busy, or already dead. The inner spec
-  # sends text to a program that has already exited, so the echo is the only
-  # possible source; it must fail rather than report a green scenario that
-  # tested nothing.
+  # asserted that atago can type, not that the program answered. The inner
+  # program stays alive and silent after its greeting, so the echo is the only
+  # possible source of the text; the expect must run out its budget rather than
+  # report a green scenario that tested nothing.
+  #
+  # The program sleeps rather than exiting, which is what makes this portable: a
+  # write to a terminal whose child has gone is EIO on macOS and accepted on
+  # Linux, so a dead program would test the platform's pty semantics instead of
+  # the rule under test here.
   - name: an expect does not match the echo of its own send
     skip:
       os: windows
@@ -579,7 +583,7 @@ scenarios:
               - name: the program never produced this
                 steps:
                   - pty:
-                      command: "sh -c 'echo ready; exit 0'"
+                      command: "sh -c 'echo ready; sleep 30'"
                       timeout: 4s
                       session:
                         - expect: "ready"
