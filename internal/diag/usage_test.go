@@ -12,17 +12,22 @@ import (
 	"testing"
 )
 
-// familyOf maps a package to the exit code the diagnostics it raises must
+// familyOf maps a package to the exit codes the diagnostics it raises may
 // belong to. A package that raises coded errors has to appear here, so adding
-// one is a deliberate statement about which family it reports in rather than
+// one is a deliberate statement about which families it reports in rather than
 // something that happens by accident.
 //
 // The point is the thousands digit: ATG2103 promises the process exits 2, and
 // that promise is only true if the package raising it exits 2. A loader
 // reporting an ATG4xxx would make the code lie about what the reader is
 // looking at.
-var familyOf = map[string]int{
-	"internal/loader": 2,
+//
+// Most packages report one family. internal/cli is listed with 3 alone because
+// the spec errors it prints come from the loader with their codes already
+// attached; it raises only its own configuration diagnostics.
+var familyOf = map[string][]int{
+	"internal/loader": {2},
+	"internal/cli":    {3},
 }
 
 // TestCodes_AreReferenced is the guard against a code that exists only in the
@@ -54,11 +59,11 @@ func TestCodes_MatchTheirPackageFamily(t *testing.T) {
 		for _, pkg := range pkgs {
 			want, ok := familyOf[pkg]
 			if !ok {
-				t.Errorf("%s raises diagnostics but is not listed in familyOf; add it with the exit code it reports", pkg)
+				t.Errorf("%s raises diagnostics but is not listed in familyOf; add it with the exit codes it reports", pkg)
 				continue
 			}
-			if got := e.Code.ExitCode(); got != want {
-				t.Errorf("%s raises %s (diag.%s), which is family %d, but %s reports exit %d", pkg, e.Code, e.Name, got, pkg, want)
+			if got := e.Code.ExitCode(); !slices.Contains(want, got) {
+				t.Errorf("%s raises %s (diag.%s), which is family %d, but %s reports exit %v", pkg, e.Code, e.Name, got, pkg, want)
 			}
 		}
 	}

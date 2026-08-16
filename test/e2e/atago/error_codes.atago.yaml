@@ -1,7 +1,7 @@
 version: "1"
 
 suite:
-  name: atago self-hosting / every spec-error diagnostic code
+  name: atago self-hosting / every diagnostic code
 
 # Diagnostic codes (#454, #455) are a published contract: ATG2103 has to keep
 # meaning the same thing across releases, or every bookmark, CI grep, and agent
@@ -14,8 +14,9 @@ suite:
 # registered code has no scenario in this directory, so adding a code to the
 # registry without exercising it here cannot pass CI.
 #
-# Every scenario asserts exit 2 as well, which is the other half of the
-# contract: the thousands digit of an ATG2xxx code promises exit 2.
+# Every scenario asserts the exit code as well, which is the other half of the
+# contract: the thousands digit of a code promises the exit status, so an
+# ATG2xxx exits 2 and an ATG3xxx exits 3.
 scenarios:
   # --- ATG20xx: the document itself -----------------------------------------
 
@@ -666,3 +667,182 @@ scenarios:
             contains:
               - "ATG2010"
               - "ATG2305"
+
+  # --- ATG30xx: the shape of the command ------------------------------------
+
+  - name: ATG3001 is a subcommand atago does not have
+    steps:
+      - run: {command: "${atago} frobnicate"}
+      - assert:
+          exit_code: 3
+          stderr: {contains: "ATG3001"}
+
+  - name: ATG3001 is also atago with no subcommand at all
+    steps:
+      - run: {command: "${atago}"}
+      - assert:
+          exit_code: 3
+          stderr: {contains: "ATG3001"}
+
+  - name: ATG3002 is a subcommand called in a shape it does not accept
+    steps:
+      - run: {command: "${atago} snapshot"}
+      - assert:
+          exit_code: 3
+          stderr: {contains: "ATG3002"}
+
+  # --- ATG31xx: options -----------------------------------------------------
+
+  - name: ATG3101 is an option atago does not define
+    steps:
+      - run: {command: "${atago} run --definitely-not-a-flag ."}
+      - assert:
+          exit_code: 3
+          stderr:
+            contains:
+              - "ATG3101"
+              # The code goes in front of the message, and the usage the
+              # failure triggers still follows it.
+              - "flag provided but not defined"
+              - "Usage: atago run"
+
+  - name: ATG3102 is an option given a value it does not accept
+    steps:
+      - fixture:
+          file: ok.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios: [{name: a, steps: [{run: {command: echo}}]}]
+      - run: {command: "${atago} run --report jnit ok.atago.yaml"}
+      - assert:
+          exit_code: 3
+          stderr: {contains: "ATG3102"}
+
+  - name: ATG3103 is an option whose companion option is not set
+    steps:
+      - run: {command: "${atago} doc --split-by-spec ."}
+      - assert:
+          exit_code: 3
+          stderr: {contains: "ATG3103"}
+
+  - name: ATG3104 is two options that contradict each other
+    steps:
+      - fixture:
+          file: ok.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios: [{name: a, steps: [{run: {command: echo}}]}]
+      - run: {command: "${atago} run --repeat 2 --retry-failed 1 ok.atago.yaml"}
+      - assert:
+          exit_code: 3
+          stderr: {contains: "ATG3104"}
+
+  - name: ATG3105 is a numeric option outside its range
+    steps:
+      - fixture:
+          file: ok.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios: [{name: a, steps: [{run: {command: echo}}]}]
+      - run: {command: "${atago} run --parallel -1 ok.atago.yaml"}
+      - assert:
+          exit_code: 3
+          stderr: {contains: "ATG3105"}
+
+  # --- ATG32xx: what the command was pointed at -----------------------------
+
+  - name: ATG3201 is a path that cannot be reached
+    steps:
+      - run: {command: "${atago} run ./nowhere"}
+      - assert:
+          exit_code: 3
+          stderr: {contains: "ATG3201"}
+
+  - name: ATG3202 is a directory holding no specs
+    steps:
+      - run: {command: "${atago} run ."}
+      - assert:
+          exit_code: 3
+          stderr: {contains: "ATG3202"}
+
+  - name: ATG3203 is a selection that matched nothing under --ci
+    steps:
+      - fixture:
+          file: ok.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios: [{name: a, steps: [{run: {command: echo}}]}]
+      - run: {command: "${atago} run --ci --tag no-such-tag ok.atago.yaml"}
+      - assert:
+          exit_code: 3
+          stderr: {contains: "ATG3203"}
+
+  - name: ATG3204 is a rerun whose recorded failures no longer exist
+    steps:
+      # Record a real failure, then rename the scenario out from under it.
+      - fixture:
+          file: ok.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: before
+                steps:
+                  - run: {command: "false"}
+                  - assert: {exit_code: 0}
+      - run: {command: "${atago} run ok.atago.yaml"}
+      - assert:
+          exit_code: 1
+      - fixture:
+          file: ok.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: after
+                steps:
+                  - run: {command: echo}
+      - run: {command: "${atago} run --rerun-failed ok.atago.yaml"}
+      - assert:
+          exit_code: 3
+          stderr: {contains: "ATG3204"}
+
+  - name: ATG3205 is a write that would replace an existing file
+    steps:
+      - fixture: {file: taken.atago.yaml, content: "already here\n"}
+      - run: {command: "${atago} init taken.atago.yaml"}
+      - assert:
+          exit_code: 3
+          stderr: {contains: "ATG3205"}
+
+  - name: ATG3206 is a destination that cannot be written
+    steps:
+      - fixture: {file: occupied, content: "not a directory\n"}
+      - fixture:
+          file: ok.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios: [{name: a, steps: [{run: {command: echo}}]}]
+      - run: {command: "${atago} run --artifacts-dir occupied ok.atago.yaml"}
+      - assert:
+          exit_code: 3
+          stderr: {contains: "ATG3206"}
+
+  - name: ATG3207 is atago's recorded state failing to load
+    steps:
+      - fixture: {file: .atago/last-failed.json, content: "not json at all\n"}
+      - fixture:
+          file: ok.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios: [{name: a, steps: [{run: {command: echo}}]}]
+      - run: {command: "${atago} run --rerun-failed ok.atago.yaml"}
+      - assert:
+          exit_code: 3
+          stderr: {contains: "ATG3207"}

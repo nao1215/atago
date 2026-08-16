@@ -30,6 +30,7 @@ func explainCmd(args []string, stdout, stderr io.Writer) int {
 			printUsage(stdout)
 			return ExitOK
 		}
+		reportFlagError("atago explain", err, stderr)
 		printUsage(stderr)
 		return ExitConfig
 	}

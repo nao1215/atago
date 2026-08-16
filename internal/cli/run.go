@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/nao1215/atago/internal/artifact"
+	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/engine"
 	"github.com/nao1215/atago/internal/loader"
 	"github.com/nao1215/atago/internal/report"
@@ -187,14 +188,16 @@ func parseRunFlags(label string, args []string, stdout, stderr io.Writer) (*runO
 	allowXPass := fs.Bool("allow-xpass", false, "exit 0 when an expect_fail scenario passed (XPASS); by default a fixed known bug fails the run so the spec gets promoted")
 	verbose := fs.Bool("verbose", false, "trace every scenario as it finishes: commands, exit codes, captured output, and per-assertion verdicts — for passing scenarios too")
 	fs.Usage = func() {
-		fmt.Fprint(stderr, "Usage: atago run [--report console|json|junit|gha|tap] [--update-snapshots] [--parallel N] [--fail-fast] [--filter S] [--tag T] [--skip-tag T] [--rerun-failed] [--repeat N] [--retry-failed N] [--allow-flaky] [--allow-xpass] [--profile NAME] [--artifacts-dir DIR] [--verbose] [--ci] <path | dir>...\n  (directories are searched recursively)\n")
+		fmt.Fprint(fs.Output(), "Usage: atago run [--report console|json|junit|gha|tap] [--update-snapshots] [--parallel N] [--fail-fast] [--filter S] [--tag T] [--skip-tag T] [--rerun-failed] [--repeat N] [--retry-failed N] [--allow-flaky] [--allow-xpass] [--profile NAME] [--artifacts-dir DIR] [--verbose] [--ci] <path | dir>...\n  (directories are searched recursively)\n")
 		fs.PrintDefaults()
 	}
 	operands, err := parseFlagsAnywhere(fs, args)
 	if err != nil {
 		if errors.Is(err, flag.ErrHelp) {
+			replayFlagOutput(err, stderr)
 			return nil, ExitOK, true
 		}
+		reportFlagError(label, err, stderr)
 		return nil, ExitConfig, true
 	}
 	if *ci {
@@ -204,7 +207,7 @@ func parseRunFlags(label string, args []string, stdout, stderr io.Writer) (*runO
 
 	format := report.Format(*reportFmt)
 	if !format.Valid() {
-		fmt.Fprintf(stderr, label+": unknown --report %q (want console, json, junit, gha, or tap)\n", *reportFmt)
+		fmt.Fprintf(stderr, "%s: %s\n", label, diag.BadOptionValue.Annotate(fmt.Sprintf("unknown --report %q (want console, json, junit, gha, or tap)", *reportFmt)))
 		return nil, ExitConfig, true
 	}
 
@@ -218,11 +221,11 @@ func parseRunFlags(label string, args []string, stdout, stderr io.Writer) (*runO
 	// only ACTIVATES at > 1 (a value < 2 is a documented no-op), so --repeat 1
 	// changes nothing and must not be rejected alongside --retry-failed.
 	if *repeat > 1 && *retryFailed > 0 {
-		fmt.Fprintln(stderr, label+": --repeat and --retry-failed are mutually exclusive (repeat detects flakiness, retry-failed tolerates it)")
+		fmt.Fprintf(stderr, "%s: %s\n", label, diag.OptionsExclusive.Annotate("--repeat and --retry-failed are mutually exclusive (repeat detects flakiness, retry-failed tolerates it)"))
 		return nil, ExitConfig, true
 	}
 	if *repeat < 0 || *retryFailed < 0 {
-		fmt.Fprintln(stderr, label+": --repeat and --retry-failed must be >= 0")
+		fmt.Fprintf(stderr, "%s: %s\n", label, diag.OptionOutOfRange.Annotate("--repeat and --retry-failed must be >= 0"))
 		return nil, ExitConfig, true
 	}
 	// A negative --parallel is a typo, not a request: the engine would clamp it to
@@ -230,7 +233,7 @@ func parseRunFlags(label string, args []string, stdout, stderr io.Writer) (*runO
 	// config error as --repeat/--retry-failed for consistent bounds checking. Zero
 	// is left to mean the default (like repeat/retry allow 0).
 	if *parallel < 0 {
-		fmt.Fprintln(stderr, label+": --parallel must be >= 0")
+		fmt.Fprintf(stderr, "%s: %s\n", label, diag.OptionOutOfRange.Annotate("--parallel must be >= 0"))
 		return nil, ExitConfig, true
 	}
 	if strings.TrimSpace(*artifactsDir) != "" {
@@ -239,7 +242,7 @@ func parseRunFlags(label string, args []string, stdout, stderr io.Writer) (*runO
 		// every artifact write fail silently, leaving the user to believe a run
 		// produced no reviewable failures when in fact none could be written.
 		if err := ensureArtifactsDir(*artifactsDir); err != nil {
-			fmt.Fprintf(stderr, label+": --artifacts-dir %q is not usable: %v\n", *artifactsDir, err)
+			fmt.Fprintf(stderr, "%s: %s\n", label, diag.OutputNotWritable.Annotate(fmt.Sprintf("--artifacts-dir %q is not usable: %v", *artifactsDir, err)))
 			return nil, ExitConfig, true
 		}
 	}

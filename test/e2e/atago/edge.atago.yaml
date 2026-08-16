@@ -101,7 +101,9 @@ scenarios:
       - assert:
           exit_code: 3
           stderr:
-            contains: "atago snapshot update: cannot access"
+            contains:
+              - "atago snapshot update: "
+              - "cannot access"
             not_contains: "atago run:"
 
   # Malformed JSON from the program under test must be reported as invalid JSON,

@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/plural"
 	"github.com/nao1215/atago/internal/record"
 	runnercmd "github.com/nao1215/atago/internal/runner/cmd"
@@ -35,7 +36,7 @@ func recordCmd(args []string, stdout, stderr io.Writer) int {
 	ptyMode := fs.Bool("pty", false, "record an interactive pty session and generate an expect/send spec")
 	ptyTimeout := fs.Duration("timeout", record.DefaultCaptureTimeout, "kill the pty session and fail if the program does not exit within this bound (--pty only)")
 	fs.Usage = func() {
-		fmt.Fprint(stderr, `Usage: atago record [--out FILE] [--force] [--shell] [--snapshot] -- <command> [args...]
+		fmt.Fprint(fs.Output(), `Usage: atago record [--out FILE] [--force] [--shell] [--snapshot] -- <command> [args...]
        atago record --pty [--out FILE] [--force] [--shell] [--timeout DUR] -- <command> [args...]
 
 Runs the command once in a scratch directory and prints a spec skeleton
@@ -53,24 +54,26 @@ non-goal for now — write those steps by hand.
 `)
 		fs.PrintDefaults()
 	}
-	if err := fs.Parse(args); err != nil {
+	if err := parseFlagsStrict(fs, args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
+			replayFlagOutput(err, stderr)
 			return ExitOK
 		}
+		reportFlagError("atago record", err, stderr)
 		return ExitConfig
 	}
 	cmdArgs := fs.Args()
 	if len(cmdArgs) == 0 {
-		fmt.Fprintln(stderr, "atago record: no command given (usage: atago record [flags] -- <command> [args...])")
+		fmt.Fprintf(stderr, "atago record: %s\n", diag.BadUsage.Annotate("no command given (usage: atago record [flags] -- <command> [args...])"))
 		return ExitConfig
 	}
 	if *snap && *out == "" {
-		fmt.Fprintln(stderr, "atago record: --snapshot needs --out (the golden is written next to the spec)")
+		fmt.Fprintf(stderr, "atago record: %s\n", diag.OptionNeedsAnother.Annotate("--snapshot needs --out (the golden is written next to the spec)"))
 		return ExitConfig
 	}
 	if *ptyMode && *snap {
 		// A hand-driven screen golden is too brittle to auto-record in v1.
-		fmt.Fprintln(stderr, "atago record: --snapshot cannot be combined with --pty")
+		fmt.Fprintf(stderr, "atago record: %s\n", diag.OptionsExclusive.Annotate("--snapshot cannot be combined with --pty"))
 		return ExitConfig
 	}
 	if *ptyMode {
