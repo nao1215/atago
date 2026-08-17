@@ -40,6 +40,10 @@ type junitTestsuite struct {
 	Skipped   int             `xml:"skipped,attr"`
 	Time      junitSeconds    `xml:"time,attr"`
 	Testcases []junitTestcase `xml:"testcase"`
+	// SystemErr carries a failed suite.teardown. It never changes the counts —
+	// teardown outcomes never change a verdict — but a junit consumer used to
+	// see a clean document with zero trace that cleanup failed.
+	SystemErr string `xml:"system-err,omitempty"`
 }
 
 type junitTestcase struct {
@@ -52,6 +56,12 @@ type junitTestcase struct {
 	// and then passed on retry (#29): the testcase itself counts as passed,
 	// the element preserves the evidence.
 	FlakyFailure *junitMessage `xml:"flakyFailure,omitempty"`
+	// SystemErr carries the scenario's failed teardown, junit's slot for
+	// output that accompanies a result without deciding it (the flakyFailure
+	// pattern one severity down): the verdict is decided by the steps alone,
+	// so a failed cleanup must not add a <failure>, but staying silent hid it
+	// from every junit consumer.
+	SystemErr string `xml:"system-err,omitempty"`
 }
 
 type junitMessage struct {
@@ -118,6 +128,9 @@ func buildJUnit(results []*engine.SuiteResult, allowXPass bool, loadFailures []L
 				tc.Failure = &junitMessage{Message: xpassMessage(sc), Body: detailText(sc)}
 				ts.Failures++
 			}
+			if td := stepsDetailText(sc.Teardown); td != "" {
+				tc.SystemErr = "teardown failed (the verdict is decided by the steps alone):\n" + td
+			}
 			ts.Testcases = append(ts.Testcases, tc)
 			ts.Tests++
 		}
@@ -134,6 +147,9 @@ func buildJUnit(results []*engine.SuiteResult, allowXPass bool, loadFailures []L
 				ts.Errors++
 				ts.Tests++
 			}
+		}
+		if td := stepsDetailText(res.Teardown); td != "" {
+			ts.SystemErr = "suite teardown failed (teardown outcomes never change the suite status):\n" + td
 		}
 		root.Suites = append(root.Suites, ts)
 		root.Tests += ts.Tests
@@ -169,6 +185,24 @@ func firstFailureMessage(sc *engine.ScenarioResult) string {
 	return "assertion failed"
 }
 
+// firstStepFailureMessage returns the first failing check's description or the
+// first errored step's message across a step list, or "" when it is clean. It
+// names a teardown failure in the one-line slots (a tap comment, a gha warning
+// title) the way firstFailureMessage names a scenario failure.
+func firstStepFailureMessage(steps []engine.StepResult) string {
+	for _, step := range steps {
+		for _, ck := range step.Checks {
+			if ck != nil && !ck.OK {
+				return ck.Desc
+			}
+		}
+		if step.ErrMsg != "" {
+			return step.ErrMsg
+		}
+	}
+	return ""
+}
+
 func firstErrorMessage(sc *engine.ScenarioResult) string {
 	for _, step := range sc.Steps {
 		if step.ErrMsg != "" {
@@ -180,8 +214,15 @@ func firstErrorMessage(sc *engine.ScenarioResult) string {
 
 // detailText renders the human failure block as plain text for the XML body.
 func detailText(sc *engine.ScenarioResult) string {
+	return stepsDetailText(sc.Steps)
+}
+
+// stepsDetailText renders the failed checks and errored steps of any step list
+// — a scenario's steps, its teardown, or the suite lifecycle — as plain text,
+// or "" when the list is clean.
+func stepsDetailText(steps []engine.StepResult) string {
 	var b strings.Builder
-	for _, step := range sc.Steps {
+	for _, step := range steps {
 		for _, ck := range step.Checks {
 			if ck == nil || ck.OK {
 				continue

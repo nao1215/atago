@@ -74,6 +74,13 @@ func writeTAP(w io.Writer, results []*engine.SuiteResult, loadFailures []LoadFai
 			default:
 				fmt.Fprintf(&b, "not ok %d - %s\n", n, name)
 			}
+			// A failed teardown never changes the point's verdict — the steps
+			// decide it — but a TAP consumer used to see a bare passing point
+			// with zero trace that cleanup failed. A comment is TAP's slot for
+			// exactly that: legal after any point, ignored by the count.
+			if msg := firstStepFailureMessage(sc.Teardown); msg != "" {
+				fmt.Fprintf(&b, "# teardown failed: %s\n", tapFlatten(msg))
+			}
 		}
 		if suiteErroredWithoutScenarios(res) {
 			for _, p := range suiteFailurePoints(res) {
@@ -81,6 +88,11 @@ func writeTAP(w io.Writer, results []*engine.SuiteResult, loadFailures []LoadFai
 				fmt.Fprintf(&b, "not ok %d - %s\n", n, tapDescription(res.Suite, p.name))
 				writeTAPDiagnostic(&b, p.message, p.body)
 			}
+		}
+		// The suite-level twin: suite.teardown outcomes never change the suite
+		// status, so they surface as a comment rather than a point.
+		if msg := firstStepFailureMessage(res.Teardown); msg != "" {
+			fmt.Fprintf(&b, "# suite teardown failed: %s\n", tapFlatten(msg))
 		}
 	}
 	_, err := io.WriteString(w, b.String())

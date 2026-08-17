@@ -794,6 +794,65 @@ func TestJSON_ScenarioTeardownFailures(t *testing.T) {
 	}
 }
 
+// TestTeardownFailure_VisibleInEveryMachineFormat is a regression: only the
+// console and json knew about a failed teardown. junit reported a clean pass
+// with zero trace of it, tap emitted a bare passing point, and gha a green
+// notice — so a CI consumer reading any of those formats never learned that
+// cleanup of external resources failed. Each format now carries the fact in
+// its non-verdict-changing slot; the verdict itself stays green everywhere.
+func TestTeardownFailure_VisibleInEveryMachineFormat(t *testing.T) {
+	t.Parallel()
+	res := scenarioTeardownFailure()
+
+	junitOut := render(t, FormatJUnit, res)
+	for _, want := range []string{"system-err", "assert file lock removed", "rm: permission denied"} {
+		if !strings.Contains(junitOut, want) {
+			t.Errorf("junit missing teardown evidence %q\n--- got ---\n%s", want, junitOut)
+		}
+	}
+	if !strings.Contains(junitOut, `failures="0" errors="0"`) {
+		t.Errorf("a failed teardown must not change the junit counts:\n%s", junitOut)
+	}
+
+	tapOut := render(t, FormatTAP, res)
+	if !strings.Contains(tapOut, "ok 1 - td / leaves-clean") {
+		t.Errorf("tap point must stay passing:\n%s", tapOut)
+	}
+	if !strings.Contains(tapOut, "# teardown failed: assert file lock removed") {
+		t.Errorf("tap missing the teardown comment:\n%s", tapOut)
+	}
+
+	ghaOut := render(t, FormatGHA, res)
+	if !strings.Contains(ghaOut, "::warning") || !strings.Contains(ghaOut, "teardown failed") {
+		t.Errorf("gha missing the teardown warning:\n%s", ghaOut)
+	}
+	if strings.Contains(ghaOut, "::error") {
+		t.Errorf("a failed teardown must not become a gha error:\n%s", ghaOut)
+	}
+}
+
+// TestSuiteTeardownFailure_VisibleInEveryMachineFormat covers the suite-level
+// twin: a failed suite.teardown was equally invisible to junit, tap, and gha.
+func TestSuiteTeardownFailure_VisibleInEveryMachineFormat(t *testing.T) {
+	t.Parallel()
+	res := suiteWithSetupAndTeardownFailures()
+
+	junitOut := render(t, FormatJUnit, res)
+	if !strings.Contains(junitOut, "docker rm: no such container") {
+		t.Errorf("junit missing the suite teardown evidence:\n%s", junitOut)
+	}
+
+	tapOut := render(t, FormatTAP, res)
+	if !strings.Contains(tapOut, "# suite teardown failed: assert dir /tmp/scratch does not exist") {
+		t.Errorf("tap missing the suite teardown comment:\n%s", tapOut)
+	}
+
+	ghaOut := render(t, FormatGHA, res)
+	if !strings.Contains(ghaOut, "suite teardown failed") {
+		t.Errorf("gha missing the suite teardown warning:\n%s", ghaOut)
+	}
+}
+
 // TestConsole_FailedScenarioArtifacts exercises writeDetail's Artifacts footer
 // for a failed check that wrote sidecar files (#48).
 func TestConsole_FailedScenarioArtifacts(t *testing.T) {
