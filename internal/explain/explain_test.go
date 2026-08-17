@@ -634,6 +634,48 @@ scenarios:
 	}
 }
 
+// TestExplain_SuiteSecurityNotes is a regression: security notes existed only
+// per scenario, so a suite whose setup curls through the shell and starts an
+// ssh-tunnel service — and whose teardown curls a purge endpoint — showed the
+// steps but flagged none of them, while the same steps inside a scenario are
+// all called out.
+func TestExplain_SuiteSecurityNotes(t *testing.T) {
+	t.Parallel()
+	src := `
+version: "1"
+suite:
+  name: egress
+  setup:
+    - run:
+        command: curl https://seed.example/data
+        shell: true
+    - service:
+        name: relay
+        command: ssh -N -L 8080:internal.example:80 jump.example
+  teardown:
+    - run:
+        command: curl https://api.example/purge
+        shell: true
+scenarios:
+  - name: quiet
+    steps:
+      - run: {command: echo hi}
+      - assert: {exit_code: 0}
+`
+	out := mustExplain(t, src)
+	for _, want := range []string{
+		"Suite security notes:",
+		"shell execution enabled: curl https://seed.example/data",
+		"network access: curl https://seed.example/data",
+		"network access (service relay): ssh -N -L 8080:internal.example:80 jump.example",
+		"network access: curl https://api.example/purge",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("explain suite security notes missing %q\n--- got ---\n%s", want, out)
+		}
+	}
+}
+
 // TestExplain_SignalStep covers describeSignal for both the fire-and-forget form
 // and the wait form. The default wait timeout rendered here (5s) must match the
 // engine's defaultSignalWait constant; a drift would mislead a reviewer about how

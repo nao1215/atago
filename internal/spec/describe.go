@@ -116,6 +116,24 @@ func SecurityNotes(sc *Scenario, runners map[string]Runner) []string {
 	return n.out
 }
 
+// SuiteSecurityNotes returns, in declaration order and de-duplicated, the
+// security-relevant operations the suite's once-per-run lifecycle performs
+// across setup and teardown. Only scenarios had a security summary, so a suite
+// whose setup curls a seed file through the shell and starts an ssh-tunnel
+// service — and whose teardown curls a purge endpoint — reported no security
+// notes anywhere, while the identical steps inside a scenario produce one for
+// each. explain and manifest share this the way they share SecurityNotes.
+func SuiteSecurityNotes(su *Suite, runners map[string]Runner) []string {
+	n := &noteSet{seen: map[string]bool{}}
+	for i := range su.Setup {
+		n.step(&su.Setup[i], runners)
+	}
+	for i := range su.Teardown {
+		n.step(&su.Teardown[i], runners)
+	}
+	return n.out
+}
+
 // noteSet accumulates the security notes in order, without repeats: two steps
 // enabling the shell on the same command say it once.
 type noteSet struct {
@@ -184,6 +202,11 @@ func (n *noteSet) step(step *Step, runners map[string]Runner) {
 		n.add("browser automation (CDP) via " + step.CDP.Runner)
 	case StepPTY:
 		n.ptyStep(step.PTY)
+	case StepService:
+		// A `service:` step appears only in suite.setup (the loader rejects it
+		// elsewhere); the process it starts deserves the same scrutiny as a
+		// scenario-level service.
+		n.service(step.Service)
 	}
 }
 

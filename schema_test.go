@@ -577,6 +577,12 @@ scenarios:
 			t.Errorf("suite_variables = %v, want it to include %q", sv, want)
 		}
 	}
+	// The shell-enabled setup run must surface in the suite security notes,
+	// proving the field round-trips through the schema above.
+	sec := strings.Join(doc.Specs[0].SuiteSecurity, "\n")
+	if !strings.Contains(sec, "shell execution enabled: echo build ${srcdir}") {
+		t.Errorf("suite_security = %v, want the shell-enabled setup run flagged", doc.Specs[0].SuiteSecurity)
+	}
 }
 
 // TestReportExample_Conforms validates the committed report example against the

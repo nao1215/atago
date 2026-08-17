@@ -119,6 +119,13 @@
             "type": "string"
           }
         },
+        "suite_security": {
+          "description": "Security-relevant notes derived from the suite setup/teardown steps (omitted when none).",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "secrets": {
           "description": "Declared secret names (omitted when none).",
           "type": "array",

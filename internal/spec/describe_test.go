@@ -202,6 +202,40 @@ func TestSecurityNotes_TeardownSteps(t *testing.T) {
 	}
 }
 
+// TestSuiteSecurityNotes is a regression: only scenarios had a security
+// summary, so a suite whose setup curls a seed file through the shell and
+// starts an ssh-tunnel service — and whose teardown curls a purge endpoint —
+// reported no security notes anywhere, while the identical steps inside a
+// scenario produce one for each.
+func TestSuiteSecurityNotes(t *testing.T) {
+	t.Parallel()
+	su := &Suite{
+		Setup: []Step{
+			{Run: &Run{Command: "curl https://seed.example/data", Shell: Bool(true)}},
+			{Service: &Service{Name: "relay", Command: "ssh -N -L 8080:internal.example:80 jump.example"}},
+		},
+		Teardown: []Step{
+			{Run: &Run{Command: "curl https://api.example/purge"}},
+		},
+	}
+	got := SuiteSecurityNotes(su, nil)
+	for _, want := range []string{
+		"shell execution enabled: curl https://seed.example/data",
+		"network access: curl https://seed.example/data",
+		"network access (service relay): ssh -N -L 8080:internal.example:80 jump.example",
+		"network access: curl https://api.example/purge",
+	} {
+		if !contains(got, want) {
+			t.Errorf("SuiteSecurityNotes missing %q\n got: %v", want, got)
+		}
+	}
+	// A quiet suite says nothing: the section only exists when there is
+	// something to review.
+	if got := SuiteSecurityNotes(&Suite{Setup: []Step{{Run: &Run{Command: "echo hi"}}}}, nil); len(got) != 0 {
+		t.Errorf("SuiteSecurityNotes for a quiet suite = %v, want none", got)
+	}
+}
+
 func TestRunHost(t *testing.T) {
 	t.Parallel()
 	runners := map[string]Runner{

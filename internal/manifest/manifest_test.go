@@ -546,6 +546,45 @@ func TestBuildSpec_SuiteLifecycle(t *testing.T) {
 	}
 }
 
+// TestBuildSpec_SuiteSecurity is a regression: the manifest carried a security
+// array per scenario and nothing for the suite lifecycle, so a consumer
+// auditing egress from the manifest saw no trace of a setup that curls through
+// the shell, a suite service that opens an ssh tunnel, or a teardown that
+// curls a purge endpoint.
+func TestBuildSpec_SuiteSecurity(t *testing.T) {
+	t.Parallel()
+	s := &spec.Spec{
+		Suite: spec.Suite{
+			Name: "egress",
+			Setup: []spec.Step{
+				{Run: &spec.Run{Command: "curl https://seed.example/data", Shell: spec.Bool(true)}},
+				{Service: &spec.Service{Name: "relay", Command: "ssh -N jump.example"}},
+			},
+			Teardown: []spec.Step{
+				{Run: &spec.Run{Command: "curl https://api.example/purge"}},
+			},
+		},
+		Scenarios: []spec.Scenario{{Name: "quiet", Steps: []spec.Step{{Run: &spec.Run{Command: "echo hi"}}}}},
+	}
+	sp := Build([]Input{{Spec: s, Path: "egress.atago.yaml"}}).Specs[0]
+	got := strings.Join(sp.SuiteSecurity, "\n")
+	for _, want := range []string{
+		"shell execution enabled: curl https://seed.example/data",
+		"network access: curl https://seed.example/data",
+		"network access (service relay): ssh -N jump.example",
+		"network access: curl https://api.example/purge",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("suite_security missing %q\n got: %v", want, sp.SuiteSecurity)
+		}
+	}
+	// A quiet scenario keeps its own security array empty — the suite's egress
+	// belongs to the suite, not to every scenario beneath it.
+	if len(sp.Scenarios[0].Security) != 0 {
+		t.Errorf("scenario security = %v, want none", sp.Scenarios[0].Security)
+	}
+}
+
 // TestBuildScenario_TeardownAndConditions covers scenario teardown steps and the
 // only/skip condition reduction.
 func TestBuildScenario_TeardownAndConditions(t *testing.T) {

@@ -269,3 +269,51 @@ scenarios:
             json:
               - path: "$.specs[0].scenarios[0].security[0]"
                 equals: "network access: ssh deploy@backend.example"
+
+  # Regression: security notes existed only per scenario, so a suite whose
+  # setup curls through the shell and starts an ssh-tunnel service — and whose
+  # teardown curls a purge endpoint — showed the steps but flagged none of
+  # them, while the identical steps inside a scenario are all called out.
+  - name: explain names suite lifecycle egress
+    steps:
+      - fixture:
+          file: suite_egress.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: suite-egress
+              setup:
+                - run:
+                    command: curl https://seed.example/data
+                    shell: true
+                - service:
+                    name: relay
+                    command: ssh -N -L 8080:internal.example:80 jump.example
+              teardown:
+                - run:
+                    command: curl https://api.example/purge
+                    shell: true
+            scenarios:
+              - name: quiet scenario
+                steps:
+                  - run:
+                      command: echo hi
+      - run:
+          command: ${atago} explain suite_egress.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "Suite security notes:"
+              - "shell execution enabled: curl https://seed.example/data"
+              - "network access (service relay): ssh -N -L 8080:internal.example:80 jump.example"
+              - "network access: curl https://api.example/purge"
+      # The machine-readable summary is built from the same list, so it agrees.
+      - run:
+          command: ${atago} manifest suite_egress.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              - path: "$.specs[0].suite_security[0]"
+                equals: "shell execution enabled: curl https://seed.example/data"
