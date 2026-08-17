@@ -481,6 +481,13 @@
           "description": "Assert target or store name.",
           "type": "string"
         },
+        "asserts": {
+          "description": "One phrase per target an assert step checks, in the wording `atago explain` prints — enough to tell two assertions on the same target apart, and to see an assertion that got weaker between revisions. Values a spec declares as secrets are masked.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "cwd": {
           "description": "The step's working directory, relative to the scenario workdir.",
           "type": "string"
@@ -530,6 +537,13 @@
         "until": {
           "description": "Assertion target(s) whose success ends the retry loop, joined with \"+\" when several are set — the same reduction an assert step's `target` carries. Omitted when the retry states no condition.",
           "type": "string"
+        },
+        "until_asserts": {
+          "description": "The retry condition in full, as an assert step's `asserts` carries its assertion.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       }
     },

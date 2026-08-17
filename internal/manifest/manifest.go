@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"sort"
 
+	"github.com/nao1215/atago/internal/security"
 	"github.com/nao1215/atago/internal/spec"
 )
 
@@ -231,6 +232,13 @@ type Step struct {
 	SQL      string   `json:"sql,omitempty"`
 	File     string   `json:"file,omitempty"`
 	Target   string   `json:"target,omitempty"` // assert target / store name
+	// Asserts carries one prose phrase per target an assert step checks —
+	// "exit code is 0", `stdout contains "ready"` — the same phrases `atago
+	// explain` prints. The target name alone reduced two different assertions
+	// on one target, and a strong assertion and its weakened version, to the
+	// same word, so a manifest could not answer what a suite checks. Values a
+	// spec declares as secrets are masked before they reach here.
+	Asserts []string `json:"asserts,omitempty"`
 	// Cwd and Timeout are the step's own declarative bounds — where it runs and
 	// how long it may take. Without them a consumer cannot answer "which steps
 	// have no explicit timeout" or "which steps run outside the workdir root"
@@ -273,6 +281,9 @@ type Retry struct {
 	// step's `target` carries, so a consumer reads a condition the same way
 	// wherever it appears. Omitted when the retry states no condition.
 	Until string `json:"until,omitempty"`
+	// UntilAsserts carries the condition in full, as Step.Asserts does for an
+	// assert step: a retry's condition is an assertion and reduces the same way.
+	UntilAsserts []string `json:"until_asserts,omitempty"`
 }
 
 // Build assembles a deterministic manifest document from the given specs, in the
@@ -330,7 +341,38 @@ func buildSpec(in Input) Spec {
 	for i := range s.Scenarios {
 		out.Scenarios = append(out.Scenarios, buildScenario(&s.Scenarios[i], in.Source, s.Runners))
 	}
+	maskAsserts(&out, s)
 	return out
+}
+
+// maskAsserts runs every assertion phrase through the spec's own masker before
+// it leaves the builder. An assertion can name the value it expects, and a
+// value the spec declares under `secrets:` must not reach a document meant to
+// be committed and diffed — the same rule that keeps an ssh runner's password
+// and a db runner's dsn out, and that emits suite_env as names without values.
+func maskAsserts(out *Spec, s *spec.Spec) {
+	m := security.NewMaskerForSpec(s)
+	if m.Empty() {
+		return
+	}
+	maskSteps := func(steps []Step) {
+		for i := range steps {
+			for j, phrase := range steps[i].Asserts {
+				steps[i].Asserts[j] = m.Mask(phrase)
+			}
+			if r := steps[i].Retry; r != nil {
+				for j, phrase := range r.UntilAsserts {
+					r.UntilAsserts[j] = m.Mask(phrase)
+				}
+			}
+		}
+	}
+	maskSteps(out.SuiteSetup)
+	maskSteps(out.SuiteTeardown)
+	for i := range out.Scenarios {
+		maskSteps(out.Scenarios[i].Steps)
+		maskSteps(out.Scenarios[i].Teardown)
+	}
 }
 
 func buildNetwork(s *spec.Spec) Network {

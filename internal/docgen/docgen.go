@@ -136,7 +136,11 @@ func writeScenario(md *markdown.Markdown, sc *spec.Scenario, specDir, outputDir 
 
 	// A matrix instance's name already shows the row's concrete values; render
 	// its commands and assertions with the same values so the reader sees
-	// `git checkout v9.9.9`, not the template's ${ref}.
+	// `git checkout v9.9.9`, not the template's ${ref}. The substitution goes
+	// through the shared walker, so doc, explain, and manifest expand the same
+	// fields — they did not, and explain and manifest printed the template while
+	// this page printed the values.
+	sc = spec.ExpandScenarioRow(sc)
 	expand := matrixExpander(sc)
 
 	if given := givenBullets(sc, expand); len(given) > 0 {

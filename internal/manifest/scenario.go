@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/nao1215/atago/internal/assertdesc"
 	"github.com/nao1215/atago/internal/spec"
 )
 
@@ -11,6 +12,14 @@ import (
 // references, generated artifacts, and security notes are collected across the
 // scenario's services and steps so tooling can see them without replaying the run.
 func buildScenario(sc *spec.Scenario, src SourceLocator, runners map[string]spec.Runner) Scenario {
+	// The row a matrix instance is expanded from is statically known, and `atago
+	// doc` already substitutes it. Without the same substitution here a consumer
+	// has to re-implement variable expansion (including the $${...} escape) to
+	// learn what a row does, the two rows of one matrix carry identical step
+	// text, and a security note names a command line nobody runs. `vars` below
+	// still carries the binding, so the substitution stays visible.
+	authored := sc
+	sc = spec.ExpandScenarioRow(sc)
 	out := Scenario{
 		Name: sc.Name,
 		Tags: append([]string(nil), sc.Tags...),
@@ -25,7 +34,20 @@ func buildScenario(sc *spec.Scenario, src SourceLocator, runners map[string]spec
 		out.Source = sourceFrom(src.ScenarioPos(sc.SourceIndex))
 	}
 
+	// Variable references are collected from the AUTHORED scenario, before the
+	// row is substituted: "which variables does this scenario use" is a question
+	// about the spec, and a row binding that has just been resolved would
+	// otherwise disappear from the list that reports it.
 	vars := map[string]bool{}
+	for i := range authored.Services {
+		spec.CollectServiceVars(vars, &authored.Services[i])
+	}
+	for i := range authored.Steps {
+		spec.CollectStepVars(vars, &authored.Steps[i], runners)
+	}
+	for i := range authored.Teardown {
+		spec.CollectStepVars(vars, &authored.Teardown[i], runners)
+	}
 
 	for i := range sc.Services {
 		svc := &sc.Services[i]
@@ -182,6 +204,12 @@ func buildStep(index int, step *spec.Step, vars map[string]bool, runners map[str
 	case spec.StepAssert:
 		st.Target = assertTarget(step.Assert)
 		st.Action = "assert " + st.Target
+		// The target alone cannot say what the step checks: two different
+		// assertions on one target reduce to the same word, and so do a strong
+		// assertion and the weakened version of it — a suite whose assertions
+		// were gutted produced a byte-identical manifest. The phrases come from
+		// the describer explain prints, so the two documents cannot disagree.
+		st.Asserts = assertdesc.Describe(step.Assert)
 
 	case spec.StepStore:
 		if step.Store != nil {
@@ -202,6 +230,9 @@ func buildRetry(r *spec.Retry) *Retry {
 	out := &Retry{Times: r.Times, Interval: r.Interval}
 	if r.Until != nil {
 		out.Until = assertTarget(r.Until)
+		// The condition that ends the loop carries the same detail an assert
+		// step does, or the two spellings of one question drift apart.
+		out.UntilAsserts = assertdesc.Describe(r.Until)
 	}
 	return out
 }

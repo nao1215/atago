@@ -229,3 +229,105 @@ scenarios:
               - "Suite generates:"
               - "build/seed.txt"
               - "network access (subject build mytool)"
+
+  # A manifest that reduced every assert to its target name could not say what a
+  # suite checks: two different assertions on one target were indistinguishable,
+  # and so were a strong assertion and the weakened version of it — a gutted
+  # suite produced a byte-identical manifest.
+  - name: an assert step carries the assertion, not only its target
+    steps:
+      - fixture:
+          file: strong.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: same}
+            scenarios:
+              - name: checks
+                steps:
+                  - run: {command: echo hi}
+                  - assert:
+                      exit_code: 0
+                      stdout: {equals: "hi\n"}
+      - fixture:
+          file: weak.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: same}
+            scenarios:
+              - name: checks
+                steps:
+                  - run: {command: echo hi}
+                  - assert:
+                      exit_code: {in: [0, 1, 2]}
+                      stdout: {not_contains: "zzz"}
+      - run:
+          shell: true
+          command: "${atago} manifest strong.atago.yaml > strong.json"
+      - assert:
+          exit_code: 0
+          file:
+            path: strong.json
+            contains:
+              - "exit code is 0"
+              - "stdout equals exact text"
+      - run:
+          shell: true
+          command: "${atago} manifest weak.atago.yaml > weak.json"
+      - assert:
+          exit_code: 0
+          file:
+            path: weak.json
+            contains:
+              - "exit code in [0, 1, 2]"
+              - "stdout does not contain"
+      # The two manifests differ, which is the whole point: the weakened suite
+      # can be told from the strong one by diffing the documents.
+      - run:
+          shell: true
+          command: "cmp -s strong.json weak.json; echo differ=$?"
+      - assert:
+          stdout:
+            contains: "differ=1"
+
+  # explain and manifest render an expanded matrix row the way doc does. The row
+  # is bound at load time, so leaving ${who} in the step text describes a command
+  # nobody runs — and makes the two rows of one matrix read identically under two
+  # different headings.
+  - name: explain and manifest substitute a matrix row into the step text
+    steps:
+      - fixture:
+          file: rows.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: rows}
+            scenarios:
+              - name: greets $${who}
+                matrix:
+                  - {who: alice}
+                  - {who: bob}
+                steps:
+                  - run: {command: "echo $${who}"}
+                  - assert: {exit_code: 0}
+      - run: {command: "${atago} explain rows.atago.yaml"}
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "echo alice"
+              - "echo bob"
+            not_contains: "echo ${who}"
+      - run: {command: "${atago} manifest rows.atago.yaml"}
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - '"command": "echo alice"'
+              - '"command": "echo bob"'
+            not_contains: '"command": "echo ${who}"'
+      # The binding stays visible, so a consumer can still see which row a
+      # scenario came from.
+      - assert:
+          stdout:
+            json:
+              - path: "$.specs[0].scenarios[0].vars.who"
+                equals: "alice"
