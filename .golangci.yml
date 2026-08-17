@@ -3,25 +3,42 @@ run:
   go: "1.26"
 linters:
   enable:
+    - asasalint
     - asciicheck
     - bidichk
     - bodyclose
+    - canonicalheader
     - copyloopvar
     - durationcheck
     - errcheck
     - errname
     - errorlint
+    - fatcontext
     - gocheckcompilerdirectives
     - gochecknoinits
     - gocognit
     - gosec
     - govet
+    - iface
     - ineffassign
+    - makezero
     - misspell
+    # musttag guards the JSON side of atago's machine-readable contracts (the
+    # json/junit/gha reports, the manifest and rerun ledgers): a field added
+    # there without a tag silently changes key names for downstream consumers.
+    # goccy/go-yaml is deliberately not registered under settings.musttag:
+    # spec types like Stdin, ExitCode and PTYSend decode through hand-written
+    # UnmarshalYAML that accepts a bare scalar as well as a mapping, so their
+    # fields have no honest tag to carry.
+    - musttag
     - nestif
     - nilerr
+    - nilnesserr
     - noctx
     - nolintlint
+    - reassign
+    - rowserrcheck
+    - sqlclosecheck
     - staticcheck
     - tagliatelle
     - thelper
