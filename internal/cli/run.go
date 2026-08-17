@@ -41,13 +41,19 @@ type runOptions struct {
 	skipTag         csvFlag
 	artifactsDir    string
 	rerunFailed     bool
-	allowFlaky      bool
-	allowXPass      bool
-	profile         string
-	verbose         bool
-	ci              bool
-	stdout          io.Writer
-	stderr          io.Writer
+	// rerunTargets are the spec paths the run was pointed at BEFORE
+	// --rerun-failed narrowed them to the ones holding recorded failures. The
+	// ledger warning needs the difference: an entry under a spec that was never
+	// a target went unexecuted because of the user's own targeting, not because
+	// the scenario disappeared.
+	rerunTargets []string
+	allowFlaky   bool
+	allowXPass   bool
+	profile      string
+	verbose      bool
+	ci           bool
+	stdout       io.Writer
+	stderr       io.Writer
 }
 
 // selectionActive reports whether the user narrowed the run with a name/tag
@@ -88,6 +94,7 @@ func runCmd(label string, args []string, stdout, stderr io.Writer) int {
 	// the previous run (#64); the selection and canonicalization invariants live
 	// with the ledger primitives in rerun.go.
 	if opts.rerunFailed {
+		opts.rerunTargets = append([]string(nil), paths...)
 		narrowed, exitNow, done := applyRerunSelection(label, stderr, paths, eng)
 		if done {
 			return exitNow
