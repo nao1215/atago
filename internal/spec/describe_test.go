@@ -7,9 +7,9 @@ import (
 
 func boolPtr(b bool) *bool { return &b }
 
-// TestGeneratedArtifacts covers the three sources a scenario can generate a file
-// from: a file exists:true assertion, an image assertion, and a cdp screenshot
-// action (#56).
+// TestGeneratedArtifacts covers every source a scenario can generate a file
+// from: a file exists:true assertion, image and pdf assertions, a cdp
+// screenshot action, redirect targets, and teardown redirects (#56).
 func TestGeneratedArtifacts(t *testing.T) {
 	t.Parallel()
 	sc := &Scenario{
@@ -20,6 +20,9 @@ func TestGeneratedArtifacts(t *testing.T) {
 			// Redirect targets are declared outputs too.
 			{Run: &Run{Command: "mycli", StdoutTo: "logs/out.log", StderrTo: "logs/err.log"}},
 			{HTTP: &HTTP{Method: "GET", Path: "/report.pdf", BodyTo: "downloads/report.pdf"}},
+			// A pdf assertion inspects an output the tool wrote, like image; it
+			// used to be the one inspecting target left out.
+			{Assert: &Assert{PDF: &PDFAssert{Path: "report.pdf"}}},
 			// A non-generating assertion must not add anything.
 			{Assert: &Assert{Stdout: &StreamAssert{Contains: StringList{"x"}}}},
 			// exists:false is a negative check, not a generated artifact.
@@ -27,9 +30,14 @@ func TestGeneratedArtifacts(t *testing.T) {
 			// A duplicate path is de-duplicated.
 			{Assert: &Assert{Image: &ImageAssert{Path: "thumb.png"}}},
 		},
+		// Teardown always runs and its redirects land in the workdir like any
+		// other step's; they used to be invisible here.
+		Teardown: []Step{
+			{Run: &Run{Command: "mycli audit", StdoutTo: "logs/audit.log"}},
+		},
 	}
 	got := GeneratedArtifacts(sc)
-	want := []string{"out.txt", "thumb.png", "shot.png", "logs/out.log", "logs/err.log", "downloads/report.pdf"}
+	want := []string{"out.txt", "thumb.png", "shot.png", "logs/out.log", "logs/err.log", "downloads/report.pdf", "report.pdf", "logs/audit.log"}
 	if strings.Join(got, ",") != strings.Join(want, ",") {
 		t.Errorf("GeneratedArtifacts = %v, want %v", got, want)
 	}

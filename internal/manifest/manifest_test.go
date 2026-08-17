@@ -175,8 +175,8 @@ func TestBuild_SecretsNeverExposeValues(t *testing.T) {
 }
 
 // TestBuild_GeneratedArtifactsAcrossKinds keeps the manifest aligned with the
-// shared spec model: image outputs and cdp screenshots are generated artifacts,
-// just like file exists:true (#56).
+// shared spec model: image/pdf outputs, cdp screenshots, and teardown
+// redirects are generated artifacts, just like file exists:true (#56).
 func TestBuild_GeneratedArtifactsAcrossKinds(t *testing.T) {
 	t.Parallel()
 	const src = `
@@ -202,6 +202,14 @@ scenarios:
           actions:
             - navigate: http://localhost:8080
             - screenshot: {path: home.png}
+      - assert:
+          pdf:
+            path: report.pdf
+            min_pages: 1
+    teardown:
+      - run:
+          command: audit
+          stdout_to: logs/audit.log
 `
 	s, err := loader.LoadBytes("gen.atago.yaml", []byte(src))
 	if err != nil {
@@ -209,8 +217,8 @@ scenarios:
 	}
 	doc := Build([]Input{{Spec: s, Path: "gen.atago.yaml"}})
 	got := doc.Specs[0].Scenarios[0].Generates
-	if strings.Join(got, ",") != "thumb.png,out.txt,home.png" {
-		t.Errorf("generates = %v, want [thumb.png out.txt home.png]", got)
+	if strings.Join(got, ",") != "thumb.png,out.txt,home.png,report.pdf,logs/audit.log" {
+		t.Errorf("generates = %v, want [thumb.png out.txt home.png report.pdf logs/audit.log]", got)
 	}
 }
 
