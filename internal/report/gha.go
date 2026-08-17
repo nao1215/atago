@@ -7,6 +7,7 @@ import (
 
 	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/engine"
+	"github.com/nao1215/atago/internal/plural"
 )
 
 // writeGHA emits GitHub Actions workflow-command annotations, so
@@ -14,6 +15,7 @@ import (
 // errored scenario, plus a final `::notice::` summary. Rendered by Render
 // (FormatGHA).
 func writeGHA(w io.Writer, results []*engine.SuiteResult, allowXPass bool, loadFailures []LoadFailure) error {
+	snapsUpdated := snapshotsUpdated(results)
 	var b strings.Builder
 	var agg engine.Counts
 	var total int
@@ -102,10 +104,19 @@ func writeGHA(w io.Writer, results []*engine.SuiteResult, allowXPass bool, loadF
 		agg = agg.Add(res.Counts())
 		total += len(res.Scenarios)
 	}
+	// A snapshot rewrite is loud in the annotations and green for the job, the
+	// flaky pattern: --update-snapshots replaced committed expected results, and
+	// a job that did so must not read like an ordinary green run.
+	if snapsUpdated > 0 {
+		fmt.Fprintf(&b, "::warning title=atago::%s\n", ghaEscapeData(fmt.Sprintf(
+			"%s updated by --update-snapshots; the committed expected results were rewritten",
+			plural.Count(snapsUpdated, "snapshot", "snapshots"))))
+	}
 	fmt.Fprintf(&b, "::notice title=atago::%s\n", ghaEscapeData(fmt.Sprintf(
-		"%d scenarios: %d passed, %d failed, %d errored, %d skipped%s%s",
+		"%d scenarios: %d passed, %d failed, %d errored, %d skipped%s%s%s",
 		total, agg.Passed, agg.Failed, agg.Errored, agg.Skipped,
-		flakySuffix(agg)+expectFailSuffix(agg), loadFailureSuffix(len(loadFailures)))))
+		flakySuffix(agg)+expectFailSuffix(agg), loadFailureSuffix(len(loadFailures)),
+		snapshotSuffix(snapsUpdated))))
 	_, err := io.WriteString(w, b.String())
 	return err
 }

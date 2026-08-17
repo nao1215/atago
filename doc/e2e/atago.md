@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-81 suites · 642 scenarios
+81 suites · 644 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -394,9 +394,10 @@
   - [the line selector strips the trailing CR](#scenario-the-line-selector-strips-the-trailing-cr)
   - [json parses a CRLF-formatted document](#scenario-json-parses-a-crlf-formatted-document)
   - [folding does not make an absent multi-line needle match](#scenario-folding-does-not-make-an-absent-multi-line-needle-match)
-- [atago self-hosting / list](#atago-self-hosting--list) — 2 scenarios
+- [atago self-hosting / list](#atago-self-hosting--list) — 3 scenarios
   - [list surfaces suites, scenarios, tags, and gates](#scenario-list-surfaces-suites-scenarios-tags-and-gates)
   - [list --json is a stable machine contract](#scenario-list---json-is-a-stable-machine-contract)
+  - [list marks an expect_fail scenario](#scenario-list-marks-an-expect_fail-scenario)
 - [atago self-hosting / loader rejects malformed specs](#atago-self-hosting--loader-rejects-malformed-specs) — 18 scenarios
   - [an empty scenario list is rejected](#scenario-an-empty-scenario-list-is-rejected)
   - [a wrong version string is rejected](#scenario-a-wrong-version-string-is-rejected)
@@ -524,7 +525,7 @@
   - [a recorded secret placeholder replays green with the env set and is guarded when unset](#scenario-a-recorded-secret-placeholder-replays-green-with-the-env-set-and-is-guarded-when-unset)
   - [a raw-mode (TUI) keystroke is recorded literally, not as a secret](#scenario-a-raw-mode-tui-keystroke-is-recorded-literally-not-as-a-secret)
   - [record --pty of a never-exiting program times out instead of hanging](#scenario-record---pty-of-a-never-exiting-program-times-out-instead-of-hanging)
-- [atago self-hosting / report formats agree on outcomes](#atago-self-hosting--report-formats-agree-on-outcomes) — 10 scenarios
+- [atago self-hosting / report formats agree on outcomes](#atago-self-hosting--report-formats-agree-on-outcomes) — 11 scenarios
   - [json report carries per-scenario verdicts and a failures array](#scenario-json-report-carries-per-scenario-verdicts-and-a-failures-array)
   - [junit report tallies tests, failures, skipped, and errors](#scenario-junit-report-tallies-tests-failures-skipped-and-errors)
   - [tap report emits the plan, a not ok line, and a SKIP directive](#scenario-tap-report-emits-the-plan-a-not-ok-line-and-a-skip-directive)
@@ -535,6 +536,7 @@
   - [a run whose specs all failed to load still reports them](#scenario-a-run-whose-specs-all-failed-to-load-still-reports-them)
   - [an errored step is counted as an error, not a failure, across formats](#scenario-an-errored-step-is-counted-as-an-error-not-a-failure-across-formats)
   - [a failed teardown surfaces in junit, tap, and gha without changing the verdict](#scenario-a-failed-teardown-surfaces-in-junit-tap-and-gha-without-changing-the-verdict)
+  - [a snapshot rewrite is reported by the console and every machine format](#scenario-a-snapshot-rewrite-is-reported-by-the-console-and-every-machine-format)
 - [atago self-hosting / reports](#atago-self-hosting--reports) — 10 scenarios
   - [JUnit report is XML with a testsuite and testcase](#scenario-junit-report-is-xml-with-a-testsuite-and-testcase)
   - [GitHub Actions annotations are emitted on failure](#scenario-github-actions-annotations-are-emitted-on-failure)
@@ -8008,6 +8010,40 @@ ${atago} list --json sample.atago.yaml
 - exit code is `0`
 - stdout at `$.schema_version` equals `1`
 - stdout at `$.scenarios[0].scenario` equals `only scenario`
+### Scenario: list marks an expect_fail scenario
+#### Given
+- Fixture file `xfail.atago.yaml` is created.
+#### Inputs
+_Fixture `xfail.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: xfail
+scenarios:
+  - name: known bug
+    expect_fail:
+      reason: "upstream renders the wrong width"
+      issue: "https://example.com/issues/42"
+    steps:
+      - run: {shell: true, command: "exit 1"}
+      - assert: {exit_code: 0}
+  - name: healthy
+    steps:
+      - run: {shell: true, command: "true"}
+      - assert: {exit_code: 0}
+```
+#### When
+```shell
+${atago} list xfail.atago.yaml
+${atago} list --json xfail.atago.yaml
+```
+#### Then
+- after `${atago} list xfail.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `XFAIL`, `known bug`
+- after `${atago} list --json xfail.atago.yaml`:
+  - exit code is `0`
+  - stdout at `$.scenarios[0].expect_fail.reason` equals `upstream renders the wrong width`; at `$.scenarios[0].expect_fail.issue` equals `https://example.com/issues/42`
 ## atago self-hosting / loader rejects malformed specs
 Source: `test/e2e/atago/loader_errors.atago.yaml`
 ### Scenario: an empty scenario list is rejected
@@ -10650,6 +10686,45 @@ ${atago} run --ci --report gha td.atago.yaml
 - after `${atago} run --ci --report gha td.atago.yaml`:
   - exit code is `0`
   - stdout contains `::warning title=td / passes but cleanup fails::teardown failed`, does not contain `::error`
+### Scenario: a snapshot rewrite is reported by the console and every machine format
+#### Given
+- Fixture file `snap.atago.yaml` is created.
+#### Inputs
+_Fixture `snap.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: snap
+scenarios:
+  - name: greets
+    steps:
+      - run: {shell: true, command: "echo greetings"}
+      - assert: {stdout: {snapshot: greet.snap}}
+```
+#### When
+```shell
+${atago} run --ci --update-snapshots snap.atago.yaml
+${atago} run --ci --update-snapshots --report json snap.atago.yaml
+${atago} run --ci --update-snapshots --report gha snap.atago.yaml
+${atago} run --ci --update-snapshots --report tap snap.atago.yaml
+${atago} run --ci snap.atago.yaml
+```
+#### Then
+- after `${atago} run --ci --update-snapshots snap.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `1 snapshot updated`
+- after `${atago} run --ci --update-snapshots --report json snap.atago.yaml`:
+  - exit code is `0`
+  - stdout at `$.snapshots_updated` equals `1`
+- after `${atago} run --ci --update-snapshots --report gha snap.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `::warning title=atago::1 snapshot updated`
+- after `${atago} run --ci --update-snapshots --report tap snap.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `# 1 snapshot updated`
+- after `${atago} run --ci snap.atago.yaml`:
+  - exit code is `0`
+  - stdout does not contain `snapshot updated`
 ## atago self-hosting / reports
 Source: `test/e2e/atago/reports.atago.yaml`
 ### Scenario: JUnit report is XML with a testsuite and testcase

@@ -38,6 +38,11 @@ type CheckResult struct {
 	Expected string
 	Actual   string
 	Hint     string
+	// SnapshotUpdated reports that this check WROTE its snapshot instead of
+	// comparing against it (`--update-snapshots`). Rewriting the committed
+	// goldens is the one passing outcome a reviewer has to be told about, so
+	// the reports can count it rather than reading it out of the description.
+	SnapshotUpdated bool
 
 	// ArtifactKind, ArtifactActual, and ArtifactExpected carry the full,
 	// untruncated payloads a failed text assertion compared, for durable export

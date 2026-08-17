@@ -260,6 +260,59 @@ func TestListCmd_JSON(t *testing.T) {
 	}
 }
 
+// TestListCmd_ExpectFail is a regression: a scenario documenting a known bug
+// was indistinguishable from a healthy one in `atago list`. explain prints the
+// marker precisely so a reviewer sees which scenarios are documentation of a
+// bug rather than guarantees, doc renders it, and the manifest carries the
+// block — the inventory was the one surface where a suite silently read as
+// promising more than it does.
+func TestListCmd_ExpectFail(t *testing.T) {
+	const src = `version: "1"
+suite:
+  name: xfail
+scenarios:
+  - name: known bug
+    expect_fail:
+      reason: "upstream renders the wrong width"
+      issue: "https://example.com/issues/42"
+    steps:
+      - run: {shell: true, command: "exit 1"}
+      - assert: {exit_code: 0}
+  - name: healthy
+    steps:
+      - run: {shell: true, command: "true"}
+      - assert: {exit_code: 0}
+`
+	dir := t.TempDir()
+	p := writeSpec(t, dir, "s.atago.yaml", src)
+
+	var out, errb bytes.Buffer
+	if got := Main([]string{"list", p}, &out, &errb); got != ExitOK {
+		t.Fatalf("exit = %d (stderr=%s)", got, errb.String())
+	}
+	table := out.String()
+	if !strings.Contains(table, "XFAIL") {
+		t.Errorf("list table does not mark the expect_fail scenario:\n%s", table)
+	}
+
+	out.Reset()
+	errb.Reset()
+	if got := Main([]string{"list", "--json", p}, &out, &errb); got != ExitOK {
+		t.Fatalf("exit = %d (stderr=%s)", got, errb.String())
+	}
+	var doc listDocument
+	if err := json.Unmarshal(out.Bytes(), &doc); err != nil {
+		t.Fatalf("invalid JSON: %v\n%s", err, out.String())
+	}
+	ef := doc.Scenarios[0].ExpectFail
+	if ef == nil || ef.Reason != "upstream renders the wrong width" || ef.Issue != "https://example.com/issues/42" {
+		t.Errorf("expect_fail = %+v, want the reason and issue", ef)
+	}
+	if doc.Scenarios[1].ExpectFail != nil {
+		t.Errorf("a healthy scenario carries expect_fail: %+v", doc.Scenarios[1].ExpectFail)
+	}
+}
+
 func TestListCmd_Deterministic(t *testing.T) {
 	dir := t.TempDir()
 	p := writeSpec(t, dir, "s.atago.yaml", listSpec)

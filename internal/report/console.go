@@ -15,7 +15,7 @@ import (
 
 // writeSummary prints the final tally line. The uppercase status word
 // (PASSED/FAILED) anchors the line and is part of the stable output contract.
-func writeSummary(b *strings.Builder, color bool, c engine.Counts, total int, d time.Duration, hardFail bool, loadFailures int, allowFlaky, allowXPass bool) {
+func writeSummary(b *strings.Builder, color bool, c engine.Counts, total int, d time.Duration, hardFail bool, loadFailures int, allowFlaky, allowXPass bool, snapsUpdated int) {
 	status, code := "PASSED", cGreen
 	// hardFail covers a suite that errored before producing any scenario row (#7):
 	// the counts are all zero, but the verdict must still read FAILED to match the
@@ -37,9 +37,13 @@ func writeSummary(b *strings.Builder, color bool, c engine.Counts, total int, d 
 		plural = "scenario"
 	}
 	loadFail := loadFailureSuffix(loadFailures)
-	fmt.Fprintf(b, "\n%s  %d %s: %d passed, %d failed, %d errored, %d skipped%s%s (%s)\n",
+	// A snapshot rewrite is the one passing outcome worth naming: --update-snapshots
+	// replaces the committed expected results, and a run that did so must not read
+	// like an ordinary green run.
+	fmt.Fprintf(b, "\n%s  %d %s: %d passed, %d failed, %d errored, %d skipped%s%s%s (%s)\n",
 		colorize(color, code+cBold, status), total, plural,
-		c.Passed, c.Failed, c.Errored, c.Skipped, flakySuffix(c)+expectFailSuffix(c), loadFail, d.Round(time.Millisecond))
+		c.Passed, c.Failed, c.Errored, c.Skipped, flakySuffix(c)+expectFailSuffix(c), loadFail,
+		snapshotSuffix(snapsUpdated), d.Round(time.Millisecond))
 }
 
 // writeDetail prints the failure/error block for a scenario, or nothing if it

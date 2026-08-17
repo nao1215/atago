@@ -281,3 +281,54 @@ scenarios:
             contains:
               - "::warning title=td / passes but cleanup fails::teardown failed"
             not_contains: "::error"
+
+  # Regression: --update-snapshots rewrites the committed expected results of a
+  # whole suite and left no trace anywhere, so a CI job carrying the flag by
+  # accident rewrote every golden to whatever the code currently does and
+  # reported green with nothing in the log to notice.
+  - name: a snapshot rewrite is reported by the console and every machine format
+    steps:
+      - fixture:
+          file: snap.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: snap
+            scenarios:
+              - name: greets
+                steps:
+                  - run: {shell: true, command: "echo greetings"}
+                  - assert: {stdout: {snapshot: greet.snap}}
+      - run:
+          command: ${atago} run --ci --update-snapshots snap.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "1 snapshot updated"
+      - run:
+          command: ${atago} run --ci --update-snapshots --report json snap.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              - path: "$.snapshots_updated"
+                equals: 1
+      - run:
+          command: ${atago} run --ci --update-snapshots --report gha snap.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "::warning title=atago::1 snapshot updated"
+      - run:
+          command: ${atago} run --ci --update-snapshots --report tap snap.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "# 1 snapshot updated"
+      # An ordinary verify run says nothing: the note exists to flag a rewrite.
+      - run:
+          command: ${atago} run --ci snap.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            not_contains: "snapshot updated"

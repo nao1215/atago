@@ -794,6 +794,98 @@ func TestJSON_ScenarioTeardownFailures(t *testing.T) {
 	}
 }
 
+// TestSnapshotUpdates_AreReported is a regression: `--update-snapshots`
+// rewrites the committed goldens — the expected results of the whole suite —
+// and left no trace anywhere. A CI job that carries the flag by accident
+// rewrites every golden to whatever the code currently does and reports green,
+// with nothing in the output for a reviewer of the log to notice.
+func TestSnapshotUpdates_AreReported(t *testing.T) {
+	t.Parallel()
+	res := &engine.SuiteResult{
+		Suite:    "snap",
+		SpecPath: "snap.atago.yaml",
+		Status:   engine.StatusPassed,
+		Scenarios: []engine.ScenarioResult{{
+			Name:   "greets",
+			Status: engine.StatusPassed,
+			Steps: []engine.StepResult{{Kind: "assert", Checks: []*assert.CheckResult{
+				{OK: true, Desc: "assert stdout snapshot (updated)", SnapshotUpdated: true},
+				{OK: true, Desc: "assert exit_code is 0"},
+			}}},
+		}},
+	}
+
+	console := render(t, FormatConsole, res)
+	if !strings.Contains(console, "1 snapshot updated") {
+		t.Errorf("console summary does not report the update:\n%s", console)
+	}
+
+	var doc jsonDocument
+	if err := json.Unmarshal([]byte(render(t, FormatJSON, res)), &doc); err != nil {
+		t.Fatalf("json invalid: %v", err)
+	}
+	if doc.SnapshotsUpdated != 1 {
+		t.Errorf("json snapshots_updated = %d, want 1", doc.SnapshotsUpdated)
+	}
+
+	if out := render(t, FormatGHA, res); !strings.Contains(out, "1 snapshot updated") {
+		t.Errorf("gha summary does not report the update:\n%s", out)
+	}
+	if out := render(t, FormatTAP, res); !strings.Contains(out, "# 1 snapshot updated") {
+		t.Errorf("tap stream does not report the update:\n%s", out)
+	}
+
+	// A run that wrote none says nothing: the note exists to flag a rewrite.
+	clean := &engine.SuiteResult{
+		Suite: "snap", Status: engine.StatusPassed,
+		Scenarios: []engine.ScenarioResult{{Name: "greets", Status: engine.StatusPassed,
+			Steps: []engine.StepResult{{Kind: "assert", Checks: []*assert.CheckResult{{OK: true}}}}}},
+	}
+	if out := render(t, FormatConsole, clean); strings.Contains(out, "snapshot updated") {
+		t.Errorf("a run that updated nothing gained a note:\n%s", out)
+	}
+}
+
+// TestEvidencePaths_ReachEveryMachineFormat is a regression: --artifacts-dir
+// writes sidecars so CI, editors, and agents can jump straight to them, and
+// preserved service logs exist for the same reason — but only the console and
+// the json report carried the paths. junit, tap, and gha reproduced the diff
+// text while referencing no file, so the CI systems those formats exist for
+// could not reach the evidence the run had just written for them.
+func TestEvidencePaths_ReachEveryMachineFormat(t *testing.T) {
+	t.Parallel()
+	res := &engine.SuiteResult{
+		Suite:    "ev",
+		SpecPath: "ev.atago.yaml",
+		Status:   engine.StatusFailed,
+		Scenarios: []engine.ScenarioResult{{
+			Name:   "golden mismatch",
+			Status: engine.StatusFailed,
+			Steps: []engine.StepResult{{Kind: "assert", Checks: []*assert.CheckResult{{
+				OK: false, Desc: "assert stdout equals golden",
+				ArtifactExpected: []byte("a\nb\nc\n"), ArtifactActual: []byte("a\nX\nc\n"),
+				ArtifactFiles: []assert.ArtifactFile{
+					{Role: "actual", Path: "ev/golden-mismatch-0/step-01-stdout.actual.txt"},
+					{Role: "expected", Path: "ev/golden-mismatch-0/step-01-stdout.expected.txt"},
+				},
+			}}}},
+			ServiceLogs: []engine.ServiceLog{{Name: "api", Path: "ev/golden-mismatch-0/service-api.log"}},
+		}},
+	}
+	for _, f := range []Format{FormatJUnit, FormatTAP, FormatGHA} {
+		out := render(t, f, res)
+		for _, want := range []string{
+			"ev/golden-mismatch-0/step-01-stdout.actual.txt",
+			"ev/golden-mismatch-0/step-01-stdout.expected.txt",
+			"ev/golden-mismatch-0/service-api.log",
+		} {
+			if !strings.Contains(out, want) {
+				t.Errorf("%s report missing evidence path %q\n--- got ---\n%s", f, want, out)
+			}
+		}
+	}
+}
+
 // TestTeardownFailure_VisibleInEveryMachineFormat is a regression: only the
 // console and json knew about a failed teardown. junit reported a clean pass
 // with zero trace of it, tap emitted a bare passing point, and gha a green
