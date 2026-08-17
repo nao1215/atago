@@ -260,6 +260,53 @@ scenarios:
             path: .atago/last-failed.json
             contains: [red-a, red-b]
 
+  # A rerun narrowed to one spec leaves the other spec's recorded failures
+  # unexecuted. They are still real and still kept, but nothing about them was
+  # renamed or removed: the user aimed the run somewhere else.
+  - name: rerun-failed does not blame a rename for a spec it was not aimed at
+    steps:
+      - fixture:
+          file: a.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: a
+            scenarios:
+              - name: red-a
+                steps:
+                  - run: {shell: true, command: "exit 1"}
+                  - assert: {exit_code: 0}
+      - fixture:
+          file: b.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: b
+            scenarios:
+              - name: red-b
+                steps:
+                  - run: {shell: true, command: "exit 1"}
+                  - assert: {exit_code: 0}
+      - run:
+          command: ${atago} run a.atago.yaml b.atago.yaml
+      - assert:
+          exit_code: 1
+      - run:
+          command: ${atago} run --rerun-failed a.atago.yaml
+      - assert:
+          exit_code: 1
+          stderr:
+            not_contains: "renamed or removed"
+      - assert:
+          stderr:
+            contains:
+              - "outside this run's targets"
+              - "red-b"
+      - assert:
+          file:
+            path: .atago/last-failed.json
+            contains: [red-a, red-b]
+
   - name: rerun-failed stays quiet when every recorded failure still exists
     steps:
       - fixture:

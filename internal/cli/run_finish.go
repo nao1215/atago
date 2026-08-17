@@ -152,7 +152,7 @@ func settleRerunLedger(ctx context.Context, opts *runOptions, results []*engine.
 		// were recorded, which reads as "the others are fixed". Say so before the
 		// ledger is rewritten, while the prior entries are still readable.
 		if opts.rerunFailed && !opts.selectionActive() {
-			warnUnmatchedRerunEntries(opts.label, opts.stderr, results, unreached)
+			warnUnmatchedRerunEntries(opts.label, opts.stderr, results, unreached, opts.rerunTargets)
 		}
 		updateRerunLedger(opts.label, opts.stderr, results, opts.allowXPass)
 	}

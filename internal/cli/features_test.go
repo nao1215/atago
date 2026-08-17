@@ -638,6 +638,135 @@ scenarios:
 	})
 }
 
+// TestRerunFailed_OutOfTargetEntriesAreNotBlamedOnARename pins the difference
+// between "the scenario is gone" and "you asked for a different spec". A rerun
+// narrowed to one spec leaves the other spec's recorded failures unexecuted, and
+// blaming a rename sends the reader after a spec change that never happened —
+// the entry is still there, and so is its spec.
+func TestRerunFailed_OutOfTargetEntriesAreNotBlamedOnARename(t *testing.T) {
+	const failing = `version: "1"
+suite:
+  name: rerun
+scenarios:
+  - name: fails
+    steps:
+      - run: {shell: true, command: "exit 1"}
+      - assert: {exit_code: 0}
+`
+	dir := t.TempDir()
+	writeSpec(t, dir, "a.atago.yaml", failing)
+	writeSpec(t, dir, "b.atago.yaml", failing)
+	withWorkdir(t, dir, func() {
+		var out, errb bytes.Buffer
+		if got := Main([]string{"run", "."}, &out, &errb); got != ExitFailures {
+			t.Fatalf("first run exit = %d, want %d (stderr=%s)", got, ExitFailures, errb.String())
+		}
+		out.Reset()
+		errb.Reset()
+		if got := Main([]string{"run", "--rerun-failed", "a.atago.yaml"}, &out, &errb); got != ExitFailures {
+			t.Fatalf("rerun exit = %d, want %d (stderr=%s)", got, ExitFailures, errb.String())
+		}
+		if strings.Contains(errb.String(), "did not match the current specs") {
+			t.Errorf("stderr = %q, want no rename/removal blame for a spec that was simply not targeted", errb.String())
+		}
+		if !strings.Contains(errb.String(), "outside this run's targets") {
+			t.Errorf("stderr = %q, want the untouched recorded failure reported as out of scope", errb.String())
+		}
+		if !strings.Contains(errb.String(), "b.atago.yaml / fails") {
+			t.Errorf("stderr = %q, want the out-of-scope entry named", errb.String())
+		}
+		st, err := loadRerunState()
+		if err != nil {
+			t.Fatalf("rerun state unreadable: %v", err)
+		}
+		if len(st.Failed) != 2 {
+			t.Errorf("recorded failures = %+v, want both entries preserved", st.Failed)
+		}
+	})
+}
+
+// TestRerunFailed_UnmatchedWarningAgreesInNumberAndIsBounded pins the shape of
+// the mismatch warning itself: the verb follows the count, and a ledger that
+// accumulated many stale entries is summarized instead of printed in full — the
+// warning is read before the run's own result, so it cannot be a wall of text.
+func TestRerunFailed_UnmatchedWarningAgreesInNumberAndIsBounded(t *testing.T) {
+	scenario := func(name string) string {
+		return "  - name: " + name + "\n    steps:\n      - run: {shell: true, command: \"exit 1\"}\n      - assert: {exit_code: 0}\n"
+	}
+	head := "version: \"1\"\nsuite:\n  name: rerun\nscenarios:\n"
+	var before, after strings.Builder
+	before.WriteString(head)
+	after.WriteString(head)
+	before.WriteString(scenario("kept"))
+	after.WriteString(scenario("kept"))
+	for i := range 8 {
+		before.WriteString(scenario("gone" + strconv.Itoa(i)))
+		after.WriteString(scenario("renamed" + strconv.Itoa(i)))
+	}
+
+	dir := t.TempDir()
+	writeSpec(t, dir, "s.atago.yaml", before.String())
+	withWorkdir(t, dir, func() {
+		var out, errb bytes.Buffer
+		if got := Main([]string{"run", "."}, &out, &errb); got != ExitFailures {
+			t.Fatalf("first run exit = %d, want %d (stderr=%s)", got, ExitFailures, errb.String())
+		}
+		// Every recorded failure but one is renamed while still broken.
+		writeSpec(t, dir, "s.atago.yaml", after.String())
+
+		out.Reset()
+		errb.Reset()
+		if got := Main([]string{"run", "--rerun-failed", "."}, &out, &errb); got != ExitFailures {
+			t.Fatalf("rerun exit = %d, want %d (stderr=%s)", got, ExitFailures, errb.String())
+		}
+		if !strings.Contains(errb.String(), "8 recorded failing scenarios did not match the current specs (renamed or removed?) and were not rerun") {
+			t.Errorf("stderr = %q, want a plural subject and a plural verb", errb.String())
+		}
+		if !strings.Contains(errb.String(), "and 3 more") {
+			t.Errorf("stderr = %q, want the named entries bounded with a count of the rest", errb.String())
+		}
+		if n := strings.Count(errb.String(), "s.atago.yaml / gone"); n != maxNamedRerunEntries {
+			t.Errorf("named entries = %d, want %d", n, maxNamedRerunEntries)
+		}
+	})
+}
+
+// TestRerunFailed_SingularWarningKeepsItsVerb guards the other half of the
+// agreement fix: one unmatched entry keeps the singular noun and verb.
+func TestRerunFailed_SingularWarningKeepsItsVerb(t *testing.T) {
+	const spec = `version: "1"
+suite:
+  name: rerun
+scenarios:
+  - name: fails
+    steps:
+      - run: {shell: true, command: "exit 1"}
+      - assert: {exit_code: 0}
+  - name: also-fails
+    steps:
+      - run: {shell: true, command: "exit 1"}
+      - assert: {exit_code: 0}
+`
+	dir := t.TempDir()
+	writeSpec(t, dir, "s.atago.yaml", spec)
+	withWorkdir(t, dir, func() {
+		var out, errb bytes.Buffer
+		if got := Main([]string{"run", "."}, &out, &errb); got != ExitFailures {
+			t.Fatalf("first run exit = %d, want %d (stderr=%s)", got, ExitFailures, errb.String())
+		}
+		writeSpec(t, dir, "s.atago.yaml", strings.ReplaceAll(spec, "name: fails\n", "name: fails-renamed\n"))
+
+		out.Reset()
+		errb.Reset()
+		if got := Main([]string{"run", "--rerun-failed", "."}, &out, &errb); got != ExitFailures {
+			t.Fatalf("rerun exit = %d, want %d (stderr=%s)", got, ExitFailures, errb.String())
+		}
+		if !strings.Contains(errb.String(), "1 recorded failing scenario did not match the current specs (renamed or removed?) and was not rerun") {
+			t.Errorf("stderr = %q, want the singular noun and verb", errb.String())
+		}
+	})
+}
+
 // TestRerunFailed_FullMatchIsQuiet pins that the warning is about a real
 // mismatch: when every recorded failure still exists, nothing extra is printed.
 func TestRerunFailed_FullMatchIsQuiet(t *testing.T) {

@@ -316,13 +316,19 @@ func applyRerunSelection(label string, stderr io.Writer, paths []string, eng *en
 // never overwritten, so recorded failures a newer atago wrote survive a plain
 // run by an older one.
 // warnUnmatchedRerunEntries reports recorded failures that this --rerun-failed
-// run did not execute, which happens when a scenario was renamed or deleted
-// while still broken. The ledger keeps those entries, but silence is the wrong
+// run did not execute. The ledger keeps those entries, but silence is the wrong
 // answer: a rerun that shows "1 scenario" where two were recorded reads as
 // "the other one is fixed". The all-gone case is handled by the caller (it
 // verified nothing and exits non-zero); a partial mismatch stays a warning
 // because the entry survives for the next rerun.
-func warnUnmatchedRerunEntries(label string, stderr io.Writer, results []*engine.SuiteResult, unreached []string) {
+//
+// The two reasons an entry goes unexecuted get separate sentences, because they
+// send the reader to different places. A scenario the run LOOKED for and did not
+// find was renamed or deleted while still broken — a spec change to go read. An
+// entry under a spec this run never targeted is not evidence of any spec change
+// at all: the user narrowed the run, and the recorded failure is simply out of
+// scope. Blaming a rename there sends them hunting for an edit nobody made.
+func warnUnmatchedRerunEntries(label string, stderr io.Writer, results []*engine.SuiteResult, unreached, targets []string) {
 	prior, err := loadRerunState()
 	if err != nil || len(prior.Failed) == 0 {
 		return
@@ -336,24 +342,59 @@ func warnUnmatchedRerunEntries(label string, stderr io.Writer, results []*engine
 	for _, p := range unreached {
 		skip[absClean(p)] = true
 	}
-	var unmatched []failedEntry
+	inScope := make(map[string]bool, len(targets))
+	for _, p := range targets {
+		inScope[absClean(p)] = true
+	}
+	var unmatched, outOfScope []failedEntry
 	for _, e := range prior.Failed {
 		if selected[canonicalScenarioID(e.SpecPath, e.Scenario)] || skip[absClean(e.SpecPath)] {
 			continue
 		}
+		if !inScope[absClean(e.SpecPath)] {
+			outOfScope = append(outOfScope, e)
+			continue
+		}
 		unmatched = append(unmatched, e)
 	}
-	if len(unmatched) == 0 {
-		return
+	if len(unmatched) > 0 {
+		fmt.Fprintf(stderr, "%s: warning: %s did not match the current specs (renamed or removed?) and %s not rerun: %s; kept in %s for the next --rerun-failed\n",
+			label, pluralScenarios(len(unmatched)), wasWere(len(unmatched)), namedRerunEntries(unmatched), rerunStatePath())
 	}
-	names := make([]string, 0, len(unmatched))
-	for _, e := range unmatched {
+	if len(outOfScope) > 0 {
+		fmt.Fprintf(stderr, "%s: warning: %s outside this run's targets %s not rerun: %s; kept in %s for the next --rerun-failed\n",
+			label, pluralScenarios(len(outOfScope)), wasWere(len(outOfScope)), namedRerunEntries(outOfScope), rerunStatePath())
+	}
+}
+
+// namedRerunEntries renders recorded failures as "spec / scenario" pairs in a
+// deterministic order, naming at most maxNamedRerunEntries of them. A ledger
+// accumulates entries for every spec ever run from this directory, so an
+// unbounded list buries the run's own result under thousands of characters of
+// warning; the file named in the same sentence holds the full set.
+func namedRerunEntries(entries []failedEntry) string {
+	names := make([]string, 0, len(entries))
+	for _, e := range entries {
 		names = append(names, fmt.Sprintf("%s / %s", e.SpecPath, e.Scenario))
 	}
 	sort.Strings(names)
-	fmt.Fprintf(stderr, "%s: warning: %s did not match the current specs (renamed or removed?) and was not rerun: %s; kept in %s for the next --rerun-failed\n",
-		label, pluralScenarios(len(unmatched)), strings.Join(names, ", "), rerunStatePath())
+	if len(names) <= maxNamedRerunEntries {
+		return strings.Join(names, ", ")
+	}
+	return fmt.Sprintf("%s, and %d more", strings.Join(names[:maxNamedRerunEntries], ", "), len(names)-maxNamedRerunEntries)
 }
+
+// wasWere picks the verb that agrees with a recorded-failure count.
+func wasWere(n int) string {
+	if n == 1 {
+		return "was"
+	}
+	return "were"
+}
+
+// maxNamedRerunEntries bounds how many recorded failures a ledger warning names
+// before summarizing the rest by count.
+const maxNamedRerunEntries = 5
 
 // pluralScenarios renders a recorded-failure count with the right noun.
 func pluralScenarios(n int) string {
