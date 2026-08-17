@@ -100,7 +100,7 @@ respond "configured response" 200
 ```
 #### When
 ```shell
-# HTTP GET /
+# HTTP GET / via web2
 ```
 #### Then
 - HTTP status is `200`
@@ -122,9 +122,9 @@ _Fixture `site/api/status.json`:_
 ```
 #### When
 ```shell
-# HTTP GET /index.html
-# HTTP GET /api/status.json
-# HTTP GET /no-such-file
+# HTTP GET /index.html via web
+# HTTP GET /api/status.json via web
+# HTTP GET /no-such-file via web
 ```
 #### Then
 - after `HTTP GET /index.html`:

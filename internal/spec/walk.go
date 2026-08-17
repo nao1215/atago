@@ -62,12 +62,55 @@ func CollectServiceVars(set map[string]bool, svc *Service) {
 	}
 }
 
-// CollectStepVars folds every ${name} reference in a step's fields into set.
-// It is the single source of truth for which fields of each step kind carry
-// variables, so the explain summary and the manifest never disagree about a
-// step's referenced variables (they previously drifted: explain under-reported
-// run env, http body_file/body_to/form/files, and cdp upload/download).
-func CollectStepVars(set map[string]bool, step *Step) {
+// StepRunner returns the runner a step names, or "" for a kind that carries no
+// runner. It is the one definition of that mapping: the variable walk and the
+// security summary both need to reach a step's runner definition, and spelling
+// the switch twice is how they would come to disagree about which steps have
+// one.
+func StepRunner(step *Step) string {
+	switch step.Kind() {
+	case StepRun:
+		return step.Run.Runner
+	case StepHTTP:
+		return step.HTTP.Runner
+	case StepQuery:
+		return step.Query.Runner
+	case StepGRPC:
+		return step.GRPC.Runner
+	case StepCDP:
+		return step.CDP.Runner
+	default:
+		return ""
+	}
+}
+
+// RunnerVarFields returns the runner fields the engine ${name}-expands at use
+// time — a cmd runner's cwd, an http base_url, a db dsn, a grpc target, and an
+// ssh runner's address and credentials. It is shared by the variable walk and
+// the security summary so both read one list of what a runner interpolates.
+func RunnerVarFields(r Runner) []string {
+	return []string{r.Cwd, r.BaseURL, r.DSN, r.Target, r.Host, r.User, r.Password, r.KeyFile, r.KnownHosts}
+}
+
+// CollectRunnerVars folds every ${name} reference in a runner definition into
+// set. A runner is expanded when a step uses it, so a `${env:DB_PASSWORD}` in a
+// dsn is a genuine dependency of every scenario that queries through it.
+func CollectRunnerVars(set map[string]bool, r Runner) {
+	CollectVars(set, RunnerVarFields(r)...)
+}
+
+// CollectStepVars folds every ${name} reference in a step's fields into set,
+// including those in the definition of the runner it names. It is the single
+// source of truth for which fields of each step kind carry variables, so the
+// explain summary and the manifest never disagree about a step's referenced
+// variables (they previously drifted: explain under-reported run env, http
+// body_file/body_to/form/files, and cdp upload/download).
+func CollectStepVars(set map[string]bool, step *Step, runners map[string]Runner) {
+	if name := StepRunner(step); name != "" {
+		if r, ok := runners[name]; ok {
+			CollectRunnerVars(set, r)
+		}
+	}
 	switch step.Kind() {
 	case StepFixture:
 		// From is ${name}-expanded by the engine (expandFixture), so a
@@ -91,9 +134,11 @@ func CollectStepVars(set map[string]bool, step *Step) {
 		for _, v := range r.Env {
 			CollectVars(set, v)
 		}
+		collectRetryVars(set, r.Retry)
 	case StepHTTP:
 		h := step.HTTP
 		CollectVars(set, h.Path, h.Body, h.BodyFile, h.BodyTo)
+		collectRetryVars(set, h.Retry)
 		for _, v := range h.Form {
 			CollectVars(set, v)
 		}
@@ -177,6 +222,20 @@ func collectPTYVars(set map[string]bool, pt *PTY) {
 			})
 		}
 	}
+}
+
+// collectRetryVars folds the ${name} references of a retry's until assertion
+// into set. The engine expands it before each evaluation (pollUntil ->
+// expandAssert), so a reference there is as live as one in the step's own
+// fields; run and http share the retry shape and so share this walk.
+func collectRetryVars(set map[string]bool, r *Retry) {
+	if r == nil || r.Until == nil {
+		return
+	}
+	WalkAssertStrings(r.Until, func(s string) string {
+		CollectVars(set, s)
+		return s
+	})
 }
 
 // collectJSONVars folds every ${name} reference in the string leaves of a

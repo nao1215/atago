@@ -26,8 +26,8 @@ _only when `pushgateway --version` succeeds_
 - Background service `pushgateway` is started: `pushgateway --web.listen-address=127.0.0.1:18092`.
 #### When
 ```shell
-# HTTP POST /metrics/job/atago_e2e
-# HTTP GET /metrics
+# HTTP POST /metrics/job/atago_e2e via push
+# HTTP GET /metrics via push
 ```
 #### Then
 - after `HTTP POST /metrics/job/atago_e2e`:
@@ -42,9 +42,9 @@ _only when `pushgateway --version` succeeds_
 - Background service `pushgateway` is started: `pushgateway --web.listen-address=127.0.0.1:18093`.
 #### When
 ```shell
-# HTTP POST /metrics/job/ephemeral
-# HTTP DELETE /metrics/job/ephemeral
-# HTTP GET /metrics
+# HTTP POST /metrics/job/ephemeral via push2
+# HTTP DELETE /metrics/job/ephemeral via push2
+# HTTP GET /metrics via push2
 ```
 #### Then
 - after `HTTP POST /metrics/job/ephemeral`:
@@ -60,8 +60,8 @@ _only when `pushgateway --version` succeeds_
 - Background service `pushgateway` is started: `pushgateway --web.listen-address=127.0.0.1:18099`.
 #### When
 ```shell
-# HTTP POST /metrics/job/badjob
-# HTTP GET /metrics
+# HTTP POST /metrics/job/badjob via push3
+# HTTP GET /metrics via push3
 ```
 #### Then
 - after `HTTP POST /metrics/job/badjob`:
@@ -76,11 +76,11 @@ _only when `pushgateway --version` succeeds_
 - Background service `pushgateway` is started: `pushgateway --web.listen-address=127.0.0.1:18100`.
 #### When
 ```shell
-# HTTP POST /metrics/job/svc
-# HTTP POST /metrics/job/svc
-# HTTP GET /metrics
-# HTTP PUT /metrics/job/svc
-# HTTP GET /metrics
+# HTTP POST /metrics/job/svc via push4
+# HTTP POST /metrics/job/svc via push4
+# HTTP GET /metrics via push4
+# HTTP PUT /metrics/job/svc via push4
+# HTTP GET /metrics via push4
 ```
 #### Then
 - after `HTTP POST /metrics/job/svc`:
@@ -102,8 +102,8 @@ _only when `pushgateway --version` succeeds_
 - Background service `pushgateway` is started: `pushgateway --web.listen-address=127.0.0.1:18101`.
 #### When
 ```shell
-# HTTP POST /metrics/job/svc/instance/host1
-# HTTP GET /metrics
+# HTTP POST /metrics/job/svc/instance/host1 via push5
+# HTTP GET /metrics via push5
 ```
 #### Then
 - after `HTTP POST /metrics/job/svc/instance/host1`:

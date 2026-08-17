@@ -446,7 +446,7 @@
       }
     },
     "retry": {
-      "description": "A run step's retry policy.",
+      "description": "A run or http step's retry policy.",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -457,6 +457,10 @@
           "type": "integer"
         },
         "interval": {
+          "type": "string"
+        },
+        "until": {
+          "description": "Assertion target(s) whose success ends the retry loop, joined with \"+\" when several are set — the same reduction an assert step's `target` carries. Omitted when the retry states no condition.",
           "type": "string"
         }
       }

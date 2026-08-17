@@ -114,6 +114,7 @@ _only when `command -v promtool && command -v prometheus` succeeds_
 #### Given
 - Background service `prometheus` is started: `prometheus --config.file=prometheus.yml --storage.tsdb.path=data --web.listen-address=127.0.0.1:18130`.
 - Fixture file `prometheus.yml` is created.
+- The step is retried up to 30 times every 500ms until HTTP status is `200`.
 #### Inputs
 _Fixture `prometheus.yml`:_
 ```text
@@ -123,10 +124,10 @@ scrape_configs: []
 ```
 #### When
 ```shell
-# HTTP GET /-/healthy
-# HTTP GET /-/ready
-# HTTP GET /api/v1/status/buildinfo
-# HTTP GET /api/v1/query?query=vector(42)
+# HTTP GET /-/healthy via prom
+# HTTP GET /-/ready via prom
+# HTTP GET /api/v1/status/buildinfo via prom
+# HTTP GET /api/v1/query?query=vector(42) via prom
 ```
 #### Then
 - after `HTTP GET /-/healthy`:
@@ -147,6 +148,7 @@ _only when `command -v promtool && command -v prometheus` succeeds_
 #### Given
 - Background service `prometheus` is started: `prometheus --config.file=prometheus.yml --storage.tsdb.path=data --web.listen-address=127.0.0.1:18131`.
 - Fixture file `prometheus.yml` is created.
+- The step is retried up to 30 times every 500ms until body at `$.data.result[0].value[1]` equals `1`.
 #### Inputs
 _Fixture `prometheus.yml`:_
 ```text
@@ -159,7 +161,7 @@ scrape_configs:
 ```
 #### When
 ```shell
-# HTTP GET /api/v1/query?query=up{job="self"}
+# HTTP GET /api/v1/query?query=up{job="self"} via prom2
 ```
 #### Then
 - HTTP status is `200`

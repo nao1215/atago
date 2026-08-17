@@ -29,8 +29,8 @@ _only when `command -v gotify` succeeds_
 - Fixture file `data/.keep` is created.
 #### When
 ```shell
-# HTTP GET /health
-# HTTP GET /version
+# HTTP GET /health via gotify
+# HTTP GET /version via gotify
 ```
 #### Then
 - after `HTTP GET /health`:
@@ -46,11 +46,11 @@ _only when `command -v gotify` succeeds_
 - Fixture file `data/.keep` is created.
 #### When
 ```shell
-# HTTP GET /message
-# HTTP POST /application
+# HTTP GET /message via gotify2
+# HTTP POST /application via gotify2
 # capture ${app_token} from the response body
-# HTTP POST /message
-# HTTP GET /message
+# HTTP POST /message via gotify2
+# HTTP GET /message via gotify2
 ```
 #### Then
 - after `HTTP GET /message`:
@@ -73,11 +73,11 @@ _only when `command -v gotify` succeeds_
 - Fixture file `icon.png` is created.
 #### When
 ```shell
-# HTTP POST /application
+# HTTP POST /application via gotify3
 # capture ${app_id} from the response body
-# HTTP POST /application/${app_id}/image
+# HTTP POST /application/${app_id}/image via gotify3
 # capture ${image_path} from the response body
-# HTTP GET /${image_path}
+# HTTP GET /${image_path} via gotify3
 ```
 #### Then
 - after `HTTP POST /application`:

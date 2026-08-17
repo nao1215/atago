@@ -38,8 +38,8 @@ _only when `nats-server --version` succeeds_
 - Background service `nats-server` is started: `nats-server -js -sd store -a 127.0.0.1 -p 18160 -m 18161`.
 #### When
 ```shell
-# HTTP GET /healthz
-# HTTP GET /varz
+# HTTP GET /healthz via monitor
+# HTTP GET /varz via monitor
 ```
 #### Then
 - after `HTTP GET /healthz`:

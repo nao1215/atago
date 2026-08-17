@@ -378,6 +378,53 @@ scenarios:
 	}
 }
 
+// TestGenerate_HTTPNamesItsRunnerAndRetry is a regression: the When line for an
+// http step named no runner, so two requests to different hosts rendered
+// identically, and a retry — which decides how many times the step's side
+// effects happen — appeared nowhere in the published contract.
+func TestGenerate_HTTPNamesItsRunnerAndRetry(t *testing.T) {
+	t.Parallel()
+	src := `
+version: "1"
+suite:
+  name: httpretry
+runners:
+  internal: {type: http, base_url: "http://127.0.0.1:8080"}
+  billing: {type: http, base_url: "https://billing.example.com"}
+scenarios:
+  - name: talks to two hosts and polls one
+    steps:
+      - http: {runner: internal, method: GET, path: /health}
+      - http:
+          runner: billing
+          method: POST
+          path: /charge
+          retry: {times: 3, interval: 200ms, until: {status: 200}}
+      - run:
+          command: probe
+          retry: {times: 5, interval: 1s, until: {exit_code: 0}}
+      - assert: {exit_code: 0}
+`
+	s := mustLoadSpec(t, "t.atago.yaml", src)
+	var b bytes.Buffer
+	if err := Generate(&b, []Source{{Path: "t.atago.yaml", Spec: s}}); err != nil {
+		t.Fatal(err)
+	}
+	out := b.String()
+	for _, w := range []string{
+		"# HTTP GET /health via internal",
+		"# HTTP POST /charge via billing",
+		// The doc renders matcher values as code spans, so the until phrase
+		// carries them the way every other assertion in the document does.
+		"The step is retried up to 3 times every 200ms until HTTP status is `200`.",
+		"The step is retried up to 5 times every 1s until exit code is `0`.",
+	} {
+		if !strings.Contains(out, w) {
+			t.Errorf("doc output missing %q\n--- got ---\n%s", w, out)
+		}
+	}
+}
+
 // TestGenerate_PTYGroupsThenBullets proves a pty step is an action for
 // Then-grouping, the same defect #23 fixed for signal one kind over: a run +
 // pty scenario (each with asserts) rendered one flattened list — two "exit

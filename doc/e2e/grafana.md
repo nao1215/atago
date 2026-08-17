@@ -23,9 +23,10 @@ Source: `test/e2e/thirdparty/grafana/grafana.atago.yaml`
 _only when `command -v grafana` succeeds_
 #### Given
 - Background service `grafana` is started: `grafana server --homepath "$GF_PATHS_HOME"`.
+- The step is retried up to 60 times every 1s until HTTP status is `200`.
 #### When
 ```shell
-# HTTP GET /api/health
+# HTTP GET /api/health via grafana
 ```
 #### Then
 - HTTP status is `200`
@@ -45,11 +46,12 @@ redirected at all.
 _only when `command -v grafana` succeeds_
 #### Given
 - Background service `grafana` is started: `grafana server --homepath "$GF_PATHS_HOME"`.
+- The step is retried up to 60 times every 1s until HTTP status is `200`.
 #### When
 ```shell
-# HTTP GET /api/health
-# HTTP GET /
-# HTTP GET /api/search
+# HTTP GET /api/health via grafana2
+# HTTP GET / via grafana2
+# HTTP GET /api/search via grafana2
 ```
 #### Then
 - after `HTTP GET /`:
@@ -61,15 +63,16 @@ _only when `command -v grafana` succeeds_
 _only when `command -v grafana` succeeds_
 #### Given
 - Background service `grafana` is started: `grafana server --homepath "$GF_PATHS_HOME"`.
+- The step is retried up to 60 times every 1s until HTTP status is `200`.
 #### When
 ```shell
-# HTTP GET /api/health
-# HTTP GET /api/org
-# HTTP POST /api/dashboards/db
+# HTTP GET /api/health via grafana3
+# HTTP GET /api/org via grafana3
+# HTTP POST /api/dashboards/db via grafana3
 # capture ${dash_uid} from the response body
-# HTTP GET /api/dashboards/uid/${dash_uid}
-# HTTP GET /api/search?query=atago
-# HTTP POST /api/datasources
+# HTTP GET /api/dashboards/uid/${dash_uid} via grafana3
+# HTTP GET /api/search?query=atago via grafana3
+# HTTP POST /api/datasources via grafana3
 ```
 #### Then
 - after `HTTP GET /api/org`:

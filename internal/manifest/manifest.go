@@ -229,6 +229,11 @@ type ExpectFail struct {
 type Retry struct {
 	Times    int    `json:"times"`
 	Interval string `json:"interval,omitempty"`
+	// Until names the assertion target(s) whose success ends the retry loop,
+	// joined with "+" when several are set — the same reduction an assert
+	// step's `target` carries, so a consumer reads a condition the same way
+	// wherever it appears. Omitted when the retry states no condition.
+	Until string `json:"until,omitempty"`
 }
 
 // Build assembles a deterministic manifest document from the given specs, in the

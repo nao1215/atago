@@ -203,7 +203,7 @@ hugo new content posts/hello.md
 _only when `hugo version` succeeds_
 #### When
 ```shell
-# HTTP GET /
+# HTTP GET / via site
 ```
 #### Then
 - HTTP status is `200`
@@ -213,7 +213,7 @@ _only when `hugo version` succeeds_
 _only when `hugo version` succeeds_
 #### When
 ```shell
-# HTTP GET /posts/hello/
+# HTTP GET /posts/hello/ via site
 ```
 #### Then
 - HTTP status is `200`
@@ -222,7 +222,7 @@ _only when `hugo version` succeeds_
 _only when `hugo version` succeeds_
 #### When
 ```shell
-# HTTP GET /no/such/page/
+# HTTP GET /no/such/page/ via site
 ```
 #### Then
 - HTTP status is `404`

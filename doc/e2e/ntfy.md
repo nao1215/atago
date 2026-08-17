@@ -39,10 +39,10 @@ _only when `command -v ntfy` succeeds_
 - Fixture file `data/.keep` is created.
 #### When
 ```shell
-# HTTP GET /v1/health
-# HTTP POST /atago-alerts
-# HTTP GET /atago-alerts/json?poll=1
-# HTTP GET /other-topic/json?poll=1
+# HTTP GET /v1/health via ntfy
+# HTTP POST /atago-alerts via ntfy
+# HTTP GET /atago-alerts/json?poll=1 via ntfy
+# HTTP GET /other-topic/json?poll=1 via ntfy
 ```
 #### Then
 - after `HTTP GET /v1/health`:
@@ -68,7 +68,7 @@ _only when `command -v ntfy` succeeds_
 ```shell
 ntfy publish http://127.0.0.1:18181/atago-deploys "deploy one"
 ntfy publish http://127.0.0.1:18181/atago-deploys "deploy two"
-# HTTP GET /atago-deploys/json?poll=1&since=all
+# HTTP GET /atago-deploys/json?poll=1&since=all via ntfy2
 ```
 #### Then
 - after `ntfy publish http://127.0.0.1:18181/atago-deploys "deploy one"`:
@@ -86,11 +86,11 @@ _only when `command -v ntfy` succeeds_
 - Environment variables are set: NTFY_PASSWORD.
 #### When
 ```shell
-# HTTP POST /secure-topic
+# HTTP POST /secure-topic via ntfy3
 ntfy user add phil
 ntfy access phil secure-topic rw
-# HTTP POST /secure-topic
-# HTTP GET /secure-topic/json?poll=1
+# HTTP POST /secure-topic via ntfy3
+# HTTP GET /secure-topic/json?poll=1 via ntfy3
 ```
 #### Then
 - after `HTTP POST /secure-topic`:

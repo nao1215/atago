@@ -53,8 +53,8 @@ _Fixture `hooks.json`:_
 ```
 #### When
 ```shell
-# HTTP POST /hooks/greet
-# HTTP POST /hooks/nope
+# HTTP POST /hooks/greet via hooks_a
+# HTTP POST /hooks/nope via hooks_a
 ```
 #### Then
 - after `HTTP POST /hooks/greet`:
@@ -96,8 +96,8 @@ _Fixture `hooks.json`:_
 ```
 #### When
 ```shell
-# HTTP POST /hooks/guarded
-# HTTP POST /hooks/guarded
+# HTTP POST /hooks/guarded via hooks_b
+# HTTP POST /hooks/guarded via hooks_b
 ```
 #### Then
 - after `HTTP POST /hooks/guarded`:
@@ -140,8 +140,8 @@ _Fixture `hooks.json`:_
 ```
 #### When
 ```shell
-# HTTP POST /hooks/signed
-# HTTP POST /hooks/signed
+# HTTP POST /hooks/signed via hooks_c
+# HTTP POST /hooks/signed via hooks_c
 ```
 #### Then
 - after `HTTP POST /hooks/signed`:
@@ -177,7 +177,7 @@ _Fixture `hooks.json`:_
 ```
 #### When
 ```shell
-# HTTP GET /hooks/postonly
+# HTTP GET /hooks/postonly via hooks_d
 ```
 #### Then
 - HTTP status is `405`
@@ -207,7 +207,7 @@ _Fixture `hooks.json`:_
 ```
 #### When
 ```shell
-# HTTP POST /hooks/failer
+# HTTP POST /hooks/failer via hooks_e
 ```
 #### Then
 - HTTP status is `500`
