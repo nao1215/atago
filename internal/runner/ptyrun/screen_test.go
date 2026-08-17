@@ -269,13 +269,13 @@ func TestRenderScreen_PreservesCombiningMarks(t *testing.T) {
 // TestRenderScreen_PendingWrapCancelledByCursorMove is a regression for the
 // wrap atago arms on the emulator's behalf (#503): a terminal cancels a pending
 // wrap the moment the cursor moves, so a move away and back must leave the wrap
-// cancelled rather than looking untouched. Comparing only the final cursor
+// canceled rather than looking untouched. Comparing only the final cursor
 // position cannot tell the two apart, and injecting a wrap here would push a
 // character onto a row the terminal never put it on.
 func TestRenderScreen_PendingWrapCancelledByCursorMove(t *testing.T) {
 	t.Parallel()
 	// `日本` fills a four-column row. BS then CUF returns the cursor to the
-	// column it started from, with the wrap cancelled, so `X` is written in the
+	// column it started from, with the wrap canceled, so `X` is written in the
 	// row — overwriting the second half of `本`, which blanks its first half.
 	got := RenderScreen([]byte("日本\b\x1b[CX"), &spec.PTY{Rows: 5, Cols: 4})
 	if got != "日 X" {

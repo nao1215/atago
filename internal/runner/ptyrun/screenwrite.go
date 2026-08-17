@@ -164,7 +164,7 @@ func (w *screenWriter) control(seq []byte) {
 // keep the wrap that was armed before it.
 const cursorMovingFinals = "ABCDEFGHIZdeafr`"
 
-// movesCursor reports whether this unit repositions the cursor, cancelling a
+// movesCursor reports whether this unit repositions the cursor, canceling a
 // pending wrap.
 func (w *screenWriter) movesCursor(seq []byte) bool {
 	if len(seq) == 1 {
