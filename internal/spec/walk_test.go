@@ -410,16 +410,19 @@ func TestCollectStepVars_NoActionStep(t *testing.T) {
 	}
 }
 
-// TestCollectJSONVars_NilAndScalar guards the helper's non-map/array inputs: a
-// nil body or a bare scalar contributes nothing and never panics.
+// TestCollectJSONVars_NilAndScalar guards json-body collection for non-map
+// inputs: a nil body or a bare scalar contributes nothing and never panics.
+// The walk rides WalkJSONValueStrings through the http walker, the same path
+// the engine expands with.
 func TestCollectJSONVars_NilAndScalar(t *testing.T) {
 	t.Parallel()
 	set := map[string]bool{}
-	collectJSONVars(set, nil)
-	collectJSONVars(set, 42)
-	collectJSONVars(set, "${top_ref}") // a bare string leaf is still scanned
+	visit := collecting(set)
+	WalkJSONValueStrings(nil, visit)
+	WalkJSONValueStrings(42, visit)
+	WalkJSONValueStrings("${top_ref}", visit) // a bare string leaf is still scanned
 	if len(set) != 1 || !set["top_ref"] {
-		t.Errorf("collectJSONVars scalar handling = %v, want {top_ref}", SortedKeys(set))
+		t.Errorf("json scalar handling = %v, want {top_ref}", SortedKeys(set))
 	}
 }
 

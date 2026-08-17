@@ -255,30 +255,6 @@ func (n *noteSet) step(step *Step, runners map[string]Runner) {
 		}
 	}
 	switch step.Kind() {
-	case StepFixture:
-		// Every fixture field is ${name}-expanded before the file is written
-		// (expandFixture), so a `content: ${env:TOKEN}` reads the invoking
-		// host's environment as surely as a run command would — and produced no
-		// note at all while the equivalent run reference did.
-		f := step.Fixture
-		n.envRefs(f.File, f.Content, f.From, f.Symlink)
-	case StepAssert:
-		// Matcher arguments are expanded through the same walker the engine
-		// expands with (expandAssert -> WalkAssertStrings), so an
-		// `equals: ${env:SECRET}` is a host environment read; the whole kind
-		// was previously invisible here.
-		WalkAssertStrings(step.Assert, func(s string) string {
-			n.envRefs(s)
-			return s
-		})
-	case StepStore:
-		// The one store field the engine expands (expandStore).
-		if step.Store.From != nil && step.Store.From.File != nil {
-			n.envRefs(step.Store.From.File.Path)
-		}
-	case StepSignal:
-		// The target service name is expanded before lookup (runSignal).
-		n.envRefs(step.Signal.Service)
 	case StepRun:
 		n.runStep(step.Run, runners)
 	case StepHTTP:
@@ -286,27 +262,14 @@ func (n *noteSet) step(step *Step, runners map[string]Runner) {
 		// constant "network access: HTTP request", so requests to two different
 		// hosts de-duplicated into one anonymous line.
 		n.add("network access: HTTP request" + ViaRunner(step.HTTP.Runner))
-		n.envRefs(step.HTTP.Path, step.HTTP.Body)
-		n.envRefs(envValues(step.HTTP.Header)...)
 	case StepQuery:
 		if remoteDatabase(runners[step.Query.Runner]) {
 			n.add("network access: SQL query via " + step.Query.Runner)
 		}
-		n.envRefs(step.Query.SQL)
 	case StepGRPC:
 		n.add("network access: gRPC " + step.GRPC.Method)
-		n.envRefs(envValues(step.GRPC.Header)...)
 	case StepCDP:
 		n.add("browser automation (CDP) via " + step.CDP.Runner)
-		// Action arguments are ${name}-expanded before the browser runs them
-		// (expandCDP), so a navigate URL or eval script reading ${env:} is a
-		// host environment read. The field list lives in the var collector;
-		// re-listing it here is the drift this file exists to prevent.
-		vars := map[string]bool{}
-		for _, a := range step.CDP.Actions {
-			collectCDPActionVars(vars, a)
-		}
-		n.envNames(vars)
 	case StepPTY:
 		n.ptyStep(step.PTY)
 	case StepService:
@@ -315,6 +278,16 @@ func (n *noteSet) step(step *Step, runners map[string]Runner) {
 		// scenario-level service.
 		n.service(step.Service)
 	}
+	// Host-environment reads are one rule for every kind: any ${env:} in a
+	// field the engine expands, found through the same walkers the engine
+	// expands with (via CollectStepVars). Per-kind field lists here are how
+	// fixture, assert, store, signal, and cdp env reads each went unreported
+	// while the identical reference in a run command produced a note. This
+	// comes after the kind notes so a summary's first line stays the operation,
+	// not an input dependency; duplicates de-duplicate through n.seen.
+	vars := map[string]bool{}
+	CollectStepVars(vars, step, runners)
+	n.envNames(vars)
 }
 
 // ptyStep mirrors runStep for the interactive form: the pty child is a process
