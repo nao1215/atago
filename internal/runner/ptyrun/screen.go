@@ -108,19 +108,19 @@ func renderScreenCells(transcript []byte, p *spec.PTY, resizes []screenResize) (
 	}
 	sanitized, cuts := sanitizeTranscriptMarks(transcript, marks)
 
-	// One writer across every piece: it carries the escape-sequence decoder's
-	// state and the terminal modes, which a resize must not reset.
-	w := newScreenWriter(term)
-	at := 0
+	// The transcript is written in ONE pass with the resizes handed to the
+	// writer as offsets, rather than sliced into pieces here: the writer applies
+	// each one at a boundary between whole units, so a resize offset that lands
+	// inside a grapheme cluster cannot separate a base character from the
+	// combining mark that belongs to it.
+	breaks := make([]screenBreak, 0, len(resizes))
+	prevCut := 0
 	for i, r := range resizes {
-		cut := min(max(cuts[i], at), len(sanitized))
-		w.write(sanitized[at:cut])
-		// Resize takes width (cols) first; getting that backwards silently
-		// transposes every frame after a resize.
-		term.Resize(r.cols, r.rows)
-		at = cut
+		cut := min(max(cuts[i], prevCut), len(sanitized))
+		breaks = append(breaks, screenBreak{at: cut, cols: r.cols, rows: r.rows})
+		prevCut = cut
 	}
-	w.write(sanitized[at:])
+	newScreenWriter(term).write(sanitized, breaks)
 
 	// Read the grid out of the emulator once and build both views from it. The
 	// emulator's own String() is not consulted: two independent reads of the same

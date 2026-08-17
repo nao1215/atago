@@ -266,6 +266,41 @@ func TestRenderScreen_PreservesCombiningMarks(t *testing.T) {
 	}
 }
 
+// TestRenderScreen_PendingWrapCancelledByCursorMove is a regression for the
+// wrap atago arms on the emulator's behalf (#503): a terminal cancels a pending
+// wrap the moment the cursor moves, so a move away and back must leave the wrap
+// cancelled rather than looking untouched. Comparing only the final cursor
+// position cannot tell the two apart, and injecting a wrap here would push a
+// character onto a row the terminal never put it on.
+func TestRenderScreen_PendingWrapCancelledByCursorMove(t *testing.T) {
+	t.Parallel()
+	// `日本` fills a four-column row. BS then CUF returns the cursor to the
+	// column it started from, with the wrap cancelled, so `X` is written in the
+	// row — overwriting the second half of `本`, which blanks its first half.
+	got := RenderScreen([]byte("日本\b\x1b[CX"), &spec.PTY{Rows: 5, Cols: 4})
+	if got != "日 X" {
+		t.Errorf("RenderScreen(%q) = %q, want %q (a cursor move cancels the pending wrap)",
+			"日本\\b\\x1b[CX", got, "日 X")
+	}
+}
+
+// TestRenderScreenResized_SplitGraphemeCluster is a regression for #505 under a
+// mid-session resize (#379): the recorded resize offset is a byte position in
+// the transcript and can fall anywhere, including between a base character and
+// the combining mark that belongs to it. The resize must be applied at a
+// boundary between whole units, or the base is committed to the screen without
+// its mark and the mark arrives with nothing to attach to.
+func TestRenderScreenResized_SplitGraphemeCluster(t *testing.T) {
+	t.Parallel()
+	const transcript = "e\u0301X"
+	// Offset 1 sits between the base "e" and its two-byte combining mark.
+	got := renderScreenResized([]byte(transcript), &spec.PTY{Rows: 5, Cols: 10},
+		[]screenResize{{offset: 1, rows: 5, cols: 20}})
+	if got != "e\u0301X" {
+		t.Errorf("resize inside a grapheme cluster = %q, want %q", got, "e\u0301X")
+	}
+}
+
 // TestRenderScreen_TrailingNormalization proves per-line trailing whitespace
 // and trailing blank rows are stripped so snapshots stay stable.
 func TestRenderScreen_TrailingNormalization(t *testing.T) {

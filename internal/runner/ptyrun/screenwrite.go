@@ -1,6 +1,7 @@
 package ptyrun
 
 import (
+	"strings"
 	"unicode/utf8"
 
 	uv "github.com/charmbracelet/ultraviolet"
@@ -64,8 +65,19 @@ func newScreenWriter(term *vt.Emulator) *screenWriter {
 	return &screenWriter{term: term, parser: ansi.NewParser(), autowrap: true}
 }
 
-// write feeds one piece of the transcript to the emulator, containing any panic
-// from its escape parser. The transcript is arbitrary bytes chosen by the
+// screenBreak is a mid-session resize (#379) anchored at its byte offset in the
+// sanitized transcript.
+type screenBreak struct {
+	at         int
+	cols, rows int
+}
+
+// write feeds the transcript to the emulator, applying each resize when the
+// scan reaches its offset — always at a boundary between whole units, so a
+// resize can never land inside an escape sequence or split a base character
+// from the combining mark that belongs to it.
+//
+// It contains any panic from the emulator's escape parser. The transcript is arbitrary bytes chosen by the
 // program under test, and a crash there must not take down the whole atago
 // process mid-suite. The shapes that make an emulator loop for minutes on an
 // enormous CSI count are defused up front by sanitizeTranscript, which preserves
@@ -73,10 +85,20 @@ func newScreenWriter(term *vt.Emulator) *screenWriter {
 // fuzzer has not met yet. On panic the screen state built so far still renders,
 // so the assertion compares against everything drawn before the malformed
 // sequence.
-func (w *screenWriter) write(transcript []byte) {
+func (w *screenWriter) write(transcript []byte, breaks []screenBreak) {
 	defer func() { _ = recover() }()
 	defer w.flush()
+	at := 0
 	for len(transcript) > 0 {
+		for len(breaks) > 0 && at >= breaks[0].at {
+			// The emulator must see everything drawn at the old size before it
+			// changes, so the batch goes in first. Resize takes width (cols)
+			// first; getting that backwards silently transposes every frame
+			// after a resize.
+			w.flush()
+			w.term.Resize(breaks[0].cols, breaks[0].rows)
+			breaks = breaks[1:]
+		}
 		seq, width, n, next := ansi.DecodeSequence(transcript, w.state, w.parser)
 		if n <= 0 {
 			// The decoder consumed nothing (an input shape it cannot advance
@@ -84,13 +106,13 @@ func (w *screenWriter) write(transcript []byte) {
 			// stops early is a wrong screen, and a render that does not move is
 			// a hung suite.
 			w.batch = append(w.batch, transcript[0])
-			transcript = transcript[1:]
+			transcript, at = transcript[1:], at+1
 			continue
 		}
 		w.state = next
 		if width <= 0 {
 			w.control(seq)
-			transcript = transcript[n:]
+			transcript, at = transcript[n:], at+n
 			continue
 		}
 		// The decoder returns an ASCII character on its own, splitting the very
@@ -109,7 +131,13 @@ func (w *screenWriter) write(transcript []byte) {
 			}
 		}
 		w.printable(cluster, clusterWidth)
-		transcript = transcript[n:]
+		transcript, at = transcript[n:], at+n
+	}
+	// A resize recorded at (or past) the end of the transcript still has to
+	// reach the emulator: the rendered grid is read at whatever size it leaves.
+	for _, b := range breaks {
+		w.flush()
+		w.term.Resize(b.cols, b.rows)
 	}
 }
 
@@ -117,7 +145,44 @@ func (w *screenWriter) write(transcript []byte) {
 // only the ones that change whether the corrections apply at all.
 func (w *screenWriter) control(seq []byte) {
 	w.trackAutoWrap(seq)
+	if w.movesCursor(seq) {
+		// A terminal cancels a pending wrap the moment the cursor moves. Where
+		// the cursor ENDS UP cannot tell that apart from never having moved —
+		// a move away and back looks identical — so the cancel is decided from
+		// the sequence itself, and the position check that follows it is only
+		// a backstop for a move this list does not name.
+		w.pending = false
+	}
 	w.batch = append(w.batch, seq...)
+}
+
+// cursorMovingFinals are the CSI final bytes that reposition the cursor:
+// CUU/CUD/CUF/CUB/CNL/CPL/CHA/CUP (A-H), CHT/CBT (I, Z), VPA/VPR (d, e), HPA/HPR
+// (`, a), HVP (f), and DECSTBM (r), which homes the cursor with the margins it
+// sets. Sequences that only paint (SGR), set a mode, or report state are
+// deliberately absent: a TUI that colors its output between two characters must
+// keep the wrap that was armed before it.
+const cursorMovingFinals = "ABCDEFGHIZdeafr`"
+
+// movesCursor reports whether this unit repositions the cursor, cancelling a
+// pending wrap.
+func (w *screenWriter) movesCursor(seq []byte) bool {
+	if len(seq) == 1 {
+		switch seq[0] {
+		case ansi.BS, ansi.HT, ansi.LF, ansi.VT, ansi.FF, ansi.CR:
+			return true
+		}
+		return false
+	}
+	if len(seq) == 2 && seq[0] == ansi.ESC {
+		switch seq[1] {
+		case 'D', 'E', 'M', '7', '8', 'c': // IND, NEL, RI, DECSC/DECRC, RIS
+			return true
+		}
+		return false
+	}
+	cmd := ansi.Cmd(w.parser.Command())
+	return cmd.Prefix() == 0 && strings.IndexByte(cursorMovingFinals, cmd.Final()) >= 0
 }
 
 // trackAutoWrap follows DECAWM (CSI ? 7 h / l) and the full reset that restores
