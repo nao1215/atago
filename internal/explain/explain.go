@@ -102,6 +102,9 @@ func explainSuiteBlock(b *strings.Builder, label string, steps []spec.Step, runn
 			for _, d := range describeAsserts(step.Assert) {
 				fmt.Fprintf(b, "  - expect %s\n", d)
 			}
+		case spec.StepHTTP, spec.StepQuery, spec.StepGRPC, spec.StepCDP, spec.StepPTY, spec.StepSignal:
+			// The loader rejects these at suite level (ATG-2106), so a spec that
+			// reaches explain never carries one here.
 		}
 	}
 }
@@ -205,6 +208,10 @@ func bucketScenarioStep(step *spec.Step, fixtures, commands, expects, stores *[]
 		if step.Signal != nil {
 			*commands = append(*commands, describeSignal(step.Signal))
 		}
+	case spec.StepService, spec.StepMockServer:
+		// Suite-level only (ATG-2106): a scenario's own services and mock servers
+		// are declared in its `services:`/`mock_servers:` lists, not as steps, and
+		// explainScenarioHeading reports those.
 	}
 }
 
@@ -332,6 +339,15 @@ func describeTeardownStep(step *spec.Step, runners map[string]spec.Runner) []str
 		return []string{"store " + step.Store.Name}
 	case spec.StepSignal:
 		return []string{describeSignal(step.Signal)}
+	case spec.StepPTY:
+		// Teardown accepts a pty session and the engine runs it, so explain has to
+		// show it. This branch was missing while the loader allowed the step: a
+		// cleanup block could drive an interactive program with nothing in
+		// `atago explain` to say so.
+		return []string{describePTY(step.PTY)}
+	case spec.StepService, spec.StepMockServer:
+		// Suite-level only (ATG-2106), so a teardown block never carries one.
+		return nil
 	}
 	return nil
 }

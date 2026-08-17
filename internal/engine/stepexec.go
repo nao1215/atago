@@ -49,6 +49,9 @@ func resultObserved(steps []spec.Step, i int) bool {
 			}
 		case spec.StepRun, spec.StepHTTP, spec.StepQuery, spec.StepGRPC, spec.StepPTY, spec.StepCDP:
 			return false
+		case spec.StepFixture, spec.StepStore, spec.StepService, spec.StepSignal, spec.StepMockServer:
+			// Keep scanning: none of these replaces the current result, so an
+			// assert further down is still looking at the step at i.
 		}
 	}
 	return false
@@ -296,6 +299,13 @@ func (x *scenarioRun) execStep(ctx context.Context, steps []spec.Step, i int, st
 			sr.ErrMsg = err.Error()
 			status = StatusError
 		}
+	case spec.StepService, spec.StepMockServer:
+		// Suite-level only, and the loader says so with ATG-2106 before a run
+		// starts. This is the backstop for a spec built through the API rather
+		// than parsed, where "no recognized action" would misname a kind atago
+		// recognizes perfectly well and merely refuses here.
+		sr.ErrMsg = fmt.Sprintf("%s steps are only allowed in suite.setup", step.Kind())
+		status = StatusError
 	default:
 		sr.ErrMsg = "step has no recognized action"
 		status = StatusError

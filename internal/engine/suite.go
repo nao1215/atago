@@ -178,10 +178,13 @@ func (x *suiteStepper) exec(ctx context.Context, step *spec.Step, i int, sr *Ste
 		return x.execService(ctx, step, sr)
 	case spec.StepMockServer:
 		return x.execMockServer(ctx, step, sr)
-	default:
-		sr.ErrMsg = fmt.Sprintf("%s steps are not allowed at suite level", step.Kind())
-		return true
+	case spec.StepHTTP, spec.StepQuery, spec.StepGRPC, spec.StepCDP, spec.StepPTY, spec.StepSignal:
+		// Named rather than defaulted so a new step kind has to answer "is this
+		// allowed at suite level?" instead of inheriting "no" in silence. Each of
+		// these drives or produces the result a scenario owns.
 	}
+	sr.ErrMsg = fmt.Sprintf("%s steps are not allowed at suite level", step.Kind())
+	return true
 }
 
 // execRun runs one suite-level command and folds its retry `until` checks.

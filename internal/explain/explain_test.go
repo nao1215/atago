@@ -1172,6 +1172,11 @@ scenarios:
       - signal:
           service: worker
           signal: TERM
+      - pty:
+          command: ./shutdown-wizard
+          session:
+            - expect: "Really quit"
+            - send: {key: enter}
 `
 	out := mustExplain(t, src)
 	for _, want := range []string{
@@ -1186,6 +1191,11 @@ scenarios:
 		"marker.txt (inline content)",
 		"store final",
 		"send SIGTERM to service worker",
+		// A pty session in teardown executes exactly like one in the steps, so
+		// explain has to show it. It did not: describeTeardownStep had no pty
+		// branch, and the reviewer reading `atago explain` saw a cleanup block
+		// that quietly drove an interactive program.
+		"interactive (pty): ./shutdown-wizard",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("explain teardown missing %q\n--- got ---\n%s", want, out)

@@ -13,6 +13,11 @@ linters:
     - errcheck
     - errname
     - errorlint
+    # exhaustive is the structural half of atago's oldest bug family: a new step
+    # kind, assert target, or scenario status gets wired into some of the layers
+    # that switch on it and quietly skipped by the rest. The coverage tests guard
+    # the walkers someone remembered to test; this guards every switch.
+    - exhaustive
     - fatcontext
     - gocheckcompilerdirectives
     - gochecknoinits
@@ -50,6 +55,19 @@ linters:
   settings:
     # The 2026-08 refactoring series brought every production function under
     # these bounds; the linters keep the next hot spot from growing back.
+    exhaustive:
+      # A `default:` clause does not excuse a missing case. Most of these switches
+      # HAVE a default, and inheriting its answer in silence is exactly how a kind
+      # goes half-wired.
+      default-signifies-exhaustive: false
+      # reflect.Kind has 27 members and the two switches over it are schema
+      # walkers that care about four.
+      ignore-enum-types: 'reflect\.Kind$'
+      # StepNone and AssertNone are the "not exactly one action" sentinels, not
+      # kinds a spec can carry. AllStepKinds and AllAssertTargets leave them out
+      # for the same reason, so the switches and the coverage tests are checked
+      # against one universe.
+      ignore-enum-members: 'atago/internal/(spec\.(StepNone|AssertNone))$'
     gocognit:
       min-complexity: 30
     nestif:

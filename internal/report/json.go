@@ -160,7 +160,10 @@ func buildJSON(res *engine.SuiteResult, allowXPass bool) jsonReport {
 			if !allowXPass {
 				out.Failures = append(out.Failures, jsonFailure{Scenario: sc.Name, Error: xpassMessage(sc)})
 			}
-		default:
+		case engine.StatusPassed, engine.StatusFailed, engine.StatusSkipped, engine.StatusError, engine.StatusFlaky:
+			// Every ordinary verdict: the failing checks are what the bucket
+			// describes. A passed or skipped scenario has none, so it contributes
+			// nothing here; a flaky one contributes the attempt that failed.
 			out.Failures = append(out.Failures, failuresOf(sc)...)
 		}
 	}

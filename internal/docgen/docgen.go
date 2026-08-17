@@ -188,6 +188,9 @@ func retryBullet(step *spec.Step) string {
 		r = step.Run.Retry
 	case spec.StepHTTP:
 		r = step.HTTP.Retry
+	case spec.StepFixture, spec.StepQuery, spec.StepGRPC, spec.StepCDP, spec.StepAssert,
+		spec.StepStore, spec.StepService, spec.StepPTY, spec.StepSignal, spec.StepMockServer:
+		// No retry shape: run and http are the only kinds that carry one.
 	}
 	if r == nil {
 		return ""
@@ -372,6 +375,12 @@ func givenBullets(sc *spec.Scenario, expand func(string) string) []string {
 			if step.PTY.SandboxHomeEnabled() {
 				out = append(out, sandboxHomeBullet)
 			}
+		case spec.StepHTTP, spec.StepQuery, spec.StepGRPC, spec.StepCDP, spec.StepAssert, spec.StepStore, spec.StepSignal:
+			// No environment of their own to declare: they act through a runner
+			// the Runners section documents, or they only read the result.
+		case spec.StepService, spec.StepMockServer:
+			// Suite-level only (ATG-2106). A scenario's own services are rendered
+			// above, from sc.Services.
 		}
 	}
 	return out
@@ -434,9 +443,12 @@ func narrativeLine(step *spec.Step, expand func(string) string, runners map[stri
 			return "# expect " + expand(strings.Join(desc, " and ")), true
 		}
 		return "", false
-	default:
-		return commandLine(step, expand, runners)
+	case spec.StepRun, spec.StepHTTP, spec.StepQuery, spec.StepGRPC, spec.StepCDP,
+		spec.StepStore, spec.StepService, spec.StepPTY, spec.StepSignal, spec.StepMockServer:
+		// commandLine owns the phrasing of every acting kind, so a lifecycle block
+		// reads the way a scenario's When does.
 	}
+	return commandLine(step, expand, runners)
 }
 
 // commandLine renders one step's "When" line; ok is false for a step kind that
@@ -493,6 +505,9 @@ func commandLine(step *spec.Step, expand func(string) string, runners map[string
 		if step.Signal != nil {
 			return signalLine(step.Signal, expand), true
 		}
+	case spec.StepFixture, spec.StepAssert:
+		// Not commands. narrativeLine renders these for the blocks that have no
+		// Given or Then section to carry them.
 	}
 	return "", false
 }
@@ -566,9 +581,13 @@ func isActionStep(kind spec.StepKind) bool {
 	switch kind {
 	case spec.StepRun, spec.StepHTTP, spec.StepQuery, spec.StepGRPC, spec.StepCDP, spec.StepSignal, spec.StepPTY:
 		return true
-	default:
+	case spec.StepFixture, spec.StepAssert, spec.StepStore, spec.StepService, spec.StepMockServer:
+		// Not an action an assertion reads against: a fixture and a store observe
+		// nothing, an assert IS the reading, and the two suite-level kinds never
+		// appear among a scenario's steps.
 		return false
 	}
+	return false
 }
 
 // thenGroups walks the steps and groups each assert under the most recent
@@ -592,6 +611,14 @@ func thenGroups(sc *spec.Scenario, expand func(string) string) []thenGroup {
 			for _, b := range describeAsserts(step.Assert) {
 				g.bullets = append(g.bullets, expand(b))
 			}
+		case spec.StepFixture, spec.StepStore:
+			// Never break a group: they observe nothing, so the assertions after
+			// them still read against the same action.
+		case spec.StepService, spec.StepMockServer:
+			// Suite-level only (ATG-2106).
+		case spec.StepRun, spec.StepHTTP, spec.StepQuery, spec.StepGRPC, spec.StepCDP, spec.StepPTY, spec.StepSignal:
+			// Unreachable: isActionStep claimed these above and continued. Listed
+			// so a new kind has to be classified here as well as there.
 		}
 	}
 	return groups
@@ -617,9 +644,11 @@ func actionLabel(step *spec.Step, expand func(string) string) string {
 		// Match the "When" line's phrasing so the group header names the same
 		// thing the code block shows.
 		return "interactive (pty): " + expand(step.PTY.Command)
-	default:
+	case spec.StepFixture, spec.StepAssert, spec.StepStore, spec.StepService, spec.StepMockServer:
+		// Not actions (isActionStep says so), so they never label a Then group.
 		return ""
 	}
+	return ""
 }
 
 // writeThen renders the Then section. A scenario with at most one action keeps

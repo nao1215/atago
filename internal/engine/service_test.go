@@ -1,7 +1,11 @@
 package engine
 
 import (
+	"context"
+	"strings"
 	"testing"
+
+	"github.com/nao1215/atago/internal/spec"
 )
 
 // TestEngine_ServiceReadyFileCapturedAndUsed covers the services feature end to
@@ -131,5 +135,47 @@ scenarios:
 `)
 	if res.Status != StatusPassed {
 		t.Fatalf("status = %s, want passed", res.Status)
+	}
+}
+
+// TestEngine_SuiteOnlyKindInScenarioStepNamesTheRule covers the backstop for a
+// spec built through the API rather than parsed. `service:` and `mock_server:`
+// are suite.setup-only kinds; the loader turns them away with ATG-2106, so this
+// path is reachable only when a caller assembles the spec in Go.
+//
+// It used to report "step has no recognized action", which is wrong twice over:
+// atago recognizes both kinds perfectly well, and the message sent the reader
+// looking for a typo in a step that has none. The kind is named instead, along
+// with where it does belong.
+func TestEngine_SuiteOnlyKindInScenarioStepNamesTheRule(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name string
+		step spec.Step
+		want string
+	}{
+		{"service", spec.Step{Service: &spec.Service{Name: "worker", Command: "sleep 1"}}, "service steps are only allowed in suite.setup"},
+		{"mock_server", spec.Step{MockServer: &spec.MockServer{Name: "api"}}, "mock_server steps are only allowed in suite.setup"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			s := &spec.Spec{
+				Version:   "1",
+				Suite:     spec.Suite{Name: "api-built"},
+				Scenarios: []spec.Scenario{{Name: "misplaced", Steps: []spec.Step{tt.step}}},
+			}
+			res := New().Run(context.Background(), s, "api.atago.yaml")
+			sc := res.Scenarios[0]
+			if sc.Status != StatusError {
+				t.Fatalf("status = %s, want error", sc.Status)
+			}
+			got := sc.Steps[0].ErrMsg
+			if !strings.Contains(got, tt.want) {
+				t.Errorf("ErrMsg = %q, want it to contain %q", got, tt.want)
+			}
+			if strings.Contains(got, "no recognized action") {
+				t.Errorf("ErrMsg claims atago does not recognize a kind it does: %q", got)
+			}
+		})
 	}
 }
