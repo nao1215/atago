@@ -378,6 +378,102 @@ scenarios:
 	}
 }
 
+// TestGenerate_NarrativeBlocksKeepEveryStep is a regression: the teardown and
+// suite lifecycle blocks rendered command-ish steps only, so a teardown
+// assertion — a documented cleanup guarantee — vanished from the published
+// contract while explain listed it, and a suite.setup made only of fixtures
+// produced no block at all.
+func TestGenerate_NarrativeBlocksKeepEveryStep(t *testing.T) {
+	t.Parallel()
+	src := `
+version: "1"
+suite:
+  name: narrative
+  setup:
+    - fixture: {file: seed.json, content: "{}"}
+    - assert: {file: {path: seed.json, exists: true}}
+scenarios:
+  - name: cleans up after itself
+    steps:
+      - run: {shell: true, command: "echo body > out.txt"}
+      - assert: {exit_code: 0}
+    teardown:
+      - fixture: {file: cleanup.txt, content: "done"}
+      - assert: {file: {path: out.txt, exists: true}}
+`
+	s := mustLoadSpec(t, "t.atago.yaml", src)
+	var b bytes.Buffer
+	if err := Generate(&b, []Source{{Path: "t.atago.yaml", Spec: s}}); err != nil {
+		t.Fatal(err)
+	}
+	out := b.String()
+	for _, w := range []string{
+		"### Suite setup (runs once before any scenario)",
+		"# write fixture seed.json",
+		"# expect file `seed.json` exists",
+		"#### Finally (teardown, always runs)",
+		"# write fixture cleanup.txt",
+		"# expect file `out.txt` exists",
+	} {
+		if !strings.Contains(out, w) {
+			t.Errorf("doc output missing %q\n--- got ---\n%s", w, out)
+		}
+	}
+	// The When block still shows commands only: fixtures belong to Given and
+	// assertions to Then, so adding them there would say everything twice.
+	when := out[strings.Index(out, "#### When"):strings.Index(out, "#### Then")]
+	if strings.Contains(when, "expect") || strings.Contains(when, "write fixture") {
+		t.Errorf("the When block gained non-command lines:\n%s", when)
+	}
+}
+
+// TestGenerate_SuiteHeaderFacts is a regression: the published doc omitted the
+// two spec-level declarations explain and the manifest both report — the
+// network allowlist a suite is confined to, and the secrets it declares — so a
+// reader could not tell that a suite only talks to one host.
+func TestGenerate_SuiteHeaderFacts(t *testing.T) {
+	t.Parallel()
+	src := `
+version: "1"
+suite:
+  name: guarded
+permissions:
+  network:
+    allow: [api.example.com, cdn.example.com]
+secrets: [API_TOKEN]
+scenarios:
+  - name: trivial
+    steps:
+      - run: {shell: true, command: "echo hi"}
+      - assert: {exit_code: 0}
+`
+	s := mustLoadSpec(t, "t.atago.yaml", src)
+	var b bytes.Buffer
+	if err := Generate(&b, []Source{{Path: "t.atago.yaml", Spec: s}}); err != nil {
+		t.Fatal(err)
+	}
+	out := b.String()
+	for _, w := range []string{
+		"Network policy: egress is allowed only to `api.example.com`, `cdn.example.com`.",
+		"Secrets declared: `API_TOKEN`.",
+	} {
+		if !strings.Contains(out, w) {
+			t.Errorf("doc output missing %q\n--- got ---\n%s", w, out)
+		}
+	}
+
+	// A suite that declares neither says nothing: an unrestricted policy is the
+	// absence of a guarantee, and a line per suite would be noise.
+	plain := mustLoadSpec(t, "p.atago.yaml", "version: \"1\"\nsuite:\n  name: plain\nscenarios:\n  - name: t\n    steps:\n      - run: {shell: true, command: \"echo hi\"}\n")
+	var pb bytes.Buffer
+	if err := Generate(&pb, []Source{{Path: "p.atago.yaml", Spec: plain}}); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(pb.String(), "Network policy") || strings.Contains(pb.String(), "Secrets declared") {
+		t.Errorf("a suite declaring neither gained header lines:\n%s", pb.String())
+	}
+}
+
 // TestGenerate_HTTPNamesItsRunnerAndRetry is a regression: the When line for an
 // http step named no runner, so two requests to different hosts rendered
 // identically, and a retry — which decides how many times the step's side

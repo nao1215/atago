@@ -193,9 +193,13 @@ exactly that point in the sequence, once, for the whole suite — the
 build-then-serve bootstrap every "run my app and test it" setup needs.
 
 Source: `test/e2e/thirdparty/hugo/hugo_server.atago.yaml`
+Network policy: egress is allowed only to `127.0.0.1`.
 ### Suite setup (runs once before any scenario)
 ```shell
 hugo new site mysite --quiet
+# write fixture mysite/layouts/home.html
+# write fixture mysite/layouts/single.html
+# write fixture mysite/layouts/list.html
 hugo new content posts/hello.md
 # start service hugo: hugo server --source ${suitedir}/mysite --port 14140 --bind 127.0.0.1 --buildDrafts
 ```

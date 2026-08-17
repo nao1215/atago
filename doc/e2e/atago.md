@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-81 suites · 639 scenarios
+81 suites · 641 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -124,7 +124,7 @@
   - [record, compare green, then a mutation names the changed paths](#scenario-record-compare-green-then-a-mutation-names-the-changed-paths)
   - [recursive matchers and ignore globs walk the tree](#scenario-recursive-matchers-and-ignore-globs-walk-the-tree)
   - [combining snapshot with matchers is a load-time error](#scenario-combining-snapshot-with-matchers-is-a-load-time-error)
-- [atago self-hosting / doc](#atago-self-hosting--doc) — 9 scenarios
+- [atago self-hosting / doc](#atago-self-hosting--doc) — 10 scenarios
   - [doc generates Markdown to a file](#scenario-doc-generates-markdown-to-a-file)
   - [doc writes Markdown to stdout without --out](#scenario-doc-writes-markdown-to-stdout-without---out)
   - [doc emits a summary, table of contents, and input previews](#scenario-doc-emits-a-summary-table-of-contents-and-input-previews)
@@ -134,6 +134,7 @@
   - [doc renders every matcher an assertion sets](#scenario-doc-renders-every-matcher-an-assertion-sets)
   - [a spec whose matchers doc renders still runs green](#scenario-a-spec-whose-matchers-doc-renders-still-runs-green)
   - [doc renders the suite lifecycle blocks](#scenario-doc-renders-the-suite-lifecycle-blocks)
+  - [doc keeps teardown assertions and states the suite guarantees](#scenario-doc-keeps-teardown-assertions-and-states-the-suite-guarantees)
 - [atago self-hosting / duration assertion](#atago-self-hosting--duration-assertion) — 4 scenarios
   - [a fast step passes a generous upper bound](#scenario-a-fast-step-passes-a-generous-upper-bound)
   - [an impossible bound fails and shows the measured duration](#scenario-an-impossible-bound-fails-and-shows-the-measured-duration)
@@ -266,7 +267,7 @@
   - [junit routes an xfail to skipped and an xpass to failure](#scenario-junit-routes-an-xfail-to-skipped-and-an-xpass-to-failure)
   - [explain and doc show which scenarios document a known bug](#scenario-explain-and-doc-show-which-scenarios-document-a-known-bug)
   - [an expected failure without a reason is a load error](#scenario-an-expected-failure-without-a-reason-is-a-load-error)
-- [atago self-hosting / explain](#atago-self-hosting--explain) — 10 scenarios
+- [atago self-hosting / explain](#atago-self-hosting--explain) — 11 scenarios
   - [explain summarizes a spec without running it](#scenario-explain-summarizes-a-spec-without-running-it)
   - [explain describes every matcher of a composed stream assertion](#scenario-explain-describes-every-matcher-of-a-composed-stream-assertion)
   - [explain names the line a line-scoped matcher inspects](#scenario-explain-names-the-line-a-line-scoped-matcher-inspects)
@@ -277,6 +278,7 @@
   - [explain lists pdf and teardown outputs under generates](#scenario-explain-lists-pdf-and-teardown-outputs-under-generates)
   - [explain names an http runner and describes a retry](#scenario-explain-names-an-http-runner-and-describes-a-retry)
   - [explain names a runner definition's host environment reads](#scenario-explain-names-a-runner-definitions-host-environment-reads)
+  - [explain names env and command gates](#scenario-explain-names-env-and-command-gates)
 - [atago self-hosting / file equals and equals_file byte-equality (#155)](#atago-self-hosting--file-equals-and-equals_file-byte-equality-155) — 10 scenarios
   - [equals_file passes for two byte-identical files](#scenario-equals_file-passes-for-two-byte-identical-files)
   - [equals matches an inline literal byte-for-byte](#scenario-equals-matches-an-inline-literal-byte-for-byte)
@@ -3353,6 +3355,36 @@ ${atago} doc lifecycle.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `### Suite setup (runs once before any scenario)`, `echo build`, `# start service relay: echo serve`, `### Suite teardown (always runs after the last scenario)`, `echo purge`
+### Scenario: doc keeps teardown assertions and states the suite guarantees
+#### Given
+- Fixture file `narrative.atago.yaml` is created.
+#### Inputs
+_Fixture `narrative.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: narrative
+  setup:
+    - fixture: {file: seed.json, content: "{}"}
+permissions:
+  network:
+    allow: [api.example.com]
+secrets: [API_TOKEN]
+scenarios:
+  - name: cleans up after itself
+    steps:
+      - run: {shell: true, command: "echo body > out.txt"}
+      - assert: {exit_code: 0}
+    teardown:
+      - assert: {file: {path: out.txt, exists: true}}
+```
+#### When
+```shell
+${atago} doc narrative.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout contains `Network policy: egress is allowed only to `api.example.com`.`, `Secrets declared: `API_TOKEN`.`, `### Suite setup (runs once before any scenario)`, `# write fixture seed.json`, `#### Finally (teardown, always runs)`, `# expect file `out.txt` exists`
 ## atago self-hosting / duration assertion
 Source: `test/e2e/atago/duration.atago.yaml`
 ### Scenario: a fast step passes a generous upper bound
@@ -6092,6 +6124,35 @@ ${atago} manifest runnerenv.atago.yaml
 - after `${atago} manifest runnerenv.atago.yaml`:
   - exit code is `0`
   - stdout at `$.specs[0].scenarios[0].variables[0]` equals `env:DB_PASSWORD`
+### Scenario: explain names env and command gates
+#### Given
+- Fixture file `gates.atago.yaml` is created.
+#### Inputs
+_Fixture `gates.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: gates
+defaults:
+  scenario:
+    only:
+      command: "jq --version"
+scenarios:
+  - name: gated by the suite default
+    steps:
+      - run: {shell: true, command: "echo hi"}
+  - name: gated on an environment variable
+    skip: {env: CI}
+    steps:
+      - run: {shell: true, command: "echo hi"}
+```
+#### When
+```shell
+${atago} explain gates.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout contains `[only command="jq --version"]`, `[skip env=CI]`
 ## atago self-hosting / file equals and equals_file byte-equality (#155)
 Source: `test/e2e/atago/file_equals.atago.yaml`
 ### Scenario: equals_file passes for two byte-identical files

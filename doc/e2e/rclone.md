@@ -26,6 +26,7 @@ the serving half is proven from the outside too. Everything runs against the
 local backend, which keeps every scenario hermetic.
 
 Source: `test/e2e/thirdparty/rclone/rclone.atago.yaml`
+Network policy: egress is allowed only to `127.0.0.1`.
 ### Scenario: version prints a semantic version
 _only when `rclone version` succeeds_
 #### When

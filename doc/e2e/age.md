@@ -22,6 +22,7 @@ like a key file; and every failure — the wrong key, the wrong passphrase, a
 corrupted file — is refused loudly rather than yielding plausible garbage.
 
 Source: `test/e2e/thirdparty/age/age.atago.yaml`
+Secrets declared: `PASSPHRASE`.
 ### Scenario: keygen writes a key and reports the public half
 _only when `age --version` succeeds_
 #### When

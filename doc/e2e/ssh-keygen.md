@@ -24,6 +24,7 @@ which is discarded when the scenario ends. No real credential is involved at
 any point.
 
 Source: `test/e2e/thirdparty/ssh-keygen/ssh-keygen.atago.yaml`
+Secrets declared: `PASSPHRASE`.
 ### Scenario: non-interactive generation writes the key pair
 _only when `command -v ssh-keygen` succeeds_
 #### When

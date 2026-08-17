@@ -30,6 +30,7 @@ counts-only report, and `store import` building a store, a model, and
 tuples from one file.
 
 Source: `test/e2e/thirdparty/openfga/openfga.atago.yaml`
+Network policy: egress is allowed only to `127.0.0.1`.
 ### Scenario: version prints something sane
 _only when `fga --version` succeeds_
 #### When

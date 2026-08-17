@@ -24,6 +24,7 @@ allowed-methods list rejects the wrong verb. And a command that exits
 non-zero surfaces as a 500 instead of being reported as success.
 
 Source: `test/e2e/thirdparty/webhook/webhook.atago.yaml`
+Network policy: egress is allowed only to `127.0.0.1`.
 ### Scenario: a post runs the command, returns its output, and writes its file
 _only when `webhook -version` succeeds_
 #### Given

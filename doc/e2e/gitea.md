@@ -19,6 +19,7 @@ of this test, are shown to interoperate — the forge really serves git, not
 just a JSON API that claims a repository exists.
 
 Source: `test/e2e/thirdparty/gitea/gitea.atago.yaml`
+Network policy: egress is allowed only to `127.0.0.1`.
 ### Scenario: the binary reports its version
 _only when `command -v gitea` succeeds_
 #### When

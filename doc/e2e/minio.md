@@ -22,6 +22,7 @@ because a client library parses that error document, and "denied" has to
 arrive in a form the client can understand.
 
 Source: `test/e2e/thirdparty/minio/minio.atago.yaml`
+Network policy: egress is allowed only to `127.0.0.1`.
 ### Scenario: the server reports itself alive over the health API
 _only when `minio --version` succeeds_
 #### Given

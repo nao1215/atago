@@ -22,6 +22,7 @@ This is the answer to "how do I test a cloud CLI in CI?": swap the endpoint,
 keep the CLI.
 
 Source: `test/e2e/thirdparty/awscli/awscli.atago.yaml`
+Secrets declared: `AWS_SECRET_ACCESS_KEY`.
 ### Scenario: bucket and object lifecycle round-trips byte-identically
 _only when `aws --version` succeeds_
 #### Given

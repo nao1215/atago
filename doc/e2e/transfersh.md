@@ -21,6 +21,7 @@ The browser-style multipart upload path is exercised as well, since that is
 how a file arrives from a web form rather than from `curl`.
 
 Source: `test/e2e/thirdparty/transfersh/transfersh.atago.yaml`
+Network policy: egress is allowed only to `127.0.0.1`.
 ### Scenario: the binary reports its version
 _only when `command -v transfer.sh` succeeds_
 #### When

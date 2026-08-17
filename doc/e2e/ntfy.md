@@ -23,6 +23,7 @@ default in place, publishing is refused; after a user is created and granted
 access through the admin CLI, the same publish succeeds.
 
 Source: `test/e2e/thirdparty/ntfy/ntfy.atago.yaml`
+Network policy: egress is allowed only to `127.0.0.1`.
 ### Scenario: the binary reports its version
 _only when `command -v ntfy` succeeds_
 #### When

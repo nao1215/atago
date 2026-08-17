@@ -19,6 +19,7 @@ survives a read-back by uid and turns up in search — with a datasource
 accepted alongside it.
 
 Source: `test/e2e/thirdparty/grafana/grafana.atago.yaml`
+Network policy: egress is allowed only to `127.0.0.1`.
 ### Scenario: the server boots and reports health and build info
 _only when `command -v grafana` succeeds_
 #### Given
