@@ -147,28 +147,82 @@ func validateScenario(add addFunc, s *spec.Spec, i int, seen, suiteServiceNames,
 		add(diag.EmptyList, "%s: steps must contain at least one step", where)
 		return
 	}
-	ptySeen := validateScenarioSteps(add, where, sc, s.Runners, serviceNames, mockNames)
-	validateScenarioTeardown(add, where, sc, s.Runners, serviceNames, mockNames, ptySeen)
+	produced := validateScenarioSteps(add, where, sc, s.Runners, serviceNames, mockNames)
+	validateScenarioTeardown(add, where, sc, s.Runners, serviceNames, mockNames, produced)
+}
+
+// producedKinds is the set of step kinds that have run so far in a scenario, so
+// an assert can be checked against the step that would feed it.
+type producedKinds map[spec.StepKind]bool
+
+// assertProducers maps an assertion target to the step kinds that can feed it,
+// and the phrase naming them. It is the one place that says which step produces
+// which observable, so the rules cannot drift apart the way they had: a screen
+// assert with no pty step was refused at load, a status assert with no http
+// step merely FAILED at run time (exit 1 — a spec doing its job, per the exit
+// contract), and a store reading a header errored (exit 4). All three are the
+// same authoring mistake, knowable without running anything.
+//
+// Only targets with an unambiguous producer are listed. file/dir/image/pdf read
+// the filesystem, which a fixture may have written; mock reads a server's log;
+// value is fed by several kinds. Those stay out rather than guess.
+var assertProducers = []struct {
+	target spec.AssertTarget
+	set    func(*spec.Assert) bool
+	kinds  []spec.StepKind
+	needs  string
+}{
+	{spec.AssertExitCode, func(a *spec.Assert) bool { return a.ExitCode != nil }, []spec.StepKind{spec.StepRun, spec.StepPTY}, "run/pty"},
+	{spec.AssertStdout, func(a *spec.Assert) bool { return a.Stdout != nil }, []spec.StepKind{spec.StepRun, spec.StepPTY}, "run/pty"},
+	{spec.AssertStderr, func(a *spec.Assert) bool { return a.Stderr != nil }, []spec.StepKind{spec.StepRun, spec.StepPTY}, "run/pty"},
+	{spec.AssertStatus, func(a *spec.Assert) bool { return a.Status != nil }, []spec.StepKind{spec.StepHTTP}, "http"},
+	{spec.AssertHeader, func(a *spec.Assert) bool { return a.Header != nil }, []spec.StepKind{spec.StepHTTP}, "http"},
+	{spec.AssertBody, func(a *spec.Assert) bool { return a.Body != nil }, []spec.StepKind{spec.StepHTTP}, "http"},
+	{spec.AssertRows, func(a *spec.Assert) bool { return a.Rows != nil }, []spec.StepKind{spec.StepQuery}, "query"},
+	{spec.AssertGRPCStatus, func(a *spec.Assert) bool { return a.GRPCStatus != nil }, []spec.StepKind{spec.StepGRPC}, "grpc"},
+	{spec.AssertMessage, func(a *spec.Assert) bool { return a.Message != nil }, []spec.StepKind{spec.StepGRPC}, "grpc"},
+	{spec.AssertScreen, func(a *spec.Assert) bool { return a.Screen != nil }, []spec.StepKind{spec.StepPTY}, "pty"},
+}
+
+// checkAssertContext refuses an assertion whose producing step has not run.
+// produced is the set of kinds seen so far, so an assert fed by a step earlier
+// in the scenario — or, in teardown, by the scenario's steps — is accepted.
+func checkAssertContext(add addFunc, where string, a *spec.Assert, produced producedKinds) {
+	if a == nil {
+		return
+	}
+	for _, p := range assertProducers {
+		if !p.set(a) {
+			continue
+		}
+		fed := false
+		for _, k := range p.kinds {
+			if produced[k] {
+				fed = true
+				break
+			}
+		}
+		if !fed {
+			add(diag.AssertNeedsStep, "%s.assert.%s requires a preceding %s step (the step that produces what it inspects)", where, p.target, p.needs)
+		}
+	}
 }
 
 // validateScenarioSteps checks the scenario's steps in order, enforcing the
-// placement rules that tie an assert to the step that feeds it. It reports
-// whether the scenario contains a pty step, which teardown asserts may render.
-func validateScenarioSteps(add addFunc, where string, sc *spec.Scenario, runners map[string]spec.Runner, serviceNames, mockNames map[string]bool) (ptySeen bool) {
+// placement rules that tie an assert to the step that feeds it. It returns the
+// set of step kinds the scenario ran, which teardown asserts are fed by too.
+func validateScenarioSteps(add addFunc, where string, sc *spec.Scenario, runners map[string]spec.Runner, serviceNames, mockNames map[string]bool) (produced producedKinds) {
 	// A screen assert renders a pty step's terminal (#27) and a duration
 	// assert bounds the immediately preceding measurable step (#31):
 	// reject placements no step could feed.
+	produced = producedKinds{}
 	prevMeasurable := false
 	prevRunOrPTY := false
 	for j := range sc.Steps {
 		sw := fmt.Sprintf("%s.steps[%d]", where, j)
 		st := &sc.Steps[j]
-		if st.Kind() == spec.StepPTY {
-			ptySeen = true
-		}
-		if st.Assert != nil && st.Assert.Screen != nil && !ptySeen {
-			add(diag.AssertNeedsStep, "%s.assert.screen requires a preceding pty step (the screen is the pty step's rendered terminal)", sw)
-		}
+		produced[st.Kind()] = true
+		checkAssertContext(add, sw, st.Assert, produced)
 		if st.Assert != nil && st.Assert.Duration != nil && !prevMeasurable {
 			add(diag.AssertNeedsStep, "%s.assert.duration requires an immediately preceding run/http/query/grpc/pty step (the step whose wall-clock time it bounds)", sw)
 		}
@@ -181,18 +235,19 @@ func validateScenarioSteps(add addFunc, where string, sc *spec.Scenario, runners
 		prevMeasurable = measurableStep(st.Kind())
 		prevRunOrPTY = st.Kind() == spec.StepRun || st.Kind() == spec.StepPTY
 	}
-	return ptySeen
+	return produced
 }
 
 // validateScenarioTeardown checks the scenario's teardown steps, whose asserts
 // may render a pty screen but can never be fed a workdir delta.
-func validateScenarioTeardown(add addFunc, where string, sc *spec.Scenario, runners map[string]spec.Runner, serviceNames, mockNames map[string]bool, ptySeen bool) {
+func validateScenarioTeardown(add addFunc, where string, sc *spec.Scenario, runners map[string]spec.Runner, serviceNames, mockNames map[string]bool, produced producedKinds) {
 	for j := range sc.Teardown {
 		tw := fmt.Sprintf("%s.teardown[%d]", where, j)
 		st := &sc.Teardown[j]
-		if st.Assert != nil && st.Assert.Screen != nil && !ptySeen {
-			add(diag.AssertNeedsStep, "%s.assert.screen requires a pty step in the scenario", tw)
-		}
+		// Teardown shares the scenario's result: an assert here is fed by the
+		// scenario's steps, or by an earlier teardown step of the right kind.
+		produced[st.Kind()] = true
+		checkAssertContext(add, tw, st.Assert, produced)
 		// The workdir delta is only tracked around Steps, so a changes assert
 		// in teardown could never be fed (#70).
 		if st.Assert != nil && st.Assert.Changes != nil {

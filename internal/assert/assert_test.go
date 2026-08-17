@@ -2361,6 +2361,46 @@ func TestCheckDirRecursive_FailureBranches(t *testing.T) {
 // snapshot.go: missing, update, mismatch, path escape
 // ---------------------------------------------------------------------------
 
+// TestCheckSnapshot_ConflictingUpdateFails is a regression: two scenarios
+// pointing at one snapshot path made --update-snapshots lie. Each wrote in
+// turn, the update run reported every scenario green, and the very next verify
+// run was red — a hard break of the documented write→verify invariant, and a
+// race between the two writers under --parallel. Two scenarios asserting the
+// SAME output against one golden (the `-h` and `--help` pattern) is legitimate
+// and must keep working, so only a conflicting rewrite is refused.
+func TestCheckSnapshot_ConflictingUpdateFails(t *testing.T) {
+	t.Parallel()
+	specDir := t.TempDir()
+	writes := NewSnapshotWrites()
+	env := Env{SpecDir: specDir, Workdir: specDir, UpdateSnapshots: true, SnapshotWrites: writes}
+
+	if cr := checkSnapshot("d", "stdout", "shared.snap", []byte("from-alpha\n"), env); !cr.OK {
+		t.Fatalf("the first write should pass: %+v", cr)
+	}
+	// The same content from another scenario is the shared-golden pattern.
+	if cr := checkSnapshot("d", "stdout", "shared.snap", []byte("from-alpha\n"), env); !cr.OK {
+		t.Errorf("an identical rewrite should pass: %+v", cr)
+	}
+	// Different content is the lie: whichever ran last would win, and the next
+	// verify run would fail on the other scenario.
+	conflict := checkSnapshot("d", "stdout", "shared.snap", []byte("from-beta\n"), env)
+	if conflict.OK {
+		t.Fatal("a conflicting rewrite was accepted; the next verify run would be red")
+	}
+	if !strings.Contains(conflict.Hint, "already written in this run") {
+		t.Errorf("hint = %q, want it to name the conflicting rewrite", conflict.Hint)
+	}
+	// The first writer's content stays on disk: the run reports the conflict
+	// rather than leaving whichever scenario happened to be last.
+	got, err := os.ReadFile(filepath.Join(specDir, "shared.snap"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "from-alpha\n" {
+		t.Errorf("snapshot = %q, want the first writer's content", got)
+	}
+}
+
 func TestCheckSnapshot_Lifecycle(t *testing.T) {
 	t.Parallel()
 	specDir := t.TempDir()

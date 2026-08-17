@@ -241,6 +241,7 @@ func (x *scenarioRun) execStep(ctx context.Context, steps []spec.Step, i int, st
 			Workdir:         x.workdir,
 			SpecDir:         x.specDir,
 			UpdateSnapshots: x.e.UpdateSnapshots,
+			SnapshotWrites:  x.e.snapshotWrites,
 			Secrets:         x.masker.MaskBytes,
 			Scrub:           x.rc.scrubber.Apply,
 			MockRecords:     x.mockRecords,
@@ -496,7 +497,7 @@ func (e *Engine) runStep(ctx context.Context, run *spec.Run, st *store.Store, wo
 		}
 		return r, nil, nil
 	}
-	env := assert.Env{Workdir: workdir, SpecDir: specDir, UpdateSnapshots: e.UpdateSnapshots, Secrets: rc.masker.MaskBytes, Scrub: rc.scrubber.Apply}
+	env := assert.Env{Workdir: workdir, SpecDir: specDir, UpdateSnapshots: e.UpdateSnapshots, SnapshotWrites: e.snapshotWrites, Secrets: rc.masker.MaskBytes, Scrub: rc.scrubber.Apply}
 	return pollUntil(ctx, run.Retry, st, env, exec, beforeAttempt)
 }
 

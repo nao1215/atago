@@ -1311,3 +1311,48 @@ scenarios:
           stdout:
             contains: "ATG4102"
             not_contains: "ATG4301: service"
+
+  # Regression: the same authoring mistake — an assertion whose producing step
+  # never ran — was classified three ways. `screen:` before a pty step was a
+  # load error, a `store from.header` after a run step an exit-4 runtime error,
+  # and `status:` or a leading `exit_code:` merely a FAILED scenario (exit 1),
+  # so a statically knowable mistake was counted as a product regression.
+  - name: an assertion with no producing step is a load-time error
+    steps:
+      - fixture:
+          file: nocontext.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: asserts an http status after a command
+                steps:
+                  - run: {shell: true, command: "true"}
+                  - assert: {status: 200}
+      - run:
+          command: ${atago} run nocontext.atago.yaml
+      - assert:
+          exit_code: 2
+          stderr:
+            contains:
+              - "ATG2107"
+              - "assert.status requires a preceding http step"
+      # The ordering that CAN be fed still loads and runs.
+      - fixture:
+          file: withcontext.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: asserts stdout after the command that produced it
+                steps:
+                  - run: {shell: true, command: "echo ready"}
+                  - assert: {stdout: {contains: ready}}
+      - run:
+          command: ${atago} run withcontext.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "1 passed"

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/nao1215/atago/internal/artifact"
+	"github.com/nao1215/atago/internal/assert"
 	"github.com/nao1215/atago/internal/runner"
 	runnercmd "github.com/nao1215/atago/internal/runner/cmd"
 	mockrunner "github.com/nao1215/atago/internal/runner/mock"
@@ -40,6 +41,13 @@ type Engine struct {
 	// UpdateSnapshots makes snapshot assertions write the snapshot file instead
 	// of comparing against it.
 	UpdateSnapshots bool
+	// snapshotWrites records what this run has written to each snapshot path, so
+	// two scenarios cannot claim one path with different content — which made an
+	// update run report green and leave the next verify run red. One Engine
+	// serves the whole run, so the record spans every spec file it executes,
+	// which is the scope the conflict actually lives in: two specs beside each
+	// other can name the same golden as easily as two scenarios can.
+	snapshotWrites *assert.SnapshotWrites
 
 	// Parallel is the maximum number of scenarios to run concurrently. Values
 	// < 1 mean sequential execution.
@@ -110,7 +118,12 @@ const defaultProbeTimeout = 30 * time.Second
 
 // New returns an Engine with the default command runner.
 func New() *Engine {
-	return &Engine{cmd: runnercmd.New(), builtins: builtinVars(), probeTimeout: defaultProbeTimeout}
+	return &Engine{
+		cmd:            runnercmd.New(),
+		builtins:       builtinVars(),
+		probeTimeout:   defaultProbeTimeout,
+		snapshotWrites: assert.NewSnapshotWrites(),
+	}
 }
 
 // builtinVars are variables seeded into every scenario's store. ${atago} is the

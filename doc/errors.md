@@ -214,7 +214,7 @@ Exits 2. Since v0.21.0.
 
 ### ATG2107 — an assertion needs a preceding step it does not have
 
-Some assertions describe the step before them rather than the scenario as a whole. `assert.screen` reads the terminal a `pty` step rendered, `assert.duration` bounds the wall-clock time of the step it follows, and `assert.changes` pins the workdir delta of the run or pty step it follows. Without that step there is nothing for the assertion to be about, so it would pass or fail for reasons unrelated to what it says.
+Some assertions describe the step before them rather than the scenario as a whole. `assert.exit_code`, `stdout`, and `stderr` read what a `run` or `pty` step produced; `status`, `header`, and `body` read an `http` response; `rows` reads a `query`; `grpc_status` and `message` read a `grpc` call; `screen` reads the terminal a `pty` step rendered; `duration` bounds the wall-clock time of the step it follows; and `changes` pins the workdir delta of the run or pty step it follows. Without that step there is nothing for the assertion to be about, so it would pass or fail for reasons unrelated to what it says.
 
 Fix: Put the assertion directly after the step it describes. One assert block may set several keys at once, so an `exit_code`, a `stdout`, and a `changes` about the same step belong together.
 

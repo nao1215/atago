@@ -1007,12 +1007,12 @@ func TestLoadBytes_JSONEqualsNull(t *testing.T) {
 	t.Parallel()
 
 	for _, spelling := range []string{"equals: null", "equals: ~", "equals: Null"} {
-		src := specSteps("assert: {stdout: {json: {path: \"$.v\", " + spelling + "}}}")
+		src := specSteps("run: {command: echo}", "assert: {stdout: {json: {path: \"$.v\", "+spelling+"}}}")
 		s, err := LoadBytes("t.atago.yaml", []byte(src))
 		if err != nil {
 			t.Fatalf("LoadBytes(%s) error = %v, want a clean load", spelling, err)
 		}
-		checks := s.Scenarios[0].Steps[0].Assert.Stdout.JSON
+		checks := s.Scenarios[0].Steps[1].Assert.Stdout.JSON
 		if len(checks) != 1 {
 			t.Fatalf("%s: got %d checks, want 1", spelling, len(checks))
 		}
@@ -1026,12 +1026,12 @@ func TestLoadBytes_JSONEqualsNull(t *testing.T) {
 
 	// An `equals` key written with a real value keeps reporting present, and a
 	// check with no `equals` key at all is still matcher-less.
-	src := specSteps("assert: {stdout: {json: [{path: \"$.a\", equals: 1}, {path: \"$.b\", equals: null}]}}")
+	src := specSteps("run: {command: echo}", "assert: {stdout: {json: [{path: \"$.a\", equals: 1}, {path: \"$.b\", equals: null}]}}")
 	s, err := LoadBytes("t.atago.yaml", []byte(src))
 	if err != nil {
 		t.Fatalf("LoadBytes(list form) error = %v", err)
 	}
-	for i, c := range s.Scenarios[0].Steps[0].Assert.Stdout.JSON {
+	for i, c := range s.Scenarios[0].Steps[1].Assert.Stdout.JSON {
 		if !c.HasEquals() {
 			t.Errorf("list check %d: HasEquals() = false, want true", i)
 		}
@@ -1368,8 +1368,8 @@ func TestBugHunt_Acceptances(t *testing.T) {
 		{"exit_code in", specSteps("run: {command: echo}", "assert: {exit_code: {in: [0, 1, 2]}}")},
 		{"exit_code not", specSteps("run: {command: echo}", "assert: {exit_code: {not: 1}}")},
 		{"file exists", specSteps("assert: {file: {path: out.txt, exists: true}}")},
-		{"header equals", specSteps("assert: {header: {name: Content-Type, equals: text/html}}")},
-		{"json gt", specSteps("assert: {stdout: {json: {path: \"$.count\", gt: 5}}}")},
+		{"header equals", withRunner("runners:\n  api: {type: http, base_url: \"http://127.0.0.1:1\"}\n", specSteps("http: {runner: api, method: GET, path: /}", "assert: {header: {name: Content-Type, equals: text/html}}"))},
+		{"json gt", specSteps("run: {command: echo}", "assert: {stdout: {json: {path: \"$.count\", gt: 5}}}")},
 		{"mock count", mockScenario("assert: {mock: {name: api, count: 2}}")},
 		{"signal valid", svcScenario("signal: {service: s, signal: TERM}")},
 		{"signal var target", svcScenario("signal: {service: \"${svc}\", signal: KILL}")},
@@ -1377,9 +1377,9 @@ func TestBugHunt_Acceptances(t *testing.T) {
 		{"fixture content", specSteps("fixture: {file: a.txt, content: hello}")},
 		{"pty valid", specSteps("pty: {command: sh, session: [{expect: \"[$] \"}, {send: \"ls\\n\"}]}")},
 		{"pty expect_screen valid", specSteps("pty: {command: sh, session: [{expect_screen: {contains: hi, stable_for: \"20ms\"}}]}")},
-		{"assert message", specSteps("assert: {message: {equals: ok}}")},
+		{"assert message", withRunner("runners:\n  rpc: {type: grpc, target: \"127.0.0.1:1\"}\n", specSteps("grpc: {runner: rpc, method: pkg.S/M}", "assert: {message: {equals: ok}}"))},
 		{"assert value", specSteps("assert: {value: {contains: hi}}")},
-		{"assert grpc_status", specSteps("assert: {grpc_status: 0}")},
+		{"assert grpc_status", withRunner("runners:\n  rpc: {type: grpc, target: \"127.0.0.1:1\"}\n", specSteps("grpc: {runner: rpc, method: pkg.S/M}", "assert: {grpc_status: 0}"))},
 		{"assert screen after pty", specSteps("pty: {command: sh}", "assert: {screen: {contains: prompt}}")},
 		{"assert duration after run", specSteps("run: {command: echo}", "assert: {duration: {lt: \"5s\"}}")},
 		{"skip valid os", scenarioTop("skip: {os: darwin}", "run: {command: echo}")},
@@ -1403,7 +1403,7 @@ func TestBugHunt_RoundTrip(t *testing.T) {
 		specSteps("run: {command: echo}", "assert: {exit_code: {in: [0, 1]}}"),
 		specSteps("store: {name: v, from: {stdout: {json: {path: \"$.a\"}}}}"),
 		specSteps("fixture: {file: a.txt, content: hello}"),
-		specSteps("assert: {stdout: {contains: [\"a\", \"b\"]}}"),
+		specSteps("run: {command: echo}", "assert: {stdout: {contains: [\"a\", \"b\"]}}"),
 	}
 	for i, src := range srcs {
 		s1, err := LoadBytes("t.atago.yaml", []byte(src))
@@ -1518,11 +1518,11 @@ func TestBugHunt_FileAndJSONExtras(t *testing.T) {
 		{"file snapshot", specSteps("assert: {file: {path: out.txt, snapshot: golden}}")},
 		{"file contains list", specSteps("assert: {file: {path: out.txt, contains: [\"a\", \"b\"]}}")},
 		{"file json", specSteps("assert: {file: {path: out.json, json: {path: \"$.id\", equals: 7}}}")},
-		{"json lt", specSteps("assert: {stdout: {json: {path: \"$.n\", lt: 10}}}")},
-		{"json lte", specSteps("assert: {stdout: {json: {path: \"$.n\", lte: 10}}}")},
-		{"json gte", specSteps("assert: {stdout: {json: {path: \"$.n\", gte: 1}}}")},
-		{"json length", specSteps("assert: {stdout: {json: {path: \"$.items\", length: 3}}}")},
-		{"yaml matcher", specSteps("assert: {stdout: {yaml: {path: \"$.k\", equals: v}}}")},
+		{"json lt", specSteps("run: {command: echo}", "assert: {stdout: {json: {path: \"$.n\", lt: 10}}}")},
+		{"json lte", specSteps("run: {command: echo}", "assert: {stdout: {json: {path: \"$.n\", lte: 10}}}")},
+		{"json gte", specSteps("run: {command: echo}", "assert: {stdout: {json: {path: \"$.n\", gte: 1}}}")},
+		{"json length", specSteps("run: {command: echo}", "assert: {stdout: {json: {path: \"$.items\", length: 3}}}")},
+		{"yaml matcher", specSteps("run: {command: echo}", "assert: {stdout: {yaml: {path: \"$.k\", equals: v}}}")},
 		{"store from body matches", specSteps("store: {name: v, from: {body: {matches: \"tok=(\\\\w+)\"}}}")},
 		{"store from rows json", specSteps("store: {name: v, from: {rows: {json: {path: \"$[0].id\"}}}}")},
 		{"store from message json", specSteps("store: {name: v, from: {message: {json: {path: \"$.ok\"}}}}")},
@@ -1772,6 +1772,82 @@ func TestLoadBytes_DuplicateTag(t *testing.T) {
 	ok := "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    tags: [smoke, slow]\n    steps:\n      - run: {command: echo}\n  - name: b\n    tags: [smoke]\n    steps:\n      - run: {command: echo}"
 	if _, err := LoadBytes("s.atago.yaml", []byte(ok)); err != nil {
 		t.Errorf("distinct tags were rejected: %v", err)
+	}
+}
+
+// TestLoadBytes_AssertNeedsItsProducingStep is a regression: the same
+// authoring mistake — an assertion whose producing step never ran — was
+// classified three different ways. `screen:` before a pty step was refused at
+// load (ATG2107), a `store from.header` after a run step errored at runtime
+// (exit 4), and `status:` or a leading `exit_code:` merely FAILED (exit 1, no
+// code), so a statically knowable mistake was counted as a product regression
+// by every dashboard reading the exit status. The loader sees the step order —
+// ATG2107 proves it — so the whole family is refused there.
+func TestLoadBytes_AssertNeedsItsProducingStep(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name string
+		src  string
+		want string
+	}{
+		{
+			"exit_code with no command",
+			specSteps("assert: {exit_code: 0}", "run: {command: echo}"),
+			"assert.exit_code requires a preceding run/pty step",
+		},
+		{
+			"stdout with no command",
+			specSteps("assert: {stdout: {contains: hi}}"),
+			"assert.stdout requires a preceding run/pty step",
+		},
+		{
+			"status with no http step",
+			specSteps("run: {command: echo}", "assert: {status: 200}"),
+			"assert.status requires a preceding http step",
+		},
+		{
+			"rows with no query",
+			specSteps("run: {command: echo}", "assert: {rows: {contains: x}}"),
+			"assert.rows requires a preceding query step",
+		},
+		{
+			"grpc_status with no grpc step",
+			specSteps("run: {command: echo}", "assert: {grpc_status: 0}"),
+			"assert.grpc_status requires a preceding grpc step",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			mustReject(t, c.name, c.src, c.want)
+		})
+	}
+}
+
+// TestLoadBytes_AssertAfterItsProducingStepLoads pins the accept side: every
+// ordering that CAN be fed must keep loading, including an assert fed by a step
+// earlier in the scenario and a teardown assert fed by the scenario's steps.
+func TestLoadBytes_AssertAfterItsProducingStepLoads(t *testing.T) {
+	t.Parallel()
+	ok := []string{
+		specSteps("run: {command: echo}", "assert: {exit_code: 0}"),
+		specSteps("pty: {command: sh, session: [{send: \"\"}]}", "assert: {stdout: {contains: hi}}"),
+		specSteps("http: {runner: api, method: GET, path: /}", "assert: {status: 200}"),
+		specSteps("query: {runner: db, sql: \"SELECT 1\"}", "assert: {rows: {contains: x}}"),
+		specSteps("grpc: {runner: rpc, method: pkg.S/M}", "assert: {grpc_status: 0}"),
+		// An assert fed by a step two positions earlier is still fed.
+		specSteps("run: {command: echo}", "fixture: {file: f.txt, content: x}", "assert: {exit_code: 0}"),
+		// A teardown assert is fed by the scenario's own steps.
+		"version: \"1\"\nsuite:\n  name: x\nrunners:\n  api: {type: http, base_url: \"http://127.0.0.1:1\"}\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n    teardown:\n      - assert: {exit_code: 0}\n",
+	}
+	runners := "runners:\n  api: {type: http, base_url: \"http://127.0.0.1:1\"}\n  db: {type: db, dsn: \"sqlite:./a.db\"}\n  rpc: {type: grpc, target: \"127.0.0.1:1\"}\n"
+	for i, src := range ok {
+		if !strings.Contains(src, "runners:") {
+			src = strings.Replace(src, "scenarios:", runners+"scenarios:", 1)
+		}
+		if _, err := LoadBytes("s.atago.yaml", []byte(src)); err != nil {
+			t.Errorf("case %d was rejected: %v\n%s", i, err, src)
+		}
 	}
 }
 
