@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-81 suites · 645 scenarios
+82 suites · 647 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -153,7 +153,7 @@
   - [file not_contains passes when the substring is absent](#scenario-file-not_contains-passes-when-the-substring-is-absent)
   - [not_contains fails when the substring is present](#scenario-not_contains-fails-when-the-substring-is-present)
   - [a shell metacharacter without shell is a load-time error](#scenario-a-shell-metacharacter-without-shell-is-a-load-time-error)
-- [atago self-hosting / every diagnostic code](#atago-self-hosting--every-diagnostic-code) — 80 scenarios
+- [atago self-hosting / every diagnostic code](#atago-self-hosting--every-diagnostic-code) — 81 scenarios
   - [ATG2001 is a spec file that cannot be read](#scenario-atg2001-is-a-spec-file-that-cannot-be-read)
   - [ATG2002 is a spec file with no YAML document in it](#scenario-atg2002-is-a-spec-file-with-no-yaml-document-in-it)
   - [ATG2003 is a document that is not valid YAML](#scenario-atg2003-is-a-document-that-is-not-valid-yaml)
@@ -234,6 +234,7 @@
   - [the JSON report carries the code as a field](#scenario-the-json-report-carries-the-code-as-a-field)
   - [an assertion failure carries no code in the JSON report](#scenario-an-assertion-failure-carries-no-code-in-the-json-report)
   - [a wrapped error reports one code, not two](#scenario-a-wrapped-error-reports-one-code-not-two)
+  - [an assertion with no producing step is a load-time error](#scenario-an-assertion-with-no-producing-step-is-a-load-time-error)
 - [atago self-hosting / exit_code in-set matcher](#atago-self-hosting--exit_code-in-set-matcher) — 4 scenarios
   - [a listed exit code passes](#scenario-a-listed-exit-code-passes)
   - [an unlisted exit code fails and the output lists the set](#scenario-an-unlisted-exit-code-fails-and-the-output-lists-the-set)
@@ -628,6 +629,8 @@
   - [updating a snapshot is deterministic](#scenario-updating-a-snapshot-is-deterministic)
   - [a real content change still fails the snapshot](#scenario-a-real-content-change-still-fails-the-snapshot)
   - [a missing golden names the update flag](#scenario-a-missing-golden-names-the-update-flag)
+- [atago self-hosting / snapshots](#atago-self-hosting--snapshots) — 1 scenario
+  - [two scenarios writing different content to one snapshot path fail the update](#scenario-two-scenarios-writing-different-content-to-one-snapshot-path-fail-the-update)
 - [atago self-hosting / ssh runner](#atago-self-hosting--ssh-runner) — 3 scenarios
   - [an ssh runner without host/user fails validation (exit 2)](#scenario-an-ssh-runner-without-hostuser-fails-validation-exit-2)
   - [a run step naming an undeclared runner fails validation (exit 2)](#scenario-a-run-step-naming-an-undeclared-runner-fails-validation-exit-2)
@@ -5183,6 +5186,45 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `4`
 - stdout contains `ATG4102`, does not contain `ATG4301: service`
+### Scenario: an assertion with no producing step is a load-time error
+#### Given
+- Fixture file `nocontext.atago.yaml` is created.
+- Fixture file `withcontext.atago.yaml` is created.
+#### Inputs
+_Fixture `nocontext.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: asserts an http status after a command
+    steps:
+      - run: {shell: true, command: "true"}
+      - assert: {status: 200}
+```
+_Fixture `withcontext.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: asserts stdout after the command that produced it
+    steps:
+      - run: {shell: true, command: "echo ready"}
+      - assert: {stdout: {contains: ready}}
+```
+#### When
+```shell
+${atago} run nocontext.atago.yaml
+${atago} run withcontext.atago.yaml
+```
+#### Then
+- after `${atago} run nocontext.atago.yaml`:
+  - exit code is `2`
+  - stderr contains `ATG2107`, `assert.status requires a preceding http step`
+- after `${atago} run withcontext.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `1 passed`
 ## atago self-hosting / exit_code in-set matcher
 Source: `test/e2e/atago/exit_code_in.atago.yaml`
 ### Scenario: a listed exit code passes
@@ -12804,6 +12846,58 @@ ${atago} run miss.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `--update-snapshots`
+## atago self-hosting / snapshots
+Source: `test/e2e/atago/snapshots.atago.yaml`
+### Scenario: two scenarios writing different content to one snapshot path fail the update
+#### Given
+- Fixture file `clash.atago.yaml` is created.
+- Fixture file `shared_golden.atago.yaml` is created.
+#### Inputs
+_Fixture `clash.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: clash
+scenarios:
+  - name: alpha
+    steps:
+      - run: {shell: true, command: "echo from-alpha"}
+      - assert: {stdout: {snapshot: shared.snap}}
+  - name: beta
+    steps:
+      - run: {shell: true, command: "echo from-beta"}
+      - assert: {stdout: {snapshot: shared.snap}}
+```
+_Fixture `shared_golden.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: shared
+scenarios:
+  - name: short flag
+    steps:
+      - run: {shell: true, command: "echo usage"}
+      - assert: {stdout: {snapshot: help.snap}}
+  - name: long flag
+    steps:
+      - run: {shell: true, command: "echo usage"}
+      - assert: {stdout: {snapshot: help.snap}}
+```
+#### When
+```shell
+${atago} run --parallel 1 --update-snapshots clash.atago.yaml
+${atago} run --parallel 1 --update-snapshots shared_golden.atago.yaml
+${atago} run --parallel 1 shared_golden.atago.yaml
+```
+#### Then
+- after `${atago} run --parallel 1 --update-snapshots clash.atago.yaml`:
+  - exit code is `1`
+  - stdout contains `already written in this run with different content`
+- after `${atago} run --parallel 1 --update-snapshots shared_golden.atago.yaml`:
+  - exit code is `0`
+- after `${atago} run --parallel 1 shared_golden.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `2 passed`
 ## atago self-hosting / ssh runner
 Source: `test/e2e/atago/ssh.atago.yaml`
 ### Scenario: an ssh runner without host/user fails validation (exit 2)

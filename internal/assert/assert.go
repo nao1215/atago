@@ -109,6 +109,11 @@ type Env struct {
 	// name for the `mock:` assertion target (#24). Nil in contexts with no
 	// mock servers (retry `until` asserts, direct API use).
 	MockRecords func(name string) ([]mock.Record, bool)
+	// SnapshotWrites, when set, is the run-scoped record of which snapshot
+	// paths this `--update-snapshots` run has written and with what content, so
+	// two scenarios cannot silently claim one path with different output. Nil
+	// outside a run, where there is nothing to scope the writes to.
+	SnapshotWrites *SnapshotWrites
 }
 
 func pass(desc string) *CheckResult { return &CheckResult{OK: true, Desc: desc} }

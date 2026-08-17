@@ -1,0 +1,60 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / snapshots
+
+scenarios:
+
+  # Regression: two scenarios pointing at one snapshot path made
+  # --update-snapshots lie — each wrote in turn, the update run reported every
+  # scenario green, and the very next verify run was red. Two scenarios
+  # asserting the SAME output against one golden stays legal.
+  - name: two scenarios writing different content to one snapshot path fail the update
+    steps:
+      - fixture:
+          file: clash.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: clash
+            scenarios:
+              - name: alpha
+                steps:
+                  - run: {shell: true, command: "echo from-alpha"}
+                  - assert: {stdout: {snapshot: shared.snap}}
+              - name: beta
+                steps:
+                  - run: {shell: true, command: "echo from-beta"}
+                  - assert: {stdout: {snapshot: shared.snap}}
+      - run:
+          command: ${atago} run --parallel 1 --update-snapshots clash.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: "already written in this run with different content"
+      - fixture:
+          file: shared_golden.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: shared
+            scenarios:
+              - name: short flag
+                steps:
+                  - run: {shell: true, command: "echo usage"}
+                  - assert: {stdout: {snapshot: help.snap}}
+              - name: long flag
+                steps:
+                  - run: {shell: true, command: "echo usage"}
+                  - assert: {stdout: {snapshot: help.snap}}
+      - run:
+          command: ${atago} run --parallel 1 --update-snapshots shared_golden.atago.yaml
+      - assert:
+          exit_code: 0
+      # And the update leaves the suite verifiable, which is the invariant.
+      - run:
+          command: ${atago} run --parallel 1 shared_golden.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "2 passed"
