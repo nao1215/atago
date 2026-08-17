@@ -66,6 +66,20 @@ func writeGHA(w io.Writer, results []*engine.SuiteResult, allowXPass bool, loadF
 				fmt.Fprintf(&b, "::notice title=%s::%s\n",
 					ghaEscapeProp(res.Suite+" / "+sc.Name), ghaEscapeData("xfail: "+expectFailSummary(sc)))
 			}
+			// A failed teardown never changes the verdict or the exit code, so
+			// it is a warning — the flaky pattern: green for the job, loud in
+			// the annotations. Silence here meant a green Actions run with no
+			// trace that cleanup of external resources failed.
+			if msg := firstStepFailureMessage(sc.Teardown); msg != "" {
+				fmt.Fprintf(&b, "::warning title=%s::%s\n",
+					ghaEscapeProp(res.Suite+" / "+sc.Name),
+					ghaEscapeData("teardown failed: "+msg+" — "+oneLine(stepsDetailText(sc.Teardown))))
+			}
+		}
+		if msg := firstStepFailureMessage(res.Teardown); msg != "" {
+			fmt.Fprintf(&b, "::warning title=%s::%s\n",
+				ghaEscapeProp(res.Suite),
+				ghaEscapeData("suite teardown failed: "+msg+" — "+oneLine(stepsDetailText(res.Teardown))))
 		}
 		// A suite that errored before any scenario ran (#7) surfaces its cause as
 		// an error annotation, so the Actions UI is never silent for a non-zero

@@ -234,3 +234,50 @@ scenarios:
               - 'errors="1"'
               - 'failures="0"'
               - "<error"
+
+  # Regression: only the console and json knew about a failed teardown. junit
+  # reported a clean pass with zero trace of it, tap emitted a bare passing
+  # point, and gha a green notice — so a CI consumer reading any of those
+  # formats never learned that cleanup failed. Each format now carries the
+  # fact in its non-verdict-changing slot; the exit code stays 0 everywhere.
+  - name: a failed teardown surfaces in junit, tap, and gha without changing the verdict
+    steps:
+      - fixture:
+          file: td.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: td
+            scenarios:
+              - name: passes but cleanup fails
+                steps:
+                  - run: {shell: true, command: "exit 0"}
+                  - assert: {exit_code: 0}
+                teardown:
+                  - run: {shell: true, command: "exit 7"}
+                  - assert: {exit_code: 0}
+      - run:
+          command: ${atago} run --ci --report junit td.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - 'failures="0"'
+              - "<system-err>teardown failed"
+              - "exit code 7"
+      - run:
+          command: ${atago} run --ci --report tap td.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "ok 1 - td / passes but cleanup fails"
+              - "# teardown failed: assert exit_code is 0"
+      - run:
+          command: ${atago} run --ci --report gha td.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "::warning title=td / passes but cleanup fails::teardown failed"
+            not_contains: "::error"

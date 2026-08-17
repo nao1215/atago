@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-81 suites · 630 scenarios
+81 suites · 631 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -516,7 +516,7 @@
   - [a recorded secret placeholder replays green with the env set and is guarded when unset](#scenario-a-recorded-secret-placeholder-replays-green-with-the-env-set-and-is-guarded-when-unset)
   - [a raw-mode (TUI) keystroke is recorded literally, not as a secret](#scenario-a-raw-mode-tui-keystroke-is-recorded-literally-not-as-a-secret)
   - [record --pty of a never-exiting program times out instead of hanging](#scenario-record---pty-of-a-never-exiting-program-times-out-instead-of-hanging)
-- [atago self-hosting / report formats agree on outcomes](#atago-self-hosting--report-formats-agree-on-outcomes) — 9 scenarios
+- [atago self-hosting / report formats agree on outcomes](#atago-self-hosting--report-formats-agree-on-outcomes) — 10 scenarios
   - [json report carries per-scenario verdicts and a failures array](#scenario-json-report-carries-per-scenario-verdicts-and-a-failures-array)
   - [junit report tallies tests, failures, skipped, and errors](#scenario-junit-report-tallies-tests-failures-skipped-and-errors)
   - [tap report emits the plan, a not ok line, and a SKIP directive](#scenario-tap-report-emits-the-plan-a-not-ok-line-and-a-skip-directive)
@@ -526,6 +526,7 @@
   - [a spec that failed to load is named by every report format](#scenario-a-spec-that-failed-to-load-is-named-by-every-report-format)
   - [a run whose specs all failed to load still reports them](#scenario-a-run-whose-specs-all-failed-to-load-still-reports-them)
   - [an errored step is counted as an error, not a failure, across formats](#scenario-an-errored-step-is-counted-as-an-error-not-a-failure-across-formats)
+  - [a failed teardown surfaces in junit, tap, and gha without changing the verdict](#scenario-a-failed-teardown-surfaces-in-junit-tap-and-gha-without-changing-the-verdict)
 - [atago self-hosting / reports](#atago-self-hosting--reports) — 10 scenarios
   - [JUnit report is XML with a testsuite and testcase](#scenario-junit-report-is-xml-with-a-testsuite-and-testcase)
   - [GitHub Actions annotations are emitted on failure](#scenario-github-actions-annotations-are-emitted-on-failure)
@@ -10349,6 +10350,40 @@ ${atago} run --ci --report junit errored.atago.yaml
 #### Then
 - exit code is `4`
 - stdout contains `errors="1"`, `failures="0"`, `<error`
+### Scenario: a failed teardown surfaces in junit, tap, and gha without changing the verdict
+#### Given
+- Fixture file `td.atago.yaml` is created.
+#### Inputs
+_Fixture `td.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: td
+scenarios:
+  - name: passes but cleanup fails
+    steps:
+      - run: {shell: true, command: "exit 0"}
+      - assert: {exit_code: 0}
+    teardown:
+      - run: {shell: true, command: "exit 7"}
+      - assert: {exit_code: 0}
+```
+#### When
+```shell
+${atago} run --ci --report junit td.atago.yaml
+${atago} run --ci --report tap td.atago.yaml
+${atago} run --ci --report gha td.atago.yaml
+```
+#### Then
+- after `${atago} run --ci --report junit td.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `failures="0"`, `<system-err>teardown failed`, `exit code 7`
+- after `${atago} run --ci --report tap td.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `ok 1 - td / passes but cleanup fails`, `# teardown failed: assert exit_code is 0`
+- after `${atago} run --ci --report gha td.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `::warning title=td / passes but cleanup fails::teardown failed`, does not contain `::error`
 ## atago self-hosting / reports
 Source: `test/e2e/atago/reports.atago.yaml`
 ### Scenario: JUnit report is XML with a testsuite and testcase
