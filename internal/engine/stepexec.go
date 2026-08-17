@@ -430,6 +430,9 @@ func (x *scenarioRun) runSteps(ctx context.Context, leadingFixtures int) {
 // each other.
 func (x *scenarioRun) runTeardown(ctx context.Context) {
 	if len(x.sc.Teardown) > 0 {
+		//nolint:contextcheck // tctx is deliberately not derived from ctx when ctx is
+		// already done: a derived context would cancel cleanup immediately. The bounded
+		// fresh context below is what lets an interrupt still tear external resources down.
 		tctx := ctx
 		if ctx.Err() != nil {
 			// The run was interrupted: give cleanup its own bounded context so an

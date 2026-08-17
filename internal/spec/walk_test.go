@@ -98,7 +98,7 @@ func TestWalkAssertStrings_CollectAndExpand(t *testing.T) {
 func TestWalkJSONValueStrings(t *testing.T) {
 	t.Parallel()
 	in := map[string]any{"s": "${x}", "n": 1, "arr": []any{"${y}", 2}}
-	out, ok := WalkJSONValueStrings(in, func(s string) string { return strings.ToUpper(s) }).(map[string]any)
+	out, ok := WalkJSONValueStrings(in, strings.ToUpper).(map[string]any)
 	if !ok {
 		t.Fatalf("result is not a map")
 	}

@@ -290,6 +290,8 @@ func stdinReader(run *spec.Run, workdir string) (io.Reader, error) {
 	case s.Inline != "":
 		return strings.NewReader(s.Inline), nil
 	}
+	//nolint:nilnil // No stdin authored: the child inherits an empty stdin, which is a
+	// configuration, not a failure.
 	return nil, nil
 }
 

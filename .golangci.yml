@@ -8,9 +8,12 @@ linters:
     - bidichk
     - bodyclose
     - canonicalheader
+    - contextcheck
     - copyloopvar
     - durationcheck
     - errcheck
+    - embeddedstructfieldcheck
+    - errchkjson
     - errname
     - errorlint
     # exhaustive is the structural half of atago's oldest bug family: a new step
@@ -21,12 +24,14 @@ linters:
     - fatcontext
     - gocheckcompilerdirectives
     - gochecknoinits
+    - gocritic
     - gocognit
     - gosec
     - govet
     - iface
     - ineffassign
     - makezero
+    - mirror
     - misspell
     # musttag guards the JSON side of atago's machine-readable contracts (the
     # json/junit/gha reports, the manifest and rerun ledgers): a field added
@@ -38,17 +43,22 @@ linters:
     - musttag
     - nestif
     - nilerr
+    - nilnil
     - nilnesserr
     - noctx
     - nolintlint
+    - predeclared
     - reassign
+    - recvcheck
     - rowserrcheck
     - sqlclosecheck
     - staticcheck
     - tagliatelle
     - thelper
+    - tparallel
     - unconvert
     - unused
+    - usetesting
     - usestdlibvars
     - wastedassign
     - whitespace
@@ -70,6 +80,13 @@ linters:
       ignore-enum-members: 'atago/internal/(spec\.(StepNone|AssertNone))$'
     gocognit:
       min-complexity: 30
+    recvcheck:
+      # UnmarshalYAML has to take a pointer and MarshalYAML has to take a value:
+      # the two halves of the yaml codec cannot agree on a receiver, so the mixed
+      # pair is the interface's doing, not an inconsistency to fix.
+      exclusions:
+        - "*.UnmarshalYAML"
+        - "*.MarshalYAML"
     nestif:
       min-complexity: 5
     errcheck:

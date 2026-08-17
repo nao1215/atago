@@ -74,17 +74,17 @@ var referenceSubcommandRowRe = regexp.MustCompile("(?m)^\\| `atago ([a-z][a-z-]*
 // subcommand fails the build instead of quietly misleading readers.
 func TestDocs_ReferenceSubcommandsAreReal(t *testing.T) {
 	ref := readDoc(t, "website/content/reference.md")
-	real := map[string]bool{}
+	known := map[string]bool{}
 	for _, name := range cli.Subcommands() {
-		real[name] = true
+		known[name] = true
 	}
 	rows := referenceSubcommandRowRe.FindAllStringSubmatch(ref, -1)
 	if len(rows) == 0 {
 		t.Fatal("no `| `atago <name>`` Subcommands rows found in website/content/reference.md")
 	}
 	for _, m := range rows {
-		if !real[m[1]] {
-			t.Errorf("website/content/reference.md Subcommands table lists `atago %s`, which is not a real subcommand (real inventory: %v)", m[1], cli.Subcommands())
+		if !known[m[1]] {
+			t.Errorf("website/content/reference.md Subcommands table lists `atago %s`, which is not a known subcommand (known inventory: %v)", m[1], cli.Subcommands())
 		}
 	}
 }

@@ -52,6 +52,8 @@ func checkDeterminism(ctx context.Context, d *spec.Deterministic, first *runner.
 			}
 		}
 	}
+	//nolint:nilnil // "no failing check" is the passing answer, not an error: every rerun
+	// matched. A sentinel would make callers treat a clean property as a problem.
 	return nil, nil
 }
 

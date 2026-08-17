@@ -555,11 +555,12 @@ func validateSuiteBlock(add addFunc, where string, steps []spec.Step, runners ma
 				continue
 			}
 			svc := st.Service
-			if svc.Name == "" {
+			switch {
+			case svc.Name == "":
 				add(diag.RequiredKey, "%s.service.name is required", sw)
-			} else if seenService[svc.Name] {
+			case seenService[svc.Name]:
 				add(diag.DuplicateName, "%s: duplicate suite service name %q", where, svc.Name)
-			} else {
+			default:
 				seenService[svc.Name] = true
 			}
 			if svc.Command == "" {
@@ -575,11 +576,12 @@ func validateSuiteBlock(add addFunc, where string, steps []spec.Step, runners ma
 				continue
 			}
 			ms := st.MockServer
-			if ms.Name == "" {
+			switch {
+			case ms.Name == "":
 				add(diag.RequiredKey, "%s.mock_server.name is required", sw)
-			} else if seenMock[ms.Name] {
+			case seenMock[ms.Name]:
 				add(diag.DuplicateName, "%s: duplicate suite mock server name %q", where, ms.Name)
-			} else {
+			default:
 				seenMock[ms.Name] = true
 			}
 			validateMockRoutes(add, sw+".mock_server", ms.Routes)

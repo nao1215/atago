@@ -127,7 +127,7 @@ func TestCompletion_RunFlagsMatchTheCommand(t *testing.T) {
 	var out, errb bytes.Buffer
 	Main([]string{"run", "--help"}, &out, &errb)
 
-	real := map[string]bool{}
+	declared := map[string]bool{}
 	for _, line := range strings.Split(out.String()+errb.String(), "\n") {
 		rest, ok := strings.CutPrefix(line, "  -")
 		if !ok {
@@ -135,10 +135,10 @@ func TestCompletion_RunFlagsMatchTheCommand(t *testing.T) {
 		}
 		name, _, _ := strings.Cut(rest, " ")
 		if name != "" {
-			real["--"+name] = true
+			declared["--"+name] = true
 		}
 	}
-	if len(real) == 0 {
+	if len(declared) == 0 {
 		t.Fatalf("no flags parsed out of run --help:\n%s%s", out.String(), errb.String())
 	}
 
@@ -146,13 +146,13 @@ func TestCompletion_RunFlagsMatchTheCommand(t *testing.T) {
 	for _, f := range runFlags {
 		offered[f] = true
 	}
-	for f := range real {
+	for f := range declared {
 		if !offered[f] {
 			t.Errorf("`atago run` accepts %s but shell completion does not offer it", f)
 		}
 	}
 	for f := range offered {
-		if !real[f] {
+		if !declared[f] {
 			t.Errorf("shell completion offers %s but `atago run` does not accept it", f)
 		}
 	}
@@ -496,18 +496,11 @@ scenarios:
 // dir to avoid touching the repo.
 func withWorkdir(t *testing.T, dir string, fn func()) {
 	t.Helper()
-	orig, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chdir(dir); err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		if err := os.Chdir(orig); err != nil {
-			t.Fatal(err)
-		}
-	}()
+	// t.Chdir restores the original directory itself, including on a panic, and it
+	// fails a test that has called t.Parallel. That is the outcome to want here:
+	// the rerun ledger's path is resolved against a process-global cwd, so two
+	// tests changing directory at once would read each other's state.
+	t.Chdir(dir)
 	fn()
 }
 

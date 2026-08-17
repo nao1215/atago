@@ -932,6 +932,7 @@ func TestLoadBytes_ExplicitTagRejected(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			s, err := LoadBytes("t.atago.yaml", []byte(tt.src))
 			if err == nil {
 				t.Fatalf("LoadBytes() = nil error, want a parse error naming the tag")
@@ -1385,6 +1386,7 @@ func TestBugHunt_Rejections(t *testing.T) {
 	// the Go runtime on Windows CI.
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			mustReject(t, tt.name, tt.src, tt.want)
 		})
 	}
@@ -1460,6 +1462,7 @@ func TestBugHunt_Acceptances(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			mustAccept(t, tt.name, tt.src)
 		})
 	}
@@ -1554,6 +1557,7 @@ func TestBugHunt_DirAssert(t *testing.T) {
 	}
 	for _, tt := range reject {
 		t.Run("reject/"+tt.name, func(t *testing.T) {
+			t.Parallel()
 			mustReject(t, tt.name, tt.src, tt.want)
 		})
 	}
@@ -1575,6 +1579,7 @@ func TestBugHunt_DirAssert(t *testing.T) {
 	}
 	for _, tt := range accept {
 		t.Run("accept/"+tt.name, func(t *testing.T) {
+			t.Parallel()
 			mustAccept(t, tt.name, tt.src)
 		})
 	}

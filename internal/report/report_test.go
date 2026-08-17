@@ -1256,6 +1256,7 @@ func TestRepeatFlaky_MessageAcrossFormats(t *testing.T) {
 		{"junit", FormatJUnit},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			var b strings.Builder
 			if err := Render(&b, tc.format, res); err != nil {
 				t.Fatalf("render: %v", err)

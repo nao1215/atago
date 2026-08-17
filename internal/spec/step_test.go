@@ -183,6 +183,7 @@ func TestJSONChecks_UnmarshalYAML(t *testing.T) {
 	t.Parallel()
 
 	t.Run("single mapping", func(t *testing.T) {
+		t.Parallel()
 		var s StreamAssert
 		if err := yaml.Unmarshal([]byte("json:\n  path: $.a\n  equals: 1\n"), &s); err != nil {
 			t.Fatalf("unmarshal single: %v", err)
@@ -193,6 +194,7 @@ func TestJSONChecks_UnmarshalYAML(t *testing.T) {
 	})
 
 	t.Run("list of mappings", func(t *testing.T) {
+		t.Parallel()
 		var s StreamAssert
 		src := "json:\n  - {path: $.a, equals: 1}\n  - {path: $.b, equals: 2}\n"
 		if err := yaml.Unmarshal([]byte(src), &s); err != nil {
@@ -204,6 +206,7 @@ func TestJSONChecks_UnmarshalYAML(t *testing.T) {
 	})
 
 	t.Run("empty list rejected", func(t *testing.T) {
+		t.Parallel()
 		var s StreamAssert
 		if err := yaml.Unmarshal([]byte("json: []\n"), &s); err == nil {
 			t.Fatal("empty json list should be rejected")
@@ -211,6 +214,7 @@ func TestJSONChecks_UnmarshalYAML(t *testing.T) {
 	})
 
 	t.Run("unknown key inside a check is rejected", func(t *testing.T) {
+		t.Parallel()
 		var s StreamAssert
 		if err := yaml.Unmarshal([]byte("json:\n  path: $.a\n  equalss: 1\n"), &s); err == nil {
 			t.Fatal("a typo'd key inside a json check should be rejected (strict)")

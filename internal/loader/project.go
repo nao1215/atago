@@ -79,6 +79,8 @@ func FindProject(dir string) (*Project, error) {
 		}
 		parent := filepath.Dir(abs)
 		if parent == abs {
+			//nolint:nilnil // No manifest anywhere above dir. That is the normal case for a
+			// project without one, so it cannot be reported as a failure.
 			return nil, nil
 		}
 		abs = parent

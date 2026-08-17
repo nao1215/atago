@@ -2,6 +2,7 @@ package scrub
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 
 	"github.com/nao1215/atago/internal/spec"
@@ -38,7 +39,7 @@ func TestNew_InvalidPatternErrors(t *testing.T) {
 		t.Fatal("New accepted an invalid regexp, want error")
 	}
 	for _, want := range []string{"scrub[1]", "("} {
-		if !bytes.Contains([]byte(err.Error()), []byte(want)) {
+		if !strings.Contains(err.Error(), want) {
 			t.Errorf("error %q missing %q", err, want)
 		}
 	}
