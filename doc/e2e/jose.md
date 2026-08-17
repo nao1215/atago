@@ -52,6 +52,7 @@
   - [parse prints the payload from stdin](#scenario-parse-prints-the-payload-from-stdin)
   - [parse prints all parts with --all](#scenario-parse-prints-all-parts-with---all)
   - [parse reports a missing file instead of a parse error](#scenario-parse-reports-a-missing-file-instead-of-a-parse-error)
+
 ## jose CLI surface
 Source: `test/e2e/tools/jose/cli.atago.yaml`
 ### Scenario: root help prints usage with no arguments
@@ -62,6 +63,7 @@ jose
 #### Then
 - exit code is `0`
 - stdout contains `JSON Object Signing and Encryption`, `Available Commands:`, `jwk`, `jws`, `jwe`
+
 ### Scenario: root help prints usage with --help
 #### When
 ```shell
@@ -70,6 +72,7 @@ jose --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`, `jwa`
+
 ### Scenario: version prints the version
 #### When
 ```shell
@@ -78,6 +81,7 @@ jose version
 #### Then
 - exit code is `0`
 - stdout contains `jose version`, `MIT LICENSE`
+
 ### Scenario: unknown command fails and reports the unknown command
 #### When
 ```shell
@@ -86,6 +90,7 @@ jose frobnicate
 #### Then
 - exit code is not `0`
 - stderr contains `unknown command`
+
 ### Scenario: jwa lists the key types
 #### When
 ```shell
@@ -94,6 +99,7 @@ jose jwa --key-type
 #### Then
 - exit code is `0`
 - stdout contains `RSA`, `oct`
+
 ### Scenario: jwa lists only key types jose can generate
 #### When
 ```shell
@@ -102,6 +108,7 @@ jose jwa --key-type
 #### Then
 - exit code is `0`
 - stdout does not contain `AKP`
+
 ### Scenario: jwa lists only signature algorithms jose accepts
 #### When
 ```shell
@@ -111,6 +118,7 @@ jose jwa --signature
 - exit code is `0`
 - stdout contains `EdDSA`
 - stdout does not contain `Ed25519`, `none`
+
 ### Scenario: jwa lists only elliptic curves jose can generate
 #### When
 ```shell
@@ -120,6 +128,7 @@ jose jwa --elliptic-curve
 - exit code is `0`
 - stdout contains `X25519`
 - stdout does not contain `X448`
+
 ### Scenario: jwa lists only key encryption algorithms jose accepts
 #### When
 ```shell
@@ -129,6 +138,7 @@ jose jwa --key-encryption
 - exit code is `0`
 - stdout contains `RSA-OAEP`
 - stdout does not contain `RSA-OAEP-384`, `HPKE`
+
 ### Scenario: jwa fails when no option is given
 #### When
 ```shell
@@ -137,6 +147,7 @@ jose jwa
 #### Then
 - exit code is not `0`
 - stderr is not empty
+
 ## jose completion
 Source: `test/e2e/tools/jose/completion.atago.yaml`
 ### Scenario: writes a bash completion script to stdout
@@ -147,6 +158,7 @@ jose completion bash
 #### Then
 - exit code is `0`
 - stdout contains `bash completion`
+
 ### Scenario: writes a zsh completion script to stdout
 #### When
 ```shell
@@ -155,6 +167,7 @@ jose completion zsh
 #### Then
 - exit code is `0`
 - stdout contains `compdef`
+
 ### Scenario: writes a fish completion script to stdout
 #### When
 ```shell
@@ -163,6 +176,7 @@ jose completion fish
 #### Then
 - exit code is `0`
 - stdout contains `fish`
+
 ### Scenario: requires a shell argument
 #### When
 ```shell
@@ -171,6 +185,7 @@ jose completion
 #### Then
 - exit code is not `0`
 - stderr is not empty
+
 ### Scenario: rejects an unknown shell
 #### When
 ```shell
@@ -179,6 +194,7 @@ jose completion powershell
 #### Then
 - exit code is not `0`
 - stderr is not empty
+
 ### Scenario: does not create files in the working directory
 #### When
 ```shell
@@ -189,6 +205,7 @@ ls -A
 #### Then
 - exit code is `0`
 - stdout is empty
+
 ## jose jwe
 Source: `test/e2e/tools/jose/jwe.atago.yaml`
 ### Scenario: round-trips a payload through encrypt and decrypt
@@ -209,6 +226,7 @@ jose jwe decrypt --key ec.jwk secret.jwe
 `:
   - exit code is `0`
   - stdout equals an exact value
+
 ### Scenario: round-trips a payload piped through stdin
 #### When
 ```shell
@@ -227,6 +245,7 @@ cat secret.jwe | jose jwe decrypt --key ec.jwk
 `:
   - exit code is `0`
   - stdout equals an exact value
+
 ### Scenario: round-trips with compression enabled
 #### When
 ```shell
@@ -245,6 +264,7 @@ jose jwe decrypt --key ec.jwk secret.jwe
 `:
   - exit code is `0`
   - stdout equals an exact value
+
 ### Scenario: fails to encrypt without a key
 #### When
 ```shell
@@ -257,6 +277,7 @@ jose jwe encrypt --key-encryption ECDH-ES --content-encryption A256GCM payload.j
 - after `jose jwe encrypt --key-encryption ECDH-ES --content-encryption A256GCM payload.json`:
   - exit code is not `0`
   - stderr contains `key file required`
+
 ### Scenario: fails to encrypt with an invalid content encryption
 #### When
 ```shell
@@ -269,6 +290,7 @@ jose jwe encrypt --key ec.jwk --key-encryption ECDH-ES --content-encryption BOGU
 - after `jose jwe encrypt --key ec.jwk --key-encryption ECDH-ES --content-encryption BOGUS payload.json`:
   - exit code is not `0`
   - stderr contains `content encryption`
+
 ## jose jwk generate
 Source: `test/e2e/tools/jose/jwk.atago.yaml`
 ### Scenario: generates an RSA key as JSON
@@ -279,6 +301,7 @@ jose jwk generate --type RSA --size 2048
 #### Then
 - exit code is `0`
 - stdout contains `"kty"`, `RSA`
+
 ### Scenario: generates an EC key in PEM format
 #### When
 ```shell
@@ -287,6 +310,7 @@ jose jwk generate --type EC --curve P-256 --output-format pem
 #### Then
 - exit code is `0`
 - stdout contains `BEGIN`, `PRIVATE KEY`
+
 ### Scenario: generates an OKP Ed25519 key
 #### When
 ```shell
@@ -295,6 +319,7 @@ jose jwk generate --type OKP --curve Ed25519
 #### Then
 - exit code is `0`
 - stdout contains `OKP`
+
 ### Scenario: generates an oct key
 #### When
 ```shell
@@ -303,6 +328,7 @@ jose jwk generate --type oct --size 256
 #### Then
 - exit code is `0`
 - stdout contains `oct`
+
 ### Scenario: emits a public key without private fields
 #### When
 ```shell
@@ -312,6 +338,7 @@ jose jwk generate --type EC --curve P-256 --public-key
 - exit code is `0`
 - stdout contains `"kty"`
 - stdout does not contain `"d"`
+
 ### Scenario: rejects the unsupported OKP X448 curve
 #### When
 ```shell
@@ -320,6 +347,7 @@ jose jwk generate --type OKP --curve X448
 #### Then
 - exit code is not `0`
 - stderr contains `OKP supports`
+
 ### Scenario: rejects the unsupported OKP Ed448 curve
 #### When
 ```shell
@@ -328,6 +356,7 @@ jose jwk generate --type OKP --curve Ed448
 #### Then
 - exit code is not `0`
 - stderr contains `OKP supports`
+
 ### Scenario: requires a curve for EC keys
 #### When
 ```shell
@@ -336,6 +365,7 @@ jose jwk generate --type EC
 #### Then
 - exit code is not `0`
 - stderr contains `require --curve`
+
 ### Scenario: rejects PEM output for oct keys
 #### When
 ```shell
@@ -344,6 +374,7 @@ jose jwk generate --type oct --size 256 --output-format pem
 #### Then
 - exit code is not `0`
 - stderr contains `oct`, `json`
+
 ### Scenario: rejects --public-key for oct keys
 #### When
 ```shell
@@ -352,6 +383,7 @@ jose jwk generate --type oct --size 256 --public-key
 #### Then
 - exit code is not `0`
 - stderr contains `public key`
+
 ### Scenario: leaves a parseable EC key after overwriting a longer RSA key
 #### When
 ```shell
@@ -364,6 +396,7 @@ jose jws sign --algorithm ES256 --key key.jwk msg.txt
 #### Then
 - exit code is `0`
 - stdout is not empty
+
 ## jose jws
 Source: `test/e2e/tools/jose/jws.atago.yaml`
 ### Scenario: sign requires an algorithm
@@ -379,6 +412,7 @@ jose jws sign --key ec.jwk payload.json
 - after `jose jws sign --key ec.jwk payload.json`:
   - exit code is not `0`
   - stderr contains `signature algorithm`
+
 ### Scenario: sign signs a payload into a compact JWS
 #### When
 ```shell
@@ -392,6 +426,7 @@ jose jws sign --algorithm ES256 --key ec.jwk payload.json
 - after `jose jws sign --algorithm ES256 --key ec.jwk payload.json`:
   - exit code is `0`
   - stdout contains `.`
+
 ### Scenario: sign signs a payload read from stdin via a pipe
 #### When
 ```shell
@@ -405,6 +440,7 @@ cat payload.json | jose jws sign --algorithm ES256 --key ec.jwk
 - after `cat payload.json | jose jws sign --algorithm ES256 --key ec.jwk`:
   - exit code is `0`
   - stdout contains `.`
+
 ### Scenario: verify verifies and prints the payload
 #### When
 ```shell
@@ -418,6 +454,7 @@ jose jws verify --algorithm ES256 --key ec.jwk token.jws
 - after `jose jws verify --algorithm ES256 --key ec.jwk token.jws`:
   - exit code is `0`
   - stdout equals an exact value
+
 ### Scenario: verify verifies a token passed directly as an argument
 #### When
 ```shell
@@ -431,6 +468,7 @@ jose jws verify --algorithm ES256 --key ec.jwk "$(cat token.jws)"
 - after `jose jws verify --algorithm ES256 --key ec.jwk "$(cat token.jws)"`:
   - exit code is `0`
   - stdout equals an exact value
+
 ### Scenario: verify verifies a token read from stdin via a pipe
 #### When
 ```shell
@@ -444,6 +482,7 @@ cat token.jws | jose jws verify --algorithm ES256 --key ec.jwk
 - after `cat token.jws | jose jws verify --algorithm ES256 --key ec.jwk`:
   - exit code is `0`
   - stdout equals an exact value
+
 ### Scenario: verify reports a missing file instead of a parse error
 #### When
 ```shell
@@ -457,6 +496,7 @@ jose jws verify --algorithm ES256 --key ec.jwk does-not-exist.jws
 - after `jose jws verify --algorithm ES256 --key ec.jwk does-not-exist.jws`:
   - exit code is not `0`
   - stderr contains `failed to open file`
+
 ### Scenario: verify fails with the wrong key
 #### When
 ```shell
@@ -471,6 +511,7 @@ jose jws verify --algorithm ES256 --key other.jwk token.jws
 - after `jose jws verify --algorithm ES256 --key other.jwk token.jws`:
   - exit code is not `0`
   - stderr contains `verify`
+
 ### Scenario: parse prints the payload from a file
 #### When
 ```shell
@@ -484,6 +525,7 @@ jose jws parse token.jws
 - after `jose jws parse token.jws`:
   - exit code is `0`
   - stdout equals an exact value
+
 ### Scenario: parse prints the payload from an inline token argument
 #### When
 ```shell
@@ -497,6 +539,7 @@ jose jws parse "$(cat token.jws)"
 - after `jose jws parse "$(cat token.jws)"`:
   - exit code is `0`
   - stdout equals an exact value
+
 ### Scenario: parse prints the payload from stdin
 #### When
 ```shell
@@ -510,6 +553,7 @@ cat token.jws | jose jws parse -
 - after `cat token.jws | jose jws parse -`:
   - exit code is `0`
   - stdout equals an exact value
+
 ### Scenario: parse prints all parts with --all
 #### When
 ```shell
@@ -523,6 +567,7 @@ jose jws parse --all token.jws
 - after `jose jws parse --all token.jws`:
   - exit code is `0`
   - stdout contains `Payload:`, `Signature 0:`
+
 ### Scenario: parse reports a missing file instead of a parse error
 #### When
 ```shell

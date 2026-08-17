@@ -33,6 +33,7 @@
   - [japanese-resume example: -t japanese-resume -o rirekisho.pdf](#scenario-japanese-resume-example--t-japanese-resume--o-rirekishopdf)
   - [work-history example: -t work-history -o shokumukeirekisho.pdf](#scenario-work-history-example--t-work-history--o-shokumukeirekishopdf)
   - [all example: -t all writes the three default file names](#scenario-all-example--t-all-writes-the-three-default-file-names)
+
 ## career CLI
 Source: `test/e2e/tools/career/cli.atago.yaml`
 ### Scenario: prints root help with no arguments
@@ -43,6 +44,7 @@ career
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`, `generate`
+
 ### Scenario: prints the version
 #### When
 ```shell
@@ -51,6 +53,7 @@ career version
 #### Then
 - exit code is `0`
 - stdout contains `career`
+
 ### Scenario: lists the available templates
 #### When
 ```shell
@@ -59,6 +62,7 @@ career templates
 #### Then
 - exit code is `0`
 - stdout contains `cv`, `japanese-resume`, `work-history`
+
 ### Scenario: documents the aliases generate accepts
 #### When
 ```shell
@@ -67,6 +71,7 @@ career templates
 #### Then
 - exit code is `0`
 - stdout contains `履歴書`, `職務経歴書`, `career-history`
+
 ### Scenario: describes the generate command
 #### When
 ```shell
@@ -75,6 +80,7 @@ career help generate
 #### Then
 - exit code is `0`
 - stdout contains `--template`
+
 ### Scenario: unknown command fails with a helpful message
 #### When
 ```shell
@@ -83,6 +89,7 @@ career frobnicate
 #### Then
 - exit code is not `0`
 - stderr contains `unknown command`
+
 ## career generate
 Source: `test/e2e/tools/career/generate.atago.yaml`
 ### Scenario: cv renders a PDF (default template) with an accent color
@@ -96,8 +103,10 @@ career generate resume.yaml --accent "#2c6e6e" -o cv.pdf
   - exit code is `0`
   - stdout contains `wrote`
   - file `cv.pdf` exists
+
 #### Generated artifacts
 - `cv.pdf`
+
 ### Scenario: cv writes a valid PDF header
 #### When
 ```shell
@@ -109,8 +118,10 @@ head -c 4 cv.pdf
 - after `head -c 4 cv.pdf`:
   - stdout equals an exact value
   - pdf `cv.pdf` >= 1 page
+
 #### Generated artifacts
 - `cv.pdf`
+
 ### Scenario: japanese-resume renders a PDF from a positional input
 #### When
 ```shell
@@ -122,8 +133,10 @@ career generate resume.yaml -t japanese-resume -o out.pdf
   - exit code is `0`
   - stdout contains `wrote`
   - file `out.pdf` exists
+
 #### Generated artifacts
 - `out.pdf`
+
 ### Scenario: japanese-resume accepts the 履歴書 alias
 #### When
 ```shell
@@ -135,8 +148,10 @@ career generate resume.yaml -t 履歴書 -o out.pdf
   - exit code is `0`
   - stdout contains `wrote`
   - file `out.pdf` exists
+
 #### Generated artifacts
 - `out.pdf`
+
 ### Scenario: japanese-resume embeds the bundled sample portrait passed with --photo
 #### When
 ```shell
@@ -148,8 +163,10 @@ career generate resume.yaml -t japanese-resume --photo "$CAREER_EXAMPLES/../imag
   - exit code is `0`
   - stdout contains `wrote`
   - file `out.pdf` exists
+
 #### Generated artifacts
 - `out.pdf`
+
 ### Scenario: work-history renders a PDF using --input and the default output name
 #### When
 ```shell
@@ -161,8 +178,10 @@ career generate --input resume.yaml --template work-history --output ch.pdf
   - exit code is `0`
   - stdout contains `wrote`
   - file `ch.pdf` exists
+
 #### Generated artifacts
 - `ch.pdf`
+
 ### Scenario: work-history still accepts the legacy career-history alias
 #### When
 ```shell
@@ -174,8 +193,10 @@ career generate resume.yaml -t career-history -o legacy.pdf
   - exit code is `0`
   - stdout contains `work-history`
   - file `legacy.pdf` exists
+
 #### Generated artifacts
 - `legacy.pdf`
+
 ### Scenario: work-history accepts the 職務経歴書 alias
 #### When
 ```shell
@@ -187,8 +208,10 @@ career generate resume.yaml -t 職務経歴書 -o ja.pdf
   - exit code is `0`
   - stdout contains `wrote`
   - file `ja.pdf` exists
+
 #### Generated artifacts
 - `ja.pdf`
+
 ### Scenario: multiple templates renders every template with -t all
 #### When
 ```shell
@@ -202,10 +225,12 @@ career generate resume.yaml -t all
   - file `cv.pdf` exists
   - file `japanese-resume.pdf` exists
   - file `work-history.pdf` exists
+
 #### Generated artifacts
 - `cv.pdf`
 - `japanese-resume.pdf`
 - `work-history.pdf`
+
 ### Scenario: errors fails when the input file is missing
 #### When
 ```shell
@@ -216,6 +241,7 @@ career generate nope.yaml -t cv -o out.pdf
 - after `career generate nope.yaml -t cv -o out.pdf`:
   - exit code is not `0`
   - stderr is not empty
+
 ### Scenario: errors fails on an unknown template
 #### When
 ```shell
@@ -226,6 +252,7 @@ career generate resume.yaml -t bogus -o out.pdf
 - after `career generate resume.yaml -t bogus -o out.pdf`:
   - exit code is not `0`
   - stderr contains `unknown template`
+
 ### Scenario: errors fails on an invalid accent color
 #### When
 ```shell
@@ -236,6 +263,7 @@ career generate resume.yaml -t cv --accent bogus -o out.pdf
 - after `career generate resume.yaml -t cv --accent bogus -o out.pdf`:
   - exit code is not `0`
   - stderr contains `hex color`
+
 ### Scenario: errors fails when no input is given
 #### When
 ```shell
@@ -246,6 +274,7 @@ career generate -t cv
 - after `career generate -t cv`:
   - exit code is not `0`
   - stderr contains `no input file`
+
 ## career init
 Source: `test/e2e/tools/career/init.atago.yaml`
 ### Scenario: writes a starter file
@@ -257,8 +286,10 @@ career init resume.yaml
 - exit code is `0`
 - stdout contains `wrote`
 - file `resume.yaml` exists
+
 #### Generated artifacts
 - `resume.yaml`
+
 ### Scenario: refuses to overwrite without --force
 #### When
 ```shell
@@ -269,6 +300,7 @@ career init resume.yaml
 - after `career init resume.yaml`:
   - exit code is not `0`
   - stderr contains `already exists`
+
 ### Scenario: overwrites with --force
 #### When
 ```shell
@@ -279,6 +311,7 @@ career init resume.yaml --force
 - after `career init resume.yaml --force`:
   - exit code is `0`
   - stdout contains `wrote`
+
 ### Scenario: produces a file that generate accepts
 #### When
 ```shell
@@ -290,8 +323,10 @@ career generate resume.yaml -t cv -o cv.pdf
   - exit code is `0`
   - stdout contains `wrote`
   - file `cv.pdf` exists
+
 #### Generated artifacts
 - `cv.pdf`
+
 ## career README examples
 Source: `test/e2e/tools/career/readme.atago.yaml`
 ### Scenario: cv example: career generate resume.yaml -t cv -o cv.pdf
@@ -305,8 +340,10 @@ career generate resume.yaml -t cv -o cv.pdf
   - exit code is `0`
   - stdout contains `wrote`
   - file `cv.pdf` exists
+
 #### Generated artifacts
 - `cv.pdf`
+
 ### Scenario: japanese-resume example: -t japanese-resume -o rirekisho.pdf
 #### When
 ```shell
@@ -318,8 +355,10 @@ career generate resume.yaml -t japanese-resume -o rirekisho.pdf
   - exit code is `0`
   - stdout contains `wrote`
   - file `rirekisho.pdf` exists
+
 #### Generated artifacts
 - `rirekisho.pdf`
+
 ### Scenario: work-history example: -t work-history -o shokumukeirekisho.pdf
 #### When
 ```shell
@@ -331,8 +370,10 @@ career generate resume.yaml -t work-history -o shokumukeirekisho.pdf
   - exit code is `0`
   - stdout contains `wrote`
   - file `shokumukeirekisho.pdf` exists
+
 #### Generated artifacts
 - `shokumukeirekisho.pdf`
+
 ### Scenario: all example: -t all writes the three default file names
 #### When
 ```shell
@@ -346,6 +387,7 @@ career generate resume.yaml -t all
   - file `cv.pdf` exists
   - file `japanese-resume.pdf` exists
   - file `work-history.pdf` exists
+
 #### Generated artifacts
 - `cv.pdf`
 - `japanese-resume.pdf`

@@ -7,6 +7,7 @@
   - [a published notification comes back through the JSON poll feed](#scenario-a-published-notification-comes-back-through-the-json-poll-feed)
   - [the bundled CLI publishes against the same server](#scenario-the-bundled-cli-publishes-against-the-same-server)
   - [deny-all access control locks a topic until a user is granted](#scenario-deny-all-access-control-locks-a-topic-until-a-user-is-granted)
+
 ## ntfy (self-hosted push notification service)
 [ntfy](https://ntfy.sh/) sends push notifications over plain HTTP, which
 means anything that can make a request can publish — and that is both its
@@ -33,11 +34,13 @@ ntfy --version
 #### Then
 - exit code is `0`
 - stdout matches `/ntfy version [0-9]+\.[0-9]+\.[0-9]+/`
+
 ### Scenario: a published notification comes back through the JSON poll feed
 _only when `command -v ntfy` succeeds_
 #### Given
 - Background service `ntfy` is started: `ntfy serve --listen-http 127.0.0.1:18180 --base-url http://127.0.0.1:18180 --cache-file data/cache.db`.
 - Fixture file `data/.keep` is created.
+
 #### When
 ```shell
 # HTTP GET /v1/health via ntfy
@@ -60,11 +63,13 @@ _only when `command -v ntfy` succeeds_
 - after `HTTP GET /other-topic/json?poll=1`:
   - HTTP status is `200`
   - body is empty
+
 ### Scenario: the bundled CLI publishes against the same server
 _only when `command -v ntfy` succeeds_
 #### Given
 - Background service `ntfy` is started: `ntfy serve --listen-http 127.0.0.1:18181 --base-url http://127.0.0.1:18181 --cache-file data/cache.db`.
 - Fixture file `data/.keep` is created.
+
 #### When
 ```shell
 ntfy publish http://127.0.0.1:18181/atago-deploys "deploy one"
@@ -79,12 +84,14 @@ ntfy publish http://127.0.0.1:18181/atago-deploys "deploy two"
 - after `HTTP GET /atago-deploys/json?poll=1&since=all`:
   - HTTP status is `200`
   - body contains `deploy one`, `deploy two`
+
 ### Scenario: deny-all access control locks a topic until a user is granted
 _only when `command -v ntfy` succeeds_
 #### Given
 - Background service `ntfy` is started: `ntfy serve --listen-http 127.0.0.1:18182 --base-url http://127.0.0.1:18182 --cache-file data/cache.db --auth-file data/auth.db --auth-default-access deny-all`.
 - Fixture file `data/.keep` is created.
 - Environment variables are set: NTFY_PASSWORD.
+
 #### When
 ```shell
 # HTTP POST /secure-topic via ntfy3

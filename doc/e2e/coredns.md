@@ -8,6 +8,7 @@
   - [missing names and foreign zones get the right RCODEs](#scenario-missing-names-and-foreign-zones-get-the-right-rcodes)
   - [the health plugin answers over HTTP while DNS serves](#scenario-the-health-plugin-answers-over-http-while-dns-serves)
   - [a broken Corefile is rejected at startup](#scenario-a-broken-corefile-is-rejected-at-startup)
+
 ## coredns (self-hosted DNS server)
 [CoreDNS](https://coredns.io/) speaks DNS, a protocol atago has no runner
 for — which is exactly why this suite exists. A protocol you cannot address
@@ -33,12 +34,14 @@ coredns -version
 #### Then
 - exit code is `0`
 - stdout matches `/CoreDNS-[0-9]+\.[0-9]+\.[0-9]+/`
+
 ### Scenario: an authored zone is served authoritatively
 _only when `coredns -version` succeeds_
 #### Given
 - Background service `coredns` is started: `coredns -conf Corefile`.
 - Fixture file `Corefile` is created.
 - Fixture file `zones/example.test.zone` is created.
+
 #### Inputs
 _Fixture `Corefile`:_
 ```text
@@ -75,12 +78,14 @@ dig @127.0.0.1 -p 18150 alias.example.test A +short
 - after `dig @127.0.0.1 -p 18150 alias.example.test A +short`:
   - exit code is `0`
   - stdout contains `www.example.test.`, `192.0.2.10`
+
 ### Scenario: missing names and foreign zones get the right RCODEs
 _only when `coredns -version` succeeds_
 #### Given
 - Background service `coredns` is started: `coredns -conf Corefile`.
 - Fixture file `Corefile` is created.
 - Fixture file `zones/example.test.zone` is created.
+
 #### Inputs
 _Fixture `Corefile`:_
 ```text
@@ -109,6 +114,7 @@ dig @127.0.0.1 -p 18151 www.example.com A +noall +comments
 - after `dig @127.0.0.1 -p 18151 www.example.com A +noall +comments`:
   - exit code is `0`
   - stdout contains `status: REFUSED`
+
 ### Scenario: the health plugin answers over HTTP while DNS serves
 _only when `coredns -version` succeeds_
 #### Given
@@ -116,6 +122,7 @@ _only when `coredns -version` succeeds_
 - Fixture file `Corefile` is created.
 - Fixture file `zones/example.test.zone` is created.
 - The step is retried up to 15 times every 500ms until HTTP status is `200`.
+
 #### Inputs
 _Fixture `Corefile`:_
 ```text
@@ -145,10 +152,12 @@ dig @127.0.0.1 -p 18152 www.example.test A +short
 - after `dig @127.0.0.1 -p 18152 www.example.test A +short`:
   - exit code is `0`
   - stdout contains `192.0.2.10`
+
 ### Scenario: a broken Corefile is rejected at startup
 _only when `coredns -version` succeeds_
 #### Given
 - Fixture file `Corefile` is created.
+
 #### Inputs
 _Fixture `Corefile`:_
 ```text

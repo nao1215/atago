@@ -10,6 +10,7 @@
   - [check reports a healthy repository as error-free](#scenario-check-reports-a-healthy-repository-as-error-free)
   - [forget --keep-last 1 --prune drops the older snapshot](#scenario-forget---keep-last-1---prune-drops-the-older-snapshot)
   - [the wrong password cannot unlock the repository](#scenario-the-wrong-password-cannot-unlock-the-repository)
+
 ## restic (self-hosted backup program)
 A backup tool is only worth anything if the restore works, so this suite
 follows [restic](https://restic.net/) through the entire lifecycle rather
@@ -36,6 +37,7 @@ restic version
 #### Then
 - exit code is `0`
 - stdout matches `/restic [0-9]+\.[0-9]+\.[0-9]+/`
+
 ### Scenario: init creates an encrypted repository on disk
 _only when `restic version` succeeds_
 #### When
@@ -46,11 +48,13 @@ restic init
 - exit code is `0`
 - stdout contains `created restic repository`
 - dir `repo` exists, contains `config`, contains `keys`, contains `snapshots`
+
 ### Scenario: backup, list as JSON, and restore round-trip user data
 _only when `restic version` succeeds_
 #### Given
 - Fixture file `data/hello.txt` is created.
 - Fixture file `data/sub/notes.md` is created.
+
 #### Inputs
 _Fixture `data/hello.txt`:_
 ```text
@@ -81,11 +85,13 @@ restic restore ${snap} --target restored
   - stdout contains `Restored`
   - file `restored/data/hello.txt` contains `hello from atago`
   - file `restored/data/sub/notes.md` contains `# notes kept safe`
+
 ### Scenario: diff names exactly the file added between two snapshots
 _only when `restic version` succeeds_
 #### Given
 - Fixture file `data/base.txt` is created.
 - Fixture file `data/added-later.txt` is created.
+
 #### Inputs
 _Fixture `data/base.txt`:_
 ```text
@@ -113,10 +119,12 @@ restic diff ${first} ${second}
   - exit code is `0`
   - stdout contains `+    /data/added-later.txt`
   - stdout does not contain `/data/base.txt`
+
 ### Scenario: check reports a healthy repository as error-free
 _only when `restic version` succeeds_
 #### Given
 - Fixture file `data/precious.txt` is created.
+
 #### Inputs
 _Fixture `data/precious.txt`:_
 ```text
@@ -132,11 +140,13 @@ restic check
 - after `restic check`:
   - exit code is `0`
   - stdout contains `no errors were found`
+
 ### Scenario: forget --keep-last 1 --prune drops the older snapshot
 _only when `restic version` succeeds_
 #### Given
 - Fixture file `data/gen.txt` is created.
 - Fixture file `data/gen.txt` is created.
+
 #### Inputs
 _Fixture `data/gen.txt`:_
 ```text
@@ -161,10 +171,12 @@ restic snapshots --json
 - after `restic snapshots --json`:
   - exit code is `0`
   - stdout at `$` has length 1
+
 ### Scenario: the wrong password cannot unlock the repository
 _only when `restic version` succeeds_
 #### Given
 - Environment variables are set: RESTIC_PASSWORD.
+
 #### When
 ```shell
 restic init

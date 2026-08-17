@@ -12,6 +12,7 @@
   - [an interactive session drives the REPL across exchanges](#scenario-an-interactive-session-drives-the-repl-across-exchanges)
   - [EOF (ctrl-d) ends the session cleanly](#scenario-eof-ctrl-d-ends-the-session-cleanly)
   - [a traceback is reported and the REPL recovers](#scenario-a-traceback-is-reported-and-the-repl-recovers)
+
 ## python3 + changes (bytecode cache footprint)
 Running a Python script quietly writes files you did not ask for: importing a
 local module leaves a compiled `.pyc` behind in `__pycache__`, while the
@@ -28,6 +29,7 @@ _only when `python3 --version` succeeds_
 #### Given
 - Fixture file `mymod.py` is created.
 - Fixture file `main.py` is created.
+
 #### Inputs
 _Fixture `mymod.py`:_
 ```text
@@ -47,12 +49,14 @@ python3 main.py
 - exit code is `0`
 - stdout equals an exact value
 - the step changed exactly created `__pycache__/*.pyc`, modified nothing, deleted nothing
+
 ### Scenario: PYTHONDONTWRITEBYTECODE suppresses the cache entirely
 _only when `python3 --version` succeeds_
 #### Given
 - Fixture file `mymod.py` is created.
 - Fixture file `main.py` is created.
 - Environment variables are set: PYTHONDONTWRITEBYTECODE.
+
 #### Inputs
 _Fixture `mymod.py`:_
 ```text
@@ -72,6 +76,7 @@ python3 main.py
 - exit code is `0`
 - stdout equals an exact value
 - the step changed exactly created nothing, modified nothing, deleted nothing
+
 ## python3 REPL (interactive pty testbed)
 The Python REPL is the canonical long-lived interactive session: it prints a
 prompt, waits, answers, and prompts again, for as many exchanges as you
@@ -102,6 +107,7 @@ python3 -c "print('hello from python')"
 - after `python3 -c "print('hello from python')"`:
   - exit code is `0`
   - stdout equals an exact value
+
 ### Scenario: a missing script exits 2 with a can't-open-file error
 _only when `python3 --version` succeeds_
 #### When
@@ -111,6 +117,7 @@ python3 no_such_script.py
 #### Then
 - exit code is `2`
 - stderr contains `can't open file`
+
 ### Scenario: stdout is a pipe under run but a tty under pty
 _only when `python3 --version` succeeds · skipped on Windows_
 #### When
@@ -125,6 +132,7 @@ python3 -c "import sys; print(sys.stdout.isatty())"
 - after `interactive (pty): python3 -c "import sys; print(sys.stdout.isatty())"`:
   - exit code is `0`
   - stdout contains `True`
+
 ### Scenario: an interactive session drives the REPL across exchanges
 _only when `python3 --version` succeeds · skipped on Windows_
 #### When
@@ -134,6 +142,7 @@ _only when `python3 --version` succeeds · skipped on Windows_
 #### Then
 - exit code is `0`
 - stdout contains `2`, `120`
+
 ### Scenario: EOF (ctrl-d) ends the session cleanly
 _only when `python3 --version` succeeds · skipped on Windows_
 #### When
@@ -142,6 +151,7 @@ _only when `python3 --version` succeeds · skipped on Windows_
 ```
 #### Then
 - exit code is `0`
+
 ### Scenario: a traceback is reported and the REPL recovers
 _only when `python3 --version` succeeds · skipped on Windows_
 #### When

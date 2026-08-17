@@ -24,6 +24,7 @@
   - [escape cancels the stash prompt and leaves the diff in place](#scenario-escape-cancels-the-stash-prompt-and-leaves-the-diff-in-place)
   - [g then enter pops the selected stash entry back into the worktree](#scenario-g-then-enter-pops-the-selected-stash-entry-back-into-the-worktree)
   - [g then escape cancels stash pop and keeps the stash stored](#scenario-g-then-escape-cancels-stash-pop-and-keeps-the-stash-stored)
+
 ## lazygit (third-party git TUI)
 [lazygit](https://github.com/jesseduffield/lazygit) is a terminal interface
 in front of a real repository: keystrokes stage files, write commits,
@@ -45,12 +46,14 @@ lazygit --version
 #### Then
 - exit code is `0`
 - stdout contains `os=`, matches `/version=[0-9]+\.[0-9]+\.[0-9]+/`
+
 ### Scenario: opening a dirty repository shows unstaged changes and quits cleanly
 _only when `lazygit --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `repo/a.txt` is created.
 - Fixture file `cfg/config.yml` is created.
 - The command runs with a cleared environment (passing through: PATH).
+
 #### Inputs
 _Fixture `repo/a.txt`:_
 ```text
@@ -80,12 +83,14 @@ printf 'more\n' >> repo/a.txt
 #### Then
 - after `interactive (pty): lazygit -ucd ${workdir}/cfg -p ${workdir}/repo`:
   - exit code is `0`
+
 ### Scenario: opening from a nested repository path rejects the subdirectory as invalid
 _only when `lazygit --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `repo/sub/note.txt` is created.
 - Fixture file `cfg/config.yml` is created.
 - The command runs with a cleared environment (passing through: PATH).
+
 #### Inputs
 _Fixture `repo/sub/note.txt`:_
 ```text
@@ -117,6 +122,7 @@ git -C repo status --porcelain
 - after `git -C repo status --porcelain`:
   - exit code is `0`
   - stdout equals an exact value
+
 ### Scenario: space stages the selected unstaged file
 _only when `lazygit --version` succeeds · skipped on Windows_
 #### Given
@@ -124,6 +130,7 @@ _only when `lazygit --version` succeeds · skipped on Windows_
 - Fixture file `repo/b.txt` is created.
 - Fixture file `cfg/config.yml` is created.
 - The command runs with a cleared environment (passing through: PATH).
+
 #### Inputs
 _Fixture `repo/a.txt`:_
 ```text
@@ -159,6 +166,7 @@ git -C repo status --porcelain
 - after `git -C repo status --porcelain`:
   - exit code is `0`
   - stdout contains `M  a.txt`, `?? b.txt`
+
 ### Scenario: space stages an untracked file into the index
 _only when `lazygit --version` succeeds · skipped on Windows_
 #### Given
@@ -166,6 +174,7 @@ _only when `lazygit --version` succeeds · skipped on Windows_
 - Fixture file `repo/b.txt` is created.
 - Fixture file `cfg/config.yml` is created.
 - The command runs with a cleared environment (passing through: PATH).
+
 #### Inputs
 _Fixture `repo/a.txt`:_
 ```text
@@ -200,6 +209,7 @@ git -C repo status --porcelain
 - after `git -C repo status --porcelain`:
   - exit code is `0`
   - stdout equals an exact value
+
 ### Scenario: down then space stages only the second modified file
 _only when `lazygit --version` succeeds · skipped on Windows_
 #### Given
@@ -207,6 +217,7 @@ _only when `lazygit --version` succeeds · skipped on Windows_
 - Fixture file `repo/b.txt` is created.
 - Fixture file `cfg/config.yml` is created.
 - The command runs with a cleared environment (passing through: PATH).
+
 #### Inputs
 _Fixture `repo/a.txt`:_
 ```text
@@ -242,12 +253,14 @@ git -C repo status --porcelain
 - after `git -C repo status --porcelain`:
   - exit code is `0`
   - stdout contains ` M a.txt`, `M  b.txt`
+
 ### Scenario: space toggles a staged file back to unstaged
 _only when `lazygit --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `repo/a.txt` is created.
 - Fixture file `cfg/config.yml` is created.
 - The command runs with a cleared environment (passing through: PATH).
+
 #### Inputs
 _Fixture `repo/a.txt`:_
 ```text
@@ -279,6 +292,7 @@ git -C repo status --porcelain
 - after `git -C repo status --porcelain`:
   - exit code is `0`
   - stdout equals an exact value
+
 ### Scenario: space toggles an added file back to untracked
 _only when `lazygit --version` succeeds · skipped on Windows_
 #### Given
@@ -286,6 +300,7 @@ _only when `lazygit --version` succeeds · skipped on Windows_
 - Fixture file `repo/b.txt` is created.
 - Fixture file `cfg/config.yml` is created.
 - The command runs with a cleared environment (passing through: PATH).
+
 #### Inputs
 _Fixture `repo/a.txt`:_
 ```text
@@ -321,6 +336,7 @@ git -C repo status --porcelain
 - after `git -C repo status --porcelain`:
   - exit code is `0`
   - stdout equals an exact value
+
 ### Scenario: capital C commits staged changes through git's editor
 _only when `lazygit --version` succeeds · skipped on Windows_
 #### Given
@@ -328,6 +344,7 @@ _only when `lazygit --version` succeeds · skipped on Windows_
 - Fixture file `editor.sh` is created.
 - Fixture file `cfg/config.yml` is created.
 - The command runs with a cleared environment (passing through: PATH).
+
 #### Inputs
 _Fixture `repo/a.txt`:_
 ```text
@@ -368,6 +385,7 @@ git -C repo log --oneline -1
 - after `git -C repo log --oneline -1`:
   - exit code is `0`
   - stdout contains `editor commit`
+
 ### Scenario: capital C commits pre-staged changes and leaves a clean worktree
 _only when `lazygit --version` succeeds · skipped on Windows_
 #### Given
@@ -375,6 +393,7 @@ _only when `lazygit --version` succeeds · skipped on Windows_
 - Fixture file `editor.sh` is created.
 - Fixture file `cfg/config.yml` is created.
 - The command runs with a cleared environment (passing through: PATH).
+
 #### Inputs
 _Fixture `repo/a.txt`:_
 ```text
@@ -419,12 +438,14 @@ git -C repo log --oneline -1
 - after `git -C repo log --oneline -1`:
   - exit code is `0`
   - stdout contains `pre-staged commit`
+
 ### Scenario: escape cancels the discard dialog and preserves the diff
 _only when `lazygit --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `repo/a.txt` is created.
 - Fixture file `cfg/config.yml` is created.
 - The command runs with a cleared environment (passing through: PATH).
+
 #### Inputs
 _Fixture `repo/a.txt`:_
 ```text
@@ -456,12 +477,14 @@ git -C repo diff -- a.txt
 - after `git -C repo diff -- a.txt`:
   - exit code is `0`
   - stdout contains `+more`
+
 ### Scenario: enter accepts the discard dialog and reverts the diff
 _only when `lazygit --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `repo/a.txt` is created.
 - Fixture file `cfg/config.yml` is created.
 - The command runs with a cleared environment (passing through: PATH).
+
 #### Inputs
 _Fixture `repo/a.txt`:_
 ```text
@@ -493,6 +516,7 @@ git -C repo diff -- a.txt
 - after `git -C repo diff -- a.txt`:
   - exit code is `0`
   - stdout is empty
+
 ### Scenario: down then discard reverts only the second modified file
 _only when `lazygit --version` succeeds · skipped on Windows_
 #### Given
@@ -500,6 +524,7 @@ _only when `lazygit --version` succeeds · skipped on Windows_
 - Fixture file `repo/b.txt` is created.
 - Fixture file `cfg/config.yml` is created.
 - The command runs with a cleared environment (passing through: PATH).
+
 #### Inputs
 _Fixture `repo/a.txt`:_
 ```text
@@ -539,12 +564,14 @@ git -C repo diff -- b.txt
 - after `git -C repo diff -- b.txt`:
   - exit code is `0`
   - stdout is empty
+
 ### Scenario: n creates a new branch from the branch panel
 _only when `lazygit --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `repo/a.txt` is created.
 - Fixture file `cfg/config.yml` is created.
 - The command runs with a cleared environment (passing through: PATH).
+
 #### Inputs
 _Fixture `repo/a.txt`:_
 ```text
@@ -575,12 +602,14 @@ git -C repo branch --show-current
 - after `git -C repo branch --show-current`:
   - exit code is `0`
   - stdout equals an exact value
+
 ### Scenario: n creates a slash branch name from the branch panel
 _only when `lazygit --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `repo/a.txt` is created.
 - Fixture file `cfg/config.yml` is created.
 - The command runs with a cleared environment (passing through: PATH).
+
 #### Inputs
 _Fixture `repo/a.txt`:_
 ```text
@@ -611,12 +640,14 @@ git -C repo branch --show-current
 - after `git -C repo branch --show-current`:
   - exit code is `0`
   - stdout equals an exact value
+
 ### Scenario: escape cancels the new branch dialog and keeps the current branch
 _only when `lazygit --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `repo/a.txt` is created.
 - Fixture file `cfg/config.yml` is created.
 - The command runs with a cleared environment (passing through: PATH).
+
 #### Inputs
 _Fixture `repo/a.txt`:_
 ```text
@@ -647,12 +678,14 @@ git -C repo branch --show-current
 - after `git -C repo branch --show-current`:
   - exit code is `0`
   - stdout equals an exact value
+
 ### Scenario: space checks out the selected branch
 _only when `lazygit --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `repo/a.txt` is created.
 - Fixture file `cfg/config.yml` is created.
 - The command runs with a cleared environment (passing through: PATH).
+
 #### Inputs
 _Fixture `repo/a.txt`:_
 ```text
@@ -684,12 +717,14 @@ git -C repo branch --show-current
 - after `git -C repo branch --show-current`:
   - exit code is `0`
   - stdout equals an exact value
+
 ### Scenario: s opens the stash prompt and records a named stash entry
 _only when `lazygit --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `repo/a.txt` is created.
 - Fixture file `cfg/config.yml` is created.
 - The command runs with a cleared environment (passing through: PATH).
+
 #### Inputs
 _Fixture `repo/a.txt`:_
 ```text
@@ -725,12 +760,14 @@ git -C repo diff -- a.txt
 - after `git -C repo diff -- a.txt`:
   - exit code is `0`
   - stdout is empty
+
 ### Scenario: escape cancels the stash prompt and leaves the diff in place
 _only when `lazygit --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `repo/a.txt` is created.
 - Fixture file `cfg/config.yml` is created.
 - The command runs with a cleared environment (passing through: PATH).
+
 #### Inputs
 _Fixture `repo/a.txt`:_
 ```text
@@ -766,12 +803,14 @@ git -C repo diff -- a.txt
 - after `git -C repo diff -- a.txt`:
   - exit code is `0`
   - stdout contains `+more`
+
 ### Scenario: g then enter pops the selected stash entry back into the worktree
 _only when `lazygit --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `repo/a.txt` is created.
 - Fixture file `cfg/config.yml` is created.
 - The command runs with a cleared environment (passing through: PATH).
+
 #### Inputs
 _Fixture `repo/a.txt`:_
 ```text
@@ -808,12 +847,14 @@ git -C repo diff -- a.txt
 - after `git -C repo diff -- a.txt`:
   - exit code is `0`
   - stdout contains `+more`
+
 ### Scenario: g then escape cancels stash pop and keeps the stash stored
 _only when `lazygit --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `repo/a.txt` is created.
 - Fixture file `cfg/config.yml` is created.
 - The command runs with a cleared environment (passing through: PATH).
+
 #### Inputs
 _Fixture `repo/a.txt`:_
 ```text

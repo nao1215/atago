@@ -446,11 +446,13 @@
   - [keeps --profile quiet on stderr after a successful directory import](#scenario-keeps---profile-quiet-on-stderr-after-a-successful-directory-import)
   - [guides "sqly help" to --help instead of an import error](#scenario-guides-sqly-help-to---help-instead-of-an-import-error)
   - [guides "sqly version" to --version instead of an import error](#scenario-guides-sqly-version-to---version-instead-of-an-import-error)
+
 ## sqly ACH/Fedwire native write-back
 Source: `test/e2e/tools/sqly/ach_fedwire_writeback.atago.yaml`
 ### Scenario: round-trips an ACH file through --save --force after an UPDATE
 #### Given
 - Fixture file `payment.ach` is created.
+
 #### When
 ```shell
 sqly --sql "UPDATE payment_entries SET individual_name='E2E Receiver' WHERE entry_index=0" --save --force payment.ach
@@ -462,9 +464,11 @@ sqly --json --sql "SELECT individual_name FROM payment_entries WHERE entry_index
 - after `sqly --json --sql "SELECT individual_name FROM payment_entries WHERE entry_index=0" payment.ach`:
   - exit code is `0`
   - stdout contains `E2E Receiver`
+
 ### Scenario: writes a reconstructed ACH file into a directory with --save-dir
 #### Given
 - Fixture file `payment.ach` is created.
+
 #### When
 ```shell
 sqly --sql "UPDATE payment_entries SET individual_name='Dir Receiver' WHERE entry_index=0" --save-dir out payment.ach
@@ -476,9 +480,11 @@ sqly --json --sql "SELECT individual_name FROM payment_entries WHERE entry_index
 - after `sqly --json --sql "SELECT individual_name FROM payment_entries WHERE entry_index=0" out/payment.ach`:
   - exit code is `0`
   - stdout contains `Dir Receiver`
+
 ### Scenario: round-trips a Fedwire file through --save --force after an UPDATE
 #### Given
 - Fixture file `transfer.fed` is created.
+
 #### When
 ```shell
 sqly --sql "UPDATE transfer_message SET sender_reference='E2EREF'" --save --force transfer.fed
@@ -490,9 +496,11 @@ sqly --json --sql "SELECT sender_reference FROM transfer_message" transfer.fed
 - after `sqly --json --sql "SELECT sender_reference FROM transfer_message" transfer.fed`:
   - exit code is `0`
   - stdout contains `E2EREF`
+
 ### Scenario: still rejects a single-table --output to .ach
 #### Given
 - Fixture file `payment.ach` is created.
+
 #### When
 ```shell
 sqly --sql "SELECT * FROM payment_entries" --output out.ach payment.ach
@@ -500,11 +508,13 @@ sqly --sql "SELECT * FROM payment_entries" --output out.ach payment.ach
 #### Then
 - exit code is `1`
 - stderr contains `input-only`
+
 ## sqly batch mode (piped stdin)
 Source: `test/e2e/tools/sqly/batch.atago.yaml`
 ### Scenario: runs SQL read from stdin
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -524,9 +534,11 @@ sqly user.csv
 #### Then
 - exit code is `0`
 - stdout contains `booker12`
+
 ### Scenario: switches output mode and runs the following query
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -548,9 +560,11 @@ sqly user.csv
 - exit code is `0`
 - stdout contains `{"user_name":"booker12"}`
 - stderr contains `Change output mode`
+
 ### Scenario: exits non-zero and names the failing statement and its line on error
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -572,9 +586,11 @@ sqly user.csv
 - exit code is `1`
 - stdout contains `booker12`
 - stderr contains `batch statement 2 failed at line 2`, `no_such_table`
+
 ### Scenario: reports the line span of a failing multiline statement
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -597,9 +613,11 @@ sqly user.csv
 #### Then
 - exit code is `1`
 - stderr contains `batch statement 3 failed at lines 3-4`, `no_such_table`
+
 ### Scenario: stops at .exit with a success status
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -619,9 +637,11 @@ sqly user.csv
 ```
 #### Then
 - exit code is `0`
+
 ### Scenario: still exits non-zero when a failure precedes .exit
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -642,9 +662,11 @@ sqly user.csv
 #### Then
 - exit code is `1`
 - stderr contains `no_such_table`
+
 ### Scenario: runs a multiline SELECT terminated by a semicolon
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -667,9 +689,11 @@ sqly user.csv
 #### Then
 - exit code is `0`
 - stdout contains `booker12`
+
 ### Scenario: runs a multiline UNION ALL across bare newlines as one statement
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -695,9 +719,11 @@ sqly user.csv
 - stdout line `2` equals an exact value
 - stdout line `3` equals an exact value
 - stderr contains `Change output mode`
+
 ### Scenario: runs a multiline WITH (CTE) query
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -720,9 +746,11 @@ sqly user.csv
 #### Then
 - exit code is `0`
 - stdout contains `booker12`
+
 ### Scenario: runs multiple statements and helper commands in one payload
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -744,9 +772,11 @@ sqly user.csv
 #### Then
 - exit code is `0`
 - stdout contains `TABLE NAME`, `booker12`
+
 ### Scenario: ignores a semicolon inside a leading line comment
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -767,9 +797,11 @@ sqly user.csv
 #### Then
 - exit code is `0`
 - stdout contains `v`
+
 ### Scenario: ignores a semicolon inside a block comment
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -790,9 +822,11 @@ sqly user.csv
 #### Then
 - exit code is `0`
 - stdout contains `v`
+
 ### Scenario: ignores a semicolon inside a trailing line comment
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -813,9 +847,11 @@ sqly user.csv
 #### Then
 - exit code is `0`
 - stdout contains `first`, `second`
+
 ### Scenario: does not split on a semicolon inside a bracket-quoted identifier
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -835,9 +871,11 @@ sqly user.csv
 #### Then
 - exit code is `0`
 - stdout contains `a;b`, `v`
+
 ### Scenario: does not split on a semicolon inside a backtick-quoted identifier
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -857,9 +895,11 @@ sqly user.csv
 #### Then
 - exit code is `0`
 - stdout contains `a;b`, `v`
+
 ### Scenario: reports an error for incomplete SQL
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -879,11 +919,13 @@ sqly user.csv
 #### Then
 - exit code is `1`
 - stderr contains `batch statement`
+
 ## sqly batch fail-fast
 Source: `test/e2e/tools/sqly/batch_failfast.atago.yaml`
 ### Scenario: stops later statements after a SQL failure
 #### Given
 - Fixture file `u.csv` is created.
+
 #### Inputs
 _Fixture `u.csv`:_
 ```text
@@ -904,9 +946,11 @@ sqly u.csv
 - exit code is `1`
 - stdout does not contain `later`
 - stderr contains `no_such_table`
+
 ### Scenario: does not run .save --force after an earlier failure
 #### Given
 - Fixture file `u.csv` is created.
+
 #### Inputs
 _Fixture `u.csv`:_
 ```text
@@ -929,9 +973,11 @@ sqly u.csv
 - stdout contains `affected`
 - stderr does not contain `Saved`
 - file `u.csv` does not contain `BROKEN`
+
 ### Scenario: does not run .dump after an earlier failure
 #### Given
 - Fixture file `u.csv` is created.
+
 #### Inputs
 _Fixture `u.csv`:_
 ```text
@@ -952,9 +998,11 @@ sqly u.csv
 - exit code is `1`
 - stderr contains `no_such_table`
 - file `out.csv` does not exist
+
 ### Scenario: does not write back for empty stdin with --save --force
 #### Given
 - Fixture file `u.csv` is created.
+
 #### Inputs
 _Fixture `u.csv`:_
 ```text
@@ -971,11 +1019,13 @@ sqly u.csv --save --force
 - stderr contains `no TTY detected`
 - stderr does not contain `Saved`
 - file `u.csv` contains `Rachel`
+
 ## sqly --cache import cache
 Source: `test/e2e/tools/sqly/cache.atago.yaml`
 ### Scenario: writes a cache on the cold run and reuses it on the warm run
 #### Given
 - Fixture file `data.csv` is created.
+
 #### Inputs
 _Fixture `data.csv`:_
 ```text
@@ -994,10 +1044,12 @@ sqly --cache snap.cache --sql "SELECT COUNT(*) AS n FROM data" data.csv
   - exit code is `0`
   - stdout contains `3`
   - stderr contains `cache: reused`
+
 ### Scenario: invalidates the cache when the source changes
 #### Given
 - Fixture file `data.csv` is created.
 - Fixture file `data.csv` is created.
+
 #### Inputs
 _Fixture `data.csv`:_
 ```text
@@ -1024,9 +1076,11 @@ sqly --cache snap.cache --sql "SELECT COUNT(*) AS n FROM data" data.csv
   - exit code is `0`
   - stdout contains `4`
   - stderr does not contain `cache: reused`
+
 ### Scenario: rebuilds after --cache-clear
 #### Given
 - Fixture file `data.csv` is created.
+
 #### Inputs
 _Fixture `data.csv`:_
 ```text
@@ -1045,10 +1099,12 @@ sqly --cache snap.cache --cache-clear --sql "SELECT COUNT(*) AS n FROM data" dat
   - exit code is `0`
   - stdout contains `3`
   - stderr does not contain `cache: reused`
+
 ### Scenario: falls back to a cold import when the cache path is unwritable
 #### Given
 - Fixture file `data.csv` is created.
 - Fixture file `snap.cache/keep` is created.
+
 #### Inputs
 _Fixture `data.csv`:_
 ```text
@@ -1069,10 +1125,12 @@ sqly --cache snap.cache --sql "SELECT COUNT(*) AS n FROM data" data.csv
 - exit code is `0`
 - stdout contains `3`
 - stderr contains `cache`
+
 ### Scenario: invalidates the cache when content changes but size and mtime do not (#592)
 #### Given
 - Fixture file `d.csv` is created.
 - Fixture file `d.csv` is created.
+
 #### Inputs
 _Fixture `d.csv`:_
 ```text
@@ -1097,9 +1155,11 @@ sqly --cache snap.cache --sql "SELECT group_concat(name, ',') AS names FROM d" d
   - stdout contains `Carol,Eve`
   - stdout does not contain `Alice,Bob`
   - stderr does not contain `cache: reused`
+
 ### Scenario: reuses the cache that lives inside the imported directory and ignores its manifest
 #### Given
 - Fixture file `indir/data.csv` is created.
+
 #### Inputs
 _Fixture `indir/data.csv`:_
 ```text
@@ -1119,11 +1179,13 @@ sqly --cache indir/snap.cache --sql "SELECT group_concat(name, ',') AS t FROM sq
   - stdout contains `data`
   - stderr contains `cache: reused`
   - stdout does not contain `manifest`, `snap`
+
 ### Scenario: keeps the cache warm when only an unsupported sibling file changes
 #### Given
 - Fixture file `indir/data.csv` is created.
 - Fixture file `indir/ignore.txt` is created.
 - Fixture file `indir/ignore.txt` is created.
+
 #### Inputs
 _Fixture `indir/data.csv`:_
 ```text
@@ -1148,11 +1210,13 @@ sqly --cache snap.cache --sql "SELECT COUNT(*) AS n FROM data" indir
   - exit code is `0`
   - stdout contains `1`
   - stderr contains `cache: reused`
+
 ### Scenario: still invalidates the cache when the supported file changes
 #### Given
 - Fixture file `indir/data.csv` is created.
 - Fixture file `indir/ignore.txt` is created.
 - Fixture file `indir/data.csv` is created.
+
 #### Inputs
 _Fixture `indir/data.csv`:_
 ```text
@@ -1179,12 +1243,14 @@ sqly --cache snap.cache --sql "SELECT COUNT(*) AS n FROM data" indir
   - exit code is `0`
   - stdout contains `2`
   - stderr does not contain `cache: reused`
+
 ## sqly changes delta cross-checks (exhaustive-set semantics)
 Source: `test/e2e/tools/sqly/changes_crosscheck.atago.yaml`
 ### Scenario: omitting sqly's history DB from an exhaustive list is rejected
 _only when `sqly --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `inner.atago.yaml` is created.
+
 #### Inputs
 _Fixture `inner.atago.yaml`:_
 ```text
@@ -1214,11 +1280,13 @@ ${atago} run inner.atago.yaml
 - exit code is `1`
 - stdout contains `unexpected created file`
 - stdout contains `.atago-home/.config/sqly/history.db`
+
 ### Scenario: the exhaustive list including the history DB passes
 _only when `sqly --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `user.csv` is created.
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -1232,6 +1300,7 @@ sqly --sql "SELECT 1" user.csv
 #### Then
 - exit code is `0`
 - the step changed exactly created `.atago-home/.config/sqly/history.db`, modified nothing, deleted nothing
+
 ## sqly CLI surface
 Source: `test/e2e/tools/sqly/cli.atago.yaml`
 ### Scenario: prints the version
@@ -1242,6 +1311,7 @@ sqly --version
 #### Then
 - exit code is `0`
 - stdout contains `sqly`
+
 ### Scenario: prints usage with --help
 #### When
 ```shell
@@ -1250,6 +1320,7 @@ sqly --help
 #### Then
 - exit code is `0`
 - stdout contains `[Usage]`, `--json`
+
 ### Scenario: fails on a non-existent file
 #### When
 ```shell
@@ -1258,9 +1329,11 @@ sqly --sql "SELECT 1" does_not_exist.csv
 #### Then
 - exit code is `1`
 - stderr contains `does not exist`
+
 ### Scenario: fails on invalid SQL with --sql
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -1274,6 +1347,7 @@ sqly --sql "SELEKT * FROM user" user.csv
 #### Then
 - exit code is `1`
 - stderr contains `syntax error`
+
 ### Scenario: reports an unknown flag as a CLI error
 #### When
 ```shell
@@ -1282,9 +1356,11 @@ sqly --no-such-flag
 #### Then
 - exit code is `1`
 - stderr contains `unknown flag`
+
 ### Scenario: reports conflicting output mode flags as a CLI error
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -1298,10 +1374,12 @@ sqly --csv --json --sql "SELECT 1" user.csv
 #### Then
 - exit code is `1`
 - stderr contains `conflicting output mode flags`
+
 ### Scenario: joins two imported files
 #### Given
 - Fixture file `user.csv` is created.
 - Fixture file `identifier.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -1323,9 +1401,11 @@ sqly --csv --sql "SELECT user_name, position FROM user INNER JOIN identifier ON 
 - exit code is `0`
 - stdout line `1` equals an exact value
 - stdout contains `booker12`
+
 ### Scenario: writes JSON results to the given path with --output
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -1340,9 +1420,11 @@ sqly --json --output result.json --sql "SELECT user_name FROM user ORDER BY iden
 - exit code is `0`
 - stderr contains `result.json`
 - file `result.json` contains `"user_name":"booker12"`
+
 ### Scenario: applies an output-mode flag placed after the file path
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -1357,9 +1439,11 @@ sqly --sql "SELECT user_name FROM user ORDER BY identifier LIMIT 1" user.csv --c
 - exit code is `0`
 - stdout line `1` equals an exact value
 - stdout contains `booker12`
+
 ### Scenario: fails fast on an unknown flag after the file path
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -1373,12 +1457,14 @@ sqly user.csv --nope
 #### Then
 - exit code is `1`
 - stderr contains `unknown flag`
+
 ## sqly table-name collision
 Source: `test/e2e/tools/sqly/collision.atago.yaml`
 ### Scenario: fails when two inputs sanitize to the same table name
 #### Given
 - Fixture file `a-b.csv` is created.
 - Fixture file `a_b.csv` is created.
+
 #### Inputs
 _Fixture `a-b.csv`:_
 ```text
@@ -1397,12 +1483,14 @@ sqly --inspect a-b.csv a_b.csv
 #### Then
 - exit code is `1`
 - stderr contains `collision`
+
 ## sqly --compare workflow
 Source: `test/e2e/tools/sqly/compare.atago.yaml`
 ### Scenario: reports schema, row count, and keyed rows as JSON
 #### Given
 - Fixture file `rev1.csv` is created.
 - Fixture file `rev2.csv` is created.
+
 #### Inputs
 _Fixture `rev1.csv`:_
 ```text
@@ -1428,10 +1516,12 @@ sqly --compare --compare-key id rev1.csv rev2.csv
 - stdout at `$.row_count.delta` equals `0`
 - stdout at `$.rows.key` equals `id`
 - stdout contains `"4"`, `"3"`
+
 ### Scenario: emits a human-readable summary with --compare-format text
 #### Given
 - Fixture file `rev1.csv` is created.
 - Fixture file `rev2.csv` is created.
+
 #### Inputs
 _Fixture `rev1.csv`:_
 ```text
@@ -1454,10 +1544,12 @@ sqly --compare --compare-key id --compare-format text rev1.csv rev2.csv
 #### Then
 - exit code is `0`
 - stdout contains `schema: identical`, `1 added, 1 removed, 1 modified`
+
 ### Scenario: resolves an uppercase --compare-key against a lowercase column
 #### Given
 - Fixture file `rev1.csv` is created.
 - Fixture file `rev2.csv` is created.
+
 #### Inputs
 _Fixture `rev1.csv`:_
 ```text
@@ -1480,10 +1572,12 @@ sqly --compare --compare-key ID rev1.csv rev2.csv
 #### Then
 - exit code is `0`
 - stdout at `$.rows.key` equals `ID`
+
 ### Scenario: rejects a missing key column
 #### Given
 - Fixture file `rev1.csv` is created.
 - Fixture file `rev2.csv` is created.
+
 #### Inputs
 _Fixture `rev1.csv`:_
 ```text
@@ -1506,10 +1600,12 @@ sqly --compare --compare-key nope rev1.csv rev2.csv
 #### Then
 - exit code is `1`
 - stderr contains `compare key`
+
 ### Scenario: rejects a duplicate key value as ambiguous
 #### Given
 - Fixture file `dupe.csv` is created.
 - Fixture file `single.csv` is created.
+
 #### Inputs
 _Fixture `dupe.csv`:_
 ```text
@@ -1529,10 +1625,12 @@ sqly --compare --compare-key id dupe.csv single.csv
 #### Then
 - exit code is `1`
 - stderr contains `not unique`
+
 ### Scenario: rejects a genuinely missing --compare-tables name
 #### Given
 - Fixture file `rev1.csv` is created.
 - Fixture file `rev2.csv` is created.
+
 #### Inputs
 _Fixture `rev1.csv`:_
 ```text
@@ -1555,9 +1653,11 @@ sqly --compare --compare-tables "nope,rev2" rev1.csv rev2.csv
 #### Then
 - exit code is `1`
 - stderr contains `compare table`
+
 ### Scenario: rejects an ambiguous single-table compare
 #### Given
 - Fixture file `rev1.csv` is created.
+
 #### Inputs
 _Fixture `rev1.csv`:_
 ```text
@@ -1573,10 +1673,12 @@ sqly --compare rev1.csv
 #### Then
 - exit code is `1`
 - stderr contains `exactly two tables`
+
 ### Scenario: follows CLI input order for left and right, not table-name sorting
 #### Given
 - Fixture file `zebra.csv` is created.
 - Fixture file `ant.csv` is created.
+
 #### Inputs
 _Fixture `zebra.csv`:_
 ```text
@@ -1595,10 +1697,12 @@ sqly --compare --compare-format text zebra.csv ant.csv
 #### Then
 - exit code is `0`
 - stdout line `1` equals an exact value
+
 ### Scenario: reverses left and right when the inputs are swapped
 #### Given
 - Fixture file `zebra.csv` is created.
 - Fixture file `ant.csv` is created.
+
 #### Inputs
 _Fixture `zebra.csv`:_
 ```text
@@ -1617,10 +1721,12 @@ sqly --compare --compare-format text ant.csv zebra.csv
 #### Then
 - exit code is `0`
 - stdout line `1` equals an exact value
+
 ### Scenario: keeps the keyed diff correct on a larger input
 #### Given
 - Fixture file `big1.csv` is created.
 - Fixture file `big2.csv` is created.
+
 #### Inputs
 _Fixture `big1.csv`:_
 ```text
@@ -1677,12 +1783,14 @@ sqly --compare --compare-key id --compare-format text big1.csv big2.csv
 #### Then
 - exit code is `0`
 - stdout contains `1 added, 1 removed, 1 modified`
+
 ## sqly cross-format workflows
 Source: `test/e2e/tools/sqly/cross_format.atago.yaml`
 ### Scenario: joins a Parquet table to a CSV table and computes a column
 #### Given
 - Fixture file `products.parquet` is created.
 - Fixture file `sales.csv` is created.
+
 #### Inputs
 _Fixture `sales.csv`:_
 ```text
@@ -1699,11 +1807,13 @@ sqly --csv --sql "SELECT p.name, p.price, s.quantity, ROUND(p.price * s.quantity
 - exit code is `0`
 - stdout line `1` equals an exact value
 - stdout contains `Laptop`, `2999.97`
+
 ## sqly empty command arguments
 Source: `test/e2e/tools/sqly/empty_args.atago.yaml`
 ### Scenario: rejects .save "" and leaves the source unchanged
 #### Given
 - Fixture file `u.csv` is created.
+
 #### Inputs
 _Fixture `u.csv`:_
 ```text
@@ -1724,9 +1834,11 @@ sqly u.csv
 - stdout contains `affected`
 - stderr contains `.save requires`
 - file `u.csv` does not contain `EMPTY`
+
 ### Scenario: rejects .dump with an empty destination
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -1744,6 +1856,7 @@ sqly user.csv
 #### Then
 - exit code is `1`
 - stderr contains `.dump requires`
+
 ### Scenario: rejects .import with an empty path
 #### Inputs
 _stdin for `sqly`:_
@@ -1758,11 +1871,13 @@ sqly
 #### Then
 - exit code is `1`
 - stderr contains `empty import path`
+
 ## sqly excel export
 Source: `test/e2e/tools/sqly/excel_export.atago.yaml`
 ### Scenario: writes a non-executable .xlsx with --output
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -1778,11 +1893,14 @@ sqly --excel --output out.xlsx --sql "SELECT * FROM user LIMIT 1" user.csv
 - stderr contains `output mode=excel`
 - file `out.xlsx` exists
 - file `out.xlsx` is not executable
+
 #### Generated artifacts
 - `out.xlsx`
+
 ### Scenario: writes a non-executable .xlsx with the .dump command
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -1803,13 +1921,16 @@ sqly user.csv
 - stderr contains `mode=excel`
 - file `dump.xlsx` exists
 - file `dump.xlsx` is not executable
+
 #### Generated artifacts
 - `dump.xlsx`
+
 ## sqly export format inference
 Source: `test/e2e/tools/sqly/export_inference.atago.yaml`
 ### Scenario: infers parquet from the destination extension without a flag
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -1824,11 +1945,14 @@ sqly --sql "SELECT user_name FROM user ORDER BY identifier LIMIT 1" user.csv --o
 - exit code is `0`
 - stderr contains `output mode=parquet`
 - file `result.parquet` exists
+
 #### Generated artifacts
 - `result.parquet`
+
 ### Scenario: infers ndjson with gzip and writes a compressed file
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -1844,11 +1968,14 @@ sqly --sql "SELECT user_name FROM user ORDER BY identifier LIMIT 1" user.csv --o
 - stderr contains `output mode=ndjson`
 - file `result.ndjson.gz` exists
 - file `result.ndjson.gz` does not contain `booker12`
+
 #### Generated artifacts
 - `result.ndjson.gz`
+
 ### Scenario: re-imports a gzip-compressed csv it wrote
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -1866,9 +1993,11 @@ sqly --csv --sql "SELECT user_name FROM result LIMIT 1" result.csv.gz
   - exit code is `0`
   - stdout line `1` equals an exact value
   - stdout line `2` equals an exact value
+
 ### Scenario: writes the CSV fallback to an unknown extension path without rewriting it
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -1884,12 +2013,15 @@ sqly --sql "SELECT user_name FROM user LIMIT 1" user.csv --output out.unknown
 - stderr contains `out.unknown`
 - file `out.unknown` exists
 - file `out.csv` does not exist
+
 #### Generated artifacts
 - `out.unknown`
+
 ### Scenario: rejects --output to an existing directory
 #### Given
 - Fixture file `user.csv` is created.
 - Fixture file `outdir/.keep` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -1904,10 +2036,12 @@ sqly --sql "SELECT identifier FROM user LIMIT 1" user.csv --output outdir
 - exit code is `1`
 - stderr contains `directory`
 - file `outdir.csv` does not exist
+
 ### Scenario: rejects .dump to an existing directory
 #### Given
 - Fixture file `user.csv` is created.
 - Fixture file `outdir/.keep` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -1925,9 +2059,11 @@ sqly user.csv
 #### Then
 - exit code is `1`
 - stderr contains `directory`
+
 ### Scenario: errors when an explicit mode flag disagrees with the path extension
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -1941,9 +2077,11 @@ sqly --json --sql "SELECT user_name FROM user LIMIT 1" user.csv --output result.
 #### Then
 - exit code is `1`
 - stderr contains `conflicts with destination path`
+
 ### Scenario: rejects bzip2 output
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -1957,9 +2095,11 @@ sqly --sql "SELECT user_name FROM user LIMIT 1" user.csv --output result.csv.bz2
 #### Then
 - exit code is `1`
 - stderr contains `bzip2`
+
 ### Scenario: rejects compression on parquet
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -1973,9 +2113,11 @@ sqly --sql "SELECT user_name FROM user LIMIT 1" user.csv --output result.parquet
 #### Then
 - exit code is `1`
 - stderr contains `cannot be compressed`
+
 ### Scenario: infers tsv from the .dump destination path
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -1994,11 +2136,14 @@ sqly user.csv
 - exit code is `0`
 - stderr contains `mode=tsv`
 - file `dump.tsv` exists
+
 #### Generated artifacts
 - `dump.tsv`
+
 ### Scenario: keeps --json --output result.json writing json
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -2014,11 +2159,13 @@ sqly --json --sql "SELECT user_name FROM user ORDER BY identifier LIMIT 1" user.
 - exit code is `0`
 - stderr contains `output mode=json`
 - file `result.json` contains `"user_name":"booker12"`
+
 ## sqly helper commands reject extra args
 Source: `test/e2e/tools/sqly/extra_args.atago.yaml`
 ### Scenario: rejects .schema with an extra argument
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -2036,9 +2183,11 @@ sqly user.csv
 #### Then
 - exit code is `1`
 - stderr contains `.schema`
+
 ### Scenario: rejects .describe with an extra argument
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -2056,9 +2205,11 @@ sqly user.csv
 #### Then
 - exit code is `1`
 - stderr contains `.describe`
+
 ### Scenario: rejects .tables with an extra argument
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -2076,9 +2227,11 @@ sqly user.csv
 #### Then
 - exit code is `1`
 - stderr contains `.tables`
+
 ### Scenario: rejects .mode with an extra argument
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -2096,9 +2249,11 @@ sqly user.csv
 #### Then
 - exit code is `1`
 - stderr contains `.mode`
+
 ### Scenario: rejects .pwd with an extra argument
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -2116,9 +2271,11 @@ sqly user.csv
 #### Then
 - exit code is `1`
 - stderr contains `.pwd`
+
 ### Scenario: rejects .clear with an extra argument
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -2136,9 +2293,11 @@ sqly user.csv
 #### Then
 - exit code is `1`
 - stderr contains `.clear`
+
 ### Scenario: does not let .exit with an extra argument silently terminate the batch
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -2157,11 +2316,13 @@ sqly user.csv
 #### Then
 - exit code is `1`
 - stderr contains `.exit`
+
 ## sqly filesql integration
 Source: `test/e2e/tools/sqly/filesql_integration.atago.yaml`
 ### Scenario: imports and queries a CSV file
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -2181,9 +2342,11 @@ sqly user.csv
 #### Then
 - exit code is `0`
 - stdout contains `3`
+
 ### Scenario: imports and queries a JSONL file
 #### Given
 - Fixture file `sample.jsonl` is created.
+
 #### Inputs
 _stdin for `sqly`:_
 ```text
@@ -2196,9 +2359,11 @@ sqly sample.jsonl
 #### Then
 - exit code is `0`
 - stdout contains `COUNT(*)`
+
 ### Scenario: imports and queries a Parquet file
 #### Given
 - Fixture file `products.parquet` is created.
+
 #### Inputs
 _stdin for `sqly`:_
 ```text
@@ -2211,9 +2376,11 @@ sqly products.parquet
 #### Then
 - exit code is `0`
 - stdout contains `3`
+
 ### Scenario: imports and queries an Excel file
 #### Given
 - Fixture file `sample.xlsx` is created.
+
 #### Inputs
 _stdin for `sqly`:_
 ```text
@@ -2226,9 +2393,11 @@ sqly sample.xlsx
 #### Then
 - exit code is `0`
 - stdout contains `COUNT(*)`
+
 ### Scenario: imports and queries an ACH file
 #### Given
 - Fixture file `ppd-debit.ach` is created.
+
 #### Inputs
 _stdin for `sqly`:_
 ```text
@@ -2241,9 +2410,11 @@ sqly ppd-debit.ach
 #### Then
 - exit code is `0`
 - stdout contains `COUNT(*)`
+
 ### Scenario: imports and queries a Fedwire file
 #### Given
 - Fixture file `customer-transfer.fed` is created.
+
 #### Inputs
 _stdin for `sqly`:_
 ```text
@@ -2256,9 +2427,11 @@ sqly customer-transfer.fed
 #### Then
 - exit code is `0`
 - stdout contains `COUNT(*)`
+
 ### Scenario: preserves filesql-detected column types for schema inspection
 #### Given
 - Fixture file `products.parquet` is created.
+
 #### Inputs
 _stdin for `sqly`:_
 ```text
@@ -2271,9 +2444,11 @@ sqly products.parquet
 #### Then
 - exit code is `0`
 - stdout contains `name`, `price`
+
 ### Scenario: produces identical tables on repeated ACH imports
 #### Given
 - Fixture file `ppd-debit.ach` is created.
+
 #### Inputs
 _stdin for `sqly`:_
 ```text
@@ -2293,6 +2468,7 @@ sqly ppd-debit.ach
   - stdout contains `ppd_debit_entries`
 - after `sqly ppd-debit.ach`:
   - stdout contains `ppd_debit_entries`
+
 ## sqly shell helper commands
 Source: `test/e2e/tools/sqly/helpers.atago.yaml`
 ### Scenario: .help groups commands, shows usage, and flags destructive save
@@ -2308,9 +2484,11 @@ sqly
 #### Then
 - exit code is `0`
 - stdout contains `Import / Export`, `.import PATH`, `.dump TABLE FILE`, `.save DIR`, `.save --force`, `destructive`
+
 ### Scenario: .cd changes directory with a relative path and reports it
 #### Given
 - Fixture file `testdata/x.csv` is created.
+
 #### Inputs
 _Fixture `testdata/x.csv`:_
 ```text
@@ -2329,9 +2507,11 @@ sqly
 #### Then
 - exit code is `0`
 - stdout contains `testdata`
+
 ### Scenario: expands a bare ~ in .cd to the home directory
 #### Given
 - Fixture file `home/sqly_tilde.csv` is created.
+
 #### Inputs
 _Fixture `home/sqly_tilde.csv`:_
 ```text
@@ -2350,9 +2530,11 @@ sqly
 #### Then
 - exit code is `0`
 - stdout contains `home`
+
 ### Scenario: expands ~/file in .import
 #### Given
 - Fixture file `home/sqly_tilde.csv` is created.
+
 #### Inputs
 _Fixture `home/sqly_tilde.csv`:_
 ```text
@@ -2371,6 +2553,7 @@ sqly
 #### Then
 - exit code is `0`
 - stdout contains `sqly_tilde`
+
 ### Scenario: .clear emits no ANSI escapes to stdout in batch mode
 #### Inputs
 _stdin for `sqly`:_
@@ -2384,9 +2567,11 @@ sqly
 #### Then
 - exit code is `0`
 - stdout is empty
+
 ### Scenario: keeps --json stdout parseable when .clear precedes a query
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -2405,9 +2590,11 @@ sqly --json user.csv
 #### Then
 - exit code is `0`
 - stdout line `1` equals an exact value
+
 ### Scenario: .import imports a quoted path containing a space as one argument
 #### Given
 - Fixture file `sqly_e2e space.csv` is created.
+
 #### Inputs
 _Fixture `sqly_e2e space.csv`:_
 ```text
@@ -2426,9 +2613,11 @@ sqly
 #### Then
 - exit code is `0`
 - stdout contains `sqly_e2e_space`
+
 ### Scenario: .mode fails on a missing mode name but still lists the modes
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -2446,9 +2635,11 @@ sqly user.csv
 #### Then
 - exit code is `1`
 - stderr contains `json`, `ndjson`
+
 ### Scenario: .dump infers TSV from the .tsv extension in table mode, not CSV
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -2468,6 +2659,7 @@ sqly user.csv
 - stderr contains `mode=tsv`
 - file `out.tsv` contains `"user_name\tidentifier"`
 - file `out.tsv` does not contain `user_name,identifier`
+
 ## sqly hermetic environment
 Source: `test/e2e/tools/sqly/hermetic.atago.yaml`
 ### Scenario: runs with HOME inside the sandbox
@@ -2478,6 +2670,7 @@ case "$HOME" in "$SQLY_E2E_SANDBOX"*) exit 0 ;; *) exit 1 ;; esac
 ```
 #### Then
 - exit code is `0`
+
 ### Scenario: routes the history DB into the sandbox
 _only when env SQLY_E2E_SANDBOX is set_
 #### When
@@ -2486,9 +2679,11 @@ case "$SQLY_HISTORY_DB_PATH" in "$SQLY_E2E_SANDBOX"*) exit 0 ;; *) exit 1 ;; esa
 ```
 #### Then
 - exit code is `0`
+
 ### Scenario: still runs sqly normally inside the sandbox
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -2502,11 +2697,13 @@ sqly --sql "SELECT 1 AS one" user.csv
 #### Then
 - exit code is `0`
 - stdout contains `one`
+
 ## sqly history tolerance
 Source: `test/e2e/tools/sqly/history_tolerance.atago.yaml`
 ### Scenario: runs --sql and warns instead of failing
 #### Given
 - Fixture file `actor.csv` is created.
+
 #### Inputs
 _Fixture `actor.csv`:_
 ```text
@@ -2522,9 +2719,11 @@ sqly --csv --sql "SELECT actor FROM actor ORDER BY actor LIMIT 1" actor.csv
 - exit code is `0`
 - stdout contains `Adam Sandler`
 - stderr contains `history disabled`
+
 ### Scenario: runs batch mode without a writable history DB
 #### Given
 - Fixture file `actor.csv` is created.
+
 #### Inputs
 _Fixture `actor.csv`:_
 ```text
@@ -2545,10 +2744,12 @@ sqly actor.csv
 - exit code is `0`
 - stdout contains `TABLE NAME`, `Adam Sandler`
 - stderr contains `history disabled`
+
 ### Scenario: runs --sql when the history DB is read-only after startup
 #### Given
 - Fixture file `user.csv` is created.
 - Fixture file `h.db` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -2565,10 +2766,12 @@ sqly --sql "SELECT user_name FROM user ORDER BY identifier LIMIT 1" user.csv
 - after `sqly --sql "SELECT user_name FROM user ORDER BY identifier LIMIT 1" user.csv`:
   - exit code is `0`
   - stdout contains `booker12`
+
 ### Scenario: runs --inspect when the history DB is read-only after startup
 #### Given
 - Fixture file `user.csv` is created.
 - Fixture file `h.db` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -2586,10 +2789,12 @@ sqly --inspect user.csv
   - exit code is `0`
   - stdout line `1` equals an exact value
   - stdout contains `"name": "user"`
+
 ### Scenario: runs batch mode and warns when a history write fails after startup
 #### Given
 - Fixture file `user.csv` is created.
 - Fixture file `h.db` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -2611,11 +2816,13 @@ sqly user.csv
   - exit code is `0`
   - stdout contains `booker12`
   - stderr contains `history disabled`
+
 ## sqly import failure handling
 Source: `test/e2e/tools/sqly/import_failure.atago.yaml`
 ### Scenario: fails query mode on a partial import and keeps stdout clean
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -2630,6 +2837,7 @@ sqly --json --sql "SELECT user_name FROM user LIMIT 1" user.csv /no/such/file.cs
 - exit code is `1`
 - stdout is empty
 - stderr contains `failed to import`, `inputs failed to import: path does not exist`
+
 ### Scenario: names the failed count and first path when every input fails
 #### When
 ```shell
@@ -2639,9 +2847,11 @@ sqly --sql "SELECT 1" /no/such/a.csv /no/such/b.csv
 - exit code is `1`
 - stdout is empty
 - stderr contains `all 2 import(s) failed`, `/no/such/a.csv`, `+1 more`
+
 ### Scenario: fails --inspect on a partial import
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -2656,9 +2866,11 @@ sqly --inspect user.csv /no/such/file.csv
 - exit code is `1`
 - stdout is empty
 - stderr contains `failed to import`
+
 ### Scenario: fails batch .import on a partial import and stops later commands
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -2678,6 +2890,7 @@ sqly
 - exit code is `1`
 - stdout does not contain `TABLE NAME`
 - stderr contains `failed to import`
+
 ### Scenario: keeps stdout clean when a stdin dataset fails to import
 #### When
 ```shell
@@ -2687,11 +2900,13 @@ sqly --stdin csv --json --sql "SELECT COUNT(*) FROM stdin"
 - exit code is `1`
 - stdout is empty
 - stderr contains `Import failed`
+
 ## sqly .import with space-containing paths
 Source: `test/e2e/tools/sqly/import_quoting.atago.yaml`
 ### Scenario: imports a backslash-escaped space path as a single argument
 #### Given
 - Fixture file `space name.csv` is created.
+
 #### Inputs
 _Fixture `space name.csv`:_
 ```text
@@ -2711,9 +2926,11 @@ sqly
 #### Then
 - exit code is `0`
 - stdout contains `alpha`, `beta`
+
 ### Scenario: imports a double-quoted space path as a single argument
 #### Given
 - Fixture file `space name.csv` is created.
+
 #### Inputs
 _Fixture `space name.csv`:_
 ```text
@@ -2733,9 +2950,11 @@ sqly
 #### Then
 - exit code is `0`
 - stdout contains `alpha`
+
 ### Scenario: imports a single-quoted space path as a single argument
 #### Given
 - Fixture file `space name.csv` is created.
+
 #### Inputs
 _Fixture `space name.csv`:_
 ```text
@@ -2755,9 +2974,11 @@ sqly
 #### Then
 - exit code is `0`
 - stdout contains `alpha`
+
 ### Scenario: imports a file inside a space-containing directory when escaped
 #### Given
 - Fixture file `space dir/nested.csv` is created.
+
 #### Inputs
 _Fixture `space dir/nested.csv`:_
 ```text
@@ -2777,9 +2998,11 @@ sqly
 #### Then
 - exit code is `0`
 - stdout contains `gamma`, `delta`
+
 ### Scenario: splits an unquoted space path into two failing arguments
 #### Given
 - Fixture file `space name.csv` is created.
+
 #### Inputs
 _Fixture `space name.csv`:_
 ```text
@@ -2798,11 +3021,13 @@ sqly
 #### Then
 - exit code is `1`
 - stderr contains `space`
+
 ## sqly --inspect
 Source: `test/e2e/tools/sqly/inspect.atago.yaml`
 ### Scenario: prints a JSON report for a single file
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -2819,9 +3044,11 @@ sqly --inspect user.csv
 - exit code is `0`
 - stdout line `1` equals an exact value
 - stdout contains `"name": "user"`, `"row_count": 3`, `"user_name"`
+
 ### Scenario: maps every table from a multi-table ACH file to its source
 #### Given
 - Fixture file `ppd-debit.ach` is created.
+
 #### When
 ```shell
 sqly --inspect ppd-debit.ach
@@ -2829,10 +3056,12 @@ sqly --inspect ppd-debit.ach
 #### Then
 - exit code is `0`
 - stdout contains `"name": "ppd_debit_entries"`, `ppd-debit.ach`
+
 ### Scenario: keeps stdout as pure JSON for a directory and stays quiet on stderr
 #### Given
 - Fixture file `ins/a.csv` is created.
 - Fixture file `ins/b.csv` is created.
+
 #### Inputs
 _Fixture `ins/a.csv`:_
 ```text
@@ -2853,6 +3082,7 @@ sqly --inspect ins
 - stdout line `1` equals an exact value
 - stdout contains `"name": "a"`, `"name": "b"`
 - stderr does not contain `Successfully imported`
+
 ### Scenario: fails with a clear error when no input is given
 #### When
 ```shell
@@ -2861,9 +3091,11 @@ sqly --inspect
 #### Then
 - exit code is `1`
 - stderr contains `no tables to inspect`
+
 ### Scenario: emits a schema-only report with --inspect-sample 0
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -2880,9 +3112,11 @@ sqly --inspect --inspect-sample 0 user.csv
 - exit code is `0`
 - stdout contains `"sample_rows": []`
 - stdout does not contain `booker12`
+
 ### Scenario: limits sample rows with --inspect-sample
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -2899,9 +3133,11 @@ sqly --inspect --inspect-sample 1 user.csv
 - exit code is `0`
 - stdout contains `booker12`
 - stdout does not contain `jenkins46`
+
 ### Scenario: rejects a negative --inspect-sample
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -2917,11 +3153,13 @@ sqly --inspect --inspect-sample -1 user.csv
 #### Then
 - exit code is `1`
 - stderr contains `inspect-sample`
+
 ## sqly --inspect conflicts
 Source: `test/e2e/tools/sqly/inspect_conflicts.atago.yaml`
 ### Scenario: rejects --inspect with --sql
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -2935,9 +3173,11 @@ sqly --inspect --sql "SELECT * FROM user LIMIT 1" user.csv
 #### Then
 - exit code is `1`
 - stderr contains `--inspect`
+
 ### Scenario: rejects --inspect with --output and writes no file
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -2952,9 +3192,11 @@ sqly --inspect --output out.csv user.csv
 - exit code is `1`
 - stderr contains `--inspect`
 - file `out.csv` does not exist
+
 ### Scenario: rejects --inspect with --save-dir and creates no save dir
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -2969,6 +3211,7 @@ sqly --inspect --save-dir save user.csv
 - exit code is `1`
 - stderr contains `--inspect`
 - file `save` does not exist
+
 ## sqly JSON/NDJSON NULL handling
 Source: `test/e2e/tools/sqly/json_null.atago.yaml`
 ### Scenario: emits NULL as JSON null in --json
@@ -2979,6 +3222,7 @@ sqly --json --sql "SELECT NULL AS n, '' AS e, 1 AS x"
 #### Then
 - exit code is `0`
 - stdout contains `"n":null`, `"e":""`
+
 ### Scenario: emits NULL as JSON null in --ndjson
 #### When
 ```shell
@@ -2987,11 +3231,13 @@ sqly --ndjson --sql "SELECT NULL AS n, '' AS e, 1 AS x"
 #### Then
 - exit code is `0`
 - stdout contains `"n":null`, `"e":""`
+
 ## sqly metamorphic relations
 Source: `test/e2e/tools/sqly/metamorphic.atago.yaml`
 ### Scenario: COUNT(*) equals the number of selected rows
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -3010,9 +3256,11 @@ sqly --csv --sql "SELECT user_name FROM user" user.csv
   - stdout line `2` equals an exact value
 - after `sqly --csv --sql "SELECT user_name FROM user" user.csv`:
   - stdout contains `booker12`, `jenkins46`, `grey07`
+
 ### Scenario: WHERE 1=1 returns all rows and WHERE 1=0 returns none
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -3031,9 +3279,11 @@ sqly --json --sql "SELECT user_name FROM user WHERE 1=0" user.csv
   - stdout line `2` equals an exact value
 - after `sqly --json --sql "SELECT user_name FROM user WHERE 1=0" user.csv`:
   - stdout equals an exact value
+
 ### Scenario: ORDER BY preserves the row multiset
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -3050,9 +3300,11 @@ sqly --csv --sql "SELECT user_name FROM user ORDER BY user_name DESC" user.csv
 - exit code is `0`
 - stdout line `2` equals an exact value
 - stdout contains `grey07`, `booker12`
+
 ### Scenario: csv and ndjson yield the same rows
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -3068,9 +3320,11 @@ sqly --ndjson --sql "SELECT user_name FROM user ORDER BY identifier" user.csv
 #### Then
 - stdout line `1` equals an exact value
 - stdout line `3` equals an exact value
+
 ### Scenario: CSV dump reimported yields identical data
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -3094,11 +3348,13 @@ sqly --csv --sql "SELECT * FROM rt ORDER BY identifier" rt.csv
   - stdout line `1` equals an exact value
   - stdout line `2` equals an exact value
   - stdout line `4` equals an exact value
+
 ## sqly .mode banner routing
 Source: `test/e2e/tools/sqly/mode_banner.atago.yaml`
 ### Scenario: keeps stdout pure JSON after .mode json
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -3119,9 +3375,11 @@ sqly user.csv
 - stdout line `1` equals an exact value
 - stdout does not contain `Change output mode`
 - stderr contains `Change output mode from table to json`
+
 ### Scenario: keeps stdout pure NDJSON after .mode ndjson
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -3142,9 +3400,11 @@ sqly user.csv
 - stdout line `1` equals an exact value
 - stdout does not contain `Change output mode`
 - stderr contains `Change output mode from table to ndjson`
+
 ### Scenario: reports the typed mode by name and emits typed output after .mode json-typed
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -3165,11 +3425,13 @@ sqly user.csv
 - stdout does not contain `Change output mode`
 - stderr contains `Change output mode from table to json-typed`
 - stdout contains `"n":7`, `"s":"x"`
+
 ## sqly output formats
 Source: `test/e2e/tools/sqly/output_format.atago.yaml`
 ### Scenario: --json renders results as a JSON array
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -3187,9 +3449,11 @@ sqly --json --sql "SELECT user_name, identifier FROM user ORDER BY identifier LI
 - stdout line `1` equals an exact value
 - stdout contains `{"user_name":"booker12","identifier":"1"}`
 - stdout contains `{"user_name":"jenkins46","identifier":"2"}`
+
 ### Scenario: --json prints [] for an empty result
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -3203,9 +3467,11 @@ sqly --json --sql "SELECT user_name FROM user WHERE user_name = 'nobody'" user.c
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: --ndjson renders one JSON object per line
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -3222,9 +3488,11 @@ sqly --ndjson --sql "SELECT user_name, identifier FROM user ORDER BY identifier 
 - exit code is `0`
 - stdout line `1` equals an exact value
 - stdout line `2` equals an exact value
+
 ### Scenario: --ndjson prints nothing for an empty result
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -3238,9 +3506,11 @@ sqly --ndjson --sql "SELECT user_name FROM user WHERE user_name = 'nobody'" user
 #### Then
 - exit code is `0`
 - stdout is empty
+
 ### Scenario: --csv renders header and rows as CSV
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -3256,11 +3526,13 @@ sqly --csv --sql "SELECT user_name, identifier FROM user ORDER BY identifier LIM
 - exit code is `0`
 - stdout line `1` equals an exact value
 - stdout line `2` equals an exact value
+
 ## sqly --output requires --sql
 Source: `test/e2e/tools/sqly/output_requires_sql.atago.yaml`
 ### Scenario: rejects --output with no query
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -3275,9 +3547,11 @@ sqly user.csv --output out.csv
 - exit code is `1`
 - stderr contains `--output requires --sql`
 - file `out.csv` does not exist
+
 ### Scenario: rejects --output for batch SQL from stdin
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -3296,11 +3570,13 @@ sqly user.csv --output out.csv
 - exit code is `1`
 - stderr contains `--output requires --sql`
 - file `out.csv` does not exist
+
 ## sqly file-output status routing
 Source: `test/e2e/tools/sqly/output_status.atago.yaml`
 ### Scenario: keeps stdout empty for --output and reports on stderr
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -3316,11 +3592,14 @@ sqly --sql "SELECT 1 AS x" --output out.csv user.csv
 - stdout is empty
 - stderr contains `Output sql result to`
 - file `out.csv` exists
+
 #### Generated artifacts
 - `out.csv`
+
 ### Scenario: keeps stdout free of the .dump status line
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -3340,11 +3619,14 @@ sqly user.csv
 - stdout is empty
 - stderr contains `dump `user` table to`
 - file `dump.csv` exists
+
 #### Generated artifacts
 - `dump.csv`
+
 ### Scenario: keeps the .save confirmation off stdout
 #### Given
 - Fixture file `u.csv` is created.
+
 #### Inputs
 _Fixture `u.csv`:_
 ```text
@@ -3365,11 +3647,13 @@ sqly u.csv
 - stdout contains `affected`
 - stdout does not contain `Saved`
 - stderr contains `Saved u to`
+
 ## sqly parquet export
 Source: `test/e2e/tools/sqly/parquet_export.atago.yaml`
 ### Scenario: writes a parquet file that re-imports with the same rows
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -3395,11 +3679,14 @@ sqly --csv --sql "SELECT COUNT(*) AS c FROM user" user.parquet
 - after `sqly --csv --sql "SELECT COUNT(*) AS c FROM user" user.parquet`:
   - exit code is `0`
   - stdout line `2` equals an exact value
+
 #### Generated artifacts
 - `user.parquet`
+
 ### Scenario: appends the .parquet extension
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -3419,11 +3706,14 @@ sqly user.csv
 ```
 #### Then
 - file `result.parquet` exists
+
 #### Generated artifacts
 - `result.parquet`
+
 ### Scenario: writes query results to the given parquet path with --output
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -3440,8 +3730,10 @@ sqly --parquet --output q.parquet --sql "SELECT user_name FROM user LIMIT 2" use
 - exit code is `0`
 - stderr contains `q.parquet`
 - file `q.parquet` exists
+
 #### Generated artifacts
 - `q.parquet`
+
 ### Scenario: preserves leading-zero codes through a parquet round-trip
 #### When
 ```shell
@@ -3452,6 +3744,7 @@ sqly --csv --sql "SELECT code, acct FROM codes" codes.parquet
 - after `sqly --csv --sql "SELECT code, acct FROM codes" codes.parquet`:
   - exit code is `0`
   - stdout contains `007`, `00042`
+
 ### Scenario: preserves SQL NULL through a parquet round-trip
 #### When
 ```shell
@@ -3463,9 +3756,11 @@ sqly --json-typed --sql "SELECT * FROM n" n.parquet
   - exit code is `0`
   - stdout contains `"id":null`
   - stdout does not contain `"id":""`
+
 ### Scenario: reports a clear error when exporting an empty result
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -3481,11 +3776,13 @@ sqly --parquet --output empty.parquet --sql "SELECT user_name FROM user WHERE 1=
 #### Then
 - exit code is `1`
 - stderr contains `empty result`
+
 ## sqly input path validation
 Source: `test/e2e/tools/sqly/path_validation.atago.yaml`
 ### Scenario: imports a deeply nested path
 #### Given
 - Fixture file `a/b/c/d/e/f/g/h/i/j/k/user.csv` is created.
+
 #### Inputs
 _Fixture `a/b/c/d/e/f/g/h/i/j/k/user.csv`:_
 ```text
@@ -3501,9 +3798,11 @@ sqly --csv --sql "SELECT COUNT(*) AS c FROM user" a/b/c/d/e/f/g/h/i/j/k/user.csv
 #### Then
 - exit code is `0`
 - stdout line `2` equals an exact value
+
 ### Scenario: imports a file whose name literally contains ..%2f
 #### Given
 - Fixture file `..%2fuser.csv` is created.
+
 #### Inputs
 _Fixture `..%2fuser.csv`:_
 ```text
@@ -3518,6 +3817,7 @@ sqly --inspect "..%2fuser.csv"
 - exit code is `0`
 - stdout contains `user_name`
 - stderr does not contain `dangerous path pattern`
+
 ### Scenario: rejects a symlink alias that resolves to a blocked system path
 _skipped on Windows_
 #### When
@@ -3529,11 +3829,13 @@ sqly --inspect hosts_alias.csv
 - after `sqly --inspect hosts_alias.csv`:
   - exit code is `1`
   - stderr contains `system directory not allowed`
+
 ### Scenario: imports a symlink alias that resolves to an ordinary user file
 _skipped on Windows_
 #### Given
 - Fixture file `real.csv` is created.
 - Fixture file `user_alias.csv` is created.
+
 #### Inputs
 _Fixture `real.csv`:_
 ```text
@@ -3547,11 +3849,13 @@ sqly --inspect user_alias.csv
 #### Then
 - exit code is `0`
 - stdout contains `user_name`
+
 ## sqly --profile workflow
 Source: `test/e2e/tools/sqly/profile.atago.yaml`
 ### Scenario: reports per-column data quality as JSON
 #### Given
 - Fixture file `messy.csv` is created.
+
 #### Inputs
 _Fixture `messy.csv`:_
 ```text
@@ -3567,6 +3871,7 @@ sqly --profile messy.csv
 #### Then
 - exit code is `0`
 - stdout contains `"row_count": 3`, `"column_count": 3`, `mixed numeric and non-numeric`, `null placeholders`
+
 ### Scenario: profiles a stdin dataset
 #### Inputs
 _stdin for `sqly`:_
@@ -3582,10 +3887,12 @@ sqly --stdin csv --profile
 #### Then
 - exit code is `0`
 - stdout contains `"name": "stdin"`, `"row_count": 2`
+
 ### Scenario: profiles multiple tables in one run
 #### Given
 - Fixture file `messy.csv` is created.
 - Fixture file `orders.csv` is created.
+
 #### Inputs
 _Fixture `messy.csv`:_
 ```text
@@ -3607,9 +3914,11 @@ sqly --profile messy.csv orders.csv
 #### Then
 - exit code is `0`
 - stdout contains `"name": "messy"`, `"name": "orders"`
+
 ### Scenario: emits a human-readable summary with --profile-format text
 #### Given
 - Fixture file `orders.csv` is created.
+
 #### Inputs
 _Fixture `orders.csv`:_
 ```text
@@ -3624,9 +3933,11 @@ sqly --profile --profile-format text orders.csv
 #### Then
 - exit code is `0`
 - stdout contains `table orders: 2 rows, 2 columns`
+
 ### Scenario: counts a blank string as a distinct value in JSON output
 #### Given
 - Fixture file `blank.csv` is created.
+
 #### Inputs
 _Fixture `blank.csv`:_
 ```text
@@ -3640,9 +3951,11 @@ sqly --profile blank.csv
 ```
 #### Then
 - stdout contains `"blank_count": 1`, `"distinct_count": 2`
+
 ### Scenario: counts a blank string as a distinct value in text output
 #### Given
 - Fixture file `blank.csv` is created.
+
 #### Inputs
 _Fixture `blank.csv`:_
 ```text
@@ -3656,9 +3969,11 @@ sqly --profile --profile-format text blank.csv
 ```
 #### Then
 - stdout contains `blanks=1 distinct=2`
+
 ### Scenario: flags a padded null-like placeholder and its whitespace together
 #### Given
 - Fixture file `nullspace.csv` is created.
+
 #### Inputs
 _Fixture `nullspace.csv`:_
 ```text
@@ -3671,9 +3986,11 @@ sqly --profile nullspace.csv
 ```
 #### Then
 - stdout contains `null placeholders`, `leading or trailing whitespace`
+
 ### Scenario: warns only about whitespace for a padded ordinary value
 #### Given
 - Fixture file `padded.csv` is created.
+
 #### Inputs
 _Fixture `padded.csv`:_
 ```text
@@ -3687,9 +4004,11 @@ sqly --profile padded.csv
 #### Then
 - stdout does not contain `null placeholders`
 - stdout contains `leading or trailing whitespace`
+
 ### Scenario: counts comma-formatted numerals as numeric, matching table-mode
 #### Given
 - Fixture file `commas.csv` is created.
+
 #### Inputs
 _Fixture `commas.csv`:_
 ```text
@@ -3704,9 +4023,11 @@ sqly --profile commas.csv
 #### Then
 - stdout contains `"numeric_count": 2`
 - stdout does not contain `mixed numeric`
+
 ### Scenario: right-aligns the same comma-formatted column in table-mode
 #### Given
 - Fixture file `commas.csv` is created.
+
 #### Inputs
 _Fixture `commas.csv`:_
 ```text
@@ -3721,11 +4042,13 @@ sqly --sql "SELECT * FROM commas" commas.csv
 #### Then
 - exit code is `0`
 - stdout contains `|  1,000 |`
+
 ## README examples
 Source: `test/e2e/tools/sqly/readme_examples.atago.yaml`
 ### Scenario: prints the full user table as an ASCII table
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -3741,10 +4064,12 @@ sqly --sql "SELECT * FROM user" user.csv
 #### Then
 - exit code is `0`
 - stdout contains `user_name`, `booker12`, `smith79`
+
 ### Scenario: joins two files on a shared key
 #### Given
 - Fixture file `user.csv` is created.
 - Fixture file `identifier.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -3767,10 +4092,12 @@ sqly --sql "SELECT user_name, position FROM user JOIN identifier ON user.identif
 #### Then
 - exit code is `0`
 - stdout contains `position`, `developrt`
+
 ### Scenario: runs the analytics script (CTE + window + GROUP BY)
 #### Given
 - Fixture file `actor.csv` is created.
 - Fixture file `analytics.sql` is created.
+
 #### When
 ```shell
 sqly --sql-file analytics.sql actor.csv
@@ -3778,10 +4105,12 @@ sqly --sql-file analytics.sql actor.csv
 #### Then
 - exit code is `0`
 - stdout contains `Harrison Ford`, `50+ movies`
+
 ### Scenario: extracts JSON fields from a JSONL file
 #### Given
 - Fixture file `sample.jsonl` is created.
 - Fixture file `json.sql` is created.
+
 #### When
 ```shell
 sqly --sql-file json.sql sample.jsonl
@@ -3789,9 +4118,11 @@ sqly --sql-file json.sql sample.jsonl
 #### Then
 - exit code is `0`
 - stdout contains `Charlie`, `Nagoya`
+
 ### Scenario: reads a gzipped CSV transparently
 #### Given
 - Fixture file `user.csv.gz` is created.
+
 #### When
 ```shell
 sqly --csv --sql "SELECT user_name FROM user ORDER BY identifier LIMIT 1" user.csv.gz
@@ -3799,9 +4130,11 @@ sqly --csv --sql "SELECT user_name FROM user ORDER BY identifier LIMIT 1" user.c
 #### Then
 - exit code is `0`
 - stdout line `2` equals an exact value
+
 ### Scenario: queries a Parquet file
 #### Given
 - Fixture file `products.parquet` is created.
+
 #### When
 ```shell
 sqly --csv --sql "SELECT name FROM products ORDER BY CAST(price AS REAL) DESC LIMIT 1" products.parquet
@@ -3809,10 +4142,12 @@ sqly --csv --sql "SELECT name FROM products ORDER BY CAST(price AS REAL) DESC LI
 #### Then
 - exit code is `0`
 - stdout line `2` equals an exact value
+
 ### Scenario: joins a compressed CSV with a plain CSV
 #### Given
 - Fixture file `user.csv.gz` is created.
 - Fixture file `identifier.csv` is created.
+
 #### Inputs
 _Fixture `identifier.csv`:_
 ```text
@@ -3828,9 +4163,11 @@ sqly --csv --sql "SELECT user_name, position FROM user JOIN identifier ON user.i
 #### Then
 - exit code is `0`
 - stdout contains `developrt`
+
 ### Scenario: renders CSV with --csv
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -3847,9 +4184,11 @@ sqly --csv --sql "SELECT user_name, identifier FROM user LIMIT 2" user.csv
 - stdout line `1` equals an exact value
 - stdout line `2` equals an exact value
 - stdout line `3` equals an exact value
+
 ### Scenario: renders JSON with --json
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -3864,9 +4203,11 @@ sqly --json --sql "SELECT user_name, identifier FROM user LIMIT 2" user.csv
 ```
 #### Then
 - stdout contains `{"user_name":"booker12","identifier":"1"}`
+
 ### Scenario: renders NDJSON with --ndjson
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -3882,9 +4223,11 @@ sqly --ndjson --sql "SELECT user_name, identifier FROM user LIMIT 2" user.csv
 #### Then
 - stdout line `1` equals an exact value
 - stdout line `2` equals an exact value
+
 ### Scenario: renders a markdown table with --markdown
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -3900,9 +4243,11 @@ sqly --markdown --sql "SELECT user_name, identifier FROM user LIMIT 2" user.csv
 #### Then
 - stdout line `1` equals an exact value
 - stdout contains `| booker12 | 1 |`
+
 ### Scenario: renders LTSV with --ltsv
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -3917,9 +4262,11 @@ sqly --ltsv --sql "SELECT user_name, identifier FROM user LIMIT 1" user.csv
 ```
 #### Then
 - stdout line `1` equals an exact value
+
 ### Scenario: writes CSV to the path given by --output
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -3936,6 +4283,7 @@ sqly --sql "SELECT * FROM user" --output out.csv user.csv
 - exit code is `0`
 - stderr contains `out.csv`
 - file `out.csv` contains `booker12`
+
 ### Scenario: queries piped CSV through the default stdin table
 #### Inputs
 _stdin for `sqly`:_
@@ -3952,9 +4300,11 @@ sqly --stdin csv --sql "SELECT user_name FROM stdin LIMIT 1"
 #### Then
 - exit code is `0`
 - stdout contains `booker12`
+
 ### Scenario: joins piped stdin with a file argument
 #### Given
 - Fixture file `identifier.csv` is created.
+
 #### Inputs
 _Fixture `identifier.csv`:_
 ```text
@@ -3977,9 +4327,11 @@ sqly --stdin csv --csv --sql "SELECT s.user_name, i.position FROM stdin s JOIN i
 #### Then
 - exit code is `0`
 - stdout contains `developrt`
+
 ### Scenario: runs a helper command and a query from piped stdin
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -4000,10 +4352,12 @@ sqly user.csv
 #### Then
 - exit code is `0`
 - stdout contains `TABLE NAME`, `user`, `3`
+
 ### Scenario: runs SQL from join.sql while stdin carries a dataset
 #### Given
 - Fixture file `identifier.csv` is created.
 - Fixture file `join.sql` is created.
+
 #### Inputs
 _Fixture `identifier.csv`:_
 ```text
@@ -4026,9 +4380,11 @@ sqly --stdin csv --sql-file join.sql identifier.csv
 #### Then
 - exit code is `0`
 - stdout contains `developrt`
+
 ### Scenario: prints a JSON inspect report with a stable source and column types
 #### Given
 - Fixture file `identifier.csv` is created.
+
 #### Inputs
 _Fixture `identifier.csv`:_
 ```text
@@ -4044,9 +4400,11 @@ sqly --inspect --inspect-sample 1 identifier.csv
 #### Then
 - exit code is `0`
 - stdout contains `"name": "identifier"`, `identifier.csv`, `"type": "INTEGER"`, `"position": "developrt"`
+
 ### Scenario: omits sample rows with --inspect-sample 0
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -4062,9 +4420,11 @@ sqly --inspect --inspect-sample 0 user.csv
 #### Then
 - exit code is `0`
 - stdout contains `"sample_rows": []`
+
 ### Scenario: prints the CREATE TABLE statement with .schema
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -4084,9 +4444,11 @@ sqly user.csv
 #### Then
 - exit code is `0`
 - stdout contains `CREATE TABLE "user"`, `"identifier" INTEGER`
+
 ### Scenario: prints column information with .describe
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -4106,9 +4468,11 @@ sqly user.csv
 #### Then
 - exit code is `0`
 - stdout contains `notnull`, `user_name`, `INTEGER`
+
 ### Scenario: writes the updated table to --save-dir, leaving the source untouched
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -4127,9 +4491,11 @@ sqly --sql "UPDATE user SET first_name = 'Rachelle' WHERE identifier = 1" --save
 - stderr contains `Saved user to`
 - file `user.csv` does not contain `Rachelle`
 - file `out/user.csv` contains `Rachelle`
+
 ### Scenario: rejects --save without --force
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -4146,9 +4512,11 @@ sqly --sql "UPDATE user SET identifier = identifier + 100" --save user.csv
 - exit code is `1`
 - stderr contains `force`
 - file `user.csv` does not contain `101`
+
 ### Scenario: rejects a schema-changing statement under --save-dir before writing anything
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -4165,9 +4533,11 @@ sqly --sql "CREATE TABLE backup AS SELECT * FROM user" --save-dir out user.csv
 - exit code is `1`
 - stderr contains `cannot persist`
 - file `out` does not exist
+
 ### Scenario: overwrites the source in place with --save --force
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -4185,10 +4555,12 @@ sqly --sql "UPDATE user SET identifier = identifier + 100" --save --force user.c
 - stdout contains `affected`
 - stderr contains `Saved user to`
 - file `user.csv` contains `101`
+
 ### Scenario: imports every supported file under a directory
 #### Given
 - Fixture file `imp/user.csv` is created.
 - Fixture file `imp/identifier.csv` is created.
+
 #### Inputs
 _Fixture `imp/user.csv`:_
 ```text
@@ -4212,9 +4584,11 @@ sqly imp
 - exit code is `0`
 - stdout contains `user`, `identifier`
 - stderr contains `Successfully imported`
+
 ### Scenario: loads ACH records into multiple tables
 #### Given
 - Fixture file `ppd-debit.ach` is created.
+
 #### Inputs
 _stdin for `sqly`:_
 ```text
@@ -4227,9 +4601,11 @@ sqly ppd-debit.ach
 #### Then
 - exit code is `0`
 - stdout contains `ppd_debit_file_header`, `ppd_debit_entries`
+
 ### Scenario: queries the ACH entries table
 #### Given
 - Fixture file `ppd-debit.ach` is created.
+
 #### When
 ```shell
 sqly --csv --sql "SELECT amount FROM ppd_debit_entries" ppd-debit.ach
@@ -4237,9 +4613,11 @@ sqly --csv --sql "SELECT amount FROM ppd_debit_entries" ppd-debit.ach
 #### Then
 - exit code is `0`
 - stdout contains `amount`
+
 ### Scenario: loads a Fedwire file into a single message table
 #### Given
 - Fixture file `customer-transfer.fed` is created.
+
 #### Inputs
 _stdin for `sqly`:_
 ```text
@@ -4252,11 +4630,13 @@ sqly customer-transfer.fed
 #### Then
 - exit code is `0`
 - stdout contains `customer_transfer_message`
+
 ## sqly interactive shell (pty)
 Source: `test/e2e/tools/sqly/repl_pty.atago.yaml`
 ### Scenario: run a query and read its rendered result table over a pty
 #### Given
 - Fixture file `actor.csv` is created.
+
 #### Inputs
 _Fixture `actor.csv`:_
 ```text
@@ -4272,9 +4652,11 @@ Samuel L. Jackson,4772
 - exit code is `0`
 - stdout contains `Harrison Ford`, `+--`
 - rendered screen contains `Harrison Ford`
+
 ### Scenario: the .tables dot-command renders the imported table over a pty
 #### Given
 - Fixture file `actor.csv` is created.
+
 #### Inputs
 _Fixture `actor.csv`:_
 ```text
@@ -4289,9 +4671,11 @@ Samuel L. Jackson,4772
 #### Then
 - exit code is `0`
 - stdout contains `TABLE NAME`, `actor`
+
 ### Scenario: a computed aggregate round-trips through the pty shell
 #### Given
 - Fixture file `actor.csv` is created.
+
 #### Inputs
 _Fixture `actor.csv`:_
 ```text
@@ -4306,9 +4690,11 @@ Samuel L. Jackson,4772
 #### Then
 - exit code is `0`
 - stdout contains `ROWS=2`
+
 ### Scenario: the prompt reflects a live .mode switch over a pty
 #### Given
 - Fixture file `actor.csv` is created.
+
 #### Inputs
 _Fixture `actor.csv`:_
 ```text
@@ -4322,6 +4708,7 @@ Samuel L. Jackson,4772
 ```
 #### Then
 - exit code is `0`
+
 ## sqly sandbox_home + changes (history DB isolation)
 Source: `test/e2e/tools/sqly/sandbox_home.atago.yaml`
 ### Scenario: sqly --sql writes exactly its history DB, only inside the sandbox home
@@ -4329,6 +4716,7 @@ _only when `sqly --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `user.csv` is created.
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -4344,14 +4732,17 @@ sqly --sql "SELECT identifier FROM user WHERE user_name = 'booker12'" user.csv
 - stdout contains `1`
 - the step changed exactly created `.atago-home/.config/sqly/history.db`, modified nothing, deleted nothing
 - file `.atago-home/.config/sqly/history.db` exists
+
 #### Generated artifacts
 - `.atago-home/.config/sqly/history.db`
+
 ### Scenario: a second sqly batch run leaves its sandbox home byte-identical
 _only when `sqly --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `user.csv` is created.
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -4369,11 +4760,13 @@ sqly --sql "SELECT 2" user.csv
 - after `sqly --sql "SELECT 2" user.csv`:
   - exit code is `0`
   - the step changed exactly created nothing, modified nothing, deleted nothing
+
 ## sqly write-back
 Source: `test/e2e/tools/sqly/save.atago.yaml`
 ### Scenario: writes to --save-dir without modifying the source
 #### Given
 - Fixture file `u.csv` is created.
+
 #### Inputs
 _Fixture `u.csv`:_
 ```text
@@ -4391,9 +4784,11 @@ sqly --sql "UPDATE u SET first_name = 'CHANGED' WHERE identifier = 1" u.csv --sa
 - stderr contains `Saved u to`
 - file `u.csv` does not contain `CHANGED`
 - file `out/u.csv` contains `CHANGED`
+
 ### Scenario: refuses --save without --force
 #### Given
 - Fixture file `u.csv` is created.
+
 #### Inputs
 _Fixture `u.csv`:_
 ```text
@@ -4409,9 +4804,11 @@ sqly --sql "UPDATE u SET first_name = 'X'" u.csv --save
 - exit code is `1`
 - stderr contains `--force`
 - file `u.csv` does not contain `X,`
+
 ### Scenario: overwrites the source in place with --save --force
 #### Given
 - Fixture file `u.csv` is created.
+
 #### Inputs
 _Fixture `u.csv`:_
 ```text
@@ -4427,9 +4824,11 @@ sqly --sql "DELETE FROM u WHERE identifier > 1" u.csv --save --force
 - exit code is `0`
 - stdout contains `affected`
 - stderr contains `Saved u to`
+
 ### Scenario: re-imports a file rewritten in place (round-trip)
 #### Given
 - Fixture file `u.csv` is created.
+
 #### Inputs
 _Fixture `u.csv`:_
 ```text
@@ -4446,9 +4845,11 @@ sqly --csv --sql "SELECT COUNT(*) AS c FROM u" u.csv
 - after `sqly --csv --sql "SELECT COUNT(*) AS c FROM u" u.csv`:
   - exit code is `0`
   - stdout line `2` equals an exact value
+
 ### Scenario: preserves gzip compression on in-place save
 #### Given
 - Fixture file `c.csv.gz` is created.
+
 #### When
 ```shell
 sqly --sql "UPDATE c SET first_name = 'GZ' WHERE identifier = 1" c.csv.gz --save --force
@@ -4458,9 +4859,11 @@ sqly --csv --sql "SELECT first_name FROM c WHERE identifier = 1" c.csv.gz
 - after `sqly --csv --sql "SELECT first_name FROM c WHERE identifier = 1" c.csv.gz`:
   - exit code is `0`
   - stdout line `2` equals an exact value
+
 ### Scenario: saves via the .save command in batch mode
 #### Given
 - Fixture file `u.csv` is created.
+
 #### Inputs
 _Fixture `u.csv`:_
 ```text
@@ -4482,6 +4885,7 @@ sqly u.csv
 - stdout contains `affected`
 - stderr contains `Saved u to`
 - file `u.csv` contains `BATCH`
+
 ### Scenario: guides a non-interactive --save with no input files toward passing input
 #### When
 ```shell
@@ -4490,6 +4894,7 @@ sqly --save --force --sql "UPDATE foo SET x = 1"
 #### Then
 - exit code is `1`
 - stderr contains `no tables to save`, `input files`
+
 ### Scenario: guides a batch .save with no imported tables toward passing input
 #### Inputs
 _stdin for `sqly`:_
@@ -4503,11 +4908,13 @@ sqly
 #### Then
 - exit code is `1`
 - stderr contains `no tables to save`, `input files`
+
 ## sqly schema inspection
 Source: `test/e2e/tools/sqly/schema.atago.yaml`
 ### Scenario: .schema prints a CREATE TABLE statement for a CSV table
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -4525,9 +4932,11 @@ sqly user.csv
 #### Then
 - exit code is `0`
 - stdout contains `CREATE TABLE`, `user_name`
+
 ### Scenario: .schema emits a structured object in json mode
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -4548,9 +4957,11 @@ sqly user.csv
 - stdout at `$[0].table` equals `user`
 - stdout at `$[0].schema` matches `/^CREATE TABLE/`
 - stderr contains `Change output mode`
+
 ### Scenario: .schema returns the stored CREATE VIEW for a differently cased view name
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -4570,9 +4981,11 @@ sqly user.csv
 - exit code is `0`
 - stdout contains `CREATE VIEW`
 - stdout does not contain `CREATE TABLE`
+
 ### Scenario: .schema errors on a missing table
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -4590,9 +5003,11 @@ sqly user.csv
 #### Then
 - exit code is `1`
 - stderr contains `no such table`
+
 ### Scenario: .describe lists columns and types for a CSV table
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -4610,9 +5025,11 @@ sqly user.csv
 #### Then
 - exit code is `0`
 - stdout contains `user_name`, `identifier`
+
 ### Scenario: .describe emits structured column metadata in json mode
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -4632,9 +5049,11 @@ sqly user.csv
 - exit code is `0`
 - stdout at `$[0].name` equals `user_name`
 - stdout at `$[0].type` equals `TEXT`
+
 ### Scenario: .describe errors on a missing table
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -4652,11 +5071,13 @@ sqly user.csv
 #### Then
 - exit code is `1`
 - stderr contains `no such table`
+
 ## sqly --sheet validation
 Source: `test/e2e/tools/sqly/sheet_flag.atago.yaml`
 ### Scenario: rejects --sheet with a non-Excel file and --sql
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -4670,9 +5091,11 @@ sqly --sql "SELECT * FROM user" --sheet "A test" user.csv
 #### Then
 - exit code is `1`
 - stderr contains `--sheet`
+
 ### Scenario: rejects --sheet with a non-Excel file and --inspect
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -4686,9 +5109,11 @@ sqly --inspect --sheet "A test" user.csv
 #### Then
 - exit code is `1`
 - stderr contains `--sheet`
+
 ### Scenario: still imports an Excel file with --sheet
 #### Given
 - Fixture file `sample.xlsx` is created.
+
 #### When
 ```shell
 sqly --csv --sql "SELECT * FROM sample_test_sheet" --sheet test_sheet sample.xlsx
@@ -4696,9 +5121,11 @@ sqly --csv --sql "SELECT * FROM sample_test_sheet" --sheet test_sheet sample.xls
 #### Then
 - exit code is `0`
 - stdout contains `name`
+
 ### Scenario: rejects an explicit empty --sheet
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -4712,9 +5139,11 @@ sqly --inspect --sheet "" user.csv
 #### Then
 - exit code is `1`
 - stderr contains `sheet`
+
 ### Scenario: rejects --sheet for a directory with no Excel files
 #### Given
 - Fixture file `dir/u.csv` is created.
+
 #### Inputs
 _Fixture `dir/u.csv`:_
 ```text
@@ -4728,9 +5157,11 @@ sqly --inspect --sheet anything dir
 #### Then
 - exit code is `1`
 - stderr contains `--sheet`
+
 ### Scenario: tells the user how to recover when --sheet has no Excel input
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -4744,9 +5175,11 @@ sqly --inspect --sheet "A test" user.csv
 #### Then
 - exit code is `1`
 - stderr contains `Excel`, `remove --sheet`
+
 ### Scenario: names the workbook and suggests recovery on a single-workbook sheet miss
 #### Given
 - Fixture file `sample.xlsx` is created.
+
 #### When
 ```shell
 sqly --inspect --sheet no_such_sheet sample.xlsx
@@ -4754,10 +5187,12 @@ sqly --inspect --sheet no_such_sheet sample.xlsx
 #### Then
 - exit code is `1`
 - stderr contains `sample.xlsx`, `without --sheet`
+
 ### Scenario: names every checked workbook on a multi-workbook sheet miss
 #### Given
 - Fixture file `sample.xlsx` is created.
 - Fixture file `sheet_with_accents.xlsx` is created.
+
 #### When
 ```shell
 sqly --inspect --sheet no_such_sheet sample.xlsx sheet_with_accents.xlsx
@@ -4765,11 +5200,13 @@ sqly --inspect --sheet no_such_sheet sample.xlsx sheet_with_accents.xlsx
 #### Then
 - exit code is `1`
 - stderr contains `sample.xlsx`, `sheet_with_accents.xlsx`, `without --sheet`
+
 ## sqly
 Source: `test/e2e/tools/sqly/smoke.atago.yaml`
 ### Scenario: count rows in a CSV fixture
 #### Given
 - Fixture file `users.csv` is created.
+
 #### Inputs
 _Fixture `users.csv`:_
 ```text
@@ -4784,9 +5221,11 @@ sqly --sql 'SELECT count(*) AS cnt FROM users' --csv users.csv
 #### Then
 - exit code is `0`
 - stdout contains `2`
+
 ### Scenario: filter rows and select a column
 #### Given
 - Fixture file `users.csv` is created.
+
 #### Inputs
 _Fixture `users.csv`:_
 ```text
@@ -4801,9 +5240,11 @@ sqly --sql 'SELECT name FROM users WHERE id = 1' --csv users.csv
 #### Then
 - exit code is `0`
 - stdout contains `Alice`
+
 ### Scenario: markdown output format works
 #### Given
 - Fixture file `users.csv` is created.
+
 #### Inputs
 _Fixture `users.csv`:_
 ```text
@@ -4818,12 +5259,14 @@ sqly --sql 'SELECT name FROM users' --markdown users.csv
 - exit code is `0`
 - stdout matches `/\|-+\|/`
 - stdout contains `Alice`
+
 ## sqly --sql-file
 Source: `test/e2e/tools/sqly/sql_file.atago.yaml`
 ### Scenario: runs a multiline query loaded from a file against a file input
 #### Given
 - Fixture file `actor.csv` is created.
 - Fixture file `q.sql` is created.
+
 #### Inputs
 _Fixture `actor.csv`:_
 ```text
@@ -4846,10 +5289,12 @@ sqly --csv --sql-file q.sql actor.csv
 #### Then
 - exit code is `0`
 - stdout contains `Adam Sandler`
+
 ### Scenario: joins a piped --stdin dataset with a query loaded from a file
 #### Given
 - Fixture file `identifier.csv` is created.
 - Fixture file `join.sql` is created.
+
 #### Inputs
 _Fixture `identifier.csv`:_
 ```text
@@ -4877,10 +5322,12 @@ sqly --stdin csv --csv --sql-file join.sql identifier.csv
 #### Then
 - exit code is `0`
 - stdout contains `alice`, `developrt`
+
 ### Scenario: runs multiple statements from a file in order
 #### Given
 - Fixture file `actor.csv` is created.
 - Fixture file `multi.sql` is created.
+
 #### Inputs
 _Fixture `actor.csv`:_
 ```text
@@ -4900,10 +5347,12 @@ sqly --csv --sql-file multi.sql actor.csv
 #### Then
 - exit code is `0`
 - stdout contains `first`, `second`
+
 ### Scenario: rejects --sql and --sql-file together
 #### Given
 - Fixture file `actor.csv` is created.
 - Fixture file `q.sql` is created.
+
 #### Inputs
 _Fixture `actor.csv`:_
 ```text
@@ -4922,9 +5371,11 @@ sqly --sql "SELECT 1" --sql-file q.sql actor.csv
 #### Then
 - exit code is `1`
 - stderr contains `--sql-file`
+
 ### Scenario: fails for a missing SQL file
 #### Given
 - Fixture file `actor.csv` is created.
+
 #### Inputs
 _Fixture `actor.csv`:_
 ```text
@@ -4939,10 +5390,12 @@ sqly --sql-file no_such.sql actor.csv
 #### Then
 - exit code is `1`
 - stderr contains `sql-file`
+
 ### Scenario: fails for an empty SQL file
 #### Given
 - Fixture file `actor.csv` is created.
 - Fixture file `empty.sql` is created.
+
 #### Inputs
 _Fixture `actor.csv`:_
 ```text
@@ -4957,10 +5410,12 @@ sqly --sql-file empty.sql actor.csv
 #### Then
 - exit code is `1`
 - stderr contains `empty`
+
 ### Scenario: locates a failing statement by its line in the SQL file
 #### Given
 - Fixture file `actor.csv` is created.
 - Fixture file `bad.sql` is created.
+
 #### Inputs
 _Fixture `actor.csv`:_
 ```text
@@ -4981,12 +5436,14 @@ sqly --sql-file bad.sql actor.csv
 #### Then
 - exit code is `1`
 - stderr contains `batch statement 3 failed at line 3`, `no_such_table`
+
 ## sqly --sql-file --output
 Source: `test/e2e/tools/sqly/sqlfile_output.atago.yaml`
 ### Scenario: exports a single-SELECT script to the output file with clean stdout
 #### Given
 - Fixture file `user.csv` is created.
 - Fixture file `q.sql` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -5007,10 +5464,12 @@ sqly --sql-file q.sql --output out.csv user.csv
 - stdout is empty
 - stderr contains `Output sql result`
 - file `out.csv` contains `user_name`
+
 ### Scenario: exports a single result set even when the script first runs DDL/DML
 #### Given
 - Fixture file `user.csv` is created.
 - Fixture file `q.sql` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -5032,12 +5491,15 @@ sqly --sql-file q.sql --output out.csv user.csv
 - stdout is empty
 - stderr contains `Output sql result`
 - file `out.csv` exists
+
 #### Generated artifacts
 - `out.csv`
+
 ### Scenario: rejects a script that produces no result set
 #### Given
 - Fixture file `user.csv` is created.
 - Fixture file `q.sql` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -5057,10 +5519,12 @@ sqly --sql-file q.sql --output out.csv user.csv
 - exit code is `1`
 - stderr contains `result set`
 - file `out.csv` does not exist
+
 ### Scenario: rejects a script that produces multiple result sets
 #### Given
 - Fixture file `user.csv` is created.
 - Fixture file `q.sql` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -5081,6 +5545,7 @@ sqly --sql-file q.sql --output out.csv user.csv
 - exit code is `1`
 - stderr contains `single result set`
 - file `out.csv` does not exist
+
 ## sqly --stdin dataset
 Source: `test/e2e/tools/sqly/stdin_dataset.atago.yaml`
 ### Scenario: queries piped CSV through the default stdin table
@@ -5100,6 +5565,7 @@ sqly --stdin csv --csv --sql "SELECT name FROM stdin ORDER BY id"
 - stdout line `1` equals an exact value
 - stdout line `2` equals an exact value
 - stdout line `3` equals an exact value
+
 ### Scenario: queries piped TSV data
 #### Inputs
 _stdin for `sqly`:_
@@ -5114,6 +5580,7 @@ sqly --stdin tsv --csv --sql "SELECT COUNT(*) AS c FROM stdin"
 #### Then
 - exit code is `0`
 - stdout contains `1`
+
 ### Scenario: queries piped JSONL data stored in a data column
 #### Inputs
 _stdin for `sqly`:_
@@ -5128,6 +5595,7 @@ sqly --stdin jsonl --csv --sql "SELECT COUNT(*) AS c FROM stdin"
 #### Then
 - exit code is `0`
 - stdout contains `2`
+
 ### Scenario: overrides the stdin table name with --stdin-name
 #### Inputs
 _stdin for `sqly`:_
@@ -5143,9 +5611,11 @@ sqly --stdin csv --stdin-name people --csv --sql "SELECT COUNT(*) FROM people"
 #### Then
 - exit code is `0`
 - stdout contains `2`
+
 ### Scenario: joins piped stdin with an imported file argument
 #### Given
 - Fixture file `identifier.csv` is created.
+
 #### Inputs
 _Fixture `identifier.csv`:_
 ```text
@@ -5166,6 +5636,7 @@ sqly --stdin csv --csv --sql "SELECT s.name, i.position FROM stdin s JOIN identi
 #### Then
 - exit code is `0`
 - stdout contains `alice`, `developrt`
+
 ### Scenario: reports a stable stdin source in --inspect, not a temp path
 #### Inputs
 _stdin for `sqly`:_
@@ -5181,6 +5652,7 @@ sqly --stdin csv --inspect
 - exit code is `0`
 - stdout contains `"source": "stdin"`
 - stdout does not contain `sqly-stdin-`
+
 ### Scenario: rejects --save --force for a stdin-backed table
 #### Inputs
 _stdin for `sqly`:_
@@ -5196,6 +5668,7 @@ sqly --stdin csv --sql "UPDATE stdin SET name = 'x'" --save --force
 - exit code is `1`
 - stdout does not contain `affected`
 - stderr contains `stdin`
+
 ### Scenario: rejects a non-identifier --stdin-name so the name stays queryable
 #### Inputs
 _stdin for `sqly`:_
@@ -5210,6 +5683,7 @@ sqly --stdin csv --stdin-name "my data" --sql 'SELECT * FROM "my data"'
 #### Then
 - exit code is `1`
 - stderr contains `stdin-name`
+
 ### Scenario: rejects a path-like --stdin-name
 #### Inputs
 _stdin for `sqly`:_
@@ -5225,6 +5699,7 @@ sqly --stdin csv --stdin-name "../escaped" --sql "SELECT 1"
 - exit code is `1`
 - stderr contains `stdin-name`
 - file `escaped.csv` does not exist
+
 ### Scenario: reports a clear error for an unsupported stdin format
 #### Inputs
 _stdin for `sqly`:_
@@ -5239,9 +5714,11 @@ sqly --stdin xml --sql "SELECT 1"
 #### Then
 - exit code is `1`
 - stderr contains `unsupported --stdin format`
+
 ### Scenario: still reads stdin as SQL and helper commands without --stdin
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -5260,6 +5737,7 @@ sqly user.csv
 #### Then
 - exit code is `0`
 - stdout contains `TABLE NAME`, `booker12`
+
 ## sqly typed JSON output
 Source: `test/e2e/tools/sqly/typed_json.atago.yaml`
 ### Scenario: emits native numbers, booleans, and null with --json-typed
@@ -5270,6 +5748,7 @@ sqly --json-typed --sql "SELECT 42 AS i, -1.5 AS f, NULL AS n, 'x' AS s"
 #### Then
 - exit code is `0`
 - stdout contains `"i":42`, `"f":-1.5`, `"n":null`, `"s":"x"`
+
 ### Scenario: keeps the legacy string contract with plain --json
 #### When
 ```shell
@@ -5277,6 +5756,7 @@ sqly --json --sql "SELECT 42 AS i"
 ```
 #### Then
 - stdout contains `"i":"42"`
+
 ### Scenario: emits native scalars per line with --ndjson-typed
 #### When
 ```shell
@@ -5284,9 +5764,11 @@ sqly --ndjson-typed --sql "SELECT 7 AS n, 't' AS s"
 ```
 #### Then
 - stdout contains `"n":7`, `"s":"t"`
+
 ### Scenario: keeps a large integer column lossless (no scientific notation)
 #### Given
 - Fixture file `typed_bigint.csv` is created.
+
 #### Inputs
 _Fixture `typed_bigint.csv`:_
 ```text
@@ -5301,6 +5783,7 @@ sqly --json-typed --sql "SELECT amount FROM typed_bigint WHERE id = 1" typed_big
 #### Then
 - stdout contains `"amount":9007199254740993`
 - stdout does not contain `e+`
+
 ### Scenario: leaves a leading-zero value as a string
 #### When
 ```shell
@@ -5308,9 +5791,11 @@ sqly --json-typed --sql "SELECT '007' AS code"
 ```
 #### Then
 - stdout contains `"code":"007"`
+
 ### Scenario: uses the typed contract for --inspect sample rows
 #### Given
 - Fixture file `typed_bigint.csv` is created.
+
 #### Inputs
 _Fixture `typed_bigint.csv`:_
 ```text
@@ -5324,9 +5809,11 @@ sqly --inspect --json-typed typed_bigint.csv
 ```
 #### Then
 - stdout contains `"amount": 9007199254740993`
+
 ### Scenario: rejects plain --json combined with --inspect
 #### Given
 - Fixture file `typed_bigint.csv` is created.
+
 #### Inputs
 _Fixture `typed_bigint.csv`:_
 ```text
@@ -5341,6 +5828,7 @@ sqly --inspect --json typed_bigint.csv
 #### Then
 - exit code is `1`
 - stderr contains `inspect`
+
 ## sqly v0.18.0 binary bug fixes
 Source: `test/e2e/tools/sqly/v0_18_bugs.atago.yaml`
 ### Scenario: rejects an empty --output
@@ -5351,6 +5839,7 @@ sqly --sql "SELECT 1 AS x" --output ""
 #### Then
 - exit code is `1`
 - stderr contains `--output`
+
 ### Scenario: rejects an empty --sql-file
 #### When
 ```shell
@@ -5359,9 +5848,11 @@ sqly --sql-file ""
 #### Then
 - exit code is `1`
 - stderr contains `--sql-file`
+
 ### Scenario: rejects an empty --save-dir
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -5375,6 +5866,7 @@ sqly --sql "SELECT 1" --save-dir "" user.csv
 #### Then
 - exit code is `1`
 - stderr contains `--save-dir`
+
 ### Scenario: rejects an empty --stdin
 #### Inputs
 _stdin for `sqly`:_
@@ -5389,6 +5881,7 @@ sqly --stdin "" --sql "SELECT 1 AS x"
 #### Then
 - exit code is `1`
 - stderr contains `--stdin`
+
 ### Scenario: rejects conflicting output mode flags
 #### When
 ```shell
@@ -5397,9 +5890,11 @@ sqly --csv --json --sql "SELECT 1 AS x"
 #### Then
 - exit code is `1`
 - stderr contains `conflicting`
+
 ### Scenario: prints rows for a DML RETURNING statement
 #### Given
 - Fixture file `u.csv` is created.
+
 #### Inputs
 _Fixture `u.csv`:_
 ```text
@@ -5414,9 +5909,11 @@ sqly --csv --sql "UPDATE u SET first_name='X' WHERE identifier=1 RETURNING ident
 - exit code is `0`
 - stdout contains `X`
 - stdout does not contain `affected`
+
 ### Scenario: rejects --output for a non-rowset DML statement
 #### Given
 - Fixture file `u.csv` is created.
+
 #### Inputs
 _Fixture `u.csv`:_
 ```text
@@ -5431,9 +5928,11 @@ sqly --sql "UPDATE u SET first_name='X' WHERE identifier=1" --output out.csv u.c
 - exit code is `1`
 - stderr contains `--output`
 - file `out.csv` does not exist
+
 ### Scenario: exports RETURNING rows with --output
 #### Given
 - Fixture file `u.csv` is created.
+
 #### Inputs
 _Fixture `u.csv`:_
 ```text
@@ -5448,11 +5947,14 @@ sqly --csv --sql "UPDATE u SET first_name='X' WHERE identifier=1 RETURNING ident
 - exit code is `0`
 - stderr contains `Output sql result`
 - file `out.csv` exists
+
 #### Generated artifacts
 - `out.csv`
+
 ### Scenario: rejects a comment-only --sql-file
 #### Given
 - Fixture file `q.sql` is created.
+
 #### Inputs
 _Fixture `q.sql`:_
 ```text
@@ -5466,10 +5968,12 @@ sqly --sql-file q.sql
 #### Then
 - exit code is `1`
 - stderr contains `no executable`
+
 ### Scenario: strips a UTF-8 BOM from a --sql-file script
 #### Given
 - Fixture file `user.csv` is created.
 - Fixture file `q.sql` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -5483,9 +5987,11 @@ sqly --csv --sql-file q.sql user.csv
 #### Then
 - exit code is `0`
 - stdout contains `2`
+
 ### Scenario: strips a UTF-8 BOM from batch stdin
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -5503,10 +6009,12 @@ sqly --csv user.csv
 #### Then
 - exit code is `0`
 - stdout contains `7`
+
 ### Scenario: rejects non-empty piped stdin with --sql-file
 #### Given
 - Fixture file `user.csv` is created.
 - Fixture file `q.sql` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -5528,6 +6036,7 @@ sqly --sql-file q.sql user.csv
 #### Then
 - exit code is `1`
 - stderr contains `stdin`
+
 ### Scenario: fails a --stdin dataset run with no query
 #### Inputs
 _stdin for `sqly`:_
@@ -5542,9 +6051,11 @@ sqly --stdin csv
 #### Then
 - exit code is `1`
 - stderr contains `--stdin`
+
 ### Scenario: reports per-file provenance for a sanitized basename
 #### Given
 - Fixture file `dir/2023-data.csv` is created.
+
 #### Inputs
 _Fixture `dir/2023-data.csv`:_
 ```text
@@ -5559,10 +6070,12 @@ sqly --inspect dir
 - exit code is `0`
 - stdout contains `2023-data.csv`
 - stderr does not contain `Successfully imported`
+
 ### Scenario: rejects duplicate basenames from different subdirectories
 #### Given
 - Fixture file `dir/a/user.csv` is created.
 - Fixture file `dir/b/user.csv` is created.
+
 #### Inputs
 _Fixture `dir/a/user.csv`:_
 ```text
@@ -5581,11 +6094,13 @@ sqly --inspect dir
 #### Then
 - exit code is `1`
 - stderr contains `collision`
+
 ### Scenario: reports an overwrite when re-importing a directory
 #### Given
 - Fixture file `user.csv` is created.
 - Fixture file `dir/user.csv` is created.
 - Fixture file `cmds.sql` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -5610,9 +6125,11 @@ sqly --sql-file cmds.sql user.csv
 - exit code is `0`
 - stdout contains `alt1`
 - stderr does not contain `No supported files`
+
 ### Scenario: rejects --output that aliases an imported source
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -5626,9 +6143,11 @@ sqly --csv --sql "SELECT * FROM user WHERE identifier=1" --output user.csv user.
 #### Then
 - exit code is `1`
 - stderr contains `--output`
+
 ### Scenario: rejects --save-dir that resolves to the source directory
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -5642,10 +6161,12 @@ sqly --sql "UPDATE user SET first_name='P' WHERE identifier=1" --save-dir . user
 #### Then
 - exit code is `1`
 - stderr contains `source`
+
 ### Scenario: rejects a --save-dir destination that already exists
 #### Given
 - Fixture file `src/user.csv` is created.
 - Fixture file `out/user.csv` is created.
+
 #### Inputs
 _Fixture `src/user.csv`:_
 ```text
@@ -5664,10 +6185,12 @@ sqly --sql "UPDATE user SET first_name='Q' WHERE identifier=1" --save-dir out sr
 #### Then
 - exit code is `1`
 - stderr contains `already exists`
+
 ### Scenario: keeps stdout clean when write-back fails
 #### Given
 - Fixture file `user.csv` is created.
 - Fixture file `sample.xlsx` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -5682,9 +6205,11 @@ sqly --sql "UPDATE user SET first_name='X' WHERE identifier=1" --save-dir out us
 - exit code is `1`
 - stdout does not contain `affected`
 - stderr contains `cannot save`
+
 ### Scenario: skips write-back for a read-only query under --save --force
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -5699,11 +6224,13 @@ sqly --csv --sql "SELECT * FROM user WHERE identifier=1" --save --force user.csv
 - exit code is `0`
 - stdout contains `booker12`
 - stderr does not contain `Saved`
+
 ### Scenario: skips workbooks lacking the requested sheet (multi-workbook --sheet)
 #### Given
 - Fixture file `sheet_with_spaces.xlsx` is created.
 - Fixture file `sample.xlsx` is created.
 - Fixture file `sheet_with_accents.xlsx` is created.
+
 #### When
 ```shell
 sqly --inspect --sheet "A test" sheet_with_spaces.xlsx sample.xlsx sheet_with_accents.xlsx
@@ -5712,6 +6239,7 @@ sqly --inspect --sheet "A test" sheet_with_spaces.xlsx sample.xlsx sheet_with_ac
 - exit code is `0`
 - stdout contains `sheet_with_spaces`
 - stderr contains `Skipped`
+
 ## sqly v0.19.0 binary bug fixes
 Source: `test/e2e/tools/sqly/v0_19_bugs.atago.yaml`
 ### Scenario: quotes a CSV value containing a comma
@@ -5722,6 +6250,7 @@ sqly --csv --sql "SELECT 'a,b' AS c"
 #### Then
 - exit code is `0`
 - stdout line `2` equals an exact value
+
 ### Scenario: quotes a CSV value containing a double quote
 #### When
 ```shell
@@ -5730,6 +6259,7 @@ sqly --csv --sql "SELECT 'a' || char(34) || 'b' AS c"
 #### Then
 - exit code is `0`
 - stdout line `2` equals an exact value
+
 ### Scenario: rejects an LTSV value containing a tab
 #### When
 ```shell
@@ -5738,6 +6268,7 @@ sqly --ltsv --sql "SELECT 'a' || char(9) || 'b' AS c"
 #### Then
 - exit code is `1`
 - stderr contains `LTSV`
+
 ### Scenario: rejects duplicate JSON keys
 #### When
 ```shell
@@ -5746,6 +6277,7 @@ sqly --json --sql "SELECT 1 AS x, 2 AS x"
 #### Then
 - exit code is `1`
 - stderr contains `unique column names`
+
 ### Scenario: rejects duplicate NDJSON keys
 #### When
 ```shell
@@ -5754,6 +6286,7 @@ sqly --ndjson --sql "SELECT 1 AS x, 2 AS x"
 #### Then
 - exit code is `1`
 - stderr contains `unique column names`
+
 ### Scenario: keeps a Markdown row on one line when a value has a newline
 #### When
 ```shell
@@ -5762,6 +6295,7 @@ sqly --markdown --sql "SELECT 'a' || char(10) || 'b' AS x"
 #### Then
 - exit code is `0`
 - stdout contains `a<br>b`
+
 ### Scenario: accepts a leading block comment in direct --sql
 #### When
 ```shell
@@ -5770,9 +6304,11 @@ sqly --csv --sql "/* note */ SELECT 1 AS x"
 #### Then
 - exit code is `0`
 - stdout line `2` equals an exact value
+
 ### Scenario: accepts PRAGMA in direct --sql
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -5786,6 +6322,7 @@ sqly --csv --sql "PRAGMA table_info(user)" user.csv
 #### Then
 - exit code is `0`
 - stdout contains `user_name`
+
 ### Scenario: accepts VALUES in direct --sql
 #### When
 ```shell
@@ -5794,9 +6331,11 @@ sqly --csv --sql "VALUES (1), (2)"
 #### Then
 - exit code is `0`
 - stdout contains `1`
+
 ### Scenario: accepts the TABLE shorthand in direct --sql
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -5810,6 +6349,7 @@ sqly --csv --sql "TABLE user" user.csv
 #### Then
 - exit code is `0`
 - stdout contains `booker12`
+
 ### Scenario: accepts CREATE TABLE in direct --sql
 #### When
 ```shell
@@ -5818,9 +6358,11 @@ sqly --sql "CREATE TABLE t(x)"
 #### Then
 - exit code is `0`
 - stdout contains `statement executed successfully`
+
 ### Scenario: accepts ANALYZE in direct --sql
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -5834,9 +6376,11 @@ sqly --sql "ANALYZE" user.csv
 #### Then
 - exit code is `0`
 - stdout contains `statement executed successfully`
+
 ### Scenario: runs WITH ... UPDATE without RETURNING as DML
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -5850,6 +6394,7 @@ sqly --sql "WITH s AS (SELECT 1 AS identifier) UPDATE user SET first_name='Z' WH
 #### Then
 - exit code is `0`
 - stdout contains `affected is 1 row`
+
 ### Scenario: rejects --stdin-name without --stdin
 #### When
 ```shell
@@ -5858,6 +6403,7 @@ sqly --stdin-name weird --csv --sql "SELECT 1 AS x"
 #### Then
 - exit code is `1`
 - stderr contains `stdin-name`
+
 ### Scenario: rejects --inspect-sample without --inspect
 #### When
 ```shell
@@ -5866,6 +6412,7 @@ sqly --inspect-sample 0 --csv --sql "SELECT 1 AS x"
 #### Then
 - exit code is `1`
 - stderr contains `inspect-sample`
+
 ### Scenario: rejects --force without --save
 #### When
 ```shell
@@ -5874,9 +6421,11 @@ sqly --force --sql "SELECT 1 AS x"
 #### Then
 - exit code is `1`
 - stderr contains `force`
+
 ### Scenario: rejects --inspect combined with --csv
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -5890,9 +6439,11 @@ sqly --inspect --csv user.csv
 #### Then
 - exit code is `1`
 - stderr contains `inspect`
+
 ### Scenario: imports an empty JSON array as a zero-row table
 #### Given
 - Fixture file `empty.json` is created.
+
 #### Inputs
 _Fixture `empty.json`:_
 ```text
@@ -5905,9 +6456,11 @@ sqly --csv --sql "SELECT COUNT(*) AS n FROM empty" empty.json
 #### Then
 - exit code is `0`
 - stdout line `2` equals an exact value
+
 ### Scenario: imports an empty JSONL file as a zero-row table
 #### Given
 - Fixture file `empty.jsonl` is created.
+
 #### When
 ```shell
 sqly --csv --sql "SELECT COUNT(*) AS n FROM empty" empty.jsonl
@@ -5915,9 +6468,11 @@ sqly --csv --sql "SELECT COUNT(*) AS n FROM empty" empty.jsonl
 #### Then
 - exit code is `0`
 - stdout line `2` equals an exact value
+
 ### Scenario: rejects an --output path ending with a slash
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -5931,9 +6486,11 @@ sqly --sql "SELECT 1 AS x" --output "outdir/" user.csv
 #### Then
 - exit code is `1`
 - stderr contains `separator`
+
 ### Scenario: rejects an --output ACH destination
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -5947,6 +6504,7 @@ sqly --sql "SELECT identifier FROM user LIMIT 1" --output out.ach user.csv
 #### Then
 - exit code is `1`
 - stderr contains `input-only`
+
 ### Scenario: parses a helper command after a terminated statement
 #### Inputs
 _stdin for `sqly`:_
@@ -5963,6 +6521,7 @@ sqly
 - exit code is `0`
 - stdout contains `2`
 - stderr does not contain `arguments`
+
 ### Scenario: parses a helper command after a leading comment
 #### Inputs
 _stdin for `sqly`:_
@@ -5979,9 +6538,11 @@ sqly
 - exit code is `0`
 - stdout contains `1`
 - stderr does not contain `arguments`
+
 ### Scenario: does not write back for an EXPLAIN under --save-dir
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -5995,9 +6556,11 @@ sqly --sql "EXPLAIN UPDATE user SET first_name='X' WHERE identifier=1" --save-di
 #### Then
 - exit code is `0`
 - file `out/user.csv` does not exist
+
 ### Scenario: does not write back for a zero-row DML under --save-dir
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -6012,9 +6575,11 @@ sqly --sql "UPDATE user SET first_name='X' WHERE identifier=999999" --save-dir o
 - exit code is `0`
 - stdout contains `affected is 0`
 - file `out/user.csv` does not exist
+
 ### Scenario: keeps stdout clean when parquet write-back fails
 #### Given
 - Fixture file `products.parquet` is created.
+
 #### When
 ```shell
 sqly --sql "DELETE FROM products" --save --force products.parquet
@@ -6023,11 +6588,13 @@ sqly --sql "DELETE FROM products" --save --force products.parquet
 - exit code is `1`
 - stdout is empty
 - stderr is not empty
+
 ## sqly v0.20.0 binary regressions
 Source: `test/e2e/tools/sqly/v0_20_bugs.atago.yaml`
 ### Scenario: write-back rejects: ALTER TABLE RENAME COLUMN
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -6042,9 +6609,11 @@ sqly --sql "ALTER TABLE user RENAME COLUMN first_name TO fname" --save --force u
 - exit code is `1`
 - stdout does not contain `affected is`
 - stderr is not empty
+
 ### Scenario: write-back rejects: DROP TABLE
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -6058,9 +6627,11 @@ sqly --sql "DROP TABLE user" --save --force user.csv
 #### Then
 - exit code is `1`
 - stderr is not empty
+
 ### Scenario: write-back rejects: CREATE VIEW
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -6074,9 +6645,11 @@ sqly --sql "CREATE VIEW v AS SELECT user_name FROM user" --save --force user.csv
 #### Then
 - exit code is `1`
 - stderr is not empty
+
 ### Scenario: write-back rejects: CREATE INDEX
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -6090,9 +6663,11 @@ sqly --sql "CREATE INDEX idx ON user(identifier)" --save --force user.csv
 #### Then
 - exit code is `1`
 - stderr is not empty
+
 ### Scenario: write-back rejects: CREATE TABLE
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -6106,9 +6681,11 @@ sqly --sql "CREATE TABLE backup (id INTEGER)" --save --force user.csv
 #### Then
 - exit code is `1`
 - stderr is not empty
+
 ### Scenario: write-back rejects: REINDEX
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -6122,9 +6699,11 @@ sqly --sql "REINDEX" --save --force user.csv
 #### Then
 - exit code is `1`
 - stderr is not empty
+
 ### Scenario: write-back rejects: ANALYZE
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -6138,9 +6717,11 @@ sqly --sql "ANALYZE" --save --force user.csv
 #### Then
 - exit code is `1`
 - stderr is not empty
+
 ### Scenario: rejects CREATE TABLE AS SELECT under --save-dir and writes nothing
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -6155,10 +6736,12 @@ sqly --sql "CREATE TABLE backup AS SELECT * FROM user" --save-dir out user.csv
 - exit code is `1`
 - stderr is not empty
 - file `out` does not exist
+
 ### Scenario: preflight rejects a CTAS+DML script before it executes
 #### Given
 - Fixture file `user.csv` is created.
 - Fixture file `s.sql` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -6177,10 +6760,12 @@ sqly --sql-file s.sql --save-dir out user.csv
 #### Then
 - exit code is `1`
 - stderr is not empty
+
 ### Scenario: allows a .import + UPDATE batch under --save-dir and writes the change
 #### Given
 - Fixture file `testdata/user.csv` is created.
 - Fixture file `imp.sql` is created.
+
 #### Inputs
 _Fixture `testdata/user.csv`:_
 ```text
@@ -6200,6 +6785,7 @@ sqly --sql-file imp.sql --save-dir out
 - exit code is `0`
 - stdout contains `affected is 1 row(s)`
 - file `out/user.csv` contains `Batch`
+
 ### Scenario: neutral success: CREATE VIEW
 #### When
 ```shell
@@ -6209,6 +6795,7 @@ sqly --sql "CREATE VIEW v AS SELECT 1 AS x"
 - exit code is `0`
 - stdout contains `statement executed successfully`
 - stdout does not contain `affected is`
+
 ### Scenario: neutral success: CREATE TABLE
 #### When
 ```shell
@@ -6218,6 +6805,7 @@ sqly --sql "CREATE TABLE t (id INTEGER)"
 - exit code is `0`
 - stdout contains `statement executed successfully`
 - stdout does not contain `affected is`
+
 ### Scenario: neutral success: ANALYZE
 #### When
 ```shell
@@ -6226,9 +6814,11 @@ sqly --sql "ANALYZE"
 #### Then
 - exit code is `0`
 - stdout contains `statement executed successfully`
+
 ### Scenario: runs a setter PRAGMA
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -6242,6 +6832,7 @@ sqly --sql "PRAGMA user_version = 1" user.csv
 #### Then
 - exit code is `0`
 - stdout contains `statement executed successfully`
+
 ### Scenario: runs a command PRAGMA that returns no rows
 #### When
 ```shell
@@ -6250,10 +6841,12 @@ sqly --sql "PRAGMA incremental_vacuum"
 #### Then
 - exit code is `0`
 - stdout contains `statement executed successfully`
+
 ### Scenario: rejects BEGIN in a --sql-file script
 #### Given
 - Fixture file `user.csv` is created.
 - Fixture file `tx.sql` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -6273,6 +6866,7 @@ sqly --sql-file tx.sql user.csv
 #### Then
 - exit code is `1`
 - stderr contains `transaction`
+
 ### Scenario: rejects VACUUM
 #### When
 ```shell
@@ -6281,6 +6875,7 @@ sqly --sql "VACUUM"
 #### Then
 - exit code is `1`
 - stderr contains `VACUUM`
+
 ### Scenario: rejects VACUUM INTO and writes no file
 #### When
 ```shell
@@ -6290,9 +6885,11 @@ sqly --sql "VACUUM INTO 'dump.db'"
 - exit code is `1`
 - stderr contains `VACUUM`
 - file `dump.db` does not exist
+
 ### Scenario: rejects ATTACH DATABASE and persists no external file
 #### Given
 - Fixture file `a.sql` is created.
+
 #### Inputs
 _Fixture `a.sql`:_
 ```text
@@ -6307,10 +6904,12 @@ sqly --sql-file a.sql
 - exit code is `1`
 - stderr is not empty
 - file `aux.db` does not exist
+
 ### Scenario: runs a multiline CREATE TRIGGER from a --sql-file
 #### Given
 - Fixture file `user.csv` is created.
 - Fixture file `t.sql` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -6330,9 +6929,11 @@ sqly --sql-file t.sql user.csv
 #### Then
 - exit code is `0`
 - stdout contains `statement executed successfully`
+
 ### Scenario: accepts a schema-qualified .schema name
 #### Given
 - Fixture file `testdata/user.csv` is created.
+
 #### Inputs
 _Fixture `testdata/user.csv`:_
 ```text
@@ -6351,9 +6952,11 @@ sqly
 #### Then
 - exit code is `0`
 - stdout contains `user_name`
+
 ### Scenario: lists session-created views and temp tables in .tables
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -6373,9 +6976,11 @@ sqly user.csv
 #### Then
 - exit code is `0`
 - stdout contains `temp_t`, `v_user`
+
 ### Scenario: prints CREATE VIEW for a view in .schema
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -6394,9 +6999,11 @@ sqly user.csv
 #### Then
 - exit code is `0`
 - stdout contains `CREATE VIEW`
+
 ### Scenario: imports an empty compressed JSON array as a zero-row table
 #### Given
 - Fixture file `empty.json.gz` is created.
+
 #### When
 ```shell
 sqly --sql "SELECT COUNT(*) AS c FROM empty" empty.json.gz
@@ -6404,9 +7011,11 @@ sqly --sql "SELECT COUNT(*) AS c FROM empty" empty.json.gz
 #### Then
 - exit code is `0`
 - stdout contains `0`
+
 ### Scenario: imports an empty compressed JSONL file as a zero-row table
 #### Given
 - Fixture file `empty.jsonl.gz` is created.
+
 #### When
 ```shell
 sqly --sql "SELECT COUNT(*) AS c FROM empty" empty.jsonl.gz
@@ -6414,6 +7023,7 @@ sqly --sql "SELECT COUNT(*) AS c FROM empty" empty.jsonl.gz
 #### Then
 - exit code is `0`
 - stdout contains `0`
+
 ### Scenario: imports /dev/stdin as CSV
 _skipped on Windows_
 #### Inputs
@@ -6431,6 +7041,7 @@ sqly --csv --sql "SELECT COUNT(*) AS c FROM stdin" /dev/stdin
 #### Then
 - exit code is `0`
 - stdout line `2` equals an exact value
+
 ### Scenario: imports /proc/self/fd/0 as CSV
 _only on Linux_
 #### Inputs
@@ -6448,9 +7059,11 @@ sqly --csv --sql "SELECT COUNT(*) AS c FROM sheet_0" /proc/self/fd/0
 #### Then
 - exit code is `0`
 - stdout line `2` equals an exact value
+
 ### Scenario: rejects --output to a multi-compressed ACH destination
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -6465,9 +7078,11 @@ sqly --sql "SELECT * FROM user LIMIT 1" --output out.ach.gz.zst user.csv
 - exit code is `1`
 - stderr contains `ACH/Fedwire`
 - file `out.ach.gz.zst` does not exist
+
 ### Scenario: rejects .dump to a multi-compressed Fedwire destination
 #### Given
 - Fixture file `testdata/user.csv` is created.
+
 #### Inputs
 _Fixture `testdata/user.csv`:_
 ```text
@@ -6487,6 +7102,7 @@ sqly
 - exit code is `1`
 - stderr contains `ACH/Fedwire`
 - file `out.fed.gz.zst` does not exist
+
 ### Scenario: rejects an invalid LTSV output label
 #### When
 ```shell
@@ -6495,6 +7111,7 @@ sqly --ltsv --sql 'SELECT 1 AS "foo:bar"' --output out.ltsv
 #### Then
 - exit code is `1`
 - stderr is not empty
+
 ### Scenario: rejects duplicate LTSV output labels
 #### When
 ```shell
@@ -6503,9 +7120,11 @@ sqly --ltsv --sql "SELECT 1 AS x, 2 AS x" --output out.ltsv
 #### Then
 - exit code is `1`
 - stderr is not empty
+
 ### Scenario: rejects an LTSV import with duplicate labels
 #### Given
 - Fixture file `dup.ltsv` is created.
+
 #### Inputs
 _Fixture `dup.ltsv`:_
 ```text
@@ -6518,11 +7137,13 @@ sqly --sql "SELECT * FROM dup" dup.ltsv
 #### Then
 - exit code is `1`
 - stderr is not empty
+
 ## sqly v0.21.0 binary regressions
 Source: `test/e2e/tools/sqly/v0_21_bugs.atago.yaml`
 ### Scenario: prefers a TEMP table over a same-named main table in .schema
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -6542,9 +7163,11 @@ sqly user.csv
 - exit code is `0`
 - stdout contains `TEMP`
 - stdout does not contain `first_name`
+
 ### Scenario: prefers a TEMP view over a same-named main table in .schema
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -6563,9 +7186,11 @@ sqly user.csv
 #### Then
 - exit code is `0`
 - stdout contains `TEMP VIEW`
+
 ### Scenario: keeps both a main and a same-named TEMP object in .tables
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -6584,6 +7209,7 @@ sqly user.csv
 #### Then
 - exit code is `0`
 - stdout contains `temp.user`
+
 ### Scenario: targets a literal dotted table name in .schema
 #### Inputs
 _stdin for `sqly`:_
@@ -6598,6 +7224,7 @@ sqly
 #### Then
 - exit code is `0`
 - stdout contains `id`
+
 ### Scenario: targets a literal dotted table name in .describe
 #### Inputs
 _stdin for `sqly`:_
@@ -6612,6 +7239,7 @@ sqly
 #### Then
 - exit code is `0`
 - stdout contains `id`
+
 ### Scenario: targets a literal dotted table name in .header
 #### Inputs
 _stdin for `sqly`:_
@@ -6626,6 +7254,7 @@ sqly
 #### Then
 - exit code is `0`
 - stdout contains `id`
+
 ### Scenario: targets a literal dotted table name in .dump
 #### Inputs
 _stdin for `sqly`:_
@@ -6640,6 +7269,7 @@ sqly
 #### Then
 - exit code is `0`
 - file `ab.csv` contains `id`
+
 ### Scenario: prints a paste-safe quoted identifier in .tables
 #### Inputs
 _stdin for `sqly`:_
@@ -6654,6 +7284,7 @@ sqly
 #### Then
 - exit code is `0`
 - stdout contains `"two words"`
+
 ### Scenario: keeps the full spaced table name in .header
 #### Inputs
 _stdin for `sqly`:_
@@ -6668,6 +7299,7 @@ sqly
 #### Then
 - exit code is `0`
 - stdout contains `two words`
+
 ### Scenario: keeps the TEMP keyword for a temp-qualified table in .schema
 #### Inputs
 _stdin for `sqly`:_
@@ -6682,6 +7314,7 @@ sqly
 #### Then
 - exit code is `0`
 - stdout contains `TEMP`
+
 ### Scenario: keeps the TEMP keyword for a temp-qualified view in .schema
 #### Inputs
 _stdin for `sqly`:_
@@ -6696,9 +7329,11 @@ sqly
 #### Then
 - exit code is `0`
 - stdout contains `TEMP VIEW`
+
 ### Scenario: direct --sql rejects multi-statement input: two SELECTs
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -6712,9 +7347,11 @@ sqly --sql "SELECT 1 AS x; SELECT 2 AS y" user.csv
 #### Then
 - exit code is `1`
 - stderr contains `single SQL statement`
+
 ### Scenario: direct --sql rejects multi-statement input: SELECT then UPDATE
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -6728,6 +7365,7 @@ sqly --sql "SELECT 1 AS x; UPDATE user SET first_name='z'" user.csv
 #### Then
 - exit code is `1`
 - stderr contains `single SQL statement`
+
 ### Scenario: rejects multi-statement --sql --output before writing the file
 #### When
 ```shell
@@ -6737,9 +7375,11 @@ sqly --csv --sql "SELECT 1 AS x; SELECT 2 AS y" --output out.csv
 - exit code is `1`
 - stderr contains `single SQL statement`
 - file `out.csv` does not exist
+
 ### Scenario: rejects under --save --force: PRAGMA user_version=1
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -6754,9 +7394,11 @@ sqly --sql "PRAGMA user_version=1" --save --force user.csv
 - exit code is `1`
 - stdout does not contain `journal_mode`
 - stderr is not empty
+
 ### Scenario: rejects under --save --force: PRAGMA incremental_vacuum
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -6771,9 +7413,11 @@ sqly --sql "PRAGMA incremental_vacuum" --save --force user.csv
 - exit code is `1`
 - stdout does not contain `journal_mode`
 - stderr is not empty
+
 ### Scenario: rejects under --save --force: PRAGMA journal_mode=OFF
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -6788,9 +7432,11 @@ sqly --sql "PRAGMA journal_mode=OFF" --save --force user.csv
 - exit code is `1`
 - stdout does not contain `journal_mode`
 - stderr is not empty
+
 ### Scenario: rejects a setter PRAGMA under --save-dir and writes nothing
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -6805,9 +7451,11 @@ sqly --sql "PRAGMA user_version=1" --save-dir out user.csv
 - exit code is `1`
 - stderr is not empty
 - file `out` does not exist
+
 ### Scenario: rejects a command PRAGMA under --save-dir and writes nothing
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -6822,6 +7470,7 @@ sqly --sql "PRAGMA incremental_vacuum" --save-dir out user.csv
 - exit code is `1`
 - stderr is not empty
 - file `out` does not exist
+
 ### Scenario: rejects END in direct --sql
 #### When
 ```shell
@@ -6830,6 +7479,7 @@ sqly --sql "END"
 #### Then
 - exit code is `1`
 - stderr contains `transaction`
+
 ### Scenario: rejects END in batch stdin
 #### Inputs
 _stdin for `sqly`:_
@@ -6843,9 +7493,11 @@ sqly
 #### Then
 - exit code is `1`
 - stderr contains `transaction`
+
 ### Scenario: rejects END in a --sql-file script
 #### Given
 - Fixture file `end.sql` is created.
+
 #### Inputs
 _Fixture `end.sql`:_
 ```text
@@ -6858,6 +7510,7 @@ sqly --sql-file end.sql
 #### Then
 - exit code is `1`
 - stderr contains `transaction`
+
 ### Scenario: --output rejects nested compression suffixes: out.csv.gz.zst
 #### When
 ```shell
@@ -6866,6 +7519,7 @@ sqly --sql "SELECT 1 AS x" --output out.csv.gz.zst
 #### Then
 - exit code is `1`
 - file `out.csv.gz.zst` does not exist
+
 ### Scenario: --output rejects nested compression suffixes: out.parquet.gz.zst
 #### When
 ```shell
@@ -6874,6 +7528,7 @@ sqly --sql "SELECT 1 AS x" --output out.parquet.gz.zst
 #### Then
 - exit code is `1`
 - file `out.parquet.gz.zst` does not exist
+
 ### Scenario: --output rejects nested compression suffixes: out.xlsx.gz.zst
 #### When
 ```shell
@@ -6882,9 +7537,11 @@ sqly --sql "SELECT 1 AS x" --output out.xlsx.gz.zst
 #### Then
 - exit code is `1`
 - file `out.xlsx.gz.zst` does not exist
+
 ### Scenario: rejects a nested .dump destination and writes nothing
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -6902,9 +7559,11 @@ sqly user.csv
 #### Then
 - exit code is `1`
 - file `d.csv.gz.zst` does not exist
+
 ### Scenario: emits structured .tables output under .mode json
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -6924,9 +7583,11 @@ sqly user.csv
 - exit code is `0`
 - stdout contains `"name"`, `"schema"`
 - stderr contains `Change output mode`
+
 ### Scenario: emits structured .header output under .mode ndjson
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -6946,9 +7607,11 @@ sqly user.csv
 - exit code is `0`
 - stdout contains `"column"`, `first_name`
 - stderr contains `Change output mode`
+
 ### Scenario: does not rewrite an unchanged source on .save --force
 #### Given
 - Fixture file `ro.csv` is created.
+
 #### Inputs
 _Fixture `ro.csv`:_
 ```text
@@ -6966,9 +7629,11 @@ sqly ro.csv
 #### Then
 - exit code is `0`
 - stderr contains `nothing to save`
+
 ### Scenario: writes no directory export for an unchanged session on .save DIR
 #### Given
 - Fixture file `ro2.csv` is created.
+
 #### Inputs
 _Fixture `ro2.csv`:_
 ```text
@@ -6989,6 +7654,7 @@ sqly ro2.csv
 - stdout contains `1`
 - stderr contains `nothing to save`
 - file `out` does not exist
+
 ## sqly v0.22.0 binary regressions
 Source: `test/e2e/tools/sqly/v0_22_bugs.atago.yaml`
 ### Scenario: inspects a literal "main.x" table with .schema
@@ -7005,6 +7671,7 @@ sqly
 #### Then
 - exit code is `0`
 - stdout contains `litcol`
+
 ### Scenario: inspects a literal "temp.x" table with .describe
 #### Inputs
 _stdin for `sqly`:_
@@ -7019,6 +7686,7 @@ sqly
 #### Then
 - exit code is `0`
 - stdout contains `litcol`
+
 ### Scenario: inspects a literal "main.v" view with .header
 #### Inputs
 _stdin for `sqly`:_
@@ -7033,6 +7701,7 @@ sqly
 #### Then
 - exit code is `0`
 - stdout contains `litcol`
+
 ### Scenario: exports a literal "temp.v" view with .dump
 #### Inputs
 _stdin for `sqly`:_
@@ -7047,6 +7716,7 @@ sqly
 #### Then
 - exit code is `0`
 - file `tv.csv` contains `litcol`
+
 ### Scenario: prints a paste-safe literal "main.x" name in .tables
 #### Inputs
 _stdin for `sqly`:_
@@ -7061,6 +7731,7 @@ sqly
 #### Then
 - exit code is `0`
 - stdout contains `"main.x"`
+
 ### Scenario: rejects a --output destination that stacks .gzip and .zst on a format suffix
 #### When
 ```shell
@@ -7069,6 +7740,7 @@ sqly --sql "SELECT 1 AS x" --output fake.parquet.gzip.zst
 #### Then
 - exit code is `1`
 - file `fake.parquet.gzip.zst` does not exist
+
 ### Scenario: rejects a --output .json.gzip.zst destination
 #### When
 ```shell
@@ -7077,6 +7749,7 @@ sqly --sql "SELECT 1 AS x" --output fake.json.gzip.zst
 #### Then
 - exit code is `1`
 - file `fake.json.gzip.zst` does not exist
+
 ### Scenario: rejects a --output .ach.gzip.zst destination as input-only
 #### When
 ```shell
@@ -7085,9 +7758,11 @@ sqly --sql "SELECT 1 AS x" --output fake.ach.gzip.zst
 #### Then
 - exit code is `1`
 - file `fake.ach.gzip.zst` does not exist
+
 ### Scenario: rejects a .dump destination that stacks .gzip and .zst
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -7105,6 +7780,7 @@ sqly user.csv
 #### Then
 - exit code is `1`
 - file `fake.parquet.gzip.zst` does not exist
+
 ### Scenario: runs the SELECT after a leading empty statement in direct --sql
 #### When
 ```shell
@@ -7113,6 +7789,7 @@ sqly --sql ";SELECT 1 AS x"
 #### Then
 - exit code is `0`
 - stdout contains `x`, `1`
+
 ### Scenario: runs the SELECT after multiple leading empty statements in direct --sql
 #### When
 ```shell
@@ -7121,6 +7798,7 @@ sqly --sql ";;SELECT 2 AS y"
 #### Then
 - exit code is `0`
 - stdout contains `2`
+
 ### Scenario: exports the SELECT after a leading empty statement with --output
 #### When
 ```shell
@@ -7129,6 +7807,7 @@ sqly --sql ";SELECT 1 AS x" --output lead.csv
 #### Then
 - exit code is `0`
 - file `lead.csv` contains `x`
+
 ### Scenario: still rejects ATTACH after a leading empty statement in direct --sql
 #### When
 ```shell
@@ -7137,9 +7816,11 @@ sqly --sql ";ATTACH DATABASE 'x.db' AS aux"
 #### Then
 - exit code is `1`
 - stderr contains `ATTACH`
+
 ### Scenario: does not rewrite an unchanged CSV when only a TEMP table changed
 #### Given
 - Fixture file `temp_only.csv` is created.
+
 #### Inputs
 _Fixture `temp_only.csv`:_
 ```text
@@ -7162,9 +7843,11 @@ sqly temp_only.csv
 - stdout does not contain `Saved`
 - stderr contains `nothing to save`
 - file `temp_only.csv` contains `alice,30`
+
 ### Scenario: does not fail on an unchanged JSONL import when only a scratch table changed
 #### Given
 - Fixture file `data.jsonl` is created.
+
 #### Inputs
 _Fixture `data.jsonl`:_
 ```text
@@ -7186,9 +7869,11 @@ sqly data.jsonl
 - stdout contains `affected`
 - stderr contains `nothing to save`
 - stderr does not contain `not loaded from a file`
+
 ### Scenario: does not rewrite the source after net-zero CSV edits
 #### Given
 - Fixture file `netzero.csv` is created.
+
 #### Inputs
 _Fixture `netzero.csv`:_
 ```text
@@ -7211,10 +7896,12 @@ sqly netzero.csv
 - stdout does not contain `Saved`
 - stderr contains `nothing to save`
 - file `netzero.csv` contains `alice,30`
+
 ### Scenario: does not rewrite the source after net-zero edits via --sql-file --save --force
 #### Given
 - Fixture file `netzero_file.csv` is created.
 - Fixture file `netzero.sql` is created.
+
 #### Inputs
 _Fixture `netzero_file.csv`:_
 ```text
@@ -7235,9 +7922,11 @@ sqly --sql-file netzero.sql --save --force netzero_file.csv
 - exit code is `0`
 - stderr contains `nothing to save`
 - file `netzero_file.csv` contains `alice,30`
+
 ### Scenario: still persists a genuine CSV change with .save --force
 #### Given
 - Fixture file `genuine.csv` is created.
+
 #### Inputs
 _Fixture `genuine.csv`:_
 ```text
@@ -7259,11 +7948,13 @@ sqly genuine.csv
 - stdout contains `affected`
 - stderr contains `Saved`
 - file `genuine.csv` contains `999`
+
 ## sqly v0.25.0 binary regressions
 Source: `test/e2e/tools/sqly/v0_25_bugs.atago.yaml`
 ### Scenario: rejects an explicit empty --sql value
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -7277,6 +7968,7 @@ sqly --sql "" user.csv
 #### Then
 - exit code is `1`
 - stderr contains `--sql requires a non-empty SQL statement`
+
 ### Scenario: reports a hint when non-interactive run gets empty stdin and no file
 #### Inputs
 _stdin for `sqly`:_
@@ -7287,9 +7979,11 @@ sqly
 #### Then
 - exit code is `1`
 - stderr contains `no TTY detected`
+
 ### Scenario: reports a hint when non-interactive run gets empty stdin with a file
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -7304,6 +7998,7 @@ sqly user.csv
 #### Then
 - exit code is `1`
 - stderr contains `no TTY detected`
+
 ### Scenario: reports a stable stdin reference instead of the staging temp path
 #### Inputs
 _stdin for `sqly`:_
@@ -7315,9 +8010,11 @@ sqly --stdin csv --sql "SELECT COUNT(*) FROM stdin"
 - exit code is `1`
 - stderr contains `stdin`
 - stderr does not contain `sqly-stdin-`
+
 ### Scenario: fails batch mode when .schema is missing its table name
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -7336,9 +8033,11 @@ sqly user.csv
 #### Then
 - exit code is `1`
 - stderr contains `.schema requires`
+
 ### Scenario: fails batch mode when .header is missing its table name
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -7356,9 +8055,11 @@ sqly user.csv
 #### Then
 - exit code is `1`
 - stderr contains `.header requires`
+
 ### Scenario: fails batch mode when .describe is missing its table name
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -7376,9 +8077,11 @@ sqly user.csv
 #### Then
 - exit code is `1`
 - stderr contains `.describe requires`
+
 ### Scenario: fails batch mode when .mode is missing its mode name
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -7396,9 +8099,11 @@ sqly user.csv
 #### Then
 - exit code is `1`
 - stderr contains `.mode requires`
+
 ### Scenario: fails batch mode when .dump is missing its destination
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -7416,9 +8121,11 @@ sqly user.csv
 #### Then
 - exit code is `1`
 - stderr contains `.dump requires`
+
 ### Scenario: fails batch mode when .import is missing its path
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -7436,9 +8143,11 @@ sqly user.csv
 #### Then
 - exit code is `1`
 - stderr contains `.import requires`
+
 ### Scenario: fails batch mode when .save is missing its argument
 #### Given
 - Fixture file `user.csv` is created.
+
 #### Inputs
 _Fixture `user.csv`:_
 ```text
@@ -7456,9 +8165,11 @@ sqly user.csv
 #### Then
 - exit code is `1`
 - stderr contains `.save requires`
+
 ### Scenario: keeps --inspect quiet on stderr after a successful directory import
 #### Given
 - Fixture file `space dir/d.csv` is created.
+
 #### Inputs
 _Fixture `space dir/d.csv`:_
 ```text
@@ -7473,9 +8184,11 @@ sqly --inspect "space dir"
 - exit code is `0`
 - stdout contains `"tables"`
 - stderr does not contain `Successfully imported`
+
 ### Scenario: keeps --profile quiet on stderr after a successful directory import
 #### Given
 - Fixture file `space dir/d.csv` is created.
+
 #### Inputs
 _Fixture `space dir/d.csv`:_
 ```text
@@ -7490,6 +8203,7 @@ sqly --profile "space dir"
 - exit code is `0`
 - stdout contains `"tables"`
 - stderr does not contain `Successfully imported`
+
 ### Scenario: guides "sqly help" to --help instead of an import error
 #### When
 ```shell
@@ -7499,6 +8213,7 @@ sqly help
 - exit code is `1`
 - stderr contains `--help`, `no subcommands`
 - stderr does not contain `path does not exist`
+
 ### Scenario: guides "sqly version" to --version instead of an import error
 #### When
 ```shell

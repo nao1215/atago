@@ -14,6 +14,7 @@
   - [the home page lists the post](#scenario-the-home-page-lists-the-post)
   - [the post page renders its title](#scenario-the-post-page-renders-its-title)
   - [an unknown path is a 404](#scenario-an-unknown-path-is-a-404)
+
 ## hugo (scaffold + build CLI, tree-snapshot testbed)
 [Hugo](https://gohugo.io/) is a scaffolder and a build tool in one binary,
 and both produce their result as a directory tree rather than as output on
@@ -41,12 +42,14 @@ hugo new site mysite
 - stdout contains `Congratulations`
 - dir `mysite` contains `archetypes`, contains `archetypes/default.md`, contains `assets`, contains `content`, contains `data`, contains `hugo.toml`, contains `i18n`, contains `layouts`, contains `static`, contains `themes`, has 2 entries, (recursive)
 - file `mysite/hugo.toml` contains `baseURL`
+
 ### Scenario: new content plus a minimal layout builds the public tree
 _only when `hugo version` succeeds_
 #### Given
 - Fixture file `mysite/layouts/home.html` is created.
 - Fixture file `mysite/layouts/single.html` is created.
 - Fixture file `mysite/layouts/list.html` is created.
+
 #### Inputs
 _Fixture `mysite/layouts/home.html`:_
 ```text
@@ -76,6 +79,7 @@ hugo --minify --buildDrafts
   - file `mysite/public/index.html` contains `/posts/hello/`
   - file `mysite/public/posts/hello/index.html` contains `<h1>Hello</h1>`
   - dir `mysite/public` contains `index.html`, contains `sitemap.xml`, contains `posts/hello/index.html`, matches glob `*.xml`, (recursive)
+
 ### Scenario: building outside a site directory fails with a config hint
 _only when `hugo version` succeeds_
 #### When
@@ -85,10 +89,12 @@ hugo
 #### Then
 - exit code is not `0`
 - stderr matches `/(?i)config/`
+
 ### Scenario: scaffolding into a non-empty directory is refused until --force
 _only when `hugo version` succeeds_
 #### Given
 - Fixture file `occupied/keep.txt` is created.
+
 #### Inputs
 _Fixture `occupied/keep.txt`:_
 ```text
@@ -109,6 +115,7 @@ hugo new site occupied --force
   - exit code is `0`
   - stdout contains `Congratulations`
   - dir `occupied` contains `hugo.toml`, contains `keep.txt`
+
 ### Scenario: creating content that already exists is refused
 _only when `hugo version` succeeds_
 #### When
@@ -123,12 +130,14 @@ hugo new content posts/dup.md
 - after `hugo new content posts/dup.md`:
   - exit code is `1`
   - stderr contains `conflicts with existing content`
+
 ### Scenario: drafts stay out of the build until --buildDrafts asks for them
 _only when `hugo version` succeeds_
 #### Given
 - Fixture file `mysite/layouts/home.html` is created.
 - Fixture file `mysite/layouts/single.html` is created.
 - Fixture file `mysite/layouts/list.html` is created.
+
 #### Inputs
 _Fixture `mysite/layouts/home.html`:_
 ```text
@@ -160,10 +169,12 @@ hugo --quiet --buildDrafts
   - exit code is `0`
   - dir `mysite/public/posts` contains `draft-post`
   - file `mysite/public/posts/draft-post/index.html` contains `Draft Post`
+
 ### Scenario: rebuilding an unchanged site is byte-for-byte idempotent
 _only when `hugo version` succeeds_
 #### Given
 - Fixture file `mysite/layouts/home.html` is created.
+
 #### Inputs
 _Fixture `mysite/layouts/home.html`:_
 ```text
@@ -181,6 +192,7 @@ cd mysite && hugo --quiet
 - after `cd mysite && hugo --quiet`:
   - exit code is `0`
   - the step changed exactly created nothing, modified nothing, deleted nothing
+
 ## hugo server (suite-wide service + http peer)
 `hugo server` is the half of Hugo a developer actually looks at: the site,
 served over HTTP, rendered. This suite scaffolds a site, starts the real
@@ -213,6 +225,7 @@ _only when `hugo version` succeeds_
 - HTTP status is `200`
 - body contains `HOME`
 - body contains `/posts/hello/`
+
 ### Scenario: the post page renders its title
 _only when `hugo version` succeeds_
 #### When
@@ -222,6 +235,7 @@ _only when `hugo version` succeeds_
 #### Then
 - HTTP status is `200`
 - body contains `<h1>Hello</h1>`
+
 ### Scenario: an unknown path is a 404
 _only when `hugo version` succeeds_
 #### When

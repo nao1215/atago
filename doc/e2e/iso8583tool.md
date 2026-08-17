@@ -277,11 +277,13 @@
   - [raw binary + packed BCD - views a kanmu-like raw message with the packed-BCD starter preset](#scenario-raw-binary--packed-bcd---views-a-kanmu-like-raw-message-with-the-packed-bcd-starter-preset)
   - [private-field safety - masks a PAN embedded in a free-form private field by default](#scenario-private-field-safety---masks-a-pan-embedded-in-a-free-form-private-field-by-default)
   - [private-field safety - reveals the raw private-field value with --unsafe](#scenario-private-field-safety---reveals-the-raw-private-field-value-with---unsafe)
+
 ## iso8583tool input auto-detection
 Source: `test/e2e/tools/iso8583tool/autodetect.atago.yaml`
 ### Scenario: views a raw binary capture without --encoding raw
 #### Given
 - Fixture file `raw.bin` is created.
+
 #### When
 ```shell
 iso8583tool view raw.bin --spec spec87bcd-starter
@@ -290,9 +292,11 @@ iso8583tool view raw.bin --spec spec87bcd-starter
 - exit code is `0`
 - stdout does not contain `decode hex`
 - stdout contains `MTI`
+
 ### Scenario: validates a raw binary capture without --encoding raw
 #### Given
 - Fixture file `raw.bin` is created.
+
 #### When
 ```shell
 iso8583tool validate raw.bin --spec spec87bcd-starter
@@ -300,9 +304,11 @@ iso8583tool validate raw.bin --spec spec87bcd-starter
 #### Then
 - exit code is `0`
 - stdout does not contain `decode hex`
+
 ### Scenario: converts a raw binary capture without --encoding raw
 #### Given
 - Fixture file `raw.bin` is created.
+
 #### When
 ```shell
 iso8583tool convert raw.bin --spec spec87bcd-starter
@@ -311,9 +317,11 @@ iso8583tool convert raw.bin --spec spec87bcd-starter
 - exit code is `0`
 - stdout does not contain `decode hex`
 - stdout contains `"mti"`
+
 ### Scenario: reads an all-numeric raw ASCII capture as raw, not packed hex
 #### Given
 - Fixture file `num.bin` is created.
+
 #### When
 ```shell
 iso8583tool view num.bin
@@ -322,11 +330,13 @@ iso8583tool view num.bin
 - exit code is `0`
 - stdout does not contain `not enough data`
 - stdout contains `0800`
+
 ## iso8583tool spec87bcd-starter preset
 Source: `test/e2e/tools/iso8583tool/bcd_starter.atago.yaml`
 ### Scenario: packs and round-trips an EMV TLV tag (55.9F02)
 #### Given
 - Fixture file `emv.json` is created.
+
 #### Inputs
 _Fixture `emv.json`:_
 ```text
@@ -341,9 +351,11 @@ iso8583tool view emv.hex --encoding hex --spec spec87bcd-starter --format json
 #### Then
 - exit code is `0`
 - stdout contains `"55.9F02"`, `000000001000`
+
 ### Scenario: packs a raw PIN field (52)
 #### Given
 - Fixture file `pin.json` is created.
+
 #### Inputs
 _Fixture `pin.json`:_
 ```text
@@ -356,9 +368,11 @@ iso8583tool convert pin.json --to hex --encoding hex --spec spec87bcd-starter
 #### Then
 - exit code is `0`
 - stdout does not contain `should be fixed`
+
 ### Scenario: packs and round-trips a raw MAC field (64)
 #### Given
 - Fixture file `mac.json` is created.
+
 #### Inputs
 _Fixture `mac.json`:_
 ```text
@@ -373,9 +387,11 @@ iso8583tool view mac.hex --encoding hex --spec spec87bcd-starter --unsafe --form
 #### Then
 - exit code is `0`
 - stdout contains `A1B2C3D4E5F60708`
+
 ### Scenario: round-trips a variable-length field with a BCD length prefix (32)
 #### Given
 - Fixture file `f32.json` is created.
+
 #### Inputs
 _Fixture `f32.json`:_
 ```text
@@ -390,9 +406,11 @@ iso8583tool view f32.hex --encoding hex --spec spec87bcd-starter --format json
 #### Then
 - exit code is `0`
 - stdout contains `"32": "123456"`
+
 ### Scenario: packs a secondary numeric field (71) as packed BCD, not ASCII
 #### Given
 - Fixture file `f71.json` is created.
+
 #### Inputs
 _Fixture `f71.json`:_
 ```text
@@ -406,9 +424,11 @@ iso8583tool convert f71.json --to hex --spec spec87bcd-starter
 - exit code is `0`
 - stdout contains `1234`
 - stdout does not contain `31323334`
+
 ### Scenario: round-trips secondary numeric fields (74, 99, 100)
 #### Given
 - Fixture file `sec.json` is created.
+
 #### Inputs
 _Fixture `sec.json`:_
 ```text
@@ -423,11 +443,13 @@ iso8583tool convert sec.hex --spec spec87bcd-starter --encoding hex --to json
 #### Then
 - exit code is `0`
 - stdout contains `"74": "0000000001"`, `"99": "12345678901"`, `"100": "98765432109"`
+
 ## iso8583tool convert with a UTF-8 BOM
 Source: `test/e2e/tools/iso8583tool/bom.atago.yaml`
 ### Scenario: auto-detects BOM-prefixed JSON as a document to pack
 #### Given
 - Fixture file `bom.json` is created.
+
 #### When
 ```shell
 iso8583tool convert bom.json
@@ -435,9 +457,11 @@ iso8583tool convert bom.json
 #### Then
 - exit code is `0`
 - stdout does not contain `invalid byte`, `decode hex`
+
 ### Scenario: packs BOM-prefixed JSON with an explicit --to hex
 #### Given
 - Fixture file `bom.json` is created.
+
 #### When
 ```shell
 iso8583tool convert bom.json --to hex
@@ -445,6 +469,7 @@ iso8583tool convert bom.json --to hex
 #### Then
 - exit code is `0`
 - stdout does not contain `invalid character`
+
 ### Scenario: views a BOM-prefixed hex file
 #### When
 ```shell
@@ -456,6 +481,7 @@ iso8583tool view bom.hex --no-color
 - after `iso8583tool view bom.hex --no-color`:
   - exit code is `0`
   - stdout contains `0110`
+
 ### Scenario: doctors a BOM-prefixed hex file as hex, not raw
 #### When
 ```shell
@@ -467,6 +493,7 @@ iso8583tool doctor bom.hex --no-color
 - after `iso8583tool doctor bom.hex --no-color`:
   - exit code is `0`
   - stdout contains `hex input`
+
 ### Scenario: validates a BOM-prefixed hex file
 #### When
 ```shell
@@ -478,6 +505,7 @@ iso8583tool validate bom.hex --no-color
 - after `iso8583tool validate bom.hex --no-color`:
   - exit code is `0`
   - stdout contains `Validation: ok`
+
 ### Scenario: converts a BOM-prefixed hex file to JSON
 #### When
 ```shell
@@ -489,6 +517,7 @@ iso8583tool convert bom.hex --to json
 - after `iso8583tool convert bom.hex --to json`:
   - exit code is `0`
   - stdout contains `"mti"`
+
 ## iso8583tool canonical field values
 Source: `test/e2e/tools/iso8583tool/canonical.atago.yaml`
 ### Scenario: shows F3 with canonical width in the full describe view
@@ -501,6 +530,7 @@ iso8583tool view $ISO_EXAMPLES/basei/0110-auth-response.hex --no-color
 - stdout line `1` is not empty
 - stdout contains `Processing Code`
 - stdout matches `/F3.*: 000000/`
+
 ### Scenario: matches the filtered view for F4
 #### When
 ```shell
@@ -509,6 +539,7 @@ iso8583tool view $ISO_EXAMPLES/basei/0110-auth-response.hex --filter 4 --no-colo
 #### Then
 - exit code is `0`
 - stdout contains `000000005000`
+
 ### Scenario: returns canonical decoded values in JSON for F3
 #### When
 ```shell
@@ -517,6 +548,7 @@ iso8583tool view $ISO_EXAMPLES/basei/0110-auth-response.hex --format json
 #### Then
 - exit code is `0`
 - stdout contains `"3": "000000"`, `"value": "000000"`
+
 ### Scenario: returns canonical decoded values from validate for F3
 #### When
 ```shell
@@ -525,6 +557,7 @@ iso8583tool validate $ISO_EXAMPLES/basei/0110-auth-response.hex --format json
 #### Then
 - exit code is `0`
 - stdout contains `"value": "000000"`
+
 ## iso8583tool CLI surface
 Source: `test/e2e/tools/iso8583tool/cli.atago.yaml`
 ### Scenario: root help prints help with no arguments
@@ -535,6 +568,7 @@ iso8583tool
 #### Then
 - exit code is `0`
 - stdout contains `Commands:`, `view`, `convert`, `validate`
+
 ### Scenario: version prints the version
 #### When
 ```shell
@@ -543,6 +577,7 @@ iso8583tool version
 #### Then
 - exit code is `0`
 - stdout contains `iso8583tool`
+
 ### Scenario: unknown command fails and shows the command list
 #### When
 ```shell
@@ -551,6 +586,7 @@ iso8583tool frobnicate
 #### Then
 - exit code is not `0`
 - stderr contains `unknown command`, `Commands:`
+
 ### Scenario: subcommand help describes convert and exits 0
 #### When
 ```shell
@@ -559,6 +595,7 @@ iso8583tool help convert
 #### Then
 - exit code is `0`
 - stdout contains `Usage: iso8583tool convert`, `--to`
+
 ### Scenario: subcommand help describes view and lists --filter
 #### When
 ```shell
@@ -568,6 +605,7 @@ iso8583tool view --help
 - exit code is `0`
 - stdout contains `Usage: iso8583tool view`, `--filter`
 - stderr equals an exact value
+
 ### Scenario: root flags reject --help with a trailing argument
 #### When
 ```shell
@@ -576,6 +614,7 @@ iso8583tool --help view
 #### Then
 - exit code is not `0`
 - stderr contains `takes no arguments`
+
 ### Scenario: root flags reject --version with a trailing argument
 #### When
 ```shell
@@ -584,6 +623,7 @@ iso8583tool --version view
 #### Then
 - exit code is not `0`
 - stderr contains `takes no arguments`
+
 ## iso8583tool convert
 Source: `test/e2e/tools/iso8583tool/convert.atago.yaml`
 ### Scenario: auto-detected direction packs a JSON document to hex
@@ -594,6 +634,7 @@ iso8583tool convert $ISO_EXAMPLES/basei/0100-auth-request.json
 #### Then
 - exit code is `0`
 - stdout matches `/^3031/`
+
 ### Scenario: auto-detected direction unpacks a message to a JSON document
 #### When
 ```shell
@@ -602,6 +643,7 @@ iso8583tool convert $ISO_EXAMPLES/basei/0100-auth-request.hex
 #### Then
 - exit code is `0`
 - stdout contains `"mti": "0100"`, `"55.9F02"`
+
 ### Scenario: --to override forces json output from a message
 #### When
 ```shell
@@ -610,6 +652,7 @@ iso8583tool convert $ISO_EXAMPLES/basei/0110-auth-response.hex --to json
 #### Then
 - exit code is `0`
 - stdout contains `"mti"`
+
 ### Scenario: --to override rejects an unknown direction
 #### When
 ```shell
@@ -618,6 +661,7 @@ iso8583tool convert $ISO_EXAMPLES/basei/0100-auth-request.json --to sideways
 #### Then
 - exit code is not `0`
 - stderr contains `unsupported --to`
+
 ### Scenario: rejects a path present in both fields and binary_fields
 #### Inputs
 _stdin for `iso8583tool`:_
@@ -631,6 +675,7 @@ iso8583tool convert --to hex
 #### Then
 - exit code is not `0`
 - stderr contains `55.8A`
+
 ### Scenario: rejects a parent path that also has nested children
 #### Inputs
 _stdin for `iso8583tool`:_
@@ -644,6 +689,7 @@ iso8583tool convert --to hex
 #### Then
 - exit code is not `0`
 - stderr contains `55.9F02`
+
 ### Scenario: rejects field id 0 (reserved for the MTI)
 #### Inputs
 _stdin for `iso8583tool`:_
@@ -657,6 +703,7 @@ iso8583tool convert --to hex
 #### Then
 - exit code is not `0`
 - stderr contains `mti`
+
 ### Scenario: rejects field id 1 (the bitmap)
 #### Inputs
 _stdin for `iso8583tool`:_
@@ -670,6 +717,7 @@ iso8583tool convert --to hex
 #### Then
 - exit code is not `0`
 - stderr contains `bitmap`
+
 ### Scenario: rejects field id 0 set through binary_fields
 #### Inputs
 _stdin for `iso8583tool`:_
@@ -683,6 +731,7 @@ iso8583tool convert --to hex
 #### Then
 - exit code is not `0`
 - stderr contains `mti`
+
 ### Scenario: rejects an out-of-range field id
 #### Inputs
 _stdin for `iso8583tool`:_
@@ -696,6 +745,7 @@ iso8583tool convert --to hex
 #### Then
 - exit code is not `0`
 - stderr contains `invalid field id`
+
 ### Scenario: rejects a non-numeric field id
 #### Inputs
 _stdin for `iso8583tool`:_
@@ -709,6 +759,7 @@ iso8583tool convert --to hex
 #### Then
 - exit code is not `0`
 - stderr contains `invalid field id`
+
 ### Scenario: rejects a malformed dotted path
 #### Inputs
 _stdin for `iso8583tool`:_
@@ -722,6 +773,7 @@ iso8583tool convert --to hex
 #### Then
 - exit code is not `0`
 - stderr contains `empty segment`
+
 ### Scenario: rejects leading whitespace in a path key
 #### Inputs
 _stdin for `iso8583tool`:_
@@ -735,6 +787,7 @@ iso8583tool convert --to hex
 #### Then
 - exit code is not `0`
 - stderr contains `whitespace`
+
 ### Scenario: rejects a leading-zero duplicate alias (02 vs 2)
 #### Inputs
 _stdin for `iso8583tool`:_
@@ -748,6 +801,7 @@ iso8583tool convert --to hex
 #### Then
 - exit code is not `0`
 - stderr contains `address field`
+
 ### Scenario: rejects a case-different duplicate TLV alias (9f02 vs 9F02)
 #### Inputs
 _stdin for `iso8583tool`:_
@@ -761,6 +815,7 @@ iso8583tool convert --to hex
 #### Then
 - exit code is not `0`
 - stderr contains `address field`
+
 ### Scenario: rejects raw bytes routed to a text field via binary_fields
 #### Inputs
 _stdin for `iso8583tool`:_
@@ -774,6 +829,7 @@ iso8583tool convert --to hex
 #### Then
 - exit code is not `0`
 - stderr contains `text field`
+
 ### Scenario: round-trip is stable through hex -> json -> hex
 #### When
 ```shell
@@ -785,9 +841,11 @@ back="$(printf "%s" "$h" | iso8583tool convert | iso8583tool convert)"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: is stable through raw -> json -> raw with the packed-BCD starter preset
 #### Given
 - Fixture file `message.bin` is created.
+
 #### When
 ```shell
 iso8583tool convert message.bin --encoding raw --spec spec87bcd-starter > doc.json &&
@@ -799,6 +857,7 @@ echo SAME
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: to a file writes the result and reports it
 #### When
 ```shell
@@ -808,8 +867,10 @@ iso8583tool convert $ISO_EXAMPLES/basei/0100-auth-request.json --output out.hex
 - exit code is `0`
 - stdout contains `Converted with`, `unmasked`, `sensitive`
 - file `out.hex` exists
+
 #### Generated artifacts
 - `out.hex`
+
 ### Scenario: unmasked-output warning is documented in help
 #### When
 ```shell
@@ -818,6 +879,7 @@ iso8583tool convert --help
 #### Then
 - exit code is `0`
 - stdout contains `UNMASKED`, `redact`
+
 ### Scenario: stays byte-clean on stderr when piped (stdout not a TTY)
 #### When
 ```shell
@@ -827,12 +889,14 @@ iso8583tool convert $ISO_EXAMPLES/basei/0100-auth-request.hex
 - exit code is `0`
 - stdout contains `"mti": "0100"`
 - stderr equals an exact value
+
 ## iso8583tool custom JSON spec import
 Source: `test/e2e/tools/iso8583tool/custom_spec.atago.yaml`
 ### Scenario: loads a top-level Hex field and round-trips it
 #### Given
 - Fixture file `hex-top.json` is created.
 - Fixture file `doc.json` is created.
+
 #### Inputs
 _Fixture `hex-top.json`:_
 ```text
@@ -849,9 +913,11 @@ iso8583tool convert doc.json --to hex --spec hex-top.json
 #### Then
 - exit code is `0`
 - stdout does not contain `no constructor`
+
 ### Scenario: loads a Hex TLV subfield
 #### Given
 - Fixture file `hex-sub.json` is created.
+
 #### Inputs
 _Fixture `hex-sub.json`:_
 ```text
@@ -864,9 +930,11 @@ iso8583tool view $ISO_EXAMPLES/basei/0100-auth-request.hex --spec hex-sub.json
 #### Then
 - exit code is not `0`
 - stderr does not contain `no constructor`
+
 ### Scenario: loads a Track1 field
 #### Given
 - Fixture file `track1.json` is created.
+
 #### Inputs
 _Fixture `track1.json`:_
 ```text
@@ -879,9 +947,11 @@ iso8583tool view $ISO_EXAMPLES/basei/0100-auth-request.hex --spec track1.json
 #### Then
 - exit code is not `0`
 - stderr does not contain `no constructor`
+
 ### Scenario: loads a Track3 field
 #### Given
 - Fixture file `track3.json` is created.
+
 #### Inputs
 _Fixture `track3.json`:_
 ```text
@@ -894,9 +964,11 @@ iso8583tool view $ISO_EXAMPLES/basei/0100-auth-request.hex --spec track3.json
 #### Then
 - exit code is not `0`
 - stderr does not contain `no constructor`
+
 ### Scenario: loads an IndexTag composite subfield
 #### Given
 - Fixture file `indextag.json` is created.
+
 #### Inputs
 _Fixture `indextag.json`:_
 ```text
@@ -909,9 +981,11 @@ iso8583tool view $ISO_EXAMPLES/basei/0100-auth-request.hex --spec indextag.json
 #### Then
 - exit code is not `0`
 - stderr does not contain `no constructor`
+
 ### Scenario: loads a composite tag that omits sort
 #### Given
 - Fixture file `nosort.json` is created.
+
 #### Inputs
 _Fixture `nosort.json`:_
 ```text
@@ -924,6 +998,7 @@ iso8583tool view $ISO_EXAMPLES/basei/0100-auth-request.hex --spec nosort.json
 #### Then
 - exit code is not `0`
 - stderr does not contain `unknown sort function`
+
 ## iso8583tool detection messaging
 Source: `test/e2e/tools/iso8583tool/diagnostics.atago.yaml`
 ### Scenario: presents tied presets for an ambiguous message
@@ -934,6 +1009,7 @@ iso8583tool doctor $ISO_EXAMPLES/spec87ascii/0800-network-echo.hex --no-color
 #### Then
 - exit code is `0`
 - stdout contains `spec87ascii`, `fits equally well`
+
 ### Scenario: flags a truncated capture instead of only "custom layout"
 #### When
 ```shell
@@ -942,6 +1018,7 @@ iso8583tool doctor --raw 010000000000000008000103DF --no-color
 #### Then
 - exit code is not `0`
 - stdout contains `truncated or malformed`
+
 ### Scenario: validate calls out a truncated capture rather than doctor
 #### When
 ```shell
@@ -951,6 +1028,7 @@ iso8583tool validate --raw 010000000000000008000103DF --no-color
 - exit code is not `0`
 - stdout contains `truncated or malformed`
 - stdout does not contain `iso8583tool doctor`
+
 ## iso8583tool diff
 Source: `test/e2e/tools/iso8583tool/diff.atago.yaml`
 ### Scenario: reports changed fields in text form
@@ -965,6 +1043,7 @@ iso8583tool diff before.hex after.hex
 - after `iso8583tool diff before.hex after.hex`:
   - exit code is `0`
   - stdout contains `Field 4 changed`, `- 000000005000`, `+ 000000009999`
+
 ### Scenario: emits jq-compatible JSON
 #### When
 ```shell
@@ -977,6 +1056,7 @@ iso8583tool diff before.hex after.hex --format json | jq -r ".changes[0].kind"
 - after `iso8583tool diff before.hex after.hex --format json | jq -r ".changes[0].kind"`:
   - exit code is `0`
   - stdout equals an exact value
+
 ### Scenario: reports no differences for identical messages
 #### When
 ```shell
@@ -985,6 +1065,7 @@ iso8583tool diff $ISO_EXAMPLES/basei/0110-auth-response.hex $ISO_EXAMPLES/basei/
 #### Then
 - exit code is `0`
 - stdout contains `No differences.`
+
 ### Scenario: filters to a field subtree
 #### When
 ```shell
@@ -998,6 +1079,7 @@ iso8583tool diff before.hex after.hex --filter 55
   - exit code is `0`
   - stdout contains `55.9F02`
   - stdout does not contain `Field 4 `
+
 ### Scenario: reads one side from stdin
 #### When
 ```shell
@@ -1010,6 +1092,7 @@ cat after.hex | iso8583tool diff before.hex -
 - after `cat after.hex | iso8583tool diff before.hex -`:
   - exit code is `0`
   - stdout contains `changed`
+
 ### Scenario: rejects two stdin sides
 #### When
 ```shell
@@ -1018,6 +1101,7 @@ iso8583tool diff - -
 #### Then
 - exit code is not `0`
 - stderr contains `stdin`
+
 ### Scenario: masks track data by default
 #### When
 ```shell
@@ -1026,6 +1110,7 @@ iso8583tool diff $ISO_EXAMPLES/basei/0100-auth-request.hex $ISO_EXAMPLES/basei/0
 #### Then
 - exit code is `0`
 - stdout does not contain `4111111111111111D`
+
 ### Scenario: reveals raw values with --unsafe
 #### When
 ```shell
@@ -1034,6 +1119,7 @@ iso8583tool diff $ISO_EXAMPLES/basei/0100-auth-request.hex $ISO_EXAMPLES/basei/0
 #### Then
 - exit code is `0`
 - stdout contains `4111111111111111D`
+
 ### Scenario: rejects an unknown --format value
 #### When
 ```shell
@@ -1042,6 +1128,7 @@ iso8583tool diff $ISO_EXAMPLES/basei/0100-auth-request.hex $ISO_EXAMPLES/basei/0
 #### Then
 - exit code is not `0`
 - stderr contains `unsupported format`
+
 ### Scenario: private-field safety - masks an embedded PAN by default
 #### When
 ```shell
@@ -1054,6 +1141,7 @@ iso8583tool diff pa.hex pb.hex --color never
 - after `iso8583tool diff pa.hex pb.hex --color never`:
   - exit code is `0`
   - stdout does not contain `4111111111111111`
+
 ### Scenario: private-field safety - reveals the embedded PAN with --unsafe
 #### When
 ```shell
@@ -1066,6 +1154,7 @@ iso8583tool diff pa.hex pb.hex --color never --unsafe
 - after `iso8583tool diff pa.hex pb.hex --color never --unsafe`:
   - exit code is `0`
   - stdout contains `4111111111111111`
+
 ## iso8583tool doctor
 Source: `test/e2e/tools/iso8583tool/doctor.atago.yaml`
 ### Scenario: recommends the BASE I starter for an ASCII BASE I message
@@ -1076,6 +1165,7 @@ iso8583tool doctor $ISO_EXAMPLES/basei/0110-auth-response.hex
 #### Then
 - exit code is `0`
 - stdout contains `Recommended: --spec basei-starter`, `Confirm with: iso8583tool view`
+
 ### Scenario: detects a packed-BCD raw message
 #### When
 ```shell
@@ -1087,6 +1177,7 @@ iso8583tool doctor message.bin --encoding raw
 - after `iso8583tool doctor message.bin --encoding raw`:
   - exit code is `0`
   - stdout contains `Recommended: --spec spec87bcd-starter`
+
 ### Scenario: auto-detects a raw .bin without --encoding
 #### When
 ```shell
@@ -1098,6 +1189,7 @@ iso8583tool doctor message.bin
 - after `iso8583tool doctor message.bin`:
   - exit code is `0`
   - stdout contains `(raw input)`, `Recommended: --spec spec87bcd-starter`
+
 ### Scenario: emits a JSON report with --format json
 #### When
 ```shell
@@ -1106,6 +1198,7 @@ iso8583tool doctor $ISO_EXAMPLES/basei/0110-auth-response.hex --format json
 #### Then
 - exit code is `0`
 - stdout contains `"recommended": "basei-starter"`, `"exact_round_trip": true`
+
 ### Scenario: exits non-zero when no preset fits
 #### When
 ```shell
@@ -1114,6 +1207,7 @@ iso8583tool doctor --raw fffefd
 #### Then
 - exit code is not `0`
 - stdout contains `No built-in preset could unpack`
+
 ### Scenario: is suggested by a wrong-spec validate failure
 #### When
 ```shell
@@ -1122,6 +1216,7 @@ iso8583tool validate $ISO_EXAMPLES/spec87ascii/0800-network-echo.hex --spec spec
 #### Then
 - exit code is not `0`
 - stdout contains `doctor`
+
 ### Scenario: marks every tied preset recommended and confirms with each
 #### When
 ```shell
@@ -1130,6 +1225,7 @@ iso8583tool doctor $ISO_EXAMPLES/spec87ascii/0800-network-echo.hex --no-color
 #### Then
 - exit code is `0`
 - stdout contains `view --spec basei-starter`, `view --spec spec87ascii`
+
 ### Scenario: explains how to choose between the tied basei-starter and spec87ascii presets
 #### When
 ```shell
@@ -1138,6 +1234,7 @@ iso8583tool doctor $ISO_EXAMPLES/spec87ascii/0800-network-echo.hex --no-color
 #### Then
 - exit code is `0`
 - stdout contains `Field 55`, `EMV`
+
 ### Scenario: shell-safe confirm hint quotes a path that contains a space
 #### When
 ```shell
@@ -1148,10 +1245,12 @@ iso8583tool doctor "with space.hex" --no-color
 - after `iso8583tool doctor "with space.hex" --no-color`:
   - exit code is `0`
   - stdout contains `'`, `with space.hex`
+
 ### Scenario: custom-spec validate hint does not steer a custom-spec failure to doctor
 #### Given
 - Fixture file `spec.json` is created.
 - Fixture file `other.json` is created.
+
 #### Inputs
 _Fixture `spec.json`:_
 ```text
@@ -1171,6 +1270,7 @@ iso8583tool validate msg.hex --spec spec.json --encoding hex --no-color
   - exit code is not `0`
   - stdout does not contain `doctor`
   - stdout contains `spec file`
+
 ## iso8583tool edge cases
 Source: `test/e2e/tools/iso8583tool/edge_cases.atago.yaml`
 ### Scenario: rejects non-hex characters under --encoding hex
@@ -1181,6 +1281,7 @@ iso8583tool view --encoding hex --raw zzzz
 #### Then
 - exit code is not `0`
 - stderr contains `hex`
+
 ### Scenario: rejects odd-length hex
 #### When
 ```shell
@@ -1189,6 +1290,7 @@ iso8583tool view --raw 0100712
 #### Then
 - exit code is not `0`
 - stderr is not empty
+
 ### Scenario: reports the failing field for a truncated message
 #### When
 ```shell
@@ -1197,6 +1299,7 @@ iso8583tool validate --raw 01007220
 #### Then
 - exit code is not `0`
 - stdout contains `[error]`
+
 ### Scenario: fails on empty inline input
 #### When
 ```shell
@@ -1205,6 +1308,7 @@ iso8583tool view --raw ''
 #### Then
 - exit code is not `0`
 - stderr is not empty
+
 ### Scenario: fails when the file does not exist
 #### When
 ```shell
@@ -1213,6 +1317,7 @@ iso8583tool view /no/such/message.hex
 #### Then
 - exit code is not `0`
 - stderr is not empty
+
 ### Scenario: fails when a directory is passed instead of a file
 #### When
 ```shell
@@ -1221,6 +1326,7 @@ iso8583tool view $ISO_EXAMPLES/basei
 #### Then
 - exit code is not `0`
 - stderr is not empty
+
 ### Scenario: refuses both a file argument and --raw
 #### When
 ```shell
@@ -1229,6 +1335,7 @@ iso8583tool view $ISO_EXAMPLES/basei/0110-auth-response.hex --raw 0100
 #### Then
 - exit code is not `0`
 - stderr is not empty
+
 ### Scenario: fails to pack a document with no mti
 #### When
 ```shell
@@ -1237,6 +1344,7 @@ printf "%s" "{\"fields\":{}}" | iso8583tool convert --to hex
 #### Then
 - exit code is not `0`
 - stderr contains `mti`
+
 ### Scenario: fails to pack a document with an invalid TLV tag
 #### When
 ```shell
@@ -1245,6 +1353,7 @@ printf "%s" "{\"mti\":\"0100\",\"binary_fields\":{\"55.ZZ\":\"00\"}}" | iso8583t
 #### Then
 - exit code is not `0`
 - stderr is not empty
+
 ### Scenario: oversized input - rejects an oversized file with a clear limit error
 #### When
 ```shell
@@ -1255,6 +1364,7 @@ iso8583tool view big.hex
 - after `iso8583tool view big.hex`:
   - exit code is not `0`
   - stderr contains `limit`
+
 ### Scenario: oversized input - rejects oversized stdin with a clear limit error
 #### When
 ```shell
@@ -1263,6 +1373,7 @@ head -c 1100000 /dev/zero | tr '\0' '0' | iso8583tool view -
 #### Then
 - exit code is not `0`
 - stderr contains `limit`
+
 ### Scenario: oversized input - cleanly fails a truncated field 55 TLV without panic
 #### When
 ```shell
@@ -1272,6 +1383,7 @@ iso8583tool validate --raw 010000000000000008000103DF
 - exit code is not `0`
 - stdout contains `[error]`
 - stderr does not contain `panic`
+
 ### Scenario: oversized input - does not panic on a length-spoofed variable-length field
 #### When
 ```shell
@@ -1280,6 +1392,7 @@ iso8583tool view --raw 0100400000000000000099
 #### Then
 - exit code is not `0`
 - stderr does not contain `panic`
+
 ## iso8583tool ergonomics
 Source: `test/e2e/tools/iso8583tool/ergonomics.atago.yaml`
 ### Scenario: flag ordering - accepts the target after the flags
@@ -1290,6 +1403,7 @@ iso8583tool view --format json $ISO_EXAMPLES/basei/0110-auth-response.hex
 #### Then
 - exit code is `0`
 - stdout contains `"mti"`
+
 ### Scenario: flag ordering - accepts the target before the flags
 #### When
 ```shell
@@ -1298,6 +1412,7 @@ iso8583tool view $ISO_EXAMPLES/basei/0110-auth-response.hex --format json
 #### Then
 - exit code is `0`
 - stdout contains `"mti"`
+
 ### Scenario: flag ordering - accepts flags interleaved around the target
 #### When
 ```shell
@@ -1306,6 +1421,7 @@ iso8583tool view --filter 39 $ISO_EXAMPLES/basei/0110-auth-response.hex --filter
 #### Then
 - exit code is `0`
 - stdout contains `Approved`, `JPY`
+
 ### Scenario: color - is plain by default when not on a terminal
 #### When
 ```shell
@@ -1314,6 +1430,7 @@ iso8583tool view $ISO_EXAMPLES/basei/0110-auth-response.hex | cat -v
 #### Then
 - exit code is `0`
 - stdout does not contain `^[`
+
 ### Scenario: color - forces color with --color always
 #### When
 ```shell
@@ -1322,6 +1439,7 @@ iso8583tool view $ISO_EXAMPLES/basei/0110-auth-response.hex --color always | cat
 #### Then
 - exit code is `0`
 - stdout contains `^[`
+
 ### Scenario: color - stays plain with --no-color even when forced elsewhere
 #### When
 ```shell
@@ -1330,6 +1448,7 @@ iso8583tool view $ISO_EXAMPLES/basei/0110-auth-response.hex --no-color | cat -v
 #### Then
 - exit code is `0`
 - stdout does not contain `^[`
+
 ### Scenario: color - rejects an unknown --color value instead of ignoring it
 #### When
 ```shell
@@ -1338,6 +1457,7 @@ iso8583tool view $ISO_EXAMPLES/basei/0110-auth-response.hex --color banana
 #### Then
 - exit code is not `0`
 - stderr contains `invalid --color`
+
 ### Scenario: end of options - treats a dash-leading filename after -- as a positional
 #### When
 ```shell
@@ -1348,9 +1468,11 @@ iso8583tool view -- -response.hex
 - after `iso8583tool view -- -response.hex`:
   - exit code is `0`
   - stdout contains `MTI`
+
 ### Scenario: config - applies an extension catalog from --config
 #### Given
 - Fixture file `cfg.json` is created.
+
 #### Inputs
 _Fixture `cfg.json`:_
 ```text
@@ -1363,9 +1485,11 @@ iso8583tool validate $ISO_EXAMPLES/basei/0110-auth-response.hex --config cfg.jso
 #### Then
 - exit code is `0`
 - stdout contains `Acme Blob`
+
 ### Scenario: config - fails on a config with an invalid strategy
 #### Given
 - Fixture file `bad.json` is created.
+
 #### Inputs
 _Fixture `bad.json`:_
 ```text
@@ -1378,12 +1502,14 @@ iso8583tool view $ISO_EXAMPLES/basei/0110-auth-response.hex --config bad.json
 #### Then
 - exit code is not `0`
 - stderr contains `strategy`
+
 ## iso8583tool extension strategy
 Source: `test/e2e/tools/iso8583tool/extension_strategy.atago.yaml`
 ### Scenario: a custom positional composite spec does not apply the BASE I catalog
 #### Given
 - Fixture file `spec.json` is created.
 - Fixture file `msg.json` is created.
+
 #### Inputs
 _Fixture `spec.json`:_
 ```text
@@ -1417,9 +1543,11 @@ iso8583tool view msg.hex --spec spec.json --encoding hex --no-color
 - after `iso8583tool view msg.hex --spec spec.json --encoding hex --no-color`:
   - exit code is `0`
   - stdout does not contain `Extension Field Strategy:`, `Additional Data - Private`, `[tlv]`
+
 ### Scenario: a built-in plain field documented as bitmap reports field 127 as opaque, matching the spec
 #### Given
 - Fixture file `msg.json` is created.
+
 #### Inputs
 _Fixture `msg.json`:_
 ```text
@@ -1435,6 +1563,7 @@ iso8583tool view msg.hex --no-color
   - exit code is `0`
   - stdout contains `F127 Reserved Private [opaque]`
   - stdout does not contain `F127 Reserved Private [bitmap]`
+
 ### Scenario: explains a dot-path set on a plain built-in field
 #### When
 ```shell
@@ -1444,6 +1573,7 @@ printf "%s" "{\"mti\":\"0100\",\"fields\":{\"11\":\"123456\",\"48.1\":\"AB\"}}" 
 - exit code is not `0`
 - stderr contains `dot-path subfields`
 - stderr does not contain `PathMarshaler`
+
 ## iso8583tool convert field count
 Source: `test/e2e/tools/iso8583tool/field_count.atago.yaml`
 ### Scenario: reports the top-level field count matching doctor
@@ -1457,6 +1587,7 @@ count=$(iso8583tool doctor out.hex --format json | sed -n 's/.*"field_count": \(
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## iso8583tool filter normalization
 Source: `test/e2e/tools/iso8583tool/filter.atago.yaml`
 ### Scenario: matches a lowercase EMV tag in view
@@ -1468,6 +1599,7 @@ iso8583tool view $ISO_EXAMPLES/basei/0100-auth-request.hex --filter 55.9f02 --no
 - exit code is `0`
 - stdout contains `55.9F02`
 - stdout does not contain `<not present>`
+
 ### Scenario: matches a lowercase EMV tag in diff
 #### When
 ```shell
@@ -1477,6 +1609,7 @@ iso8583tool diff $ISO_EXAMPLES/basei/0100-auth-request.hex $ISO_EXAMPLES/basei/0
 - exit code is `0`
 - stdout contains `55.8A`
 - stdout does not contain `No field matched`
+
 ### Scenario: accepts "0" as an MTI alias in diff
 #### When
 ```shell
@@ -1485,6 +1618,7 @@ iso8583tool diff $ISO_EXAMPLES/basei/0100-auth-request.hex $ISO_EXAMPLES/basei/0
 #### Then
 - exit code is `0`
 - stdout contains `MTI changed`
+
 ### Scenario: reports an unmatched diff filter
 #### When
 ```shell
@@ -1493,6 +1627,7 @@ iso8583tool diff $ISO_EXAMPLES/basei/0100-auth-request.hex $ISO_EXAMPLES/basei/0
 #### Then
 - exit code is `0`
 - stdout contains `No field matched filter: 999`
+
 ### Scenario: reports an unmatched filter in JSON
 #### When
 ```shell
@@ -1501,6 +1636,7 @@ iso8583tool diff $ISO_EXAMPLES/basei/0100-auth-request.hex $ISO_EXAMPLES/basei/0
 #### Then
 - exit code is `0`
 - stdout contains `"missing_filters"`, `999`
+
 ## iso8583tool sensitive-data masking
 Source: `test/e2e/tools/iso8583tool/masking.atago.yaml`
 ### Scenario: does not mask a non-PAN business identifier
@@ -1512,6 +1648,7 @@ printf '%s' '{"mti":"0110","fields":{"11":"123456","39":"00","63":"ORDER_ID=1234
 #### Then
 - exit code is `0`
 - stdout contains `ORDER_ID=1234567890123`
+
 ### Scenario: masks a dash-separated PAN
 #### When
 ```shell
@@ -1521,6 +1658,7 @@ printf '%s' '{"mti":"0110","fields":{"11":"123456","39":"00","63":"PAN=4111-1111
 #### Then
 - exit code is `0`
 - stdout does not contain `1111-1111-1111`
+
 ### Scenario: masks a space-separated PAN
 #### When
 ```shell
@@ -1530,6 +1668,7 @@ printf '%s' '{"mti":"0110","fields":{"11":"123456","39":"00","63":"PAN=4111 1111
 #### Then
 - exit code is `0`
 - stdout does not contain `1111 1111 1111`
+
 ### Scenario: masks a PAN embedded in a non-private free-form field
 #### When
 ```shell
@@ -1539,6 +1678,7 @@ printf '%s' '{"mti":"0110","fields":{"11":"123456","39":"00","44":"PAN=411111111
 #### Then
 - exit code is `0`
 - stdout does not contain `4111111111111111`
+
 ### Scenario: masks the extended PAN field 34
 #### When
 ```shell
@@ -1548,6 +1688,7 @@ printf '%s' '{"mti":"0100","fields":{"11":"123456","34":"41111111111111111111111
 #### Then
 - exit code is `0`
 - stdout does not contain `411111111111111111111111`
+
 ### Scenario: does not mask the country code field 20
 #### When
 ```shell
@@ -1557,6 +1698,7 @@ printf '%s' '{"mti":"0100","fields":{"11":"123456","20":"840"}}' | iso8583tool c
 #### Then
 - exit code is `0`
 - stdout contains `"20": "840"`
+
 ### Scenario: shows the raw field 20 change in diff
 #### When
 ```shell
@@ -1569,6 +1711,7 @@ iso8583tool diff a.hex b.hex --no-color
 - after `iso8583tool diff a.hex b.hex --no-color`:
   - exit code is `0`
   - stdout contains `840`, `392`
+
 ### Scenario: masks a whole free-form track, not just its PAN
 #### When
 ```shell
@@ -1578,6 +1721,7 @@ printf '%s' '{"mti":"0110","fields":{"11":"123456","39":"00","63":"TRACK2=411111
 #### Then
 - exit code is `0`
 - stdout does not contain `29122011234567890`
+
 ### Scenario: masks an underscore-labeled PAN (card_no)
 #### When
 ```shell
@@ -1587,6 +1731,7 @@ printf '%s' '{"mti":"0110","fields":{"11":"123456","39":"00","63":"card_no=42222
 #### Then
 - exit code is `0`
 - stdout does not contain `4222222222222222`
+
 ### Scenario: masks a spaced-label PAN (card number)
 #### When
 ```shell
@@ -1596,10 +1741,12 @@ printf '%s' '{"mti":"0110","fields":{"11":"123456","39":"00","63":"card number=4
 #### Then
 - exit code is `0`
 - stdout does not contain `4222222222222222`
+
 ### Scenario: a custom positional composite with a PAN-numbered subfield does not mask subfield 48.2 with the top-level PAN rule
 #### Given
 - Fixture file `spec.json` is created.
 - Fixture file `msg.json` is created.
+
 #### Inputs
 _Fixture `spec.json`:_
 ```text
@@ -1633,12 +1780,14 @@ iso8583tool view msg.hex --spec spec.json --encoding hex --no-color
 - after `iso8583tool view msg.hex --spec spec.json --encoding hex --no-color`:
   - exit code is `0`
   - stdout contains `48.2`, `DE`
+
 ## iso8583tool masking under custom specs
 Source: `test/e2e/tools/iso8583tool/masking_custom.atago.yaml`
 ### Scenario: masks a PAN in a binary field 63
 #### Given
 - Fixture file `spec.json` is created.
 - Fixture file `doc.json` is created.
+
 #### Inputs
 _Fixture `spec.json`:_
 ```text
@@ -1657,10 +1806,12 @@ iso8583tool view m.hex --spec spec.json --format json
 - after `iso8583tool view m.hex --spec spec.json --format json`:
   - exit code is `0`
   - stdout does not contain `50414E3D`
+
 ### Scenario: masks a known 9F6B track2-equivalent tag in view
 #### Given
 - Fixture file `spec.json` is created.
 - Fixture file `doc.json` is created.
+
 #### Inputs
 _Fixture `spec.json`:_
 ```text
@@ -1679,10 +1830,12 @@ iso8583tool view m.hex --spec spec.json --format json
 - after `iso8583tool view m.hex --spec spec.json --format json`:
   - exit code is `0`
   - stdout does not contain `4111111111111111`
+
 ### Scenario: masks a known 9F6B track2-equivalent tag in redact
 #### Given
 - Fixture file `spec.json` is created.
 - Fixture file `doc.json` is created.
+
 #### Inputs
 _Fixture `spec.json`:_
 ```text
@@ -1701,10 +1854,12 @@ iso8583tool redact m.hex --spec spec.json --format json
 - after `iso8583tool redact m.hex --spec spec.json --format json`:
   - exit code is `0`
   - stdout does not contain `4111111111111111`
+
 ### Scenario: masks a track2-equivalent tag in a non-55 container (127.57)
 #### Given
 - Fixture file `spec.json` is created.
 - Fixture file `doc.json` is created.
+
 #### Inputs
 _Fixture `spec.json`:_
 ```text
@@ -1723,10 +1878,12 @@ iso8583tool view m.hex --spec spec.json --format json
 - after `iso8583tool view m.hex --spec spec.json --format json`:
   - exit code is `0`
   - stdout does not contain `4111111111111111`
+
 ### Scenario: masks a sensitive tag nested in a constructed TLV (55.70.57)
 #### Given
 - Fixture file `spec.json` is created.
 - Fixture file `doc.json` is created.
+
 #### Inputs
 _Fixture `spec.json`:_
 ```text
@@ -1745,10 +1902,12 @@ iso8583tool redact m.hex --spec spec.json --format json
 - after `iso8583tool redact m.hex --spec spec.json --format json`:
   - exit code is `0`
   - stdout does not contain `4111111111111111`
+
 ### Scenario: does not over-mask a harmless custom field 35
 #### Given
 - Fixture file `spec.json` is created.
 - Fixture file `doc.json` is created.
+
 #### Inputs
 _Fixture `spec.json`:_
 ```text
@@ -1767,10 +1926,12 @@ iso8583tool view m.hex --spec spec.json --format json
 - after `iso8583tool view m.hex --spec spec.json --format json`:
   - exit code is `0`
   - stdout contains `REF-ORDER-ABC-0001`
+
 ### Scenario: does not over-mask a harmless custom field 52
 #### Given
 - Fixture file `spec.json` is created.
 - Fixture file `doc.json` is created.
+
 #### Inputs
 _Fixture `spec.json`:_
 ```text
@@ -1789,10 +1950,12 @@ iso8583tool view m.hex --spec spec.json --format json
 - after `iso8583tool view m.hex --spec spec.json --format json`:
   - exit code is `0`
   - stdout contains `ABCDEFGH`
+
 ### Scenario: still masks a real PAN in a custom field 2
 #### Given
 - Fixture file `spec.json` is created.
 - Fixture file `doc.json` is created.
+
 #### Inputs
 _Fixture `spec.json`:_
 ```text
@@ -1811,12 +1974,14 @@ iso8583tool view m.hex --spec spec.json --format json
 - after `iso8583tool view m.hex --spec spec.json --format json`:
   - exit code is `0`
   - stdout does not contain `4111111111111111`
+
 ## iso8583tool view nested composites
 Source: `test/e2e/tools/iso8583tool/nested_describe.atago.yaml`
 ### Scenario: nested positional composite keeps the nested positional path
 #### Given
 - Fixture file `spec.json` is created.
 - Fixture file `msg.json` is created.
+
 #### Inputs
 _Fixture `spec.json`:_
 ```text
@@ -1850,10 +2015,12 @@ iso8583tool view msg.hex --spec spec.json --encoding hex --no-color
 - after `iso8583tool view msg.hex --spec spec.json --encoding hex --no-color`:
   - exit code is `0`
   - stdout contains `F48.2`, `48.2.1`
+
 ### Scenario: nested EMV tag annotation annotates a nested ARC tag as Approved
 #### Given
 - Fixture file `spec.json` is created.
 - Fixture file `msg.json` is created.
+
 #### Inputs
 _Fixture `spec.json`:_
 ```text
@@ -1886,10 +2053,12 @@ iso8583tool view msg.hex --spec spec.json --encoding hex --no-color
 - after `iso8583tool view msg.hex --spec spec.json --encoding hex --no-color`:
   - exit code is `0`
   - stdout contains `55.70.8A`, `Approved`
+
 ### Scenario: nested EMV tag annotation decodes nested leaf tags in validate --format json
 #### Given
 - Fixture file `spec.json` is created.
 - Fixture file `msg.json` is created.
+
 #### Inputs
 _Fixture `spec.json`:_
 ```text
@@ -1922,12 +2091,14 @@ iso8583tool validate msg.hex --spec spec.json --encoding hex --format json
 - after `iso8583tool validate msg.hex --spec spec.json --encoding hex --format json`:
   - exit code is `0`
   - stdout contains `55.70.9A`, `2026-06-05`
+
 ## iso8583tool nested TLV
 Source: `test/e2e/tools/iso8583tool/nested_tlv.atago.yaml`
 ### Scenario: unpacks a nested TLV to its leaf path
 #### Given
 - Fixture file `spec.json` is created.
 - Fixture file `a.json` is created.
+
 #### Inputs
 _Fixture `spec.json`:_
 ```text
@@ -1961,10 +2132,12 @@ iso8583tool convert a.hex --spec spec.json
   - exit code is `0`
   - stdout contains `"55.70.9F02"`
   - stdout does not contain `"55.70":`
+
 ### Scenario: selects a nested TLV leaf with --filter
 #### Given
 - Fixture file `spec.json` is created.
 - Fixture file `a.json` is created.
+
 #### Inputs
 _Fixture `spec.json`:_
 ```text
@@ -1998,11 +2171,13 @@ iso8583tool view a.hex --spec spec.json --filter 55.70.9F02 --no-color
   - exit code is `0`
   - stdout contains `55.70.9F02`
   - stdout does not contain `<not present>`
+
 ### Scenario: diffs at the nested TLV leaf tag
 #### Given
 - Fixture file `spec.json` is created.
 - Fixture file `a.json` is created.
 - Fixture file `b.json` is created.
+
 #### Inputs
 _Fixture `spec.json`:_
 ```text
@@ -2040,9 +2215,11 @@ iso8583tool diff a.hex b.hex --spec spec.json --no-color
 - after `iso8583tool diff a.hex b.hex --spec spec.json --no-color`:
   - exit code is `0`
   - stdout contains `Field 55.70.9F02 changed`
+
 ### Scenario: keeps a top-level tag and a nested tag set on the same field
 #### Given
 - Fixture file `spec.json` is created.
+
 #### Inputs
 _Fixture `spec.json`:_
 ```text
@@ -2072,10 +2249,12 @@ iso8583tool convert mix.hex --spec spec.json
 #### Then
 - exit code is `0`
 - stdout contains `"55.82"`, `"55.70.9F02"`
+
 ### Scenario: shows the full nested path in the describe output
 #### Given
 - Fixture file `spec.json` is created.
 - Fixture file `a.json` is created.
+
 #### Inputs
 _Fixture `spec.json`:_
 ```text
@@ -2108,6 +2287,7 @@ iso8583tool view a.hex --spec spec.json --no-color
 - after `iso8583tool view a.hex --spec spec.json --no-color`:
   - exit code is `0`
   - stdout contains `F55.70`, `55.70.9F02`
+
 ## iso8583tool workflows
 Source: `test/e2e/tools/iso8583tool/pipeline.atago.yaml`
 ### Scenario: streams sample -> convert -> view
@@ -2118,6 +2298,7 @@ iso8583tool sample 0100-auth-request --format hex | iso8583tool convert | iso858
 #### Then
 - exit code is `0`
 - stdout contains `MTI`
+
 ### Scenario: editing an EMV tag edits one tag and packs it back
 #### When
 ```shell
@@ -2130,6 +2311,7 @@ iso8583tool convert edited.json | iso8583tool view - --filter 55.9F02
 - after `iso8583tool convert edited.json | iso8583tool view - --filter 55.9F02`:
   - exit code is `0`
   - stdout contains `000000010000`
+
 ### Scenario: editing an EMV tag keeps an unknown tag through the round trip
 #### When
 ```shell
@@ -2140,6 +2322,7 @@ iso8583tool convert u.json | iso8583tool validate -
 - after `iso8583tool convert u.json | iso8583tool validate -`:
   - exit code is `0`
   - stdout contains `55.DF8129`
+
 ### Scenario: extracts a single field value with --filter
 #### When
 ```shell
@@ -2148,6 +2331,7 @@ iso8583tool view $ISO_EXAMPLES/basei/0110-auth-response.hex --filter 39
 #### Then
 - exit code is `0`
 - stdout contains `00`, `Approved`
+
 ## iso8583tool README examples
 Source: `test/e2e/tools/iso8583tool/readme.atago.yaml`
 ### Scenario: quick start - lists the bundled samples
@@ -2158,6 +2342,7 @@ iso8583tool sample
 #### Then
 - exit code is `0`
 - stdout contains `0100-auth-request`
+
 ### Scenario: quick start - views the BASE I auth response
 #### When
 ```shell
@@ -2166,6 +2351,7 @@ iso8583tool view $ISO_EXAMPLES/basei/0110-auth-response.hex
 #### Then
 - exit code is `0`
 - stdout contains `Summary:`
+
 ### Scenario: quick start - validates the unknown-TLV sample
 #### When
 ```shell
@@ -2174,6 +2360,7 @@ iso8583tool validate $ISO_EXAMPLES/basei/0100-auth-request-unknown-tlv.hex
 #### Then
 - exit code is `0`
 - stdout contains `55.DF8129`
+
 ### Scenario: quick start - converts the BASE I request to JSON
 #### When
 ```shell
@@ -2182,6 +2369,7 @@ iso8583tool convert $ISO_EXAMPLES/basei/0100-auth-request.hex
 #### Then
 - exit code is `0`
 - stdout contains `"mti": "0100"`
+
 ### Scenario: view - shows JSON output
 #### When
 ```shell
@@ -2190,6 +2378,7 @@ iso8583tool view $ISO_EXAMPLES/basei/0110-auth-response.hex --format json
 #### Then
 - exit code is `0`
 - stdout contains `"fields"`
+
 ### Scenario: view - filters the requested fields
 #### When
 ```shell
@@ -2198,6 +2387,7 @@ iso8583tool view $ISO_EXAMPLES/basei/0110-auth-response.hex --filter 39 --filter
 #### Then
 - exit code is `0`
 - stdout contains `Approved`
+
 ### Scenario: view - reads a message from stdin
 #### When
 ```shell
@@ -2206,6 +2396,7 @@ cat $ISO_EXAMPLES/basei/0110-auth-response.hex | iso8583tool view -
 #### Then
 - exit code is `0`
 - stdout contains `MTI`
+
 ### Scenario: view - is jq-compatible for fields
 #### When
 ```shell
@@ -2214,6 +2405,7 @@ iso8583tool view $ISO_EXAMPLES/basei/0110-auth-response.hex --format json | jq -
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: diff - compares a request and a response
 #### When
 ```shell
@@ -2222,6 +2414,7 @@ iso8583tool diff $ISO_EXAMPLES/basei/0100-auth-request.hex $ISO_EXAMPLES/basei/0
 #### Then
 - exit code is `0`
 - stdout contains `changed`
+
 ### Scenario: diff - is jq-compatible for changes
 #### When
 ```shell
@@ -2230,6 +2423,7 @@ iso8583tool diff $ISO_EXAMPLES/basei/0100-auth-request.hex $ISO_EXAMPLES/basei/0
 #### Then
 - exit code is `0`
 - stdout is not empty
+
 ### Scenario: redact - masks the PAN for safe sharing
 #### When
 ```shell
@@ -2238,6 +2432,7 @@ iso8583tool redact $ISO_EXAMPLES/basei/0100-auth-request.hex
 #### Then
 - exit code is `0`
 - stdout does not contain `4111111111111111`
+
 ### Scenario: redact - supports a text format
 #### When
 ```shell
@@ -2246,6 +2441,7 @@ iso8583tool redact $ISO_EXAMPLES/basei/0100-auth-request.hex --format text
 #### Then
 - exit code is `0`
 - stdout contains `Redacted:`
+
 ### Scenario: convert - packs the BASE I request to hex
 #### When
 ```shell
@@ -2254,6 +2450,7 @@ iso8583tool convert $ISO_EXAMPLES/basei/0100-auth-request.json
 #### Then
 - exit code is `0`
 - stdout matches `/^3031/`
+
 ### Scenario: convert - converts a sample through stdin
 #### When
 ```shell
@@ -2262,6 +2459,7 @@ iso8583tool sample 0100-auth-request --format hex | iso8583tool convert
 #### Then
 - exit code is `0`
 - stdout contains `"mti": "0100"`
+
 ### Scenario: convert - writes converted output to a file
 #### When
 ```shell
@@ -2270,6 +2468,7 @@ tmp="$(mktemp)"; iso8583tool convert $ISO_EXAMPLES/basei/0100-auth-request.json 
 #### Then
 - exit code is `0`
 - stdout contains `Converted with`
+
 ### Scenario: validate - reports a broken inline message as an error
 #### When
 ```shell
@@ -2278,6 +2477,7 @@ iso8583tool validate --raw 01007220
 #### Then
 - exit code is not `0`
 - stdout contains `[error]`
+
 ### Scenario: validate - emits JSON when asked
 #### When
 ```shell
@@ -2286,6 +2486,7 @@ iso8583tool validate $ISO_EXAMPLES/basei/0110-auth-response.hex --format json
 #### Then
 - exit code is `0`
 - stdout contains `"valid": true`
+
 ### Scenario: doctor - recommends a preset for the BASE I sample
 #### When
 ```shell
@@ -2294,6 +2495,7 @@ iso8583tool doctor $ISO_EXAMPLES/basei/0110-auth-response.hex
 #### Then
 - exit code is `0`
 - stdout contains `Recommended: --spec basei-starter`
+
 ### Scenario: doctor - is jq-compatible for the recommendation
 #### When
 ```shell
@@ -2302,6 +2504,7 @@ iso8583tool doctor $ISO_EXAMPLES/basei/0110-auth-response.hex --format json | jq
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: specs - lists the presets
 #### When
 ```shell
@@ -2310,6 +2513,7 @@ iso8583tool specs
 #### Then
 - exit code is `0`
 - stdout contains `basei-starter (default)`
+
 ### Scenario: specs - is jq-compatible for preset names
 #### When
 ```shell
@@ -2318,6 +2522,7 @@ iso8583tool specs --format json | jq -r '.[].name' | head -n1
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: sample - prints a sample as JSON
 #### When
 ```shell
@@ -2326,6 +2531,7 @@ iso8583tool sample 0100-auth-request
 #### Then
 - exit code is `0`
 - stdout contains `"mti": "0100"`
+
 ### Scenario: sample - writes a sample as hex
 #### When
 ```shell
@@ -2334,9 +2540,11 @@ tmp="$(mktemp)"; iso8583tool sample 0100-auth-request --format hex --output "$tm
 #### Then
 - exit code is `0`
 - stdout contains `Wrote sample`
+
 ### Scenario: send (default 2byte-binary framing) - sends a packed 0800 and decodes the 0810 reply
 #### Given
 - Background service `mock` is started: `iso-mock --framing 2byte-binary --reply-hex $REPLY_HEX --ready-file ready.txt`.
+
 #### When
 ```shell
 iso8583tool send ${addr} $ISO_EXAMPLES/basei/0800-network-echo.hex
@@ -2344,9 +2552,11 @@ iso8583tool send ${addr} $ISO_EXAMPLES/basei/0800-network-echo.hex
 #### Then
 - exit code is `0`
 - stdout contains `0810`
+
 ### Scenario: send (default 2byte-binary framing) - reads the message from stdin and is jq-compatible for the response MTI
 #### Given
 - Background service `mock` is started: `iso-mock --framing 2byte-binary --reply-hex $REPLY_HEX --ready-file ready.txt`.
+
 #### When
 ```shell
 iso8583tool sample 0800-network-echo --format hex | iso8583tool send ${addr} - --format json | jq -r '.response_view.mti'
@@ -2354,9 +2564,11 @@ iso8583tool sample 0800-network-echo --format hex | iso8583tool send ${addr} - -
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: send (default 2byte-binary framing) - asserts the reply with --expect-mti / --expect-field (no jq needed)
 #### Given
 - Background service `mock` is started: `iso-mock --framing 2byte-binary --reply-hex $REPLY_HEX --ready-file ready.txt`.
+
 #### When
 ```shell
 iso8583tool send ${addr} $ISO_EXAMPLES/basei/0800-network-echo.hex --expect-mti 0810 --expect-field 39=00
@@ -2364,9 +2576,11 @@ iso8583tool send ${addr} $ISO_EXAMPLES/basei/0800-network-echo.hex --expect-mti 
 #### Then
 - exit code is `0`
 - stdout contains `0810`
+
 ### Scenario: send (default 2byte-binary framing) - accepts an inline message via --raw
 #### Given
 - Background service `mock` is started: `iso-mock --framing 2byte-binary --reply-hex $REPLY_HEX --ready-file ready.txt`.
+
 #### When
 ```shell
 iso8583tool send ${addr} --raw '{"mti":"0800","fields":{"70":"301","11":"654321","41":"TERMNET1"}}' --format json
@@ -2374,9 +2588,11 @@ iso8583tool send ${addr} --raw '{"mti":"0800","fields":{"70":"301","11":"654321"
 #### Then
 - exit code is `0`
 - stdout contains `"mti": "0810"`
+
 ### Scenario: send (4-digit ASCII framing) - packs a JSON document and sends it with a 4-digit header
 #### Given
 - Background service `mock` is started: `iso-mock --framing 4digit-ascii --reply-hex $REPLY_HEX --ready-file ready.txt`.
+
 #### When
 ```shell
 iso8583tool send ${addr} $ISO_EXAMPLES/basei/0100-auth-request.json --framing 4digit-ascii --format json
@@ -2384,6 +2600,7 @@ iso8583tool send ${addr} $ISO_EXAMPLES/basei/0100-auth-request.json --framing 4d
 #### Then
 - exit code is `0`
 - stdout contains `"framing": "4digit-ascii"`, `"mti": "0810"`
+
 ### Scenario: unknown TLV round-trip - preserves the unknown tag when unpacking and packing again
 #### When
 ```shell
@@ -2392,6 +2609,7 @@ iso8583tool convert $ISO_EXAMPLES/basei/0100-auth-request-unknown-tlv.hex | iso8
 #### Then
 - exit code is `0`
 - stdout contains `DF8129`
+
 ### Scenario: other specs - validates the spec87ascii sample
 #### When
 ```shell
@@ -2400,6 +2618,7 @@ iso8583tool validate $ISO_EXAMPLES/spec87ascii/0800-network-echo.hex --spec spec
 #### Then
 - exit code is `0`
 - stdout contains `Spec: spec87ascii`
+
 ### Scenario: other specs - strict-validates the spec87ascii sample under its intended preset
 #### When
 ```shell
@@ -2408,6 +2627,7 @@ iso8583tool validate $ISO_EXAMPLES/spec87ascii/0800-network-echo.hex --spec spec
 #### Then
 - exit code is `0`
 - stdout contains `ok`
+
 ### Scenario: other specs - views the spec87ascii sample
 #### When
 ```shell
@@ -2416,6 +2636,7 @@ iso8583tool view $ISO_EXAMPLES/spec87ascii/0800-network-echo.hex --spec spec87as
 #### Then
 - exit code is `0`
 - stdout contains `0800`
+
 ### Scenario: other specs - converts the spec87ascii sample to JSON
 #### When
 ```shell
@@ -2424,6 +2645,7 @@ iso8583tool convert $ISO_EXAMPLES/spec87ascii/0800-network-echo.hex --spec spec8
 #### Then
 - exit code is `0`
 - stdout contains `"mti": "0800"`
+
 ## iso8583tool redact
 Source: `test/e2e/tools/iso8583tool/redact.atago.yaml`
 ### Scenario: masks the PAN in JSON output
@@ -2435,6 +2657,7 @@ iso8583tool redact $ISO_EXAMPLES/basei/0100-auth-request.hex | jq -r '.fields["2
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: never leaks the full PAN
 #### When
 ```shell
@@ -2443,6 +2666,7 @@ iso8583tool redact $ISO_EXAMPLES/basei/0100-auth-request.hex
 #### Then
 - exit code is `0`
 - stdout does not contain `4111111111111111`
+
 ### Scenario: fully masks the EMV application cryptogram
 #### When
 ```shell
@@ -2452,6 +2676,7 @@ iso8583tool redact $ISO_EXAMPLES/basei/0100-auth-request.hex | jq -r '.binary_fi
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: supports a human-readable text format
 #### When
 ```shell
@@ -2460,6 +2685,7 @@ iso8583tool redact $ISO_EXAMPLES/basei/0100-auth-request.hex --format text
 #### Then
 - exit code is `0`
 - stdout contains `Redacted:`, `411111******1111`
+
 ### Scenario: orders text output by MTI then numeric field id
 #### When
 ```shell
@@ -2469,6 +2695,7 @@ iso8583tool redact $ISO_EXAMPLES/basei/0100-auth-request.hex --format text --col
 - exit code is `0`
 - stdout line `1` contains `MTI:`
 - stdout line `2` contains `F2 =`
+
 ### Scenario: reads from stdin for a Slack-safe pipe
 #### When
 ```shell
@@ -2477,6 +2704,7 @@ cat $ISO_EXAMPLES/basei/0100-auth-request.hex | iso8583tool redact -
 #### Then
 - exit code is `0`
 - stdout does not contain `4111111111111111`
+
 ### Scenario: masks a PAN embedded in a free-form private field (F63)
 #### When
 ```shell
@@ -2486,6 +2714,7 @@ printf '%s' '{"mti":"0110","fields":{"11":"123456","39":"00","63":"PAN=411111111
 #### Then
 - exit code is `0`
 - stdout does not contain `4111111111111111`
+
 ### Scenario: auto-detected input encoding redacts a raw binary capture without --encoding
 #### When
 ```shell
@@ -2496,6 +2725,7 @@ iso8583tool redact message.bin --spec spec87bcd-starter
 - after `iso8583tool redact message.bin --spec spec87bcd-starter`:
   - exit code is `0`
   - stdout contains `"mti"`
+
 ### Scenario: auto-detected input encoding still masks the PAN in a raw binary capture
 #### When
 ```shell
@@ -2508,11 +2738,13 @@ iso8583tool redact message.bin --spec spec87bcd-starter | jq -r '.fields["2"]'
 `:
   - exit code is `0`
   - stdout contains `*`
+
 ## iso8583tool control-byte sanitization
 Source: `test/e2e/tools/iso8583tool/sanitize_output.atago.yaml`
 ### Scenario: view escapes control bytes
 #### Given
 - Fixture file `bin41.json` is created.
+
 #### Inputs
 _Fixture `bin41.json`:_
 ```text
@@ -2528,9 +2760,11 @@ iso8583tool view a.hex --no-color
   - exit code is `0`
   - stdout does not contain `"\x1b"`
   - stdout contains `^[`
+
 ### Scenario: validate escapes control bytes
 #### Given
 - Fixture file `bin41.json` is created.
+
 #### Inputs
 _Fixture `bin41.json`:_
 ```text
@@ -2545,9 +2779,11 @@ iso8583tool validate a.hex --no-color
 - after `iso8583tool validate a.hex --no-color`:
   - exit code is `0`
   - stdout does not contain `"\x1b"`
+
 ### Scenario: diff escapes control bytes
 #### Given
 - Fixture file `bin41.json` is created.
+
 #### Inputs
 _Fixture `bin41.json`:_
 ```text
@@ -2564,9 +2800,11 @@ iso8583tool diff a.hex b.hex --no-color
   - exit code is `0`
   - stdout does not contain `"\x1b"`
   - stdout contains `^[`
+
 ### Scenario: redact text escapes control bytes
 #### Given
 - Fixture file `bin41.json` is created.
+
 #### Inputs
 _Fixture `bin41.json`:_
 ```text
@@ -2582,11 +2820,13 @@ iso8583tool redact a.hex --format text --no-color
   - exit code is `0`
   - stdout does not contain `"\x1b"`
   - stdout contains `^[`
+
 ## iso8583tool send
 Source: `test/e2e/tools/iso8583tool/send.atago.yaml`
 ### Scenario: sends an 0800 and decodes the 0810 response (2byte-binary)
 #### Given
 - Background service `mock` is started: `iso-mock --framing 2byte-binary --reply-hex $REPLY_HEX --ready-file ready.txt`.
+
 #### When
 ```shell
 iso8583tool send ${addr} $ISO_EXAMPLES/basei/0800-network-echo.hex --framing 2byte-binary
@@ -2594,9 +2834,11 @@ iso8583tool send ${addr} $ISO_EXAMPLES/basei/0800-network-echo.hex --framing 2by
 #### Then
 - exit code is `0`
 - stdout contains `Framing:`, `2byte-binary`, `Request:`, `Response:`, `0810`
+
 ### Scenario: lists every response field, not only annotated codes
 #### Given
 - Background service `mock` is started: `iso-mock --framing 2byte-binary --reply-hex $REPLY_HEX --ready-file ready.txt`.
+
 #### When
 ```shell
 iso8583tool send ${addr} $ISO_EXAMPLES/basei/0800-network-echo.hex --framing 2byte-binary --no-color
@@ -2604,9 +2846,11 @@ iso8583tool send ${addr} $ISO_EXAMPLES/basei/0800-network-echo.hex --framing 2by
 #### Then
 - exit code is `0`
 - stdout contains `41 = TERMNET1`, `48 = HEARTBEAT=BASEI`, `63 = ECHO=OK`
+
 ### Scenario: packs a JSON document and sends it (2byte-binary)
 #### Given
 - Background service `mock` is started: `iso-mock --framing 2byte-binary --reply-hex $REPLY_HEX --ready-file ready.txt`.
+
 #### When
 ```shell
 iso8583tool send ${addr} $ISO_EXAMPLES/basei/0800-network-echo.json --framing 2byte-binary --format json
@@ -2616,9 +2860,11 @@ iso8583tool send ${addr} $ISO_EXAMPLES/basei/0800-network-echo.json --framing 2b
 - stdout at `$.framing` equals `2byte-binary`
 - stdout at `$.response_view.mti` equals `0810`
 - stdout contains `"rtt_ms"`, `"sent_bytes"`, `"received_bytes"`, `"request_view"`
+
 ### Scenario: reads the message from stdin via -
 #### Given
 - Background service `mock` is started: `iso-mock --framing 2byte-binary --reply-hex $REPLY_HEX --ready-file ready.txt`.
+
 #### When
 ```shell
 iso8583tool send ${addr} - --framing 2byte-binary < $ISO_EXAMPLES/basei/0800-network-echo.hex
@@ -2626,9 +2872,11 @@ iso8583tool send ${addr} - --framing 2byte-binary < $ISO_EXAMPLES/basei/0800-net
 #### Then
 - exit code is `0`
 - stdout contains `0810`, `Response:`
+
 ### Scenario: frames with a 4-digit ASCII length header
 #### Given
 - Background service `mock` is started: `iso-mock --framing 4digit-ascii --reply-hex $REPLY_HEX --ready-file ready.txt`.
+
 #### When
 ```shell
 iso8583tool send ${addr} $ISO_EXAMPLES/basei/0800-network-echo.hex --framing 4digit-ascii --format json
@@ -2637,9 +2885,11 @@ iso8583tool send ${addr} $ISO_EXAMPLES/basei/0800-network-echo.hex --framing 4di
 - exit code is `0`
 - stdout at `$.framing` equals `4digit-ascii`
 - stdout at `$.response_view.mti` equals `0810`
+
 ### Scenario: sends with no length header and reads the reply until EOF
 #### Given
 - Background service `mock` is started: `iso-mock --framing none --reply-hex $REPLY_HEX --ready-file ready.txt`.
+
 #### When
 ```shell
 iso8583tool send ${addr} $ISO_EXAMPLES/basei/0800-network-echo.hex --framing none --format json
@@ -2648,9 +2898,11 @@ iso8583tool send ${addr} $ISO_EXAMPLES/basei/0800-network-echo.hex --framing non
 - exit code is `0`
 - stdout at `$.framing` equals `none`
 - stdout at `$.response_view.mti` equals `0810`
+
 ### Scenario: decodes the response in describe output (none framing)
 #### Given
 - Background service `mock` is started: `iso-mock --framing none --reply-hex $REPLY_HEX --ready-file ready.txt`.
+
 #### When
 ```shell
 iso8583tool send ${addr} $ISO_EXAMPLES/basei/0800-network-echo.hex --framing none
@@ -2658,9 +2910,11 @@ iso8583tool send ${addr} $ISO_EXAMPLES/basei/0800-network-echo.hex --framing non
 #### Then
 - exit code is `0`
 - stdout contains `none`, `Response:`
+
 ### Scenario: exits non-zero with a clear error when the response times out
 #### Given
 - Background service `mock` is started: `iso-mock --framing 2byte-binary --reply-hex $REPLY_HEX --ready-file ready.txt --no-reply`.
+
 #### When
 ```shell
 iso8583tool send ${addr} $ISO_EXAMPLES/basei/0800-network-echo.hex --framing 2byte-binary --timeout 600ms
@@ -2668,9 +2922,11 @@ iso8583tool send ${addr} $ISO_EXAMPLES/basei/0800-network-echo.hex --framing 2by
 #### Then
 - exit code is not `0`
 - stderr contains `timed out`
+
 ### Scenario: exits non-zero when a none-framing peer never replies
 #### Given
 - Background service `mock` is started: `iso-mock --framing none --reply-hex $REPLY_HEX --ready-file ready.txt --no-reply`.
+
 #### When
 ```shell
 iso8583tool send ${addr} $ISO_EXAMPLES/basei/0800-network-echo.hex --framing none --timeout 600ms
@@ -2678,9 +2934,11 @@ iso8583tool send ${addr} $ISO_EXAMPLES/basei/0800-network-echo.hex --framing non
 #### Then
 - exit code is not `0`
 - stderr contains `timed out`
+
 ### Scenario: passes when --expect-mti and --expect-field match the response
 #### Given
 - Background service `mock` is started: `iso-mock --framing 2byte-binary --reply-hex $REPLY_HEX --ready-file ready.txt`.
+
 #### When
 ```shell
 iso8583tool send ${addr} $ISO_EXAMPLES/basei/0800-network-echo.hex --expect-mti 0810 --expect-field 39=00 --expect-field 70=301
@@ -2688,9 +2946,11 @@ iso8583tool send ${addr} $ISO_EXAMPLES/basei/0800-network-echo.hex --expect-mti 
 #### Then
 - exit code is `0`
 - stdout contains `0810`
+
 ### Scenario: exits non-zero with a deterministic error on an MTI mismatch
 #### Given
 - Background service `mock` is started: `iso-mock --framing 2byte-binary --reply-hex $REPLY_HEX --ready-file ready.txt`.
+
 #### When
 ```shell
 iso8583tool send ${addr} $ISO_EXAMPLES/basei/0800-network-echo.hex --expect-mti 0800
@@ -2699,9 +2959,11 @@ iso8583tool send ${addr} $ISO_EXAMPLES/basei/0800-network-echo.hex --expect-mti 
 - exit code is not `0`
 - stdout contains `Response:`
 - stderr contains `send expectation failed:`, `MTI: expected "0800", got "0810"`
+
 ### Scenario: exits non-zero when an expected field value differs
 #### Given
 - Background service `mock` is started: `iso-mock --framing 2byte-binary --reply-hex $REPLY_HEX --ready-file ready.txt`.
+
 #### When
 ```shell
 iso8583tool send ${addr} $ISO_EXAMPLES/basei/0800-network-echo.hex --expect-field 39=99
@@ -2710,9 +2972,11 @@ iso8583tool send ${addr} $ISO_EXAMPLES/basei/0800-network-echo.hex --expect-fiel
 - exit code is not `0`
 - stdout contains `Response:`
 - stderr contains `send expectation failed:`, `F39: expected "99", got "00"`
+
 ### Scenario: rejects an --expect-field without PATH=VALUE
 #### Given
 - Background service `mock` is started: `iso-mock --framing 2byte-binary --reply-hex $REPLY_HEX --ready-file ready.txt`.
+
 #### When
 ```shell
 iso8583tool send ${addr} $ISO_EXAMPLES/basei/0800-network-echo.hex --expect-field 39
@@ -2720,6 +2984,7 @@ iso8583tool send ${addr} $ISO_EXAMPLES/basei/0800-network-echo.hex --expect-fiel
 #### Then
 - exit code is not `0`
 - stderr contains `invalid --expect-field`
+
 ### Scenario: frames and prints the request without connecting
 #### When
 ```shell
@@ -2728,6 +2993,7 @@ iso8583tool send 127.0.0.1:1 $ISO_EXAMPLES/basei/0800-network-echo.hex --dry-run
 #### Then
 - exit code is `0`
 - stdout contains `Dry run`, `Would send bytes:`, `Request:`, `0800`
+
 ### Scenario: emits a machine-readable dry-run record
 #### When
 ```shell
@@ -2738,6 +3004,7 @@ iso8583tool send 127.0.0.1:1 $ISO_EXAMPLES/basei/0800-network-echo.hex --dry-run
 - stdout at `$.dry_run` equals `true`
 - stdout contains `"would_send_bytes"`
 - stdout at `$.request_view.mti` equals `0800`
+
 ### Scenario: withholds the framed bytes by default
 #### When
 ```shell
@@ -2746,6 +3013,7 @@ iso8583tool send 127.0.0.1:1 $ISO_EXAMPLES/basei/0800-network-echo.hex --dry-run
 #### Then
 - exit code is `0`
 - stdout does not contain `Framed bytes`
+
 ### Scenario: reveals the framed wire bytes under --unsafe
 #### When
 ```shell
@@ -2754,6 +3022,7 @@ iso8583tool send 127.0.0.1:1 $ISO_EXAMPLES/basei/0800-network-echo.hex --dry-run
 #### Then
 - exit code is `0`
 - stdout contains `Framed bytes:`
+
 ### Scenario: includes framed_hex in JSON only under --unsafe
 #### When
 ```shell
@@ -2762,6 +3031,7 @@ iso8583tool send 127.0.0.1:1 $ISO_EXAMPLES/basei/0800-network-echo.hex --dry-run
 #### Then
 - exit code is `0`
 - stdout contains `"framed_hex"`
+
 ### Scenario: rejects expectations because there is no response to assert
 #### When
 ```shell
@@ -2770,6 +3040,7 @@ iso8583tool send 127.0.0.1:1 $ISO_EXAMPLES/basei/0800-network-echo.hex --dry-run
 #### Then
 - exit code is not `0`
 - stderr contains `dry-run`
+
 ### Scenario: rejects an invalid --framing value
 #### When
 ```shell
@@ -2778,6 +3049,7 @@ iso8583tool send 127.0.0.1:1 $ISO_EXAMPLES/basei/0800-network-echo.hex --framing
 #### Then
 - exit code is not `0`
 - stderr contains `invalid --framing`
+
 ### Scenario: rejects a HOST:PORT without a port
 #### When
 ```shell
@@ -2786,6 +3058,7 @@ iso8583tool send 127.0.0.1 $ISO_EXAMPLES/basei/0800-network-echo.hex --timeout 5
 #### Then
 - exit code is not `0`
 - stderr contains `invalid address`
+
 ### Scenario: prints usage for send --help
 #### When
 ```shell
@@ -2794,6 +3067,7 @@ iso8583tool send --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: iso8583tool send`, `--framing`
+
 ## iso8583tool specs
 Source: `test/e2e/tools/iso8583tool/specs.atago.yaml`
 ### Scenario: lists the built-in presets with the default marked
@@ -2804,6 +3078,7 @@ iso8583tool specs
 #### Then
 - exit code is `0`
 - stdout contains `basei-starter (default)`, `spec87ascii`, `spec87bcd-starter`
+
 ### Scenario: emits a JSON array with --format json
 #### When
 ```shell
@@ -2812,6 +3087,7 @@ iso8583tool specs --format json
 #### Then
 - exit code is `0`
 - stdout contains `"name": "basei-starter"`, `"default": true`
+
 ### Scenario: rejects an unexpected positional argument
 #### When
 ```shell
@@ -2820,11 +3096,13 @@ iso8583tool specs extra
 #### Then
 - exit code is not `0`
 - stderr contains `Usage:`
+
 ## iso8583tool standard high-numbered fields
 Source: `test/e2e/tools/iso8583tool/standard_fields.atago.yaml`
 ### Scenario: packs and round-trips fields 95/96/100/102/103/104
 #### Given
 - Fixture file `hi.json` is created.
+
 #### Inputs
 _Fixture `hi.json`:_
 ```text
@@ -2839,9 +3117,11 @@ iso8583tool view hi.hex --format json
 - after `iso8583tool view hi.hex --format json`:
   - exit code is `0`
   - stdout contains `"100": "12345678901"`, `"104": "DESCRIPTION"`
+
 ### Scenario: packs the reserved fields 123-127
 #### Given
 - Fixture file `r.json` is created.
+
 #### Inputs
 _Fixture `r.json`:_
 ```text
@@ -2854,9 +3134,11 @@ iso8583tool convert r.json --to hex
 #### Then
 - exit code is `0`
 - stdout does not contain `not defined`
+
 ### Scenario: packs and round-trips the binary MAC field 128
 #### Given
 - Fixture file `m.json` is created.
+
 #### Inputs
 _Fixture `m.json`:_
 ```text
@@ -2871,11 +3153,13 @@ iso8583tool view m.hex --unsafe --format json
 - after `iso8583tool view m.hex --unsafe --format json`:
   - exit code is `0`
   - stdout contains `"128": "A1B2C3D4E5F60708"`
+
 ## iso8583tool validate --strict advice and network rules
 Source: `test/e2e/tools/iso8583tool/strict_validate.atago.yaml`
 ### Scenario: fails a hollow authorization advice (0120)
 #### Given
 - Fixture file `h0120.json` is created.
+
 #### Inputs
 _Fixture `h0120.json`:_
 ```text
@@ -2890,9 +3174,11 @@ iso8583tool validate h0120.hex --strict
 - after `iso8583tool validate h0120.hex --strict`:
   - exit code is not `0`
   - stdout contains `failed`
+
 ### Scenario: fails a hollow financial advice (0220)
 #### Given
 - Fixture file `h0220.json` is created.
+
 #### Inputs
 _Fixture `h0220.json`:_
 ```text
@@ -2907,9 +3193,11 @@ iso8583tool validate h0220.hex --strict
 - after `iso8583tool validate h0220.hex --strict`:
   - exit code is not `0`
   - stdout contains `failed`
+
 ### Scenario: fails a hollow network advice (0820)
 #### Given
 - Fixture file `h0820.json` is created.
+
 #### Inputs
 _Fixture `h0820.json`:_
 ```text
@@ -2924,9 +3212,11 @@ iso8583tool validate h0820.hex --strict
 - after `iso8583tool validate h0820.hex --strict`:
   - exit code is not `0`
   - stdout contains `failed`
+
 ### Scenario: fails a hollow network response (0810)
 #### Given
 - Fixture file `h0810.json` is created.
+
 #### Inputs
 _Fixture `h0810.json`:_
 ```text
@@ -2941,9 +3231,11 @@ iso8583tool validate h0810.hex --strict
 - after `iso8583tool validate h0810.hex --strict`:
   - exit code is not `0`
   - stdout contains `failed`
+
 ### Scenario: fails a hollow network advice response (0830)
 #### Given
 - Fixture file `h0830.json` is created.
+
 #### Inputs
 _Fixture `h0830.json`:_
 ```text
@@ -2958,6 +3250,7 @@ iso8583tool validate h0830.hex --strict
 - after `iso8583tool validate h0830.hex --strict`:
   - exit code is not `0`
   - stdout contains `failed`
+
 ### Scenario: still accepts the bundled network echo under --strict
 #### When
 ```shell
@@ -2966,9 +3259,11 @@ iso8583tool validate $ISO_EXAMPLES/basei/0800-network-echo.hex --strict
 #### Then
 - exit code is `0`
 - stdout contains `ok`
+
 ### Scenario: fails a hollow authorization notification (0140)
 #### Given
 - Fixture file `h0140.json` is created.
+
 #### Inputs
 _Fixture `h0140.json`:_
 ```text
@@ -2983,9 +3278,11 @@ iso8583tool validate h0140.hex --strict
 - after `iso8583tool validate h0140.hex --strict`:
   - exit code is not `0`
   - stdout contains `failed`
+
 ### Scenario: fails a hollow financial instruction ack (0270)
 #### Given
 - Fixture file `h0270.json` is created.
+
 #### Inputs
 _Fixture `h0270.json`:_
 ```text
@@ -3000,9 +3297,11 @@ iso8583tool validate h0270.hex --strict
 - after `iso8583tool validate h0270.hex --strict`:
   - exit code is not `0`
   - stdout contains `failed`
+
 ### Scenario: fails a hollow file-action request (0300)
 #### Given
 - Fixture file `h0300.json` is created.
+
 #### Inputs
 _Fixture `h0300.json`:_
 ```text
@@ -3017,9 +3316,11 @@ iso8583tool validate h0300.hex --strict
 - after `iso8583tool validate h0300.hex --strict`:
   - exit code is not `0`
   - stdout contains `failed`
+
 ### Scenario: requires a PAN source for a reversal request (0400)
 #### Given
 - Fixture file `h0400.json` is created.
+
 #### Inputs
 _Fixture `h0400.json`:_
 ```text
@@ -3034,9 +3335,11 @@ iso8583tool validate h0400.hex --strict
 - after `iso8583tool validate h0400.hex --strict`:
   - exit code is not `0`
   - stdout contains `PAN source`
+
 ### Scenario: warns that reconciliation (0500) rules are not implemented
 #### Given
 - Fixture file `h0500.json` is created.
+
 #### Inputs
 _Fixture `h0500.json`:_
 ```text
@@ -3051,9 +3354,11 @@ iso8583tool validate h0500.hex --strict
 - after `iso8583tool validate h0500.hex --strict`:
   - exit code is `0`
   - stdout contains `class 5`
+
 ### Scenario: rejects an alphabetic value in a numeric field (70)
 #### Given
 - Fixture file `hc0800.json` is created.
+
 #### Inputs
 _Fixture `hc0800.json`:_
 ```text
@@ -3068,6 +3373,7 @@ iso8583tool validate hc0800.hex --strict
 - after `iso8583tool validate hc0800.hex --strict`:
   - exit code is not `0`
   - stdout contains `must be numeric`
+
 ## iso8583tool validate
 Source: `test/e2e/tools/iso8583tool/validate.atago.yaml`
 ### Scenario: passes a good message with exit 0
@@ -3078,6 +3384,7 @@ iso8583tool validate $ISO_EXAMPLES/basei/0110-auth-response.hex
 #### Then
 - exit code is `0`
 - stdout contains `Validation: ok`, `MTI: 0110`
+
 ### Scenario: reports unknown TLV tags as a warning but still exits 0
 #### When
 ```shell
@@ -3086,6 +3393,7 @@ iso8583tool validate $ISO_EXAMPLES/basei/0100-auth-request-unknown-tlv.hex
 #### Then
 - exit code is `0`
 - stdout contains `warning`, `55.DF8129`
+
 ### Scenario: fails a broken message with exit 1 and names the field
 #### When
 ```shell
@@ -3094,6 +3402,7 @@ iso8583tool validate --raw 01007220
 #### Then
 - exit code is not `0`
 - stdout contains `Validation: failed`, `[error]`, `input was`
+
 ### Scenario: emits a JSON report with --format json
 #### When
 ```shell
@@ -3102,6 +3411,7 @@ iso8583tool validate $ISO_EXAMPLES/basei/0110-auth-response.hex --format json
 #### Then
 - exit code is `0`
 - stdout contains `"valid": true`, `"summary"`
+
 ### Scenario: accepts a complete sample under --strict
 #### When
 ```shell
@@ -3110,6 +3420,7 @@ iso8583tool validate $ISO_EXAMPLES/basei/0110-auth-response.hex --strict
 #### Then
 - exit code is `0`
 - stdout contains `Validation: ok`
+
 ### Scenario: flags a hollow response under --strict
 #### When
 ```shell
@@ -3118,6 +3429,7 @@ printf "%s" "{\"mti\":\"0110\",\"fields\":{\"11\":\"123456\"}}" | iso8583tool co
 #### Then
 - exit code is not `0`
 - stdout contains `Validation: failed`, `39`
+
 ### Scenario: omits the Decoded Fields heading when only the MTI decoded
 #### When
 ```shell
@@ -3126,6 +3438,7 @@ printf "%s" "{\"mti\":\"0500\",\"fields\":{\"11\":\"123456\"}}" | iso8583tool co
 #### Then
 - exit code is `0`
 - stdout does not contain `Decoded Fields:`
+
 ## iso8583tool view
 Source: `test/e2e/tools/iso8583tool/view.atago.yaml`
 ### Scenario: describe output - decodes codes and prints a summary
@@ -3136,6 +3449,7 @@ iso8583tool view $ISO_EXAMPLES/basei/0110-auth-response.hex
 #### Then
 - exit code is `0`
 - stdout contains `Summary:`, `Approved`, `JPY 5000`, `06-04 12:34:56`
+
 ### Scenario: describe output - masks the PAN
 #### When
 ```shell
@@ -3145,6 +3459,7 @@ iso8583tool view $ISO_EXAMPLES/basei/0110-auth-response.hex
 - exit code is `0`
 - stdout contains `411111******1111`
 - stdout does not contain `4111111111111111`
+
 ### Scenario: json output - emits a decoded array and stays uncolored
 #### When
 ```shell
@@ -3153,6 +3468,7 @@ iso8583tool view $ISO_EXAMPLES/basei/0110-auth-response.hex --format json --colo
 #### Then
 - exit code is `0`
 - stdout contains `"decoded"`, `"meaning": "Approved"`
+
 ### Scenario: --filter prints only the requested fields
 #### When
 ```shell
@@ -3162,6 +3478,7 @@ iso8583tool view $ISO_EXAMPLES/basei/0110-auth-response.hex --filter 39 --filter
 - exit code is `0`
 - stdout contains `Approved`
 - stdout does not contain `Primary Account Number`
+
 ### Scenario: --filter marks a field that is not present
 #### When
 ```shell
@@ -3170,6 +3487,7 @@ iso8583tool view $ISO_EXAMPLES/basei/0110-auth-response.hex --filter 90
 #### Then
 - exit code is `0`
 - stdout contains `not present`
+
 ### Scenario: --filter emits object-shaped JSON with an explicit missing_filters list
 #### When
 ```shell
@@ -3178,6 +3496,7 @@ iso8583tool view $ISO_EXAMPLES/basei/0110-auth-response.hex --filter 39 --filter
 #### Then
 - exit code is `0`
 - stdout contains `"mti"`, `"missing_filters"`, `"90"`, `"meaning": "Approved"`
+
 ### Scenario: --filter always emits missing_filters as an array even when nothing is missing
 #### When
 ```shell
@@ -3186,6 +3505,7 @@ iso8583tool view $ISO_EXAMPLES/basei/0110-auth-response.hex --filter 39 --format
 #### Then
 - exit code is `0`
 - stdout contains `"missing_filters": []`
+
 ### Scenario: stdin - reads a message piped in via -
 #### When
 ```shell
@@ -3194,6 +3514,7 @@ iso8583tool sample 0110-auth-response --format hex | iso8583tool view -
 #### Then
 - exit code is `0`
 - stdout contains `MTI`, `Approved`
+
 ### Scenario: stdin - reads from stdin when the target is omitted
 #### When
 ```shell
@@ -3202,6 +3523,7 @@ iso8583tool sample 0110-auth-response --format hex | iso8583tool view
 #### Then
 - exit code is `0`
 - stdout contains `MTI`
+
 ### Scenario: raw binary + packed BCD - views a kanmu-like raw message with the packed-BCD starter preset
 #### When
 ```shell
@@ -3212,6 +3534,7 @@ iso8583tool view message.bin --encoding raw --spec spec87bcd-starter
 - after `iso8583tool view message.bin --encoding raw --spec spec87bcd-starter`:
   - exit code is `0`
   - stdout contains `401924******9999`, `327327`, `1138`, `2204`
+
 ### Scenario: private-field safety - masks a PAN embedded in a free-form private field by default
 #### When
 ```shell
@@ -3220,6 +3543,7 @@ printf "%s" "{\"mti\":\"0110\",\"fields\":{\"11\":\"123456\",\"39\":\"00\",\"63\
 #### Then
 - exit code is `0`
 - stdout does not contain `4111111111111111`
+
 ### Scenario: private-field safety - reveals the raw private-field value with --unsafe
 #### When
 ```shell

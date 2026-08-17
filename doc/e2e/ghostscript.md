@@ -13,6 +13,7 @@
   - [a missing input fails, naming the file on stdout](#scenario-a-missing-input-fails-naming-the-file-on-stdout)
   - [a failed conversion still leaves a PDF behind](#scenario-a-failed-conversion-still-leaves-a-pdf-behind)
   - [an unknown device is refused](#scenario-an-unknown-device-is-refused)
+
 ## Ghostscript (PostScript and PDF pipeline)
 [Ghostscript](https://www.ghostscript.com/) turns PostScript into PDF, PDF
 into text, and PDF into raster images. Its output is the kind a test usually
@@ -35,6 +36,7 @@ _only when `gs --version` succeeds_
 #### Given
 - Fixture file `doc.ps` is created.
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `doc.ps`:_
 ```text
@@ -55,12 +57,15 @@ gs -q -dNOPAUSE -dBATCH -sDEVICE=pdfwrite -o out.pdf doc.ps
 - the step changed exactly created `out.pdf`, modified nothing, deleted nothing
 - pdf `out.pdf` 2 pages
 - pdf `out.pdf` text contains `Quarterly earnings report`, `Appendix and totals`
+
 #### Generated artifacts
 - `out.pdf`
+
 ### Scenario: a DOCINFO pdfmark reaches the Info dictionary
 _only when `gs --version` succeeds_
 #### Given
 - Fixture file `doc.ps` is created.
+
 #### Inputs
 _Fixture `doc.ps`:_
 ```text
@@ -77,12 +82,15 @@ gs -q -dNOPAUSE -dBATCH -sDEVICE=pdfwrite -o titled.pdf -c "[/Title (Quarterly R
 - exit code is `0`
 - pdf `titled.pdf` author contains `atago`, title contains `Quarterly Report`
 - pdf `titled.pdf` producer contains `Ghostscript`
+
 #### Generated artifacts
 - `titled.pdf`
+
 ### Scenario: selecting one page keeps that page's text and drops the other
 _only when `gs --version` succeeds_
 #### Given
 - Fixture file `doc.ps` is created.
+
 #### Inputs
 _Fixture `doc.ps`:_
 ```text
@@ -107,14 +115,17 @@ gs -q -dNOPAUSE -dBATCH -sDEVICE=pdfwrite -dFirstPage=2 -dLastPage=2 -o second.p
   - pdf `second.pdf` 1 page
   - pdf `second.pdf` text contains `Second page marker`
   - pdf `second.pdf` text does not contain `First page marker`
+
 #### Generated artifacts
 - `whole.pdf`
 - `second.pdf`
+
 ### Scenario: merging two documents yields the sum of their pages
 _only when `gs --version` succeeds_
 #### Given
 - Fixture file `one.ps` is created.
 - Fixture file `two.ps` is created.
+
 #### Inputs
 _Fixture `one.ps`:_
 ```text
@@ -149,14 +160,17 @@ gs -q -dNOPAUSE -dBATCH -sDEVICE=pdfwrite -o merged.pdf one.pdf two.pdf
   - exit code is `0`
   - pdf `merged.pdf` 3 pages
   - pdf `merged.pdf` text contains `Document one`, `Document two page A`, `Document two page B`
+
 #### Generated artifacts
 - `one.pdf`
 - `two.pdf`
 - `merged.pdf`
+
 ### Scenario: txtwrite agrees with the text inside the PDF
 _only when `gs --version` succeeds_
 #### Given
 - Fixture file `doc.ps` is created.
+
 #### Inputs
 _Fixture `doc.ps`:_
 ```text
@@ -177,12 +191,15 @@ gs -q -dNOPAUSE -dBATCH -sDEVICE=txtwrite -o extracted.txt out.pdf
 - after `gs -q -dNOPAUSE -dBATCH -sDEVICE=txtwrite -o extracted.txt out.pdf`:
   - exit code is `0`
   - file `extracted.txt` contains `Extractable sentence`
+
 #### Generated artifacts
 - `out.pdf`
+
 ### Scenario: rasterizing a page produces an image of the requested size
 _only when `gs --version` succeeds_
 #### Given
 - Fixture file `doc.ps` is created.
+
 #### Inputs
 _Fixture `doc.ps`:_
 ```text
@@ -207,13 +224,16 @@ gs -q -dNOPAUSE -dBATCH -sDEVICE=png16m -r144 -o page2x.png out.pdf
 - after `gs -q -dNOPAUSE -dBATCH -sDEVICE=png16m -r144 -o page2x.png out.pdf`:
   - exit code is `0`
   - image `page2x.png` width 400, height 200
+
 #### Generated artifacts
 - `page.png`
 - `page2x.png`
+
 ### Scenario: converting the same input twice yields the same text
 _only when `gs --version` succeeds_
 #### Given
 - Fixture file `doc.ps` is created.
+
 #### Inputs
 _Fixture `doc.ps`:_
 ```text
@@ -239,6 +259,7 @@ gs -q -dNOPAUSE -dBATCH -sDEVICE=txtwrite -o second.txt second.pdf
 - after `gs -q -dNOPAUSE -dBATCH -sDEVICE=txtwrite -o second.txt second.pdf`:
   - exit code is `0`
   - file `second.txt` is byte-identical to `first.txt`
+
 ### Scenario: a missing input fails, naming the file on stdout
 _only when `gs --version` succeeds_
 #### When
@@ -249,10 +270,12 @@ gs -dNOPAUSE -dBATCH -sDEVICE=pdfwrite -o out.pdf no-such-input.ps
 - exit code is `1`
 - stdout contains `undefinedfilename`, `no-such-input.ps`
 - stderr contains `Unrecoverable error`
+
 ### Scenario: a failed conversion still leaves a PDF behind
 _only when `gs --version` succeeds_
 #### Given
 - Fixture file `broken.ps` is created.
+
 #### Inputs
 _Fixture `broken.ps`:_
 ```text
@@ -267,12 +290,15 @@ gs -q -dNOPAUSE -dBATCH -sDEVICE=pdfwrite -o out.pdf broken.ps
 - stderr contains `Unrecoverable error`
 - pdf `out.pdf` 1 page
 - pdf `out.pdf` text does not contain `this is not postscript`
+
 #### Generated artifacts
 - `out.pdf`
+
 ### Scenario: an unknown device is refused
 _only when `gs --version` succeeds_
 #### Given
 - Fixture file `doc.ps` is created.
+
 #### Inputs
 _Fixture `doc.ps`:_
 ```text

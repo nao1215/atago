@@ -12,6 +12,7 @@
   - [render config resolves the defaults](#scenario-render-config-resolves-the-defaults)
   - [an undefined must_env fails the render](#scenario-an-undefined-must_env-fails-the-render)
   - [a missing config file fails cleanly](#scenario-a-missing-config-file-fails-cleanly)
+
 ## ecspresso + deploy (real ECS deploy against a mock)
 The thing ecspresso exists to do: deploy an ECS service, and roll it when
 the definition changes. This suite runs that for real against a mock AWS
@@ -32,6 +33,7 @@ _only when `command -v ecspresso && command -v moto_server && command -v aws` su
 - Fixture file `ecspresso.yml` is created.
 - Fixture file `taskdef.json` is created.
 - Fixture file `servicedef.json` is created.
+
 #### Inputs
 _Fixture `ecspresso.yml`:_
 ```text
@@ -90,6 +92,7 @@ aws --endpoint-url http://127.0.0.1:15111 ecs list-task-definitions --query "len
 - after `aws --endpoint-url http://127.0.0.1:15111 ecs list-task-definitions --query "length(taskDefinitionArns)" --output text`:
   - exit code is `0`
   - stdout contains `2`
+
 ## ecspresso (Amazon ECS deploy tool)
 [ecspresso](https://github.com/kayac/ecspresso) deploys ECS services, which
 needs AWS — but everything that decides *what* gets deployed happens locally
@@ -117,12 +120,14 @@ ecspresso version
 ```
 #### Then
 - exit code is `0`
+
 ### Scenario: render substitutes an env template function
 _only when `ecspresso version` succeeds_
 #### Given
 - Fixture file `ecspresso.yml` is created.
 - Fixture file `taskdef.json` is created.
 - Environment variables are set: IMAGE_TAG.
+
 #### Inputs
 _Fixture `ecspresso.yml`:_
 ```text
@@ -152,11 +157,13 @@ ecspresso render --config ecspresso.yml taskdef
 #### Then
 - exit code is `0`
 - stdout at `$.containerDefinitions[0].image` equals `nginx:1.2.3`
+
 ### Scenario: render falls back to the template default when the env is unset
 _only when `ecspresso version` succeeds_
 #### Given
 - Fixture file `ecspresso.yml` is created.
 - Fixture file `taskdef.json` is created.
+
 #### Inputs
 _Fixture `ecspresso.yml`:_
 ```text
@@ -186,11 +193,13 @@ ecspresso render --config ecspresso.yml taskdef
 #### Then
 - exit code is `0`
 - stdout at `$.containerDefinitions[0].image` equals `nginx:latest`
+
 ### Scenario: render evaluates a jsonnet task definition with an external variable
 _only when `ecspresso version` succeeds_
 #### Given
 - Fixture file `ecspresso.yml` is created.
 - Fixture file `task.jsonnet` is created.
+
 #### Inputs
 _Fixture `ecspresso.yml`:_
 ```text
@@ -220,11 +229,13 @@ ecspresso render --config ecspresso.yml --ext-str tag=9.9.9 taskdef
 #### Then
 - exit code is `0`
 - stdout at `$.containerDefinitions[0].image` equals `nginx:9.9.9`
+
 ### Scenario: render config resolves the defaults
 _only when `ecspresso version` succeeds_
 #### Given
 - Fixture file `ecspresso.yml` is created.
 - Fixture file `taskdef.json` is created.
+
 #### Inputs
 _Fixture `ecspresso.yml`:_
 ```text
@@ -244,11 +255,13 @@ ecspresso render --config ecspresso.yml config
 #### Then
 - exit code is `0`
 - stdout contains `cluster: demo`, `timeout:`
+
 ### Scenario: an undefined must_env fails the render
 _only when `ecspresso version` succeeds_
 #### Given
 - Fixture file `ecspresso.yml` is created.
 - Fixture file `taskdef.json` is created.
+
 #### Inputs
 _Fixture `ecspresso.yml`:_
 ```text
@@ -278,6 +291,7 @@ ecspresso render --config ecspresso.yml taskdef
 #### Then
 - exit code is `2`
 - stderr contains `REQUIRED_TAG is not defined`
+
 ### Scenario: a missing config file fails cleanly
 _only when `ecspresso version` succeeds_
 #### When

@@ -16,6 +16,7 @@
   - [an unknown output extension keeps the input encoding](#scenario-an-unknown-output-extension-keeps-the-input-encoding)
   - [identify reads the dimensions back out of a written file](#scenario-identify-reads-the-dimensions-back-out-of-a-written-file)
   - [identify on a missing file fails and prints nothing to stdout](#scenario-identify-on-a-missing-file-fails-and-prints-nothing-to-stdout)
+
 ## ImageMagick (image conversion pipeline)
 [ImageMagick](https://imagemagick.org/) converts, resizes, and inspects
 images. What this suite pins is the part a converter must not get wrong:
@@ -35,6 +36,7 @@ Source: `test/e2e/thirdparty/imagemagick/imagemagick.atago.yaml`
 _only when `convert -version` succeeds_
 #### Given
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### When
 ```shell
 convert -size 8x6 xc:red source.png
@@ -47,8 +49,10 @@ convert source.png out.jpg
   - exit code is `0`
   - the step changed exactly created `out.jpg`, modified nothing, deleted nothing
   - image `out.jpg` is `jpeg`, width 8, height 6
+
 #### Generated artifacts
 - `out.jpg`
+
 ### Scenario: resize honors the aspect ratio unless it is forced
 _only when `convert -version` succeeds_
 #### When
@@ -66,9 +70,11 @@ convert source.png -resize 20x20! forced.png
 - after `convert source.png -resize 20x20! forced.png`:
   - exit code is `0`
   - image `forced.png` width 20, height 20
+
 #### Generated artifacts
 - `fitted.png`
 - `forced.png`
+
 ### Scenario: a 1x1 canvas survives the smallest possible conversion
 _only when `convert -version` succeeds_
 #### When
@@ -78,8 +84,10 @@ convert -size 1x1 xc:black tiny.png
 #### Then
 - exit code is `0`
 - image `tiny.png` is `png`, width 1, height 1
+
 #### Generated artifacts
 - `tiny.png`
+
 ### Scenario: an alpha channel survives PNG but is dropped by JPEG
 _only when `convert -version` succeeds_
 #### When
@@ -94,9 +102,11 @@ convert transparent.png -background white -flatten flat.jpg
 - after `convert transparent.png -background white -flatten flat.jpg`:
   - exit code is `0`
   - image `flat.jpg` is `jpeg`, has no alpha
+
 #### Generated artifacts
 - `transparent.png`
 - `flat.jpg`
+
 ### Scenario: a PNG to PPM round trip restores the original pixels
 _only when `convert -version` succeeds_
 #### When
@@ -116,8 +126,10 @@ compare -metric AE source.png restored.png null:
   - image `restored.png` similar to `source.png`
 - after `compare -metric AE source.png restored.png null:`:
   - exit code is `0`
+
 #### Generated artifacts
 - `restored.png`
+
 ### Scenario: comparing different images reports a nonzero difference
 _only when `convert -version` succeeds_
 #### When
@@ -134,6 +146,7 @@ compare -metric AE red.png blue.png null:
 - after `compare -metric AE red.png blue.png null:`:
   - exit code is `1`
   - stderr contains `48`
+
 ### Scenario: the JSON report describes the image it just wrote
 _only when `convert -version` succeeds_
 #### When
@@ -147,6 +160,7 @@ convert report.png json:
 - after `convert report.png json:`:
   - exit code is `0`
   - stdout at `$[0].image.format` equals `PNG`; at `$[0].image.geometry.width` equals `24`; at `$[0].image.geometry.height` equals `18`; at `$[0].image.mimeType` equals `image/png`
+
 ### Scenario: strip removes an embedded comment from the output bytes
 _only when `convert -version` succeeds_
 #### When
@@ -162,8 +176,10 @@ convert marked.png -strip stripped.png
   - exit code is `0`
   - file `stripped.png` does not contain `CONFIDENTIAL-MARK`
   - image `stripped.png` similar to `marked.png`
+
 #### Generated artifacts
 - `stripped.png`
+
 ### Scenario: a missing input fails without writing an output
 _only when `convert -version` succeeds_
 #### When
@@ -175,10 +191,12 @@ convert no-such-input.png out.png
 - stdout is empty
 - stderr contains `no-such-input.png`
 - file `out.png` does not exist
+
 ### Scenario: a corrupt input is rejected rather than converted
 _only when `convert -version` succeeds_
 #### Given
 - Fixture file `broken.png` is created.
+
 #### Inputs
 _Fixture `broken.png`:_
 ```text
@@ -193,6 +211,7 @@ convert broken.png out.png
 - stdout is empty
 - stderr contains `broken.png`
 - file `out.png` does not exist
+
 ### Scenario: an unknown output extension keeps the input encoding
 _only when `convert -version` succeeds_
 #### When
@@ -206,8 +225,10 @@ convert source.png out.notaformat
 - after `convert source.png out.notaformat`:
   - exit code is `0`
   - image `out.notaformat` is `png`, width 8, height 6
+
 #### Generated artifacts
 - `out.notaformat`
+
 ### Scenario: identify reads the dimensions back out of a written file
 _only when `convert -version` succeeds_
 #### When
@@ -221,6 +242,7 @@ identify -format "%wx%h %m" sized.png
 - after `identify -format "%wx%h %m" sized.png`:
   - exit code is `0`
   - stdout equals an exact value
+
 ### Scenario: identify on a missing file fails and prints nothing to stdout
 _only when `convert -version` succeeds_
 #### When

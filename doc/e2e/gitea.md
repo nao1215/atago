@@ -6,6 +6,7 @@
   - [the binary reports its version](#scenario-the-binary-reports-its-version)
   - [the server boots from an authored app.ini and reports healthy](#scenario-the-server-boots-from-an-authored-appini-and-reports-healthy)
   - [admin CLI, REST API, and a real git clone interoperate](#scenario-admin-cli-rest-api-and-a-real-git-clone-interoperate)
+
 ## gitea (self-hosted git service)
 [Gitea](https://about.gitea.com/) is a whole git forge, and this suite meets
 it the way an administrator would: a real server is booted from an authored
@@ -29,12 +30,14 @@ gitea --version
 #### Then
 - exit code is `0`
 - stdout matches `/gitea version [0-9]+\.[0-9]+\.[0-9]+/`
+
 ### Scenario: the server boots from an authored app.ini and reports healthy
 _only when `command -v gitea` succeeds_
 #### Given
 - Background service `gitea` is started: `gitea web --config app.ini`.
 - Fixture file `app.ini` is created.
 - The step is retried up to 30 times every 1s until HTTP status is `200`.
+
 #### Inputs
 _Fixture `app.ini`:_
 ```text
@@ -71,12 +74,14 @@ ROOT = data/repos
 - after `HTTP GET /api/v1/version`:
   - HTTP status is `200`
   - body at `$.version` matches `/^[0-9]+\.[0-9]+\.[0-9]+/`
+
 ### Scenario: admin CLI, REST API, and a real git clone interoperate
 _only when `command -v gitea` succeeds_
 #### Given
 - Background service `gitea` is started: `gitea web --config app.ini`.
 - Fixture file `app.ini` is created.
 - The step is retried up to 30 times every 1s until HTTP status is `200`.
+
 #### Inputs
 _Fixture `app.ini`:_
 ```text

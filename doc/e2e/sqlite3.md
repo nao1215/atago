@@ -14,6 +14,7 @@
   - [.import loads a CSV fixture into a table](#scenario-import-loads-a-csv-fixture-into-a-table)
   - [bad SQL exits 1 with the error position on stderr](#scenario-bad-sql-exits-1-with-the-error-position-on-stderr)
   - [querying a missing table names it in the diagnostics](#scenario-querying-a-missing-table-names-it-in-the-diagnostics)
+
 ## sqlite3 + changes (workdir-delta of a database write)
 SQLite creates side files while it works — a rollback journal by default, or
 a write-ahead log and shared-memory file in WAL mode. A process that dies
@@ -38,6 +39,7 @@ sqlite3 t.db "create table x(a); insert into x values(1)"
 #### Then
 - exit code is `0`
 - the step changed exactly created `t.db`, modified nothing, deleted nothing
+
 ### Scenario: WAL mode leaves no -wal/-shm behind after a clean close
 _only when `sqlite3 --version` succeeds_
 #### When
@@ -47,6 +49,7 @@ sqlite3 t.db "PRAGMA journal_mode=WAL; create table x(a); insert into x values(1
 #### Then
 - exit code is `0`
 - the step changed exactly created `t.db`, modified nothing, deleted nothing
+
 ## sqlite3 (third-party CLI, no build required)
 The `sqlite3` shell driven as a user drives it — the actual binary on a
 command line, not SQLite embedded as a library.
@@ -72,8 +75,10 @@ sqlite3 app.db "CREATE TABLE u(id INTEGER, name TEXT); INSERT INTO u VALUES(1,'a
 - exit code is `0`
 - stdout equals an exact value
 - file `app.db` exists
+
 #### Generated artifacts
 - `app.db`
+
 ### Scenario: the database file is durable across invocations
 _only when `sqlite3 --version` succeeds_
 #### When
@@ -85,6 +90,7 @@ sqlite3 app.db "SELECT v FROM kv WHERE k='answer';"
 - after `sqlite3 app.db "SELECT v FROM kv WHERE k='answer';"`:
   - exit code is `0`
   - stdout equals an exact value
+
 ### Scenario: -json output mode is valid JSON with typed values
 _only when `sqlite3 --version` succeeds_
 #### When
@@ -97,6 +103,7 @@ sqlite3 -json app.db "SELECT * FROM u;"
   - exit code is `0`
   - stdout at `$[0].id` equals `1`
   - stdout at `$[0].name` equals `alice`
+
 ### Scenario: -csv output mode emits plain rows
 _only when `sqlite3 --version` succeeds_
 #### When
@@ -109,6 +116,7 @@ sqlite3 -csv app.db "SELECT * FROM u ORDER BY id;"
   - exit code is `0`
   - stdout line `1` equals an exact value
   - stdout line `2` equals an exact value
+
 ### Scenario: .dump emits SQL that rebuilds an identical database
 _only when `sqlite3 --version` succeeds_
 #### When
@@ -125,12 +133,15 @@ sqlite3 copy.db "SELECT name FROM u WHERE id=1;"
 - after `sqlite3 copy.db "SELECT name FROM u WHERE id=1;"`:
   - exit code is `0`
   - stdout equals an exact value
+
 #### Generated artifacts
 - `dump.sql`
+
 ### Scenario: .import loads a CSV fixture into a table
 _only when `sqlite3 --version` succeeds_
 #### Given
 - Fixture file `people.csv` is created.
+
 #### Inputs
 _Fixture `people.csv`:_
 ```text
@@ -149,6 +160,7 @@ sqlite3 app.db "SELECT count(*) FROM people;"
 - after `sqlite3 app.db "SELECT count(*) FROM people;"`:
   - exit code is `0`
   - stdout equals an exact value
+
 ### Scenario: bad SQL exits 1 with the error position on stderr
 _only when `sqlite3 --version` succeeds_
 #### When
@@ -159,6 +171,7 @@ sqlite3 app.db "SELEC broken;"
 - exit code is `1`
 - stdout is empty
 - stderr contains `syntax error`
+
 ### Scenario: querying a missing table names it in the diagnostics
 _only when `sqlite3 --version` succeeds_
 #### When

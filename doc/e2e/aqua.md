@@ -13,6 +13,7 @@
   - [an unknown subcommand is a usage error](#scenario-an-unknown-subcommand-is-a-usage-error)
 - [aqua + install (declarative install of a real tool)](#aqua--install-declarative-install-of-a-real-tool) — 1 scenario
   - [install downloads the tool and makes it runnable](#scenario-install-downloads-the-tool-and-makes-it-runnable)
+
 ## aqua (declarative CLI version manager)
 [aqua](https://aquaproj.github.io/) manages CLI tools declaratively from an
 `aqua.yaml`. Actually installing a tool needs the network and the registry,
@@ -36,10 +37,12 @@ aqua version
 #### Then
 - exit code is `0`
 - stdout matches `/\S/`
+
 ### Scenario: init writes an aqua.yaml with the standard registry
 _only when `aqua version` succeeds_
 #### Given
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### When
 ```shell
 aqua init
@@ -48,10 +51,12 @@ aqua init
 - exit code is `0`
 - the step changed exactly created `aqua.yaml`, modified nothing, deleted nothing
 - file `aqua.yaml` contains `registries:`, `type: standard`, `packages:`
+
 ### Scenario: init is idempotent on an existing config
 _only when `aqua version` succeeds_
 #### Given
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### When
 ```shell
 aqua init
@@ -64,10 +69,12 @@ aqua init
   - exit code is `0`
   - stderr contains `configuration file already exists`
   - the step changed exactly created nothing, modified nothing, deleted nothing
+
 ### Scenario: policy init writes an aqua-policy.yaml
 _only when `aqua version` succeeds_
 #### Given
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### When
 ```shell
 aqua policy init
@@ -76,6 +83,7 @@ aqua policy init
 - exit code is `0`
 - the step changed exactly created `aqua-policy.yaml`, modified nothing, deleted nothing
 - file `aqua-policy.yaml` contains `registries:`
+
 ### Scenario: root-dir prints the aqua root path
 _only when `aqua version` succeeds_
 #### When
@@ -85,6 +93,7 @@ aqua root-dir
 #### Then
 - exit code is `0`
 - stdout contains `aquaproj-aqua`
+
 ### Scenario: completion generates a bash script
 _only when `aqua version` succeeds_
 #### When
@@ -94,10 +103,12 @@ aqua completion bash
 #### Then
 - exit code is `0`
 - stdout contains `completion script`
+
 ### Scenario: which reports an unknown command as not found
 _only when `aqua version` succeeds_
 #### Given
 - Fixture file `aqua.yaml` is created.
+
 #### Inputs
 _Fixture `aqua.yaml`:_
 ```text
@@ -113,6 +124,7 @@ aqua which definitely-not-a-real-tool-xyz
 #### Then
 - exit code is `1`
 - stderr contains `command is not found`
+
 ### Scenario: an unknown subcommand is a usage error
 _only when `aqua version` succeeds_
 #### When
@@ -122,6 +134,7 @@ aqua bogus-subcommand-xyz
 #### Then
 - exit code is `3`
 - stderr contains `No help topic`
+
 ## aqua + install (declarative install of a real tool)
 The thing aqua exists to do: turn a line in a config file into a tool you
 can run. This suite exercises that end to end — declare a package, install
@@ -145,6 +158,7 @@ _only when `aqua version` succeeds_
 - Fixture file `registry.yaml` is created.
 - Fixture file `aqua.yaml` is created.
 - Fixture file `aqua-policy.yaml` is created.
+
 #### Inputs
 _Fixture `dist/mytool`:_
 ```text
