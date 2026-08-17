@@ -146,6 +146,16 @@ func applyProject(s *spec.Spec, p *Project) {
 	}
 	s.ProjectPath = p.Path
 	s.FixturesDir = p.ResolvedFixturesDir
+	// Record the subject build on the spec: it is a command that runs on the
+	// host before any scenario, and leaving it inside the loader is why nothing
+	// described or flagged it.
+	if p.Subject != nil && p.Subject.Build != nil {
+		s.Subject = &spec.Subject{
+			Name:    p.Subject.Name,
+			Command: p.Subject.Build.Command,
+			Shell:   p.Subject.Build.Shell != nil && *p.Subject.Build.Shell,
+		}
+	}
 	if len(p.Env) > 0 {
 		s.Suite.Env = mergeStringMap(p.Env, s.Suite.Env)
 	}

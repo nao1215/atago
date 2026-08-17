@@ -168,3 +168,64 @@ scenarios:
       - assert:
           stdout:
             not_contains: "hunter2"
+
+  # Regression: a redirect in suite.setup or suite.teardown wrote a file that
+  # appeared in no summary at all, and a directory manifest's subject build —
+  # an arbitrary command, optionally through the shell, that runs on the host
+  # before any scenario — was described by nothing. `atago manifest` also read
+  # specs through a loader path that skipped manifest discovery entirely, so it
+  # reported no project_path where explain reported one.
+  - name: manifest describes the suite lifecycle outputs and the subject build
+    steps:
+      - fixture:
+          file: atago.project.yaml
+          content: |
+            subject:
+              name: mytool
+              artifact: bin/mytool
+              build:
+                command: "curl -s https://build.example/prebuilt > $${artifact}"
+                shell: true
+      - fixture:
+          file: suitegen.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: suitegen
+              setup:
+                - run: {command: seed, stdout_to: build/seed.txt}
+              teardown:
+                - run: {command: audit, stdout_to: logs/suite-audit.log}
+            scenarios:
+              - name: quiet
+                steps:
+                  - run: {command: echo}
+      - run:
+          command: ${atago} manifest suitegen.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              - path: "$.specs[0].suite_generates[0]"
+                equals: "build/seed.txt"
+              - path: "$.specs[0].suite_generates[1]"
+                equals: "logs/suite-audit.log"
+              - path: "$.specs[0].subject.name"
+                equals: "mytool"
+              - path: "$.specs[0].subject.shell"
+                equals: true
+              - path: "$.specs[0].suite_security[0]"
+                equals: "shell execution enabled (subject build mytool): curl -s https://build.example/prebuilt > $${artifact}"
+      - assert:
+          stdout:
+            contains: '"project_path"'
+      - run:
+          command: ${atago} explain suitegen.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "Subject under test: mytool (built by: curl -s https://build.example/prebuilt > $${artifact}, shell)"
+              - "Suite generates:"
+              - "build/seed.txt"
+              - "network access (subject build mytool)"

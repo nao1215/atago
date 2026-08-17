@@ -1775,6 +1775,40 @@ func TestLoadBytes_DuplicateTag(t *testing.T) {
 	}
 }
 
+// TestLoadWithSource_AppliesTheProjectManifest is a regression: LoadWithSource
+// is what `atago manifest` reads specs with, and it went straight to LoadBytes
+// — skipping the directory-manifest discovery every other command performs. A
+// spec under an atago.project.yaml therefore meant one thing to run/explain/doc
+// and another to manifest, which reported no project_path and none of the
+// configuration the file applies.
+func TestLoadWithSource_AppliesTheProjectManifest(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	proj := filepath.Join(dir, "atago.project.yaml")
+	if err := os.WriteFile(proj, []byte("env:\n  FROM_PROJECT: \"1\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	specPath := filepath.Join(dir, "s.atago.yaml")
+	if err := os.WriteFile(specPath, []byte("version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	withSource, _, err := LoadWithSource(specPath)
+	if err != nil {
+		t.Fatalf("LoadWithSource: %v", err)
+	}
+	plain, err := Load(specPath)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if withSource.ProjectPath != plain.ProjectPath {
+		t.Errorf("project path = %q via LoadWithSource, %q via Load; the two must agree", withSource.ProjectPath, plain.ProjectPath)
+	}
+	if withSource.Suite.Env["FROM_PROJECT"] != "1" {
+		t.Errorf("the manifest's env was not applied: %v", withSource.Suite.Env)
+	}
+}
+
 // TestLoadBytes_EmptyTag is a regression: an empty tag loaded cleanly and then
 // corrupted every tag index — `atago list` rendered the column as ",smoke" and
 // `atago doc` summarized "Tags: “ (1)" — while selecting nothing, since no

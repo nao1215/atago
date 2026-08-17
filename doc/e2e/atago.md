@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-81 suites · 644 scenarios
+81 suites · 645 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -417,10 +417,11 @@
   - [a missing target names the reason without syscall noise](#scenario-a-missing-target-names-the-reason-without-syscall-noise)
   - [an empty directory says how to create a first spec](#scenario-an-empty-directory-says-how-to-create-a-first-spec)
   - [a cwd that traverses out of the workdir is refused before running](#scenario-a-cwd-that-traverses-out-of-the-workdir-is-refused-before-running)
-- [atago self-hosting / manifest](#atago-self-hosting--manifest) — 3 scenarios
+- [atago self-hosting / manifest](#atago-self-hosting--manifest) — 4 scenarios
   - [manifest emits a stable JSON summary without running the spec](#scenario-manifest-emits-a-stable-json-summary-without-running-the-spec)
   - [manifest does not execute the spec's commands](#scenario-manifest-does-not-execute-the-specs-commands)
   - [manifest carries the declarative fields of steps and runners](#scenario-manifest-carries-the-declarative-fields-of-steps-and-runners)
+  - [manifest describes the suite lifecycle outputs and the subject build](#scenario-manifest-describes-the-suite-lifecycle-outputs-and-the-subject-build)
 - [atago self-hosting / matrix scenarios](#atago-self-hosting--matrix-scenarios) — 4 scenarios
   - [matrix expands into one scenario per row](#scenario-matrix-expands-into-one-scenario-per-row)
   - [matrix without a templated name gets a deterministic suffix](#scenario-matrix-without-a-templated-name-gets-a-deterministic-suffix)
@@ -8496,6 +8497,47 @@ ${atago} manifest fields.atago.yaml
 - exit code is `0`
 - stdout at `$.specs[0].scenarios[0].steps[0].cwd` equals `sub/dir`; at `$.specs[0].scenarios[0].steps[0].timeout` equals `90s`; at `$.specs[0].scenarios[0].steps[0].stdout_to` equals `logs/build.log`; at `$.specs[0].scenarios[0].steps[0].stderr_to` equals `logs/build.err`; at `$.specs[0].runners[0].insecure_host_key` equals `true`; at `$.specs[0].runners[0].user` equals `deploy`; at `$.specs[0].runners[1].cwd` equals `./sub`; at `$.specs[0].runners[1].timeout` equals `45s`
 - stdout does not contain `hunter2`
+### Scenario: manifest describes the suite lifecycle outputs and the subject build
+#### Given
+- Fixture file `atago.project.yaml` is created.
+- Fixture file `suitegen.atago.yaml` is created.
+#### Inputs
+_Fixture `atago.project.yaml`:_
+```text
+subject:
+  name: mytool
+  artifact: bin/mytool
+  build:
+    command: "curl -s https://build.example/prebuilt > $${artifact}"
+    shell: true
+```
+_Fixture `suitegen.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: suitegen
+  setup:
+    - run: {command: seed, stdout_to: build/seed.txt}
+  teardown:
+    - run: {command: audit, stdout_to: logs/suite-audit.log}
+scenarios:
+  - name: quiet
+    steps:
+      - run: {command: echo}
+```
+#### When
+```shell
+${atago} manifest suitegen.atago.yaml
+${atago} explain suitegen.atago.yaml
+```
+#### Then
+- after `${atago} manifest suitegen.atago.yaml`:
+  - exit code is `0`
+  - stdout at `$.specs[0].suite_generates[0]` equals `build/seed.txt`; at `$.specs[0].suite_generates[1]` equals `logs/suite-audit.log`; at `$.specs[0].subject.name` equals `mytool`; at `$.specs[0].subject.shell` equals `true`; at `$.specs[0].suite_security[0]` equals `shell execution enabled (subject build mytool): curl -s https://build.example/prebuilt > $${artifact}`
+  - stdout contains `"project_path"`
+- after `${atago} explain suitegen.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `Subject under test: mytool (built by: curl -s https://build.example/prebuilt > $${artifact}, shell)`, `Suite generates:`, `build/seed.txt`, `network access (subject build mytool)`
 ## atago self-hosting / matrix scenarios
 Source: `test/e2e/atago/matrix.atago.yaml`
 ### Scenario: matrix expands into one scenario per row

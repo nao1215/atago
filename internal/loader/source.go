@@ -3,6 +3,7 @@ package loader
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/goccy/go-yaml"
 	"github.com/goccy/go-yaml/ast"
@@ -32,7 +33,15 @@ func LoadWithSource(path string) (*spec.Spec, *Source, error) {
 	if err != nil {
 		return nil, nil, &Error{Path: path, Kind: KindValidation, Msg: err.Error()}
 	}
-	s, lerr := LoadBytes(path, data)
+	// Discover the directory manifest exactly as Load does. Going straight to
+	// LoadBytes skipped it, so a spec under an atago.project.yaml meant one
+	// thing to run/explain/doc and another to `atago manifest` — which reported
+	// no project_path and none of the configuration the file applies.
+	proj, perr := FindProject(filepath.Dir(path))
+	if perr != nil {
+		return nil, nil, perr
+	}
+	s, lerr := loadBytesWithProject(path, data, proj)
 	if lerr != nil {
 		return nil, nil, lerr
 	}

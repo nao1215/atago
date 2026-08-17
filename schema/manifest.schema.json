@@ -119,6 +119,17 @@
             "type": "string"
           }
         },
+        "suite_generates": {
+          "description": "Files the suite lifecycle declares it produces — redirect targets and asserted outputs in suite.setup/suite.teardown (omitted when none).",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "subject": {
+          "description": "The binary under test declared by the directory manifest (#393), including the command that builds it on the host before any scenario. Omitted when no manifest declares one.",
+          "$ref": "#/$defs/subject"
+        },
         "suite_security": {
           "description": "Security-relevant notes derived from the suite setup/teardown steps (omitted when none).",
           "type": "array",
@@ -151,6 +162,27 @@
         },
         "source": {
           "$ref": "#/$defs/source"
+        }
+      }
+    },
+    "subject": {
+      "description": "The binary under test a directory manifest declares, reduced to the name specs invoke it by and the command that builds it.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "command"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "command": {
+          "type": "string"
+        },
+        "shell": {
+          "description": "True when the build command runs through the shell.",
+          "type": "boolean"
         }
       }
     },
