@@ -260,9 +260,11 @@ scenarios:
                   - assert:
                       exit_code: {in: [0, 1, 2]}
                       stdout: {not_contains: "zzz"}
+      # stdout_to rather than a shell redirect, so the scenario runs in the
+      # Windows portable subset too.
       - run:
-          shell: true
-          command: "${atago} manifest strong.atago.yaml > strong.json"
+          command: "${atago} manifest strong.atago.yaml"
+          stdout_to: strong.json
       - assert:
           exit_code: 0
           file:
@@ -271,8 +273,8 @@ scenarios:
               - "exit code is 0"
               - "stdout equals exact text"
       - run:
-          shell: true
-          command: "${atago} manifest weak.atago.yaml > weak.json"
+          command: "${atago} manifest weak.atago.yaml"
+          stdout_to: weak.json
       - assert:
           exit_code: 0
           file:
@@ -280,14 +282,16 @@ scenarios:
             contains:
               - "exit code in [0, 1, 2]"
               - "stdout does not contain"
-      # The two manifests differ, which is the whole point: the weakened suite
-      # can be told from the strong one by diffing the documents.
-      - run:
-          shell: true
-          command: "cmp -s strong.json weak.json; echo differ=$?"
+      # The two documents differ, which is the whole point: the weakened suite
+      # can be told from the strong one by diffing them. The suite name and the
+      # scenario name are identical in both, so before the assertion detail was
+      # recorded these two files were byte-identical.
       - assert:
-          stdout:
-            contains: "differ=1"
+          file:
+            path: weak.json
+            not_contains:
+              - "exit code is 0"
+              - "stdout equals exact text"
 
   # explain and manifest render an expanded matrix row the way doc does. The row
   # is bound at load time, so leaving ${who} in the step text describes a command
