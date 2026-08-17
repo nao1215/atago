@@ -518,17 +518,14 @@ scenarios:
           stdout:
             contains: loading
 
-  # A known limitation of the terminal emulator atago renders `screen:` with,
-  # kept in CI rather than in a comment nobody re-checks: once a wide character
-  # has filled the last column, autowrap is not armed, so `X` overwrites the
-  # second half of `本` instead of landing on the next line. A terminal shows
-  # `日本` and then `X` on row 2. The day the emulator learns to wrap, this turns
-  # XPASS and the run goes red, which is what gets the limitation retired.
-  - name: a wide character at the right margin does not autowrap yet
+  # #503: a wide character reaches the right margin from the second-to-last
+  # column, and the emulator arms pending wrap only from the last one — so `X`
+  # used to overwrite the second half of `本` (blanking its first half) instead
+  # of starting row 2, and a wide character that no longer fits was dropped.
+  # atago arms the wrap itself; these are what a terminal shows.
+  - name: a wide character at the right margin autowraps
     skip:
       os: windows
-    expect_fail:
-      reason: "the emulator drops or clobbers a character that must autowrap after a wide one fills the last column"
     steps:
       - pty:
           shell: true
@@ -543,6 +540,48 @@ scenarios:
           screen:
             line: 2
             equals: "X"
+
+  - name: a wide character that no longer fits wraps instead of vanishing
+    skip:
+      os: windows
+    steps:
+      - pty:
+          shell: true
+          command: "printf '日本語'; sleep 0.2"
+          rows: 5
+          cols: 5
+      - assert:
+          screen:
+            line: 1
+            equals: "日本"
+      - assert:
+          screen:
+            line: 2
+            equals: "語"
+
+  # #505: the emulator commits an ASCII character to the screen the moment it
+  # arrives, so a combining mark that follows could never join it and was
+  # dropped — `screen:` saw `e` where the program wrote a decomposed `é`. The
+  # expected text is written with an explicit \u escape on both sides of the
+  # comparison, because a screen assertion compares the bytes the program wrote:
+  # a decomposed grapheme and its precomposed spelling look identical and are
+  # not the same text.
+  - name: screen preserves a decomposed grapheme's combining mark
+    skip:
+      os: windows
+    steps:
+      - pty:
+          shell: true
+          command: "printf '\\303\\251 e\\314\\201'; sleep 0.2"
+          rows: 5
+          cols: 10
+      - assert:
+          screen:
+            line: 1
+            equals: "\u00e9 e\u0301"
+      - assert:
+          screen:
+            contains: "e\u0301"
 
   - name: a screen snapshot round-trips through update and compare
     skip:

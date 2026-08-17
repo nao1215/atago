@@ -129,6 +129,143 @@ func TestRenderScreen_PreservesGraphemeClusters(t *testing.T) {
 	}
 }
 
+// TestRenderScreen_WideCharacterAutowrap is the #503 regression. A real
+// terminal arms pending wrap once a wide character has filled the last columns,
+// so the next character starts the following row, and it wraps a wide character
+// that no longer fits rather than dropping it. The emulator arms pending wrap
+// only from the LAST column, which a wide character reaches from the
+// second-to-last — so `X` overwrote the second half of `本` (blanking its first
+// half) and `語` fell off the end entirely.
+func TestRenderScreen_WideCharacterAutowrap(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name       string
+		transcript string
+		rows, cols int
+		want       string
+	}{
+		{
+			name:       "a character after a wide one filled the row starts the next row",
+			transcript: "日本X",
+			rows:       5, cols: 4,
+			want: "日本\nX",
+		},
+		{
+			name:       "a wide character that no longer fits wraps instead of vanishing",
+			transcript: "日本語",
+			rows:       5, cols: 5,
+			want: "日本\n語",
+		},
+		{
+			name:       "a wide character after a narrow one filled the row wraps too",
+			transcript: "abcd日",
+			rows:       5, cols: 4,
+			want: "abcd\n日",
+		},
+		{
+			// The wrap must not fire twice: `日本` fills row 1 exactly, and the
+			// program's own newline is what moves to row 2.
+			name:       "an explicit newline after a filled row does not skip one",
+			transcript: "日本\r\nX",
+			rows:       5, cols: 4,
+			want: "日本\nX",
+		},
+		{
+			// Cursor addressing cancels a pending wrap, the way a terminal does.
+			name:       "cursor addressing after a filled row cancels the pending wrap",
+			transcript: "日本\x1b[1;1HX",
+			rows:       5, cols: 4,
+			want: "X 本",
+		},
+		{
+			// With autowrap off (DECAWM reset) a terminal keeps overwriting the
+			// last column instead of wrapping, so the correction must stay out.
+			name:       "autowrap off keeps the emulator's overwrite behavior",
+			transcript: "\x1b[?7l日本X",
+			rows:       5, cols: 4,
+			want: "日 X",
+		},
+		{
+			// Narrow autowrap was never broken; it must keep working alongside.
+			name:       "narrow characters still wrap at the last column",
+			transcript: "abcdX",
+			rows:       5, cols: 4,
+			want: "abcd\nX",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := RenderScreen([]byte(tt.transcript), &spec.PTY{Rows: tt.rows, Cols: tt.cols})
+			if got != tt.want {
+				t.Errorf("RenderScreen(%q) = %q, want %q", tt.transcript, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestRenderScreen_PreservesCombiningMarks is the #505 regression: a decomposed
+// grapheme (an ASCII base plus a combining mark) must render as the program
+// wrote it. The emulator commits an ASCII character to the screen the moment it
+// arrives, so the mark that follows can never join it and was dropped — a
+// `screen:` assertion saw `e` where the program wrote `e´`.
+func TestRenderScreen_PreservesCombiningMarks(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name       string
+		transcript string
+		rows, cols int
+		want       string
+	}{
+		{
+			name:       "a decomposed accent keeps its mark",
+			transcript: "e\u0301",
+			rows:       3, cols: 10,
+			want: "e\u0301",
+		},
+		{
+			name:       "the mark does not swallow the character after it",
+			transcript: "e\u0301X",
+			rows:       3, cols: 10,
+			want: "e\u0301X",
+		},
+		{
+			name:       "two marks on one base are both kept",
+			transcript: "e\u0301\u0308",
+			rows:       3, cols: 10,
+			want: "e\u0301\u0308",
+		},
+		{
+			name:       "a mark on the last column still lands on its base",
+			transcript: "abce\u0301",
+			rows:       3, cols: 4,
+			want: "abce\u0301",
+		},
+		{
+			// A precomposed accent and a non-ASCII base were never affected.
+			name:       "a precomposed accent is unchanged",
+			transcript: "\u00e9",
+			rows:       3, cols: 10,
+			want: "\u00e9",
+		},
+		{
+			name:       "a wide base keeps its mark",
+			transcript: "\u304b\u3099",
+			rows:       3, cols: 10,
+			want: "\u304b\u3099",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := RenderScreen([]byte(tt.transcript), &spec.PTY{Rows: tt.rows, Cols: tt.cols})
+			if got != tt.want {
+				t.Errorf("RenderScreen(%q) = %q, want %q", tt.transcript, got, tt.want)
+			}
+		})
+	}
+}
+
 // TestRenderScreen_TrailingNormalization proves per-line trailing whitespace
 // and trailing blank rows are stripped so snapshots stay stable.
 func TestRenderScreen_TrailingNormalization(t *testing.T) {
