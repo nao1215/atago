@@ -37,7 +37,7 @@ Look a code up from the terminal with `atago explain ATG2201`, which prints this
 | [`ATG2104`](#atg2104--a-group-of-keys-that-takes-exactly-one-member-has-none-or-several) | a group of keys that takes exactly one member has none or several | 2 | v0.21.0 |
 | [`ATG2105`](#atg2105--a-key-is-real-but-has-no-meaning-in-this-position) | a key is real but has no meaning in this position | 2 | v0.21.0 |
 | [`ATG2106`](#atg2106--a-block-is-not-allowed-at-this-level-of-the-spec) | a block is not allowed at this level of the spec | 2 | v0.21.0 |
-| [`ATG2107`](#atg2107--an-assertion-needs-a-preceding-step-it-does-not-have) | an assertion needs a preceding step it does not have | 2 | v0.21.0 |
+| [`ATG2107`](#atg2107--an-assertion-or-store-needs-a-preceding-step-it-does-not-have) | an assertion or store needs a preceding step it does not have | 2 | v0.21.0 |
 | [`ATG2108`](#atg2108--a-key-needs-another-key-that-is-not-set) | a key needs another key that is not set | 2 | v0.21.0 |
 | [`ATG2201`](#atg2201--a-required-key-is-missing) | a required key is missing | 2 | v0.21.0 |
 | [`ATG2202`](#atg2202--a-list-that-must-hold-at-least-one-entry-is-empty) | a list that must hold at least one entry is empty | 2 | v0.21.0 |
@@ -212,11 +212,11 @@ Fix: Move the block to the level the message names.
 
 Exits 2. Since v0.21.0.
 
-### ATG2107 — an assertion needs a preceding step it does not have
+### ATG2107 — an assertion or store needs a preceding step it does not have
 
-Some assertions describe the step before them rather than the scenario as a whole. `assert.exit_code`, `stdout`, and `stderr` read what a `run` or `pty` step produced; `status`, `header`, and `body` read an `http` response; `rows` reads a `query`; `grpc_status` and `message` read a `grpc` call; `screen` reads the terminal a `pty` step rendered; `duration` bounds the wall-clock time of the step it follows; and `changes` pins the workdir delta of the run or pty step it follows. Without that step there is nothing for the assertion to be about, so it would pass or fail for reasons unrelated to what it says.
+Some assertions describe the step before them rather than the scenario as a whole. `assert.exit_code`, `stdout`, and `stderr` read what a `run` or `pty` step produced; `status`, `header`, and `body` read an `http` response; `rows` reads a `query`; `grpc_status` and `message` read a `grpc` call; `value` reads a `cdp` step's capture; `screen` reads the terminal a `pty` step rendered; `duration` bounds the wall-clock time of the step it follows; and `changes` pins the workdir delta of the run or pty step it follows. A `store` reading `from.stdout`, `body`, `header`, `rows`, `message`, or `value` needs the same step the matching assertion does. Without that step there is nothing to read, so the step would pass or fail for reasons unrelated to what it says. In `suite.setup` and `suite.teardown` only a `run` step produces anything, and each block feeds only its own reads, so a source no `run` can fill can never be read there at all.
 
-Fix: Put the assertion directly after the step it describes. One assert block may set several keys at once, so an `exit_code`, a `stdout`, and a `changes` about the same step belong together.
+Fix: Put the assertion or store directly after the step it reads. One assert block may set several keys at once, so an `exit_code`, a `stdout`, and a `changes` about the same step belong together. A read that needs an `http`, `query`, `grpc`, `cdp`, or `pty` step belongs in a scenario rather than a suite block.
 
 Exits 2. Since v0.21.0.
 
