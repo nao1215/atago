@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nao1215/atago/internal/artifact"
 	"github.com/nao1215/atago/internal/assert"
 	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/fixture"
@@ -428,6 +429,13 @@ func (x *scenarioRun) runTeardown(ctx context.Context) {
 			tctx, cancel = context.WithTimeout(context.Background(), teardownInterruptTimeout)
 			defer cancel()
 		}
+		// Teardown steps are numbered from zero like the scenario's own, so their
+		// artifacts need a phase of their own to land beside — not on top of — the
+		// evidence for the step the verdict is about. Restored afterwards, because
+		// the service and mock logs written once the scenario is over belong to
+		// the scenario rather than to its teardown.
+		x.phase = artifact.PhaseTeardown
+		defer func() { x.phase = "" }()
 		for i := range x.sc.Teardown {
 			sr, _, secViolation := x.execStep(tctx, x.sc.Teardown, i, &x.sc.Teardown[i], nil) // teardown never carries a changes assert
 			// A teardown failure never changes the scenario verdict — the behavior

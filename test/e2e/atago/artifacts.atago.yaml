@@ -137,3 +137,49 @@ scenarios:
       - assert:
           stdout:
             not_matches: "^\\s*0\\s*$"
+
+  # A teardown step's index counts from zero like a scenario step's, so a
+  # teardown failure at index N used to overwrite the payload the report offered
+  # for the scenario step at index N — the verdict said one thing and the file
+  # beside it held the other phase's bytes. Teardown payloads live under a
+  # teardown/ segment of the same scenario directory, the way suite-level
+  # lifecycle blocks already have their own directory.
+  - name: a teardown failure keeps the steps failure payloads
+    steps:
+      - fixture:
+          file: bothfail.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: bothfail}
+            scenarios:
+              - name: both phases fail at index 1
+                steps:
+                  - run: {shell: true, command: "printf 'STEPS-ACTUAL\\n'"}
+                  - assert: {stdout: {equals: "STEPS-EXPECTED"}}
+                teardown:
+                  - run: {shell: true, command: "printf 'TEARDOWN-ACTUAL\\n'"}
+                  - assert: {stdout: {equals: "TEARDOWN-EXPECTED"}}
+      - run: {command: "${atago} run --artifacts-dir tarts bothfail.atago.yaml"}
+      - assert: {exit_code: 1}
+      # The scenario step's evidence is where it always was.
+      - run:
+          shell: true
+          command: "cat tarts/*/*/step-01-stdout.actual.txt"
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "STEPS-ACTUAL"
+      # The teardown's evidence is beside it, under its own phase segment.
+      - run:
+          shell: true
+          command: "cat tarts/*/*/teardown/step-01-stdout.actual.txt"
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "TEARDOWN-ACTUAL"
+      - run:
+          shell: true
+          command: "find tarts -name '*.actual.txt' | wc -l | tr -d ' '"
+      - assert:
+          stdout:
+            equals: "2"
