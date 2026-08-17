@@ -1253,9 +1253,9 @@ func TestBugHunt_Rejections(t *testing.T) {
 		{"only bad os", scenarioTop("only: {os: bsd}", "run: {command: echo}"), "only.os \"bsd\" is invalid"},
 		{"empty skip gate", scenarioTop("skip: {}", "run: {command: echo}"), "skip must name a condition"},
 		{"empty only gate", scenarioTop("only: {}", "run: {command: echo}"), "only must name a condition"},
-		{"cancelling os gates", scenarioTop("skip: {os: linux}\n    only: {os: linux}", "run: {command: echo}"), "skip.os and only.os both name \"linux\""},
-		{"cancelling env gates", scenarioTop("skip: {env: FEATURE_X}\n    only: {env: FEATURE_X}", "run: {command: echo}"), "skip.env and only.env both name \"FEATURE_X\""},
-		{"cancelling command gates", scenarioTop("skip: {command: \"true\"}\n    only: {command: \"true\"}", "run: {command: echo}"), "skip.command and only.command both name \"true\""},
+		{"canceling os gates", scenarioTop("skip: {os: linux}\n    only: {os: linux}", "run: {command: echo}"), "skip.os and only.os both name \"linux\""},
+		{"canceling env gates", scenarioTop("skip: {env: FEATURE_X}\n    only: {env: FEATURE_X}", "run: {command: echo}"), "skip.env and only.env both name \"FEATURE_X\""},
+		{"canceling command gates", scenarioTop("skip: {command: \"true\"}\n    only: {command: \"true\"}", "run: {command: echo}"), "skip.command and only.command both name \"true\""},
 
 		// ---- validateDeterministic empty compare (#564) ----
 		{"deterministic empty compare", specSteps("run: {command: echo, deterministic: {compare: []}}"), "deterministic.compare must not be empty"},
