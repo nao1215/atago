@@ -324,6 +324,50 @@ scenarios:
 	}
 }
 
+// TestGenerate_PTYGroupsThenBullets proves a pty step is an action for
+// Then-grouping, the same defect #23 fixed for signal one kind over: a run +
+// pty scenario (each with asserts) rendered one flattened list — two "exit
+// code is 0" bullets with nothing saying which command each checks, and the
+// pty's stdout assertion reading as if it could apply to the run step.
+func TestGenerate_PTYGroupsThenBullets(t *testing.T) {
+	t.Parallel()
+	src := `
+version: "1"
+suite:
+  name: tui
+scenarios:
+  - name: quit from the menu
+    steps:
+      - run:
+          command: setup-tool init
+      - assert:
+          exit_code: 0
+      - pty:
+          command: mytui --menu
+          session:
+            - expect: "Ready"
+            - send: "q"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: Bye
+`
+	s := mustLoadSpec(t, "tui.atago.yaml", src)
+	var b bytes.Buffer
+	if err := Generate(&b, []Source{{Path: "tui.atago.yaml", Spec: s}}); err != nil {
+		t.Fatal(err)
+	}
+	out := b.String()
+	for _, w := range []string{
+		"after `setup-tool init`:",
+		"after `interactive (pty): mytui --menu`:",
+	} {
+		if !strings.Contains(out, w) {
+			t.Errorf("doc output missing %q\n--- got ---\n%s", w, out)
+		}
+	}
+}
+
 // TestGenerate_MixedRunners verifies doc generation reaches parity with the
 // supported step kinds: background services, HTTP/query/gRPC/CDP steps all
 // appear in the narrative instead of only run steps (issue #41).

@@ -451,7 +451,7 @@ type thenGroup struct {
 // or grouped flat ones.
 func isActionStep(kind spec.StepKind) bool {
 	switch kind {
-	case spec.StepRun, spec.StepHTTP, spec.StepQuery, spec.StepGRPC, spec.StepCDP, spec.StepSignal:
+	case spec.StepRun, spec.StepHTTP, spec.StepQuery, spec.StepGRPC, spec.StepCDP, spec.StepSignal, spec.StepPTY:
 		return true
 	default:
 		return false
@@ -459,8 +459,8 @@ func isActionStep(kind spec.StepKind) bool {
 }
 
 // thenGroups walks the steps and groups each assert under the most recent
-// action step (run/http/query/grpc/cdp). Fixture and store steps never break a
-// group: they observe nothing.
+// action step (isActionStep is the one definition of that set). Fixture and
+// store steps never break a group: they observe nothing.
 func thenGroups(sc *spec.Scenario, expand func(string) string) []thenGroup {
 	var groups []thenGroup
 	actionIdx, actionLbl := -1, ""
@@ -500,6 +500,10 @@ func actionLabel(step *spec.Step, expand func(string) string) string {
 		return "the browser flow"
 	case spec.StepSignal:
 		return "SIG" + spec.NormalizeSignalName(step.Signal.Signal) + " to " + expand(step.Signal.Service)
+	case spec.StepPTY:
+		// Match the "When" line's phrasing so the group header names the same
+		// thing the code block shows.
+		return "interactive (pty): " + expand(step.PTY.Command)
 	default:
 		return ""
 	}
