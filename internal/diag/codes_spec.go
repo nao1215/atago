@@ -127,11 +127,11 @@ var (
 		Since:   specSince,
 	})
 
-	// AssertNeedsStep is an assertion with nothing to assert about.
+	// AssertNeedsStep is an assertion or a store with nothing to read.
 	AssertNeedsStep = register(2107, "AssertNeedsStep", Entry{
-		Summary: "an assertion needs a preceding step it does not have",
-		Detail:  "Some assertions describe the step before them rather than the scenario as a whole. `assert.exit_code`, `stdout`, and `stderr` read what a `run` or `pty` step produced; `status`, `header`, and `body` read an `http` response; `rows` reads a `query`; `grpc_status` and `message` read a `grpc` call; `screen` reads the terminal a `pty` step rendered; `duration` bounds the wall-clock time of the step it follows; and `changes` pins the workdir delta of the run or pty step it follows. Without that step there is nothing for the assertion to be about, so it would pass or fail for reasons unrelated to what it says.",
-		Fix:     "Put the assertion directly after the step it describes. One assert block may set several keys at once, so an `exit_code`, a `stdout`, and a `changes` about the same step belong together.",
+		Summary: "an assertion or store needs a preceding step it does not have",
+		Detail:  "Some assertions describe the step before them rather than the scenario as a whole. `assert.exit_code`, `stdout`, and `stderr` read what a `run` or `pty` step produced; `status`, `header`, and `body` read an `http` response; `rows` reads a `query`; `grpc_status` and `message` read a `grpc` call; `value` reads a `cdp` step's capture; `screen` reads the terminal a `pty` step rendered; `duration` bounds the wall-clock time of the step it follows; and `changes` pins the workdir delta of the run or pty step it follows. A `store` reading `from.stdout`, `body`, `header`, `rows`, `message`, or `value` needs the same step the matching assertion does. Without that step there is nothing to read, so the step would pass or fail for reasons unrelated to what it says. In `suite.setup` and `suite.teardown` only a `run` step produces anything, and each block feeds only its own reads, so a source no `run` can fill can never be read there at all.",
+		Fix:     "Put the assertion or store directly after the step it reads. One assert block may set several keys at once, so an `exit_code`, a `stdout`, and a `changes` about the same step belong together. A read that needs an `http`, `query`, `grpc`, `cdp`, or `pty` step belongs in a scenario rather than a suite block.",
 		Since:   specSince,
 	})
 

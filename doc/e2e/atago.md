@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-82 suites · 648 scenarios
+82 suites · 650 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -153,7 +153,7 @@
   - [file not_contains passes when the substring is absent](#scenario-file-not_contains-passes-when-the-substring-is-absent)
   - [not_contains fails when the substring is present](#scenario-not_contains-fails-when-the-substring-is-present)
   - [a shell metacharacter without shell is a load-time error](#scenario-a-shell-metacharacter-without-shell-is-a-load-time-error)
-- [atago self-hosting / every diagnostic code](#atago-self-hosting--every-diagnostic-code) — 81 scenarios
+- [atago self-hosting / every diagnostic code](#atago-self-hosting--every-diagnostic-code) — 83 scenarios
   - [ATG2001 is a spec file that cannot be read](#scenario-atg2001-is-a-spec-file-that-cannot-be-read)
   - [ATG2002 is a spec file with no YAML document in it](#scenario-atg2002-is-a-spec-file-with-no-yaml-document-in-it)
   - [ATG2003 is a document that is not valid YAML](#scenario-atg2003-is-a-document-that-is-not-valid-yaml)
@@ -235,6 +235,8 @@
   - [an assertion failure carries no code in the JSON report](#scenario-an-assertion-failure-carries-no-code-in-the-json-report)
   - [a wrapped error reports one code, not two](#scenario-a-wrapped-error-reports-one-code-not-two)
   - [an assertion with no producing step is a load-time error](#scenario-an-assertion-with-no-producing-step-is-a-load-time-error)
+  - [a store with no producing step is a load-time error](#scenario-a-store-with-no-producing-step-is-a-load-time-error)
+  - [a suite block read that can never be fed is a load-time error](#scenario-a-suite-block-read-that-can-never-be-fed-is-a-load-time-error)
 - [atago self-hosting / exit_code in-set matcher](#atago-self-hosting--exit_code-in-set-matcher) — 4 scenarios
   - [a listed exit code passes](#scenario-a-listed-exit-code-passes)
   - [an unlisted exit code fails and the output lists the set](#scenario-an-unlisted-exit-code-fails-and-the-output-lists-the-set)
@@ -5039,16 +5041,22 @@ ${atago} run bad.atago.yaml
 - stdout contains `ATG4406`
 ### Scenario: ATG4501 is a store step with no result behind it
 #### Given
+- Stub HTTP server `api` serves 1 canned route(s) at `${api.url}` and records every request (#24).
 - Fixture file `bad.atago.yaml` is created.
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
 version: "1"
 suite: {name: x}
+runners:
+  api:
+    type: http
+    base_url: ${api.url}
 
 scenarios:
   - name: a
     steps:
+      - http: {runner: api, method: GET, path: /v1/ok}
       - run: {command: echo}
       - store: {name: v, from: {body: {trim: true}}}
 ```
@@ -5224,6 +5232,72 @@ ${atago} run withcontext.atago.yaml
   - exit code is `2`
   - stderr contains `ATG2107`, `assert.status requires a preceding http step`
 - after `${atago} run withcontext.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `1 passed`
+### Scenario: a store with no producing step is a load-time error
+#### Given
+- Fixture file `nostore.atago.yaml` is created.
+#### Inputs
+_Fixture `nostore.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: stores a response header after a command
+    steps:
+      - run: {shell: true, command: "true"}
+      - store: {name: token, from: {header: X-Token}}
+```
+#### When
+```shell
+${atago} run nostore.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `ATG2107`, `store.from.header requires a preceding http step`
+### Scenario: a suite block read that can never be fed is a load-time error
+#### Given
+- Fixture file `suiteread.atago.yaml` is created.
+- Fixture file `suiteok.atago.yaml` is created.
+#### Inputs
+_Fixture `suiteread.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+  teardown:
+    - assert: {status: 200}
+scenarios:
+  - name: a
+    steps:
+      - run: {shell: true, command: "true"}
+      - assert: {exit_code: 0}
+```
+_Fixture `suiteok.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+  setup:
+    - run: {shell: true, command: "echo built"}
+    - assert: {stdout: {contains: built}}
+scenarios:
+  - name: a
+    steps:
+      - run: {shell: true, command: "true"}
+      - assert: {exit_code: 0}
+```
+#### When
+```shell
+${atago} run suiteread.atago.yaml
+${atago} run suiteok.atago.yaml
+```
+#### Then
+- after `${atago} run suiteread.atago.yaml`:
+  - exit code is `2`
+  - stderr contains `ATG2107`, `can never be fed here`
+- after `${atago} run suiteok.atago.yaml`:
   - exit code is `0`
   - stdout contains `1 passed`
 ## atago self-hosting / exit_code in-set matcher

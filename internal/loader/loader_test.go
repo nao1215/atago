@@ -1361,9 +1361,9 @@ func TestBugHunt_Acceptances(t *testing.T) {
 	}
 
 	tests := []struct{ name, src string }{
-		{"store stdout json", specSteps("store: {name: v, from: {stdout: {json: {path: \"$.a\"}}}}")},
-		{"store header", specSteps("store: {name: v, from: {header: X-Request-Id}}")},
-		{"store stdout matches", specSteps("store: {name: v, from: {stdout: {matches: \"id=(\\\\d+)\"}}}")},
+		{"store stdout json", specSteps("run: {command: echo}", "store: {name: v, from: {stdout: {json: {path: \"$.a\"}}}}")},
+		{"store header", withRunner("runners:\n  api: {type: http, base_url: \"http://127.0.0.1:1\"}\n", specSteps("http: {runner: api, method: GET, path: /}", "store: {name: v, from: {header: X-Request-Id}}"))},
+		{"store stdout matches", specSteps("run: {command: echo}", "store: {name: v, from: {stdout: {matches: \"id=(\\\\d+)\"}}}")},
 		{"store file json", specSteps("store: {name: v, from: {file: {path: out.json, json: {path: \"$.id\"}}}}")},
 		{"exit_code in", specSteps("run: {command: echo}", "assert: {exit_code: {in: [0, 1, 2]}}")},
 		{"exit_code not", specSteps("run: {command: echo}", "assert: {exit_code: {not: 1}}")},
@@ -1378,7 +1378,7 @@ func TestBugHunt_Acceptances(t *testing.T) {
 		{"pty valid", specSteps("pty: {command: sh, session: [{expect: \"[$] \"}, {send: \"ls\\n\"}]}")},
 		{"pty expect_screen valid", specSteps("pty: {command: sh, session: [{expect_screen: {contains: hi, stable_for: \"20ms\"}}]}")},
 		{"assert message", withRunner("runners:\n  rpc: {type: grpc, target: \"127.0.0.1:1\"}\n", specSteps("grpc: {runner: rpc, method: pkg.S/M}", "assert: {message: {equals: ok}}"))},
-		{"assert value", specSteps("assert: {value: {contains: hi}}")},
+		{"assert value", withRunner(browserRunner, specSteps("cdp: {runner: b, actions: [{text: \"h1\"}]}", "assert: {value: {contains: hi}}"))},
 		{"assert grpc_status", withRunner("runners:\n  rpc: {type: grpc, target: \"127.0.0.1:1\"}\n", specSteps("grpc: {runner: rpc, method: pkg.S/M}", "assert: {grpc_status: 0}"))},
 		{"assert screen after pty", specSteps("pty: {command: sh}", "assert: {screen: {contains: prompt}}")},
 		{"assert duration after run", specSteps("run: {command: echo}", "assert: {duration: {lt: \"5s\"}}")},
@@ -1401,7 +1401,7 @@ func TestBugHunt_RoundTrip(t *testing.T) {
 	t.Parallel()
 	srcs := []string{
 		specSteps("run: {command: echo}", "assert: {exit_code: {in: [0, 1]}}"),
-		specSteps("store: {name: v, from: {stdout: {json: {path: \"$.a\"}}}}"),
+		specSteps("run: {command: echo}", "store: {name: v, from: {stdout: {json: {path: \"$.a\"}}}}"),
 		specSteps("fixture: {file: a.txt, content: hello}"),
 		specSteps("run: {command: echo}", "assert: {stdout: {contains: [\"a\", \"b\"]}}"),
 	}
@@ -1513,6 +1513,12 @@ func TestBugHunt_DirAssert(t *testing.T) {
 // (executable, snapshot, the numeric json bounds) on the accept side.
 func TestBugHunt_FileAndJSONExtras(t *testing.T) {
 	t.Parallel()
+	// A store reads what a step produced, so the runner-backed sources need both
+	// the runner and the step that fills the source.
+	withRunners := func(body string) string {
+		runners := "runners:\n  api: {type: http, base_url: \"http://127.0.0.1:1\"}\n  db: {type: db, dsn: \"sqlite:./a.db\"}\n  rpc: {type: grpc, target: \"127.0.0.1:1\"}\n  b: {type: browser}\n"
+		return strings.Replace(body, "scenarios:", runners+"scenarios:", 1)
+	}
 	accept := []struct{ name, src string }{
 		{"file executable", specSteps("assert: {file: {path: bin/tool, executable: true}}")},
 		{"file snapshot", specSteps("assert: {file: {path: out.txt, snapshot: golden}}")},
@@ -1523,10 +1529,10 @@ func TestBugHunt_FileAndJSONExtras(t *testing.T) {
 		{"json gte", specSteps("run: {command: echo}", "assert: {stdout: {json: {path: \"$.n\", gte: 1}}}")},
 		{"json length", specSteps("run: {command: echo}", "assert: {stdout: {json: {path: \"$.items\", length: 3}}}")},
 		{"yaml matcher", specSteps("run: {command: echo}", "assert: {stdout: {yaml: {path: \"$.k\", equals: v}}}")},
-		{"store from body matches", specSteps("store: {name: v, from: {body: {matches: \"tok=(\\\\w+)\"}}}")},
-		{"store from rows json", specSteps("store: {name: v, from: {rows: {json: {path: \"$[0].id\"}}}}")},
-		{"store from message json", specSteps("store: {name: v, from: {message: {json: {path: \"$.ok\"}}}}")},
-		{"store from value matches", specSteps("store: {name: v, from: {value: {matches: \"^ok$\"}}}")},
+		{"store from body matches", withRunners(specSteps("http: {runner: api, method: GET, path: /}", "store: {name: v, from: {body: {matches: \"tok=(\\\\w+)\"}}}"))},
+		{"store from rows json", withRunners(specSteps("query: {runner: db, sql: \"SELECT 1\"}", "store: {name: v, from: {rows: {json: {path: \"$[0].id\"}}}}"))},
+		{"store from message json", withRunners(specSteps("grpc: {runner: rpc, method: pkg.S/M}", "store: {name: v, from: {message: {json: {path: \"$.ok\"}}}}"))},
+		{"store from value matches", withRunners(specSteps("cdp: {runner: b, actions: [{text: \"h1\"}]}", "store: {name: v, from: {value: {matches: \"^ok$\"}}}"))},
 	}
 	for _, tt := range accept {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1839,6 +1845,165 @@ func TestLoadBytes_AssertAfterItsProducingStepLoads(t *testing.T) {
 		specSteps("run: {command: echo}", "fixture: {file: f.txt, content: x}", "assert: {exit_code: 0}"),
 		// A teardown assert is fed by the scenario's own steps.
 		"version: \"1\"\nsuite:\n  name: x\nrunners:\n  api: {type: http, base_url: \"http://127.0.0.1:1\"}\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n    teardown:\n      - assert: {exit_code: 0}\n",
+	}
+	runners := "runners:\n  api: {type: http, base_url: \"http://127.0.0.1:1\"}\n  db: {type: db, dsn: \"sqlite:./a.db\"}\n  rpc: {type: grpc, target: \"127.0.0.1:1\"}\n"
+	for i, src := range ok {
+		if !strings.Contains(src, "runners:") {
+			src = strings.Replace(src, "scenarios:", runners+"scenarios:", 1)
+		}
+		if _, err := LoadBytes("s.atago.yaml", []byte(src)); err != nil {
+			t.Errorf("case %d was rejected: %v\n%s", i, err, src)
+		}
+	}
+}
+
+// suiteBlockSteps builds a spec whose suite.setup or suite.teardown holds the
+// given steps, with one trivial scenario so the suite has something to run.
+func suiteBlockSteps(block string, steps ...string) string {
+	var b strings.Builder
+	b.WriteString("version: \"1\"\nsuite:\n  name: x\n  " + block + ":\n")
+	for _, s := range steps {
+		b.WriteString("    - " + s + "\n")
+	}
+	b.WriteString("scenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n      - assert: {exit_code: 0}\n")
+	return b.String()
+}
+
+// TestLoadBytes_SuiteBlockAssertNeedsItsProducingStep is a regression: the
+// producing-step rule was applied to scenario steps and teardown but not to the
+// suite lifecycle, where the mistake is worse. A suite block admits neither pty
+// nor the runner-backed kinds, so a screen or status assertion there can never
+// be fed by any ordering — and a suite.teardown failure preserves the verdict by
+// contract, so such a spec printed SUITE TEARDOWN FAILED on every run while
+// exiting 0 forever.
+func TestLoadBytes_SuiteBlockAssertNeedsItsProducingStep(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name string
+		src  string
+		want string
+	}{
+		{
+			"setup stdout with no command",
+			suiteBlockSteps("setup", "fixture: {file: f.txt, content: x}", "assert: {stdout: {contains: hi}}"),
+			"suite.setup[1].assert.stdout requires a preceding run step",
+		},
+		{
+			"setup exit_code with no command",
+			suiteBlockSteps("setup", "assert: {exit_code: 0}"),
+			"suite.setup[0].assert.exit_code requires a preceding run step",
+		},
+		{
+			"setup screen can never be fed",
+			suiteBlockSteps("setup", "assert: {screen: {contains: hi}}"),
+			"pty steps are not allowed in a suite block",
+		},
+		{
+			"teardown status can never be fed",
+			suiteBlockSteps("teardown", "assert: {status: 200}"),
+			"http steps are not allowed in a suite block",
+		},
+		{
+			"teardown does not inherit the setup block's command",
+			"version: \"1\"\nsuite:\n  name: x\n  setup:\n    - run: {command: echo}\n  teardown:\n    - assert: {stdout: {contains: hi}}\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n      - assert: {exit_code: 0}\n",
+			"suite.teardown[0].assert.stdout requires a preceding run step",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			mustReject(t, c.name, c.src, c.want)
+		})
+	}
+}
+
+// TestLoadBytes_SuiteBlockAssertAfterItsRunLoads pins the accept side: the
+// build-then-check bootstrap a suite.setup exists for must keep loading, in both
+// blocks, and filesystem-fed assertions stay unaffected.
+func TestLoadBytes_SuiteBlockAssertAfterItsRunLoads(t *testing.T) {
+	t.Parallel()
+	ok := []string{
+		suiteBlockSteps("setup", "run: {command: echo}", "assert: {exit_code: 0}"),
+		suiteBlockSteps("setup", "run: {command: echo}", "assert: {stdout: {contains: hi}}"),
+		suiteBlockSteps("teardown", "run: {command: echo}", "assert: {stdout: {contains: hi}}"),
+		// A filesystem assertion has no unambiguous producer and is unaffected.
+		suiteBlockSteps("setup", "fixture: {file: f.txt, content: x}", "assert: {file: {path: f.txt, contains: x}}"),
+	}
+	for i, src := range ok {
+		if _, err := LoadBytes("s.atago.yaml", []byte(src)); err != nil {
+			t.Errorf("case %d was rejected: %v\n%s", i, err, src)
+		}
+	}
+}
+
+// TestLoadBytes_StoreNeedsItsProducingStep is a regression: the commit that
+// refused a context-less assertion named a `store from.header` after a run step
+// as one of the three shapes of the same authoring mistake, and then fixed only
+// the assertion. A store whose source no step produces stayed a runtime error
+// (ATG4501, exit 4) while the identical assertion became a load error.
+func TestLoadBytes_StoreNeedsItsProducingStep(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name string
+		src  string
+		want string
+	}{
+		{
+			"stdout with no command",
+			specSteps("store: {name: v, from: {stdout: {matches: \"(.+)\"}}}", "run: {command: echo}"),
+			"store.from.stdout requires a preceding run/pty step",
+		},
+		{
+			"header with no http step",
+			specSteps("run: {command: echo}", "store: {name: v, from: {header: X-Token}}"),
+			"store.from.header requires a preceding http step",
+		},
+		{
+			"body with no http step",
+			specSteps("run: {command: echo}", "store: {name: v, from: {body: {matches: \"(.+)\"}}}"),
+			"store.from.body requires a preceding http step",
+		},
+		{
+			"rows with no query",
+			specSteps("run: {command: echo}", "store: {name: v, from: {rows: {matches: \"(.+)\"}}}"),
+			"store.from.rows requires a preceding query step",
+		},
+		{
+			"message with no grpc call",
+			specSteps("run: {command: echo}", "store: {name: v, from: {message: {matches: \"(.+)\"}}}"),
+			"store.from.message requires a preceding grpc step",
+		},
+		{
+			"suite block header can never be fed",
+			suiteBlockSteps("setup", "store: {name: v, from: {header: X-Token}}"),
+			"http steps are not allowed in a suite block",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			mustReject(t, c.name, c.src, c.want)
+		})
+	}
+}
+
+// TestLoadBytes_StoreAfterItsProducingStepLoads pins the accept side for stores,
+// including the sources with no unambiguous producer.
+func TestLoadBytes_StoreAfterItsProducingStepLoads(t *testing.T) {
+	t.Parallel()
+	ok := []string{
+		specSteps("run: {command: echo}", "store: {name: v, from: {stdout: {matches: \"(.+)\"}}}"),
+		specSteps("pty: {command: sh, session: [{send: \"\"}]}", "store: {name: v, from: {stdout: {matches: \"(.+)\"}}}"),
+		specSteps("http: {runner: api, method: GET, path: /}", "store: {name: v, from: {header: X-Token}}"),
+		specSteps("query: {runner: db, sql: \"SELECT 1\"}", "store: {name: v, from: {rows: {matches: \"(.+)\"}}}"),
+		specSteps("grpc: {runner: rpc, method: pkg.S/M}", "store: {name: v, from: {message: {matches: \"(.+)\"}}}"),
+		// A file source may read what a fixture wrote, so it needs no command.
+		specSteps("fixture: {file: f.txt, content: \"{}\"}", "store: {name: v, from: {file: {path: f.txt, text: true}}}"),
+		// A suite.setup store reading the block's own run output is the ordinary
+		// bootstrap and must keep loading.
+		suiteBlockSteps("setup", "run: {command: echo}", "store: {name: v, from: {stdout: {matches: \"(.+)\"}}}"),
+		// A teardown store is fed by the scenario's steps.
+		"version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n    teardown:\n      - store: {name: v, from: {stdout: {matches: \"(.+)\"}}}\n",
 	}
 	runners := "runners:\n  api: {type: http, base_url: \"http://127.0.0.1:1\"}\n  db: {type: db, dsn: \"sqlite:./a.db\"}\n  rpc: {type: grpc, target: \"127.0.0.1:1\"}\n"
 	for i, src := range ok {
