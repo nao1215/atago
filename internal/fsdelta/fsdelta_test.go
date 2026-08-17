@@ -500,6 +500,32 @@ type entrySpecimen struct {
 	// skip reports that this host cannot carry the specimen (a kind Windows has
 	// no equivalent of, a node only root can create).
 	skip func() string
+	// root, when set, supplies the scanned directory instead of t.TempDir(). A
+	// unix socket needs one: its path must fit in sockaddr_un.sun_path (~104
+	// bytes), and macOS puts t.TempDir() under a long /var/folders path that
+	// already spends most of the budget before the test name is appended.
+	root func(t *testing.T) string
+}
+
+// specimenRoot is the directory a specimen's entry is planted in.
+func (sp entrySpecimen) specimenRoot(t *testing.T) string {
+	t.Helper()
+	if sp.root != nil {
+		return sp.root(t)
+	}
+	return t.TempDir()
+}
+
+// shortTempDir is a temp directory whose path stays short: no test name, so a
+// unix socket bound inside it fits in sun_path on macOS as well as Linux.
+func shortTempDir(t *testing.T) string {
+	t.Helper()
+	dir, err := os.MkdirTemp("", "atg")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(dir) })
+	return dir
 }
 
 func entrySpecimens() []entrySpecimen {
@@ -568,6 +594,7 @@ func entrySpecimens() []entrySpecimen {
 			mutate:  chmodTo(0o600),
 			tracked: true,
 			skip:    posixOnly("unix sockets"),
+			root:    shortTempDir,
 		},
 		{
 			name:  "directory",
@@ -601,7 +628,7 @@ func TestScan_EveryEntryKindIsDecided(t *testing.T) {
 
 			t.Run("created", func(t *testing.T) {
 				t.Parallel()
-				root := t.TempDir()
+				root := sp.specimenRoot(t)
 				pre := scanOrFail(t, root)
 				sp.plant(t, filepath.Join(root, "entry"))
 				post := scanOrFail(t, root)
@@ -609,7 +636,7 @@ func TestScan_EveryEntryKindIsDecided(t *testing.T) {
 			})
 			t.Run("deleted", func(t *testing.T) {
 				t.Parallel()
-				root := t.TempDir()
+				root := sp.specimenRoot(t)
 				sp.plant(t, filepath.Join(root, "entry"))
 				pre := scanOrFail(t, root)
 				if err := os.RemoveAll(filepath.Join(root, "entry")); err != nil {
@@ -620,7 +647,7 @@ func TestScan_EveryEntryKindIsDecided(t *testing.T) {
 			})
 			t.Run("untouched", func(t *testing.T) {
 				t.Parallel()
-				root := t.TempDir()
+				root := sp.specimenRoot(t)
 				sp.plant(t, filepath.Join(root, "entry"))
 				pre := scanOrFail(t, root)
 				post := scanOrFail(t, root)
@@ -631,7 +658,7 @@ func TestScan_EveryEntryKindIsDecided(t *testing.T) {
 			}
 			t.Run("modified", func(t *testing.T) {
 				t.Parallel()
-				root := t.TempDir()
+				root := sp.specimenRoot(t)
 				sp.plant(t, filepath.Join(root, "entry"))
 				pre := scanOrFail(t, root)
 				sp.mutate(t, filepath.Join(root, "entry"))

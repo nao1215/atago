@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-82 suites · 659 scenarios
+82 suites · 661 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
