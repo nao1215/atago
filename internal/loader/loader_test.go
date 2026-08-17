@@ -1297,6 +1297,12 @@ func TestBugHunt_Rejections(t *testing.T) {
 		{"pty expect_screen with snapshot rejected", specSteps("pty: {command: sh, session: [{expect_screen: {snapshot: snap.txt}}]}"), "snapshot is not supported in expect_screen"},
 		{"pty expect_screen with trim rejected", specSteps("pty: {command: sh, session: [{expect_screen: {contains: hi, trim: true}}]}"), "trim is not supported in expect_screen"},
 		{"pty expect_screen stable exceeds timeout", specSteps("pty: {command: sh, session: [{expect_screen: {contains: hi, timeout: \"20ms\", stable_for: \"30ms\"}}]}"), "must not exceed scenario \"a\".steps[0].pty.session[0].expect_screen.timeout"},
+		// With no action-local timeout the session budget is what bounds the
+		// wait, so a stable_for above it can never succeed either.
+		{"pty expect_screen stable exceeds the session timeout", specSteps("pty: {command: sh, timeout: \"2s\", session: [{expect_screen: {contains: hi, stable_for: \"60s\"}}]}"), "must not exceed scenario \"a\".steps[0].pty.timeout"},
+		// Same contradiction against the built-in session default when the step
+		// sets no timeout of its own.
+		{"pty expect_screen stable exceeds the default session timeout", specSteps("pty: {command: sh, session: [{expect_screen: {contains: hi, stable_for: \"60s\"}}]}"), "must not exceed the pty session timeout"},
 
 		// ---- validateMockRoutes (scenario) ----
 		{"route method required", "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    mock_servers:\n      - name: m\n        routes:\n          - {path: /}\n    steps:\n      - run: {command: echo}\n", "method is required"},

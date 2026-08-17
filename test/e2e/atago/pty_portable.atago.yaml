@@ -184,3 +184,32 @@ scenarios:
             contains:
               - "pty expect /absent-forever/"
               - "never appeared in the terminal transcript"
+
+  # An expect_screen whose stable_for exceeds the budget that bounds the wait
+  # can never succeed. The contradiction against the action's own timeout was
+  # refused at load; against the enclosing session timeout it loaded, burned the
+  # whole budget, and reported an assertion failure — a statically knowable
+  # authoring mistake charged to the program under test.
+  - name: a stable_for above the session budget is a load-time error
+    steps:
+      - fixture:
+          file: stable.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: waits longer than the session allows
+                steps:
+                  - pty:
+                      shell: true
+                      command: echo hi
+                      timeout: 2s
+                      session:
+                        - expect_screen: {contains: hi, stable_for: 60s}
+      - run:
+          command: ${atago} run stable.atago.yaml
+      - assert:
+          exit_code: 2
+          stderr:
+            contains: "must not exceed"

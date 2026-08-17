@@ -1,5 +1,14 @@
 package spec
 
+import "time"
+
+// DefaultPTYSessionTimeout bounds a pty session when the spec sets none: an
+// interactive program that never produces the expected prompt (or never exits)
+// must fail loudly instead of hanging the run. It lives here, beside
+// DefaultPTYExecTimeout, so the runtime that enforces it and the loader that
+// validates a session-local duration against it read one definition.
+const DefaultPTYSessionTimeout = 30 * time.Second
+
 // ClearEnvEnabled reports whether the pty step opts into a cleared environment (#16).
 func (p *PTY) ClearEnvEnabled() bool { return p.ClearEnv != nil && *p.ClearEnv }
 

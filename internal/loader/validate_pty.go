@@ -49,7 +49,7 @@ func validatePTY(add addFunc, where string, p *spec.PTY) {
 				validatePTYMouse(add, aw+".send.mouse", a.Send.Mouse)
 			}
 		case hasExpectScreen:
-			validatePTYExpectScreen(add, aw+".expect_screen", a.ExpectScreen)
+			validatePTYExpectScreen(add, aw+".expect_screen", a.ExpectScreen, sessionBudget{where: where + ".pty.timeout", value: p.Timeout})
 		case hasResize:
 			// Both dimensions are required: a resize that names one side would
 			// have to invent the other, and a terminal has no natural "keep".
@@ -101,7 +101,15 @@ func validatePTYMouse(add addFunc, where string, m *spec.PTYMouse) {
 	}
 }
 
-func validatePTYExpectScreen(add addFunc, where string, es *spec.PTYExpectScreen) {
+// sessionBudget is the pty step's own timeout — the bound an expect_screen wait
+// runs under when it sets no timeout of its own. It carries where the value was
+// written so the diagnostic can name the knob the author has to change.
+type sessionBudget struct {
+	where string
+	value string
+}
+
+func validatePTYExpectScreen(add addFunc, where string, es *spec.PTYExpectScreen, session sessionBudget) {
 	// Share the screen validator so a mid-session wait accepts exactly what the
 	// post-step assert does — including an attrs-only wait (#382).
 	validateScreen(add, where, &es.ScreenAssert)
@@ -113,12 +121,25 @@ func validatePTYExpectScreen(add addFunc, where string, es *spec.PTYExpectScreen
 	}
 	positiveDuration(add, where+".timeout", es.Timeout, "", "")
 	positiveDuration(add, where+".stable_for", es.StableFor, "", "")
-	if es.Timeout != "" && es.StableFor != "" {
-		timeout, terr := time.ParseDuration(es.Timeout)
-		stable, serr := time.ParseDuration(es.StableFor)
-		if terr == nil && serr == nil && stable > timeout {
-			add(diag.EmptyInterval, "%s.stable_for %q must not exceed %s.timeout %q", where, es.StableFor, where, es.Timeout)
-		}
+	// A stable_for above the budget that bounds the wait can never be satisfied.
+	// The budget is the action's own timeout when it sets one, and otherwise the
+	// enclosing session timeout (or its built-in default) — one comparison over
+	// whichever applies, so the two contradictions cannot be reported by
+	// different rules that drift apart.
+	bound, boundWhere := es.Timeout, where+".timeout"
+	if bound == "" {
+		bound, boundWhere = session.value, session.where
+	}
+	if bound == "" {
+		bound, boundWhere = spec.DefaultPTYSessionTimeout.String(), "the pty session timeout"
+	}
+	if es.StableFor == "" || bound == "" {
+		return
+	}
+	limit, lerr := time.ParseDuration(bound)
+	stable, serr := time.ParseDuration(es.StableFor)
+	if lerr == nil && serr == nil && stable > limit {
+		add(diag.EmptyInterval, "%s.stable_for %q must not exceed %s %q", where, es.StableFor, boundWhere, bound)
 	}
 }
 

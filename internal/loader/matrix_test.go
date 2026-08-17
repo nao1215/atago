@@ -65,6 +65,21 @@ scenarios:
 	}
 }
 
+// TestLoadBytes_MatrixNameEscapeStaysLiteral pins the accept side of the
+// unbound-reference rule: `$${who}` is the documented way to write a literal
+// ${who}, so a name using it must keep loading even though no row binds `who`.
+func TestLoadBytes_MatrixNameEscapeStaysLiteral(t *testing.T) {
+	t.Parallel()
+	src := "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: \"writes $${who} verbatim ${n}\"\n    matrix:\n      - { n: \"1\" }\n    steps:\n      - run: {command: echo}"
+	s, err := LoadBytes("m.atago.yaml", []byte(src))
+	if err != nil {
+		t.Fatalf("an escaped reference in a matrix name was rejected: %v", err)
+	}
+	if got := s.Scenarios[0].Name; got != "writes $${who} verbatim 1" {
+		t.Errorf("name = %q, want the escape left alone and ${n} bound", got)
+	}
+}
+
 func TestLoadBytes_MatrixErrors(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -96,6 +111,20 @@ func TestLoadBytes_MatrixErrors(t *testing.T) {
 			name:    "template omits a distinguishing variable",
 			src:     "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: \"check ${who}\"\n    matrix:\n      - { who: alice, lang: en }\n      - { who: alice, lang: fr }\n    steps:\n      - run: {command: echo}",
 			wantMsg: "omits row variable \"lang\"",
+		},
+		{
+			// A row that does not bind a name the template references leaves the
+			// literal ${who} in the expanded scenario name, which then reaches
+			// list, the reports, and the rerun ledger.
+			name:    "row leaves a referenced name unbound",
+			src:     "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: \"greets ${who}\"\n    matrix:\n      - { who: Alice }\n      - { name: Bob }\n    steps:\n      - run: {command: echo}",
+			wantMsg: "matrix[1] does not bind ${who}",
+		},
+		{
+			// No row binds it at all: every expanded name carries the literal.
+			name:    "no row binds the referenced name",
+			src:     "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: \"greets ${who}\"\n    matrix:\n      - { a: \"1\" }\n      - { a: \"2\" }\n    steps:\n      - run: {command: echo}",
+			wantMsg: "does not bind ${who}",
 		},
 	}
 	for _, tt := range tests {

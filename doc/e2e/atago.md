@@ -422,12 +422,13 @@
   - [matrix without a templated name gets a deterministic suffix](#scenario-matrix-without-a-templated-name-gets-a-deterministic-suffix)
   - [stdout_to expands a matrix variable into the redirect target \[who=alice\]](#scenario-stdout_to-expands-a-matrix-variable-into-the-redirect-target-whoalice)
   - [stdout_to expands a matrix variable into the redirect target \[who=bob\]](#scenario-stdout_to-expands-a-matrix-variable-into-the-redirect-target-whobob)
-- [atago self-hosting / matrix expansion boundary values](#atago-self-hosting--matrix-expansion-boundary-values) — 5 scenarios
+- [atago self-hosting / matrix expansion boundary values](#atago-self-hosting--matrix-expansion-boundary-values) — 6 scenarios
   - [each row substitutes into the scenario name](#scenario-each-row-substitutes-into-the-scenario-name)
   - [a row with several variables substitutes all of them](#scenario-a-row-with-several-variables-substitutes-all-of-them)
   - [a single-row matrix expands to exactly one scenario](#scenario-a-single-row-matrix-expands-to-exactly-one-scenario)
   - [an empty matrix row list is a load-time error](#scenario-an-empty-matrix-row-list-is-a-load-time-error)
   - [rows that expand to the same name are rejected as duplicates](#scenario-rows-that-expand-to-the-same-name-are-rejected-as-duplicates)
+  - [a row that leaves a referenced name unbound is a load-time error](#scenario-a-row-that-leaves-a-referenced-name-unbound-is-a-load-time-error)
 - [atago self-hosting / mock http server (offline API-client testing)](#atago-self-hosting--mock-http-server-offline-api-client-testing) — 4 scenarios
   - [count, header, and body-json asserts pass against a real client](#scenario-count-header-and-body-json-asserts-pass-against-a-real-client)
   - [a failing count summarizes the recorded requests](#scenario-a-failing-count-summarizes-the-recorded-requests)
@@ -491,7 +492,7 @@
   - [a send referencing an undefined variable is an execution error, not typed literally](#scenario-a-send-referencing-an-undefined-variable-is-an-execution-error-not-typed-literally)
   - [an expect does not match the echo of its own send](#scenario-an-expect-does-not-match-the-echo-of-its-own-send)
   - [a program's own copy of the input still satisfies an expect](#scenario-a-programs-own-copy-of-the-input-still-satisfies-an-expect)
-- [atago self-hosting / pty (portable)](#atago-self-hosting--pty-portable) — 9 scenarios
+- [atago self-hosting / pty (portable)](#atago-self-hosting--pty-portable) — 10 scenarios
   - [a pty step starts a command, captures its output, and reports exit 0](#scenario-a-pty-step-starts-a-command-captures-its-output-and-reports-exit-0)
   - [a pty step surfaces a command's non-zero exit code](#scenario-a-pty-step-surfaces-a-commands-non-zero-exit-code)
   - [sequential expects match successive output in declaration order](#scenario-sequential-expects-match-successive-output-in-declaration-order)
@@ -501,6 +502,7 @@
   - [a pty step drives the atago binary directly with no shell](#scenario-a-pty-step-drives-the-atago-binary-directly-with-no-shell)
   - [a pty drives atago running an inner spec to a green result](#scenario-a-pty-drives-atago-running-an-inner-spec-to-a-green-result)
   - [a never-matching expect fails and names the pattern in the transcript](#scenario-a-never-matching-expect-fails-and-names-the-pattern-in-the-transcript)
+  - [a stable_for above the session budget is a load-time error](#scenario-a-stable_for-above-the-session-budget-is-a-load-time-error)
 - [atago self-hosting / record (spec skeleton from an observed run)](#atago-self-hosting--record-spec-skeleton-from-an-observed-run) — 17 scenarios
   - [record then run round-trips green](#scenario-record-then-run-round-trips-green)
   - [refusing to overwrite without --force](#scenario-refusing-to-overwrite-without---force)
@@ -8556,6 +8558,44 @@ ${atago} run dupmx.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `duplicate scenario name "dup same"`
+### Scenario: a row that leaves a referenced name unbound is a load-time error
+#### Given
+- Fixture file `unbound.atago.yaml` is created.
+- Fixture file `escaped.atago.yaml` is created.
+#### Inputs
+_Fixture `unbound.atago.yaml`:_
+```text
+version: "1"
+suite: {name: unbound}
+scenarios:
+  - name: "greets ${who}"
+    matrix:
+      - {who: Alice}
+      - {name: Bob}
+    steps: [{run: {shell: true, command: "exit 0"}}]
+```
+_Fixture `escaped.atago.yaml`:_
+```text
+version: "1"
+suite: {name: escaped}
+scenarios:
+  - name: "writes $$${who} verbatim ${n}"
+    matrix:
+      - {n: "1"}
+    steps: [{run: {shell: true, command: "exit 0"}}, {assert: {exit_code: 0}}]
+```
+#### When
+```shell
+${atago} run unbound.atago.yaml
+${atago} run --ci --report json escaped.atago.yaml
+```
+#### Then
+- after `${atago} run unbound.atago.yaml`:
+  - exit code is `2`
+  - stderr contains `does not bind ${who}`
+- after `${atago} run --ci --report json escaped.atago.yaml`:
+  - exit code is `0`
+  - stdout at `$.suites[0].scenarios[0].name` equals `writes $$${who} verbatim 1`
 ## atago self-hosting / mock http server (offline API-client testing)
 Source: `test/e2e/atago/mock_server.atago.yaml`
 ### Scenario: count, header, and body-json asserts pass against a real client
@@ -9928,6 +9968,32 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `pty expect /absent-forever/`, `never appeared in the terminal transcript`
+### Scenario: a stable_for above the session budget is a load-time error
+#### Given
+- Fixture file `stable.atago.yaml` is created.
+#### Inputs
+_Fixture `stable.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: waits longer than the session allows
+    steps:
+      - pty:
+          shell: true
+          command: echo hi
+          timeout: 2s
+          session:
+            - expect_screen: {contains: hi, stable_for: 60s}
+```
+#### When
+```shell
+${atago} run stable.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `must not exceed`
 ## atago self-hosting / record (spec skeleton from an observed run)
 Source: `test/e2e/atago/record.atago.yaml`
 ### Scenario: record then run round-trips green
