@@ -138,10 +138,10 @@ func checkSnapshot(desc, label, snapPath string, data []byte, env Env) *CheckRes
 		if err := snapshot.Update(env.SpecDir, path, data, opt); err != nil {
 			return &CheckResult{Desc: desc, Hint: fmt.Sprintf("could not write snapshot %q: %v", snapPath, err)}
 		}
+		// The run-level tally of rewrites lives in the recorder (markWritten
+		// above); the check itself only says so in its label.
 		env.SnapshotWrites.markWritten(path)
-		updated := pass(desc + " (updated)")
-		updated.SnapshotUpdated = true
-		return updated
+		return pass(desc + " (updated)")
 	}
 
 	// Under --update-snapshots a frozen golden's hints must not send the reader

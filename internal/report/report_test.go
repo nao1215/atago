@@ -815,7 +815,7 @@ func TestSnapshotUpdates_AreReported(t *testing.T) {
 			Name:   "greets",
 			Status: engine.StatusPassed,
 			Steps: []engine.StepResult{{Kind: "assert", Checks: []*assert.CheckResult{
-				{OK: true, Desc: "assert stdout snapshot (updated)", SnapshotUpdated: true},
+				{OK: true, Desc: "assert stdout snapshot (updated)"},
 				{OK: true, Desc: "assert exit_code is 0"},
 			}}},
 		}},
