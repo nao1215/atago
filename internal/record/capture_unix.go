@@ -9,7 +9,6 @@ package record
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -147,7 +146,10 @@ func CapturePTY(command string, shell bool, in, out *os.File, timeout time.Durat
 	// timeout. The buffered channel lets the timeout path deliver the code even
 	// after it kills the tree — the reaper never blocks on a drained receiver.
 	waitCh := make(chan int, 1)
-	go func() { waitCh <- exitCode(cmd.Wait()) }()
+	// The code goes through the cmd runner's shared mapping, so a session the
+	// developer ended with Ctrl-C records the same 130 a run: step would report
+	// and the generated spec replays.
+	go func() { waitCh <- runnercmd.ExitCode(cmd.Wait()) }()
 
 	timedOut := false
 	var code int
@@ -158,7 +160,12 @@ func CapturePTY(command string, shell bool, in, out *os.File, timeout time.Durat
 		// Kill the whole process group (Setsid) so a never-exiting child and any
 		// descendant are torn down, not just the direct child, then reap it.
 		_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
-		code = <-waitCh
+		<-waitCh
+		// The recorder killed this child, so it has no exit status of its own to
+		// record: -1 is the sentinel, and mapping the SIGKILL to 137 would put a
+		// number an author could assert on a session that never finished. The
+		// Windows capture reaches the same value through PseudoConsole.Wait.
+		code = -1
 	}
 
 	// The child is reaped, so the handle held since before it started has done
@@ -207,17 +214,4 @@ func secretPromptActive(master *os.File) bool {
 		return false
 	}
 	return secret
-}
-
-// exitCode extracts a process exit code from cmd.Wait's error (0 on success,
-// the signal-derived code otherwise, -1 when it cannot be determined).
-func exitCode(waitErr error) int {
-	if waitErr == nil {
-		return 0
-	}
-	var exitErr *exec.ExitError
-	if errors.As(waitErr, &exitErr) {
-		return exitErr.ExitCode()
-	}
-	return -1
 }

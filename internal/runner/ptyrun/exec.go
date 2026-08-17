@@ -82,8 +82,12 @@ func runSessionExec(ctx context.Context, e *spec.PTYExec, dir string, env []stri
 	}
 	var exitErr *exec.ExitError
 	if errors.As(runErr, &exitErr) {
+		// The same mapping every atago runner reports through, so a helper killed
+		// by a signal is named 143 here rather than Go's -1. The timeout and
+		// cancel paths returned above, so a signal at this point is the command's
+		// own termination.
 		return diag.SessionExecFailed.Errorf("exec %q exited %d, so the change the session waits for was not made%s",
-			e.Command, exitErr.ExitCode(), execOutputSuffix(detail))
+			e.Command, runnercmd.ExitCode(runErr), execOutputSuffix(detail))
 	}
 	return diag.CommandNotStarted.Errorf("exec %q could not run: %w%s", e.Command, runErr, execOutputSuffix(detail))
 }
