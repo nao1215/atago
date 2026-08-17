@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -1069,6 +1070,40 @@ func mustReject(t *testing.T, name, src, want string) {
 	}
 	if !strings.Contains(err.Error(), want) {
 		t.Errorf("%s: error = %q, want substring %q", name, err.Error(), want)
+	}
+	requireDiagnosticCodes(t, name, err)
+}
+
+// atgCode matches the code prefix every load error is supposed to carry.
+var atgCode = regexp.MustCompile(`ATG\d{4}: `)
+
+// requireDiagnosticCodes asserts every message inside a load error carries a
+// diagnostic code. The published error reference can only explain what it can
+// name, and the coverage gate proves the reference is provoked — nothing proved
+// the converse, which is how the matrix validator emitted five uncoded messages
+// beside coded ones in a single error list. Every rejection case in this file is
+// a corpus entry for that check.
+func requireDiagnosticCodes(t *testing.T, name string, err error) {
+	t.Helper()
+	lines := strings.Split(err.Error(), "\n")
+	// One problem is rendered as a single message that may carry a multi-line
+	// source excerpt below it, so only its first line is checked. Several are
+	// rendered as a count header followed by one "  - " entry each, and every
+	// entry has to name its own diagnostic.
+	if !strings.HasSuffix(lines[0], "validation errors:") {
+		if !atgCode.MatchString(lines[0]) {
+			t.Errorf("%s: error %q carries no ATG code; every load error must name the diagnostic that explains it", name, lines[0])
+		}
+		return
+	}
+	for _, line := range lines[1:] {
+		entry, listed := strings.CutPrefix(strings.TrimSpace(line), "- ")
+		if !listed {
+			continue // continuation of the entry above
+		}
+		if !atgCode.MatchString(entry) {
+			t.Errorf("%s: error entry %q carries no ATG code; every load error must name the diagnostic that explains it", name, entry)
+		}
 	}
 }
 

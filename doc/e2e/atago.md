@@ -9019,7 +9019,7 @@ ${atago} run emptymx.atago.yaml
 ```
 #### Then
 - exit code is `2`
-- stderr contains `matrix must contain at least one row`
+- stderr contains `ATG2202: `, `matrix must contain at least one row`
 ### Scenario: rows that expand to the same name are rejected as duplicates
 #### Given
 - Fixture file `dupmx.atago.yaml` is created.
@@ -9076,7 +9076,7 @@ ${atago} run --ci --report json escaped.atago.yaml
 #### Then
 - after `${atago} run unbound.atago.yaml`:
   - exit code is `2`
-  - stderr contains `does not bind ${who}`
+  - stderr contains `ATG2403: `, `does not bind ${who}`
 - after `${atago} run --ci --report json escaped.atago.yaml`:
   - exit code is `0`
   - stdout at `$.suites[0].scenarios[0].name` equals `writes $$${who} verbatim 1`

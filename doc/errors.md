@@ -382,17 +382,17 @@ Exits 2. Since v0.21.0.
 
 ### ATG2403 — a reference names something the spec does not declare
 
-Services, mock servers, and stored values are addressed by name from elsewhere in the spec — a signal targets a service, an assertion targets a mock, an expansion reads a stored value. A name nothing declares would be resolved at run time against nothing at all.
+Services, mock servers, and stored values are addressed by name from elsewhere in the spec — a signal targets a service, an assertion targets a mock, an expansion reads a stored value. A name nothing declares would be resolved at run time against nothing at all. A matrix scenario's name is the same shape: it is rendered from the row alone, so a `${var}` no row binds survives into the expanded name as literal text.
 
-Fix: Declare the target, or correct the name. Suite-level services and mocks are visible to every scenario; a scenario's own are visible only within it.
+Fix: Declare the target, or correct the name. Suite-level services and mocks are visible to every scenario; a scenario's own are visible only within it. For a matrix name, either bind the variable in every row or drop it from the name.
 
 Exits 2. Since v0.21.0.
 
 ### ATG2404 — a name collides with one atago reserves
 
-atago provides a few variables of its own — `atago`, `workdir`, `suitedir` — and a stored value taking one of those names would shadow it. Every later expansion would then read the spec's value where it meant atago's, silently and only in the specs that happen to declare the name.
+atago provides a few variables of its own — `atago`, `workdir`, `suitedir` — and a stored value or a matrix row key taking one of those names would shadow it. Every later expansion would then read the spec's value where it meant atago's, silently and only in the specs that happen to declare the name.
 
-Fix: Choose another name for the stored value.
+Fix: Choose another name for the stored value or the matrix variable.
 
 Exits 2. Since v0.21.0.
 

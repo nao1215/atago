@@ -308,16 +308,16 @@ var (
 	// the spec never defines.
 	NameNotDeclared = register(2403, "NameNotDeclared", Entry{
 		Summary: "a reference names something the spec does not declare",
-		Detail:  "Services, mock servers, and stored values are addressed by name from elsewhere in the spec — a signal targets a service, an assertion targets a mock, an expansion reads a stored value. A name nothing declares would be resolved at run time against nothing at all.",
-		Fix:     "Declare the target, or correct the name. Suite-level services and mocks are visible to every scenario; a scenario's own are visible only within it.",
+		Detail:  "Services, mock servers, and stored values are addressed by name from elsewhere in the spec — a signal targets a service, an assertion targets a mock, an expansion reads a stored value. A name nothing declares would be resolved at run time against nothing at all. A matrix scenario's name is the same shape: it is rendered from the row alone, so a `${var}` no row binds survives into the expanded name as literal text.",
+		Fix:     "Declare the target, or correct the name. Suite-level services and mocks are visible to every scenario; a scenario's own are visible only within it. For a matrix name, either bind the variable in every row or drop it from the name.",
 		Since:   specSince,
 	})
 
 	// ReservedName is a name atago has already given a meaning.
 	ReservedName = register(2404, "ReservedName", Entry{
 		Summary: "a name collides with one atago reserves",
-		Detail:  "atago provides a few variables of its own — `atago`, `workdir`, `suitedir` — and a stored value taking one of those names would shadow it. Every later expansion would then read the spec's value where it meant atago's, silently and only in the specs that happen to declare the name.",
-		Fix:     "Choose another name for the stored value.",
+		Detail:  "atago provides a few variables of its own — `atago`, `workdir`, `suitedir` — and a stored value or a matrix row key taking one of those names would shadow it. Every later expansion would then read the spec's value where it meant atago's, silently and only in the specs that happen to declare the name.",
+		Fix:     "Choose another name for the stored value or the matrix variable.",
 		Since:   specSince,
 	})
 
