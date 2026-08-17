@@ -317,3 +317,49 @@ scenarios:
             json:
               - path: "$.specs[0].suite_security[0]"
                 equals: "shell execution enabled: curl https://seed.example/data"
+
+  # Regression: the Generates list counted image assertions as declared
+  # outputs but not pdf assertions — the same "inspected output the tool
+  # wrote" one target over — and never walked teardown, whose redirects land
+  # in the workdir like any other step's.
+  - name: explain lists pdf and teardown outputs under generates
+    steps:
+      - fixture:
+          file: gen.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: gen
+            scenarios:
+              - name: renders a report
+                steps:
+                  - run:
+                      command: mytool render
+                  - assert:
+                      pdf:
+                        path: report.pdf
+                        min_pages: 1
+                teardown:
+                  - run:
+                      command: mytool audit
+                      stdout_to: logs/audit.log
+      - run:
+          command: ${atago} explain gen.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "Generates:"
+              - "report.pdf"
+              - "logs/audit.log"
+      # The machine-readable summary is built from the same list, so it agrees.
+      - run:
+          command: ${atago} manifest gen.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              - path: "$.specs[0].scenarios[0].generates[0]"
+                equals: "report.pdf"
+              - path: "$.specs[0].scenarios[0].generates[1]"
+                equals: "logs/audit.log"
