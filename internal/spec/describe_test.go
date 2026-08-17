@@ -226,7 +226,7 @@ func TestSuiteSecurityNotes(t *testing.T) {
 			{Run: &Run{Command: "curl https://api.example/purge"}},
 		},
 	}
-	got := SuiteSecurityNotes(su, nil)
+	got := SuiteSecurityNotes(&Spec{Suite: *su})
 	for _, want := range []string{
 		"shell execution enabled: curl https://seed.example/data",
 		"network access: curl https://seed.example/data",
@@ -239,8 +239,61 @@ func TestSuiteSecurityNotes(t *testing.T) {
 	}
 	// A quiet suite says nothing: the section only exists when there is
 	// something to review.
-	if got := SuiteSecurityNotes(&Suite{Setup: []Step{{Run: &Run{Command: "echo hi"}}}}, nil); len(got) != 0 {
+	if got := SuiteSecurityNotes(&Spec{Suite: Suite{Setup: []Step{{Run: &Run{Command: "echo hi"}}}}}); len(got) != 0 {
 		t.Errorf("SuiteSecurityNotes for a quiet suite = %v, want none", got)
+	}
+}
+
+// TestSuiteGeneratedArtifacts is a regression: a redirect in suite.setup or
+// suite.teardown writes a file that appeared in no summary at all, while the
+// identical redirect inside a scenario is listed by explain, doc, and the
+// manifest.
+func TestSuiteGeneratedArtifacts(t *testing.T) {
+	t.Parallel()
+	su := &Suite{
+		Setup: []Step{
+			{Run: &Run{Command: "seed", StdoutTo: "build/seed.txt"}},
+			{Assert: &Assert{File: &FileAssert{Path: "build/marker", Exists: boolPtr(true)}}},
+		},
+		Teardown: []Step{
+			{Run: &Run{Command: "audit", StdoutTo: "logs/suite-audit.log"}},
+		},
+	}
+	got := SuiteGeneratedArtifacts(su)
+	want := []string{"build/seed.txt", "build/marker", "logs/suite-audit.log"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Errorf("SuiteGeneratedArtifacts = %v, want %v", got, want)
+	}
+	if got := SuiteGeneratedArtifacts(&Suite{Setup: []Step{{Run: &Run{Command: "quiet"}}}}); len(got) != 0 {
+		t.Errorf("a lifecycle producing nothing = %v, want none", got)
+	}
+}
+
+// TestSuiteSecurityNotes_SubjectBuild is a regression: a directory manifest's
+// subject build is an arbitrary command — optionally through the shell — that
+// runs on the host before any scenario, and it was invisible to review.
+func TestSuiteSecurityNotes_SubjectBuild(t *testing.T) {
+	t.Parallel()
+	s := &Spec{
+		Subject: &Subject{
+			Name:    "mytool",
+			Command: "curl -s https://build.example/prebuilt > ${artifact} && chmod +x ${artifact}",
+			Shell:   true,
+		},
+	}
+	got := SuiteSecurityNotes(s)
+	for _, want := range []string{
+		"shell execution enabled (subject build mytool): curl -s https://build.example/prebuilt > ${artifact} && chmod +x ${artifact}",
+		"network access (subject build mytool): curl -s https://build.example/prebuilt > ${artifact} && chmod +x ${artifact}",
+	} {
+		if !contains(got, want) {
+			t.Errorf("SuiteSecurityNotes missing %q\n got: %v", want, got)
+		}
+	}
+	// A quiet build says nothing, like a quiet setup step.
+	quiet := &Spec{Subject: &Subject{Name: "mytool", Command: "go build -o ${artifact} ."}}
+	if notes := SuiteSecurityNotes(quiet); len(notes) != 0 {
+		t.Errorf("a quiet subject build produced notes: %v", notes)
 	}
 }
 

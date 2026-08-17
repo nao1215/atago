@@ -25,6 +25,16 @@ func Explain(w io.Writer, s *spec.Spec, path string) error {
 	if s.ProjectPath != "" {
 		fmt.Fprintf(&b, "Project manifest: %s\n", s.ProjectPath)
 	}
+	// The manifest's subject build runs on the host before any scenario, so a
+	// reviewer has to see the command as well as the file it came from: naming
+	// only the path left an arbitrary (optionally shell) build invisible.
+	if sub := s.Subject; sub != nil {
+		line := fmt.Sprintf("Subject under test: %s (built by: %s", sub.Name, sub.Command)
+		if sub.Shell {
+			line += ", shell"
+		}
+		fmt.Fprintf(&b, "%s)\n", line)
+	}
 	if s.FixturesDir != "" {
 		fmt.Fprintf(&b, "Fixtures (${fixtures}): %s\n", s.FixturesDir)
 	}
@@ -37,9 +47,14 @@ func Explain(w io.Writer, s *spec.Spec, path string) error {
 	fmt.Fprintf(&b, "Network policy: %s\n", networkPolicy(s))
 	explainSuiteBlock(&b, "Suite setup (runs once before any scenario)", s.Suite.Setup, s.Runners)
 	explainSuiteBlock(&b, "Suite teardown (always runs after the last scenario)", s.Suite.Teardown, s.Runners)
+	// The lifecycle's own outputs: a redirect in setup or teardown writes a file
+	// exactly as a scenario's does, and there was no suite-level list anywhere.
+	if gen := spec.SuiteGeneratedArtifacts(&s.Suite); len(gen) > 0 {
+		writeList(&b, "Suite generates", gen)
+	}
 	// The suite lifecycle gets the same security summary a scenario gets: its
 	// steps run like any scenario's, and only the scenarios were flagged.
-	if notes := spec.SuiteSecurityNotes(&s.Suite, s.Runners); len(notes) > 0 {
+	if notes := spec.SuiteSecurityNotes(s); len(notes) > 0 {
 		b.WriteString("⚠ Suite security notes:\n")
 		for _, note := range notes {
 			fmt.Fprintf(&b, "  - %s\n", note)

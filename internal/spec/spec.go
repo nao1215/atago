@@ -32,6 +32,12 @@ type Spec struct {
 	// (#394), absolute. Set by the loader from atago.project.yaml, never
 	// authored in a spec, and exposed to every scenario as ${fixtures}.
 	FixturesDir string `yaml:"-"`
+	// Subject is the binary under test declared by that manifest (#393), when
+	// it declares one. It is recorded here — rather than staying inside the
+	// loader — because the build is a command that runs on the host before any
+	// scenario, with the invoking environment and optionally through the shell,
+	// and the spec summaries have to be able to describe and flag it.
+	Subject *Subject `yaml:"-"`
 	// ProjectPath is the manifest that applied to this spec, if any (#392). Set
 	// by the loader, never authored; the read-only commands print it, because
 	// configuration that applies to a file without appearing in it has to be
@@ -257,6 +263,20 @@ type Scenario struct {
 	// step). A teardown failure is reported but does not change the scenario's
 	// verdict: the behavior under test is decided by Steps alone.
 	Teardown []Step `yaml:"teardown,omitempty"`
+}
+
+// Subject is the binary under test a directory manifest declares (#393),
+// reduced to what a spec summary needs: the name specs invoke it by, and the
+// command that builds it before any scenario runs.
+//
+// The build command is the reason this reaches the spec model at all. It runs
+// on the host with the invoking environment, optionally through the shell, and
+// nothing described or flagged it — a `curl … > ${artifact}` build was as
+// invisible to review as an empty manifest.
+type Subject struct {
+	Name    string
+	Command string
+	Shell   bool
 }
 
 // Condition gates a scenario by platform, environment, or a probe command

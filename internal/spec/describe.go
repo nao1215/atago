@@ -64,49 +64,70 @@ var NetworkCommand = regexp.MustCompile(`(?i)\b(curl|wget|nc|ncat|ssh|scp|telnet
 // and manifest all consume this so a generated output can never appear in one
 // spec summary but silently vanish from another (#56).
 func GeneratedArtifacts(sc *Scenario) []string {
-	var out []string
-	seen := map[string]bool{}
-	add := func(p string) {
-		if p != "" && !seen[p] {
-			seen[p] = true
-			out = append(out, p)
-		}
+	a := &artifactSet{seen: map[string]bool{}}
+	a.steps(sc.Steps)
+	a.steps(sc.Teardown)
+	return a.out
+}
+
+// SuiteGeneratedArtifacts is GeneratedArtifacts for the suite's once-per-run
+// lifecycle. A redirect in suite.setup or suite.teardown writes a file exactly
+// as a scenario's does, and it appeared in no summary at all: there was no
+// suite-level list anywhere, so the path was unrecoverable from explain, doc,
+// or the manifest.
+func SuiteGeneratedArtifacts(su *Suite) []string {
+	a := &artifactSet{seen: map[string]bool{}}
+	a.steps(su.Setup)
+	a.steps(su.Teardown)
+	return a.out
+}
+
+// artifactSet accumulates declared output paths in order, without repeats. The
+// scenario and suite walks share it so a new way of declaring an output cannot
+// be learned by one and missed by the other.
+type artifactSet struct {
+	out  []string
+	seen map[string]bool
+}
+
+func (a *artifactSet) add(p string) {
+	if p != "" && !a.seen[p] {
+		a.seen[p] = true
+		a.out = append(a.out, p)
 	}
-	collect := func(steps []Step) {
-		for i := range steps {
-			step := &steps[i]
-			switch step.Kind() {
-			case StepRun:
-				add(step.Run.StdoutTo)
-				add(step.Run.StderrTo)
-			case StepHTTP:
-				add(step.HTTP.BodyTo)
-			case StepAssert:
-				a := step.Assert
-				if a.File != nil && a.File.Exists != nil && *a.File.Exists {
-					add(a.File.Path)
-				}
-				if a.Image != nil {
-					add(a.Image.Path)
-				}
-				// A pdf assertion inspects an output the tool wrote, exactly
-				// like image; it arrived later (#73) and was the one inspecting
-				// target this list never learned.
-				if a.PDF != nil {
-					add(a.PDF.Path)
-				}
-			case StepCDP:
-				for _, act := range step.CDP.Actions {
-					if act.Screenshot != nil {
-						add(act.Screenshot.Path)
-					}
+}
+
+func (a *artifactSet) steps(steps []Step) {
+	for i := range steps {
+		step := &steps[i]
+		switch step.Kind() {
+		case StepRun:
+			a.add(step.Run.StdoutTo)
+			a.add(step.Run.StderrTo)
+		case StepHTTP:
+			a.add(step.HTTP.BodyTo)
+		case StepAssert:
+			as := step.Assert
+			if as.File != nil && as.File.Exists != nil && *as.File.Exists {
+				a.add(as.File.Path)
+			}
+			if as.Image != nil {
+				a.add(as.Image.Path)
+			}
+			// A pdf assertion inspects an output the tool wrote, exactly like
+			// image; it arrived later (#73) and was the one inspecting target
+			// this list never learned.
+			if as.PDF != nil {
+				a.add(as.PDF.Path)
+			}
+		case StepCDP:
+			for _, act := range step.CDP.Actions {
+				if act.Screenshot != nil {
+					a.add(act.Screenshot.Path)
 				}
 			}
 		}
 	}
-	collect(sc.Steps)
-	collect(sc.Teardown)
-	return out
 }
 
 // SecurityNotes returns, in declaration order and de-duplicated, the
@@ -145,13 +166,27 @@ func SecurityNotes(sc *Scenario, runners map[string]Runner) []string {
 // service — and whose teardown curls a purge endpoint — reported no security
 // notes anywhere, while the identical steps inside a scenario produce one for
 // each. explain and manifest share this the way they share SecurityNotes.
-func SuiteSecurityNotes(su *Suite, runners map[string]Runner) []string {
+// It takes the whole spec because the lifecycle is not only suite.setup and
+// suite.teardown: a directory manifest's subject build (#393) runs on the host
+// before any scenario, with the invoking environment and optionally through the
+// shell, and was described by nothing.
+func SuiteSecurityNotes(s *Spec) []string {
 	n := &noteSet{seen: map[string]bool{}}
-	for i := range su.Setup {
-		n.step(&su.Setup[i], runners)
+	if sub := s.Subject; sub != nil {
+		where := "subject build " + sub.Name
+		if sub.Shell {
+			n.add("shell execution enabled (" + where + "): " + sub.Command)
+		}
+		if NetworkCommand.MatchString(sub.Command) {
+			n.add("network access (" + where + "): " + sub.Command)
+		}
+		n.envRefs(sub.Command)
 	}
-	for i := range su.Teardown {
-		n.step(&su.Teardown[i], runners)
+	for i := range s.Suite.Setup {
+		n.step(&s.Suite.Setup[i], s.Runners)
+	}
+	for i := range s.Suite.Teardown {
+		n.step(&s.Suite.Teardown[i], s.Runners)
 	}
 	return n.out
 }

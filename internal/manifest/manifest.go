@@ -97,8 +97,24 @@ type Spec struct {
 	// setup/teardown steps. Without it, a consumer auditing egress from the
 	// manifest saw no trace of a setup that curls or a suite service that
 	// opens an ssh tunnel.
-	SuiteSecurity []string   `json:"suite_security,omitempty"`
-	Scenarios     []Scenario `json:"scenarios"`
+	SuiteSecurity []string `json:"suite_security,omitempty"`
+	// SuiteGenerates mirrors a scenario's Generates for the suite lifecycle: a
+	// redirect in setup or teardown writes a file exactly as a scenario's does,
+	// and no suite-level list existed anywhere, so the path was unrecoverable
+	// from any machine surface.
+	SuiteGenerates []string `json:"suite_generates,omitempty"`
+	// Subject is the binary under test declared by the directory manifest
+	// (#393), including the command that builds it on the host before any
+	// scenario runs. Omitted when no manifest declares one.
+	Subject   *Subject   `json:"subject,omitempty"`
+	Scenarios []Scenario `json:"scenarios"`
+}
+
+// Subject is the binary under test declared by a directory manifest (#393).
+type Subject struct {
+	Name    string `json:"name"`
+	Command string `json:"command"`
+	Shell   bool   `json:"shell,omitempty"`
 }
 
 // Network summarizes the spec's network policy.
@@ -306,7 +322,11 @@ func buildSpec(in Input) Spec {
 		out.SuiteTeardown = append(out.SuiteTeardown, buildStep(i, &s.Suite.Teardown[i], suiteVars, s.Runners))
 	}
 	out.SuiteVariables = spec.SortedKeys(suiteVars)
-	out.SuiteSecurity = spec.SuiteSecurityNotes(&s.Suite, s.Runners)
+	out.SuiteSecurity = spec.SuiteSecurityNotes(s)
+	out.SuiteGenerates = spec.SuiteGeneratedArtifacts(&s.Suite)
+	if sub := s.Subject; sub != nil {
+		out.Subject = &Subject{Name: sub.Name, Command: sub.Command, Shell: sub.Shell}
+	}
 	for i := range s.Scenarios {
 		out.Scenarios = append(out.Scenarios, buildScenario(&s.Scenarios[i], in.Source, s.Runners))
 	}
