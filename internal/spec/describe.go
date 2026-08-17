@@ -302,17 +302,10 @@ func (n *noteSet) ptyStep(p *PTY) {
 	if NetworkCommand.MatchString(p.Command) {
 		n.add("network access: " + p.Command)
 	}
-	n.envRefs(p.Command)
-	n.envRefs(envValues(p.Env)...)
+	// The ${env:} reads across the command, env, and session are reported by
+	// the unified walker scan in step(); only the shell/network judgments live
+	// here.
 	for _, a := range p.Session {
-		if a.Send != nil {
-			if a.Send.Text != nil {
-				n.envRefs(*a.Send.Text)
-			}
-			if a.Send.Paste != nil {
-				n.envRefs(*a.Send.Paste)
-			}
-		}
 		if a.Exec == nil {
 			continue
 		}
@@ -322,7 +315,6 @@ func (n *noteSet) ptyStep(p *PTY) {
 		if NetworkCommand.MatchString(a.Exec.Command) {
 			n.add("network access (pty exec): " + a.Exec.Command)
 		}
-		n.envRefs(a.Exec.Command)
 	}
 }
 
@@ -347,8 +339,7 @@ func (n *noteSet) runStep(r *Run, runners map[string]Runner) {
 			n.add("ssh host key verification disabled (runner " + strconv.Quote(r.Runner) + ")")
 		}
 	}
-	n.envRefs(r.Command, r.Stdin.Inline, r.Stdin.File)
-	n.envRefs(envValues(r.Env)...)
+	// The ${env:} reads are reported by the unified walker scan in step().
 }
 
 // remoteDatabase reports whether a db runner dials a server rather than opening

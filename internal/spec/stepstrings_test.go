@@ -227,6 +227,18 @@ func TestWalkStepStrings_IdentityKeepsEverything(t *testing.T) {
 			&PTYAction{Send: &PTYSend{Paste: &paste}}},
 		{"signal", WalkSignalStrings(&Signal{Service: "s", Signal: "TERM", Wait: &SignalWait{Timeout: "1s"}}, identity),
 			&Signal{Service: "s", Signal: "TERM", Wait: &SignalWait{Timeout: "1s"}}},
+		{"service", WalkServiceStrings(&Service{Name: "n", Command: "c", Cwd: "d", Env: map[string]string{"K": "v"}, Ready: &Ready{File: "f", Port: "p", Log: "l", Delay: "1s", Store: "sv", Timeout: "2s"}}, identity),
+			&Service{Name: "n", Command: "c", Cwd: "d", Env: map[string]string{"K": "v"}, Ready: &Ready{File: "f", Port: "p", Log: "l", Delay: "1s", Store: "sv", Timeout: "2s"}}},
+		{"store", WalkStoreStrings(&Store{Name: "n", From: &StoreFrom{File: &FileAssert{Path: "p", Text: boolp(true)}}}, identity),
+			&Store{Name: "n", From: &StoreFrom{File: &FileAssert{Path: "p", Text: boolp(true)}}}},
+		{"http", WalkHTTPStrings(&HTTP{Runner: "r", Method: "GET", Path: "p", Header: map[string]string{"K": "v"}, Body: "b", BodyFile: "bf", BodyTo: "bt", Form: map[string]string{"K": "v"}, Files: []FilePart{{Field: "f", Path: "fp"}}, Retry: &Retry{Times: 2}}, identity),
+			&HTTP{Runner: "r", Method: "GET", Path: "p", Header: map[string]string{"K": "v"}, Body: "b", BodyFile: "bf", BodyTo: "bt", Form: map[string]string{"K": "v"}, Files: []FilePart{{Field: "f", Path: "fp"}}, Retry: &Retry{Times: 2}}},
+		{"grpc", WalkGRPCStrings(&GRPC{Runner: "r", Method: "m", Header: map[string]string{"K": "v"}, JSON: map[string]any{"k": "v"}}, identity),
+			&GRPC{Runner: "r", Method: "m", Header: map[string]string{"K": "v"}, JSON: map[string]any{"k": "v"}}},
+		{"cdp", WalkCDPStrings(&CDP{Runner: "r", Actions: []CDPAction{{Title: true}, {Screenshot: &CDPScreenshot{Path: "p", Selector: "s"}}}}, identity),
+			&CDP{Runner: "r", Actions: []CDPAction{{Title: true}, {Screenshot: &CDPScreenshot{Path: "p", Selector: "s"}}}}},
+		{"pty", WalkPTYStrings(&PTY{Command: "c", Cwd: "d", Rows: 24, Cols: 80, Timeout: "5s", Env: map[string]string{"K": "v"}, Session: []PTYAction{{Resize: &PTYResize{Rows: 10, Cols: 20}}}}, identity),
+			&PTY{Command: "c", Cwd: "d", Rows: 24, Cols: 80, Timeout: "5s", Env: map[string]string{"K": "v"}, Session: []PTYAction{{Resize: &PTYResize{Rows: 10, Cols: 20}}}}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

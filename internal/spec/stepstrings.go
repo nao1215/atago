@@ -29,11 +29,12 @@ package spec
 // one place and reviewed in one diff.
 
 // walkMapValues applies visit to each value of a string map, leaving keys
-// untouched (mirroring store.ExpandMap), or returns the map unchanged when
-// empty so nil stays nil.
+// untouched (mirroring store.ExpandMap). nil stays nil; any non-nil map comes
+// back as a fresh copy, keeping the walkers' copy-first contract even for an
+// empty one.
 func walkMapValues(m map[string]string, visit func(string) string) map[string]string {
-	if len(m) == 0 {
-		return m
+	if m == nil {
+		return nil
 	}
 	out := make(map[string]string, len(m))
 	for k, v := range m {
