@@ -367,6 +367,15 @@ func validateScrub(add addFunc, rules []spec.ScrubRule) {
 	for i, r := range rules {
 		if r.Pattern == "" {
 			add(diag.RequiredKey, "scrub[%d].pattern is required (a regex to normalize; e.g. \"req-\\d+\")", i)
+			continue
+		}
+		// A rule whose pattern matches the empty string matches between every
+		// byte, so it inserts the placeholder throughout the snapshot — and,
+		// because normalization applies the rules twice by design, shreds the
+		// placeholder it just wrote. The run stays green and the golden it
+		// commits no longer resembles anything a reviewer can read.
+		if matchesEmpty(r.Pattern) {
+			add(diag.VacuousMatcher, "scrub[%d].pattern %q matches the empty string, so it matches between every byte and replaces the whole snapshot with placeholders; require at least one character (e.g. \"[0-9]+\")", i, r.Pattern)
 		}
 	}
 	if _, err := scrub.New(rules); err != nil {

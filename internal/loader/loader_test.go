@@ -1248,6 +1248,19 @@ func TestBugHunt_Rejections(t *testing.T) {
 		{"mock header invalid", mockScenario("assert: {mock: {name: api, header: {name: X}}}"), "must set one of contains/equals/matches"},
 		{"mock body invalid", mockScenario("assert: {mock: {name: api, body: {}}}"), "must set at least one matcher"},
 
+		// ---- empty-matching regexps outside not_matches (#557) ----
+		{"count bound on an empty-matching pattern", specSteps("run: {command: echo}", "assert: {stdout: {matches: \"q*\", max_count: 0}}"), "matches the empty string"},
+		{"count bound on an optional group", specSteps("run: {command: echo}", "assert: {stdout: {matches: \"(foo)?\", count: 1}}"), "matches the empty string"},
+		{"scrub rule matching the empty string", "version: \"1\"\nsuite: {name: s}\nscrub:\n  - {pattern: \"[0-9]*\", placeholder: \"<ID>\"}\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n", "matches the empty string"},
+		{"store capture matching the empty string", specSteps("run: {command: echo}", "store: {name: v, from: {stdout: {matches: \"[0-9]*\"}}}"), "matches the empty string"},
+
+		// ---- matchers of one assert that contradict each other (#558) ----
+		{"contains and not_contains share an entry", specSteps("run: {command: echo}", "assert: {stdout: {contains: [abc], not_contains: [abc]}}"), "contains and not_contains both list \"abc\""},
+		{"matches equals not_matches", specSteps("run: {command: echo}", "assert: {stdout: {matches: \"a.c\", not_matches: \"a.c\"}}"), "matches and not_matches are the same pattern"},
+		{"dir contains with count zero", specSteps("assert: {dir: {path: d, contains: [x], count: 0}}"), "count: 0 cannot hold together with contains"},
+		{"dir contains above max_count", specSteps("assert: {dir: {path: d, contains: [x, y], max_count: 1}}"), "requires at least 2 entries"},
+		{"dir contains and not_contains share an entry", specSteps("assert: {dir: {path: d, contains: [x], not_contains: [x]}}"), "contains and not_contains both list \"x\""},
+
 		// ---- validateCondition ----
 		{"skip bad os", scenarioTop("skip: {os: solaris}", "run: {command: echo}"), "skip.os \"solaris\" is invalid"},
 		{"only bad os", scenarioTop("only: {os: bsd}", "run: {command: echo}"), "only.os \"bsd\" is invalid"},
@@ -1427,6 +1440,14 @@ func TestBugHunt_Acceptances(t *testing.T) {
 		{"assert duration after run", specSteps("run: {command: echo}", "assert: {duration: {lt: \"5s\"}}")},
 		{"skip valid os", scenarioTop("skip: {os: darwin}", "run: {command: echo}")},
 		{"only valid os", scenarioTop("only: {os: windows}", "run: {command: echo}")},
+		// Contradiction checks compare literally, so anything that can be
+		// satisfied keeps loading.
+		{"contains and not_contains that differ", specSteps("run: {command: echo}", "assert: {stdout: {contains: [abc], not_contains: [abcd]}}")},
+		{"matches and not_matches that differ", specSteps("run: {command: echo}", "assert: {stdout: {matches: \"a.c\", not_matches: \"a\\\\.c\"}}")},
+		{"dir contains repeated names one child", specSteps("assert: {dir: {path: d, contains: [x, x], count: 1}}")},
+		{"dir contains a nested path under its ceiling", specSteps("assert: {dir: {path: d, contains: [\"assets/app.css\"], max_count: 1}}")},
+		{"recursive dir contains with a count", specSteps("assert: {dir: {path: d, recursive: true, contains: [\"a/b.txt\"], count: 0}}")},
+		{"empty-matching pattern without a count bound", specSteps("run: {command: echo}", "assert: {stdout: {matches: \"z*\"}}")},
 		// Gates that name DIFFERENT fields compose normally: "this scenario is
 		// POSIX-only and needs fzf" is an ordinary spec, and so are two gates on
 		// one field with different values.

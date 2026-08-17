@@ -131,6 +131,13 @@ func validateStoreSelector(add addFunc, where string, s *spec.StreamAssert) {
 		n++
 		if _, err := regexp.Compile(*s.Matches); err != nil {
 			add(diag.BadRegexp, "%s.matches %q is not a valid regexp: %v", where, *s.Matches, err)
+		} else if matchesEmpty(*s.Matches) {
+			// The capture takes the first match, which for an empty-matching
+			// pattern is the empty string at position 0 — so the store silently
+			// holds "" for output that plainly contains the value, and the empty
+			// value flows into later steps with no diagnostic at all. This is the
+			// dangerous member of the family: a wrong value, not a wrong verdict.
+			add(diag.VacuousMatcher, "%s.matches %q matches the empty string, so it captures \"\" from any output; require at least one character (e.g. \"[0-9]+\")", where, *s.Matches)
 		}
 	}
 	if s.Trim != nil {

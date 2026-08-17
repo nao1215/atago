@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-82 suites · 665 scenarios
+82 suites · 669 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -408,7 +408,7 @@
   - [list surfaces suites, scenarios, tags, and gates](#scenario-list-surfaces-suites-scenarios-tags-and-gates)
   - [list --json is a stable machine contract](#scenario-list---json-is-a-stable-machine-contract)
   - [list marks an expect_fail scenario](#scenario-list-marks-an-expect_fail-scenario)
-- [atago self-hosting / loader rejects malformed specs](#atago-self-hosting--loader-rejects-malformed-specs) — 22 scenarios
+- [atago self-hosting / loader rejects malformed specs](#atago-self-hosting--loader-rejects-malformed-specs) — 26 scenarios
   - [an empty scenario list is rejected](#scenario-an-empty-scenario-list-is-rejected)
   - [a wrong version string is rejected](#scenario-a-wrong-version-string-is-rejected)
   - [an unknown top-level field is rejected with its position](#scenario-an-unknown-top-level-field-is-rejected-with-its-position)
@@ -431,6 +431,10 @@
   - [skip and only naming the same condition are rejected](#scenario-skip-and-only-naming-the-same-condition-are-rejected)
   - [gates naming different fields still load](#scenario-gates-naming-different-fields-still-load)
   - [an empty deterministic compare list is rejected](#scenario-an-empty-deterministic-compare-list-is-rejected)
+  - [an empty-matching pattern under a count bound is rejected](#scenario-an-empty-matching-pattern-under-a-count-bound-is-rejected)
+  - [an empty-matching store capture is rejected](#scenario-an-empty-matching-store-capture-is-rejected)
+  - [an empty-matching scrub rule is rejected](#scenario-an-empty-matching-scrub-rule-is-rejected)
+  - [matchers of one assert that contradict each other are rejected](#scenario-matchers-of-one-assert-that-contradict-each-other-are-rejected)
 - [atago self-hosting / manifest](#atago-self-hosting--manifest) — 4 scenarios
   - [manifest emits a stable JSON summary without running the spec](#scenario-manifest-emits-a-stable-json-summary-without-running-the-spec)
   - [manifest does not execute the spec's commands](#scenario-manifest-does-not-execute-the-specs-commands)
@@ -8839,6 +8843,93 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `deterministic.compare must not be empty`
+### Scenario: an empty-matching pattern under a count bound is rejected
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    steps:
+      - run: {command: echo}
+      - assert: {stdout: {matches: "q*", max_count: 0}}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `matches the empty string`
+### Scenario: an empty-matching store capture is rejected
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    steps:
+      - run: {command: echo}
+      - store: {name: v, from: {stdout: {matches: "[0-9]*"}}}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `captures "" from any output`
+### Scenario: an empty-matching scrub rule is rejected
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scrub:
+  - {pattern: "[0-9]*", placeholder: "<ID>"}
+scenarios:
+  - name: a
+    steps: [{run: {command: echo}}]
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `matches between every byte`
+### Scenario: matchers of one assert that contradict each other are rejected
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    steps:
+      - run: {command: echo}
+      - assert: {stdout: {contains: [abc], not_contains: [abc]}}
+  - name: b
+    steps:
+      - assert: {dir: {path: d, contains: [x], count: 0}}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `contains and not_contains both list "abc"`, `count: 0 cannot hold together with contains`
 ## atago self-hosting / manifest
 Source: `test/e2e/atago/manifest.atago.yaml`
 ### Scenario: manifest emits a stable JSON summary without running the spec

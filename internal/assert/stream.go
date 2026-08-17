@@ -265,10 +265,10 @@ func equalsNormalized(got, want string) bool {
 }
 
 // foldCRLF collapses Windows CRLF line endings to LF so text comparison treats
-// line endings as an OS artifact. A lone CR (an old-Mac line ending) stays
-// observable, matching equalsNormalized — only the CR that precedes an LF is
-// dropped.
-func foldCRLF(s string) string { return strings.ReplaceAll(s, "\r\n", "\n") }
+// line endings as an OS artifact. The rule itself lives in spec.FoldCRLF,
+// because the loader folds the same text when it decides whether two matchers
+// of one assert contradict each other.
+func foldCRLF(s string) string { return spec.FoldCRLF(s) }
 
 // foldCRLFList folds CRLF in every element so a needle authored with CRLF
 // compares equal to LF-folded output.
