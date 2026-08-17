@@ -193,6 +193,12 @@ exactly that point in the sequence, once, for the whole suite — the
 build-then-serve bootstrap every "run my app and test it" setup needs.
 
 Source: `test/e2e/thirdparty/hugo/hugo_server.atago.yaml`
+### Suite setup (runs once before any scenario)
+```shell
+hugo new site mysite --quiet
+hugo new content posts/hello.md
+# start service hugo: hugo server --source ${suitedir}/mysite --port 14140 --bind 127.0.0.1 --buildDrafts
+```
 ### Scenario: the home page lists the post
 _only when `hugo version` succeeds_
 #### When

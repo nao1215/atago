@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-81 suites · 631 scenarios
+81 suites · 632 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -124,7 +124,7 @@
   - [record, compare green, then a mutation names the changed paths](#scenario-record-compare-green-then-a-mutation-names-the-changed-paths)
   - [recursive matchers and ignore globs walk the tree](#scenario-recursive-matchers-and-ignore-globs-walk-the-tree)
   - [combining snapshot with matchers is a load-time error](#scenario-combining-snapshot-with-matchers-is-a-load-time-error)
-- [atago self-hosting / doc](#atago-self-hosting--doc) — 8 scenarios
+- [atago self-hosting / doc](#atago-self-hosting--doc) — 9 scenarios
   - [doc generates Markdown to a file](#scenario-doc-generates-markdown-to-a-file)
   - [doc writes Markdown to stdout without --out](#scenario-doc-writes-markdown-to-stdout-without---out)
   - [doc emits a summary, table of contents, and input previews](#scenario-doc-emits-a-summary-table-of-contents-and-input-previews)
@@ -133,6 +133,7 @@
   - [doc renders suite and scenario descriptions verbatim](#scenario-doc-renders-suite-and-scenario-descriptions-verbatim)
   - [doc renders every matcher an assertion sets](#scenario-doc-renders-every-matcher-an-assertion-sets)
   - [a spec whose matchers doc renders still runs green](#scenario-a-spec-whose-matchers-doc-renders-still-runs-green)
+  - [doc renders the suite lifecycle blocks](#scenario-doc-renders-the-suite-lifecycle-blocks)
 - [atago self-hosting / duration assertion](#atago-self-hosting--duration-assertion) — 4 scenarios
   - [a fast step passes a generous upper bound](#scenario-a-fast-step-passes-a-generous-upper-bound)
   - [an impossible bound fails and shows the measured duration](#scenario-an-impossible-bound-fails-and-shows-the-measured-duration)
@@ -3310,6 +3311,39 @@ ${atago} run matchers.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `3 passed`
+### Scenario: doc renders the suite lifecycle blocks
+#### Given
+- Fixture file `lifecycle.atago.yaml` is created.
+#### Inputs
+_Fixture `lifecycle.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: lifecycle
+  setup:
+    - run:
+        command: echo build
+    - service:
+        name: relay
+        command: echo serve
+        ready:
+          delay: 10ms
+  teardown:
+    - run:
+        command: echo purge
+scenarios:
+  - name: trivial
+    steps:
+      - run: {command: echo hi}
+      - assert: {exit_code: 0}
+```
+#### When
+```shell
+${atago} doc lifecycle.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout contains `### Suite setup (runs once before any scenario)`, `echo build`, `# start service relay: echo serve`, `### Suite teardown (always runs after the last scenario)`, `echo purge`
 ## atago self-hosting / duration assertion
 Source: `test/e2e/atago/duration.atago.yaml`
 ### Scenario: a fast step passes a generous upper bound
