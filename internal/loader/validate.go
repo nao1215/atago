@@ -155,55 +155,129 @@ func validateScenario(add addFunc, s *spec.Spec, i int, seen, suiteServiceNames,
 // an assert can be checked against the step that would feed it.
 type producedKinds map[spec.StepKind]bool
 
-// assertProducers maps an assertion target to the step kinds that can feed it,
-// and the phrase naming them. It is the one place that says which step produces
-// which observable, so the rules cannot drift apart the way they had: a screen
-// assert with no pty step was refused at load, a status assert with no http
-// step merely FAILED at run time (exit 1 — a spec doing its job, per the exit
-// contract), and a store reading a header errored (exit 4). All three are the
-// same authoring mistake, knowable without running anything.
+// producer names the step kinds that can feed one observable. It is the one
+// place that says which step produces what, so the rules cannot drift apart the
+// way they had: a screen assert with no pty step was refused at load, a status
+// assert with no http step merely FAILED at run time (exit 1 — a spec doing its
+// job, per the exit contract), and a store reading a header errored (exit 4).
+// All three are the same authoring mistake, knowable without running anything.
+type producer []spec.StepKind
+
+// The observables an assertion target or a store source can read, named once so
+// an assert and the store spelling of the same read cannot disagree.
+var (
+	fromRunOrPTY = producer{spec.StepRun, spec.StepPTY}
+	fromHTTP     = producer{spec.StepHTTP}
+	fromQuery    = producer{spec.StepQuery}
+	fromGRPC     = producer{spec.StepGRPC}
+	fromPTY      = producer{spec.StepPTY}
+	fromCDP      = producer{spec.StepCDP}
+)
+
+// phrase names the producing kinds in a diagnostic ("run/pty", "http").
+func (p producer) phrase() string {
+	parts := make([]string, 0, len(p))
+	for _, k := range p {
+		parts = append(parts, string(k))
+	}
+	return strings.Join(parts, "/")
+}
+
+// feasible narrows the producing kinds to those a block admits at all. allowed
+// is nil in a scenario, where every kind may appear.
+func (p producer) feasible(allowed map[spec.StepKind]bool) producer {
+	if allowed == nil {
+		return p
+	}
+	out := make(producer, 0, len(p))
+	for _, k := range p {
+		if allowed[k] {
+			out = append(out, k)
+		}
+	}
+	return out
+}
+
+// assertProducers maps an assertion target to the step kinds that can feed it.
 //
 // Only targets with an unambiguous producer are listed. file/dir/image/pdf read
-// the filesystem, which a fixture may have written; mock reads a server's log;
-// value is fed by several kinds. Those stay out rather than guess.
+// the filesystem, which a fixture may have written, and mock reads a server's
+// log. Those stay out rather than guess.
 var assertProducers = []struct {
 	target spec.AssertTarget
 	set    func(*spec.Assert) bool
-	kinds  []spec.StepKind
-	needs  string
+	from   producer
 }{
-	{spec.AssertExitCode, func(a *spec.Assert) bool { return a.ExitCode != nil }, []spec.StepKind{spec.StepRun, spec.StepPTY}, "run/pty"},
-	{spec.AssertStdout, func(a *spec.Assert) bool { return a.Stdout != nil }, []spec.StepKind{spec.StepRun, spec.StepPTY}, "run/pty"},
-	{spec.AssertStderr, func(a *spec.Assert) bool { return a.Stderr != nil }, []spec.StepKind{spec.StepRun, spec.StepPTY}, "run/pty"},
-	{spec.AssertStatus, func(a *spec.Assert) bool { return a.Status != nil }, []spec.StepKind{spec.StepHTTP}, "http"},
-	{spec.AssertHeader, func(a *spec.Assert) bool { return a.Header != nil }, []spec.StepKind{spec.StepHTTP}, "http"},
-	{spec.AssertBody, func(a *spec.Assert) bool { return a.Body != nil }, []spec.StepKind{spec.StepHTTP}, "http"},
-	{spec.AssertRows, func(a *spec.Assert) bool { return a.Rows != nil }, []spec.StepKind{spec.StepQuery}, "query"},
-	{spec.AssertGRPCStatus, func(a *spec.Assert) bool { return a.GRPCStatus != nil }, []spec.StepKind{spec.StepGRPC}, "grpc"},
-	{spec.AssertMessage, func(a *spec.Assert) bool { return a.Message != nil }, []spec.StepKind{spec.StepGRPC}, "grpc"},
-	{spec.AssertScreen, func(a *spec.Assert) bool { return a.Screen != nil }, []spec.StepKind{spec.StepPTY}, "pty"},
+	{spec.AssertExitCode, func(a *spec.Assert) bool { return a.ExitCode != nil }, fromRunOrPTY},
+	{spec.AssertStdout, func(a *spec.Assert) bool { return a.Stdout != nil }, fromRunOrPTY},
+	{spec.AssertStderr, func(a *spec.Assert) bool { return a.Stderr != nil }, fromRunOrPTY},
+	{spec.AssertStatus, func(a *spec.Assert) bool { return a.Status != nil }, fromHTTP},
+	{spec.AssertHeader, func(a *spec.Assert) bool { return a.Header != nil }, fromHTTP},
+	{spec.AssertBody, func(a *spec.Assert) bool { return a.Body != nil }, fromHTTP},
+	{spec.AssertRows, func(a *spec.Assert) bool { return a.Rows != nil }, fromQuery},
+	{spec.AssertGRPCStatus, func(a *spec.Assert) bool { return a.GRPCStatus != nil }, fromGRPC},
+	{spec.AssertMessage, func(a *spec.Assert) bool { return a.Message != nil }, fromGRPC},
+	{spec.AssertScreen, func(a *spec.Assert) bool { return a.Screen != nil }, fromPTY},
+	{spec.AssertValue, func(a *spec.Assert) bool { return a.Value != nil }, fromCDP},
+}
+
+// storeProducers maps a store source to the step kinds that can feed it, from
+// the same producers the assertions use. A store reads the step result an
+// assertion reads, so `store: {from: {header: …}}` with no http step is the
+// mistake `assert: {header: …}` already names at load time. from.file reads the
+// filesystem and is unaffected.
+var storeProducers = []struct {
+	source string
+	set    func(*spec.StoreFrom) bool
+	from   producer
+}{
+	{"stdout", func(f *spec.StoreFrom) bool { return f.Stdout != nil }, fromRunOrPTY},
+	{"body", func(f *spec.StoreFrom) bool { return f.Body != nil }, fromHTTP},
+	{"header", func(f *spec.StoreFrom) bool { return f.Header != "" }, fromHTTP},
+	{"rows", func(f *spec.StoreFrom) bool { return f.Rows != nil }, fromQuery},
+	{"message", func(f *spec.StoreFrom) bool { return f.Message != nil }, fromGRPC},
+	{"value", func(f *spec.StoreFrom) bool { return f.Value != nil }, fromCDP},
+}
+
+// checkProducerContext refuses a read whose producing step has not run. produced
+// is the set of kinds seen so far, so a read fed by an earlier step — or, in a
+// scenario's teardown, by the scenario's steps — is accepted. allowed is the set
+// of kinds the enclosing block admits, or nil in a scenario: when a block admits
+// no producer for this read at all, no ordering can ever feed it, so the message
+// says that instead of asking for a step the block would reject.
+func checkProducerContext(add addFunc, what string, p producer, produced producedKinds, allowed map[spec.StepKind]bool) {
+	for _, k := range p {
+		if produced[k] {
+			return
+		}
+	}
+	if fit := p.feasible(allowed); len(fit) == 0 {
+		add(diag.AssertNeedsStep, "%s can never be fed here: %s steps are not allowed in a suite block; move it into a scenario", what, p.phrase())
+	} else {
+		add(diag.AssertNeedsStep, "%s requires a preceding %s step (the step that produces what it inspects)", what, fit.phrase())
+	}
 }
 
 // checkAssertContext refuses an assertion whose producing step has not run.
-// produced is the set of kinds seen so far, so an assert fed by a step earlier
-// in the scenario — or, in teardown, by the scenario's steps — is accepted.
-func checkAssertContext(add addFunc, where string, a *spec.Assert, produced producedKinds) {
+func checkAssertContext(add addFunc, where string, a *spec.Assert, produced producedKinds, allowed map[spec.StepKind]bool) {
 	if a == nil {
 		return
 	}
 	for _, p := range assertProducers {
-		if !p.set(a) {
-			continue
+		if p.set(a) {
+			checkProducerContext(add, fmt.Sprintf("%s.assert.%s", where, p.target), p.from, produced, allowed)
 		}
-		fed := false
-		for _, k := range p.kinds {
-			if produced[k] {
-				fed = true
-				break
-			}
-		}
-		if !fed {
-			add(diag.AssertNeedsStep, "%s.assert.%s requires a preceding %s step (the step that produces what it inspects)", where, p.target, p.needs)
+	}
+}
+
+// checkStoreContext refuses a store whose source no preceding step produced.
+func checkStoreContext(add addFunc, where string, s *spec.Store, produced producedKinds, allowed map[spec.StepKind]bool) {
+	if s == nil || s.From == nil {
+		return
+	}
+	for _, p := range storeProducers {
+		if p.set(s.From) {
+			checkProducerContext(add, fmt.Sprintf("%s.store.from.%s", where, p.source), p.from, produced, allowed)
 		}
 	}
 }
@@ -222,7 +296,8 @@ func validateScenarioSteps(add addFunc, where string, sc *spec.Scenario, runners
 		sw := fmt.Sprintf("%s.steps[%d]", where, j)
 		st := &sc.Steps[j]
 		produced[st.Kind()] = true
-		checkAssertContext(add, sw, st.Assert, produced)
+		checkAssertContext(add, sw, st.Assert, produced, nil)
+		checkStoreContext(add, sw, st.Store, produced, nil)
 		if st.Assert != nil && st.Assert.Duration != nil && !prevMeasurable {
 			add(diag.AssertNeedsStep, "%s.assert.duration requires an immediately preceding run/http/query/grpc/pty step (the step whose wall-clock time it bounds)", sw)
 		}
@@ -244,10 +319,11 @@ func validateScenarioTeardown(add addFunc, where string, sc *spec.Scenario, runn
 	for j := range sc.Teardown {
 		tw := fmt.Sprintf("%s.teardown[%d]", where, j)
 		st := &sc.Teardown[j]
-		// Teardown shares the scenario's result: an assert here is fed by the
+		// Teardown shares the scenario's result: a read here is fed by the
 		// scenario's steps, or by an earlier teardown step of the right kind.
 		produced[st.Kind()] = true
-		checkAssertContext(add, tw, st.Assert, produced)
+		checkAssertContext(add, tw, st.Assert, produced, nil)
+		checkStoreContext(add, tw, st.Store, produced, nil)
 		// The workdir delta is only tracked around Steps, so a changes assert
 		// in teardown could never be fed (#70).
 		if st.Assert != nil && st.Assert.Changes != nil {
@@ -370,14 +446,31 @@ func validateRunnerRef(add addFunc, where, stepKind, name string, runners map[st
 	}
 }
 
+// suiteBlockKinds is the set of step kinds a suite.setup / suite.teardown block
+// admits. It bounds what those blocks can ever produce, so a read they could
+// never be fed is knowable from the block alone.
+var suiteBlockKinds = map[spec.StepKind]bool{
+	spec.StepFixture:    true,
+	spec.StepRun:        true,
+	spec.StepStore:      true,
+	spec.StepAssert:     true,
+	spec.StepService:    true,
+	spec.StepMockServer: true,
+}
+
 // validateSuiteBlock checks suite.setup / suite.teardown (#7): steps run once
 // per suite in the ${suitedir} scratch dir, so only the suite-scoped kinds are
 // allowed — fixture, run, store, assert, and (setup only) `service:`. The
 // runner-backed kinds (http/query/grpc/cdp) are per-scenario machinery and are
 // rejected with a pointer to where they belong.
+//
+// Each block feeds its own reads: a teardown assertion does not see what the
+// setup block ran, which is what the engine does, so the two blocks track their
+// produced kinds separately.
 func validateSuiteBlock(add addFunc, where string, steps []spec.Step, runners map[string]spec.Runner, allowService bool) {
 	seenService := map[string]bool{}
 	seenMock := map[string]bool{}
+	produced := producedKinds{}
 	for i := range steps {
 		st := &steps[i]
 		sw := fmt.Sprintf("%s[%d]", where, i)
@@ -386,6 +479,7 @@ func validateSuiteBlock(add addFunc, where string, steps []spec.Step, runners ma
 			add(diag.StepManyActions, "%s: step must set exactly one action (got %v)", sw, keys)
 			continue
 		}
+		produced[st.Kind()] = true
 		switch st.Kind() {
 		case spec.StepFixture:
 			validateFixture(add, sw, st.Fixture)
@@ -393,8 +487,10 @@ func validateSuiteBlock(add addFunc, where string, steps []spec.Step, runners ma
 			validateRunStep(add, sw, st.Run, runners, false)
 		case spec.StepStore:
 			validateStore(add, sw, st.Store)
+			checkStoreContext(add, sw, st.Store, produced, suiteBlockKinds)
 		case spec.StepAssert:
 			validateAssert(add, sw, st.Assert, nil)
+			checkAssertContext(add, sw, st.Assert, produced, suiteBlockKinds)
 		case spec.StepService:
 			if !allowService {
 				add(diag.BlockNotHere, "%s: service steps are only allowed in suite.setup", sw)

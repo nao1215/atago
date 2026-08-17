@@ -1162,17 +1162,31 @@ scenarios:
           exit_code: 4
           stdout: {contains: "ATG4406"}
 
+  # The loader refuses a store whose producing KIND never appears (ATG2107), so
+  # what is left at run time is the ordering it cannot decide: an http step did
+  # run, but a later step replaced the result the store would have read.
   - name: ATG4501 is a store step with no result behind it
+    mock_servers:
+      - name: api
+        routes:
+          - method: GET
+            path: /v1/ok
+            body: ok
     steps:
       - fixture:
           file: bad.atago.yaml
           content: |
             version: "1"
             suite: {name: x}
+            runners:
+              api:
+                type: http
+                base_url: ${api.url}
 
             scenarios:
               - name: a
                 steps:
+                  - http: {runner: api, method: GET, path: /v1/ok}
                   - run: {command: echo}
                   - store: {name: v, from: {body: {trim: true}}}
       - run: {command: "${atago} run bad.atago.yaml"}
@@ -1352,6 +1366,79 @@ scenarios:
                   - assert: {stdout: {contains: ready}}
       - run:
           command: ${atago} run withcontext.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "1 passed"
+
+  # A store reads the step result an assertion reads, so the same mistake spelled
+  # as a store was the third shape named above and stayed an exit-4 runtime error.
+  - name: a store with no producing step is a load-time error
+    steps:
+      - fixture:
+          file: nostore.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: stores a response header after a command
+                steps:
+                  - run: {shell: true, command: "true"}
+                  - store: {name: token, from: {header: X-Token}}
+      - run:
+          command: ${atago} run nostore.atago.yaml
+      - assert:
+          exit_code: 2
+          stderr:
+            contains:
+              - "ATG2107"
+              - "store.from.header requires a preceding http step"
+
+  # A suite block admits neither pty nor the runner-backed kinds, so such a read
+  # can never be fed there by any ordering. In suite.teardown it was worse than
+  # unhelpful: a teardown failure preserves the verdict, so the spec printed
+  # SUITE TEARDOWN FAILED on every run and still exited 0.
+  - name: a suite block read that can never be fed is a load-time error
+    steps:
+      - fixture:
+          file: suiteread.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+              teardown:
+                - assert: {status: 200}
+            scenarios:
+              - name: a
+                steps:
+                  - run: {shell: true, command: "true"}
+                  - assert: {exit_code: 0}
+      - run:
+          command: ${atago} run suiteread.atago.yaml
+      - assert:
+          exit_code: 2
+          stderr:
+            contains:
+              - "ATG2107"
+              - "can never be fed here"
+      # The bootstrap a suite.setup exists for still loads and runs.
+      - fixture:
+          file: suiteok.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+              setup:
+                - run: {shell: true, command: "echo built"}
+                - assert: {stdout: {contains: built}}
+            scenarios:
+              - name: a
+                steps:
+                  - run: {shell: true, command: "true"}
+                  - assert: {exit_code: 0}
+      - run:
+          command: ${atago} run suiteok.atago.yaml
       - assert:
           exit_code: 0
           stdout:
