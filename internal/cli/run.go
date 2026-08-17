@@ -40,7 +40,13 @@ type runOptions struct {
 	tag             csvFlag
 	skipTag         csvFlag
 	artifactsDir    string
-	rerunFailed     bool
+	// snapshotsUpdated is how many golden files the run rewrote under
+	// --update-snapshots, read from the engine after the run. It reaches the
+	// report from the recorder the writes go through rather than from the
+	// results, which cannot see the writes a teardown, a suite lifecycle block,
+	// or a non-surviving repeat/retry iteration made.
+	snapshotsUpdated int
+	rerunFailed      bool
 	// rerunTargets are the spec paths the run was pointed at BEFORE
 	// --rerun-failed narrowed them to the ones holding recorded failures. The
 	// ledger warning needs the difference: an entry under a spec that was never
@@ -163,6 +169,9 @@ func runCmd(label string, args []string, stdout, stderr io.Writer) int {
 	start := time.Now()
 	suiteResults, loadErrs := runSpecs(ctx, eng, paths)
 	elapsed := time.Since(start)
+	// Read the rewrite count from the engine that did the writing: a run that
+	// ends red still has to report the goldens it replaced along the way.
+	opts.snapshotsUpdated = eng.SnapshotsUpdated()
 
 	return finishRun(ctx, opts, suiteResults, loadErrs, progress, elapsed)
 }

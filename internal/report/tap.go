@@ -14,7 +14,7 @@ import (
 // `ok`/`not ok` line per scenario across every suite, numbered from 1; failures
 // and errors carry a YAML diagnostic block, and skips use the `# SKIP` directive.
 // Rendered by Render (FormatTAP).
-func writeTAP(w io.Writer, results []*engine.SuiteResult, loadFailures []LoadFailure) error {
+func writeTAP(w io.Writer, results []*engine.SuiteResult, loadFailures []LoadFailure, snapsUpdated int) error {
 	var b strings.Builder
 	total := len(loadFailures)
 	for _, res := range results {
@@ -99,7 +99,7 @@ func writeTAP(w io.Writer, results []*engine.SuiteResult, loadFailures []LoadFai
 	// A snapshot rewrite is not a test point — nothing was verified — so it is a
 	// comment, the slot TAP has for a fact a consumer should see without it
 	// counting toward the plan.
-	if n := snapshotsUpdated(results); n > 0 {
+	if n := snapsUpdated; n > 0 {
 		fmt.Fprintf(&b, "# %s updated by --update-snapshots; the committed expected results were rewritten\n",
 			plural.Count(n, "snapshot", "snapshots"))
 	}

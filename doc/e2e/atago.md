@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-82 suites · 653 scenarios
+82 suites · 656 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -635,8 +635,11 @@
   - [updating a snapshot is deterministic](#scenario-updating-a-snapshot-is-deterministic)
   - [a real content change still fails the snapshot](#scenario-a-real-content-change-still-fails-the-snapshot)
   - [a missing golden names the update flag](#scenario-a-missing-golden-names-the-update-flag)
-- [atago self-hosting / snapshots](#atago-self-hosting--snapshots) — 1 scenario
+- [atago self-hosting / snapshots](#atago-self-hosting--snapshots) — 4 scenarios
   - [two scenarios writing different content to one snapshot path fail the update](#scenario-two-scenarios-writing-different-content-to-one-snapshot-path-fail-the-update)
+  - [the rewrite count covers teardown and the suite lifecycle](#scenario-the-rewrite-count-covers-teardown-and-the-suite-lifecycle)
+  - [a red run still reports the goldens it rewrote](#scenario-a-red-run-still-reports-the-goldens-it-rewrote)
+  - [a clash with the scenario's own earlier attempt names the attempt](#scenario-a-clash-with-the-scenarios-own-earlier-attempt-names-the-attempt)
 - [atago self-hosting / ssh runner](#atago-self-hosting--ssh-runner) — 3 scenarios
   - [an ssh runner without host/user fails validation (exit 2)](#scenario-an-ssh-runner-without-hostuser-fails-validation-exit-2)
   - [a run step naming an undeclared runner fails validation (exit 2)](#scenario-a-run-step-naming-an-undeclared-runner-fails-validation-exit-2)
@@ -13135,6 +13138,96 @@ ${atago} run --parallel 1 shared_golden.atago.yaml
 - after `${atago} run --parallel 1 shared_golden.atago.yaml`:
   - exit code is `0`
   - stdout contains `2 passed`
+  - stdout does not contain `2 snapshots updated`
+### Scenario: the rewrite count covers teardown and the suite lifecycle
+#### Given
+- Fixture file `lifecycle.atago.yaml` is created.
+#### Inputs
+_Fixture `lifecycle.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: lifecycle
+  setup:
+    - run: {shell: true, command: "echo setup banner"}
+    - assert: {stdout: {snapshot: setup.snap}}
+  teardown:
+    - run: {shell: true, command: "echo suite teardown"}
+    - assert: {stdout: {snapshot: suite_teardown.snap}}
+scenarios:
+  - name: writes goldens in every phase
+    steps:
+      - run: {shell: true, command: "echo main output"}
+      - assert: {stdout: {snapshot: main.snap}}
+    teardown:
+      - run: {shell: true, command: "echo scenario teardown"}
+      - assert: {stdout: {snapshot: scenario_teardown.snap}}
+```
+#### When
+```shell
+${atago} run --parallel 1 --update-snapshots lifecycle.atago.yaml
+${atago} run --parallel 1 lifecycle.atago.yaml
+```
+#### Then
+- after `${atago} run --parallel 1 --update-snapshots lifecycle.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `4 snapshots updated`
+  - file `setup.snap` contains `setup banner`
+  - file `suite_teardown.snap` contains `suite teardown`
+  - file `scenario_teardown.snap` contains `scenario teardown`
+- after `${atago} run --parallel 1 lifecycle.atago.yaml`:
+  - exit code is `0`
+### Scenario: a red run still reports the goldens it rewrote
+_skipped on Windows_
+#### Given
+- Fixture file `unstable.atago.yaml` is created.
+#### Inputs
+_Fixture `unstable.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: unstable
+scenarios:
+  - name: output differs between iterations
+    steps:
+      - run: {shell: true, command: "date +%s%N"}
+      - assert: {stdout: {snapshot: now.snap}}
+```
+#### When
+```shell
+${atago} run --parallel 1 --repeat 2 --update-snapshots unstable.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `1 snapshot updated`
+- file `now.snap` exists
+#### Generated artifacts
+- `now.snap`
+### Scenario: a clash with the scenario's own earlier attempt names the attempt
+_skipped on Windows_
+#### Given
+- Fixture file `retry.atago.yaml` is created.
+#### Inputs
+_Fixture `retry.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: retry
+scenarios:
+  - name: snapshots a value that changes every attempt
+    steps:
+      - run: {shell: true, command: "date +%s%N"}
+      - assert: {stdout: {snapshot: attempt.snap}}
+      - run: {shell: true, command: "exit 1"}
+      - assert: {exit_code: 0}
+```
+#### When
+```shell
+${atago} run --parallel 1 --retry-failed 1 --update-snapshots retry.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `changed between attempts of this scenario`, does not contain `two scenarios cannot share`
 ## atago self-hosting / ssh runner
 Source: `test/e2e/atago/ssh.atago.yaml`
 ### Scenario: an ssh runner without host/user fails validation (exit 2)

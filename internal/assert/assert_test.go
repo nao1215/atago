@@ -2372,23 +2372,49 @@ func TestCheckSnapshot_ConflictingUpdateFails(t *testing.T) {
 	t.Parallel()
 	specDir := t.TempDir()
 	writes := NewSnapshotWrites()
-	env := Env{SpecDir: specDir, Workdir: specDir, UpdateSnapshots: true, SnapshotWrites: writes}
+	// Each scenario claims under its own identity, which is what tells this
+	// cross-scenario clash apart from one scenario's own retry attempt.
+	alpha := Env{SpecDir: specDir, Workdir: specDir, UpdateSnapshots: true, SnapshotWrites: writes, Writer: "s.atago.yaml / alpha"}
+	beta := Env{SpecDir: specDir, Workdir: specDir, UpdateSnapshots: true, SnapshotWrites: writes, Writer: "s.atago.yaml / beta"}
 
-	if cr := checkSnapshot("d", "stdout", "shared.snap", []byte("from-alpha\n"), env); !cr.OK {
+	if cr := checkSnapshot("d", "stdout", "shared.snap", []byte("from-alpha\n"), alpha); !cr.OK {
 		t.Fatalf("the first write should pass: %+v", cr)
 	}
 	// The same content from another scenario is the shared-golden pattern.
-	if cr := checkSnapshot("d", "stdout", "shared.snap", []byte("from-alpha\n"), env); !cr.OK {
+	if cr := checkSnapshot("d", "stdout", "shared.snap", []byte("from-alpha\n"), beta); !cr.OK {
 		t.Errorf("an identical rewrite should pass: %+v", cr)
 	}
 	// Different content is the lie: whichever ran last would win, and the next
 	// verify run would fail on the other scenario.
-	conflict := checkSnapshot("d", "stdout", "shared.snap", []byte("from-beta\n"), env)
+	conflict := checkSnapshot("d", "stdout", "shared.snap", []byte("from-beta\n"), beta)
 	if conflict.OK {
 		t.Fatal("a conflicting rewrite was accepted; the next verify run would be red")
 	}
 	if !strings.Contains(conflict.Hint, "already written in this run") {
 		t.Errorf("hint = %q, want it to name the conflicting rewrite", conflict.Hint)
+	}
+	// One scenario clashing with its OWN earlier claim is a different finding:
+	// output that changes between attempts, not a path two scenarios share.
+	retry := checkSnapshot("d", "stdout", "attempt.snap", []byte("first\n"), alpha)
+	if !retry.OK {
+		t.Fatalf("the first attempt should pass: %+v", retry)
+	}
+	again := checkSnapshot("d", "stdout", "attempt.snap", []byte("second\n"), alpha)
+	if again.OK {
+		t.Fatal("a conflicting rewrite from the same scenario was accepted")
+	}
+	if !strings.Contains(again.Hint, "changed between attempts") {
+		t.Errorf("hint = %q, want the clash attributed to this scenario's own earlier attempt", again.Hint)
+	}
+	// An unnamed writer (direct API use) keeps the general wording rather than
+	// claiming two anonymous writes came from one scenario.
+	anon := Env{SpecDir: specDir, Workdir: specDir, UpdateSnapshots: true, SnapshotWrites: writes}
+	if cr := checkSnapshot("d", "stdout", "anon.snap", []byte("one\n"), anon); !cr.OK {
+		t.Fatalf("the first anonymous write should pass: %+v", cr)
+	}
+	anonClash := checkSnapshot("d", "stdout", "anon.snap", []byte("two\n"), anon)
+	if !strings.Contains(anonClash.Hint, "two scenarios cannot share") {
+		t.Errorf("hint = %q, want the general wording for an unnamed writer", anonClash.Hint)
 	}
 	// The first writer's content stays on disk: the run reports the conflict
 	// rather than leaving whichever scenario happened to be last.

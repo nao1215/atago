@@ -27,7 +27,7 @@ func (e *Engine) runHTTPStep(ctx context.Context, h *spec.HTTP, st *store.Store,
 	// The policy-violation flag only matters alongside an error, so the shared
 	// poll loop carries it inside the closure.
 	secViolation := false
-	env := assert.Env{Workdir: workdir, SpecDir: specDir, UpdateSnapshots: e.UpdateSnapshots, SnapshotWrites: e.snapshotWrites, KeepSnapshots: rc.keepSnapshots, Secrets: rc.masker.MaskBytes, Scrub: rc.scrubber.Apply}
+	env := assert.Env{Workdir: workdir, SpecDir: specDir, UpdateSnapshots: e.UpdateSnapshots, SnapshotWrites: e.snapshotWrites, Writer: rc.snapshotWriter, KeepSnapshots: rc.keepSnapshots, Secrets: rc.masker.MaskBytes, Scrub: rc.scrubber.Apply}
 	last, checks, err := pollUntil(ctx, h.Retry, st, env, func(ctx context.Context) (*runner.Result, error) {
 		r, sv, rerr := e.runHTTP(ctx, h, st, rc, workdir)
 		secViolation = sv
