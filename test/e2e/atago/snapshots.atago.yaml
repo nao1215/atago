@@ -111,6 +111,11 @@ scenarios:
   # and the count was read from the surviving result — which a --repeat fold
   # replaces — so the rewrite was reported nowhere at all.
   - name: a red run still reports the goldens it rewrote
+    # The scenario needs output that differs between iterations and survives
+    # snapshot normalization, which scrubs the workdir path by design. A POSIX
+    # nanosecond timestamp is the portable-enough primitive for that.
+    skip:
+      os: windows
     steps:
       - fixture:
           file: unstable.atago.yaml
@@ -136,6 +141,10 @@ scenarios:
   # made was reported as two scenarios sharing a path, sending the reader after
   # a second scenario that does not exist.
   - name: a clash with the scenario's own earlier attempt names the attempt
+    # Same reason as above: the value has to differ per attempt after
+    # normalization.
+    skip:
+      os: windows
     steps:
       - fixture:
           file: retry.atago.yaml

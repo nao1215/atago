@@ -13178,6 +13178,7 @@ ${atago} run --parallel 1 lifecycle.atago.yaml
 - after `${atago} run --parallel 1 lifecycle.atago.yaml`:
   - exit code is `0`
 ### Scenario: a red run still reports the goldens it rewrote
+_skipped on Windows_
 #### Given
 - Fixture file `unstable.atago.yaml` is created.
 #### Inputs
@@ -13203,6 +13204,7 @@ ${atago} run --parallel 1 --repeat 2 --update-snapshots unstable.atago.yaml
 #### Generated artifacts
 - `now.snap`
 ### Scenario: a clash with the scenario's own earlier attempt names the attempt
+_skipped on Windows_
 #### Given
 - Fixture file `retry.atago.yaml` is created.
 #### Inputs

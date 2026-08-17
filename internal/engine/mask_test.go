@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -118,6 +119,15 @@ scenarios:
 	}
 }
 
+// requirePOSIXShell skips a test whose spec needs a POSIX shell builtin that
+// has no Windows equivalent.
+func requirePOSIXShell(t *testing.T) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("needs a POSIX shell primitive that yields a different value per attempt")
+	}
+}
+
 // TestSnapshotsUpdated_CountsEveryGoldenTheRunWrote is a regression: the count
 // exists so a reviewer is told when a run rewrote committed goldens, and it was
 // derived by walking the scenarios' numbered steps. That walk misses a
@@ -186,6 +196,11 @@ scenarios:
 // surviving result carries the write at all.
 func TestSnapshotsUpdated_CountsAGoldenARedRunWrote(t *testing.T) {
 	t.Parallel()
+	// The scenario needs output that differs between iterations AND survives
+	// snapshot normalization, which scrubs the workdir path by design. A POSIX
+	// nanosecond timestamp is that value; Windows has no equivalent in the shell
+	// atago runs there.
+	requirePOSIXShell(t)
 	dir := t.TempDir()
 	specPath := filepath.Join(dir, "s.atago.yaml")
 	src := `
@@ -269,6 +284,7 @@ scenarios:
 // between attempts.
 func TestSnapshotClash_NamesTheAttemptNotASecondScenario(t *testing.T) {
 	t.Parallel()
+	requirePOSIXShell(t)
 	dir := t.TempDir()
 	specPath := filepath.Join(dir, "s.atago.yaml")
 	src := `
