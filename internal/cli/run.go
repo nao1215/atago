@@ -176,6 +176,24 @@ func runCmd(label string, args []string, stdout, stderr io.Writer) int {
 	return finishRun(ctx, opts, suiteResults, loadErrs, progress, elapsed)
 }
 
+// formatAlternatives renders the report formats as the "console|json|…" list
+// the flag help and usage line show. Derived from report.AllFormats — the list
+// used to be spelled here by hand and a format added to the report package
+// would have been invisible in --help.
+func formatAlternatives() string {
+	return strings.Join(report.FormatNames(), "|")
+}
+
+// formatProse renders the report formats as the "console, json, …, or tap"
+// prose the unknown-format diagnostic uses, from the same list.
+func formatProse() string {
+	names := report.FormatNames()
+	if len(names) == 1 {
+		return names[0]
+	}
+	return strings.Join(names[:len(names)-1], ", ") + ", or " + names[len(names)-1]
+}
+
 // parseRunFlags parses and validates `atago run`'s flags into a runOptions. The
 // bool return is true when parsing already decided the outcome (a --help, a bad
 // flag, an unknown --report, no matching spec files, or a failed bounds check),
@@ -184,7 +202,7 @@ func runCmd(label string, args []string, stdout, stderr io.Writer) int {
 func parseRunFlags(label string, args []string, stdout, stderr io.Writer) (*runOptions, int, bool) {
 	fs := flag.NewFlagSet(label, flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	reportFmt := fs.String("report", "console", "report format: console|json|junit|gha|tap")
+	reportFmt := fs.String("report", "console", "report format: "+formatAlternatives())
 	updateSnapshots := fs.Bool("update-snapshots", false, "create or overwrite snapshot files instead of comparing")
 	ci := fs.Bool("ci", false, "CI-safe defaults: deterministic, no color (sets NO_COLOR), secret masking")
 	parallel := fs.Int("parallel", runtime.NumCPU(), "number of scenarios to run concurrently; scenarios are isolated, each in its own temp dir")
@@ -204,7 +222,7 @@ func parseRunFlags(label string, args []string, stdout, stderr io.Writer) (*runO
 	allowXPass := fs.Bool("allow-xpass", false, "exit 0 when an expect_fail scenario passed (XPASS); by default a fixed known bug fails the run so the spec gets promoted")
 	verbose := fs.Bool("verbose", false, "trace every scenario as it finishes: commands, exit codes, captured output, and per-assertion verdicts — for passing scenarios too")
 	fs.Usage = func() {
-		fmt.Fprint(fs.Output(), "Usage: atago run [--report console|json|junit|gha|tap] [--update-snapshots] [--parallel N] [--fail-fast] [--filter S] [--tag T] [--skip-tag T] [--rerun-failed] [--repeat N] [--retry-failed N] [--allow-flaky] [--allow-xpass] [--profile NAME] [--artifacts-dir DIR] [--verbose] [--ci] <path | dir>...\n  (directories are searched recursively)\n")
+		fmt.Fprint(fs.Output(), "Usage: atago run [--report "+formatAlternatives()+"] [--update-snapshots] [--parallel N] [--fail-fast] [--filter S] [--tag T] [--skip-tag T] [--rerun-failed] [--repeat N] [--retry-failed N] [--allow-flaky] [--allow-xpass] [--profile NAME] [--artifacts-dir DIR] [--verbose] [--ci] <path | dir>...\n  (directories are searched recursively)\n")
 		fs.PrintDefaults()
 	}
 	operands, err := parseFlagsAnywhere(fs, args)
@@ -223,7 +241,7 @@ func parseRunFlags(label string, args []string, stdout, stderr io.Writer) (*runO
 
 	format := report.Format(*reportFmt)
 	if !format.Valid() {
-		fmt.Fprintf(stderr, "%s: %s\n", label, diag.BadOptionValue.Annotate(fmt.Sprintf("unknown --report %q (want console, json, junit, gha, or tap)", *reportFmt)))
+		fmt.Fprintf(stderr, "%s: %s\n", label, diag.BadOptionValue.Annotate(fmt.Sprintf("unknown --report %q (want %s)", *reportFmt, formatProse())))
 		return nil, ExitConfig, true
 	}
 
