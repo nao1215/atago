@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-82 suites · 657 scenarios
+82 suites · 658 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -484,7 +484,7 @@
   - [explain names the manifest that applied](#scenario-explain-names-the-manifest-that-applied)
   - [a manifest pointing at a missing fixtures dir fails to load](#scenario-a-manifest-pointing-at-a-missing-fixtures-dir-fails-to-load)
   - [an unknown manifest key is rejected](#scenario-an-unknown-manifest-key-is-rejected)
-- [atago self-hosting / pty](#atago-self-hosting--pty) — 19 scenarios
+- [atago self-hosting / pty](#atago-self-hosting--pty) — 20 scenarios
   - [a pty step sees a terminal where a run step sees a pipe](#scenario-a-pty-step-sees-a-terminal-where-a-run-step-sees-a-pipe)
   - [a never-matching expect fails with the pattern in the block](#scenario-a-never-matching-expect-fails-with-the-pattern-in-the-block)
   - [named keys transmit their documented bytes and ctrl-c aborts](#scenario-named-keys-transmit-their-documented-bytes-and-ctrl-c-aborts)
@@ -504,6 +504,7 @@
   - [a send referencing an undefined variable is an execution error, not typed literally](#scenario-a-send-referencing-an-undefined-variable-is-an-execution-error-not-typed-literally)
   - [an expect does not match the echo of its own send](#scenario-an-expect-does-not-match-the-echo-of-its-own-send)
   - [a program's own copy of the input still satisfies an expect](#scenario-a-programs-own-copy-of-the-input-still-satisfies-an-expect)
+  - [a signaled child reports 128+signal from both runners](#scenario-a-signaled-child-reports-128signal-from-both-runners)
 - [atago self-hosting / pty (portable)](#atago-self-hosting--pty-portable) — 10 scenarios
   - [a pty step starts a command, captures its output, and reports exit 0](#scenario-a-pty-step-starts-a-command-captures-its-output-and-reports-exit-0)
   - [a pty step surfaces a command's non-zero exit code](#scenario-a-pty-step-surfaces-a-commands-non-zero-exit-code)
@@ -10305,6 +10306,21 @@ _skipped on Windows_
 ```
 #### Then
 - exit code is `0`
+### Scenario: a signaled child reports 128+signal from both runners
+_skipped on Windows_
+#### When
+```shell
+# interactive (pty): sh -c 'kill -TERM $$'
+kill -TERM $$
+# interactive (pty): sh -c 'kill -INT $$'
+```
+#### Then
+- after `interactive (pty): sh -c 'kill -TERM $$'`:
+  - exit code is `143`
+- after `kill -TERM $$`:
+  - exit code is `143`
+- after `interactive (pty): sh -c 'kill -INT $$'`:
+  - exit code is `130`
 ## atago self-hosting / pty (portable)
 Source: `test/e2e/atago/pty_portable.atago.yaml`
 ### Scenario: a pty step starts a command, captures its output, and reports exit 0

@@ -726,3 +726,27 @@ scenarios:
             - send: ""
       - assert:
           exit_code: 0
+
+  # A pty step reports an exit code by the same rule a run step does: a child a
+  # signal terminated is 128+signal, not Go's -1. A TUI or REPL that quits on
+  # Ctrl-C is exactly the program a pty step is written for, so exit_code: 130
+  # has to be assertable from here as well as from run:.
+  - name: a signaled child reports 128+signal from both runners
+    skip:
+      os: windows
+    steps:
+      - pty:
+          command: "sh -c 'kill -TERM $$'"
+          timeout: 10s
+      - assert:
+          exit_code: 143
+      - run:
+          shell: true
+          command: "kill -TERM $$"
+      - assert:
+          exit_code: 143
+      - pty:
+          command: "sh -c 'kill -INT $$'"
+          timeout: 10s
+      - assert:
+          exit_code: 130

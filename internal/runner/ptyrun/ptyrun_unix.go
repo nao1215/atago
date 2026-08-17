@@ -4,7 +4,6 @@ package ptyrun
 
 import (
 	"context"
-	"errors"
 	"math"
 	"os"
 	"os/exec"
@@ -92,7 +91,11 @@ func Run(ctx context.Context, p *spec.PTY, workdir string, env []string) (*runne
 	// succeeding, so liveness must come from Wait itself. The buffered channel
 	// lets the reaper deliver the code even when a kill path drains it later.
 	exitCh := make(chan int, 1)
-	go func() { exitCh <- waitExitCode(cmd.Wait()) }()
+	// The exit code goes through the cmd runner's shared mapping, so a signaled
+	// child reports 128+signal here exactly as it does through a run: step. The
+	// abort paths (session budget, parent cancel) resolve to -1 before this value
+	// is ever consumed, which is what keeps a timeout kill from looking like 137.
+	go func() { exitCh <- runnercmd.ExitCode(cmd.Wait()) }()
 
 	proc := ptyProcess{
 		rw:    master,
@@ -192,18 +195,4 @@ func adoptMasterReads(master *os.File) error {
 		return ctlErr
 	}
 	return setErr
-}
-
-// waitExitCode maps a cmd.Wait() error to the observed exit code, mirroring the
-// cmd runner: nil is a clean 0, an ExitError carries the process's own code, and
-// any other failure to reap is -1.
-func waitExitCode(err error) int {
-	if err == nil {
-		return 0
-	}
-	var exitErr *exec.ExitError
-	if errors.As(err, &exitErr) {
-		return exitErr.ExitCode()
-	}
-	return -1
 }
