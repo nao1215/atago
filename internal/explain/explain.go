@@ -6,7 +6,6 @@ package explain
 import (
 	"fmt"
 	"io"
-	"strconv"
 	"strings"
 
 	"github.com/nao1215/atago/internal/assertdesc"
@@ -109,6 +108,14 @@ func explainSuiteBlock(b *strings.Builder, label string, steps []spec.Step, runn
 
 func explainScenario(b *strings.Builder, sc *spec.Scenario, runners map[string]spec.Runner) {
 	explainScenarioHeading(b, sc)
+
+	// A matrix instance's NAME already carries its row's values, so its
+	// commands and assertions are shown with the same values — the two rows of
+	// one matrix otherwise print identical bodies under two different headings,
+	// and a reader cannot tell them apart. Only the row is substituted:
+	// ${env:...} and a value produced at run time are genuinely unknown before
+	// the run, and the "Variables used" line is how those are reported.
+	sc = spec.ExpandScenarioRow(sc)
 
 	var fixtures, commands, expects, stores, services []string
 	vars := map[string]bool{}
@@ -377,17 +384,6 @@ func describeSignal(sg *spec.Signal) string {
 	return desc
 }
 
-// describeChangesExplain renders a workdir-delta assertion (#70) as a compact
-// phrase for `atago explain`. `modified: []` renders as "modified nothing".
-func describeChangesExplain(c *spec.ChangesAssert) string {
-	return assertdesc.DescribeChanges(c, explainChangesStyle)
-}
-
-// describeMockAssert renders a one-line summary of a mock assertion (#24).
-func describeMockAssert(m *spec.MockAssert) string {
-	return assertdesc.DescribeMock(m, explainMockStyle)
-}
-
 func describeFixture(f *spec.Fixture) string {
 	kind := "inline content"
 	if f.Base64 != "" {
@@ -483,176 +479,11 @@ func describeRun(r *spec.Run, runners map[string]spec.Runner) string {
 
 // describeAsserts renders one line per assertion target; an assert may set
 // several (exit_code + stdout + …), each an independent expectation.
+// describeAsserts renders one phrase per target an assert sets. The phrases
+// themselves live in assertdesc, shared with the manifest so explain and
+// manifest cannot describe the same assertion differently.
 func describeAsserts(a *spec.Assert) []string {
-	targets := a.SetTargets()
-	if len(targets) == 0 {
-		return []string{"(invalid assertion)"}
-	}
-	out := make([]string, 0, len(targets))
-	for _, t := range targets {
-		out = append(out, describeTarget(a, t))
-	}
-	return out
-}
-
-func describeTarget(a *spec.Assert, target spec.AssertTarget) string {
-	switch target {
-	case spec.AssertExitCode:
-		if a.ExitCode.Not != nil {
-			return fmt.Sprintf("exit code is not %d", *a.ExitCode.Not)
-		}
-		if len(a.ExitCode.In) > 0 {
-			return "exit code in " + intList(a.ExitCode.In)
-		}
-		if a.ExitCode.Equals != nil {
-			return fmt.Sprintf("exit code is %d", *a.ExitCode.Equals)
-		}
-		return "exit code"
-	case spec.AssertMock:
-		return describeMockAssert(a.Mock)
-	case spec.AssertScreen:
-		return "screen " + describeScreen(a.Screen)
-	case spec.AssertDuration:
-		return "completes " + a.Duration.DescribeDuration()
-	case spec.AssertChanges:
-		return "changed exactly " + describeChangesExplain(a.Changes)
-	case spec.AssertStdout:
-		return "stdout " + describeStream(a.Stdout)
-	case spec.AssertStderr:
-		return "stderr " + describeStream(a.Stderr)
-	case spec.AssertFile:
-		return "file " + describeFile(a.File)
-	case spec.AssertImage:
-		return "image " + describeImage(a.Image)
-	case spec.AssertDir:
-		return "dir " + describeDir(a.Dir)
-	case spec.AssertPDF:
-		return "pdf " + describePDF(a.PDF)
-	case spec.AssertStatus:
-		if a.Status != nil {
-			return fmt.Sprintf("HTTP status is %d", *a.Status)
-		}
-		return "HTTP status"
-	case spec.AssertHeader:
-		if a.Header != nil {
-			return "header " + describeHeader(a.Header)
-		}
-		return "header"
-	case spec.AssertBody:
-		return "body " + describeStream(a.Body)
-	case spec.AssertRows:
-		return "rows " + describeStream(a.Rows)
-	case spec.AssertGRPCStatus:
-		if a.GRPCStatus != nil {
-			return fmt.Sprintf("gRPC status is %d", *a.GRPCStatus)
-		}
-		return "gRPC status"
-	case spec.AssertMessage:
-		return "message " + describeStream(a.Message)
-	case spec.AssertValue:
-		return "value " + describeStream(a.Value)
-	default:
-		return string(target)
-	}
-}
-
-func describeHeader(h *spec.HeaderMatch) string {
-	return assertdesc.DescribeHeader(h, explainHeaderStyle)
-}
-
-func describeImage(im *spec.ImageAssert) string {
-	return assertdesc.DescribeImage(im, explainImageStyle)
-}
-
-// describeDir renders a directory/tree assertion (#74) for explain output.
-func describeDir(d *spec.DirAssert) string {
-	return assertdesc.DescribeDir(d, explainDirStyle)
-}
-
-// describePDF renders a PDF assertion (#73) for explain output.
-func describePDF(p *spec.PDFAssert) string {
-	return assertdesc.DescribePDF(p, explainPDFStyle)
-}
-
-var explainJSONStyle = assertdesc.JSONStyle{
-	Prefix:  func(path string) string { return "JSON " + path },
-	Equals:  func(v any) string { return "== " + assertdesc.JSONValueText(v) },
-	Matches: func(s string) string { return fmt.Sprintf("matches /%s/", s) },
-	Length:  func(n int) string { return fmt.Sprintf("length %d", n) },
-	Compare: func(op string, v any) string { return fmt.Sprintf("%s %v", op, v) },
-	Default: "",
-}
-
-var explainYAMLStyle = explainJSONStyle.WithPrefix(func(path string) string {
-	return "YAML " + path
-})
-
-var explainStreamStyle = assertdesc.StreamStyle{
-	List:      spec.StringList.Quoted,
-	Regex:     func(s string) string { return fmt.Sprintf("/%s/", s) },
-	Equals:    "equals exact text",
-	NotEquals: "does not equal exact text",
-	JSON:      explainJSONStyle,
-	YAML:      explainYAMLStyle,
-	Snapshot:  func(s string) string { return s },
-	Line:      func(n int) string { return fmt.Sprintf("line %d", n) },
-	NoMatcher: "(no matcher)",
-}
-
-var explainFileStyle = assertdesc.FileStyle{
-	Path:       func(s string) string { return fmt.Sprintf("%q", s) },
-	List:       spec.StringList.Quoted,
-	JSON:       explainJSONStyle,
-	Snapshot:   func(s string) string { return s },
-	Checked:    func(path string) string { return path },
-	ExactBytes: "equals exact bytes",
-}
-
-var explainHeaderStyle = assertdesc.HeaderStyle{
-	Name:  func(s string) string { return fmt.Sprintf("%q", s) },
-	Value: func(s string) string { return fmt.Sprintf("%q", s) },
-	Regex: func(s string) string { return fmt.Sprintf("/%s/", s) },
-	Bare:  func(s string) string { return fmt.Sprintf("%q", s) },
-}
-
-var explainImageStyle = assertdesc.ImageStyle{
-	Path:      func(s string) string { return fmt.Sprintf("%q", s) },
-	Format:    func(s string) string { return s },
-	SimilarTo: func(s string) string { return s },
-	Checked:   func(path string) string { return fmt.Sprintf("%q is checked", path) },
-}
-
-var explainDirStyle = assertdesc.DirStyle{
-	Path:    func(s string) string { return fmt.Sprintf("%q", s) },
-	Item:    func(s string) string { return s },
-	Token:   func(s string) string { return s },
-	Checked: func(path string) string { return fmt.Sprintf("%q is checked", path) },
-}
-
-var explainPDFStyle = assertdesc.PDFStyle{
-	Path:    func(s string) string { return fmt.Sprintf("%q", s) },
-	Value:   func(s string) string { return fmt.Sprintf("%q", s) },
-	Stream:  describeStream,
-	Checked: func(path string) string { return fmt.Sprintf("%q is checked", path) },
-}
-
-var explainChangesStyle = assertdesc.ChangesStyle{
-	Entry: func(s string) string { return s },
-	Join:  "; ",
-}
-
-var explainMockStyle = assertdesc.MockStyle{
-	Name:  func(s string) string { return s },
-	Route: func(s string) string { return s },
-	Count: func(n int) string { return fmt.Sprintf(" x%d", n) },
-}
-
-func describeStream(s *spec.StreamAssert) string {
-	return assertdesc.DescribeStream(s, explainStreamStyle)
-}
-
-func describeFile(f *spec.FileAssert) string {
-	return assertdesc.DescribeFile(f, explainFileStyle)
+	return assertdesc.Describe(a)
 }
 
 func writeList(b *strings.Builder, title string, items []string) {
@@ -665,35 +496,10 @@ func writeList(b *strings.Builder, title string, items []string) {
 	}
 }
 
-// intList renders an accepted exit-code set as "[0, 2]" (#19).
-func intList(ns []int) string {
-	parts := make([]string, len(ns))
-	for i, n := range ns {
-		parts[i] = strconv.Itoa(n)
-	}
-	return "[" + strings.Join(parts, ", ") + "]"
-}
-
 func toSet(m map[string]string) map[string]bool {
 	out := make(map[string]bool, len(m))
 	for k := range m {
 		out[k] = true
 	}
 	return out
-}
-
-// describeScreen renders a rendered-screen assertion: its stream matcher, plus
-// the attribute entries (#382) that say how the text is drawn.
-func describeScreen(s *spec.ScreenAssert) string {
-	if s == nil {
-		return ""
-	}
-	parts := []string{}
-	if desc := describeStream(&s.StreamAssert); desc != "" {
-		parts = append(parts, desc)
-	}
-	for i := range s.Attrs {
-		parts = append(parts, "shows "+s.Attrs[i].Describe())
-	}
-	return strings.Join(parts, " and ")
 }

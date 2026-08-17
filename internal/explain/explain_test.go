@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/nao1215/atago/internal/assertdesc"
 	"github.com/nao1215/atago/internal/loader"
 	"github.com/nao1215/atago/internal/spec"
 	"github.com/nao1215/atago/internal/spectest"
@@ -1265,7 +1266,7 @@ scenarios:
 func TestDescribeTarget_CoversEveryAssertTarget(t *testing.T) {
 	t.Parallel()
 	for _, target := range spec.AllAssertTargets() {
-		got := describeTarget(spectest.AssertForTarget(target), target)
+		got := assertdesc.DescribeTarget(spectest.AssertForTarget(target), target)
 		if got == "" {
 			t.Errorf("target %q renders as an empty line", target)
 		}

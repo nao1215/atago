@@ -21,7 +21,12 @@
               "index": 1,
               "kind": "assert",
               "action": "assert exit_code+stdout+stderr",
-              "target": "exit_code+stdout+stderr"
+              "target": "exit_code+stdout+stderr",
+              "asserts": [
+                "exit code is 0",
+                "stdout contains \"atago\"",
+                "stderr is empty"
+              ]
             }
           ],
           "variables": [
@@ -41,7 +46,11 @@
               "index": 1,
               "kind": "assert",
               "action": "assert exit_code+stderr",
-              "target": "exit_code+stderr"
+              "target": "exit_code+stderr",
+              "asserts": [
+                "exit code is 3",
+                "stderr contains \"unknown command\""
+              ]
             }
           ],
           "variables": [

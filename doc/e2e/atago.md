@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-82 suites · 669 scenarios
+82 suites · 671 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -435,11 +435,13 @@
   - [an empty-matching store capture is rejected](#scenario-an-empty-matching-store-capture-is-rejected)
   - [an empty-matching scrub rule is rejected](#scenario-an-empty-matching-scrub-rule-is-rejected)
   - [matchers of one assert that contradict each other are rejected](#scenario-matchers-of-one-assert-that-contradict-each-other-are-rejected)
-- [atago self-hosting / manifest](#atago-self-hosting--manifest) — 4 scenarios
+- [atago self-hosting / manifest](#atago-self-hosting--manifest) — 6 scenarios
   - [manifest emits a stable JSON summary without running the spec](#scenario-manifest-emits-a-stable-json-summary-without-running-the-spec)
   - [manifest does not execute the spec's commands](#scenario-manifest-does-not-execute-the-specs-commands)
   - [manifest carries the declarative fields of steps and runners](#scenario-manifest-carries-the-declarative-fields-of-steps-and-runners)
   - [manifest describes the suite lifecycle outputs and the subject build](#scenario-manifest-describes-the-suite-lifecycle-outputs-and-the-subject-build)
+  - [an assert step carries the assertion, not only its target](#scenario-an-assert-step-carries-the-assertion-not-only-its-target)
+  - [explain and manifest substitute a matrix row into the step text](#scenario-explain-and-manifest-substitute-a-matrix-row-into-the-step-text)
 - [atago self-hosting / matrix scenarios](#atago-self-hosting--matrix-scenarios) — 4 scenarios
   - [matrix expands into one scenario per row](#scenario-matrix-expands-into-one-scenario-per-row)
   - [matrix without a templated name gets a deterministic suffix](#scenario-matrix-without-a-templated-name-gets-a-deterministic-suffix)
@@ -9071,6 +9073,81 @@ ${atago} explain suitegen.atago.yaml
 - after `${atago} explain suitegen.atago.yaml`:
   - exit code is `0`
   - stdout contains `Subject under test: mytool (built by: curl -s https://build.example/prebuilt > $${artifact}, shell)`, `Suite generates:`, `build/seed.txt`, `network access (subject build mytool)`
+### Scenario: an assert step carries the assertion, not only its target
+#### Given
+- Fixture file `strong.atago.yaml` is created.
+- Fixture file `weak.atago.yaml` is created.
+#### Inputs
+_Fixture `strong.atago.yaml`:_
+```text
+version: "1"
+suite: {name: same}
+scenarios:
+  - name: checks
+    steps:
+      - run: {command: echo hi}
+      - assert:
+          exit_code: 0
+          stdout: {equals: "hi\n"}
+```
+_Fixture `weak.atago.yaml`:_
+```text
+version: "1"
+suite: {name: same}
+scenarios:
+  - name: checks
+    steps:
+      - run: {command: echo hi}
+      - assert:
+          exit_code: {in: [0, 1, 2]}
+          stdout: {not_contains: "zzz"}
+```
+#### When
+```shell
+${atago} manifest strong.atago.yaml
+${atago} manifest weak.atago.yaml
+```
+#### Then
+- after `${atago} manifest strong.atago.yaml`:
+  - exit code is `0`
+  - file `strong.json` contains `exit code is 0`, `stdout equals exact text`
+- after `${atago} manifest weak.atago.yaml`:
+  - exit code is `0`
+  - file `weak.json` contains `exit code in [0, 1, 2]`, `stdout does not contain`
+  - file `weak.json` does not contain `exit code is 0`, `stdout equals exact text`
+#### Generated artifacts
+- `strong.json`
+- `weak.json`
+### Scenario: explain and manifest substitute a matrix row into the step text
+#### Given
+- Fixture file `rows.atago.yaml` is created.
+#### Inputs
+_Fixture `rows.atago.yaml`:_
+```text
+version: "1"
+suite: {name: rows}
+scenarios:
+  - name: greets $${who}
+    matrix:
+      - {who: alice}
+      - {who: bob}
+    steps:
+      - run: {command: "echo $${who}"}
+      - assert: {exit_code: 0}
+```
+#### When
+```shell
+${atago} explain rows.atago.yaml
+${atago} manifest rows.atago.yaml
+```
+#### Then
+- after `${atago} explain rows.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `echo alice`, `echo bob`, does not contain `echo ${who}`
+- after `${atago} manifest rows.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `"command": "echo alice"`, `"command": "echo bob"`, does not contain `"command": "echo ${who}"`
+  - stdout at `$.specs[0].scenarios[0].vars.who` equals `alice`
 ## atago self-hosting / matrix scenarios
 Source: `test/e2e/atago/matrix.atago.yaml`
 ### Scenario: matrix expands into one scenario per row
@@ -9140,7 +9217,7 @@ printf hello-alice
 - exit code is `0`
 - file `out-alice.txt` contains `hello-alice`
 #### Generated artifacts
-- `out-${who}.txt`
+- `out-alice.txt`
 ### Scenario: stdout_to expands a matrix variable into the redirect target [who=bob]
 #### When
 ```shell
@@ -9150,7 +9227,7 @@ printf hello-bob
 - exit code is `0`
 - file `out-bob.txt` contains `hello-bob`
 #### Generated artifacts
-- `out-${who}.txt`
+- `out-bob.txt`
 ## atago self-hosting / matrix expansion boundary values
 Source: `test/e2e/atago/matrix_edges.atago.yaml`
 ### Scenario: each row substitutes into the scenario name
