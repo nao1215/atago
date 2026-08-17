@@ -169,6 +169,7 @@
   - [block shell command renames a spaced filename](#scenario-block-shell-command-renames-a-spaced-filename)
   - [block shell command creates a symlink to a spaced filename](#scenario-block-shell-command-creates-a-symlink-to-a-spaced-filename)
   - [block shell command creates a symlink to a spaced directory](#scenario-block-shell-command-creates-a-symlink-to-a-spaced-directory)
+
 ## yazi (third-party terminal file manager) / chooser selection
 Used as a file chooser, yazi's job is to hand a shell script the paths the
 user picked. The rule that matters — and the one easiest to get wrong — is
@@ -193,6 +194,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `b.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `a.txt`:_
 ```text
@@ -208,6 +210,7 @@ b
 ```
 #### Then
 - file `chosen.txt` contains `/b.txt`
+
 ### Scenario: chooser-file writes a space-selected directory instead of the hovered directory
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -215,6 +218,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `b-dir/b.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `a-dir/a.txt`:_
 ```text
@@ -230,6 +234,7 @@ b
 ```
 #### Then
 - file `chosen.txt` contains `/b-dir`
+
 ### Scenario: chooser-file writes space-selected spaced directories
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -237,6 +242,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `b two/b.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `a one/a.txt`:_
 ```text
@@ -252,6 +258,7 @@ b
 ```
 #### Then
 - file `chosen.txt` contains `/b two`
+
 ### Scenario: chooser-file writes a visual-selected file range
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -260,6 +267,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `c.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `a.txt`:_
 ```text
@@ -279,6 +287,7 @@ c
 ```
 #### Then
 - file `chosen.txt` contains `/a.txt`, `/b.txt`
+
 ### Scenario: chooser-file writes a visual-selected directory range
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -287,6 +296,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `c-dir/c.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `a-dir/a.txt`:_
 ```text
@@ -306,6 +316,7 @@ c
 ```
 #### Then
 - file `chosen.txt` contains `/a-dir`, `/b-dir`
+
 ### Scenario: chooser-file writes a visual-selected spaced file range
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -314,6 +325,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `c three.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `a one.txt`:_
 ```text
@@ -333,6 +345,7 @@ c
 ```
 #### Then
 - file `chosen.txt` contains `/a one.txt`, `/b two.txt`
+
 ### Scenario: chooser-file writes a visual-selected spaced directory range
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -341,6 +354,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `c three/c.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `a one/a.txt`:_
 ```text
@@ -360,6 +374,7 @@ c
 ```
 #### Then
 - file `chosen.txt` contains `/a one`, `/b two`
+
 ### Scenario: chooser-file writes ctrl-a selected directories
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -367,6 +382,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `b-dir/b.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `a-dir/a.txt`:_
 ```text
@@ -382,6 +398,7 @@ b
 ```
 #### Then
 - file `chosen.txt` contains `/a-dir`, `/b-dir`
+
 ### Scenario: chooser-file writes ctrl-a selected spaced files
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -389,6 +406,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `b two.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `a one.txt`:_
 ```text
@@ -404,6 +422,7 @@ b
 ```
 #### Then
 - file `chosen.txt` contains `/a one.txt`, `/b two.txt`
+
 ### Scenario: inverse selection with one chosen directory writes the other two
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -412,6 +431,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `c-dir/c.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `a-dir/a.txt`:_
 ```text
@@ -433,6 +453,7 @@ cat chosen.txt
 #### Then
 - after `cat chosen.txt`:
   - stdout matches `/(?m)^.*/b-dir\n.*/c-dir\n?$/`
+
 ### Scenario: inverse selection with one spaced file writes the other two
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -441,6 +462,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `c three.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `a one.txt`:_
 ```text
@@ -462,6 +484,7 @@ cat chosen.txt
 #### Then
 - after `cat chosen.txt`:
   - stdout matches `/(?m)^.*/b two\.txt\n.*/c three\.txt\n?$/`
+
 ### Scenario: toggling the same directory twice removes the explicit selection
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -469,6 +492,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `b-dir/b.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `a-dir/a.txt`:_
 ```text
@@ -484,6 +508,7 @@ b
 ```
 #### Then
 - file `chosen.txt` contains `/b-dir`
+
 ### Scenario: toggling the same spaced directory twice removes the explicit selection
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -491,6 +516,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `b two/b.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `a one/a.txt`:_
 ```text
@@ -506,6 +532,7 @@ b
 ```
 #### Then
 - file `chosen.txt` contains `/b two`
+
 ### Scenario: ctrl-a then esc on files restores enter to the hovered file
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -513,6 +540,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `b.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `a.txt`:_
 ```text
@@ -528,6 +556,7 @@ b
 ```
 #### Then
 - file `chosen.txt` contains `/b.txt`
+
 ### Scenario: ctrl-a then esc on spaced directories restores enter to the hovered directory
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -535,6 +564,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `b two/b.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `a one/a.txt`:_
 ```text
@@ -550,6 +580,7 @@ b
 ```
 #### Then
 - file `chosen.txt` contains `/b two`
+
 ## yazi (third-party terminal file manager) / entry args
 Where yazi starts depends on what you pass it, and the two cases differ: a
 directory argument opens that directory, while a file argument opens its
@@ -575,6 +606,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `target/a.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `target/a.txt`:_
 ```text
@@ -586,12 +618,14 @@ a
 ```
 #### Then
 - file `cwd.txt` contains `/target`
+
 ### Scenario: starting on an explicit file can choose that file immediately
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `target/a.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `target/a.txt`:_
 ```text
@@ -603,12 +637,14 @@ a
 ```
 #### Then
 - file `chosen.txt` contains `/target/a.txt`
+
 ### Scenario: starting on an explicit file writes its parent cwd on q
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `target/a.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `target/a.txt`:_
 ```text
@@ -620,6 +656,7 @@ a
 ```
 #### Then
 - file `cwd.txt` contains `/target`
+
 ### Scenario: starting on an explicit file can leave to its parent and choose a sibling
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -627,6 +664,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `target/b.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `target/a.txt`:_
 ```text
@@ -642,12 +680,14 @@ b
 ```
 #### Then
 - file `chosen.txt` contains `/target/b.txt`
+
 ### Scenario: starting on a spaced directory writes that cwd on quit
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `two words/a.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `two words/a.txt`:_
 ```text
@@ -659,12 +699,14 @@ a
 ```
 #### Then
 - file `cwd.txt` contains `/two words`
+
 ### Scenario: starting on a spaced file can choose that file immediately
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `two words/a file.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `two words/a file.txt`:_
 ```text
@@ -676,12 +718,14 @@ a
 ```
 #### Then
 - file `chosen.txt` contains `/two words/a file.txt`
+
 ### Scenario: starting with a spaced file writes its parent cwd on q
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `two words/a file.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `two words/a file.txt`:_
 ```text
@@ -693,12 +737,14 @@ a
 ```
 #### Then
 - file `cwd.txt` contains `/two words`
+
 ### Scenario: starting on a hidden directory writes that cwd on quit
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `.hidden/a.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `.hidden/a.txt`:_
 ```text
@@ -710,12 +756,14 @@ a
 ```
 #### Then
 - file `cwd.txt` contains `/.hidden`
+
 ### Scenario: starting on a nested file lets q write its parent cwd
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `nested/deeper/file.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `nested/deeper/file.txt`:_
 ```text
@@ -727,6 +775,7 @@ a
 ```
 #### Then
 - file `cwd.txt` contains `/nested/deeper`
+
 ### Scenario: starting with two explicit directories opens the second as another tab
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -734,6 +783,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `two/b.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `one/a.txt`:_
 ```text
@@ -749,6 +799,7 @@ b
 ```
 #### Then
 - file `cwd.txt` contains `/two`
+
 ### Scenario: starting with a directory and a file lets numeric switching choose the file tab
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -756,6 +807,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `two/b.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `one/a.txt`:_
 ```text
@@ -771,6 +823,7 @@ b
 ```
 #### Then
 - file `chosen.txt` contains `/two/b.txt`
+
 ### Scenario: starting with two explicit files lets next-tab choose the second file tab
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -778,6 +831,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `two/b.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `one/a.txt`:_
 ```text
@@ -793,6 +847,7 @@ b
 ```
 #### Then
 - file `chosen.txt` contains `/two/b.txt`
+
 ### Scenario: starting with three explicit directories can switch to the third tab
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -801,6 +856,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `three/c.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `one/a.txt`:_
 ```text
@@ -820,6 +876,7 @@ c
 ```
 #### Then
 - file `cwd.txt` contains `/three`
+
 ## yazi (third-party terminal file manager) / links and overwrite
 The operations here are the ones that can lose data, so each is pinned in
 both directions.
@@ -847,6 +904,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `dst/keep.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `src/move-me.txt`:_
 ```text
@@ -864,6 +922,7 @@ keep
 - file `src/move-me.txt` contains `keep`
 - file `dst/move-me.txt` does not exist
 - file `dst/keep.txt` contains `keep`
+
 ### Scenario: uppercase Y cancels a copy before pasting
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -871,6 +930,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `dst/keep.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `src/copy-me.txt`:_
 ```text
@@ -888,6 +948,7 @@ keep
 - file `src/copy-me.txt` contains `keep`
 - file `dst/copy-me.txt` does not exist
 - file `dst/keep.txt` contains `keep`
+
 ### Scenario: uppercase P overwrites an existing spaced file during copy
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -895,6 +956,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `dst/two words.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `src/two words.txt`:_
 ```text
@@ -910,6 +972,7 @@ dst
 ```
 #### Then
 - file `dst/two words.txt` contains `src`
+
 ### Scenario: uppercase P overwrites an existing spaced file during move
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -917,6 +980,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `dst/two words.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `src/two words.txt`:_
 ```text
@@ -933,6 +997,7 @@ dst
 #### Then
 - file `dst/two words.txt` contains `src`
 - file `src/two words.txt` does not exist
+
 ### Scenario: uppercase P overwrites an existing directory subtree during copy
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -940,6 +1005,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `dst/src/sub/a.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `src/sub/a.txt`:_
 ```text
@@ -955,6 +1021,7 @@ dst
 ```
 #### Then
 - file `dst/src/sub/a.txt` contains `src`
+
 ### Scenario: uppercase P overwrites an existing directory subtree during move
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -962,6 +1029,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `dst/src/sub/a.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `src/sub/a.txt`:_
 ```text
@@ -978,6 +1046,7 @@ dst
 #### Then
 - file `dst/src/sub/a.txt` contains `src`
 - dir `src` does not exist
+
 ### Scenario: ctrl-hyphen hardlinks a hovered file into a sibling directory
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -985,6 +1054,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `dst/keep.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `src/alpha.txt`:_
 ```text
@@ -1004,6 +1074,7 @@ stat -c '%h' src/alpha.txt
   - file `dst/alpha.txt` contains `alpha`
 - after `stat -c '%h' src/alpha.txt`:
   - stdout equals an exact value
+
 ### Scenario: ctrl-minus hardlinks a spaced file into a sibling directory
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -1011,6 +1082,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `dst/keep.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `src/two words.txt`:_
 ```text
@@ -1030,6 +1102,7 @@ stat -c '%h' 'src/two words.txt'
   - file `dst/two words.txt` contains `alpha`
 - after `stat -c '%h' 'src/two words.txt'`:
   - stdout equals an exact value
+
 ## yazi (third-party terminal file manager) / navigation and tabs
 Moving around is what a file manager does between operations, and it has to
 put the cursor exactly where the user believes it is — because the next
@@ -1054,6 +1127,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `b.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `a.txt`:_
 ```text
@@ -1069,6 +1143,7 @@ b
 ```
 #### Then
 - file `chosen.txt` contains `/b.txt`
+
 ### Scenario: up arrow returns from the third file to the second before choosing
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -1077,6 +1152,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `c.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `a.txt`:_
 ```text
@@ -1096,12 +1172,14 @@ c
 ```
 #### Then
 - file `chosen.txt` contains `/b.txt`
+
 ### Scenario: right arrow enters the hovered directory before choosing a file
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `sub/inside.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `sub/inside.txt`:_
 ```text
@@ -1113,12 +1191,14 @@ inside
 ```
 #### Then
 - file `chosen.txt` contains `/sub/inside.txt`
+
 ### Scenario: left arrow leaves the entered directory and q writes the parent cwd
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `sub/inside.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `sub/inside.txt`:_
 ```text
@@ -1130,12 +1210,14 @@ inside
 ```
 #### Then
 - file `cwd.txt` does not contain `/sub`
+
 ### Scenario: right arrow enters a spaced directory before choosing a file
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `two words/inside.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `two words/inside.txt`:_
 ```text
@@ -1147,6 +1229,7 @@ inside
 ```
 #### Then
 - file `chosen.txt` contains `/two words/inside.txt`
+
 ### Scenario: down arrow reaches a spaced filename before choosing
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -1154,6 +1237,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `two words.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `a.txt`:_
 ```text
@@ -1169,6 +1253,7 @@ b
 ```
 #### Then
 - file `chosen.txt` contains `/two words.txt`
+
 ### Scenario: swap-left reorders two directory tabs for numeric switching
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -1176,6 +1261,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `two/b.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `one/a.txt`:_
 ```text
@@ -1191,6 +1277,7 @@ b
 ```
 #### Then
 - file `cwd.txt` contains `/two`
+
 ### Scenario: swap-right reorders two directory tabs for numeric switching
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -1198,6 +1285,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `two/b.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `one/a.txt`:_
 ```text
@@ -1213,6 +1301,7 @@ b
 ```
 #### Then
 - file `cwd.txt` contains `/one`
+
 ### Scenario: swap-left reorders two file tabs for numeric switching
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -1220,6 +1309,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `two/b.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `one/a.txt`:_
 ```text
@@ -1235,12 +1325,14 @@ b
 ```
 #### Then
 - file `chosen.txt` contains `/two/b.txt`
+
 ### Scenario: tt twice creates a third tab that 3 can activate
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `alpha.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `alpha.txt`:_
 ```text
@@ -1252,12 +1344,14 @@ a
 ```
 #### Then
 - file `cwd.txt` contains `${workdir}`
+
 ### Scenario: closing the third tab with ctrl-c returns to the second tab
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `alpha.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `alpha.txt`:_
 ```text
@@ -1269,6 +1363,7 @@ a
 ```
 #### Then
 - file `cwd.txt` contains `${workdir}`
+
 ## yazi (third-party terminal file manager) / search and tabs
 Two things a file manager offers beyond moving files: finding them, and
 keeping more than one place open at a time.
@@ -1291,6 +1386,7 @@ _only when `rg --version` succeeds · skipped on Windows_
 - Fixture file `gamma.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `alpha.txt`:_
 ```text
@@ -1310,12 +1406,14 @@ gamma
 ```
 #### Then
 - file `chosen.txt` contains `beta.txt`
+
 ### Scenario: tab shows file information for the hovered file
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `alpha.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `alpha.txt`:_
 ```text
@@ -1331,6 +1429,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `alpha.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `alpha.txt`:_
 ```text
@@ -1342,6 +1441,7 @@ a
 ```
 #### Then
 - file `cwd.txt` contains `${workdir}`
+
 ### Scenario: ctrl-c closes the current tab and returns to the previous tab cwd
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -1349,6 +1449,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `two/b.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `one/a.txt`:_
 ```text
@@ -1364,6 +1465,7 @@ b
 ```
 #### Then
 - file `cwd.txt` contains `/one`
+
 ## yazi (third-party terminal file manager) / selection matrix
 One rule, checked against every combination that could break it: an
 operation acts on what is selected, not on what the cursor is pointing at.
@@ -1387,6 +1489,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `dst/.keep` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `src/a.txt`:_
 ```text
@@ -1404,6 +1507,7 @@ b
 - file `dst/b.txt` contains `b`
 - file `src/b.txt` does not exist
 - file `dst/a.txt` does not exist
+
 ### Scenario: space-selected directory is copied even when the cursor moves away
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -1412,6 +1516,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `dst/.keep` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `src/a-dir/a.txt`:_
 ```text
@@ -1428,6 +1533,7 @@ b
 #### Then
 - file `dst/b-dir/b.txt` contains `b`
 - dir `dst/a-dir` does not exist
+
 ### Scenario: space-selected directory is moved even when the cursor moves away
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -1436,6 +1542,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `dst/.keep` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `src/a-dir/a.txt`:_
 ```text
@@ -1453,6 +1560,7 @@ b
 - file `dst/b-dir/b.txt` contains `b`
 - dir `src/b-dir` does not exist
 - dir `dst/a-dir` does not exist
+
 ### Scenario: space-selected spaced directory is moved even when the cursor moves away
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -1461,6 +1569,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `dst/.keep` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `src/a-dir/a.txt`:_
 ```text
@@ -1478,6 +1587,7 @@ b
 - file `dst/two words/b.txt` contains `b`
 - dir `src/two words` does not exist
 - dir `dst/a-dir` does not exist
+
 ### Scenario: visual mode selects a file range and moves both files
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -1487,6 +1597,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `dst/.keep` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `src/a.txt`:_
 ```text
@@ -1509,6 +1620,7 @@ c
 - file `dst/b.txt` contains `b`
 - file `src/c.txt` contains `c`
 - file `src/a.txt` does not exist
+
 ### Scenario: visual mode selects a file range and permanently deletes both files
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -1517,6 +1629,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `c.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `a.txt`:_
 ```text
@@ -1538,6 +1651,7 @@ c
 - file `a.txt` does not exist
 - file `b.txt` does not exist
 - file `c.txt` contains `c`
+
 ### Scenario: visual mode selects a directory range and copies both directories
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -1547,6 +1661,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `dst/.keep` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `src/a-dir/a.txt`:_
 ```text
@@ -1568,6 +1683,7 @@ c
 - file `dst/a-dir/a.txt` contains `a`
 - file `dst/b-dir/b.txt` contains `b`
 - dir `dst/c-dir` does not exist
+
 ### Scenario: visual mode selects a directory range and moves both directories
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -1577,6 +1693,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `dst/.keep` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `src/a-dir/a.txt`:_
 ```text
@@ -1599,6 +1716,7 @@ c
 - file `dst/b-dir/b.txt` contains `b`
 - dir `src/a-dir` does not exist
 - file `src/c-dir/c.txt` contains `c`
+
 ### Scenario: visual mode selects spaced directories and moves both
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -1608,6 +1726,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `dst/.keep` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `src/a one/a.txt`:_
 ```text
@@ -1630,6 +1749,7 @@ c
 - file `dst/b two/b.txt` contains `b`
 - dir `src/a one` does not exist
 - file `src/c three/c.txt` contains `c`
+
 ## yazi (third-party terminal file manager)
 [yazi](https://yazi-rs.github.io/) is a file manager, so every keystroke is
 a potential file operation. A test that only checked the screen would pass
@@ -1658,6 +1778,7 @@ yazi --version
 #### Then
 - exit code is `0`
 - stdout matches `/^Yazi [0-9]+\.[0-9]+\.[0-9]+/`
+
 ### Scenario: hidden files stay hidden by default
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -1665,6 +1786,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `.secret` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### When
 ```shell
 # interactive (pty): yazi .
@@ -1672,6 +1794,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 #### Then
 - rendered screen contains `alpha.txt`
 - rendered screen does not contain `.secret`
+
 ### Scenario: dot toggles hidden files into view
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -1679,6 +1802,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `.secret` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### When
 ```shell
 # interactive (pty): yazi .
@@ -1686,6 +1810,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 #### Then
 - rendered screen contains `alpha.txt`
 - rendered screen contains `.secret`
+
 ### Scenario: filter narrows the visible file list
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -1694,6 +1819,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `gamma.log` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### When
 ```shell
 # interactive (pty): yazi .
@@ -1702,12 +1828,14 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - rendered screen contains `beta.txt`
 - rendered screen does not contain `alpha.txt`
 - rendered screen does not contain `gamma.log`
+
 ### Scenario: create makes a new file
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `keep.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `keep.txt`:_
 ```text
@@ -1721,14 +1849,17 @@ keep
 - exit code is `0`
 - the step changed exactly created `notes.txt`, modified nothing, deleted nothing, ignoring `.atago-home/**`
 - file `notes.txt` exists
+
 #### Generated artifacts
 - `notes.txt`
+
 ### Scenario: create with a trailing slash makes a directory
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `keep.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### When
 ```shell
 # interactive (pty): yazi .
@@ -1736,12 +1867,14 @@ _only when `yazi --version` succeeds · skipped on Windows_
 #### Then
 - exit code is `0`
 - dir `nested` exists
+
 ### Scenario: rename changes the hovered file name and nothing else
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `old.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `old.txt`:_
 ```text
@@ -1755,6 +1888,7 @@ old
 - the step changed exactly created `old.bak.txt`, modified nothing, deleted `old.txt`, ignoring `.atago-home/**`
 - file `old.txt` does not exist
 - file `old.bak.txt` contains `old`
+
 ### Scenario: yank then paste copies a file into a sibling directory
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -1762,6 +1896,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `dst/.keep` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `src/alpha.txt`:_
 ```text
@@ -1776,6 +1911,7 @@ alpha
 - the step changed exactly created `dst/alpha.txt`, modified nothing, deleted nothing, ignoring `.atago-home/**`
 - file `src/alpha.txt` contains `alpha`
 - file `dst/alpha.txt` contains `alpha`
+
 ### Scenario: select-all then yank copies multiple files into a sibling directory
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -1784,6 +1920,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `dst/.keep` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `src/a.txt`:_
 ```text
@@ -1802,6 +1939,7 @@ b
 - the step changed exactly created `dst/a.txt`, `dst/b.txt`, modified nothing, deleted nothing, ignoring `.atago-home/**`
 - file `dst/a.txt` contains `a`
 - file `dst/b.txt` contains `b`
+
 ### Scenario: cut then paste moves a file into a sibling directory
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -1809,6 +1947,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `dst/.keep` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `src/beta.txt`:_
 ```text
@@ -1823,12 +1962,14 @@ beta
 - the step changed exactly created `dst/beta.txt`, modified nothing, deleted `src/beta.txt`, ignoring `.atago-home/**`
 - file `src/beta.txt` does not exist
 - file `dst/beta.txt` contains `beta`
+
 ### Scenario: uppercase D permanently deletes the hovered file after confirmation
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `doomed.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `doomed.txt`:_
 ```text
@@ -1842,12 +1983,14 @@ doomed
 - exit code is `0`
 - the step changed exactly created nothing, modified nothing, deleted `doomed.txt`, ignoring `.atago-home/**`
 - file `doomed.txt` does not exist
+
 ### Scenario: canceling permanent delete returns to the file list and keeps the file
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `keep.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `keep.txt`:_
 ```text
@@ -1860,6 +2003,7 @@ keep
 #### Then
 - exit code is `0`
 - file `keep.txt` contains `keep`
+
 ### Scenario: canceling a yank leaves nothing to paste
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -1867,6 +2011,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `dst/.keep` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `src/one.txt`:_
 ```text
@@ -1879,6 +2024,7 @@ one
 #### Then
 - exit code is `0`
 - the step changed exactly created nothing, modified nothing, deleted nothing, ignoring `.atago-home/**`
+
 ### Scenario: canceling a cut leaves nothing to paste
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -1886,6 +2032,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `dst/.keep` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `src/one.txt`:_
 ```text
@@ -1898,6 +2045,7 @@ one
 #### Then
 - exit code is `0`
 - the step changed exactly created nothing, modified nothing, deleted nothing, ignoring `.atago-home/**`
+
 ### Scenario: select-all then cut moves multiple files into a sibling directory
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -1906,6 +2054,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `dst/.keep` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `src/a.txt`:_
 ```text
@@ -1925,6 +2074,7 @@ b
 - file `dst/b.txt` contains `b`
 - file `src/a.txt` does not exist
 - file `src/b.txt` does not exist
+
 ### Scenario: select-all then permanent delete removes multiple files
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -1932,6 +2082,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `b.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `a.txt`:_
 ```text
@@ -1949,12 +2100,14 @@ b
 - exit code is `0`
 - file `a.txt` does not exist
 - file `b.txt` does not exist
+
 ### Scenario: trash moves the hovered file into sandbox home trash
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `trashme.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `trashme.txt`:_
 ```text
@@ -1968,6 +2121,7 @@ trash
 - exit code is `0`
 - file `trashme.txt` does not exist
 - file `.atago-home/.local/share/Trash/files/trashme.txt` contains `trash`
+
 ### Scenario: trashing selected files moves both into sandbox home trash
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -1975,6 +2129,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `b.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `a.txt`:_
 ```text
@@ -1994,12 +2149,14 @@ b
 - file `b.txt` does not exist
 - file `.atago-home/.local/share/Trash/files/a.txt` contains `a`
 - file `.atago-home/.local/share/Trash/files/b.txt` contains `b`
+
 ### Scenario: canceling trash returns to the file list and keeps the file
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `keep.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `keep.txt`:_
 ```text
@@ -2012,6 +2169,7 @@ keep
 #### Then
 - exit code is `0`
 - file `keep.txt` contains `keep`
+
 ### Scenario: space-selected file is copied even when the cursor moves away
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -2020,6 +2178,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `dst/.keep` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `src/a.txt`:_
 ```text
@@ -2037,6 +2196,7 @@ b
 - exit code is `0`
 - file `dst/b.txt` contains `b`
 - file `dst/a.txt` does not exist
+
 ### Scenario: visual mode selects a range and copies both files
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -2046,6 +2206,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `dst/.keep` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `src/a.txt`:_
 ```text
@@ -2068,6 +2229,7 @@ c
 - file `dst/a.txt` contains `a`
 - file `dst/b.txt` contains `b`
 - file `dst/c.txt` does not exist
+
 ### Scenario: lowercase p copies to item_1 when the destination already exists
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -2075,6 +2237,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `dst/item.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `src/item.txt`:_
 ```text
@@ -2093,6 +2256,7 @@ old
 - file `src/item.txt` contains `new`
 - file `dst/item.txt` contains `old`
 - file `dst/item_1.txt` contains `new`
+
 ### Scenario: lowercase p moves to item_1 when the destination already exists
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -2100,6 +2264,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `dst/item.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `src/item.txt`:_
 ```text
@@ -2118,6 +2283,7 @@ old
 - file `src/item.txt` does not exist
 - file `dst/item.txt` contains `old`
 - file `dst/item_1.txt` contains `new`
+
 ### Scenario: uppercase P overwrites an existing file during copy
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -2125,6 +2291,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `dst/item.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `src/item.txt`:_
 ```text
@@ -2142,6 +2309,7 @@ old
 - exit code is `0`
 - file `src/item.txt` contains `new`
 - file `dst/item.txt` contains `new`
+
 ### Scenario: uppercase P overwrites an existing file during move
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -2149,6 +2317,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `dst/item.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `src/item.txt`:_
 ```text
@@ -2166,6 +2335,7 @@ old
 - exit code is `0`
 - file `src/item.txt` does not exist
 - file `dst/item.txt` contains `new`
+
 ### Scenario: alphabetical sort puts a then b then c at the cursor
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -2174,12 +2344,14 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `c.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### When
 ```shell
 # interactive (pty): yazi .
 ```
 #### Then
 - exit code is `0`
+
 ### Scenario: reverse alphabetical sort puts c then b then a at the cursor
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -2188,12 +2360,14 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `c.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### When
 ```shell
 # interactive (pty): yazi .
 ```
 #### Then
 - exit code is `0`
+
 ### Scenario: extension sort puts log then md then txt at the cursor
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -2202,12 +2376,14 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `c.log` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### When
 ```shell
 # interactive (pty): yazi .
 ```
 #### Then
 - exit code is `0`
+
 ### Scenario: reverse extension sort puts txt then md then log at the cursor
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -2216,12 +2392,14 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `c.log` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### When
 ```shell
 # interactive (pty): yazi .
 ```
 #### Then
 - exit code is `0`
+
 ### Scenario: size sort puts one then two then three at the cursor
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -2230,6 +2408,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `two.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `one.txt`:_
 ```text
@@ -2249,6 +2428,7 @@ _Fixture `two.txt`:_
 ```
 #### Then
 - exit code is `0`
+
 ### Scenario: reverse size sort puts three then two then one at the cursor
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -2257,6 +2437,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `two.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `one.txt`:_
 ```text
@@ -2276,6 +2457,7 @@ _Fixture `two.txt`:_
 ```
 #### Then
 - exit code is `0`
+
 ### Scenario: natural sort puts 3 then 20 then 100 at the cursor
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -2284,12 +2466,14 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `100.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### When
 ```shell
 # interactive (pty): yazi .
 ```
 #### Then
 - exit code is `0`
+
 ### Scenario: natural sort is visible on the rendered file list before quitting
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -2298,12 +2482,14 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `100.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### When
 ```shell
 # interactive (pty): yazi .
 ```
 #### Then
 - exit code is `0`
+
 ### Scenario: reverse natural sort puts 100 then 20 then 3 at the cursor
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -2312,12 +2498,14 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `100.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### When
 ```shell
 # interactive (pty): yazi .
 ```
 #### Then
 - exit code is `0`
+
 ### Scenario: reverse natural sort is visible on the rendered file list before quitting
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -2326,18 +2514,21 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `100.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### When
 ```shell
 # interactive (pty): yazi .
 ```
 #### Then
 - exit code is `0`
+
 ### Scenario: chooser-file writes the hovered path and exits on enter
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `picked.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `picked.txt`:_
 ```text
@@ -2350,6 +2541,7 @@ picked
 #### Then
 - exit code is `0`
 - file `chosen.txt` contains `picked.txt`
+
 ### Scenario: chooser-file writes all selected paths on enter
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -2357,6 +2549,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `b.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `a.txt`:_
 ```text
@@ -2373,12 +2566,14 @@ b
 #### Then
 - exit code is `0`
 - file `chosen.txt` contains `a.txt`, `b.txt`
+
 ### Scenario: chooser-file remains absent when quitting with uppercase Q
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `picked.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `picked.txt`:_
 ```text
@@ -2391,6 +2586,7 @@ picked
 #### Then
 - exit code is `0`
 - file `chosen.txt` does not exist
+
 ### Scenario: uppercase G moves to the bottom item before choosing
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -2399,6 +2595,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `z.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### When
 ```shell
 # interactive (pty): yazi --chooser-file ${workdir}/chosen.txt .
@@ -2406,6 +2603,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 #### Then
 - exit code is `0`
 - file `chosen.txt` contains `z.txt`
+
 ### Scenario: gg moves to the top item before choosing
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -2414,6 +2612,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `z.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### When
 ```shell
 # interactive (pty): yazi --chooser-file ${workdir}/chosen.txt .
@@ -2421,12 +2620,14 @@ _only when `yazi --version` succeeds · skipped on Windows_
 #### Then
 - exit code is `0`
 - file `chosen.txt` contains `a.txt`
+
 ### Scenario: quitting immediately writes the initial cwd to cwd-file
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `alpha.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### When
 ```shell
 # interactive (pty): yazi --cwd-file ${workdir}/cwd.txt .
@@ -2434,12 +2635,14 @@ _only when `yazi --version` succeeds · skipped on Windows_
 #### Then
 - exit code is `0`
 - file `cwd.txt` contains `/atago-`
+
 ### Scenario: quitting after entering a directory writes the final cwd
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `z-nested/inside.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### When
 ```shell
 # interactive (pty): yazi --cwd-file ${workdir}/cwd.txt .
@@ -2447,12 +2650,14 @@ _only when `yazi --version` succeeds · skipped on Windows_
 #### Then
 - exit code is `0`
 - file `cwd.txt` contains `z-nested`
+
 ### Scenario: leaving a directory then quitting writes the parent cwd
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `a-dir/a.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### When
 ```shell
 # interactive (pty): yazi --cwd-file ${workdir}/cwd.txt .
@@ -2460,6 +2665,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 #### Then
 - exit code is `0`
 - file `cwd.txt` does not contain `a-dir`
+
 ### Scenario: tabs preserve per-tab cwd and q writes the active tab cwd
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -2467,6 +2673,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `z-dir/z.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### When
 ```shell
 # interactive (pty): yazi --cwd-file ${workdir}/cwd.txt .
@@ -2474,6 +2681,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 #### Then
 - exit code is `0`
 - file `cwd.txt` contains `a-dir`
+
 ### Scenario: closing the current tab returns to the previous tab cwd
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -2481,6 +2689,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `z-dir/z.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### When
 ```shell
 # interactive (pty): yazi --cwd-file ${workdir}/cwd.txt .
@@ -2488,6 +2697,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 #### Then
 - exit code is `0`
 - file `cwd.txt` contains `a-dir`
+
 ### Scenario: previous and next tab navigation preserve each tab cwd
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -2495,6 +2705,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `z-dir/z.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### When
 ```shell
 # interactive (pty): yazi --cwd-file ${workdir}/cwd.txt .
@@ -2502,12 +2713,14 @@ _only when `yazi --version` succeeds · skipped on Windows_
 #### Then
 - exit code is `0`
 - file `cwd.txt` contains `z-dir`
+
 ### Scenario: uppercase Q exits without writing the cwd file
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `z-nested/inside.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### When
 ```shell
 # interactive (pty): yazi --cwd-file ${workdir}/cwd.txt .
@@ -2515,12 +2728,14 @@ _only when `yazi --version` succeeds · skipped on Windows_
 #### Then
 - exit code is `0`
 - file `cwd.txt` does not exist
+
 ### Scenario: create accepts filenames with spaces
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `keep.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `keep.txt`:_
 ```text
@@ -2532,14 +2747,17 @@ keep
 ```
 #### Then
 - file `two words.txt` exists
+
 #### Generated artifacts
 - `two words.txt`
+
 ### Scenario: create accepts directory names with spaces
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `keep.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `keep.txt`:_
 ```text
@@ -2551,12 +2769,14 @@ keep
 ```
 #### Then
 - dir `two words` exists
+
 ### Scenario: rename accepts spaces in filenames
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `old.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `old.txt`:_
 ```text
@@ -2568,12 +2788,14 @@ old
 ```
 #### Then
 - file `old two words.txt` contains `old`
+
 ### Scenario: rename accepts spaces in directory names
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `old-dir/keep.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `old-dir/keep.txt`:_
 ```text
@@ -2585,6 +2807,7 @@ keep
 ```
 #### Then
 - file `old-dir two words/keep.txt` contains `keep`
+
 ### Scenario: yank then dash creates an absolute symlink in the sibling directory
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -2592,6 +2815,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `dst/.keep` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `src/a.txt`:_
 ```text
@@ -2605,6 +2829,7 @@ readlink dst/a.txt
 #### Then
 - after `readlink dst/a.txt`:
   - stdout matches `/^.+/src/a\.txt\n?$/`
+
 ### Scenario: yank then underscore creates a relative symlink in the sibling directory
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -2612,6 +2837,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `dst/.keep` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `src/a.txt`:_
 ```text
@@ -2625,6 +2851,7 @@ readlink dst/a.txt
 #### Then
 - after `readlink dst/a.txt`:
   - stdout equals an exact value
+
 ### Scenario: yanked directory can be absolute-symlinked into a sibling directory
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -2632,6 +2859,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `dst/.keep` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `src/sub/a.txt`:_
 ```text
@@ -2645,6 +2873,7 @@ readlink dst/sub
 #### Then
 - after `readlink dst/sub`:
   - stdout matches `/^.+/src/sub\n?$/`
+
 ### Scenario: yanked directory can be relative-symlinked into a sibling directory
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -2652,6 +2881,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `dst/.keep` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `src/sub/a.txt`:_
 ```text
@@ -2665,6 +2895,7 @@ readlink dst/sub
 #### Then
 - after `readlink dst/sub`:
   - stdout equals an exact value
+
 ### Scenario: modified time sort reorders the rendered list
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -2673,6 +2904,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `middle.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `oldest.txt`:_
 ```text
@@ -2698,6 +2930,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `middle.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `oldest.txt`:_
 ```text
@@ -2723,6 +2956,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `middle.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `oldest.txt`:_
 ```text
@@ -2742,6 +2976,7 @@ mid
 ```
 #### Then
 - file `chosen.txt` contains `oldest.txt`
+
 ### Scenario: reverse modified time sort chooses the newest file first
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -2750,6 +2985,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `middle.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `oldest.txt`:_
 ```text
@@ -2769,6 +3005,7 @@ mid
 ```
 #### Then
 - file `chosen.txt` contains `newest.txt`
+
 ### Scenario: toggling the same file twice removes the explicit selection
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -2776,6 +3013,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `b.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `a.txt`:_
 ```text
@@ -2791,6 +3029,7 @@ b
 ```
 #### Then
 - file `chosen.txt` contains `/b.txt`
+
 ### Scenario: inverse selection flips one picked file into the other two
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -2799,6 +3038,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `c.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `a.txt`:_
 ```text
@@ -2820,6 +3060,7 @@ cat chosen.txt
 #### Then
 - after `cat chosen.txt`:
   - stdout matches `/(?m)^.*/b\.txt\n.*/c\.txt\n?$/`
+
 ### Scenario: direct tab switching with 1 and 2 preserves per-tab cwd
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -2827,6 +3068,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `two/b.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `one/a.txt`:_
 ```text
@@ -2842,12 +3084,14 @@ b
 ```
 #### Then
 - file `cwd.txt` contains `/two`
+
 ### Scenario: block shell command creates a file and returns to the browser
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `keep.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `keep.txt`:_
 ```text
@@ -2859,6 +3103,7 @@ keep
 ```
 #### Then
 - file `shell-created.txt` contains `shell-created`
+
 ### Scenario: filter can be cleared after confirming it
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -2866,6 +3111,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `beta.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `alpha.txt`:_
 ```text
@@ -2886,6 +3132,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `dst/.keep` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `src/sub/a.txt`:_
 ```text
@@ -2898,6 +3145,7 @@ a
 #### Then
 - file `dst/src/sub/a.txt` contains `a`
 - file `src/sub/a.txt` contains `a`
+
 ### Scenario: cut then paste moves a directory subtree into a sibling directory
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -2905,6 +3153,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `dst/.keep` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `src/sub/a.txt`:_
 ```text
@@ -2917,6 +3166,7 @@ a
 #### Then
 - file `dst/src/sub/a.txt` contains `a`
 - dir `src` does not exist
+
 ### Scenario: lowercase p copies a directory to name_1 when the destination exists
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -2924,6 +3174,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `dst/src/existing.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `src/sub/a.txt`:_
 ```text
@@ -2940,6 +3191,7 @@ dst
 #### Then
 - file `dst/src/existing.txt` contains `dst`
 - file `dst/src_1/sub/a.txt` contains `src`
+
 ### Scenario: lowercase p moves a directory to name_1 when the destination exists
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -2947,6 +3199,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `dst/src/existing.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `src/sub/a.txt`:_
 ```text
@@ -2964,6 +3217,7 @@ dst
 - file `dst/src/existing.txt` contains `dst`
 - file `dst/src_1/sub/a.txt` contains `src`
 - dir `src` does not exist
+
 ### Scenario: uppercase D permanently deletes a directory subtree after confirmation
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -2971,6 +3225,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `keep.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `doomed/sub/a.txt`:_
 ```text
@@ -2986,6 +3241,7 @@ keep
 ```
 #### Then
 - dir `doomed` does not exist
+
 ### Scenario: canceling uppercase D keeps a directory subtree intact
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -2993,6 +3249,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `keep.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `doomed/sub/a.txt`:_
 ```text
@@ -3008,6 +3265,7 @@ keep
 ```
 #### Then
 - file `doomed/sub/a.txt` contains `a`
+
 ### Scenario: trash moves a directory subtree into sandbox home trash
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -3015,6 +3273,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `keep.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `doomed/sub/a.txt`:_
 ```text
@@ -3031,6 +3290,7 @@ keep
 #### Then
 - dir `doomed` does not exist
 - file `.atago-home/.local/share/Trash/files/doomed/sub/a.txt` contains `a`
+
 ### Scenario: canceling trash keeps a directory subtree intact
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -3038,6 +3298,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `keep.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `doomed/sub/a.txt`:_
 ```text
@@ -3053,6 +3314,7 @@ keep
 ```
 #### Then
 - file `doomed/sub/a.txt` contains `a`
+
 ### Scenario: canceling trash for selected directories keeps both subtrees
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -3060,6 +3322,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `beta-dir/sub/y.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `alpha-dir/sub/x.txt`:_
 ```text
@@ -3076,6 +3339,7 @@ y
 #### Then
 - file `alpha-dir/sub/x.txt` contains `x`
 - file `beta-dir/sub/y.txt` contains `y`
+
 ### Scenario: yank then paste copies a spaced filename into a sibling directory
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -3083,6 +3347,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `dst/.keep` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `src/two words.txt`:_
 ```text
@@ -3094,6 +3359,7 @@ spaced
 ```
 #### Then
 - file `dst/two words.txt` contains `spaced`
+
 ### Scenario: cut then paste moves a spaced filename into a sibling directory
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -3101,6 +3367,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `dst/.keep` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `src/two words.txt`:_
 ```text
@@ -3113,6 +3380,7 @@ spaced
 #### Then
 - file `dst/two words.txt` contains `spaced`
 - file `src/two words.txt` does not exist
+
 ### Scenario: yank then paste copies a spaced directory subtree into a sibling directory
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -3120,6 +3388,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `dst/.keep` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `src/two words/a.txt`:_
 ```text
@@ -3131,6 +3400,7 @@ spaced
 ```
 #### Then
 - file `dst/two words/a.txt` contains `spaced`
+
 ### Scenario: dash symlinks a spaced filename with an absolute target
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -3138,6 +3408,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `dst/.keep` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `src/two words.txt`:_
 ```text
@@ -3151,6 +3422,7 @@ readlink "dst/two words.txt"
 #### Then
 - after `readlink "dst/two words.txt"`:
   - stdout matches `/^.+/src/two words\.txt\n?$/`
+
 ### Scenario: underscore symlinks a spaced filename with a relative target
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -3158,6 +3430,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `dst/.keep` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `src/two words.txt`:_
 ```text
@@ -3171,6 +3444,7 @@ readlink "dst/two words.txt"
 #### Then
 - after `readlink "dst/two words.txt"`:
   - stdout equals an exact value
+
 ### Scenario: dash symlinks a spaced directory with an absolute target
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -3178,6 +3452,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `dst/.keep` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `src/two words/a.txt`:_
 ```text
@@ -3191,6 +3466,7 @@ readlink "dst/two words"
 #### Then
 - after `readlink "dst/two words"`:
   - stdout matches `/^.+/src/two words\n?$/`
+
 ### Scenario: underscore symlinks a spaced directory with a relative target
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -3198,6 +3474,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `dst/.keep` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `src/two words/a.txt`:_
 ```text
@@ -3211,6 +3488,7 @@ readlink "dst/two words"
 #### Then
 - after `readlink "dst/two words"`:
   - stdout equals an exact value
+
 ### Scenario: hidden toggle can be turned back off
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -3218,18 +3496,21 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `.secret` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### When
 ```shell
 # interactive (pty): yazi --chooser-file ${workdir}/chosen.txt .
 ```
 #### Then
 - file `chosen.txt` contains `alpha.txt`
+
 ### Scenario: block shell command creates a directory and returns to the browser
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `keep.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `keep.txt`:_
 ```text
@@ -3241,12 +3522,14 @@ keep
 ```
 #### Then
 - dir `shell-dir` exists
+
 ### Scenario: block shell command can rename a file in place
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `old.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `old.txt`:_
 ```text
@@ -3258,12 +3541,14 @@ old
 ```
 #### Then
 - file `shell-renamed.txt` contains `old`
+
 ### Scenario: block shell command creates a spaced filename
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `keep.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `keep.txt`:_
 ```text
@@ -3275,12 +3560,14 @@ keep
 ```
 #### Then
 - file `two words.txt` contains `spaced`
+
 ### Scenario: block shell command creates a spaced directory
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `keep.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `keep.txt`:_
 ```text
@@ -3292,6 +3579,7 @@ keep
 ```
 #### Then
 - dir `two words` exists
+
 ### Scenario: block shell command deletes the hovered file
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -3299,6 +3587,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `keep.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `doomed.txt`:_
 ```text
@@ -3314,12 +3603,14 @@ keep
 ```
 #### Then
 - file `doomed.txt` does not exist
+
 ### Scenario: block shell command copies the hovered file to a new name
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `old.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `old.txt`:_
 ```text
@@ -3331,12 +3622,14 @@ old
 ```
 #### Then
 - file `shell-copy.txt` contains `old`
+
 ### Scenario: block shell command runs inside the entered directory
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `sub/keep.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `sub/keep.txt`:_
 ```text
@@ -3348,12 +3641,14 @@ keep
 ```
 #### Then
 - file `sub/inside.txt` contains `inside`
+
 ### Scenario: block shell command can create nested files inside a new directory
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `keep.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `keep.txt`:_
 ```text
@@ -3365,12 +3660,14 @@ keep
 ```
 #### Then
 - file `shell-nested/file.txt` contains `nested`
+
 ### Scenario: block shell command moves a file into a new directory
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `move-me.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `move-me.txt`:_
 ```text
@@ -3382,12 +3679,14 @@ move
 ```
 #### Then
 - file `moved/move-me.txt` contains `move`
+
 ### Scenario: block shell command renames a directory
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `old-dir/a.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `old-dir/a.txt`:_
 ```text
@@ -3399,12 +3698,14 @@ a
 ```
 #### Then
 - file `shell-dir/a.txt` contains `a`
+
 ### Scenario: block shell command appends to the hovered file content
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `note.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `note.txt`:_
 ```text
@@ -3416,12 +3717,14 @@ first
 ```
 #### Then
 - file `note.txt` contains `second`
+
 ### Scenario: block shell command can create a hidden file that dot then reveals
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `keep.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `keep.txt`:_
 ```text
@@ -3433,6 +3736,7 @@ keep
 ```
 #### Then
 - file `.shell-hidden` contains `hidden`
+
 ### Scenario: block shell command deletes a directory subtree
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -3440,6 +3744,7 @@ _only when `yazi --version` succeeds · skipped on Windows_
 - Fixture file `keep.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `doomed/a.txt`:_
 ```text
@@ -3455,12 +3760,14 @@ keep
 ```
 #### Then
 - dir `doomed` does not exist
+
 ### Scenario: block shell command copies a directory subtree to a new name
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `src/a.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `src/a.txt`:_
 ```text
@@ -3472,12 +3779,14 @@ a
 ```
 #### Then
 - file `shell-copy-dir/a.txt` contains `a`
+
 ### Scenario: block shell command creates a symlink to a file
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `target.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `target.txt`:_
 ```text
@@ -3491,12 +3800,14 @@ readlink linked.txt
 #### Then
 - after `readlink linked.txt`:
   - stdout equals an exact value
+
 ### Scenario: block shell command creates a symlink to a directory
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `target-dir/a.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `target-dir/a.txt`:_
 ```text
@@ -3510,12 +3821,14 @@ readlink linked-dir
 #### Then
 - after `readlink linked-dir`:
   - stdout equals an exact value
+
 ### Scenario: block shell command renames a spaced filename
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `old name.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `old name.txt`:_
 ```text
@@ -3527,12 +3840,14 @@ old
 ```
 #### Then
 - file `new name.txt` contains `old`
+
 ### Scenario: block shell command creates a symlink to a spaced filename
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `target file.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `target file.txt`:_
 ```text
@@ -3546,12 +3861,14 @@ readlink "linked file.txt"
 #### Then
 - after `readlink "linked file.txt"`:
   - stdout equals an exact value
+
 ### Scenario: block shell command creates a symlink to a spaced directory
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `target dir/a.txt` is created.
 - The command runs with a cleared environment (passing through: PATH).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `target dir/a.txt`:_
 ```text

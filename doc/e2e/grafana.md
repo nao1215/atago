@@ -6,6 +6,7 @@
   - [the server boots and reports health and build info](#scenario-the-server-boots-and-reports-health-and-build-info)
   - [anonymous visitors are redirected to the login page](#scenario-anonymous-visitors-are-redirected-to-the-login-page)
   - [a dashboard and datasource lifecycle over the REST API](#scenario-a-dashboard-and-datasource-lifecycle-over-the-rest-api)
+
 ## grafana (self-hosted observability platform)
 [Grafana](https://grafana.com/oss/grafana/) treated as a black box: a real
 server is booted per scenario on SQLite and driven only over HTTP, the way
@@ -25,6 +26,7 @@ _only when `command -v grafana` succeeds_
 #### Given
 - Background service `grafana` is started: `grafana server --homepath "$GF_PATHS_HOME"`.
 - The step is retried up to 60 times every 1s until HTTP status is `200`.
+
 #### When
 ```shell
 # HTTP GET /api/health via grafana
@@ -33,6 +35,7 @@ _only when `command -v grafana` succeeds_
 - HTTP status is `200`
 - body at `$.database` equals `ok`
 - body at `$.version` matches `/^[0-9]+\.[0-9]+\.[0-9]+/`
+
 ### Scenario: anonymous visitors are redirected to the login page
 An unauthenticated visitor asking for `/` must land on the login page,
 and the same visitor asking the API for data must be refused with 401 —
@@ -48,6 +51,7 @@ _only when `command -v grafana` succeeds_
 #### Given
 - Background service `grafana` is started: `grafana server --homepath "$GF_PATHS_HOME"`.
 - The step is retried up to 60 times every 1s until HTTP status is `200`.
+
 #### When
 ```shell
 # HTTP GET /api/health via grafana2
@@ -60,11 +64,13 @@ _only when `command -v grafana` succeeds_
   - header `Location` contains `/login`
 - after `HTTP GET /api/search`:
   - HTTP status is `401`
+
 ### Scenario: a dashboard and datasource lifecycle over the REST API
 _only when `command -v grafana` succeeds_
 #### Given
 - Background service `grafana` is started: `grafana server --homepath "$GF_PATHS_HOME"`.
 - The step is retried up to 60 times every 1s until HTTP status is `200`.
+
 #### When
 ```shell
 # HTTP GET /api/health via grafana3

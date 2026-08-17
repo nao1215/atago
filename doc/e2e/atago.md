@@ -755,6 +755,7 @@
 - [atago self-hosting / yaml stream matcher](#atago-self-hosting--yaml-stream-matcher) — 2 scenarios
   - [a yaml stream matcher selects and asserts a decoded value (#9)](#scenario-a-yaml-stream-matcher-selects-and-asserts-a-decoded-value-9)
   - [a yaml matcher mismatch fails the inner spec (#9)](#scenario-a-yaml-matcher-mismatch-fails-the-inner-spec-9)
+
 ## atago self-hosting / cross-platform no-shell argv tokenization (#154)
 Source: `test/e2e/atago/argv_quotes.atago.yaml`
 ### Scenario: a single-quoted JSON argument survives tokenization
@@ -765,6 +766,7 @@ ${atago} run '{"k":"v"}'
 #### Then
 - exit code is `3`
 - stderr contains `{\"k\":\"v\"}`
+
 ### Scenario: a single-quoted argument with a space stays one argument
 #### When
 ```shell
@@ -773,6 +775,7 @@ ${atago} run 'no such file.yaml'
 #### Then
 - exit code is `3`
 - stderr contains `no such file.yaml`
+
 ### Scenario: a block-scalar command splits on newlines like spaces
 #### When
 ```shell
@@ -783,6 +786,7 @@ no-such-file.yaml
 #### Then
 - exit code is `3`
 - stderr contains `no-such-file.yaml`
+
 ### Scenario: a folded-scalar command drops its trailing newline
 #### When
 ```shell
@@ -792,11 +796,13 @@ ${atago} run no-such-file.yaml
 #### Then
 - exit code is `3`
 - stderr contains `no-such-file.yaml`
+
 ## atago self-hosting / artifacts-dir failure payloads
 Source: `test/e2e/atago/artifacts.atago.yaml`
 ### Scenario: a failing stdout equals writes expected and actual sidecars
 #### Given
 - Fixture file `fail.atago.yaml` is created.
+
 #### Inputs
 _Fixture `fail.atago.yaml`:_
 ```text
@@ -819,9 +825,11 @@ cat arts/*/*/*.actual.txt arts/*/*/*.expected.txt
 - after `cat arts/*/*/*.actual.txt arts/*/*/*.expected.txt`:
   - exit code is `0`
   - stdout contains `actual-value`, `expected-value`
+
 ### Scenario: a passing scenario writes no failure payload
 #### Given
 - Fixture file `pass.atago.yaml` is created.
+
 #### Inputs
 _Fixture `pass.atago.yaml`:_
 ```text
@@ -843,9 +851,11 @@ find arts2 -name '*.actual.txt' 2>/dev/null | wc -l
   - exit code is `0`
 - after `find arts2 -name '*.actual.txt' 2>/dev/null | wc -l`:
   - stdout matches `/^\s*0\s*$/`
+
 ### Scenario: the artifacts directory is created when it does not exist
 #### Given
 - Fixture file `nested.atago.yaml` is created.
+
 #### Inputs
 _Fixture `nested.atago.yaml`:_
 ```text
@@ -864,9 +874,11 @@ ${atago} run --artifacts-dir deep/made/arts nested.atago.yaml
 #### Then
 - exit code is `1`
 - dir `deep/made/arts` exists
+
 ### Scenario: each repeat iteration keeps its own failure payloads
 #### Given
 - Fixture file `repeated.atago.yaml` is created.
+
 #### Inputs
 _Fixture `repeated.atago.yaml`:_
 ```text
@@ -897,6 +909,7 @@ cat $(find reparts -name '*.actual.txt') | sort -u | wc -l | tr -d ' '
   - stdout equals an exact value
 - after `cat $(find reparts -name '*.actual.txt') | sort -u | wc -l | tr -d ' '`:
   - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -906,6 +919,7 @@ attempt-3
 ### Scenario: a file-content mismatch also writes a payload
 #### Given
 - Fixture file `filefail.atago.yaml` is created.
+
 #### Inputs
 _Fixture `filefail.atago.yaml`:_
 ```text
@@ -927,9 +941,11 @@ find farts -type f | wc -l
   - exit code is `1`
 - after `find farts -type f | wc -l`:
   - stdout does not match `/^\s*0\s*$/`
+
 ### Scenario: a teardown failure keeps the steps failure payloads
 #### Given
 - Fixture file `bothfail.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bothfail.atago.yaml`:_
 ```text
@@ -962,6 +978,7 @@ find tarts -name '*.actual.txt' | wc -l | tr -d ' '
   - stdout equals an exact value
 - after `find tarts -name '*.actual.txt' | wc -l | tr -d ' '`:
   - stdout equals an exact value
+
 ## atago self-hosting / variable expansion in assertion matcher values
 Source: `test/e2e/atago/assert_expand.atago.yaml`
 ### Scenario: stdout.equals expands ${workdir}
@@ -971,6 +988,7 @@ printf "%s\n" "${workdir}/out.txt"
 ```
 #### Then
 - stdout equals an exact value
+
 ### Scenario: stdout.contains and not_contains expand a stored variable
 #### When
 ```shell
@@ -982,6 +1000,7 @@ printf "%s\n" "hello-123 world"
 - after `printf "%s\n" "hello-123 world"`:
   - stdout contains `${token}`
   - stdout does not contain `${token}-absent`
+
 ### Scenario: file.contains expands ${workdir}
 #### When
 ```shell
@@ -989,6 +1008,7 @@ printf "%s\n" "${workdir}/marker" > note.txt
 ```
 #### Then
 - file `note.txt` contains `${workdir}/marker`
+
 ### Scenario: dir.path expands a stored variable
 #### When
 ```shell
@@ -997,6 +1017,7 @@ mkdir -p site && touch site/a.html && echo site
 ```
 #### Then
 - dir `${outdir}` contains `a.html`
+
 ### Scenario: changes entries expand a stored variable
 #### When
 ```shell
@@ -1007,6 +1028,7 @@ echo w > ${base}2.txt
 #### Then
 - after `echo w > ${base}2.txt`:
   - the step changed exactly created `${base}2.txt`, modified nothing, deleted nothing
+
 ### Scenario: screen matcher expands a stored variable
 _skipped on Windows_
 #### When
@@ -1018,11 +1040,13 @@ echo needle
 #### Then
 - after `interactive (pty): echo needle`:
   - rendered screen contains `${pat}`
+
 ## atago self-hosting / browser (cdp) runner
 Source: `test/e2e/atago/cdp.atago.yaml`
 ### Scenario: a cdp step with no actions fails validation (exit 2)
 #### Given
 - Fixture file `badcdp.atago.yaml` is created.
+
 #### Inputs
 _Fixture `badcdp.atago.yaml`:_
 ```text
@@ -1046,9 +1070,11 @@ ${atago} run badcdp.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `at least one action`
+
 ### Scenario: a cdp step naming an undeclared runner fails validation (exit 2)
 #### Given
 - Fixture file `norunner.atago.yaml` is created.
+
 #### Inputs
 _Fixture `norunner.atago.yaml`:_
 ```text
@@ -1070,9 +1096,11 @@ ${atago} run norunner.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `is not declared`
+
 ### Scenario: a screenshot action without a path fails validation (exit 2)
 #### Given
 - Fixture file `noshotpath.atago.yaml` is created.
+
 #### Inputs
 _Fixture `noshotpath.atago.yaml`:_
 ```text
@@ -1099,9 +1127,11 @@ ${atago} run noshotpath.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `screenshot requires a path`
+
 ### Scenario: explain lists the extended cdp actions
 #### Given
 - Fixture file `actions.atago.yaml` is created.
+
 #### Inputs
 _Fixture `actions.atago.yaml`:_
 ```text
@@ -1133,9 +1163,11 @@ ${atago} explain actions.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `wait_hidden`, `screenshot shot.png`, `attribute href`
+
 ### Scenario: a browser-only field on a non-browser runner fails validation (exit 2)
 #### Given
 - Fixture file `crosstype.atago.yaml` is created.
+
 #### Inputs
 _Fixture `crosstype.atago.yaml`:_
 ```text
@@ -1159,9 +1191,11 @@ ${atago} run crosstype.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `cannot be set on a http runner`
+
 ### Scenario: manifest surfaces the browser-runner configuration
 #### Given
 - Fixture file `cfg.atago.yaml` is created.
+
 #### Inputs
 _Fixture `cfg.atago.yaml`:_
 ```text
@@ -1191,9 +1225,11 @@ ${atago} manifest cfg.atago.yaml
 - exit code is `0`
 - stdout at `$.specs[0].runners[0].headless` equals `false`
 - stdout at `$.specs[0].runners[0].exec_path` equals `/usr/bin/chromium`
+
 ### Scenario: an upload action without a file fails validation (exit 2)
 #### Given
 - Fixture file `badupload.atago.yaml` is created.
+
 #### Inputs
 _Fixture `badupload.atago.yaml`:_
 ```text
@@ -1218,9 +1254,11 @@ ${atago} run badupload.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `upload requires selector and file`
+
 ### Scenario: a download action without a click selector fails validation (exit 2)
 #### Given
 - Fixture file `baddownload.atago.yaml` is created.
+
 #### Inputs
 _Fixture `baddownload.atago.yaml`:_
 ```text
@@ -1245,9 +1283,11 @@ ${atago} run baddownload.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `download requires a click selector`
+
 ### Scenario: a navigate to a denied host is a policy violation (exit 6)
 #### Given
 - Fixture file `policy.atago.yaml` is created.
+
 #### Inputs
 _Fixture `policy.atago.yaml`:_
 ```text
@@ -1275,6 +1315,7 @@ ${atago} run policy.atago.yaml
 #### Then
 - exit code is `6`
 - stdout contains `network policy denies host "denied.example"`, `holds `navigate:` to the policy`
+
 ## atago self-hosting / changes (workdir delta assertions)
 Source: `test/e2e/atago/changes.atago.yaml`
 ### Scenario: a generator touches exactly the files it should (POSIX)
@@ -1282,6 +1323,7 @@ _skipped on Windows_
 #### Given
 - Fixture file `config.yaml` is created.
 - Fixture file `stale.html` is created.
+
 #### Inputs
 _Fixture `config.yaml`:_
 ```text
@@ -1298,10 +1340,12 @@ printf 'theme: dark\n' > config.yaml && rm stale.html && mkdir -p site/assets &&
 #### Then
 - exit code is `0`
 - the step changed exactly created `site/index.html`, `site/assets/*.css`, modified `config.yaml`, deleted `stale.html`
+
 ### Scenario: an unexpected creation breaks the exact contract (POSIX)
 _skipped on Windows_
 #### Given
 - Fixture file `check.atago.yaml` is created.
+
 #### Inputs
 _Fixture `check.atago.yaml`:_
 ```text
@@ -1326,9 +1370,11 @@ ${atago} run check.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `unexpected created file`
+
 ### Scenario: stdout_to counts as created, and modified nothing holds (portable)
 #### Given
 - Fixture file `input.txt` is created.
+
 #### Inputs
 _Fixture `input.txt`:_
 ```text
@@ -1341,12 +1387,15 @@ echo produced
 #### Then
 - exit code is `0`
 - the step changed exactly created `result.txt`, modified nothing, deleted nothing
+
 #### Generated artifacts
 - `result.txt`
+
 ### Scenario: the delta over a retried step reflects only the converged attempt (POSIX)
 _skipped on Windows_
 #### Given
 - The step is retried up to 3 times every 10ms until exit code is `0`.
+
 #### When
 ```shell
 touch a; [ -f b ] && touch c; touch b; [ -f c ]
@@ -1354,6 +1403,7 @@ touch a; [ -f b ] && touch c; touch b; [ -f c ]
 #### Then
 - exit code is `0`
 - the step changed exactly created `c`, modified nothing, deleted nothing
+
 ### Scenario: deleting and recreating a byte-identical file appears in no list (POSIX)
 _skipped on Windows_
 #### When
@@ -1365,10 +1415,12 @@ rm f.txt && printf hello > f.txt
 - after `rm f.txt && printf hello > f.txt`:
   - exit code is `0`
   - the step changed exactly created nothing, modified nothing, deleted nothing
+
 ### Scenario: deleting and recreating with different content is modified only (POSIX)
 _skipped on Windows_
 #### Given
 - Fixture file `f.txt` is created.
+
 #### Inputs
 _Fixture `f.txt`:_
 ```text
@@ -1381,10 +1433,12 @@ rm f.txt && printf world > f.txt
 #### Then
 - exit code is `0`
 - the step changed exactly created nothing, modified `f.txt`, deleted nothing
+
 ### Scenario: stdout_to overwrites a fixture (modified) while stderr_to creates an empty file (POSIX)
 _skipped on Windows_
 #### Given
 - Fixture file `existing.txt` is created.
+
 #### Inputs
 _Fixture `existing.txt`:_
 ```text
@@ -1397,9 +1451,11 @@ printf newcontent
 #### Then
 - exit code is `0`
 - the step changed exactly created `err.txt`, modified `existing.txt`, deleted nothing
+
 #### Generated artifacts
 - `existing.txt`
 - `err.txt`
+
 ### Scenario: a pty step feeds the delta scan just like a run step (POSIX)
 _skipped on Windows_
 #### When
@@ -1408,6 +1464,7 @@ _skipped on Windows_
 ```
 #### Then
 - the step changed exactly created `from-pty`
+
 ### Scenario: a doublestar glob pins an arbitrary-depth generated tree exactly (POSIX)
 _skipped on Windows_
 #### When
@@ -1417,10 +1474,12 @@ mkdir -p out/a/b && printf '1' > out/top.txt && printf '2' > out/a/mid.txt && pr
 #### Then
 - exit code is `0`
 - the step changed exactly created `out/**`, modified nothing, deleted nothing
+
 ### Scenario: a stray file outside the doublestar prefix breaks the exact contract (POSIX)
 _skipped on Windows_
 #### Given
 - Fixture file `check.atago.yaml` is created.
+
 #### Inputs
 _Fixture `check.atago.yaml`:_
 ```text
@@ -1445,6 +1504,7 @@ ${atago} run check.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `unexpected created file`
+
 ### Scenario: a doublestar glob matches a nested redirect target (portable)
 #### When
 ```shell
@@ -1453,8 +1513,10 @@ echo produced
 #### Then
 - exit code is `0`
 - the step changed exactly created `out/**`, modified nothing, deleted nothing
+
 #### Generated artifacts
 - `out/deep/result.txt`
+
 ### Scenario: a doublestar prefix covers both redirect streams (portable)
 #### When
 ```shell
@@ -1463,13 +1525,16 @@ echo out
 #### Then
 - exit code is `0`
 - the step changed exactly created `logs/**`, modified nothing, deleted nothing
+
 #### Generated artifacts
 - `logs/out.txt`
 - `logs/err.txt`
+
 ### Scenario: creating a symlink is a creation
 _skipped on Windows_
 #### Given
 - Fixture file `real.txt` is created.
+
 #### Inputs
 _Fixture `real.txt`:_
 ```text
@@ -1482,10 +1547,12 @@ ln -s real.txt link.txt
 #### Then
 - exit code is `0`
 - the step changed exactly created `link.txt`, modified nothing, deleted nothing
+
 ### Scenario: an exhaustive created list catches an unexpected symlink
 _skipped on Windows_
 #### Given
 - Fixture file `check.atago.yaml` is created.
+
 #### Inputs
 _Fixture `check.atago.yaml`:_
 ```text
@@ -1510,12 +1577,14 @@ ${atago} run check.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `unexpected created file`
+
 ### Scenario: retargeting a symlink is a modification
 _skipped on Windows_
 #### Given
 - Fixture file `v1.txt` is created.
 - Fixture file `v2.txt` is created.
 - Fixture file `current` is created.
+
 #### Inputs
 _Fixture `v1.txt`:_
 ```text
@@ -1532,11 +1601,13 @@ ln -sfn v2.txt current
 #### Then
 - exit code is `0`
 - the step changed exactly created nothing, modified `current`, deleted nothing
+
 ### Scenario: writing through a symlink modifies the target only
 _skipped on Windows_
 #### Given
 - Fixture file `real.txt` is created.
 - Fixture file `link.txt` is created.
+
 #### Inputs
 _Fixture `real.txt`:_
 ```text
@@ -1549,11 +1620,13 @@ printf 'after\n' > link.txt
 #### Then
 - exit code is `0`
 - the step changed exactly created nothing, modified `real.txt`, deleted nothing
+
 ### Scenario: removing a symlink is a deletion
 _skipped on Windows_
 #### Given
 - Fixture file `real.txt` is created.
 - Fixture file `link.txt` is created.
+
 #### Inputs
 _Fixture `real.txt`:_
 ```text
@@ -1566,6 +1639,7 @@ rm link.txt
 #### Then
 - exit code is `0`
 - the step changed exactly created nothing, modified nothing, deleted `link.txt`
+
 ### Scenario: a dangling symlink is still a creation
 _skipped on Windows_
 #### When
@@ -1575,9 +1649,11 @@ ln -s no/such/target dangling
 #### Then
 - exit code is `0`
 - the step changed exactly created `dangling`, modified nothing, deleted nothing
+
 ### Scenario: a changes entry naming a directory says what the path is
 #### Given
 - Fixture file `direntry.atago.yaml` is created.
+
 #### Inputs
 _Fixture `direntry.atago.yaml`:_
 ```text
@@ -1598,9 +1674,11 @@ ${atago} run direntry.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `"out" exists as a directory`, `tracks only regular files and symlinks`, `assert it with dir:`
+
 ### Scenario: an ignored path does not break an exhaustive delta
 #### Given
 - Fixture file `strict.atago.yaml` is created.
+
 #### Inputs
 _Fixture `strict.atago.yaml`:_
 ```text
@@ -1627,9 +1705,11 @@ ${atago} run strict.atago.yaml
 - after `${atago} run strict.atago.yaml`:
   - exit code is `1`
   - stdout contains `unexpected created file "surprise.txt"`
+
 ### Scenario: an ignored path cannot satisfy an entry that names it
 #### Given
 - Fixture file `contradiction.atago.yaml` is created.
+
 #### Inputs
 _Fixture `contradiction.atago.yaml`:_
 ```text
@@ -1651,10 +1731,12 @@ ${atago} run contradiction.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `created entry "out.txt" matched no file the step created`
+
 ### Scenario: a permission-only change is a modification
 _skipped on Windows_
 #### Given
 - Fixture file `cfg.yaml` is created.
+
 #### Inputs
 _Fixture `cfg.yaml`:_
 ```text
@@ -1668,10 +1750,12 @@ chmod 777 cfg.yaml
 - exit code is `0`
 - the step changed exactly created nothing, modified `cfg.yaml`, deleted nothing
 - file `cfg.yaml` is executable
+
 ### Scenario: a planted fifo is a creation and is never opened
 _skipped on Windows_
 #### Given
 - Fixture file `blind.atago.yaml` is created.
+
 #### Inputs
 _Fixture `blind.atago.yaml`:_
 ```text
@@ -1697,11 +1781,13 @@ ${atago} run blind.atago.yaml
 - after `${atago} run blind.atago.yaml`:
   - exit code is `1`
   - stdout contains `unexpected created file "surprise"`
+
 ## atago self-hosting / CLI scenario selection
 Source: `test/e2e/atago/cli_selection.atago.yaml`
 ### Scenario: filter selects by a name substring
 #### Given
 - Fixture file `inner.atago.yaml` is created.
+
 #### Inputs
 _Fixture `inner.atago.yaml`:_
 ```text
@@ -1726,9 +1812,11 @@ ${atago} run --ci --report json --filter alpha inner.atago.yaml
 - exit code is `0`
 - stdout at `$.suites[0].scenarios` has length 1
 - stdout contains `"alpha"`, does not contain `"beta"`, `"gamma"`
+
 ### Scenario: filter is OR across a comma-separated list
 #### Given
 - Fixture file `inner.atago.yaml` is created.
+
 #### Inputs
 _Fixture `inner.atago.yaml`:_
 ```text
@@ -1753,9 +1841,11 @@ ${atago} run --ci --report json --filter alpha,beta inner.atago.yaml
 - exit code is `0`
 - stdout at `$.suites[0].scenarios` has length 2
 - stdout contains `"alpha"`, `"beta"`, does not contain `"gamma"`
+
 ### Scenario: tag selects scenarios carrying the tag
 #### Given
 - Fixture file `inner.atago.yaml` is created.
+
 #### Inputs
 _Fixture `inner.atago.yaml`:_
 ```text
@@ -1780,9 +1870,11 @@ ${atago} run --ci --report json --tag fast inner.atago.yaml
 - exit code is `0`
 - stdout at `$.suites[0].scenarios` has length 2
 - stdout contains `"alpha"`, `"gamma"`, does not contain `"beta"`
+
 ### Scenario: a repeated tag flag is OR
 #### Given
 - Fixture file `inner.atago.yaml` is created.
+
 #### Inputs
 _Fixture `inner.atago.yaml`:_
 ```text
@@ -1806,9 +1898,11 @@ ${atago} run --ci --report json --tag fast --tag slow inner.atago.yaml
 #### Then
 - exit code is `0`
 - stdout at `$.suites[0].scenarios` has length 3
+
 ### Scenario: skip-tag removes scenarios carrying the tag
 #### Given
 - Fixture file `inner.atago.yaml` is created.
+
 #### Inputs
 _Fixture `inner.atago.yaml`:_
 ```text
@@ -1833,9 +1927,11 @@ ${atago} run --ci --report json --skip-tag slow inner.atago.yaml
 - exit code is `0`
 - stdout at `$.suites[0].scenarios` has length 1
 - stdout contains `"alpha"`, does not contain `"beta"`, `"gamma"`
+
 ### Scenario: tag and skip-tag compose as selected minus skipped
 #### Given
 - Fixture file `inner.atago.yaml` is created.
+
 #### Inputs
 _Fixture `inner.atago.yaml`:_
 ```text
@@ -1860,9 +1956,11 @@ ${atago} run --ci --report json --tag fast --skip-tag slow inner.atago.yaml
 - exit code is `0`
 - stdout at `$.suites[0].scenarios` has length 1
 - stdout contains `"alpha"`, does not contain `"gamma"`
+
 ### Scenario: an empty filter selection fails under --ci with a substring hint
 #### Given
 - Fixture file `inner.atago.yaml` is created.
+
 #### Inputs
 _Fixture `inner.atago.yaml`:_
 ```text
@@ -1887,9 +1985,11 @@ ${atago} run --ci --report json --filter no_such_name inner.atago.yaml
 - exit code is `3`
 - stdout at `$.suites[0].scenarios` has length 0
 - stderr contains `no scenarios matched`, `--filter "no_such_name"`, `case-sensitive substring`
+
 ### Scenario: an empty tag selection fails under --ci and names the exact-tag rule
 #### Given
 - Fixture file `inner.atago.yaml` is created.
+
 #### Inputs
 _Fixture `inner.atago.yaml`:_
 ```text
@@ -1913,9 +2013,11 @@ ${atago} run --ci --report json --tag no_such_tag inner.atago.yaml
 #### Then
 - exit code is `3`
 - stderr contains `no scenarios matched`, `--tag "no_such_tag"`, `match tags exactly`, `atago list`, does not contain `case-sensitive substring`
+
 ### Scenario: without --ci an empty selection only warns and still exits zero
 #### Given
 - Fixture file `inner.atago.yaml` is created.
+
 #### Inputs
 _Fixture `inner.atago.yaml`:_
 ```text
@@ -1940,6 +2042,7 @@ ${atago} run --report json --filter no_such_name inner.atago.yaml
 - exit code is `0`
 - stdout at `$.suites[0].scenarios` has length 0
 - stderr contains `warning: no scenarios matched`
+
 ## atago self-hosting / completion
 Source: `test/e2e/atago/completion.atago.yaml`
 ### Scenario: bash completion emits a recognizable script
@@ -1950,6 +2053,7 @@ ${atago} completion bash
 #### Then
 - exit code is `0`
 - stdout contains `complete -F _atago atago`
+
 ### Scenario: zsh completion emits a compdef script
 #### When
 ```shell
@@ -1958,6 +2062,7 @@ ${atago} completion zsh
 #### Then
 - exit code is `0`
 - stdout contains `#compdef atago`
+
 ### Scenario: fish completion emits complete directives
 #### When
 ```shell
@@ -1966,6 +2071,7 @@ ${atago} completion fish
 #### Then
 - exit code is `0`
 - stdout contains `complete -c atago`
+
 ### Scenario: powershell completion registers an argument completer
 #### When
 ```shell
@@ -1974,6 +2080,7 @@ ${atago} completion powershell
 #### Then
 - exit code is `0`
 - stdout contains `Register-ArgumentCompleter`
+
 ### Scenario: unknown shell is a configuration error
 #### When
 ```shell
@@ -1982,6 +2089,7 @@ ${atago} completion tcsh
 #### Then
 - exit code is `3`
 - stderr contains `unknown shell`
+
 ## atago self-hosting / occurrence counts and byte sizes
 Source: `test/e2e/atago/count_size.atago.yaml`
 ### Scenario: an exact count distinguishes once from twice
@@ -1991,6 +2099,7 @@ printf 'error: boom\nfine\n'
 ```
 #### Then
 - stdout contains `error:` exactly 1 time
+
 ### Scenario: a count of zero is how a spec says never
 #### When
 ```shell
@@ -1998,6 +2107,7 @@ echo ok
 ```
 #### Then
 - stdout contains `panic` never
+
 ### Scenario: min and max bound a range a single number cannot
 #### When
 ```shell
@@ -2005,6 +2115,7 @@ printf '1,a\n2,b\n3,c\n'
 ```
 #### Then
 - stdout matches `/(?m)^[0-9]+,/` between 3 and 10 times
+
 ### Scenario: a regexp counts its own non-overlapping matches
 #### When
 ```shell
@@ -2012,9 +2123,11 @@ echo aaa
 ```
 #### Then
 - stdout matches `/aa/` exactly 1 time
+
 ### Scenario: a count applies to a file's content too
 #### Given
 - Fixture file `log.txt` is created.
+
 #### Inputs
 _Fixture `log.txt`:_
 ```text
@@ -2024,9 +2137,11 @@ hit
 ```
 #### Then
 - file `log.txt` contains `hit` exactly 2 times
+
 ### Scenario: a duplicated line fails the inner spec and names where it landed
 #### Given
 - Fixture file `inner.atago.yaml` is created.
+
 #### Inputs
 _Fixture `inner.atago.yaml`:_
 ```text
@@ -2051,6 +2166,7 @@ ${atago} run inner.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `occurs 2 times`, `line 1`, `line 3`
+
 ### Scenario: size zero pins a file that was created but left empty
 #### When
 ```shell
@@ -2058,9 +2174,11 @@ printf '' > empty.txt
 ```
 #### Then
 - file `empty.txt` is empty
+
 ### Scenario: size bounds compose with a content matcher
 #### Given
 - Fixture file `five.txt` is created.
+
 #### Inputs
 _Fixture `five.txt`:_
 ```text
@@ -2069,9 +2187,11 @@ abcde
 #### Then
 - file `five.txt` contains `abc` and is exactly 5 bytes
 - file `five.txt` is between 1 and 4096 bytes
+
 ### Scenario: a size miss by one byte names the usual cause
 #### Given
 - Fixture file `inner_size.atago.yaml` is created.
+
 #### Inputs
 _Fixture `inner_size.atago.yaml`:_
 ```text
@@ -2096,9 +2216,11 @@ ${atago} run inner_size.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `trailing newline`
+
 ### Scenario: a count without a countable matcher is a load error
 #### Given
 - Fixture file `bad_count.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad_count.atago.yaml`:_
 ```text
@@ -2122,9 +2244,11 @@ ${atago} run bad_count.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `need a contains or matches matcher to count`
+
 ### Scenario: an ambiguous count over two countable matchers is a load error
 #### Given
 - Fixture file `bad_two.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad_two.atago.yaml`:_
 ```text
@@ -2149,9 +2273,11 @@ ${atago} run bad_two.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `exactly one countable matcher`
+
 ### Scenario: an unsatisfiable size range is a load error
 #### Given
 - Fixture file `bad_size.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad_size.atago.yaml`:_
 ```text
@@ -2174,10 +2300,12 @@ ${atago} run bad_size.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `greater than max_size`
+
 ### Scenario: a size bound refuses to stat through a planted symlink
 _skipped on Windows_
 #### Given
 - Fixture file `inner_link.atago.yaml` is created.
+
 #### Inputs
 _Fixture `inner_link.atago.yaml`:_
 ```text
@@ -2205,9 +2333,11 @@ ${atago} run inner_link.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `symlink`
+
 ### Scenario: a size bound next to exists false is a load error
 #### Given
 - Fixture file `bad_absent.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad_absent.atago.yaml`:_
 ```text
@@ -2230,11 +2360,13 @@ ${atago} run bad_absent.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `an absent file has no size`
+
 ## atago self-hosting / db runner
 Source: `test/e2e/atago/db.atago.yaml`
 ### Scenario: query workflow (create, insert, select, row assert, value binding) passes
 #### Given
 - Fixture file `db.atago.yaml` is created.
+
 #### Inputs
 _Fixture `db.atago.yaml`:_
 ```text
@@ -2267,9 +2399,11 @@ ${atago} run db.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `passed`
+
 ### Scenario: a query against an undeclared runner fails validation (exit 2)
 #### Given
 - Fixture file `norunner.atago.yaml` is created.
+
 #### Inputs
 _Fixture `norunner.atago.yaml`:_
 ```text
@@ -2290,9 +2424,11 @@ ${atago} run norunner.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `is not declared`
+
 ### Scenario: a hostaddr dsn is held to the network policy (exit 6)
 #### Given
 - Fixture file `hostaddr.atago.yaml` is created.
+
 #### Inputs
 _Fixture `hostaddr.atago.yaml`:_
 ```text
@@ -2322,9 +2458,11 @@ ${atago} run hostaddr.atago.yaml
 #### Then
 - exit code is `6`
 - stdout contains `network policy denies host "127.0.0.1"`
+
 ### Scenario: a quoted host is compared to the allowlist without its quotes
 #### Given
 - Fixture file `quoted.atago.yaml` is created.
+
 #### Inputs
 _Fixture `quoted.atago.yaml`:_
 ```text
@@ -2354,11 +2492,13 @@ ${atago} run quoted.atago.yaml
 #### Then
 - exit code is `4`
 - stdout does not contain `network policy denies`
+
 ## atago self-hosting / top-level defaults
 Source: `test/e2e/atago/defaults.atago.yaml`
 ### Scenario: defaults.run.shell applies to every run step without repeating it
 #### Given
 - Fixture file `shell.atago.yaml` is created.
+
 #### Inputs
 _Fixture `shell.atago.yaml`:_
 ```text
@@ -2386,9 +2526,11 @@ ${atago} run shell.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `1 passed`
+
 ### Scenario: defaults.scenario.env is merged and an explicit scenario env wins
 #### Given
 - Fixture file `env.atago.yaml` is created.
+
 #### Inputs
 _Fixture `env.atago.yaml`:_
 ```text
@@ -2420,10 +2562,12 @@ ${atago} run env.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `1 passed`
+
 ### Scenario: defaults.run.sandbox_home governs a run step and a pty step alike (POSIX)
 _skipped on Windows_
 #### Given
 - Fixture file `sandbox.atago.yaml` is created.
+
 #### Inputs
 _Fixture `sandbox.atago.yaml`:_
 ```text
@@ -2456,9 +2600,11 @@ ${atago} run sandbox.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `1 passed`
+
 ### Scenario: an unsupported defaults field is a load-time error (exit 2)
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -2481,9 +2627,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `defaults.run.command is not supported`
+
 ### Scenario: defaults.run.env merges per key and a step env wins the collisions
 #### Given
 - Fixture file `env.atago.yaml` is created.
+
 #### Inputs
 _Fixture `env.atago.yaml`:_
 ```text
@@ -2511,9 +2659,11 @@ ${atago} run env.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `PASSED`
+
 ### Scenario: a step opts out of defaults.run.shell with an explicit shell false
 #### Given
 - Fixture file `optout.atago.yaml` is created.
+
 #### Inputs
 _Fixture `optout.atago.yaml`:_
 ```text
@@ -2540,9 +2690,11 @@ ${atago} run optout.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `PASSED`
+
 ### Scenario: a runner's cwd beats defaults.run.cwd
 #### Given
 - Fixture file `cwd.atago.yaml` is created.
+
 #### Inputs
 _Fixture `cwd.atago.yaml`:_
 ```text
@@ -2575,9 +2727,11 @@ ${atago} run cwd.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `3 passed`
+
 ### Scenario: defaults.scenario.only gates every scenario that states no gate
 #### Given
 - Fixture file `gated.atago.yaml` is created.
+
 #### Inputs
 _Fixture `gated.atago.yaml`:_
 ```text
@@ -2605,9 +2759,11 @@ ${atago} run gated.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `2 skipped`
+
 ### Scenario: a scenario's own gate replaces the default rather than combining
 #### Given
 - Fixture file `own.atago.yaml` is created.
+
 #### Inputs
 _Fixture `own.atago.yaml`:_
 ```text
@@ -2637,9 +2793,11 @@ ${atago} run own.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `1 passed`, `1 skipped`
+
 ### Scenario: defaults.scenario.skip excludes every scenario that states no skip
 #### Given
 - Fixture file `skipped.atago.yaml` is created.
+
 #### Inputs
 _Fixture `skipped.atago.yaml`:_
 ```text
@@ -2663,11 +2821,13 @@ ${atago} run skipped.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `1 skipped`
+
 ## atago self-hosting / deterministic runs
 Source: `test/e2e/atago/deterministic.atago.yaml`
 ### Scenario: a read-only command satisfies the default check
 #### Given
 - Fixture file `rows.csv` is created.
+
 #### Inputs
 _Fixture `rows.csv`:_
 ```text
@@ -2681,6 +2841,7 @@ cat rows.csv
 #### Then
 - exit code is `0`
 - stdout contains `alice`
+
 ### Scenario: the asserts and store still describe the first run
 #### When
 ```shell
@@ -2693,6 +2854,7 @@ echo ${captured}
   - stdout equals an exact value
 - after `echo ${captured}`:
   - stdout contains `stable`
+
 ### Scenario: a stable failure is a stable answer
 #### When
 ```shell
@@ -2700,9 +2862,11 @@ cat definitely-not-here.txt
 ```
 #### Then
 - exit code is not `0`
+
 ### Scenario: output that changes between runs fails with a diff
 #### Given
 - Fixture file `inner.atago.yaml` is created.
+
 #### Inputs
 _Fixture `inner.atago.yaml`:_
 ```text
@@ -2724,9 +2888,11 @@ ${atago} run inner.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `deterministic: stdout identical`, `not deterministic`, `first run`, `later run`
+
 ### Scenario: a command that rewrites its own input is called out, not blamed
 #### Given
 - Fixture file `inner_mutating.atago.yaml` is created.
+
 #### Inputs
 _Fixture `inner_mutating.atago.yaml`:_
 ```text
@@ -2751,9 +2917,11 @@ ${atago} run inner_mutating.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `changed the workdir`
+
 ### Scenario: explain shows that the command runs more than once
 #### Given
 - Fixture file `shown.atago.yaml` is created.
+
 #### Inputs
 _Fixture `shown.atago.yaml`:_
 ```text
@@ -2776,9 +2944,11 @@ ${atago} explain shown.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `deterministic: stdout compared across 3 runs`
+
 ### Scenario: deterministic next to retry is a load error
 #### Given
 - Fixture file `bad_retry.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad_retry.atago.yaml`:_
 ```text
@@ -2803,10 +2973,12 @@ ${atago} run bad_retry.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `cannot be combined with retry`
+
 ### Scenario: a single run and an unknown observable are load errors
 #### Given
 - Fixture file `bad_runs.atago.yaml` is created.
 - Fixture file `bad_compare.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad_runs.atago.yaml`:_
 ```text
@@ -2846,6 +3018,7 @@ ${atago} run bad_compare.atago.yaml
 - after `${atago} run bad_compare.atago.yaml`:
   - exit code is `2`
   - stderr contains `unknown observable`
+
 ## atago self-hosting / dir assertion
 Source: `test/e2e/atago/dir.atago.yaml`
 ### Scenario: directory/tree assertions cover a multi-file generator
@@ -2857,9 +3030,11 @@ mkdir -p site/assets && printf '<html>' > site/index.html && printf '<html>' > s
 #### Then
 - exit code is `0`
 - dir `site` exists, contains `index.html`, contains `about.html`, contains `assets/app.css`, does not contain `secret.txt`, has 3 entries, has >= 1 entry, has <= 10 entries, matches glob `*.html`
+
 ### Scenario: a missing directory can be asserted absent
 #### Then
 - dir `never-created` does not exist
+
 ### Scenario: a dangling symlink is a present directory entry (membership uses Lstat)
 _skipped on Windows_
 #### When
@@ -2869,6 +3044,7 @@ mkdir -p linkdir && ln -s /nonexistent-target-xyz linkdir/planted
 #### Then
 - exit code is `0`
 - dir `linkdir` contains `planted`, does not contain `never-planted`
+
 ### Scenario: a symlinked directory reads the same in every dir mode
 _skipped on Windows_
 #### When
@@ -2880,10 +3056,12 @@ mkdir -p releases/v2/assets && echo bin > releases/v2/app.bin && echo css > rele
 - dir `latest` contains `app.bin`
 - dir `latest` contains `assets/app.css`, (recursive)
 - dir `latest` has 2 entries, (recursive)
+
 ### Scenario: a dir path that resolves out of the workdir is refused
 _skipped on Windows_
 #### Given
 - Fixture file `escaping.atago.yaml` is created.
+
 #### Inputs
 _Fixture `escaping.atago.yaml`:_
 ```text
@@ -2912,9 +3090,11 @@ ${atago} run escaping.atago.yaml
 - after `${atago} run escaping.atago.yaml`:
   - exit code is `1`
   - stdout contains `escapes the scenario workdir`
+
 ### Scenario: a failed dir assert lists what the directory actually holds
 #### Given
 - Fixture file `listing.atago.yaml` is created.
+
 #### Inputs
 _Fixture `listing.atago.yaml`:_
 ```text
@@ -2939,9 +3119,11 @@ ${atago} run listing.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `app.js`, `index.html`
+
 ### Scenario: a failed count assert lists the entries it counted
 #### Given
 - Fixture file `counted.atago.yaml` is created.
+
 #### Inputs
 _Fixture `counted.atago.yaml`:_
 ```text
@@ -2965,9 +3147,11 @@ ${atago} run counted.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `only.txt`, `has 1 entry`
+
 ### Scenario: a failed recursive assert lists the walked tree
 #### Given
 - Fixture file `walked.atago.yaml` is created.
+
 #### Inputs
 _Fixture `walked.atago.yaml`:_
 ```text
@@ -2993,9 +3177,11 @@ ${atago} run walked.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `assets/app.css`, `index.html`
+
 ### Scenario: a dir assertion on a file path says the path is a file
 #### Given
 - Fixture file `mistaken.atago.yaml` is created.
+
 #### Inputs
 _Fixture `mistaken.atago.yaml`:_
 ```text
@@ -3018,10 +3204,12 @@ ${atago} run mistaken.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `exists but is a regular file`, `use a file: assertion`
+
 ### Scenario: a named pipe in the tree does not block the walk
 _skipped on Windows_
 #### Given
 - Fixture file `treespec.atago.yaml` is created.
+
 #### Inputs
 _Fixture `treespec.atago.yaml`:_
 ```text
@@ -3049,10 +3237,12 @@ ${atago} run treespec.atago.yaml
   - stdout contains `fifo pipe`, `file real.txt sha256:`
 - after `${atago} run treespec.atago.yaml`:
   - exit code is `0`
+
 ### Scenario: a file assertion on a named pipe fails instead of hanging
 _skipped on Windows_
 #### Given
 - Fixture file `piped.atago.yaml` is created.
+
 #### Inputs
 _Fixture `piped.atago.yaml`:_
 ```text
@@ -3071,12 +3261,14 @@ ${atago} run piped.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `is a named pipe, not a regular file`
+
 ## atago self-hosting / recursive dir asserts + tree snapshots
 Source: `test/e2e/atago/dir_tree.atago.yaml`
 ### Scenario: record, compare green, then a mutation names the changed paths
 #### Given
 - Fixture file `inner.atago.yaml` is created.
 - Fixture file `inner_mutated.atago.yaml` is created.
+
 #### Inputs
 _Fixture `inner.atago.yaml`:_
 ```text
@@ -3134,11 +3326,13 @@ ${atago} run inner_mutated.atago.yaml
 - after `${atago} run inner_mutated.atago.yaml`:
   - exit code is `1`
   - stdout contains `added:   file extra.txt`, `changed: content/posts/hello.md`
+
 ### Scenario: recursive matchers and ignore globs walk the tree
 #### Given
 - Fixture file `out/a/deep/nested.md` is created.
 - Fixture file `out/top.txt` is created.
 - Fixture file `out/noise.log` is created.
+
 #### Inputs
 _Fixture `out/a/deep/nested.md`:_
 ```text
@@ -3155,9 +3349,11 @@ noise
 #### Then
 - dir `out` contains `a/deep/nested.md`, has 2 entries, matches glob `*.md`, (recursive), ignoring *.log
 - dir `out` does not contain `a/deep/missing.md`, (recursive)
+
 ### Scenario: combining snapshot with matchers is a load-time error
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -3181,11 +3377,13 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `snapshot cannot be combined`
+
 ## atago self-hosting / doc
 Source: `test/e2e/atago/doc.atago.yaml`
 ### Scenario: doc generates Markdown to a file
 #### Given
 - Fixture file `target.atago.yaml` is created.
+
 #### Inputs
 _Fixture `target.atago.yaml`:_
 ```text
@@ -3209,9 +3407,11 @@ ${atago} doc --out specs.md target.atago.yaml
 - exit code is `0`
 - file `specs.md` contains `# atago Behavior Specs`
 - file `specs.md` contains `### Scenario: greet`
+
 ### Scenario: doc writes Markdown to stdout without --out
 #### Given
 - Fixture file `t2.atago.yaml` is created.
+
 #### Inputs
 _Fixture `t2.atago.yaml`:_
 ```text
@@ -3233,9 +3433,11 @@ ${atago} doc t2.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `## sample2`
+
 ### Scenario: doc emits a summary, table of contents, and input previews
 #### Given
 - Fixture file `rich.atago.yaml` is created.
+
 #### Inputs
 _Fixture `rich.atago.yaml`:_
 ```text
@@ -3261,10 +3463,12 @@ ${atago} doc rich.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `## Summary`, `1 suite · 1 scenario`, `## Contents`, `(#scenario-seeded-query)`, `#### Inputs`, `id,name`
+
 ### Scenario: doc --split-by-spec writes one file per spec and an index
 #### Given
 - Fixture file `one.atago.yaml` is created.
 - Fixture file `two.atago.yaml` is created.
+
 #### Inputs
 _Fixture `one.atago.yaml`:_
 ```text
@@ -3298,12 +3502,15 @@ ${atago} doc --split-by-spec --out-dir generated one.atago.yaml two.atago.yaml
 - file `generated/two.md` exists
 - file `generated/index.md` contains `atago Behavior Specs — Index`
 - file `generated/index.md` contains `(one.md)`
+
 #### Generated artifacts
 - `generated/one.md`
 - `generated/two.md`
+
 ### Scenario: doc --split-by-spec requires --out-dir
 #### Given
 - Fixture file `solo.atago.yaml` is created.
+
 #### Inputs
 _Fixture `solo.atago.yaml`:_
 ```text
@@ -3323,9 +3530,11 @@ ${atago} doc --split-by-spec solo.atago.yaml
 #### Then
 - exit code is `3`
 - stderr contains `requires --out-dir`
+
 ### Scenario: doc renders suite and scenario descriptions verbatim
 #### Given
 - Fixture file `described.atago.yaml` is created.
+
 #### Inputs
 _Fixture `described.atago.yaml`:_
 ```text
@@ -3357,9 +3566,11 @@ ${atago} run described.atago.yaml
 - after `${atago} run described.atago.yaml`:
   - exit code is `0`
   - stdout contains `1 passed`
+
 ### Scenario: doc renders every matcher an assertion sets
 #### Given
 - Fixture file `matchers.atago.yaml` is created.
+
 #### Inputs
 _Fixture `matchers.atago.yaml`:_
 ```text
@@ -3393,10 +3604,12 @@ ${atago} doc matchers.atago.yaml
 - exit code is `0`
 - stdout contains `stdout contains `, `, does not contain `, `stdout line `, ` equals an exact value`, ` is executable`, ` does not contain `
 - stdout does not contain ` is checked`
+
 ### Scenario: a spec whose matchers doc renders still runs green
 _skipped on Windows_
 #### Given
 - Fixture file `matchers.atago.yaml` is created.
+
 #### Inputs
 _Fixture `matchers.atago.yaml`:_
 ```text
@@ -3429,9 +3642,11 @@ ${atago} run matchers.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `3 passed`
+
 ### Scenario: doc renders the suite lifecycle blocks
 #### Given
 - Fixture file `lifecycle.atago.yaml` is created.
+
 #### Inputs
 _Fixture `lifecycle.atago.yaml`:_
 ```text
@@ -3462,9 +3677,11 @@ ${atago} doc lifecycle.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `### Suite setup (runs once before any scenario)`, `echo build`, `# start service relay: echo serve`, `### Suite teardown (always runs after the last scenario)`, `echo purge`
+
 ### Scenario: doc keeps teardown assertions and states the suite guarantees
 #### Given
 - Fixture file `narrative.atago.yaml` is created.
+
 #### Inputs
 _Fixture `narrative.atago.yaml`:_
 ```text
@@ -3492,6 +3709,7 @@ ${atago} doc narrative.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `Network policy: egress is allowed only to `api.example.com`.`, `Secrets declared: `API_TOKEN`.`, `### Suite setup (runs once before any scenario)`, `# write fixture seed.json`, `#### Finally (teardown, always runs)`, `# expect file `out.txt` exists`
+
 ## atago self-hosting / duration assertion
 Source: `test/e2e/atago/duration.atago.yaml`
 ### Scenario: a fast step passes a generous upper bound
@@ -3502,9 +3720,11 @@ ${atago} version
 #### Then
 - exit code is `0`
 - completes in under 60s
+
 ### Scenario: an impossible bound fails and shows the measured duration
 #### Given
 - Fixture file `slow.atago.yaml` is created.
+
 #### Inputs
 _Fixture `slow.atago.yaml`:_
 ```text
@@ -3527,6 +3747,7 @@ ${atago} run slow.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `assert duration < 1ns`, `orders of magnitude`
+
 ### Scenario: a deliberate wait satisfies a lower bound
 _skipped on Windows_
 #### When
@@ -3536,9 +3757,11 @@ sleep 0.2
 #### Then
 - exit code is `0`
 - completes in under 60s and in at least 100ms
+
 ### Scenario: a duration assert with no preceding step is a load-time error
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -3558,11 +3781,13 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `requires an immediately preceding`
+
 ## atago self-hosting / edge cases
 Source: `test/e2e/atago/edge.atago.yaml`
 ### Scenario: JSON assertion on empty stdout reports an empty stream
 #### Given
 - Fixture file `empty.atago.yaml` is created.
+
 #### Inputs
 _Fixture `empty.atago.yaml`:_
 ```text
@@ -3588,9 +3813,11 @@ ${atago} run empty.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `was empty`
+
 ### Scenario: an unsupported matcher is a parse error
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -3614,10 +3841,12 @@ ${atago} run bad.atago.yaml
 ```
 #### Then
 - exit code is `2`
+
 ### Scenario: a mixed valid+invalid run reads FAILED and counts the dropped spec
 #### Given
 - Fixture file `good.atago.yaml` is created.
 - Fixture file `broken.atago.yaml` is created.
+
 #### Inputs
 _Fixture `good.atago.yaml`:_
 ```text
@@ -3648,6 +3877,7 @@ ${atago} run good.atago.yaml broken.atago.yaml
 - exit code is `2`
 - stdout contains `1 spec failed to load`
 - stdout does not contain `PASSED`
+
 ### Scenario: a snapshot update error names the snapshot command, not run
 #### When
 ```shell
@@ -3656,9 +3886,11 @@ ${atago} snapshot update no-such-spec.atago.yaml
 #### Then
 - exit code is `3`
 - stderr contains `atago snapshot update: `, `cannot access`, does not contain `atago run:`
+
 ### Scenario: a json assertion on malformed input fails cleanly, without a crash
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -3677,6 +3909,7 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `not valid JSON`
+
 ## atago self-hosting / workdir + scenario env + not_contains
 Source: `test/e2e/atago/env_workdir.atago.yaml`
 ### Scenario: run.stdout_to redirects stdout to a workdir file without a shell
@@ -3687,11 +3920,14 @@ printf marked
 #### Then
 - exit code is `0`
 - file `marker.txt` contains `marked`
+
 #### Generated artifacts
 - `marker.txt`
+
 ### Scenario: scenario env is shared by every run step and overridable per step
 #### Given
 - Environment variables are set: OVERRIDE_ME.
+
 #### When
 ```shell
 printf '%s\n' "$SHARED"
@@ -3702,6 +3938,7 @@ printf '%s\n' "$OVERRIDE_ME"
   - stdout equals an exact value
 - after `printf '%s\n' "$OVERRIDE_ME"`:
   - stdout equals an exact value
+
 ### Scenario: scenario env can reference ${workdir} for isolated paths
 #### When
 ```shell
@@ -3710,9 +3947,11 @@ printf '%s\n' "$ISO_HOME"
 #### Then
 - stdout contains `/home`
 - stdout does not contain `${workdir}/home/extra`
+
 ### Scenario: file not_contains passes when the substring is absent
 #### Given
 - Fixture file `data.txt` is created.
+
 #### Inputs
 _Fixture `data.txt`:_
 ```text
@@ -3721,9 +3960,11 @@ beta
 ```
 #### Then
 - file `data.txt` does not contain `gamma`
+
 ### Scenario: not_contains fails when the substring is present
 #### Given
 - Fixture file `inner.atago.yaml` is created.
+
 #### Inputs
 _Fixture `inner.atago.yaml`:_
 ```text
@@ -3746,9 +3987,11 @@ ${atago} run inner.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `unexpectedly present`
+
 ### Scenario: a shell metacharacter without shell is a load-time error
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -3768,12 +4011,14 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `shell is not enabled`, `shell: true`, `stdout_to`
+
 ## atago self-hosting / every diagnostic code
 Source: `test/e2e/atago/error_codes.atago.yaml`
 ### Scenario: ATG2001 is a spec file that cannot be read
 _skipped on Windows_
 #### Given
 - Fixture file `broken.atago.yaml` is created.
+
 #### When
 ```shell
 ${atago} run .
@@ -3781,9 +4026,11 @@ ${atago} run .
 #### Then
 - exit code is `2`
 - stderr contains `ATG2001`
+
 ### Scenario: ATG2002 is a spec file with no YAML document in it
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -3796,9 +4043,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `ATG2002`
+
 ### Scenario: ATG2003 is a document that is not valid YAML
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -3812,9 +4061,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `ATG2003`
+
 ### Scenario: ATG2004 is an explicit YAML tag
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -3829,9 +4080,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `ATG2004`
+
 ### Scenario: ATG2005 is a key the schema does not define
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -3846,9 +4099,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `ATG2005`, `unknown field "scenariosss"`
+
 ### Scenario: ATG2006 is a value written in a shape its key cannot take
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -3863,9 +4118,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `ATG2006`
+
 ### Scenario: ATG2010 is an unsupported spec format version
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -3880,9 +4137,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `ATG2010`
+
 ### Scenario: ATG2101 is a step that sets no action
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -3897,9 +4156,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `ATG2101`
+
 ### Scenario: ATG2102 is a step that sets more than one action
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -3918,9 +4179,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `ATG2102`
+
 ### Scenario: ATG2103 is a pair of keys that contradict each other
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -3939,9 +4202,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `ATG2103`
+
 ### Scenario: ATG2104 is a group that takes exactly one member and got two
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -3959,9 +4224,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `ATG2104`
+
 ### Scenario: ATG2105 is a real key in a position where it means nothing
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -3977,9 +4244,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `ATG2105`
+
 ### Scenario: ATG2106 is a block at the wrong level of the spec
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -3997,9 +4266,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `ATG2106`
+
 ### Scenario: ATG2107 is an assertion with no step to describe
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -4018,9 +4289,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `ATG2107`
+
 ### Scenario: ATG2108 is a key whose companion key is not set
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -4039,9 +4312,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `ATG2108`
+
 ### Scenario: ATG2201 is a required key that is absent
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -4056,9 +4331,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `ATG2201`
+
 ### Scenario: ATG2202 is a list that must hold an entry and holds none
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -4073,9 +4350,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `ATG2202`
+
 ### Scenario: ATG2203 is a group that needs at least one member and got none
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -4094,9 +4373,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `ATG2203`
+
 ### Scenario: ATG2204 is a key present with an empty value
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -4115,9 +4396,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `ATG2204`
+
 ### Scenario: ATG2301 is a duration atago cannot read
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -4132,9 +4415,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `ATG2301`
+
 ### Scenario: ATG2302 is a negative value where a negative means nothing
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -4149,9 +4434,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `ATG2302`
+
 ### Scenario: ATG2303 is a value that must be positive and is not
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -4170,9 +4457,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `ATG2303`
+
 ### Scenario: ATG2304 is a number outside the range its key accepts
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -4191,9 +4480,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `ATG2304`
+
 ### Scenario: ATG2305 is a regular expression that does not compile
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -4212,9 +4503,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `ATG2305`
+
 ### Scenario: ATG2306 is a glob pattern that does not parse
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -4233,9 +4526,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `ATG2306`
+
 ### Scenario: ATG2307 is a value outside a closed vocabulary
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -4250,9 +4545,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `ATG2307`
+
 ### Scenario: ATG2308 is a range nothing could satisfy
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -4271,9 +4568,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `ATG2308`
+
 ### Scenario: ATG2309 is an absolute path where a relative one is required
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -4292,9 +4591,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `ATG2309`
+
 ### Scenario: ATG2310 is a path that climbs out of the workdir
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -4313,9 +4614,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `ATG2310`
+
 ### Scenario: ATG2311 is a control character in a name
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -4330,9 +4633,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `ATG2311`
+
 ### Scenario: ATG2312 is a matcher that could never fail
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -4351,9 +4656,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `ATG2312`
+
 ### Scenario: ATG2313 is a value in the wrong notation
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -4371,9 +4678,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `ATG2313`
+
 ### Scenario: ATG2401 is a runner the spec never declared
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -4391,9 +4700,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `ATG2401`
+
 ### Scenario: ATG2402 is a declared runner of the wrong type
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -4412,9 +4723,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `ATG2402`
+
 ### Scenario: ATG2403 is a reference to something the spec never declared
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -4432,9 +4745,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `ATG2403`
+
 ### Scenario: ATG2404 is a stored value shadowing a built-in
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -4453,10 +4768,12 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `ATG2404`
+
 ### Scenario: ATG2405 is a manifest path that resolves to nothing
 #### Given
 - Fixture file `atago.project.yaml` is created.
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `atago.project.yaml`:_
 ```text
@@ -4475,9 +4792,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `ATG2405`
+
 ### Scenario: ATG2501 is two scenarios sharing a name
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -4494,9 +4813,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `ATG2501`
+
 ### Scenario: ATG2502 is a set listing the same entry twice
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -4515,9 +4836,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `ATG2502`
+
 ### Scenario: a code is added to the message rather than replacing it
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -4532,9 +4855,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr matches `/ATG2201: suite\.name is required/`
+
 ### Scenario: several problems each report their own code in one pass
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -4553,6 +4878,7 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `ATG2010`, `ATG2305`
+
 ### Scenario: ATG3001 is a subcommand atago does not have
 #### When
 ```shell
@@ -4561,6 +4887,7 @@ ${atago} frobnicate
 #### Then
 - exit code is `3`
 - stderr contains `ATG3001`
+
 ### Scenario: ATG3001 is also atago with no subcommand at all
 #### When
 ```shell
@@ -4569,6 +4896,7 @@ ${atago}
 #### Then
 - exit code is `3`
 - stderr contains `ATG3001`
+
 ### Scenario: ATG3002 is a subcommand called in a shape it does not accept
 #### When
 ```shell
@@ -4577,6 +4905,7 @@ ${atago} snapshot
 #### Then
 - exit code is `3`
 - stderr contains `ATG3002`
+
 ### Scenario: ATG3101 is an option atago does not define
 #### When
 ```shell
@@ -4585,9 +4914,11 @@ ${atago} run --definitely-not-a-flag .
 #### Then
 - exit code is `3`
 - stderr contains `ATG3101`, `flag provided but not defined`, `Usage: atago run`
+
 ### Scenario: ATG3102 is an option given a value it does not accept
 #### Given
 - Fixture file `ok.atago.yaml` is created.
+
 #### Inputs
 _Fixture `ok.atago.yaml`:_
 ```text
@@ -4602,6 +4933,7 @@ ${atago} run --report jnit ok.atago.yaml
 #### Then
 - exit code is `3`
 - stderr contains `ATG3102`
+
 ### Scenario: ATG3103 is an option whose companion option is not set
 #### When
 ```shell
@@ -4610,9 +4942,11 @@ ${atago} doc --split-by-spec .
 #### Then
 - exit code is `3`
 - stderr contains `ATG3103`
+
 ### Scenario: ATG3104 is two options that contradict each other
 #### Given
 - Fixture file `ok.atago.yaml` is created.
+
 #### Inputs
 _Fixture `ok.atago.yaml`:_
 ```text
@@ -4627,9 +4961,11 @@ ${atago} run --repeat 2 --retry-failed 1 ok.atago.yaml
 #### Then
 - exit code is `3`
 - stderr contains `ATG3104`
+
 ### Scenario: ATG3105 is a numeric option outside its range
 #### Given
 - Fixture file `ok.atago.yaml` is created.
+
 #### Inputs
 _Fixture `ok.atago.yaml`:_
 ```text
@@ -4644,6 +4980,7 @@ ${atago} run --parallel -1 ok.atago.yaml
 #### Then
 - exit code is `3`
 - stderr contains `ATG3105`
+
 ### Scenario: ATG3201 is a path that cannot be reached
 #### When
 ```shell
@@ -4652,6 +4989,7 @@ ${atago} run ./nowhere
 #### Then
 - exit code is `3`
 - stderr contains `ATG3201`
+
 ### Scenario: ATG3202 is a directory holding no specs
 #### When
 ```shell
@@ -4660,9 +4998,11 @@ ${atago} run .
 #### Then
 - exit code is `3`
 - stderr contains `ATG3202`
+
 ### Scenario: ATG3203 is a selection that matched nothing under --ci
 #### Given
 - Fixture file `ok.atago.yaml` is created.
+
 #### Inputs
 _Fixture `ok.atago.yaml`:_
 ```text
@@ -4677,10 +5017,12 @@ ${atago} run --ci --tag no-such-tag ok.atago.yaml
 #### Then
 - exit code is `3`
 - stderr contains `ATG3203`
+
 ### Scenario: ATG3204 is a rerun whose recorded failures no longer exist
 #### Given
 - Fixture file `ok.atago.yaml` is created.
 - Fixture file `ok.atago.yaml` is created.
+
 #### Inputs
 _Fixture `ok.atago.yaml`:_
 ```text
@@ -4712,9 +5054,11 @@ ${atago} run --rerun-failed ok.atago.yaml
 - after `${atago} run --rerun-failed ok.atago.yaml`:
   - exit code is `3`
   - stderr contains `ATG3204`
+
 ### Scenario: ATG3205 is a write that would replace an existing file
 #### Given
 - Fixture file `taken.atago.yaml` is created.
+
 #### Inputs
 _Fixture `taken.atago.yaml`:_
 ```text
@@ -4727,10 +5071,12 @@ ${atago} init taken.atago.yaml
 #### Then
 - exit code is `3`
 - stderr contains `ATG3205`
+
 ### Scenario: ATG3206 is a destination that cannot be written
 #### Given
 - Fixture file `occupied` is created.
 - Fixture file `ok.atago.yaml` is created.
+
 #### Inputs
 _Fixture `occupied`:_
 ```text
@@ -4749,10 +5095,12 @@ ${atago} run --artifacts-dir occupied ok.atago.yaml
 #### Then
 - exit code is `3`
 - stderr contains `ATG3206`
+
 ### Scenario: ATG3207 is atago's recorded state failing to load
 #### Given
 - Fixture file `.atago/last-failed.json` is created.
 - Fixture file `ok.atago.yaml` is created.
+
 #### Inputs
 _Fixture `.atago/last-failed.json`:_
 ```text
@@ -4771,9 +5119,11 @@ ${atago} run --rerun-failed ok.atago.yaml
 #### Then
 - exit code is `3`
 - stderr contains `ATG3207`
+
 ### Scenario: ATG6001 is a request to a host the network policy denies
 #### Given
 - Fixture file `denied.atago.yaml` is created.
+
 #### Inputs
 _Fixture `denied.atago.yaml`:_
 ```text
@@ -4799,9 +5149,11 @@ ${atago} run denied.atago.yaml
 #### Then
 - exit code is `6`
 - stdout contains `ATG6001`
+
 ### Scenario: ATG4001 is a command line that cannot be split into arguments
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -4820,9 +5172,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `4`
 - stdout contains `ATG4001`
+
 ### Scenario: ATG4002 is a program that could not be started
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -4841,9 +5195,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `4`
 - stdout contains `ATG4002`
+
 ### Scenario: ATG4003 is an environment the step needs that could not be prepared
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -4862,9 +5218,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `4`
 - stdout contains `ATG4003`
+
 ### Scenario: ATG4004 is a file the step depends on that cannot be read
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -4887,10 +5245,12 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `4`
 - stdout contains `ATG4004`
+
 ### Scenario: ATG4005 is a command run beside a terminal session that failed
 _skipped on Windows_
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -4909,10 +5269,12 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `4`
 - stdout contains `ATG4005`
+
 ### Scenario: ATG4101 is a step that outlasted its timeout
 _skipped on Windows_
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -4931,10 +5293,12 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `4`
 - stdout contains `ATG4101`
+
 ### Scenario: ATG4102 is a service that never became ready
 _skipped on Windows_
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -4955,9 +5319,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `4`
 - stdout contains `ATG4102`
+
 ### Scenario: ATG4201 is a peer that could not be reached
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -4977,9 +5343,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `4`
 - stdout contains `ATG4201`
+
 ### Scenario: ATG4202 is a runner missing what it needs to connect
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -4999,9 +5367,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `4`
 - stdout contains `ATG4202`
+
 ### Scenario: ATG4203 is a peer that was reached and refused the request
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -5021,9 +5391,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `4`
 - stdout contains `ATG4203`
+
 ### Scenario: ATG4204 is an address atago cannot make sense of
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -5043,10 +5415,12 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `4`
 - stdout contains `ATG4204`
+
 ### Scenario: ATG4301 is a service that failed before it became ready
 _skipped on Windows_
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -5067,10 +5441,12 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `4`
 - stdout contains `ATG4301`
+
 ### Scenario: ATG4302 is a service addressed after it exited
 _skipped on Windows_
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -5092,10 +5468,12 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `4`
 - stdout contains `ATG4302`
+
 ### Scenario: ATG4403 is output that could not be captured
 _skipped on Windows_
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -5114,10 +5492,12 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `4`
 - stdout contains `ATG4403`
+
 ### Scenario: ATG4406 is input the program is not set up to receive
 _skipped on Windows_
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -5136,10 +5516,12 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `4`
 - stdout contains `ATG4406`
+
 ### Scenario: ATG4501 is a store step with no result behind it
 #### Given
 - Stub HTTP server `api` serves 1 canned route(s) at `${api.url}` and records every request (#24).
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -5164,9 +5546,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `4`
 - stdout contains `ATG4501`
+
 ### Scenario: ATG4502 is a store selector that found nothing
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -5186,10 +5570,12 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `4`
 - stdout contains `ATG4502`
+
 ### Scenario: ATG4505 is a variable the step expands that is not defined
 _skipped on Windows_
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -5212,6 +5598,7 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `4`
 - stdout contains `ATG4505`
+
 ### Scenario: atago explain prints what a code means, offline
 #### When
 ```shell
@@ -5220,6 +5607,7 @@ ${atago} explain ATG2201
 #### Then
 - exit code is `0`
 - stdout contains `ATG2201`, `a required key is missing`, `Fix`, `Exits 2.`
+
 ### Scenario: atago explain refuses a code nobody assigned, and suggests one
 #### When
 ```shell
@@ -5228,9 +5616,11 @@ ${atago} explain ATG2999
 #### Then
 - exit code is `3`
 - stderr contains `ATG3102`, `unknown diagnostic code`, `did you mean`
+
 ### Scenario: the JSON report carries the code as a field
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -5248,9 +5638,11 @@ ${atago} run --report json bad.atago.yaml
 #### Then
 - exit code is `4`
 - stdout at `$.suites[0].failures[0].code` equals `ATG4002`
+
 ### Scenario: an assertion failure carries no code in the JSON report
 #### Given
 - Fixture file `fails.atago.yaml` is created.
+
 #### Inputs
 _Fixture `fails.atago.yaml`:_
 ```text
@@ -5269,10 +5661,12 @@ ${atago} run --report json fails.atago.yaml
 #### Then
 - exit code is `1`
 - stdout does not contain `"code"`
+
 ### Scenario: a wrapped error reports one code, not two
 _skipped on Windows_
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -5292,10 +5686,12 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `4`
 - stdout contains `ATG4102`, does not contain `ATG4301: service`
+
 ### Scenario: an assertion with no producing step is a load-time error
 #### Given
 - Fixture file `nocontext.atago.yaml` is created.
 - Fixture file `withcontext.atago.yaml` is created.
+
 #### Inputs
 _Fixture `nocontext.atago.yaml`:_
 ```text
@@ -5331,9 +5727,11 @@ ${atago} run withcontext.atago.yaml
 - after `${atago} run withcontext.atago.yaml`:
   - exit code is `0`
   - stdout contains `1 passed`
+
 ### Scenario: a store with no producing step is a load-time error
 #### Given
 - Fixture file `nostore.atago.yaml` is created.
+
 #### Inputs
 _Fixture `nostore.atago.yaml`:_
 ```text
@@ -5353,10 +5751,12 @@ ${atago} run nostore.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `ATG2107`, `store.from.header requires a preceding http step`
+
 ### Scenario: a suite block read that can never be fed is a load-time error
 #### Given
 - Fixture file `suiteread.atago.yaml` is created.
 - Fixture file `suiteok.atago.yaml` is created.
+
 #### Inputs
 _Fixture `suiteread.atago.yaml`:_
 ```text
@@ -5397,6 +5797,7 @@ ${atago} run suiteok.atago.yaml
 - after `${atago} run suiteok.atago.yaml`:
   - exit code is `0`
   - stdout contains `1 passed`
+
 ## atago self-hosting / exit_code in-set matcher
 Source: `test/e2e/atago/exit_code_in.atago.yaml`
 ### Scenario: a listed exit code passes
@@ -5406,9 +5807,11 @@ exit 2
 ```
 #### Then
 - exit code is one of `0`, `2`
+
 ### Scenario: an unlisted exit code fails and the output lists the set
 #### Given
 - Fixture file `inner.atago.yaml` is created.
+
 #### Inputs
 _Fixture `inner.atago.yaml`:_
 ```text
@@ -5432,9 +5835,11 @@ ${atago} run inner.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `exit code in [0, 1]`
+
 ### Scenario: mixing not and in is a load-time error
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -5459,9 +5864,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `exactly one of`
+
 ### Scenario: an empty in list is a load-time error
 #### Given
 - Fixture file `empty.atago.yaml` is created.
+
 #### Inputs
 _Fixture `empty.atago.yaml`:_
 ```text
@@ -5485,6 +5892,7 @@ ${atago} run empty.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `at least one accepted exit code`
+
 ## atago self-hosting / exit code semantics
 Source: `test/e2e/atago/exit_codes.atago.yaml`
 ### Scenario: a clean exit is zero
@@ -5494,6 +5902,7 @@ exit 0
 ```
 #### Then
 - exit code is `0`
+
 ### Scenario: a general error is one
 #### When
 ```shell
@@ -5501,6 +5910,7 @@ exit 1
 ```
 #### Then
 - exit code is `1`
+
 ### Scenario: a usage error is two
 #### When
 ```shell
@@ -5508,6 +5918,7 @@ exit 2
 ```
 #### Then
 - exit code is `2`
+
 ### Scenario: an arbitrary code passes through unchanged
 #### When
 ```shell
@@ -5515,6 +5926,7 @@ exit 42
 ```
 #### Then
 - exit code is `42`
+
 ### Scenario: the single-byte ceiling is 255
 #### When
 ```shell
@@ -5522,6 +5934,7 @@ exit 255
 ```
 #### Then
 - exit code is `255`
+
 ### Scenario: the not matcher excludes a specific code
 #### When
 ```shell
@@ -5529,6 +5942,7 @@ exit 3
 ```
 #### Then
 - exit code is not `0`
+
 ### Scenario: the in matcher accepts any listed code
 #### When
 ```shell
@@ -5536,9 +5950,11 @@ exit 2
 ```
 #### Then
 - exit code is one of `0`, `1`, `2`
+
 ### Scenario: an unlisted code fails the in matcher and names the set
 #### Given
 - Fixture file `inner.atago.yaml` is created.
+
 #### Inputs
 _Fixture `inner.atago.yaml`:_
 ```text
@@ -5560,6 +5976,7 @@ ${atago} run inner.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `exit code in [0, 1, 2]`
+
 ### Scenario: SIGKILL is reported as 137
 _skipped on Windows_
 #### When
@@ -5568,6 +5985,7 @@ kill -KILL $$
 ```
 #### Then
 - exit code is `137`
+
 ### Scenario: SIGTERM is reported as 143
 _skipped on Windows_
 #### When
@@ -5576,6 +5994,7 @@ kill -TERM $$
 ```
 #### Then
 - exit code is `143`
+
 ### Scenario: SIGINT is reported as 130
 _skipped on Windows_
 #### When
@@ -5584,6 +6003,7 @@ kill -INT $$
 ```
 #### Then
 - exit code is `130`
+
 ### Scenario: a signal exit composes with the in matcher alongside normal codes
 _skipped on Windows_
 #### When
@@ -5592,6 +6012,7 @@ kill -TERM $$
 ```
 #### Then
 - exit code is one of `0`, `143`
+
 ### Scenario: a missing command is 127 under the shell
 _skipped on Windows_
 #### When
@@ -5600,6 +6021,7 @@ no_such_command_zzz
 ```
 #### Then
 - exit code is `127`
+
 ### Scenario: POSIX exit codes wrap modulo 256
 _skipped on Windows_
 #### When
@@ -5608,11 +6030,13 @@ exit 257
 ```
 #### Then
 - exit code is `1`
+
 ## atago self-hosting / expected failures
 Source: `test/e2e/atago/expect_fail.atago.yaml`
 ### Scenario: a known bug that still fails keeps the run green
 #### Given
 - Fixture file `inner_xfail.atago.yaml` is created.
+
 #### Inputs
 _Fixture `inner_xfail.atago.yaml`:_
 ```text
@@ -5638,9 +6062,11 @@ ${atago} run inner_xfail.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `XFAIL:`, `rounds half-down instead of half-even`, `https://example.test/issues/42`, `1 xfail`
+
 ### Scenario: a known bug that is fixed fails the run so it gets promoted
 #### Given
 - Fixture file `inner_xpass.atago.yaml` is created.
+
 #### Inputs
 _Fixture `inner_xpass.atago.yaml`:_
 ```text
@@ -5666,9 +6092,11 @@ ${atago} run inner_xpass.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `XPASS:`, `Move it into the suite`, `1 xpass`
+
 ### Scenario: allow-xpass keeps the run green while the spec is promoted
 #### Given
 - Fixture file `inner_allow.atago.yaml` is created.
+
 #### Inputs
 _Fixture `inner_allow.atago.yaml`:_
 ```text
@@ -5698,9 +6126,11 @@ ${atago} run --allow-xpass --report junit inner_allow.atago.yaml
 - after `${atago} run --allow-xpass --report junit inner_allow.atago.yaml`:
   - exit code is `0`
   - stdout contains `failures="0"`, does not contain `<failure`
+
 ### Scenario: fail-fast stops for an xpass and the ledger can rerun it
 #### Given
 - Fixture file `inner_ff.atago.yaml` is created.
+
 #### Inputs
 _Fixture `inner_ff.atago.yaml`:_
 ```text
@@ -5736,9 +6166,11 @@ ${atago} run --rerun-failed --report json inner_ff.atago.yaml
 - after `${atago} run --rerun-failed --report json inner_ff.atago.yaml`:
   - exit code is `1`
   - stdout at `$.suites[0].scenarios` has length 1; at `$.suites[0].scenarios[0].status` equals `xpass`
+
 ### Scenario: an allowed xpass leaves nothing behind to rerun
 #### Given
 - Fixture file `inner_allow_ledger.atago.yaml` is created.
+
 #### Inputs
 _Fixture `inner_allow_ledger.atago.yaml`:_
 ```text
@@ -5767,9 +6199,11 @@ ${atago} run --rerun-failed inner_allow_ledger.atago.yaml
 - after `${atago} run --rerun-failed inner_allow_ledger.atago.yaml`:
   - exit code is `0`
   - stderr contains `nothing to rerun`
+
 ### Scenario: an execution error is still an error, not an expected failure
 #### Given
 - Fixture file `inner_error.atago.yaml` is created.
+
 #### Inputs
 _Fixture `inner_error.atago.yaml`:_
 ```text
@@ -5791,10 +6225,12 @@ ${atago} run inner_error.atago.yaml
 #### Then
 - exit code is `4`
 - stdout contains `ERROR:`, does not contain `XFAIL:`
+
 ### Scenario: a skip gate still decides on its own
 #### Given
 - Fixture file `inner_skip.atago.yaml` is created.
 - Environment variables are set: ATAGO_E2E_INNER_SKIP.
+
 #### Inputs
 _Fixture `inner_skip.atago.yaml`:_
 ```text
@@ -5821,9 +6257,11 @@ ${atago} run inner_skip.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `1 skipped`
+
 ### Scenario: an expected failure is not retried into a flake
 #### Given
 - Fixture file `inner_retry.atago.yaml` is created.
+
 #### Inputs
 _Fixture `inner_retry.atago.yaml`:_
 ```text
@@ -5861,9 +6299,11 @@ ATTEMPTS_FILE=${workdir}/repeat.count ${atago} run --repeat 3 inner_retry.atago.
   - exit code is `0`
   - stdout contains `1 xfail`, does not contain `REPEAT:`
   - file `repeat.count` contains `x` exactly 1 time
+
 ### Scenario: tap marks both verdicts with a TODO directive
 #### Given
 - Fixture file `inner_tap.atago.yaml` is created.
+
 #### Inputs
 _Fixture `inner_tap.atago.yaml`:_
 ```text
@@ -5896,9 +6336,11 @@ ${atago} run --report tap inner_tap.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `not ok 1 - inner tap / still broken # TODO known`, `ok 2 - inner tap / now fixed # TODO known too`
+
 ### Scenario: junit routes an xfail to skipped and an xpass to failure
 #### Given
 - Fixture file `inner_junit.atago.yaml` is created.
+
 #### Inputs
 _Fixture `inner_junit.atago.yaml`:_
 ```text
@@ -5931,9 +6373,11 @@ ${atago} run --report junit inner_junit.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `skipped="1"`, `failures="1"`, `<skipped message="xfail: known">`, `<failure message="xpass:`
+
 ### Scenario: explain and doc show which scenarios document a known bug
 #### Given
 - Fixture file `shown.atago.yaml` is created.
+
 #### Inputs
 _Fixture `shown.atago.yaml`:_
 ```text
@@ -5961,10 +6405,12 @@ ${atago} doc shown.atago.yaml
 - after `${atago} doc shown.atago.yaml`:
   - exit code is `0`
   - stdout contains `expected to FAIL (known bug): wrong rounding`
+
 ### Scenario: update-snapshots keeps the golden of an expected failure
 #### Given
 - Fixture file `desired.snap` is created.
 - Fixture file `inner_snap.atago.yaml` is created.
+
 #### Inputs
 _Fixture `desired.snap`:_
 ```text
@@ -6000,10 +6446,12 @@ ${atago} snapshot update inner_snap.atago.yaml
 - after `${atago} snapshot update inner_snap.atago.yaml`:
   - exit code is `0`
   - file `desired.snap` contains `the CORRECT output once fixed`
+
 ### Scenario: update-snapshots still reports the day the documented bug is fixed
 #### Given
 - Fixture file `fixed.snap` is created.
 - Fixture file `inner_fixed.atago.yaml` is created.
+
 #### Inputs
 _Fixture `fixed.snap`:_
 ```text
@@ -6033,11 +6481,13 @@ ${atago} run --update-snapshots inner_fixed.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `XPASS:`, `1 xpass`
+
 ### Scenario: an ordinary scenario beside an expected failure is still re-recorded
 #### Given
 - Fixture file `ordinary.snap` is created.
 - Fixture file `frozen.snap` is created.
 - Fixture file `inner_mixed.atago.yaml` is created.
+
 #### Inputs
 _Fixture `ordinary.snap`:_
 ```text
@@ -6080,9 +6530,11 @@ ${atago} run --update-snapshots inner_mixed.atago.yaml
 - stdout contains `1 snapshot updated`
 - file `ordinary.snap` contains `fresh`
 - file `frozen.snap` contains `desired`
+
 ### Scenario: an expected failure without a reason is a load error
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -6104,11 +6556,13 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `expect_fail.reason is required`
+
 ## atago self-hosting / explain
 Source: `test/e2e/atago/explain.atago.yaml`
 ### Scenario: explain summarizes a spec without running it
 #### Given
 - Fixture file `target.atago.yaml` is created.
+
 #### Inputs
 _Fixture `target.atago.yaml`:_
 ```text
@@ -6132,10 +6586,12 @@ ${atago} explain target.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `Suite: sample`, `Scenario: list as json`, `Commands:`, `Network policy:`
+
 ### Scenario: explain describes every matcher of a composed stream assertion
 #### Given
 - Fixture file `composed.atago.yaml` is created.
 - Fixture file `broken.atago.yaml` is created.
+
 #### Inputs
 _Fixture `composed.atago.yaml`:_
 ```text
@@ -6181,9 +6637,11 @@ ${atago} run broken.atago.yaml
 - after `${atago} run broken.atago.yaml`:
   - exit code is `1`
   - stdout contains `does not contain`
+
 ### Scenario: explain names the line a line-scoped matcher inspects
 #### Given
 - Fixture file `lined.atago.yaml` is created.
+
 #### Inputs
 _Fixture `lined.atago.yaml`:_
 ```text
@@ -6208,9 +6666,11 @@ ${atago} explain lined.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `stdout line 2 equals exact text`
+
 ### Scenario: explain describes file not_contains and executable matchers
 #### Given
 - Fixture file `filematch.atago.yaml` is created.
+
 #### Inputs
 _Fixture `filematch.atago.yaml`:_
 ```text
@@ -6243,9 +6703,11 @@ ${atago} explain filematch.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `file "out.txt" does not contain "secret-token"`, `file "install.sh" is executable`
+
 ### Scenario: explain names ssh and remote-database egress
 #### Given
 - Fixture file `remote.atago.yaml` is created.
+
 #### Inputs
 _Fixture `remote.atago.yaml`:_
 ```text
@@ -6286,9 +6748,11 @@ ${atago} doc remote.atago.yaml
 - after `${atago} doc remote.atago.yaml`:
   - exit code is `0`
   - stdout contains `# ssh box: uptime`
+
 ### Scenario: explain names pty and teardown egress
 #### Given
 - Fixture file `pty_teardown.atago.yaml` is created.
+
 #### Inputs
 _Fixture `pty_teardown.atago.yaml`:_
 ```text
@@ -6321,9 +6785,11 @@ ${atago} manifest pty_teardown.atago.yaml
 - after `${atago} manifest pty_teardown.atago.yaml`:
   - exit code is `0`
   - stdout at `$.specs[0].scenarios[0].security[0]` equals `network access: ssh deploy@backend.example`
+
 ### Scenario: explain names suite lifecycle egress
 #### Given
 - Fixture file `suite_egress.atago.yaml` is created.
+
 #### Inputs
 _Fixture `suite_egress.atago.yaml`:_
 ```text
@@ -6359,9 +6825,11 @@ ${atago} manifest suite_egress.atago.yaml
 - after `${atago} manifest suite_egress.atago.yaml`:
   - exit code is `0`
   - stdout at `$.specs[0].suite_security[0]` equals `shell execution enabled: curl https://seed.example/data`
+
 ### Scenario: explain names environment reads in fixtures asserts and cdp actions
 #### Given
 - Fixture file `env_reads.atago.yaml` is created.
+
 #### Inputs
 _Fixture `env_reads.atago.yaml`:_
 ```text
@@ -6393,9 +6861,11 @@ ${atago} explain env_reads.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `host environment read: $${env:SEED_TOKEN}`, `host environment read: $${env:EXPECTED_GREETING}`, `host environment read: $${env:CDP_KEY}`
+
 ### Scenario: explain lists pdf and teardown outputs under generates
 #### Given
 - Fixture file `gen.atago.yaml` is created.
+
 #### Inputs
 _Fixture `gen.atago.yaml`:_
 ```text
@@ -6428,9 +6898,11 @@ ${atago} manifest gen.atago.yaml
 - after `${atago} manifest gen.atago.yaml`:
   - exit code is `0`
   - stdout at `$.specs[0].scenarios[0].generates[0]` equals `report.pdf`; at `$.specs[0].scenarios[0].generates[1]` equals `logs/audit.log`
+
 ### Scenario: explain names an http runner and describes a retry
 #### Given
 - Fixture file `httpretry.atago.yaml` is created.
+
 #### Inputs
 _Fixture `httpretry.atago.yaml`:_
 ```text
@@ -6467,9 +6939,11 @@ ${atago} manifest httpretry.atago.yaml
 - after `${atago} manifest httpretry.atago.yaml`:
   - exit code is `0`
   - stdout at `$.specs[0].scenarios[0].steps[1].action` equals `HTTP POST /charge via billing`; at `$.specs[0].scenarios[0].steps[1].retry.until` equals `status`
+
 ### Scenario: explain names a runner definition's host environment reads
 #### Given
 - Fixture file `runnerenv.atago.yaml` is created.
+
 #### Inputs
 _Fixture `runnerenv.atago.yaml`:_
 ```text
@@ -6495,9 +6969,11 @@ ${atago} manifest runnerenv.atago.yaml
 - after `${atago} manifest runnerenv.atago.yaml`:
   - exit code is `0`
   - stdout at `$.specs[0].scenarios[0].variables[0]` equals `env:DB_PASSWORD`
+
 ### Scenario: explain names env and command gates
 #### Given
 - Fixture file `gates.atago.yaml` is created.
+
 #### Inputs
 _Fixture `gates.atago.yaml`:_
 ```text
@@ -6524,12 +7000,14 @@ ${atago} explain gates.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `[only command="jq --version"]`, `[skip env=CI]`
+
 ## atago self-hosting / file equals and equals_file byte-equality (#155)
 Source: `test/e2e/atago/file_equals.atago.yaml`
 ### Scenario: equals_file passes for two byte-identical files
 #### Given
 - Fixture file `in.hex` is created.
 - Fixture file `out.hex` is created.
+
 #### Inputs
 _Fixture `in.hex`:_
 ```text
@@ -6541,9 +7019,11 @@ DEADBEEF
 ```
 #### Then
 - file `out.hex` is byte-identical to `in.hex`
+
 ### Scenario: equals matches an inline literal byte-for-byte
 #### Given
 - Fixture file `token.txt` is created.
+
 #### Inputs
 _Fixture `token.txt`:_
 ```text
@@ -6551,9 +7031,11 @@ opaque-value-42
 ```
 #### Then
 - file `token.txt` equals exact bytes
+
 ### Scenario: equals_file fails the inner spec when the two files differ by one byte
 #### Given
 - Fixture file `neq.atago.yaml` is created.
+
 #### Inputs
 _Fixture `neq.atago.yaml`:_
 ```text
@@ -6581,9 +7063,11 @@ ${atago} run neq.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `not byte-identical`
+
 ### Scenario: equals_file is byte-exact — a CRLF vs LF difference fails
 #### Given
 - Fixture file `crlf.atago.yaml` is created.
+
 #### Inputs
 _Fixture `crlf.atago.yaml`:_
 ```text
@@ -6611,9 +7095,11 @@ ${atago} run crlf.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `not byte-identical`
+
 ### Scenario: a file assertion is not satisfied by a directory
 #### Given
 - Fixture file `mistaken.atago.yaml` is created.
+
 #### Inputs
 _Fixture `mistaken.atago.yaml`:_
 ```text
@@ -6635,10 +7121,12 @@ ${atago} run mistaken.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `exists but is a directory`, `use a dir: assertion`
+
 ### Scenario: an executable assertion is not satisfied by a directory
 _skipped on Windows_
 #### Given
 - Fixture file `execdir.atago.yaml` is created.
+
 #### Inputs
 _Fixture `execdir.atago.yaml`:_
 ```text
@@ -6660,10 +7148,12 @@ ${atago} run execdir.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `is a directory, not an executable file`
+
 ### Scenario: a real file still satisfies both matchers
 _skipped on Windows_
 #### Given
 - Fixture file `ok.atago.yaml` is created.
+
 #### Inputs
 _Fixture `ok.atago.yaml`:_
 ```text
@@ -6689,9 +7179,11 @@ ${atago} run ok.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `PASSED`
+
 ### Scenario: an invisible difference is quoted in the failure output
 #### Given
 - Fixture file `crlf.atago.yaml` is created.
+
 #### Inputs
 _Fixture `crlf.atago.yaml`:_
 ```text
@@ -6716,9 +7208,11 @@ ${atago} run crlf.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `"shared\n"`, `"shared\r\n"`
+
 ### Scenario: a trailing space difference is quoted too
 #### Given
 - Fixture file `spaces.atago.yaml` is created.
+
 #### Inputs
 _Fixture `spaces.atago.yaml`:_
 ```text
@@ -6741,9 +7235,11 @@ ${atago} run spaces.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `"value  "`
+
 ### Scenario: an ordinary difference keeps its plain form
 #### Given
 - Fixture file `plain.atago.yaml` is created.
+
 #### Inputs
 _Fixture `plain.atago.yaml`:_
 ```text
@@ -6767,11 +7263,13 @@ ${atago} run plain.atago.yaml
 - exit code is `1`
 - stdout contains `expected text`, `actual text`
 - stdout does not contain `"actual text"`
+
 ## atago self-hosting / fixture from (copy committed testdata)
 Source: `test/e2e/atago/fixture_from.atago.yaml`
 ### Scenario: a committed binary blob is copied verbatim into the workdir
 #### Given
 - Fixture file `copied.bin` is created.
+
 #### When
 ```shell
 wc -c < copied.bin
@@ -6780,9 +7278,11 @@ wc -c < copied.bin
 - exit code is `0`
 - stdout contains `21`
 - file `copied.bin` contains `binary-marker`
+
 ### Scenario: copying from a missing source errors the scenario
 #### Given
 - Fixture file `copied.bin` is created.
+
 #### Inputs
 _Fixture `copied.bin`:_
 ```text
@@ -6805,12 +7305,14 @@ ${atago} run copied.bin
 #### Then
 - exit code is `4`
 - stdout contains `copy from`
+
 ## atago self-hosting / fixture symlink+mode+mtime, file executable, env skip
 Source: `test/e2e/atago/fixture_modes.atago.yaml`
 ### Scenario: a symlink fixture resolves to its target
 #### Given
 - Fixture file `target.txt` is created.
 - Fixture file `alias.txt` is created.
+
 #### Inputs
 _Fixture `target.txt`:_
 ```text
@@ -6822,10 +7324,12 @@ cat alias.txt
 ```
 #### Then
 - stdout equals an exact value
+
 ### Scenario: fixture.mode sets permissions and file.executable reads them
 #### Given
 - Fixture file `run.sh` is created.
 - Fixture file `data.txt` is created.
+
 #### Inputs
 _Fixture `run.sh`:_
 ```text
@@ -6838,9 +7342,11 @@ plain
 #### Then
 - file `run.sh` is executable
 - file `data.txt` is not executable
+
 ### Scenario: fixture.mtime pins the modification time
 #### Given
 - Fixture file `stamped.txt` is created.
+
 #### Inputs
 _Fixture `stamped.txt`:_
 ```text
@@ -6852,6 +7358,7 @@ date -u -r stamped.txt +%Y
 ```
 #### Then
 - stdout contains `2021`
+
 ### Scenario: only.env skips when the variable is unset
 _only when env ATAGO_DEFINITELY_UNSET is set_
 #### When
@@ -6866,12 +7373,14 @@ true
 ```
 #### Then
 - exit code is `0`
+
 ## atago self-hosting / flaky tooling (--repeat, --retry-failed)
 Source: `test/e2e/atago/flaky.atago.yaml`
 ### Scenario: retry-failed recovers a flaky scenario and reports it loudly
 _skipped on Windows_
 #### Given
 - Fixture file `flaky.atago.yaml` is created.
+
 #### Inputs
 _Fixture `flaky.atago.yaml`:_
 ```text
@@ -6909,12 +7418,14 @@ ${atago} run --retry-failed 1 --report json flaky.atago.yaml
 - after `${atago} run --retry-failed 1 --report json flaky.atago.yaml`:
   - exit code is `1`
   - stdout contains `"status": "flaky"`, `"attempts": 2`
+
 ### Scenario: repeat surfaces flakiness that a single run would miss
 _skipped on Windows_
 #### Given
 - Fixture file `green.atago.yaml` is created.
 - Fixture file `flaky.atago.yaml` is created.
 - Fixture file `broken.atago.yaml` is created.
+
 #### Inputs
 _Fixture `green.atago.yaml`:_
 ```text
@@ -6975,9 +7486,11 @@ ${atago} run --repeat 3 broken.atago.yaml
 - after `${atago} run --repeat 3 broken.atago.yaml`:
   - exit code is `1`
   - stdout contains `always fails: 0/3 passed`, `1 failed`
+
 ### Scenario: a gated-out scenario reports no repeat rate
 #### Given
 - Fixture file `gated.atago.yaml` is created.
+
 #### Inputs
 _Fixture `gated.atago.yaml`:_
 ```text
@@ -6999,9 +7512,11 @@ ${atago} run --repeat 3 gated.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `1 skipped`, does not contain `0/3 passed`
+
 ### Scenario: repeat and retry-failed are mutually exclusive
 #### Given
 - Fixture file `any.atago.yaml` is created.
+
 #### Inputs
 _Fixture `any.atago.yaml`:_
 ```text
@@ -7020,11 +7535,13 @@ ${atago} run --repeat 2 --retry-failed 1 any.atago.yaml
 #### Then
 - exit code is `3`
 - stderr contains `mutually exclusive`
+
 ## atago self-hosting / grpc runner
 Source: `test/e2e/atago/grpc.atago.yaml`
 ### Scenario: a grpc runner without a target fails validation (exit 2)
 #### Given
 - Fixture file `badgrpc.atago.yaml` is created.
+
 #### Inputs
 _Fixture `badgrpc.atago.yaml`:_
 ```text
@@ -7048,9 +7565,11 @@ ${atago} run badgrpc.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `requires a target`
+
 ### Scenario: a grpc step naming an undeclared runner fails validation (exit 2)
 #### Given
 - Fixture file `norunner.atago.yaml` is created.
+
 #### Inputs
 _Fixture `norunner.atago.yaml`:_
 ```text
@@ -7071,9 +7590,11 @@ ${atago} run norunner.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `is not declared`
+
 ### Scenario: an unreachable server is a connection failure, not a reflection question
 #### Given
 - Fixture file `dead.atago.yaml` is created.
+
 #### Inputs
 _Fixture `dead.atago.yaml`:_
 ```text
@@ -7096,12 +7617,14 @@ ${atago} run dead.atago.yaml
 #### Then
 - exit code is `4`
 - stdout contains `the server could not be reached`, does not contain `server reflection enabled`
+
 ## atago self-hosting / hermetic environment (clear_env + pass_env)
 Source: `test/e2e/atago/hermetic_env.atago.yaml`
 ### Scenario: clear_env drops inherited host variables
 _skipped on Windows_
 #### Given
 - The command runs with a cleared environment.
+
 #### When
 ```shell
 env
@@ -7115,10 +7638,12 @@ env
   - exit code is `0`
   - stdout contains `ATAGO_HERMETIC_CANARY=leaked-from-scenario`
   - stdout does not contain `PATH=/`
+
 ### Scenario: pass_env re-admits an allowlist of host variables
 _skipped on Windows_
 #### Given
 - The command runs with a cleared environment (passing through: PATH).
+
 #### When
 ```shell
 env
@@ -7127,11 +7652,13 @@ env
 - exit code is `0`
 - stdout contains `PATH=`
 - stdout does not contain `HOME=`
+
 ### Scenario: explicit env wins over a passed-through host variable
 _skipped on Windows_
 #### Given
 - Environment variables are set: HOME.
 - The command runs with a cleared environment (passing through: HOME).
+
 #### When
 ```shell
 printf '%s\n' "$HOME"
@@ -7139,9 +7666,11 @@ printf '%s\n' "$HOME"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: pass_env without clear_env is a load-time error
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -7162,10 +7691,12 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `pass_env requires clear_env: true`, `steps[0].run`
+
 ### Scenario: unset host variables in pass_env are skipped, not an error
 _skipped on Windows_
 #### Given
 - The command runs with a cleared environment (passing through: PATH, ATAGO_SURELY_UNSET_VAR_2026).
+
 #### When
 ```shell
 env
@@ -7174,11 +7705,13 @@ env
 - exit code is `0`
 - stdout contains `PATH=`
 - stdout does not contain `ATAGO_SURELY_UNSET_VAR_2026`
+
 ## atago self-hosting / http runner
 Source: `test/e2e/atago/http.atago.yaml`
 ### Scenario: a denied host is a security policy violation (exit 6)
 #### Given
 - Fixture file `denied.atago.yaml` is created.
+
 #### Inputs
 _Fixture `denied.atago.yaml`:_
 ```text
@@ -7208,9 +7741,11 @@ ${atago} run denied.atago.yaml
 #### Then
 - exit code is `6`
 - stdout contains `network policy denies`
+
 ### Scenario: a db runner dialing a denied host is the same violation (exit 6)
 #### Given
 - Fixture file `deniedb.atago.yaml` is created.
+
 #### Inputs
 _Fixture `deniedb.atago.yaml`:_
 ```text
@@ -7239,9 +7774,11 @@ ${atago} run deniedb.atago.yaml
 #### Then
 - exit code is `6`
 - stdout contains `network policy denies host "denied.example"`
+
 ### Scenario: a file-backed db runner is not egress
 #### Given
 - Fixture file `localdb.atago.yaml` is created.
+
 #### Inputs
 _Fixture `localdb.atago.yaml`:_
 ```text
@@ -7270,9 +7807,11 @@ ${atago} run localdb.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `1 passed`
+
 ### Scenario: an http step with an undeclared runner fails validation (exit 2)
 #### Given
 - Fixture file `norunner.atago.yaml` is created.
+
 #### Inputs
 _Fixture `norunner.atago.yaml`:_
 ```text
@@ -7294,11 +7833,13 @@ ${atago} run norunner.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `is not declared`
+
 ## atago self-hosting / image
 Source: `test/e2e/atago/image.atago.yaml`
 ### Scenario: format, dimension and alpha assertions pass on a PNG
 #### Given
 - Fixture file `img.atago.yaml` is created.
+
 #### Inputs
 _Fixture `img.atago.yaml`:_
 ```text
@@ -7330,10 +7871,12 @@ ${atago} run img.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `PASSED`
+
 ### Scenario: a pixel comparison against an identical baseline passes
 #### Given
 - Fixture file `baseline.png` is created.
 - Fixture file `sim.atago.yaml` is created.
+
 #### Inputs
 _Fixture `sim.atago.yaml`:_
 ```text
@@ -7358,9 +7901,11 @@ ${atago} run sim.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `PASSED`
+
 ### Scenario: a wrong dimension assertion fails with a clear diff
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -7385,10 +7930,12 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `FAILED`
+
 ### Scenario: a failing similar_to writes visual diff artifacts
 #### Given
 - Fixture file `baseline.png` is created.
 - Fixture file `diff.atago.yaml` is created.
+
 #### Inputs
 _Fixture `diff.atago.yaml`:_
 ```text
@@ -7423,9 +7970,11 @@ cat arts/*/*/*image.metadata.json
 - after `cat arts/*/*/*image.metadata.json`:
   - exit code is `0`
   - stdout at `$.diff_generated` equals `true`
+
 ### Scenario: a similar_to baseline resolves in the scenario workdir
 #### Given
 - Fixture file `roundtrip.atago.yaml` is created.
+
 #### Inputs
 _Fixture `roundtrip.atago.yaml`:_
 ```text
@@ -7454,9 +8003,11 @@ ${atago} run roundtrip.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `PASSED`
+
 ### Scenario: a workdir baseline still fails when the images differ
 #### Given
 - Fixture file `differ.atago.yaml` is created.
+
 #### Inputs
 _Fixture `differ.atago.yaml`:_
 ```text
@@ -7486,9 +8037,11 @@ ${atago} run differ.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `FAILED`
+
 ### Scenario: a baseline that exists nowhere names both places it was looked for
 #### Given
 - Fixture file `missing.atago.yaml` is created.
+
 #### Inputs
 _Fixture `missing.atago.yaml`:_
 ```text
@@ -7515,6 +8068,7 @@ ${atago} run missing.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `could not read baseline image`, `scenario workdir`
+
 ## atago self-hosting / init
 Source: `test/e2e/atago/init.atago.yaml`
 ### Scenario: init scaffolds a runnable spec
@@ -7530,8 +8084,10 @@ ${atago} run starter.atago.yaml
 - after `${atago} run starter.atago.yaml`:
   - exit code is `0`
   - stdout contains `PASSED`
+
 #### Generated artifacts
 - `starter.atago.yaml`
+
 ### Scenario: init emits a resolvable schema header for editor completion
 #### When
 ```shell
@@ -7545,9 +8101,11 @@ head -1 headed.atago.yaml
   - exit code is `0`
   - stdout contains `# yaml-language-server: $schema=https://`
   - stdout does not contain `./schema/`
+
 ### Scenario: init refuses to overwrite without --force
 #### Given
 - Fixture file `taken.atago.yaml` is created.
+
 #### Inputs
 _Fixture `taken.atago.yaml`:_
 ```text
@@ -7568,6 +8126,7 @@ ${atago} init taken.atago.yaml
 #### Then
 - exit code is `3`
 - stderr contains `already exists`
+
 ## atago self-hosting / init templates
 Source: `test/e2e/atago/init_templates.atago.yaml`
 ### Scenario: every template scaffolds a schema-valid spec [template=cli]
@@ -7582,8 +8141,10 @@ ${atago} explain gen.atago.yaml
   - file `gen.atago.yaml` exists
 - after `${atago} explain gen.atago.yaml`:
   - exit code is `0`
+
 #### Generated artifacts
 - `gen.atago.yaml`
+
 ### Scenario: every template scaffolds a schema-valid spec [template=http]
 #### When
 ```shell
@@ -7596,8 +8157,10 @@ ${atago} explain gen.atago.yaml
   - file `gen.atago.yaml` exists
 - after `${atago} explain gen.atago.yaml`:
   - exit code is `0`
+
 #### Generated artifacts
 - `gen.atago.yaml`
+
 ### Scenario: every template scaffolds a schema-valid spec [template=db]
 #### When
 ```shell
@@ -7610,8 +8173,10 @@ ${atago} explain gen.atago.yaml
   - file `gen.atago.yaml` exists
 - after `${atago} explain gen.atago.yaml`:
   - exit code is `0`
+
 #### Generated artifacts
 - `gen.atago.yaml`
+
 ### Scenario: every template scaffolds a schema-valid spec [template=grpc]
 #### When
 ```shell
@@ -7624,8 +8189,10 @@ ${atago} explain gen.atago.yaml
   - file `gen.atago.yaml` exists
 - after `${atago} explain gen.atago.yaml`:
   - exit code is `0`
+
 #### Generated artifacts
 - `gen.atago.yaml`
+
 ### Scenario: every template scaffolds a schema-valid spec [template=ssh]
 #### When
 ```shell
@@ -7638,8 +8205,10 @@ ${atago} explain gen.atago.yaml
   - file `gen.atago.yaml` exists
 - after `${atago} explain gen.atago.yaml`:
   - exit code is `0`
+
 #### Generated artifacts
 - `gen.atago.yaml`
+
 ### Scenario: every template scaffolds a schema-valid spec [template=browser]
 #### When
 ```shell
@@ -7652,8 +8221,10 @@ ${atago} explain gen.atago.yaml
   - file `gen.atago.yaml` exists
 - after `${atago} explain gen.atago.yaml`:
   - exit code is `0`
+
 #### Generated artifacts
 - `gen.atago.yaml`
+
 ### Scenario: every template scaffolds a schema-valid spec [template=services]
 #### When
 ```shell
@@ -7666,8 +8237,10 @@ ${atago} explain gen.atago.yaml
   - file `gen.atago.yaml` exists
 - after `${atago} explain gen.atago.yaml`:
   - exit code is `0`
+
 #### Generated artifacts
 - `gen.atago.yaml`
+
 ### Scenario: list-templates names every runner family with a description
 #### When
 ```shell
@@ -7677,6 +8250,7 @@ ${atago} init --list-templates
 - exit code is `0`
 - stdout contains `cli`, `http`, `db`, `grpc`, `ssh`, `browser`, `services`
 - stdout contains `runs as-is`, `edit base_url first`
+
 ### Scenario: unknown template is a configuration error
 #### When
 ```shell
@@ -7685,6 +8259,7 @@ ${atago} init --template nope gen.atago.yaml
 #### Then
 - exit code is `3`
 - stderr contains `unknown template`
+
 ### Scenario: the default cli template runs green
 #### When
 ```shell
@@ -7696,6 +8271,7 @@ ${atago} run cli.atago.yaml
   - exit code is `0`
 - after `${atago} run cli.atago.yaml`:
   - exit code is `0`
+
 ### Scenario: the db template runs green with the bundled sqlite driver
 #### When
 ```shell
@@ -7707,6 +8283,7 @@ ${atago} run db.atago.yaml
   - exit code is `0`
 - after `${atago} run db.atago.yaml`:
   - exit code is `0`
+
 ### Scenario: the services template runs green and exercises readiness + retry
 _skipped on Windows_
 #### When
@@ -7719,6 +8296,7 @@ ${atago} run services.atago.yaml
   - exit code is `0`
 - after `${atago} run services.atago.yaml`:
   - exit code is `0`
+
 ## atago self-hosting / json numeric comparators
 Source: `test/e2e/atago/json_compare.atago.yaml`
 ### Scenario: gt and gte pass on a value at or above the bound
@@ -7729,6 +8307,7 @@ echo '{"count":3,"rate":0.5}'
 #### Then
 - stdout at `$.count` is `> 2`
 - stdout at `$.count` is `>= 3`
+
 ### Scenario: lt and lte pass on a value at or below the bound
 #### When
 ```shell
@@ -7737,6 +8316,7 @@ echo '{"count":3,"rate":0.5}'
 #### Then
 - stdout at `$.rate` is `< 1`
 - stdout at `$.count` is `<= 3`
+
 ### Scenario: comparators work on a numeric string
 #### When
 ```shell
@@ -7744,9 +8324,11 @@ echo '{"n":"7"}'
 ```
 #### Then
 - stdout at `$.n` is `>= 7`
+
 ### Scenario: comparators apply to rows and file json targets too
 #### Given
 - Fixture file `metrics.json` is created.
+
 #### Inputs
 _Fixture `metrics.json`:_
 ```text
@@ -7755,9 +8337,11 @@ _Fixture `metrics.json`:_
 #### Then
 - file `metrics.json` at `$.processed` is `> 1000`
 - file `metrics.json` at `$.errors` is `<= 0`
+
 ### Scenario: a value below the gt bound fails the inner spec
 #### Given
 - Fixture file `cmp.atago.yaml` is created.
+
 #### Inputs
 _Fixture `cmp.atago.yaml`:_
 ```text
@@ -7783,9 +8367,11 @@ ${atago} run cmp.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `is not gt`
+
 ### Scenario: a non-numeric value cannot be compared and fails
 #### Given
 - Fixture file `cmp.atago.yaml` is created.
+
 #### Inputs
 _Fixture `cmp.atago.yaml`:_
 ```text
@@ -7811,11 +8397,13 @@ ${atago} run cmp.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `not numeric`
+
 ## atago self-hosting / json and yaml matcher lists (#156)
 Source: `test/e2e/atago/json_list.atago.yaml`
 ### Scenario: a file json list asserts several paths at once
 #### Given
 - Fixture file `starters.json` is created.
+
 #### Inputs
 _Fixture `starters.json`:_
 ```text
@@ -7827,9 +8415,11 @@ _Fixture `starters.json`:_
 ```
 #### Then
 - file `starters.json` at `$[0].name` equals `basei-starter`; at `$[0].default` equals `true`; at `$[2].name` equals `spec87bcd-starter`
+
 ### Scenario: a single mapping still works (backward compatible)
 #### Given
 - Fixture file `one.json` is created.
+
 #### Inputs
 _Fixture `one.json`:_
 ```text
@@ -7837,9 +8427,11 @@ _Fixture `one.json`:_
 ```
 #### Then
 - file `one.json` at `$.id` equals `7`
+
 ### Scenario: a json list fails the inner spec when one listed path mismatches
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -7866,6 +8458,7 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `did not equal`
+
 ### Scenario: a stdout json list against a JSON-producing command
 _skipped on Windows_
 #### When
@@ -7874,6 +8467,7 @@ echo '{"count": 3, "name": "ok"}'
 ```
 #### Then
 - stdout at `$.count` is `>= 2`; at `$.name` equals `ok`
+
 ### Scenario: a yaml list asserts several paths on one document
 _skipped on Windows_
 #### When
@@ -7882,6 +8476,7 @@ printf 'name: ada\nid: 42\n'
 ```
 #### Then
 - stdout YAML at `$.name` equals `ada`; YAML at `$.id` equals `42`
+
 ## atago self-hosting / json matcher boundary values
 Source: `test/e2e/atago/json_matcher_edges.atago.yaml`
 ### Scenario: an array element is addressable by index
@@ -7891,6 +8486,7 @@ printf '{"items":[10,20,30]}'
 ```
 #### Then
 - stdout at `$.items[0]` equals `10`; at `$.items[2]` equals `30`
+
 ### Scenario: a top-level array reports its length
 #### When
 ```shell
@@ -7898,6 +8494,7 @@ printf '[1,2,3,4,5]'
 ```
 #### Then
 - stdout at `$` has length 5
+
 ### Scenario: an empty array has length zero
 #### When
 ```shell
@@ -7905,6 +8502,7 @@ printf '{"rows":[]}'
 ```
 #### Then
 - stdout at `$.rows` has length 0
+
 ### Scenario: the numeric comparators bound a value
 #### When
 ```shell
@@ -7912,6 +8510,7 @@ printf '{"n":50}'
 ```
 #### Then
 - stdout at `$.n` is `> 49`; at `$.n` is `>= 50`; at `$.n` is `<= 50`; at `$.n` is `< 51`
+
 ### Scenario: a boolean value compares equal
 #### When
 ```shell
@@ -7919,6 +8518,7 @@ printf '{"ok":true,"off":false}'
 ```
 #### Then
 - stdout at `$.ok` equals `true`; at `$.off` equals `false`
+
 ### Scenario: a floating-point value compares equal
 #### When
 ```shell
@@ -7926,9 +8526,11 @@ printf '{"pi":3.14}'
 ```
 #### Then
 - stdout at `$.pi` equals `3.14`
+
 ### Scenario: a string carrying a quote compares equal
 #### Given
 - Fixture file `quoted.json` is created.
+
 #### Inputs
 _Fixture `quoted.json`:_
 ```text
@@ -7940,6 +8542,7 @@ cat quoted.json
 ```
 #### Then
 - stdout at `$.s` equals `a"b`
+
 ### Scenario: a deeply nested path resolves
 #### When
 ```shell
@@ -7947,9 +8550,11 @@ printf '{"x":{"y":{"z":{"w":42}}}}'
 ```
 #### Then
 - stdout at `$.x.y.z.w` equals `42`
+
 ### Scenario: a path that selects nothing fails with a clear message
 #### Given
 - Fixture file `nopath.atago.yaml` is created.
+
 #### Inputs
 _Fixture `nopath.atago.yaml`:_
 ```text
@@ -7968,9 +8573,11 @@ ${atago} run nopath.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `selected no value`
+
 ### Scenario: a type mismatch failure distinguishes a string from a boolean
 #### Given
 - Fixture file `typed.atago.yaml` is created.
+
 #### Inputs
 _Fixture `typed.atago.yaml`:_
 ```text
@@ -7989,9 +8596,11 @@ ${atago} run typed.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `$.b == "true"`, `$.b = true`
+
 ### Scenario: a whitespace-only mismatch shows the surrounding spaces
 #### Given
 - Fixture file `spaced.atago.yaml` is created.
+
 #### Inputs
 _Fixture `spaced.atago.yaml`:_
 ```text
@@ -8010,9 +8619,11 @@ ${atago} run spaced.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `$.v = " x "`
+
 ### Scenario: a numeric mismatch stays unquoted
 #### Given
 - Fixture file `nums.atago.yaml` is created.
+
 #### Inputs
 _Fixture `nums.atago.yaml`:_
 ```text
@@ -8032,6 +8643,7 @@ ${atago} run nums.atago.yaml
 - exit code is `1`
 - stdout contains `$.n == 1`, `$.n = 2`
 - stdout does not contain `"2"`
+
 ### Scenario: a null value is spelled null, not the Go zero value
 #### When
 ```shell
@@ -8039,9 +8651,11 @@ printf '{"v": null}'
 ```
 #### Then
 - stdout at `$.v` matches `/^null$/`
+
 ### Scenario: a failure against a null value names it as null
 #### Given
 - Fixture file `nulled.atago.yaml` is created.
+
 #### Inputs
 _Fixture `nulled.atago.yaml`:_
 ```text
@@ -8061,6 +8675,7 @@ ${atago} run nulled.atago.yaml
 - exit code is `1`
 - stdout contains `$.v = null`
 - stdout does not contain `<nil>`
+
 ### Scenario: equals null asserts the field is null
 #### When
 ```shell
@@ -8068,9 +8683,11 @@ printf '{"done": null, "count": 0}'
 ```
 #### Then
 - stdout at `$.done` equals `null`; at `$.count` equals `0`
+
 ### Scenario: equals null rejects every value that is not null
 #### Given
 - Fixture file `notnull.atago.yaml` is created.
+
 #### Inputs
 _Fixture `notnull.atago.yaml`:_
 ```text
@@ -8101,9 +8718,11 @@ ${atago} run notnull.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `0 passed, 4 failed`, `$.v == null`, `$.v = "null"`, `$.v = 0`, `$.v = false`, `$.v = ""`
+
 ### Scenario: an absent path is not null either
 #### Given
 - Fixture file `absent.atago.yaml` is created.
+
 #### Inputs
 _Fixture `absent.atago.yaml`:_
 ```text
@@ -8122,9 +8741,11 @@ ${atago} run absent.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `selected no value`
+
 ### Scenario: a json check with no matcher at all is still rejected
 #### Given
 - Fixture file `bare.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bare.atago.yaml`:_
 ```text
@@ -8143,9 +8764,11 @@ ${atago} run bare.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `must set one of equals/matches/length/gt/gte/lt/lte`
+
 ### Scenario: explain and doc describe a null assertion as one
 #### Given
 - Fixture file `nullspec.atago.yaml` is created.
+
 #### Inputs
 _Fixture `nullspec.atago.yaml`:_
 ```text
@@ -8170,6 +8793,7 @@ ${atago} doc nullspec.atago.yaml
 - after `${atago} doc nullspec.atago.yaml`:
   - exit code is `0`
   - stdout contains `equals `null``
+
 ## atago self-hosting / line selector
 Source: `test/e2e/atago/line.atago.yaml`
 ### Scenario: line selector narrows stdout to a single 1-based line
@@ -8181,6 +8805,7 @@ printf '[\n  {"id":1}\n]\n'
 - stdout line `1` equals an exact value
 - stdout line `2` contains `"id":1`
 - stdout line `3` equals an exact value
+
 ### Scenario: a trailing newline does not add a phantom final line
 #### When
 ```shell
@@ -8188,9 +8813,11 @@ printf 'only-line\n'
 ```
 #### Then
 - stdout line `1` equals an exact value
+
 ### Scenario: an out-of-range line fails the inner spec
 #### Given
 - Fixture file `oor.atago.yaml` is created.
+
 #### Inputs
 _Fixture `oor.atago.yaml`:_
 ```text
@@ -8214,6 +8841,7 @@ ${atago} run oor.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `out of range`
+
 ## atago self-hosting / stream text matchers fold CRLF
 Source: `test/e2e/atago/line_endings.atago.yaml`
 ### Scenario: equals folds a CRLF body to its LF form
@@ -8223,6 +8851,7 @@ printf 'first\r\nsecond\r\n'
 ```
 #### Then
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -8236,6 +8865,7 @@ printf 'only\r\n'
 ```
 #### Then
 - stdout equals an exact value
+
 ### Scenario: contains folds CRLF for a multi-line needle
 #### When
 ```shell
@@ -8243,6 +8873,7 @@ printf 'alpha\r\nbeta\r\ngamma\r\n'
 ```
 #### Then
 - stdout contains `"alpha\nbeta"`
+
 ### Scenario: contains authored with CRLF matches LF-folded output
 #### When
 ```shell
@@ -8250,6 +8881,7 @@ printf 'alpha\r\nbeta\r\n'
 ```
 #### Then
 - stdout contains `"alpha\r\nbeta"`
+
 ### Scenario: contains list every multi-line element folds
 #### When
 ```shell
@@ -8257,6 +8889,7 @@ printf 'a\r\nb\r\nc\r\nd\r\n'
 ```
 #### Then
 - stdout contains `"a\nb"`, `"c\nd"`
+
 ### Scenario: matches anchors a line over CRLF with the multiline flag
 #### When
 ```shell
@@ -8264,6 +8897,7 @@ printf 'hello\r\nworld\r\n'
 ```
 #### Then
 - stdout matches `/(?m)^world$/`
+
 ### Scenario: matches a literal newline in the pattern over CRLF
 #### When
 ```shell
@@ -8271,6 +8905,7 @@ printf 'up\r\ndown\r\n'
 ```
 #### Then
 - stdout matches `/up\ndown/`
+
 ### Scenario: not_contains stays clear of an absent multi-line needle
 #### When
 ```shell
@@ -8278,6 +8913,7 @@ printf 'red\r\ngreen\r\n'
 ```
 #### Then
 - stdout does not contain `"red\nblue"`
+
 ### Scenario: not_matches passes for an anchored line that is absent
 #### When
 ```shell
@@ -8285,6 +8921,7 @@ printf 'north\r\nsouth\r\n'
 ```
 #### Then
 - stdout does not match `/(?m)^east$/`
+
 ### Scenario: the line selector strips the trailing CR
 #### When
 ```shell
@@ -8292,6 +8929,7 @@ printf 'header\r\npayload\r\n'
 ```
 #### Then
 - stdout line `2` equals an exact value
+
 ### Scenario: json parses a CRLF-formatted document
 #### When
 ```shell
@@ -8299,9 +8937,11 @@ printf '{\r\n"count":3\r\n}\r\n'
 ```
 #### Then
 - stdout at `$.count` equals `3`
+
 ### Scenario: folding does not make an absent multi-line needle match
 #### Given
 - Fixture file `inner.atago.yaml` is created.
+
 #### Inputs
 _Fixture `inner.atago.yaml`:_
 ```text
@@ -8325,11 +8965,13 @@ ${atago} run inner.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `was not present`
+
 ## atago self-hosting / list
 Source: `test/e2e/atago/list.atago.yaml`
 ### Scenario: list surfaces suites, scenarios, tags, and gates
 #### Given
 - Fixture file `sample.atago.yaml` is created.
+
 #### Inputs
 _Fixture `sample.atago.yaml`:_
 ```text
@@ -8355,9 +8997,11 @@ ${atago} list sample.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `tagged scenario`, `smoke`, `skip:env=ATAGO_SKIP_DEMO`
+
 ### Scenario: list --json is a stable machine contract
 #### Given
 - Fixture file `sample.atago.yaml` is created.
+
 #### Inputs
 _Fixture `sample.atago.yaml`:_
 ```text
@@ -8378,9 +9022,11 @@ ${atago} list --json sample.atago.yaml
 - exit code is `0`
 - stdout at `$.schema_version` equals `1`
 - stdout at `$.scenarios[0].scenario` equals `only scenario`
+
 ### Scenario: list marks an expect_fail scenario
 #### Given
 - Fixture file `xfail.atago.yaml` is created.
+
 #### Inputs
 _Fixture `xfail.atago.yaml`:_
 ```text
@@ -8412,11 +9058,13 @@ ${atago} list --json xfail.atago.yaml
 - after `${atago} list --json xfail.atago.yaml`:
   - exit code is `0`
   - stdout at `$.scenarios[0].expect_fail.reason` equals `upstream renders the wrong width`; at `$.scenarios[0].expect_fail.issue` equals `https://example.com/issues/42`
+
 ## atago self-hosting / loader rejects malformed specs
 Source: `test/e2e/atago/loader_errors.atago.yaml`
 ### Scenario: an empty scenario list is rejected
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -8431,9 +9079,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `must contain at least one scenario`
+
 ### Scenario: a wrong version string is rejected
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -8448,9 +9098,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `version must be "1"`
+
 ### Scenario: an unknown top-level field is rejected with its position
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -8465,9 +9117,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `unknown field "scenariosss"`
+
 ### Scenario: a step that sets two actions is rejected
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -8486,9 +9140,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `must set exactly one action`
+
 ### Scenario: a stream assertion with no matcher is rejected
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -8507,9 +9163,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `must set at least one matcher`
+
 ### Scenario: combining equals with another matcher is rejected
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -8528,9 +9186,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `cannot be combined with another matcher`
+
 ### Scenario: a line index below one is rejected
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -8549,9 +9209,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `line must be >= 1`
+
 ### Scenario: combining a line selector with json is rejected
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -8570,9 +9232,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `cannot be combined with json/yaml/snapshot`
+
 ### Scenario: a duplicate scenario name is rejected
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -8589,9 +9253,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `duplicate scenario name "dup"`
+
 ### Scenario: an empty run command is rejected
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -8606,9 +9272,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `run.command is required`
+
 ### Scenario: an unparseable timeout is rejected with an example
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -8623,9 +9291,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `is not a valid duration`
+
 ### Scenario: a fixture with two content sources is rejected
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -8640,9 +9310,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `set only one of content, base64, from, or symlink`
+
 ### Scenario: an absolute changes glob is rejected as not workdir-relative
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -8661,9 +9333,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `must be workdir-relative, not absolute`
+
 ### Scenario: the inline stdin form is a scalar, not a mapping key
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -8678,9 +9352,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `unknown key "inline"`
+
 ### Scenario: a wrong-typed exit_code is rejected with its position and excerpt
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -8700,6 +9376,7 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `[8:22]`, `exit_code must be an integer`, `exit_code: zero`
+
 ### Scenario: a missing target names the reason without syscall noise
 #### When
 ```shell
@@ -8709,6 +9386,7 @@ ${atago} run no-such-spec.atago.yaml
 - exit code is `3`
 - stderr contains `cannot access "no-such-spec.atago.yaml": `
 - stderr does not contain `stat no-such-spec`
+
 ### Scenario: an empty directory says how to create a first spec
 #### When
 ```shell
@@ -8719,10 +9397,12 @@ ${atago} run specs
 - after `${atago} run specs`:
   - exit code is `3`
   - stderr contains `no *.atago.yaml`, `specs`, `atago init`
+
 ### Scenario: a cwd that traverses out of the workdir is refused before running
 #### Given
 - Fixture file `escape.atago.yaml` is created.
 - Fixture file `ok.atago.yaml` is created.
+
 #### Inputs
 _Fixture `escape.atago.yaml`:_
 ```text
@@ -8764,9 +9444,11 @@ ${atago} run ok.atago.yaml
 - after `${atago} run ok.atago.yaml`:
   - exit code is `0`
   - stdout contains `1 passed`
+
 ### Scenario: a gate with no condition is rejected
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -8784,9 +9466,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `only must name a condition (os, env, or command)`
+
 ### Scenario: skip and only naming the same condition are rejected
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -8805,9 +9489,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `skip.os and only.os both name`, `can never run anywhere`
+
 ### Scenario: gates naming different fields still load
 #### Given
 - Fixture file `ok.atago.yaml` is created.
+
 #### Inputs
 _Fixture `ok.atago.yaml`:_
 ```text
@@ -8826,9 +9512,11 @@ ${atago} run ok.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `1 skipped`
+
 ### Scenario: an empty deterministic compare list is rejected
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -8845,9 +9533,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `deterministic.compare must not be empty`
+
 ### Scenario: an empty-matching pattern under a count bound is rejected
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -8866,9 +9556,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `matches the empty string`
+
 ### Scenario: an empty-matching store capture is rejected
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -8887,9 +9579,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `captures "" from any output`
+
 ### Scenario: an empty-matching scrub rule is rejected
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -8908,9 +9602,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `matches between every byte`
+
 ### Scenario: matchers of one assert that contradict each other are rejected
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -8932,11 +9628,13 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `contains and not_contains both list "abc"`, `count: 0 cannot hold together with contains`
+
 ## atago self-hosting / manifest
 Source: `test/e2e/atago/manifest.atago.yaml`
 ### Scenario: manifest emits a stable JSON summary without running the spec
 #### Given
 - Fixture file `sample.atago.yaml` is created.
+
 #### Inputs
 _Fixture `sample.atago.yaml`:_
 ```text
@@ -8977,9 +9675,11 @@ ${atago} manifest sample.atago.yaml
 - stdout at `$.specs[0].scenarios[0].source.line` equals `7`
 - stdout at `$.specs[0].scenarios[1].source.line` equals `7`
 - stdout at `$.specs[0].scenarios[0].steps[0].source.line` equals `13`
+
 ### Scenario: manifest does not execute the spec's commands
 #### Given
 - Fixture file `side_effect.atago.yaml` is created.
+
 #### Inputs
 _Fixture `side_effect.atago.yaml`:_
 ```text
@@ -9002,9 +9702,11 @@ ${atago} manifest side_effect.atago.yaml
 #### Then
 - exit code is `0`
 - file `executed.marker` does not exist
+
 ### Scenario: manifest carries the declarative fields of steps and runners
 #### Given
 - Fixture file `fields.atago.yaml` is created.
+
 #### Inputs
 _Fixture `fields.atago.yaml`:_
 ```text
@@ -9032,10 +9734,12 @@ ${atago} manifest fields.atago.yaml
 - exit code is `0`
 - stdout at `$.specs[0].scenarios[0].steps[0].cwd` equals `sub/dir`; at `$.specs[0].scenarios[0].steps[0].timeout` equals `90s`; at `$.specs[0].scenarios[0].steps[0].stdout_to` equals `logs/build.log`; at `$.specs[0].scenarios[0].steps[0].stderr_to` equals `logs/build.err`; at `$.specs[0].runners[0].insecure_host_key` equals `true`; at `$.specs[0].runners[0].user` equals `deploy`; at `$.specs[0].runners[1].cwd` equals `./sub`; at `$.specs[0].runners[1].timeout` equals `45s`
 - stdout does not contain `hunter2`
+
 ### Scenario: manifest describes the suite lifecycle outputs and the subject build
 #### Given
 - Fixture file `atago.project.yaml` is created.
 - Fixture file `suitegen.atago.yaml` is created.
+
 #### Inputs
 _Fixture `atago.project.yaml`:_
 ```text
@@ -9073,10 +9777,12 @@ ${atago} explain suitegen.atago.yaml
 - after `${atago} explain suitegen.atago.yaml`:
   - exit code is `0`
   - stdout contains `Subject under test: mytool (built by: curl -s https://build.example/prebuilt > $${artifact}, shell)`, `Suite generates:`, `build/seed.txt`, `network access (subject build mytool)`
+
 ### Scenario: an assert step carries the assertion, not only its target
 #### Given
 - Fixture file `strong.atago.yaml` is created.
 - Fixture file `weak.atago.yaml` is created.
+
 #### Inputs
 _Fixture `strong.atago.yaml`:_
 ```text
@@ -9115,12 +9821,15 @@ ${atago} manifest weak.atago.yaml
   - exit code is `0`
   - file `weak.json` contains `exit code in [0, 1, 2]`, `stdout does not contain`
   - file `weak.json` does not contain `exit code is 0`, `stdout equals exact text`
+
 #### Generated artifacts
 - `strong.json`
 - `weak.json`
+
 ### Scenario: explain and manifest substitute a matrix row into the step text
 #### Given
 - Fixture file `rows.atago.yaml` is created.
+
 #### Inputs
 _Fixture `rows.atago.yaml`:_
 ```text
@@ -9148,11 +9857,13 @@ ${atago} manifest rows.atago.yaml
   - exit code is `0`
   - stdout contains `"command": "echo alice"`, `"command": "echo bob"`, does not contain `"command": "echo ${who}"`
   - stdout at `$.specs[0].scenarios[0].vars.who` equals `alice`
+
 ## atago self-hosting / matrix scenarios
 Source: `test/e2e/atago/matrix.atago.yaml`
 ### Scenario: matrix expands into one scenario per row
 #### Given
 - Fixture file `matrix.atago.yaml` is created.
+
 #### Inputs
 _Fixture `matrix.atago.yaml`:_
 ```text
@@ -9179,9 +9890,11 @@ ${atago} run --report junit matrix.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `name="greets Alice"`, `name="greets Bob"`
+
 ### Scenario: matrix without a templated name gets a deterministic suffix
 #### Given
 - Fixture file `suffix.atago.yaml` is created.
+
 #### Inputs
 _Fixture `suffix.atago.yaml`:_
 ```text
@@ -9208,6 +9921,7 @@ ${atago} run --report junit suffix.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `name="row [n=1]"`, `name="row [n=2]"`
+
 ### Scenario: stdout_to expands a matrix variable into the redirect target [who=alice]
 #### When
 ```shell
@@ -9216,8 +9930,10 @@ printf hello-alice
 #### Then
 - exit code is `0`
 - file `out-alice.txt` contains `hello-alice`
+
 #### Generated artifacts
 - `out-alice.txt`
+
 ### Scenario: stdout_to expands a matrix variable into the redirect target [who=bob]
 #### When
 ```shell
@@ -9226,13 +9942,16 @@ printf hello-bob
 #### Then
 - exit code is `0`
 - file `out-bob.txt` contains `hello-bob`
+
 #### Generated artifacts
 - `out-bob.txt`
+
 ## atago self-hosting / matrix expansion boundary values
 Source: `test/e2e/atago/matrix_edges.atago.yaml`
 ### Scenario: each row substitutes into the scenario name
 #### Given
 - Fixture file `names.atago.yaml` is created.
+
 #### Inputs
 _Fixture `names.atago.yaml`:_
 ```text
@@ -9253,9 +9972,11 @@ ${atago} run --ci --report json names.atago.yaml
 #### Then
 - exit code is `0`
 - stdout at `$.suites[0].scenarios` has length 3; at `$.suites[0].scenarios[0].name` equals `case 1`; at `$.suites[0].scenarios[2].name` equals `case 3`
+
 ### Scenario: a row with several variables substitutes all of them
 #### Given
 - Fixture file `multi.atago.yaml` is created.
+
 #### Inputs
 _Fixture `multi.atago.yaml`:_
 ```text
@@ -9275,9 +9996,11 @@ ${atago} run --ci --report json multi.atago.yaml
 #### Then
 - exit code is `0`
 - stdout at `$.suites[0].scenarios[0].name` equals `Alice speaks en`; at `$.suites[0].scenarios[1].name` equals `Bob speaks fr`
+
 ### Scenario: a single-row matrix expands to exactly one scenario
 #### Given
 - Fixture file `single.atago.yaml` is created.
+
 #### Inputs
 _Fixture `single.atago.yaml`:_
 ```text
@@ -9296,9 +10019,11 @@ ${atago} run --ci --report json single.atago.yaml
 #### Then
 - exit code is `0`
 - stdout at `$.suites[0].scenarios` has length 1; at `$.suites[0].scenarios[0].name` equals `only solo`
+
 ### Scenario: an empty matrix row list is a load-time error
 #### Given
 - Fixture file `emptymx.atago.yaml` is created.
+
 #### Inputs
 _Fixture `emptymx.atago.yaml`:_
 ```text
@@ -9316,9 +10041,11 @@ ${atago} run emptymx.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `ATG2202: `, `matrix must contain at least one row`
+
 ### Scenario: rows that expand to the same name are rejected as duplicates
 #### Given
 - Fixture file `dupmx.atago.yaml` is created.
+
 #### Inputs
 _Fixture `dupmx.atago.yaml`:_
 ```text
@@ -9338,10 +10065,12 @@ ${atago} run dupmx.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `duplicate scenario name "dup same"`
+
 ### Scenario: a row that leaves a referenced name unbound is a load-time error
 #### Given
 - Fixture file `unbound.atago.yaml` is created.
 - Fixture file `escaped.atago.yaml` is created.
+
 #### Inputs
 _Fixture `unbound.atago.yaml`:_
 ```text
@@ -9376,12 +10105,14 @@ ${atago} run --ci --report json escaped.atago.yaml
 - after `${atago} run --ci --report json escaped.atago.yaml`:
   - exit code is `0`
   - stdout at `$.suites[0].scenarios[0].name` equals `writes $$${who} verbatim 1`
+
 ## atago self-hosting / mock http server (offline API-client testing)
 Source: `test/e2e/atago/mock_server.atago.yaml`
 ### Scenario: count, header, and body-json asserts pass against a real client
 #### Given
 - Stub HTTP server `api` serves 1 canned route(s) at `${api.url}` and records every request (#24).
 - Fixture file `client.atago.yaml` is created.
+
 #### Inputs
 _Fixture `client.atago.yaml`:_
 ```text
@@ -9411,10 +10142,12 @@ ${atago} run client.atago.yaml
 #### Then
 - exit code is `0`
 - mock `api` received `POST /v1/reports` exactly 1 time(s)
+
 ### Scenario: a failing count summarizes the recorded requests
 #### Given
 - Stub HTTP server `stub` serves 1 canned route(s) at `${stub.url}` and records every request (#24).
 - Fixture file `outer.atago.yaml` is created.
+
 #### Inputs
 _Fixture `outer.atago.yaml`:_
 ```text
@@ -9447,9 +10180,11 @@ ${atago} run outer.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `1 request for /right`, `0 matching of 0 recorded`
+
 ### Scenario: an unknown mock name in an assert is a load-time error
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -9473,10 +10208,12 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `not a declared mock server (declared: api)`
+
 ### Scenario: a route that can never answer is a load-time error
 #### Given
 - Fixture file `dead.atago.yaml` is created.
 - Fixture file `query.atago.yaml` is created.
+
 #### Inputs
 _Fixture `dead.atago.yaml`:_
 ```text
@@ -9519,6 +10256,7 @@ ${atago} run query.atago.yaml
 - after `${atago} run query.atago.yaml`:
   - exit code is `2`
   - stderr contains `must not contain a query string`
+
 ## atago self-hosting / combined stream matchers
 Source: `test/e2e/atago/multi_matcher.atago.yaml`
 ### Scenario: contains and not_contains hold together
@@ -9528,6 +10266,7 @@ echo "hello world"
 ```
 #### Then
 - stdout contains `hello`, does not contain `goodbye`
+
 ### Scenario: matches and not_matches hold together
 #### When
 ```shell
@@ -9535,6 +10274,7 @@ echo "release 1.2.3"
 ```
 #### Then
 - stdout matches `/[0-9]+\.[0-9]+\.[0-9]+/`, does not match `/(?i)error/`
+
 ### Scenario: all four text matchers compose
 #### When
 ```shell
@@ -9542,6 +10282,7 @@ echo "Alice and Bob"
 ```
 #### Then
 - stdout contains `Alice`, `Bob`, does not contain `Carol`, matches `/A.+e/`, does not match `/Dave/`
+
 ### Scenario: a combined matcher composes with a line selector
 #### When
 ```shell
@@ -9549,9 +10290,11 @@ printf 'first line\nsecond line\n'
 ```
 #### Then
 - stdout line `2` contains `second`, does not contain `first`
+
 ### Scenario: a failing member fails the inner spec and names the offender
 #### Given
 - Fixture file `inner.atago.yaml` is created.
+
 #### Inputs
 _Fixture `inner.atago.yaml`:_
 ```text
@@ -9575,9 +10318,11 @@ ${atago} run inner.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `goodbye`, does not contain `internal error`
+
 ### Scenario: mixing a whole-stream matcher with a text matcher is a load error
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -9601,6 +10346,7 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `cannot be combined with another matcher`
+
 ## atago self-hosting / not_equals matcher
 Source: `test/e2e/atago/not_equals.atago.yaml`
 ### Scenario: not_equals passes when stdout differs from the given text
@@ -9610,6 +10356,7 @@ echo Bob
 ```
 #### Then
 - stdout does not equal an exact value
+
 ### Scenario: not_equals is trailing-newline tolerant like equals
 #### When
 ```shell
@@ -9617,6 +10364,7 @@ echo hello
 ```
 #### Then
 - stdout does not equal an exact value
+
 ### Scenario: not_equals composes with a line selector
 #### When
 ```shell
@@ -9624,9 +10372,11 @@ printf 'first\nsecond\n'
 ```
 #### Then
 - stdout line `2` does not equal an exact value
+
 ### Scenario: not_equals fails the inner spec when the text matches exactly
 #### Given
 - Fixture file `ne.atago.yaml` is created.
+
 #### Inputs
 _Fixture `ne.atago.yaml`:_
 ```text
@@ -9649,11 +10399,13 @@ ${atago} run ne.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `unexpectedly equaled`
+
 ## atago self-hosting / parallel
 Source: `test/e2e/atago/parallel.atago.yaml`
 ### Scenario: parallel run passes and stays deterministic
 #### Given
 - Fixture file `many.atago.yaml` is created.
+
 #### Inputs
 _Fixture `many.atago.yaml`:_
 ```text
@@ -9675,9 +10427,11 @@ ${atago} run --parallel 3 many.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `3 passed`
+
 ### Scenario: fail-fast stops after the first failure
 #### Given
 - Fixture file `ff.atago.yaml` is created.
+
 #### Inputs
 _Fixture `ff.atago.yaml`:_
 ```text
@@ -9697,10 +10451,12 @@ ${atago} run --parallel 1 --fail-fast ff.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `1 skipped`
+
 ### Scenario: scenario-scoped services stay isolated under parallel workers
 _skipped on Windows_
 #### Given
 - Fixture file `par-svc.atago.yaml` is created.
+
 #### Inputs
 _Fixture `par-svc.atago.yaml`:_
 ```text
@@ -9733,6 +10489,7 @@ ${atago} run --parallel 3 par-svc.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `3 passed`
+
 ## atago self-hosting / forward-slash spec paths resolve on every OS
 Source: `test/e2e/atago/paths_portable.atago.yaml`
 ### Scenario: stdout_to creates a nested parent directory
@@ -9743,8 +10500,10 @@ echo produced
 #### Then
 - exit code is `0`
 - file `out/logs/result.txt` contains `produced`
+
 #### Generated artifacts
 - `out/logs/result.txt`
+
 ### Scenario: stderr_to creates its own nested parent directory
 #### When
 ```shell
@@ -9753,11 +10512,14 @@ echo oops 1>&2
 #### Then
 - exit code is `0`
 - file `errs/deep/err.txt` contains `oops`
+
 #### Generated artifacts
 - `errs/deep/err.txt`
+
 ### Scenario: a fixture at a nested forward-slash path is created and addressable
 #### Given
 - Fixture file `data/config/app.json` is created.
+
 #### Inputs
 _Fixture `data/config/app.json`:_
 ```text
@@ -9765,9 +10527,11 @@ _Fixture `data/config/app.json`:_
 ```
 #### Then
 - file `data/config/app.json` at `$.k` equals `1`
+
 ### Scenario: a file assert reaches a deeply nested fixture by forward-slash path
 #### Given
 - Fixture file `a/b/c/leaf.txt` is created.
+
 #### Inputs
 _Fixture `a/b/c/leaf.txt`:_
 ```text
@@ -9775,11 +10539,13 @@ at the bottom
 ```
 #### Then
 - file `a/b/c/leaf.txt` contains `at the bottom`
+
 ### Scenario: a dir assert addresses a nested tree and child by forward-slash path
 #### Given
 - Fixture file `pkg/mod/one.go` is created.
 - Fixture file `pkg/mod/two.go` is created.
 - Fixture file `pkg/mod/sub/three.go` is created.
+
 #### Inputs
 _Fixture `pkg/mod/one.go`:_
 ```text
@@ -9795,15 +10561,19 @@ package sub
 ```
 #### Then
 - dir `pkg/mod` exists, contains `one.go`, contains `two.go`, contains `sub/three.go`, does not contain `missing.go`
+
 ### Scenario: equals_file compares two files addressed by forward-slash paths
 #### Given
 - Fixture file `golden/expected.bin` is created.
 - Fixture file `build/actual.bin` is created.
+
 #### Then
 - file `build/actual.bin` is byte-identical to `golden/expected.bin`
+
 ### Scenario: a redirect path may not escape the workdir via a nested traversal
 #### Given
 - Fixture file `probe.atago.yaml` is created.
+
 #### Inputs
 _Fixture `probe.atago.yaml`:_
 ```text
@@ -9825,11 +10595,13 @@ ${atago} run probe.atago.yaml
 #### Then
 - exit code is `4`
 - stdout contains `escapes the scenario workdir`
+
 ## atago self-hosting / pdf assertion
 Source: `test/e2e/atago/pdf.atago.yaml`
 ### Scenario: pdf assertions cover page count, metadata, and text
 #### Given
 - Fixture file `report.pdf` is created.
+
 #### Inputs
 _Fixture `report.pdf`:_
 ```text
@@ -9857,11 +10629,14 @@ trailer
 ```
 #### Then
 - pdf `report.pdf` 1 page, >= 1 page, <= 3 pages, author contains `atago`, title contains `Quarterly`, text contains `Hello atago report`
+
 #### Generated artifacts
 - `report.pdf`
+
 ### Scenario: a non-pdf file fails the pdf target
 #### Given
 - Fixture file `notpdf.txt` is created.
+
 #### Inputs
 _Fixture `notpdf.txt`:_
 ```text
@@ -9873,9 +10648,11 @@ ${atago} version
 ```
 #### Then
 - exit code is `0`
+
 ### Scenario: metadata is found inside a compressed object stream
 #### Given
 - Fixture file `objstm.atago.yaml` is created.
+
 #### Inputs
 _Fixture `objstm.atago.yaml`:_
 ```text
@@ -9902,9 +10679,11 @@ ${atago} run objstm.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `PASSED`
+
 ### Scenario: a wrong expectation still fails against compressed metadata
 #### Given
 - Fixture file `wrongmeta.atago.yaml` is created.
+
 #### Inputs
 _Fixture `wrongmeta.atago.yaml`:_
 ```text
@@ -9930,9 +10709,11 @@ ${atago} run wrongmeta.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `Compressed Title`
+
 ### Scenario: a stream that ends without a newline does not swallow the next object
 #### Given
 - Fixture file `nonewline.atago.yaml` is created.
+
 #### Inputs
 _Fixture `nonewline.atago.yaml`:_
 ```text
@@ -9963,6 +10744,7 @@ ${atago} run nonewline.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `PASSED`
+
 ## atago self-hosting / directory manifest
 Source: `test/e2e/atago/project_manifest.atago.yaml`
 ### Scenario: a manifest applies to a spec nested below it
@@ -9970,6 +10752,7 @@ Source: `test/e2e/atago/project_manifest.atago.yaml`
 - Fixture file `atago.project.yaml` is created.
 - Fixture file `corpus/golden.txt` is created.
 - Fixture file `deep/nested/inner.atago.yaml` is created.
+
 #### Inputs
 _Fixture `atago.project.yaml`:_
 ```text
@@ -10004,11 +10787,13 @@ ${atago} run deep/nested/inner.atago.yaml
 ```
 #### Then
 - exit code is `0`
+
 ### Scenario: the nearest manifest wins
 #### Given
 - Fixture file `atago.project.yaml` is created.
 - Fixture file `deep/atago.project.yaml` is created.
 - Fixture file `deep/spec.atago.yaml` is created.
+
 #### Inputs
 _Fixture `atago.project.yaml`:_
 ```text
@@ -10041,10 +10826,12 @@ ${atago} run deep/spec.atago.yaml
 ```
 #### Then
 - exit code is `0`
+
 ### Scenario: a spec's own values beat the manifest
 #### Given
 - Fixture file `atago.project.yaml` is created.
 - Fixture file `spec.atago.yaml` is created.
+
 #### Inputs
 _Fixture `atago.project.yaml`:_
 ```text
@@ -10077,10 +10864,12 @@ ${atago} run spec.atago.yaml
 ```
 #### Then
 - exit code is `0`
+
 ### Scenario: specdir points at the spec's own directory
 #### Given
 - Fixture file `sub/marker.txt` is created.
 - Fixture file `sub/spec.atago.yaml` is created.
+
 #### Inputs
 _Fixture `sub/marker.txt`:_
 ```text
@@ -10107,11 +10896,13 @@ ${atago} run sub/spec.atago.yaml
 ```
 #### Then
 - exit code is `0`
+
 ### Scenario: explain names the manifest that applied
 #### Given
 - Fixture file `atago.project.yaml` is created.
 - Fixture file `corpus/keep.txt` is created.
 - Fixture file `spec.atago.yaml` is created.
+
 #### Inputs
 _Fixture `atago.project.yaml`:_
 ```text
@@ -10141,10 +10932,12 @@ ${atago} explain spec.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `Project manifest:`, `atago.project.yaml`, `Fixtures ($${fixtures}):`
+
 ### Scenario: a manifest pointing at a missing fixtures dir fails to load
 #### Given
 - Fixture file `atago.project.yaml` is created.
 - Fixture file `spec.atago.yaml` is created.
+
 #### Inputs
 _Fixture `atago.project.yaml`:_
 ```text
@@ -10168,10 +10961,12 @@ ${atago} run spec.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `fixtures_dir "not-there" does not exist`
+
 ### Scenario: an unknown manifest key is rejected
 #### Given
 - Fixture file `atago.project.yaml` is created.
 - Fixture file `spec.atago.yaml` is created.
+
 #### Inputs
 _Fixture `atago.project.yaml`:_
 ```text
@@ -10195,12 +10990,14 @@ ${atago} run spec.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `scenarios`
+
 ## atago self-hosting / pty
 Source: `test/e2e/atago/pty.atago.yaml`
 ### Scenario: a pty step sees a terminal where a run step sees a pipe
 _skipped on Windows_
 #### Given
 - Fixture file `tty.atago.yaml` is created.
+
 #### Inputs
 _Fixture `tty.atago.yaml`:_
 ```text
@@ -10225,10 +11022,12 @@ ${atago} run tty.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `1 passed`
+
 ### Scenario: a never-matching expect fails with the pattern in the block
 _skipped on Windows_
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -10251,6 +11050,7 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `pty expect /prompt-that-never-comes/`, `never appeared in the terminal transcript`
+
 ### Scenario: named keys transmit their documented bytes and ctrl-c aborts
 _skipped on Windows_
 #### When
@@ -10260,6 +11060,7 @@ _skipped on Windows_
 #### Then
 - exit code is `0`
 - stdout contains `^[[B`, `^_`, `^[[45;5u`
+
 ### Scenario: shift-tab, meta chords, and modified arrows transmit their xterm bytes
 _skipped on Windows_
 #### When
@@ -10285,10 +11086,12 @@ _skipped on Windows_
   - stdout contains `^[[Z`
 - after `interactive (pty): trap 'exit 130' INT; echo waiting; while true; do sleep 0.1; done`:
   - exit code is `130`
+
 ### Scenario: a bracketed paste is delivered wrapped, and refused when unasked for
 _skipped on Windows_
 #### Given
 - Fixture file `unasked.atago.yaml` is created.
+
 #### Inputs
 _Fixture `unasked.atago.yaml`:_
 ```text
@@ -10316,6 +11119,7 @@ ${atago} run unasked.atago.yaml
 - after `${atago} run unasked.atago.yaml`:
   - exit code is `4`
   - stdout contains `has not enabled bracketed paste`, `ESC [?2004h`
+
 ### Scenario: a resize delivers the new size and the screen follows it
 _skipped on Windows_
 #### When
@@ -10331,10 +11135,12 @@ _skipped on Windows_
 - after `interactive (pty): printf 'abcdefghijKL
 '; sleep 0.2`:
   - rendered screen contains `"abcdefghij\nKL"`
+
 ### Scenario: a session can change the world and watch the program notice
 _skipped on Windows_
 #### Given
 - Fixture file `badexec.atago.yaml` is created.
+
 #### Inputs
 _Fixture `badexec.atago.yaml`:_
 ```text
@@ -10365,12 +11171,15 @@ ${atago} run badexec.atago.yaml
 - after `${atago} run badexec.atago.yaml`:
   - exit code is `4`
   - stdout contains `exited 7`, `the change the session waits for was not made`
+
 #### Generated artifacts
 - `marker.txt`
+
 ### Scenario: a mouse click is delivered as an SGR report, and refused when unasked for
 _skipped on Windows_
 #### Given
 - Fixture file `unasked_mouse.atago.yaml` is created.
+
 #### Inputs
 _Fixture `unasked_mouse.atago.yaml`:_
 ```text
@@ -10398,11 +11207,13 @@ ${atago} run unasked_mouse.atago.yaml
 - after `${atago} run unasked_mouse.atago.yaml`:
   - exit code is `4`
   - stdout contains `has not enabled mouse reporting`, `ESC [?1000h`
+
 ### Scenario: screen attrs check colors and styling, not only text
 _skipped on Windows_
 #### Given
 - Fixture file `badattrs.atago.yaml` is created.
 - Fixture file `badflag.atago.yaml` is created.
+
 #### Inputs
 _Fixture `badattrs.atago.yaml`:_
 ```text
@@ -10458,9 +11269,11 @@ ${atago} run badflag.atago.yaml
 - after `${atago} run badflag.atago.yaml`:
   - exit code is `1`
   - stdout contains `italic`
+
 ### Scenario: an unknown key name is a load-time error listing the vocabulary
 #### Given
 - Fixture file `badkey.atago.yaml` is created.
+
 #### Inputs
 _Fixture `badkey.atago.yaml`:_
 ```text
@@ -10482,6 +11295,7 @@ ${atago} run badkey.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `not a supported key (supported: enter, tab`
+
 ### Scenario: screen asserts see the final frame where the transcript sees history
 _skipped on Windows_
 #### When
@@ -10493,6 +11307,7 @@ _skipped on Windows_
 - rendered screen line `1` equals an exact value
 - rendered screen does not contain `loading`
 - stdout contains `loading`
+
 ### Scenario: a wide character at the right margin autowraps
 _skipped on Windows_
 #### When
@@ -10502,6 +11317,7 @@ _skipped on Windows_
 #### Then
 - rendered screen line `1` equals an exact value
 - rendered screen line `2` equals an exact value
+
 ### Scenario: a wide character that no longer fits wraps instead of vanishing
 _skipped on Windows_
 #### When
@@ -10511,6 +11327,7 @@ _skipped on Windows_
 #### Then
 - rendered screen line `1` equals an exact value
 - rendered screen line `2` equals an exact value
+
 ### Scenario: screen preserves a decomposed grapheme's combining mark
 _skipped on Windows_
 #### When
@@ -10520,10 +11337,12 @@ _skipped on Windows_
 #### Then
 - rendered screen line `1` equals an exact value
 - rendered screen contains `é`
+
 ### Scenario: a screen snapshot round-trips through update and compare
 _skipped on Windows_
 #### Given
 - Fixture file `inner.atago.yaml` is created.
+
 #### Inputs
 _Fixture `inner.atago.yaml`:_
 ```text
@@ -10553,9 +11372,11 @@ ${atago} run inner.atago.yaml
   - file `snapshots/menu.txt` contains `> Settings`
 - after `${atago} run inner.atago.yaml`:
   - exit code is `0`
+
 ### Scenario: a screen assert without a pty step is a load-time error
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -10576,10 +11397,12 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `requires a preceding pty step`
+
 ### Scenario: a send referencing an undefined variable is an execution error, not typed literally
 _skipped on Windows_
 #### Given
 - Fixture file `typo.atago.yaml` is created.
+
 #### Inputs
 _Fixture `typo.atago.yaml`:_
 ```text
@@ -10602,10 +11425,12 @@ ${atago} run typo.atago.yaml
 #### Then
 - exit code is `4`
 - stdout contains `no variable with that name is defined`, `$${no_such_var}`
+
 ### Scenario: an expect does not match the echo of its own send
 _skipped on Windows_
 #### Given
 - Fixture file `echo.atago.yaml` is created.
+
 #### Inputs
 _Fixture `echo.atago.yaml`:_
 ```text
@@ -10630,6 +11455,7 @@ ${atago} run echo.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `pty expect /NEVER-PRODUCED-BY-THE-PROGRAM/`, `never appeared in the terminal transcript`
+
 ### Scenario: a program's own copy of the input still satisfies an expect
 _skipped on Windows_
 #### When
@@ -10638,6 +11464,7 @@ _skipped on Windows_
 ```
 #### Then
 - exit code is `0`
+
 ### Scenario: a signaled child reports 128+signal from both runners
 _skipped on Windows_
 #### When
@@ -10653,6 +11480,7 @@ kill -TERM $$
   - exit code is `143`
 - after `interactive (pty): sh -c 'kill -INT $$'`:
   - exit code is `130`
+
 ## atago self-hosting / pty (portable)
 Source: `test/e2e/atago/pty_portable.atago.yaml`
 ### Scenario: a pty step starts a command, captures its output, and reports exit 0
@@ -10663,6 +11491,7 @@ Source: `test/e2e/atago/pty_portable.atago.yaml`
 #### Then
 - exit code is `0`
 - stdout contains `hello from a pty`
+
 ### Scenario: a pty step surfaces a command's non-zero exit code
 #### When
 ```shell
@@ -10670,6 +11499,7 @@ Source: `test/e2e/atago/pty_portable.atago.yaml`
 ```
 #### Then
 - exit code is `3`
+
 ### Scenario: sequential expects match successive output in declaration order
 #### When
 ```shell
@@ -10678,6 +11508,7 @@ Source: `test/e2e/atago/pty_portable.atago.yaml`
 #### Then
 - exit code is `0`
 - stdout contains `first`, `third`
+
 ### Scenario: an expect pattern is a regular expression, not a literal
 #### When
 ```shell
@@ -10685,6 +11516,7 @@ Source: `test/e2e/atago/pty_portable.atago.yaml`
 ```
 #### Then
 - exit code is `0`
+
 ### Scenario: a screen assert reads the rendered frame sized by rows and cols
 #### When
 ```shell
@@ -10693,6 +11525,7 @@ Source: `test/e2e/atago/pty_portable.atago.yaml`
 #### Then
 - exit code is `0`
 - rendered screen contains `rendered line`
+
 ### Scenario: a mid-session resize succeeds on every platform
 #### When
 ```shell
@@ -10702,6 +11535,7 @@ Source: `test/e2e/atago/pty_portable.atago.yaml`
 - exit code is `0`
 - stdout contains `before resize`, `after resize`
 - rendered screen contains `after resize`
+
 ### Scenario: a pty step drives the atago binary directly with no shell
 #### When
 ```shell
@@ -10710,9 +11544,11 @@ Source: `test/e2e/atago/pty_portable.atago.yaml`
 #### Then
 - exit code is `0`
 - stdout contains `atago`
+
 ### Scenario: a pty drives atago running an inner spec to a green result
 #### Given
 - Fixture file `inner.atago.yaml` is created.
+
 #### Inputs
 _Fixture `inner.atago.yaml`:_
 ```text
@@ -10737,9 +11573,11 @@ scenarios:
 #### Then
 - exit code is `0`
 - stdout contains `1 passed`
+
 ### Scenario: a never-matching expect fails and names the pattern in the transcript
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -10763,9 +11601,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `pty expect /absent-forever/`, `never appeared in the terminal transcript`
+
 ### Scenario: a stable_for above the session budget is a load-time error
 #### Given
 - Fixture file `stable.atago.yaml` is created.
+
 #### Inputs
 _Fixture `stable.atago.yaml`:_
 ```text
@@ -10789,6 +11629,7 @@ ${atago} run stable.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `must not exceed`
+
 ## atago self-hosting / record (spec skeleton from an observed run)
 Source: `test/e2e/atago/record.atago.yaml`
 ### Scenario: record then run round-trips green
@@ -10805,9 +11646,11 @@ ${atago} run recorded.atago.yaml
 - after `${atago} run recorded.atago.yaml`:
   - exit code is `0`
   - stdout contains `1 passed`
+
 ### Scenario: refusing to overwrite without --force
 #### Given
 - Fixture file `existing.atago.yaml` is created.
+
 #### Inputs
 _Fixture `existing.atago.yaml`:_
 ```text
@@ -10826,9 +11669,11 @@ ${atago} record --force --out existing.atago.yaml -- ${atago} version
 - after `${atago} record --force --out existing.atago.yaml -- ${atago} version`:
   - exit code is `0`
   - file `existing.atago.yaml` contains `exit_code: 0`
+
 ### Scenario: record --pty refuses an existing --out before driving the session
 #### Given
 - Fixture file `taken.atago.yaml` is created.
+
 #### Inputs
 _Fixture `taken.atago.yaml`:_
 ```text
@@ -10842,6 +11687,7 @@ ${atago} record --pty --out taken.atago.yaml -- echo hi
 - exit code is `3`
 - stderr contains `use --force to overwrite`
 - file `taken.atago.yaml` contains `precious`
+
 ### Scenario: an observed stderr diagnostic is anchored, not dropped
 _skipped on Windows_
 #### When
@@ -10857,6 +11703,7 @@ ${atago} run diag.atago.yaml
 - after `${atago} run diag.atago.yaml`:
   - exit code is `0`
   - stdout contains `1 passed`
+
 ### Scenario: created files become exists asserts (shell mode)
 _skipped on Windows_
 #### When
@@ -10871,6 +11718,7 @@ ${atago} run gen.atago.yaml
   - file `gen.atago.yaml` contains `shell: true`
 - after `${atago} run gen.atago.yaml`:
   - exit code is `0`
+
 ### Scenario: snapshot mode writes a golden the run then matches
 _skipped on Windows_
 #### When
@@ -10886,6 +11734,7 @@ ${atago} run snapdemo.atago.yaml
 - after `${atago} run snapdemo.atago.yaml`:
   - exit code is `0`
   - stdout contains `1 passed`
+
 ### Scenario: no command is a usage error
 #### When
 ```shell
@@ -10894,6 +11743,7 @@ ${atago} record
 #### Then
 - exit code is `3`
 - stderr contains `no command given`
+
 ### Scenario: argv boundaries survive spaced arguments
 _skipped on Windows_
 #### When
@@ -10908,6 +11758,7 @@ ${atago} run spaced.atago.yaml
 - after `${atago} run spaced.atago.yaml`:
   - exit code is `0`
   - stdout contains `1 passed`
+
 ### Scenario: a shell metacharacter argument stays one token
 _skipped on Windows_
 #### When
@@ -10922,6 +11773,7 @@ ${atago} run meta.atago.yaml
 - after `${atago} run meta.atago.yaml`:
   - exit code is `0`
   - stdout contains `1 passed`
+
 ### Scenario: record --pty records a live session and the generated spec replays green
 _skipped on Windows_
 #### When
@@ -10936,6 +11788,7 @@ ${atago} run generated.atago.yaml
 - after `${atago} run generated.atago.yaml`:
   - exit code is `0`
   - stdout contains `1 passed`
+
 ### Scenario: record --pty of a silent program anchors on nothing rather than on the echo
 _skipped on Windows_
 #### When
@@ -10950,6 +11803,7 @@ ${atago} run silent.atago.yaml
 - after `${atago} run silent.atago.yaml`:
   - exit code is `0`
   - stdout contains `1 passed`
+
 ### Scenario: record --pty of a no-input command yields a session-less spec that replays green
 _skipped on Windows_
 #### When
@@ -10965,6 +11819,7 @@ ${atago} run echo.atago.yaml
 - after `${atago} run echo.atago.yaml`:
   - exit code is `0`
   - stdout contains `1 passed`
+
 ### Scenario: a prompt with regex metacharacters is escaped in the generated expect
 _skipped on Windows_
 #### When
@@ -10979,6 +11834,7 @@ ${atago} run meta.atago.yaml
 - after `${atago} run meta.atago.yaml`:
   - exit code is `0`
   - stdout contains `1 passed`
+
 ### Scenario: recorded text containing dollar-brace round-trips as literal text
 _skipped on Windows_
 #### When
@@ -10993,10 +11849,12 @@ ${atago} run dollar.atago.yaml
 - after `${atago} run dollar.atago.yaml`:
   - exit code is `0`
   - stdout contains `1 passed`
+
 ### Scenario: a recorded secret placeholder replays green with the env set and is guarded when unset
 _skipped on Windows_
 #### Given
 - Environment variables are set: ATAGO_SECRET_1.
+
 #### When
 ```shell
 # interactive (pty): ${atago} record --pty --out sec.atago.yaml -- sh -c 'stty -echo; printf "Password: "; read pw; stty echo; printf "\naccepted\n"'
@@ -11014,6 +11872,7 @@ ${atago} run sec.atago.yaml
 - after `${atago} run sec.atago.yaml`:
   - exit code is `4`
   - stdout contains `ATAGO_SECRET_1 is not set`
+
 ### Scenario: a raw-mode (TUI) keystroke is recorded literally, not as a secret
 _skipped on Windows_
 #### When
@@ -11029,6 +11888,7 @@ ${atago} run tui.atago.yaml
 - after `${atago} run tui.atago.yaml`:
   - exit code is `0`
   - stdout contains `1 passed`
+
 ### Scenario: record --pty of a never-exiting program times out instead of hanging
 _skipped on Windows_
 #### When
@@ -11040,11 +11900,13 @@ ${atago} record --pty --timeout 2s --out wedged.atago.yaml -- tail -f /dev/null
 - stderr contains `did not exit within 2s`
 - stderr contains `use --timeout to adjust`
 - file `wedged.atago.yaml` contains `- pty:`
+
 ## atago self-hosting / report formats agree on outcomes
 Source: `test/e2e/atago/report_formats.atago.yaml`
 ### Scenario: json report carries per-scenario verdicts and a failures array
 #### Given
 - Fixture file `mixed.atago.yaml` is created.
+
 #### Inputs
 _Fixture `mixed.atago.yaml`:_
 ```text
@@ -11076,9 +11938,11 @@ ${atago} run --ci --report json mixed.atago.yaml
 #### Then
 - exit code is `1`
 - stdout at `$.suites[0].status` equals `failed`; at `$.suites[0].scenarios[0].status` equals `passed`; at `$.suites[0].scenarios[2].status` equals `failed`; at `$.suites[0].scenarios[3].status` equals `skipped`; at `$.suites[0].failures[0].scenario` equals `gamma fails`
+
 ### Scenario: junit report tallies tests, failures, skipped, and errors
 #### Given
 - Fixture file `mixed.atago.yaml` is created.
+
 #### Inputs
 _Fixture `mixed.atago.yaml`:_
 ```text
@@ -11110,9 +11974,11 @@ ${atago} run --ci --report junit mixed.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `tests="4"`, `failures="1"`, `errors="0"`, `skipped="1"`, `<skipped`
+
 ### Scenario: tap report emits the plan, a not ok line, and a SKIP directive
 #### Given
 - Fixture file `mixed.atago.yaml` is created.
+
 #### Inputs
 _Fixture `mixed.atago.yaml`:_
 ```text
@@ -11144,9 +12010,11 @@ ${atago} run --ci --report tap mixed.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `TAP version 13`, `1..4`, `not ok 3 - mixed / gamma fails`, `# SKIP`
+
 ### Scenario: gha report annotates the failure and summarizes the counts
 #### Given
 - Fixture file `mixed.atago.yaml` is created.
+
 #### Inputs
 _Fixture `mixed.atago.yaml`:_
 ```text
@@ -11178,9 +12046,11 @@ ${atago} run --ci --report gha mixed.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `::error title=mixed / gamma fails::`, `::notice title=atago::4 scenarios: 2 passed, 1 failed, 0 errored, 1 skipped`
+
 ### Scenario: console report prints the same counts in its summary line
 #### Given
 - Fixture file `mixed.atago.yaml` is created.
+
 #### Inputs
 _Fixture `mixed.atago.yaml`:_
 ```text
@@ -11212,9 +12082,11 @@ ${atago} run --ci --report console mixed.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `4 scenarios: 2 passed, 1 failed, 0 errored, 1 skipped`
+
 ### Scenario: an all-passing run reports a zero-failure suite and exits zero
 #### Given
 - Fixture file `allpass.atago.yaml` is created.
+
 #### Inputs
 _Fixture `allpass.atago.yaml`:_
 ```text
@@ -11234,10 +12106,12 @@ ${atago} run --ci --report json allpass.atago.yaml
 #### Then
 - exit code is `0`
 - stdout at `$.suites[0].status` equals `passed`; at `$.suites[0].scenarios[0].status` equals `passed`
+
 ### Scenario: a spec that failed to load is named by every report format
 #### Given
 - Fixture file `good.atago.yaml` is created.
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `good.atago.yaml`:_
 ```text
@@ -11276,9 +12150,11 @@ ${atago} run --report gha .
 - after `${atago} run --report gha .`:
   - exit code is `2`
   - stdout contains `::error file=bad.atago.yaml,title=bad.atago.yaml`, `1 spec failed to load`
+
 ### Scenario: a run whose specs all failed to load still reports them
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -11298,9 +12174,11 @@ ${atago} run --report tap .
 - after `${atago} run --report tap .`:
   - exit code is `2`
   - stdout contains `1..1`, `not ok 1 - bad.atago.yaml`
+
 ### Scenario: an errored step is counted as an error, not a failure, across formats
 #### Given
 - Fixture file `errored.atago.yaml` is created.
+
 #### Inputs
 _Fixture `errored.atago.yaml`:_
 ```text
@@ -11319,9 +12197,11 @@ ${atago} run --ci --report junit errored.atago.yaml
 #### Then
 - exit code is `4`
 - stdout contains `errors="1"`, `failures="0"`, `<error`
+
 ### Scenario: a failed teardown surfaces in junit, tap, and gha without changing the verdict
 #### Given
 - Fixture file `td.atago.yaml` is created.
+
 #### Inputs
 _Fixture `td.atago.yaml`:_
 ```text
@@ -11353,9 +12233,11 @@ ${atago} run --ci --report gha td.atago.yaml
 - after `${atago} run --ci --report gha td.atago.yaml`:
   - exit code is `0`
   - stdout contains `::warning title=td / passes but cleanup fails::teardown failed`, does not contain `::error`
+
 ### Scenario: a snapshot rewrite is reported by the console and every machine format
 #### Given
 - Fixture file `snap.atago.yaml` is created.
+
 #### Inputs
 _Fixture `snap.atago.yaml`:_
 ```text
@@ -11392,11 +12274,13 @@ ${atago} run --ci snap.atago.yaml
 - after `${atago} run --ci snap.atago.yaml`:
   - exit code is `0`
   - stdout does not contain `snapshot updated`
+
 ## atago self-hosting / reports
 Source: `test/e2e/atago/reports.atago.yaml`
 ### Scenario: JUnit report is XML with a testsuite and testcase
 #### Given
 - Fixture file `ok.atago.yaml` is created.
+
 #### Inputs
 _Fixture `ok.atago.yaml`:_
 ```text
@@ -11419,9 +12303,11 @@ ${atago} run --report junit ok.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `<testsuites`, `<testcase`
+
 ### Scenario: GitHub Actions annotations are emitted on failure
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -11444,9 +12330,11 @@ ${atago} run --report gha bad.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `::error`
+
 ### Scenario: TAP report is a numbered TAP 13 stream with ok / not ok points
 #### Given
 - Fixture file `mixed.atago.yaml` is created.
+
 #### Inputs
 _Fixture `mixed.atago.yaml`:_
 ```text
@@ -11478,9 +12366,11 @@ ${atago} run --report tap mixed.atago.yaml
 - stdout line `1` equals an exact value
 - stdout line `2` equals an exact value
 - stdout contains `ok 1 - sample / good`, `not ok 2 - sample / bad`
+
 ### Scenario: failure artifacts are written and referenced in the JSON report
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -11508,10 +12398,12 @@ cat arts/*/*/step-*-stdout.actual.txt
 - after `cat arts/*/*/step-*-stdout.actual.txt`:
   - exit code is `0`
   - stdout contains `Bob`
+
 ### Scenario: a multi-line snapshot failure renders a unified diff with hunks
 #### Given
 - Fixture file `diffspec.atago.yaml` is created.
 - Fixture file `diffspec.atago.yaml` is created.
+
 #### Inputs
 _Fixture `diffspec.atago.yaml`:_
 ```text
@@ -11557,9 +12449,11 @@ ${atago} run --report json diffspec.atago.yaml; true
   - stdout contains `Diff (-expected +actual):`, `--- snapshot (golden)`, `-beta`, `+BETA`, `snaps/out.txt`
 - after `${atago} run --report json diffspec.atago.yaml; true`:
   - stdout contains `"diff":`
+
 ### Scenario: a failure names the command it was observed under
 #### Given
 - Fixture file `attrib.atago.yaml` is created.
+
 #### Inputs
 _Fixture `attrib.atago.yaml`:_
 ```text
@@ -11586,9 +12480,11 @@ ${atago} run --report json attrib.atago.yaml
 - after `${atago} run --report json attrib.atago.yaml`:
   - exit code is `1`
   - stdout at `$.suites[0].failures[0].command` matches `/early/`
+
 ### Scenario: a failure against an empty stream reports the stream as empty
 #### Given
 - Fixture file `silent.atago.yaml` is created.
+
 #### Inputs
 _Fixture `silent.atago.yaml`:_
 ```text
@@ -11607,9 +12503,11 @@ ${atago} run silent.atago.yaml
 #### Then
 - exit code is `1`
 - stdout matches `/Actual:\n  \(empty\)/`
+
 ### Scenario: an exit_code failure states that the command printed nothing
 #### Given
 - Fixture file `quiet.atago.yaml` is created.
+
 #### Inputs
 _Fixture `quiet.atago.yaml`:_
 ```text
@@ -11628,9 +12526,11 @@ ${atago} run quiet.atago.yaml
 #### Then
 - exit code is `1`
 - stdout matches `/Stdout/Stderr:\n  \(empty\)/`
+
 ### Scenario: a stdout failure points at stderr when the text is there
 #### Given
 - Fixture file `wrongstream.atago.yaml` is created.
+
 #### Inputs
 _Fixture `wrongstream.atago.yaml`:_
 ```text
@@ -11649,10 +12549,12 @@ ${atago} run wrongstream.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `stderr satisfies this assertion (assert `stderr:` instead?)`
+
 ### Scenario: an empty stream that ended early says so in the failure block
 _skipped on Windows_
 #### Given
 - Fixture file `earlyeof.atago.yaml` is created.
+
 #### Inputs
 _Fixture `earlyeof.atago.yaml`:_
 ```text
@@ -11673,11 +12575,13 @@ ${atago} run earlyeof.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `before the command exited`, `never connected to atago's pipe`
+
 ## atago self-hosting / rerun-failed
 Source: `test/e2e/atago/rerun.atago.yaml`
 ### Scenario: a failing run is recorded and rerun-failed selects only it
 #### Given
 - Fixture file `inner.atago.yaml` is created.
+
 #### Inputs
 _Fixture `inner.atago.yaml`:_
 ```text
@@ -11707,11 +12611,14 @@ ${atago} run --rerun-failed inner.atago.yaml
 - after `${atago} run --rerun-failed inner.atago.yaml`:
   - exit code is `1`
   - stdout contains `always-red`
+
 #### Generated artifacts
 - `.atago/last-failed.json`
+
 ### Scenario: rerun-failed with nothing recorded is a no-op success
 #### Given
 - Fixture file `green.atago.yaml` is created.
+
 #### Inputs
 _Fixture `green.atago.yaml`:_
 ```text
@@ -11731,9 +12638,11 @@ ${atago} run --rerun-failed green.atago.yaml
 #### Then
 - exit code is `0`
 - stderr contains `nothing to rerun`
+
 ### Scenario: rerun-failed with a filter preserves the still-failing scenarios it did not run
 #### Given
 - Fixture file `two.atago.yaml` is created.
+
 #### Inputs
 _Fixture `two.atago.yaml`:_
 ```text
@@ -11761,10 +12670,12 @@ ${atago} run --rerun-failed --filter red-a two.atago.yaml
 - after `${atago} run --rerun-failed --filter red-a two.atago.yaml`:
   - exit code is `1`
   - file `.atago/last-failed.json` contains `red-a`, `red-b`
+
 ### Scenario: a fail-fast run keeps the recorded failures it never got to
 #### Given
 - Fixture file `two.atago.yaml` is created.
 - Fixture file `two.atago.yaml` is created.
+
 #### Inputs
 _Fixture `two.atago.yaml`:_
 ```text
@@ -11812,10 +12723,12 @@ ${atago} run --rerun-failed two.atago.yaml
 - after `${atago} run --rerun-failed two.atago.yaml`:
   - exit code is `1`
   - stdout contains `red-b`
+
 ### Scenario: a fail-fast run does not blame a rename for the spec it never loaded
 #### Given
 - Fixture file `a.atago.yaml` is created.
 - Fixture file `b.atago.yaml` is created.
+
 #### Inputs
 _Fixture `a.atago.yaml`:_
 ```text
@@ -11851,10 +12764,12 @@ ${atago} run --rerun-failed --fail-fast --parallel 1 a.atago.yaml b.atago.yaml
   - exit code is `1`
   - stderr does not contain `renamed or removed`
   - file `.atago/last-failed.json` contains `red-a`, `red-b`
+
 ### Scenario: rerun-failed names the recorded failures that no longer match
 #### Given
 - Fixture file `two.atago.yaml` is created.
 - Fixture file `two.atago.yaml` is created.
+
 #### Inputs
 _Fixture `two.atago.yaml`:_
 ```text
@@ -11898,10 +12813,12 @@ ${atago} run --rerun-failed two.atago.yaml
   - exit code is `1`
   - stderr contains `1 recorded failing scenario did not match`, `red-a`
   - file `.atago/last-failed.json` contains `red-a`, `red-b`
+
 ### Scenario: rerun-failed does not blame a rename for a spec it was not aimed at
 #### Given
 - Fixture file `a.atago.yaml` is created.
 - Fixture file `b.atago.yaml` is created.
+
 #### Inputs
 _Fixture `a.atago.yaml`:_
 ```text
@@ -11938,9 +12855,11 @@ ${atago} run --rerun-failed a.atago.yaml
   - stderr does not contain `renamed or removed`
   - stderr contains `outside this run's targets`, `red-b`
   - file `.atago/last-failed.json` contains `red-a`, `red-b`
+
 ### Scenario: rerun-failed stays quiet when every recorded failure still exists
 #### Given
 - Fixture file `two.atago.yaml` is created.
+
 #### Inputs
 _Fixture `two.atago.yaml`:_
 ```text
@@ -11968,11 +12887,13 @@ ${atago} run --rerun-failed two.atago.yaml
 - after `${atago} run --rerun-failed two.atago.yaml`:
   - exit code is `1`
   - stderr does not contain `did not match the current specs`
+
 ## atago self-hosting / retry until
 Source: `test/e2e/atago/retry.atago.yaml`
 ### Scenario: retry polls until the condition becomes true
 #### Given
 - Fixture file `ready.atago.yaml` is created.
+
 #### Inputs
 _Fixture `ready.atago.yaml`:_
 ```text
@@ -12002,9 +12923,11 @@ ${atago} run ready.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `passed`
+
 ### Scenario: retry fails the inner spec when until never holds
 #### Given
 - Fixture file `never.atago.yaml` is created.
+
 #### Inputs
 _Fixture `never.atago.yaml`:_
 ```text
@@ -12029,9 +12952,11 @@ ${atago} run never.atago.yaml
 ```
 #### Then
 - exit code is `1`
+
 ### Scenario: until with a changes target is a load-time error
 #### Given
 - Fixture file `badchanges.atago.yaml` is created.
+
 #### Inputs
 _Fixture `badchanges.atago.yaml`:_
 ```text
@@ -12056,11 +12981,13 @@ ${atago} run badchanges.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `retry.until.changes cannot be satisfied`, `steps[0].run`
+
 ## atago self-hosting / run
 Source: `test/e2e/atago/run.atago.yaml`
 ### Scenario: a passing spec exits zero and reports PASS
 #### Given
 - Fixture file `passing.atago.yaml` is created.
+
 #### Inputs
 _Fixture `passing.atago.yaml`:_
 ```text
@@ -12086,9 +13013,11 @@ ${atago} run passing.atago.yaml
 - exit code is `0`
 - stdout contains `PASS`
 - stderr is empty
+
 ### Scenario: a failing assertion exits one and reports the failure
 #### Given
 - Fixture file `failing.atago.yaml` is created.
+
 #### Inputs
 _Fixture `failing.atago.yaml`:_
 ```text
@@ -12111,10 +13040,12 @@ ${atago} run failing.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `FAILED`, `expected exit code 0`, `(failing.atago.yaml)`
+
 ### Scenario: an exit_code failure surfaces the command's stderr
 _skipped on Windows_
 #### Given
 - Fixture file `stderr_cause.atago.yaml` is created.
+
 #### Inputs
 _Fixture `stderr_cause.atago.yaml`:_
 ```text
@@ -12137,10 +13068,12 @@ ${atago} run stderr_cause.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `Stderr:`, `conversion aborted: bad header`
+
 ### Scenario: an exit_code failure surfaces the command's stderr (windows)
 _only on Windows_
 #### Given
 - Fixture file `stderr_cause.atago.yaml` is created.
+
 #### Inputs
 _Fixture `stderr_cause.atago.yaml`:_
 ```text
@@ -12163,10 +13096,12 @@ ${atago} run stderr_cause.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `Stderr:`, `conversion aborted: bad header`
+
 ### Scenario: an exit_code failure falls back to stdout when stderr is silent
 _skipped on Windows_
 #### Given
 - Fixture file `stdout_cause.atago.yaml` is created.
+
 #### Inputs
 _Fixture `stdout_cause.atago.yaml`:_
 ```text
@@ -12189,10 +13124,12 @@ ${atago} run stdout_cause.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `Stdout:`, `wrote 0 of 3 files`
+
 ### Scenario: an exit_code failure falls back to stdout when stderr is silent (windows)
 _only on Windows_
 #### Given
 - Fixture file `stdout_cause.atago.yaml` is created.
+
 #### Inputs
 _Fixture `stdout_cause.atago.yaml`:_
 ```text
@@ -12215,9 +13152,11 @@ ${atago} run stdout_cause.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `Stdout:`, `wrote 0 of 3 files`
+
 ### Scenario: a parse error exits with code two
 #### Given
 - Fixture file `broken.atago.yaml` is created.
+
 #### Inputs
 _Fixture `broken.atago.yaml`:_
 ```text
@@ -12231,9 +13170,11 @@ ${atago} run broken.atago.yaml
 ```
 #### Then
 - exit code is `2`
+
 ### Scenario: JSON report is valid JSON with a passed status
 #### Given
 - Fixture file `ok.atago.yaml` is created.
+
 #### Inputs
 _Fixture `ok.atago.yaml`:_
 ```text
@@ -12259,9 +13200,11 @@ ${atago} run --report json ok.atago.yaml
 - stdout at `$.schema_version` equals `1`
 - stdout at `$.suites[0].status` equals `passed`
 - stdout at `$.suites[0].scenarios` has length 1
+
 ### Scenario: a flag after the spec path is still a flag
 #### Given
 - Fixture file `ok.atago.yaml` is created.
+
 #### Inputs
 _Fixture `ok.atago.yaml`:_
 ```text
@@ -12284,10 +13227,12 @@ ${atago} run ok.atago.yaml --report json
 #### Then
 - exit code is `0`
 - stdout at `$.suites[0].status` equals `passed`
+
 ### Scenario: a flag between two spec paths is still a flag
 #### Given
 - Fixture file `ok.atago.yaml` is created.
 - Fixture file `second.atago.yaml` is created.
+
 #### Inputs
 _Fixture `ok.atago.yaml`:_
 ```text
@@ -12324,9 +13269,11 @@ ${atago} run ok.atago.yaml --report json second.atago.yaml
 #### Then
 - exit code is `0`
 - stdout at `$.suites` has length 2
+
 ### Scenario: a double dash keeps later arguments as paths
 #### Given
 - Fixture file `ok.atago.yaml` is created.
+
 #### Inputs
 _Fixture `ok.atago.yaml`:_
 ```text
@@ -12349,6 +13296,7 @@ ${atago} run -- ok.atago.yaml --report
 #### Then
 - exit code is `3`
 - stderr contains `cannot access "--report"`
+
 ## atago self-hosting / sandbox_home (isolated per-OS home)
 Source: `test/e2e/atago/sandbox_home.atago.yaml`
 ### Scenario: Unix XDG family — write config, read it back, inspect it under the workdir
@@ -12356,6 +13304,7 @@ _skipped on Windows_
 #### Given
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### When
 ```shell
 mkdir -p "$XDG_CONFIG_HOME/mytool" && printf editor=vim > "$XDG_CONFIG_HOME/mytool/config"
@@ -12368,11 +13317,13 @@ cat "$XDG_CONFIG_HOME/mytool/config"
   - exit code is `0`
   - stdout equals an exact value
   - file `.atago-home/.config/mytool/config` contains `editor=vim`
+
 ### Scenario: Windows APPDATA family — write config, read it back, inspect it under the workdir
 _only on Windows_
 #### Given
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### When
 ```shell
 mkdir "%APPDATA%\mytool" & echo editor=vim>"%APPDATA%\mytool\config.txt"
@@ -12385,10 +13336,12 @@ type "%APPDATA%\mytool\config.txt"
   - exit code is `0`
   - stdout contains `editor=vim`
   - file `.atago-home/AppData/Roaming/mytool/config.txt` contains `editor=vim`
+
 ### Scenario: cwd anchors the run, but sandbox_home stays at the workdir ROOT (Unix)
 _skipped on Windows_
 #### Given
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### When
 ```shell
 mkdir -p sub
@@ -12399,12 +13352,14 @@ mkdir -p "$XDG_CONFIG_HOME/mytool" && printf editor=vim > "$XDG_CONFIG_HOME/myto
   - exit code is `0`
   - file `.atago-home/.config/mytool/config` contains `editor=vim`
   - file `sub/.atago-home/.config/mytool/config` does not exist
+
 ## atago self-hosting / security
 Source: `test/e2e/atago/security.atago.yaml`
 ### Scenario: declared secrets are masked in failure output
 #### Given
 - Fixture file `sec.atago.yaml` is created.
 - Environment variables are set: DEMO_TOKEN.
+
 #### Inputs
 _Fixture `sec.atago.yaml`:_
 ```text
@@ -12430,9 +13385,11 @@ ${atago} run sec.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `token=***`
+
 ### Scenario: a file assertion path may not escape the scenario workdir
 #### Given
 - Fixture file `escape.atago.yaml` is created.
+
 #### Inputs
 _Fixture `escape.atago.yaml`:_
 ```text
@@ -12457,10 +13414,12 @@ ${atago} run escape.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `escapes the scenario workdir`
+
 ### Scenario: a file assertion may not read through a symlinked directory
 _skipped on Windows_
 #### Given
 - Fixture file `link_read.atago.yaml` is created.
+
 #### Inputs
 _Fixture `link_read.atago.yaml`:_
 ```text
@@ -12484,10 +13443,12 @@ ${atago} run link_read.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `escapes the scenario workdir`
+
 ### Scenario: a redirect may not write through a symlinked directory
 _skipped on Windows_
 #### Given
 - Fixture file `link_write.atago.yaml` is created.
+
 #### Inputs
 _Fixture `link_write.atago.yaml`:_
 ```text
@@ -12511,10 +13472,12 @@ ${atago} run link_write.atago.yaml
 #### Then
 - exit code is `4`
 - stdout contains `escapes the scenario workdir`
+
 ### Scenario: a symlinked directory inside the workdir still resolves
 _skipped on Windows_
 #### Given
 - Fixture file `link_ok.atago.yaml` is created.
+
 #### Inputs
 _Fixture `link_ok.atago.yaml`:_
 ```text
@@ -12543,9 +13506,11 @@ ${atago} run link_ok.atago.yaml
 ```
 #### Then
 - exit code is `0`
+
 ### Scenario: a snapshot path may not escape the spec directory
 #### Given
 - Fixture file `snap_escape.atago.yaml` is created.
+
 #### Inputs
 _Fixture `snap_escape.atago.yaml`:_
 ```text
@@ -12569,11 +13534,13 @@ ${atago} run snap_escape.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `escapes the spec directory`
+
 ## atago self-hosting / selection
 Source: `test/e2e/atago/select.atago.yaml`
 ### Scenario: --filter runs only matching scenarios
 #### Given
 - Fixture file `many.atago.yaml` is created.
+
 #### Inputs
 _Fixture `many.atago.yaml`:_
 ```text
@@ -12593,9 +13560,11 @@ ${atago} run --filter keep many.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `1 passed`
+
 ### Scenario: --filter selects multiple scenarios with OR (comma and repeated)
 #### Given
 - Fixture file `three.atago.yaml` is created.
+
 #### Inputs
 _Fixture `three.atago.yaml`:_
 ```text
@@ -12622,9 +13591,11 @@ ${atago} run --filter alpha --filter gamma three.atago.yaml
 - after `${atago} run --filter alpha --filter gamma three.atago.yaml`:
   - exit code is `0`
   - stdout contains `2 passed`
+
 ### Scenario: --skip-tag drops tagged scenarios
 #### Given
 - Fixture file `tagged.atago.yaml` is created.
+
 #### Inputs
 _Fixture `tagged.atago.yaml`:_
 ```text
@@ -12646,10 +13617,12 @@ ${atago} run --skip-tag slow tagged.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `1 passed`
+
 ### Scenario: a repeated tag on one scenario is a load-time error
 #### Given
 - Fixture file `duptag.atago.yaml` is created.
 - Fixture file `shared.atago.yaml` is created.
+
 #### Inputs
 _Fixture `duptag.atago.yaml`:_
 ```text
@@ -12689,9 +13662,11 @@ ${atago} doc shared.atago.yaml
 - after `${atago} doc shared.atago.yaml`:
   - exit code is `0`
   - stdout contains ``smoke` (2)`
+
 ### Scenario: an empty tag is a load-time error
 #### Given
 - Fixture file `emptytag.atago.yaml` is created.
+
 #### Inputs
 _Fixture `emptytag.atago.yaml`:_
 ```text
@@ -12711,9 +13686,11 @@ ${atago} run emptytag.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `tag must not be empty`
+
 ### Scenario: a ready.store that shadows a built-in is a load-time error
 #### Given
 - Fixture file `readyshadow.atago.yaml` is created.
+
 #### Inputs
 _Fixture `readyshadow.atago.yaml`:_
 ```text
@@ -12736,9 +13713,11 @@ ${atago} run readyshadow.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `shadows a built-in variable`
+
 ### Scenario: a scenario service that shadows a suite service is a load-time error
 #### Given
 - Fixture file `svcshadow.atago.yaml` is created.
+
 #### Inputs
 _Fixture `svcshadow.atago.yaml`:_
 ```text
@@ -12761,48 +13740,58 @@ ${atago} run svcshadow.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `duplicate service name "peer"`
+
 ## atago self-hosting / background services
 Source: `test/e2e/atago/services.atago.yaml`
 ### Scenario: file readiness captures a dynamic value into a variable
 #### Given
 - Background service `publisher` is started: `printf "127.0.0.1:5555" > ready.txt; sleep 30`.
+
 #### When
 ```shell
 echo ${addr}
 ```
 #### Then
 - stdout equals an exact value
+
 ### Scenario: log readiness waits for a line on the service output
 #### Given
 - Background service `logger` is started: `echo "ready: listening"; sleep 30`.
+
 #### When
 ```shell
 echo started
 ```
 #### Then
 - stdout contains `started`
+
 ### Scenario: delay readiness waits a fixed duration
 #### Given
 - Background service `slow` is started: `sleep 30`.
+
 #### When
 ```shell
 echo ok
 ```
 #### Then
 - stdout contains `ok`
+
 ### Scenario: multiple services start and capture independently
 #### Given
 - Background service `first` is started: `printf alpha > a.txt; sleep 30`.
 - Background service `second` is started: `printf beta > b.txt; sleep 30`.
+
 #### When
 ```shell
 echo ${a}-${b}
 ```
 #### Then
 - stdout equals an exact value
+
 ### Scenario: a readiness failure preserves the service log as an artifact
 #### Given
 - Fixture file `notready.atago.yaml` is created.
+
 #### Inputs
 _Fixture `notready.atago.yaml`:_
 ```text
@@ -12833,9 +13822,11 @@ cat arts/*/*/service-chatty.log
 - after `cat arts/*/*/service-chatty.log`:
   - exit code is `0`
   - stdout contains `booting-up`
+
 ### Scenario: a step failure after the service is ready preserves the service log
 #### Given
 - Fixture file `readythenfail.atago.yaml` is created.
+
 #### Inputs
 _Fixture `readythenfail.atago.yaml`:_
 ```text
@@ -12870,9 +13861,11 @@ cat arts/*/*/service-peer.log
 - after `cat arts/*/*/service-peer.log`:
   - exit code is `0`
   - stdout contains `peer-log-line`
+
 ### Scenario: a green run with a healthy service writes no service log
 #### Given
 - Fixture file `healthy.atago.yaml` is created.
+
 #### Inputs
 _Fixture `healthy.atago.yaml`:_
 ```text
@@ -12905,10 +13898,12 @@ ls arts 2>/dev/null | wc -l | tr -d " "
   - exit code is `0`
 - after `ls arts 2>/dev/null | wc -l | tr -d " "`:
   - stdout equals an exact value
+
 ### Scenario: a service that dies before readiness names its exit status
 _skipped on Windows_
 #### Given
 - Fixture file `crasher.atago.yaml` is created.
+
 #### Inputs
 _Fixture `crasher.atago.yaml`:_
 ```text
@@ -12935,11 +13930,13 @@ ${atago} run crasher.atago.yaml
 #### Then
 - exit code is `4`
 - stdout contains `service exited before it became ready (exit status 3)`, `starting`
+
 ## atago self-hosting / harness shell is not shadowed by the program PATH
 Source: `test/e2e/atago/shell_path.atago.yaml`
 ### Scenario: a PATH-resident fake sh does not hijack shell:true
 #### Given
 - Fixture file `sh` is created.
+
 #### Inputs
 _Fixture `sh`:_
 ```text
@@ -12955,6 +13952,7 @@ echo real-shell
 - exit code is `0`
 - stdout equals an exact value
 - stdout does not contain `HIJACKED`
+
 ### Scenario: ATAGO_SHELL overrides the shell used for shell:true
 #### When
 ```shell
@@ -12962,22 +13960,26 @@ printf '%s\n' ok
 ```
 #### Then
 - stdout equals an exact value
+
 ## atago self-hosting / signal step (graceful shutdown)
 Source: `test/e2e/atago/signal.atago.yaml`
 ### Scenario: SIGTERM reaches the trap handler and wait observes the exit
 _skipped on Windows_
 #### Given
 - Background service `server` is started: `trap 'echo graceful shutdown complete > server.log; exit 0' TERM; echo booted; while true; do sleep 0.1; done`.
+
 #### When
 ```shell
 # send SIGTERM to service server and wait up to 5s for exit
 ```
 #### Then
 - file `server.log` contains `graceful shutdown complete`
+
 ### Scenario: SIGHUP triggers a reload without stopping the service
 _skipped on Windows_
 #### Given
 - Background service `reloader` is started: `trap 'echo reloaded >> reload.log' HUP; echo booted; while true; do sleep 0.1; done`.
+
 #### When
 ```shell
 # send SIGHUP to service reloader
@@ -12987,10 +13989,12 @@ for i in $(seq 1 100); do grep -q reloaded reload.log 2>/dev/null && break; slee
 - after `for i in $(seq 1 100); do grep -q reloaded reload.log 2>/dev/null && break; sleep 0.1; done; cat reload.log`:
   - exit code is `0`
   - stdout contains `reloaded`
+
 ### Scenario: a wait timeout on a TERM-ignoring service fails with the documented message
 _skipped on Windows_
 #### Given
 - Fixture file `stubborn.atago.yaml` is created.
+
 #### Inputs
 _Fixture `stubborn.atago.yaml`:_
 ```text
@@ -13018,9 +14022,11 @@ ${atago} run stubborn.atago.yaml
 #### Then
 - exit code is not `0`
 - stdout contains `did not exit within 300ms after SIGTERM`
+
 ### Scenario: an unknown target service is a load-time error listing declared names
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -13044,11 +14050,13 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `not a declared service (declared: web)`
+
 ## atago self-hosting / skip-only command predicate
 Source: `test/e2e/atago/skip_command.atago.yaml`
 ### Scenario: skip command that succeeds skips the scenario
 #### Given
 - Fixture file `skip.atago.yaml` is created.
+
 #### Inputs
 _Fixture `skip.atago.yaml`:_
 ```text
@@ -13074,9 +14082,11 @@ ${atago} run skip.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `skipped`
+
 ### Scenario: only command that fails skips the scenario
 #### Given
 - Fixture file `only.atago.yaml` is created.
+
 #### Inputs
 _Fixture `only.atago.yaml`:_
 ```text
@@ -13102,9 +14112,11 @@ ${atago} run only.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `skipped`
+
 ### Scenario: only command that succeeds runs the scenario
 #### Given
 - Fixture file `run.atago.yaml` is created.
+
 #### Inputs
 _Fixture `run.atago.yaml`:_
 ```text
@@ -13130,12 +14142,14 @@ ${atago} run run.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `passed`
+
 ## atago self-hosting / snapshot
 Source: `test/e2e/atago/snapshot.atago.yaml`
 ### Scenario: a snapshot assertion passes against a committed snapshot
 #### Given
 - Fixture file `snap.atago.yaml` is created.
 - Fixture file `out.snap` is created.
+
 #### Inputs
 _Fixture `snap.atago.yaml`:_
 ```text
@@ -13162,9 +14176,11 @@ ${atago} run snap.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `PASSED`
+
 ### Scenario: snapshot update creates the snapshot file
 #### Given
 - Fixture file `gen.atago.yaml` is created.
+
 #### Inputs
 _Fixture `gen.atago.yaml`:_
 ```text
@@ -13187,10 +14203,12 @@ ${atago} snapshot update gen.atago.yaml
 #### Then
 - exit code is `0`
 - file `created.snap` contains `stable`
+
 ### Scenario: a snapshot mismatch writes the normalized actual as an artifact
 #### Given
 - Fixture file `drift.atago.yaml` is created.
 - Fixture file `committed.snap` is created.
+
 #### Inputs
 _Fixture `drift.atago.yaml`:_
 ```text
@@ -13222,11 +14240,13 @@ cat arts/*/*/step-*-snapshot.actual.txt
 - after `cat arts/*/*/step-*-snapshot.actual.txt`:
   - exit code is `0`
   - stdout contains `changed`
+
 ## atago self-hosting / snapshot normalization and round-trip
 Source: `test/e2e/atago/snapshot_normalization.atago.yaml`
 ### Scenario: record then run round-trips green
 #### Given
 - Fixture file `rt.atago.yaml` is created.
+
 #### Inputs
 _Fixture `rt.atago.yaml`:_
 ```text
@@ -13248,9 +14268,11 @@ ${atago} run rt.atago.yaml
   - exit code is `0`
 - after `${atago} run rt.atago.yaml`:
   - exit code is `0`
+
 ### Scenario: a UUID is masked in the golden
 #### Given
 - Fixture file `uuid.atago.yaml` is created.
+
 #### Inputs
 _Fixture `uuid.atago.yaml`:_
 ```text
@@ -13269,9 +14291,11 @@ ${atago} snapshot update uuid.atago.yaml
 #### Then
 - file `g.txt` contains `id=<uuid>`
 - file `g.txt` does not contain `550e8400`
+
 ### Scenario: an ISO timestamp is masked in the golden
 #### Given
 - Fixture file `ts.atago.yaml` is created.
+
 #### Inputs
 _Fixture `ts.atago.yaml`:_
 ```text
@@ -13289,9 +14313,11 @@ ${atago} snapshot update ts.atago.yaml
 ```
 #### Then
 - file `g.txt` contains `at <timestamp> done`
+
 ### Scenario: a loopback host and port are masked in the golden
 #### Given
 - Fixture file `port.atago.yaml` is created.
+
 #### Inputs
 _Fixture `port.atago.yaml`:_
 ```text
@@ -13310,9 +14336,11 @@ ${atago} snapshot update port.atago.yaml
 #### Then
 - file `g.txt` contains `127.0.0.1:<port>`
 - file `g.txt` does not contain `54321`
+
 ### Scenario: the home directory is masked to a tilde in the golden
 #### Given
 - Fixture file `home.atago.yaml` is created.
+
 #### Inputs
 _Fixture `home.atago.yaml`:_
 ```text
@@ -13330,9 +14358,11 @@ ${atago} snapshot update home.atago.yaml
 ```
 #### Then
 - file `g.txt` contains `home=~/x`
+
 ### Scenario: an escape between a CR and an LF leaves no CR in the golden
 #### Given
 - Fixture file `cr.atago.yaml` is created.
+
 #### Inputs
 _Fixture `cr.atago.yaml`:_
 ```text
@@ -13355,10 +14385,12 @@ ${atago} run cr.atago.yaml
   - file `g.txt` does not contain `"\r"`
 - after `${atago} run cr.atago.yaml`:
   - exit code is `0`
+
 ### Scenario: a golden verifies against a different volatile value
 #### Given
 - Fixture file `rec.atago.yaml` is created.
 - Fixture file `ver.atago.yaml` is created.
+
 #### Inputs
 _Fixture `rec.atago.yaml`:_
 ```text
@@ -13390,10 +14422,12 @@ ${atago} run ver.atago.yaml
   - exit code is `0`
 - after `${atago} run ver.atago.yaml`:
   - exit code is `0`
+
 ### Scenario: updating a snapshot is deterministic
 #### Given
 - Fixture file `d1.atago.yaml` is created.
 - Fixture file `d2.atago.yaml` is created.
+
 #### Inputs
 _Fixture `d1.atago.yaml`:_
 ```text
@@ -13423,10 +14457,12 @@ ${atago} snapshot update d2.atago.yaml
 #### Then
 - after `${atago} snapshot update d2.atago.yaml`:
   - file `a.txt` is byte-identical to `b.txt`
+
 ### Scenario: a real content change still fails the snapshot
 #### Given
 - Fixture file `change.atago.yaml` is created.
 - Fixture file `g.txt` is created.
+
 #### Inputs
 _Fixture `change.atago.yaml`:_
 ```text
@@ -13448,9 +14484,11 @@ ${atago} run change.atago.yaml
 ```
 #### Then
 - exit code is `1`
+
 ### Scenario: a missing golden names the update flag
 #### Given
 - Fixture file `miss.atago.yaml` is created.
+
 #### Inputs
 _Fixture `miss.atago.yaml`:_
 ```text
@@ -13469,12 +14507,14 @@ ${atago} run miss.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `--update-snapshots`
+
 ## atago self-hosting / snapshots
 Source: `test/e2e/atago/snapshots.atago.yaml`
 ### Scenario: two scenarios writing different content to one snapshot path fail the update
 #### Given
 - Fixture file `clash.atago.yaml` is created.
 - Fixture file `shared_golden.atago.yaml` is created.
+
 #### Inputs
 _Fixture `clash.atago.yaml`:_
 ```text
@@ -13522,9 +14562,11 @@ ${atago} run --parallel 1 shared_golden.atago.yaml
   - exit code is `0`
   - stdout contains `2 passed`
   - stdout does not contain `2 snapshots updated`
+
 ### Scenario: the rewrite count covers teardown and the suite lifecycle
 #### Given
 - Fixture file `lifecycle.atago.yaml` is created.
+
 #### Inputs
 _Fixture `lifecycle.atago.yaml`:_
 ```text
@@ -13560,10 +14602,12 @@ ${atago} run --parallel 1 lifecycle.atago.yaml
   - file `scenario_teardown.snap` contains `scenario teardown`
 - after `${atago} run --parallel 1 lifecycle.atago.yaml`:
   - exit code is `0`
+
 ### Scenario: a red run still reports the goldens it rewrote
 _skipped on Windows_
 #### Given
 - Fixture file `unstable.atago.yaml` is created.
+
 #### Inputs
 _Fixture `unstable.atago.yaml`:_
 ```text
@@ -13584,12 +14628,15 @@ ${atago} run --parallel 1 --repeat 2 --update-snapshots unstable.atago.yaml
 - exit code is `1`
 - stdout contains `1 snapshot updated`
 - file `now.snap` exists
+
 #### Generated artifacts
 - `now.snap`
+
 ### Scenario: a clash with the scenario's own earlier attempt names the attempt
 _skipped on Windows_
 #### Given
 - Fixture file `retry.atago.yaml` is created.
+
 #### Inputs
 _Fixture `retry.atago.yaml`:_
 ```text
@@ -13611,11 +14658,13 @@ ${atago} run --parallel 1 --retry-failed 1 --update-snapshots retry.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `changed between attempts of this scenario`, does not contain `two scenarios cannot share`
+
 ## atago self-hosting / ssh runner
 Source: `test/e2e/atago/ssh.atago.yaml`
 ### Scenario: an ssh runner without host/user fails validation (exit 2)
 #### Given
 - Fixture file `badssh.atago.yaml` is created.
+
 #### Inputs
 _Fixture `badssh.atago.yaml`:_
 ```text
@@ -13639,9 +14688,11 @@ ${atago} run badssh.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `requires a host`
+
 ### Scenario: a run step naming an undeclared runner fails validation (exit 2)
 #### Given
 - Fixture file `norunner.atago.yaml` is created.
+
 #### Inputs
 _Fixture `norunner.atago.yaml`:_
 ```text
@@ -13662,9 +14713,11 @@ ${atago} run norunner.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `is not declared`
+
 ### Scenario: a local-only run field on an ssh runner fails validation (exit 2)
 #### Given
 - Fixture file `sshfield.atago.yaml` is created.
+
 #### Inputs
 _Fixture `sshfield.atago.yaml`:_
 ```text
@@ -13691,6 +14744,7 @@ ${atago} run sshfield.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `run.cwd has no effect on an ssh runner`, `steps[0].run`
+
 ## atago self-hosting / stdin sources (file + base64)
 Source: `test/e2e/atago/stdin_sources.atago.yaml`
 ### Scenario: base64 stdin delivers the exact byte count
@@ -13707,10 +14761,12 @@ wc -c
 #### Then
 - exit code is `0`
 - stdout matches `/^\s*4\s*$/`
+
 ### Scenario: stdin file is expanded and read from the workdir
 _skipped on Windows_
 #### Given
 - Fixture file `payload.txt` is created.
+
 #### Inputs
 _Fixture `payload.txt`:_
 ```text
@@ -13727,10 +14783,12 @@ cat
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: a stdin file outside the workdir is rejected at runtime
 _skipped on Windows_
 #### Given
 - Fixture file `escape.atago.yaml` is created.
+
 #### Inputs
 _Fixture `escape.atago.yaml`:_
 ```text
@@ -13752,9 +14810,11 @@ ${atago} run escape.atago.yaml
 #### Then
 - exit code is not `0`
 - stdout contains `run.stdin.file`
+
 ### Scenario: stdin with both file and base64 is a load-time error
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -13777,9 +14837,11 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `exactly one of file/base64`
+
 ### Scenario: invalid base64 stdin is a load-time error
 #### Given
 - Fixture file `badb64.atago.yaml` is created.
+
 #### Inputs
 _Fixture `badb64.atago.yaml`:_
 ```text
@@ -13801,11 +14863,13 @@ ${atago} run badb64.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `not valid base64`
+
 ## atago self-hosting / store
 Source: `test/e2e/atago/store.atago.yaml`
 ### Scenario: a stored JSON value is reusable in later commands
 #### Given
 - Fixture file `store.atago.yaml` is created.
+
 #### Inputs
 _Fixture `store.atago.yaml`:_
 ```text
@@ -13838,9 +14902,11 @@ ${atago} run store.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `PASSED`
+
 ### Scenario: storing from a missing JSON path is an execution error
 #### Given
 - Fixture file `bad-store.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad-store.atago.yaml`:_
 ```text
@@ -13869,6 +14935,7 @@ ${atago} run bad-store.atago.yaml
 #### Then
 - exit code is `4`
 - stdout contains `ERROR`
+
 ## atago self-hosting / store capture boundary values
 Source: `test/e2e/atago/store_edges.atago.yaml`
 ### Scenario: a regex with a capture group stores the group
@@ -13881,6 +14948,7 @@ echo shipping ${ver}
 #### Then
 - after `echo shipping ${ver}`:
   - stdout equals an exact value
+
 ### Scenario: a regex without a group stores the whole match
 #### When
 ```shell
@@ -13891,6 +14959,7 @@ echo checksum ${sha}
 #### Then
 - after `echo checksum ${sha}`:
   - stdout equals an exact value
+
 ### Scenario: a JSON path captures a scalar from stdout
 #### When
 ```shell
@@ -13901,9 +14970,11 @@ echo bound ${port}
 #### Then
 - after `echo bound ${port}`:
   - stdout equals an exact value
+
 ### Scenario: a JSON path captures a value from a generated file
 #### Given
 - Fixture file `meta.json` is created.
+
 #### Inputs
 _Fixture `meta.json`:_
 ```text
@@ -13916,9 +14987,11 @@ echo build ${build}
 ```
 #### Then
 - stdout equals an exact value
+
 ### Scenario: a regex that matches nothing is an execution error
 #### Given
 - Fixture file `nomatch.atago.yaml` is created.
+
 #### Inputs
 _Fixture `nomatch.atago.yaml`:_
 ```text
@@ -13937,9 +15010,11 @@ ${atago} run nomatch.atago.yaml
 #### Then
 - exit code is `4`
 - stdout contains `did not match`
+
 ### Scenario: a stored value does not leak into the next scenario
 #### Given
 - Fixture file `scope.atago.yaml` is created.
+
 #### Inputs
 _Fixture `scope.atago.yaml`:_
 ```text
@@ -13962,6 +15037,7 @@ ${atago} run scope.atago.yaml
 #### Then
 - exit code is `4`
 - stdout contains `references ${captured}`, `no variable with that name is defined`
+
 ## atago self-hosting / store whole-content trim and text selectors (#158)
 Source: `test/e2e/atago/store_whole.atago.yaml`
 ### Scenario: trim captures an opaque token and round-trips it as an argument
@@ -13975,10 +15051,12 @@ ${atago} run ${token}
 - after `${atago} run ${token}`:
   - exit code is `3`
   - stderr contains `opaque-token-abc123`
+
 ### Scenario: text captures a whole multi-line file verbatim
 #### Given
 - Fixture file `blob.txt` is created.
 - Fixture file `copy.txt` is created.
+
 #### Inputs
 _Fixture `blob.txt`:_
 ```text
@@ -13995,6 +15073,7 @@ ${blob}
 ```
 #### Then
 - file `copy.txt` contains `first line`, `second line`
+
 ## atago self-hosting / stream matcher boundary values
 Source: `test/e2e/atago/stream_edges.atago.yaml`
 ### Scenario: equals a multibyte and emoji line
@@ -14004,6 +15083,7 @@ printf 'テスト🎌\n'
 ```
 #### Then
 - stdout equals an exact value
+
 ### Scenario: contains a multibyte substring inside a longer line
 #### When
 ```shell
@@ -14011,6 +15091,7 @@ printf 'café ☕ の résumé\n'
 ```
 #### Then
 - stdout contains `☕ の`
+
 ### Scenario: a regex matches across multibyte runes
 #### When
 ```shell
@@ -14018,6 +15099,7 @@ printf 'αβγδ\n'
 ```
 #### Then
 - stdout matches `/β.δ/`
+
 ### Scenario: line selection returns a multibyte line intact
 #### When
 ```shell
@@ -14025,6 +15107,7 @@ printf 'ひらがな\nカタカナ\n漢字\n'
 ```
 #### Then
 - stdout line `2` equals an exact value
+
 ### Scenario: not_contains a multibyte needle that is absent
 #### When
 ```shell
@@ -14032,6 +15115,7 @@ printf '日本語\n'
 ```
 #### Then
 - stdout does not contain `中文`
+
 ### Scenario: empty is true for a command that prints nothing
 #### When
 ```shell
@@ -14039,6 +15123,7 @@ true
 ```
 #### Then
 - stdout is empty
+
 ### Scenario: empty is true for whitespace-only output
 #### When
 ```shell
@@ -14046,6 +15131,7 @@ printf '   \n\t\n'
 ```
 #### Then
 - stdout is empty
+
 ### Scenario: equals tolerates output with no trailing newline
 #### When
 ```shell
@@ -14053,6 +15139,7 @@ printf 'noeol'
 ```
 #### Then
 - stdout equals an exact value
+
 ### Scenario: a deliberate trailing blank line is addressable by index
 #### When
 ```shell
@@ -14060,6 +15147,7 @@ printf 'body\n\n'
 ```
 #### Then
 - stdout line `2` equals an exact value
+
 ### Scenario: contains treats a needle with regex metacharacters literally
 #### When
 ```shell
@@ -14067,6 +15155,7 @@ printf 'price is $3.50 (approx)\n'
 ```
 #### Then
 - stdout contains `$3.50 (approx)`
+
 ### Scenario: matches requires escaping a literal metacharacter
 #### When
 ```shell
@@ -14074,6 +15163,7 @@ printf 'v1.2.3\n'
 ```
 #### Then
 - stdout matches `/v1\.2\.3/`
+
 ### Scenario: not_matches passes when an unescaped-metachar pattern does not match
 #### When
 ```shell
@@ -14081,6 +15171,7 @@ printf 'ab\n'
 ```
 #### Then
 - stdout does not match `/a.c/`
+
 ### Scenario: a tab-separated record contains the exact tab byte
 #### When
 ```shell
@@ -14088,6 +15179,7 @@ printf 'name\tvalue\n'
 ```
 #### Then
 - stdout contains `"name\tvalue"`
+
 ### Scenario: quotes and brackets survive an exact equals
 #### When
 ```shell
@@ -14095,6 +15187,7 @@ printf '[{"id":1}]\n'
 ```
 #### Then
 - stdout equals an exact value
+
 ### Scenario: the last of many lines is selectable by index
 #### When
 ```shell
@@ -14102,6 +15195,7 @@ seq 1 100
 ```
 #### Then
 - stdout line `100` equals an exact value
+
 ### Scenario: a line selector composes with contains
 #### When
 ```shell
@@ -14109,6 +15203,7 @@ printf 'alpha\nbeta-gamma\n'
 ```
 #### Then
 - stdout line `2` contains `gamma`
+
 ### Scenario: a line selector composes with a regex
 #### When
 ```shell
@@ -14116,6 +15211,7 @@ printf 'k=1\nk=2\n'
 ```
 #### Then
 - stdout line `2` matches `/^k=[0-9]$/`
+
 ### Scenario: stderr carries the same matcher semantics as stdout
 #### When
 ```shell
@@ -14124,6 +15220,7 @@ printf 'to stderr\n' 1>&2
 #### Then
 - stdout is empty
 - stderr equals an exact value
+
 ## atago self-hosting / subject builds
 Source: `test/e2e/atago/subject.atago.yaml`
 ### Scenario: the built artifact resolves by bare name from a spec
@@ -14132,6 +15229,7 @@ _skipped on Windows_
 - Fixture file `src/mytool` is created.
 - Fixture file `atago.project.yaml` is created.
 - Fixture file `spec.atago.yaml` is created.
+
 #### Inputs
 _Fixture `src/mytool`:_
 ```text
@@ -14169,6 +15267,7 @@ ${atago} run spec.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `1 passed`
+
 ### Scenario: a profile swaps the build and adds environment
 _skipped on Windows_
 #### Given
@@ -14176,6 +15275,7 @@ _skipped on Windows_
 - Fixture file `src/alt` is created.
 - Fixture file `atago.project.yaml` is created.
 - Fixture file `spec.atago.yaml` is created.
+
 #### Inputs
 _Fixture `src/mytool`:_
 ```text
@@ -14230,12 +15330,14 @@ ${atago} run spec.atago.yaml
   - exit code is `0`
 - after `${atago} run spec.atago.yaml`:
   - exit code is `1`
+
 ### Scenario: an unknown profile names the ones that exist
 _skipped on Windows_
 #### Given
 - Fixture file `src/mytool` is created.
 - Fixture file `atago.project.yaml` is created.
 - Fixture file `spec.atago.yaml` is created.
+
 #### Inputs
 _Fixture `src/mytool`:_
 ```text
@@ -14273,11 +15375,13 @@ ${atago} run --profile race spec.atago.yaml
 #### Then
 - exit code is `4`
 - stderr contains `declares no profile "race"`, `cover`
+
 ### Scenario: an artifact nothing can execute is refused
 _skipped on Windows_
 #### Given
 - Fixture file `atago.project.yaml` is created.
 - Fixture file `spec.atago.yaml` is created.
+
 #### Inputs
 _Fixture `atago.project.yaml`:_
 ```text
@@ -14306,11 +15410,13 @@ ${atago} run spec.atago.yaml
 #### Then
 - exit code is `4`
 - stderr contains `execute bit`
+
 ### Scenario: a failing build stops the run and carries the build output
 _skipped on Windows_
 #### Given
 - Fixture file `atago.project.yaml` is created.
 - Fixture file `spec.atago.yaml` is created.
+
 #### Inputs
 _Fixture `atago.project.yaml`:_
 ```text
@@ -14340,11 +15446,13 @@ ${atago} run spec.atago.yaml
 - exit code is `4`
 - stdout does not contain `never runs`
 - stderr contains `BUILD-BROKE`, `exit 3`
+
 ### Scenario: a build that writes nothing is caught, not passed on
 _skipped on Windows_
 #### Given
 - Fixture file `atago.project.yaml` is created.
 - Fixture file `spec.atago.yaml` is created.
+
 #### Inputs
 _Fixture `atago.project.yaml`:_
 ```text
@@ -14372,10 +15480,12 @@ ${atago} run spec.atago.yaml
 #### Then
 - exit code is `4`
 - stderr contains `produced no file`
+
 ### Scenario: a manifest with no subject leaves the run untouched
 #### Given
 - Fixture file `atago.project.yaml` is created.
 - Fixture file `spec.atago.yaml` is created.
+
 #### Inputs
 _Fixture `atago.project.yaml`:_
 ```text
@@ -14402,11 +15512,13 @@ ${atago} run spec.atago.yaml
 #### Then
 - exit code is `0`
 - stderr does not contain `building`
+
 ## atago self-hosting / suite env from setup
 Source: `test/e2e/atago/suite_env.atago.yaml`
 ### Scenario: a value captured in setup reaches every scenario as env
 #### Given
 - Fixture file `inner.atago.yaml` is created.
+
 #### Inputs
 _Fixture `inner.atago.yaml`:_
 ```text
@@ -14438,9 +15550,11 @@ ${atago} run inner.atago.yaml
 ```
 #### Then
 - exit code is `0`
+
 ### Scenario: a service publishes its ephemeral address into suite env
 #### Given
 - Fixture file `inner_service.atago.yaml` is created.
+
 #### Inputs
 _Fixture `inner_service.atago.yaml`:_
 ```text
@@ -14472,9 +15586,11 @@ ${atago} run inner_service.atago.yaml
 ```
 #### Then
 - exit code is `0`
+
 ### Scenario: a setup step still runs when a later key is not resolvable yet
 #### Given
 - Fixture file `inner_order.atago.yaml` is created.
+
 #### Inputs
 _Fixture `inner_order.atago.yaml`:_
 ```text
@@ -14506,9 +15622,11 @@ ${atago} run inner_order.atago.yaml
 ```
 #### Then
 - exit code is `0`
+
 ### Scenario: an env value nothing defines is refused instead of leaking
 #### Given
 - Fixture file `inner_typo.atago.yaml` is created.
+
 #### Inputs
 _Fixture `inner_typo.atago.yaml`:_
 ```text
@@ -14538,9 +15656,11 @@ ${atago} run inner_typo.atago.yaml
 #### Then
 - exit code is `4`
 - stdout contains `environment setup`, `suite.env GOPROXY references ${proxy_url}`, `literal text`, `proxy_addr`
+
 ### Scenario: an unset host variable in suite env stays literal, as documented
 #### Given
 - Fixture file `inner_hostenv.atago.yaml` is created.
+
 #### Inputs
 _Fixture `inner_hostenv.atago.yaml`:_
 ```text
@@ -14563,9 +15683,11 @@ ${atago} run inner_hostenv.atago.yaml
 ```
 #### Then
 - exit code is `0`
+
 ### Scenario: an escaped reference stays literal on purpose
 #### Given
 - Fixture file `inner_escaped.atago.yaml` is created.
+
 #### Inputs
 _Fixture `inner_escaped.atago.yaml`:_
 ```text
@@ -14590,11 +15712,13 @@ ${atago} run inner_escaped.atago.yaml
 ```
 #### Then
 - exit code is `0`
+
 ## atago self-hosting / suite setup
 Source: `test/e2e/atago/suite_setup.atago.yaml`
 ### Scenario: setup runs once, shares stores and env, and teardown always runs
 #### Given
 - Fixture file `ok.atago.yaml` is created.
+
 #### Inputs
 _Fixture `ok.atago.yaml`:_
 ```text
@@ -14627,9 +15751,11 @@ ${atago} run --verbose ok.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `2 passed`
+
 ### Scenario: a failing setup errors every scenario and none runs (exit 4)
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -14654,9 +15780,11 @@ ${atago} run bad.atago.yaml
 - exit code is `4`
 - stdout contains `suite setup`, `0 passed`, `2 errored`
 - stdout does not contain `unreached`
+
 ### Scenario: a suite service starts once and its store reaches every scenario
 #### Given
 - Fixture file `svc.atago.yaml` is created.
+
 #### Inputs
 _Fixture `svc.atago.yaml`:_
 ```text
@@ -14686,9 +15814,11 @@ ${atago} run svc.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `1 passed`
+
 ### Scenario: a failing suite teardown is loud but does not flip the verdict
 #### Given
 - Fixture file `td.atago.yaml` is created.
+
 #### Inputs
 _Fixture `td.atago.yaml`:_
 ```text
@@ -14713,12 +15843,14 @@ ${atago} run td.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `1 passed`, `SUITE TEARDOWN FAILED`
+
 ## atago self-hosting / step timeouts (suite default + escape hatch)
 Source: `test/e2e/atago/timeouts.atago.yaml`
 ### Scenario: suite.timeout kills a hanging step and the hint names it
 _skipped on Windows_
 #### Given
 - Fixture file `hang.atago.yaml` is created.
+
 #### Inputs
 _Fixture `hang.atago.yaml`:_
 ```text
@@ -14742,10 +15874,12 @@ ${atago} run hang.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `timed out`, `suite.timeout`
+
 ### Scenario: a step timeout beats the suite timeout and the hint says run.timeout
 _skipped on Windows_
 #### Given
 - Fixture file `step_wins.atago.yaml` is created.
+
 #### Inputs
 _Fixture `step_wins.atago.yaml`:_
 ```text
@@ -14770,10 +15904,12 @@ ${atago} run step_wins.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `timed out`, `run.timeout`
+
 ### Scenario: timeout zero disables a short suite bound
 _skipped on Windows_
 #### Given
 - Fixture file `optout.atago.yaml` is created.
+
 #### Inputs
 _Fixture `optout.atago.yaml`:_
 ```text
@@ -14797,10 +15933,12 @@ ${atago} run optout.atago.yaml
 ```
 #### Then
 - exit code is `0`
+
 ### Scenario: a killed step fails even when nothing asserts on it
 _skipped on Windows_
 #### Given
 - Fixture file `unobserved.atago.yaml` is created.
+
 #### Inputs
 _Fixture `unobserved.atago.yaml`:_
 ```text
@@ -14822,10 +15960,12 @@ ${atago} run unobserved.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `run completes before its timeout`, `was killed`, `suite.timeout`
+
 ### Scenario: an assert that ignores the result does not mask the kill
 _skipped on Windows_
 #### Given
 - Fixture file `file_assert.atago.yaml` is created.
+
 #### Inputs
 _Fixture `file_assert.atago.yaml`:_
 ```text
@@ -14855,10 +15995,12 @@ ${atago} run file_assert.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `run completes before its timeout`, `run.timeout`
+
 ### Scenario: an assert on the killed result keeps the timeout observable
 _skipped on Windows_
 #### Given
 - Fixture file `observed.atago.yaml` is created.
+
 #### Inputs
 _Fixture `observed.atago.yaml`:_
 ```text
@@ -14882,10 +16024,12 @@ ${atago} run observed.atago.yaml
 ```
 #### Then
 - exit code is `0`
+
 ### Scenario: timeout zero keeps an unasserted step green
 _skipped on Windows_
 #### Given
 - Fixture file `optout_bare.atago.yaml` is created.
+
 #### Inputs
 _Fixture `optout_bare.atago.yaml`:_
 ```text
@@ -14907,9 +16051,11 @@ ${atago} run optout_bare.atago.yaml
 ```
 #### Then
 - exit code is `0`
+
 ### Scenario: an invalid suite.timeout is a load-time error
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -14930,10 +16076,12 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `suite.timeout`
+
 ### Scenario: a session outlived by its program says so instead of blaming the clock
 _skipped on Windows_
 #### Given
 - Fixture file `outlived.atago.yaml` is created.
+
 #### Inputs
 _Fixture `outlived.atago.yaml`:_
 ```text
@@ -14957,10 +16105,12 @@ ${atago} run outlived.atago.yaml
 - exit code is `1`
 - stdout contains `the program was still running`, `send its quit key as the last action`
 - stdout does not contain `raise the timeout if the command is merely slow`
+
 ### Scenario: an expect that never matches still reports the pattern, not the quit advice
 _skipped on Windows_
 #### Given
 - Fixture file `nomatch.atago.yaml` is created.
+
 #### Inputs
 _Fixture `nomatch.atago.yaml`:_
 ```text
@@ -14983,9 +16133,11 @@ ${atago} run nomatch.atago.yaml
 - exit code is `1`
 - stdout contains `never-going-to-appear`, `never appeared in the terminal transcript`
 - stdout does not contain `send its quit key`
+
 ### Scenario: a timeout that expires before the process starts is still a timeout
 #### Given
 - Fixture file `prestart.atago.yaml` is created.
+
 #### Inputs
 _Fixture `prestart.atago.yaml`:_
 ```text
@@ -15009,6 +16161,7 @@ ${atago} run prestart.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `timed out`, `run.timeout`, does not contain `failed to execute`
+
 ## atago self-hosting / tui
 Source: `test/e2e/atago/tui.atago.yaml`
 ### Scenario: a pty step exports a usable TERM by default
@@ -15020,6 +16173,7 @@ _skipped on Windows_
 #### Then
 - exit code is `0`
 - stdout contains `TERM=[xterm-256color]`
+
 ### Scenario: an explicit TERM overrides the default
 _skipped on Windows_
 #### When
@@ -15029,10 +16183,12 @@ _skipped on Windows_
 #### Then
 - exit code is `0`
 - stdout contains `TERM=[vt100]`
+
 ### Scenario: an expect does not re-match a consumed pattern
 _skipped on Windows_
 #### Given
 - Fixture file `inner.atago.yaml` is created.
+
 #### Inputs
 _Fixture `inner.atago.yaml`:_
 ```text
@@ -15057,10 +16213,12 @@ ${atago} run inner.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `1 failed`
+
 ### Scenario: a failing screen assert frames a CJK screen squarely
 _skipped on Windows_
 #### Given
 - Fixture file `inner.atago.yaml` is created.
+
 #### Inputs
 _Fixture `inner.atago.yaml`:_
 ```text
@@ -15086,6 +16244,7 @@ ${atago} run inner.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `| abcdefgh       |`, `| 日本語メニュー |`
+
 ### Scenario: a screen assert sees wide characters at their true width
 _skipped on Windows_
 #### When
@@ -15094,10 +16253,12 @@ _skipped on Windows_
 ```
 #### Then
 - rendered screen contains `日本語[OK]`, does not contain `日本語 [OK]`
+
 ### Scenario: less -X renders a real pager onto the screen
 _only when `command -v less` succeeds · skipped on Windows_
 #### Given
 - Fixture file `page.txt` is created.
+
 #### Inputs
 _Fixture `page.txt`:_
 ```text
@@ -15112,6 +16273,7 @@ Gamma line
 #### Then
 - rendered screen contains `Alpha line`
 - rendered screen contains `Gamma line`
+
 ## atago self-hosting / variable resolution semantics
 Source: `test/e2e/atago/var_resolution.atago.yaml`
 ### Scenario: a doubled dollar keeps the braces literal
@@ -15121,6 +16283,7 @@ echo pre-$${keep}-post
 ```
 #### Then
 - stdout contains `${keep}`
+
 ### Scenario: the workdir builtin expands to the scenario directory
 #### When
 ```shell
@@ -15128,6 +16291,7 @@ echo at=${workdir}
 ```
 #### Then
 - stdout does not contain `$${workdir}`
+
 ### Scenario: the atago builtin resolves to the binary under test
 #### When
 ```shell
@@ -15136,6 +16300,7 @@ ${atago} --version
 #### Then
 - exit code is `0`
 - stdout contains `atago`
+
 ### Scenario: an env reference expands from the host environment
 #### When
 ```shell
@@ -15143,6 +16308,7 @@ echo path=${env:PATH}
 ```
 #### Then
 - stdout matches `/path=.+/`
+
 ### Scenario: shell true defers an unknown reference to the shell
 #### When
 ```shell
@@ -15151,9 +16317,11 @@ echo [${undefined_in_atago}]
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: an unresolved variable is a hard error, not a silent empty
 #### Given
 - Fixture file `typo.atago.yaml` is created.
+
 #### Inputs
 _Fixture `typo.atago.yaml`:_
 ```text
@@ -15171,9 +16339,11 @@ ${atago} run typo.atago.yaml
 #### Then
 - exit code is `4`
 - stdout contains `references ${reuslt}`, `no variable with that name is defined`
+
 ### Scenario: an unset env reference names the missing variable
 #### Given
 - Fixture file `unsetenv.atago.yaml` is created.
+
 #### Inputs
 _Fixture `unsetenv.atago.yaml`:_
 ```text
@@ -15191,11 +16361,13 @@ ${atago} run unsetenv.atago.yaml
 #### Then
 - exit code is `4`
 - stdout contains `environment variable ATAGO_SURELY_UNSET_VAR is not set`
+
 ## atago self-hosting / verbose
 Source: `test/e2e/atago/verbose.atago.yaml`
 ### Scenario: verbose shows a passing scenario's command, output, and verdicts
 #### Given
 - Fixture file `ok.atago.yaml` is created.
+
 #### Inputs
 _Fixture `ok.atago.yaml`:_
 ```text
@@ -15220,9 +16392,11 @@ ${atago} run --verbose ok.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `sample / greets`, `echo hello-trace`, `exit 0`, `ok   assert`
+
 ### Scenario: without --verbose the trace is absent
 #### Given
 - Fixture file `ok.atago.yaml` is created.
+
 #### Inputs
 _Fixture `ok.atago.yaml`:_
 ```text
@@ -15245,9 +16419,11 @@ ${atago} run ok.atago.yaml
 #### Then
 - exit code is `0`
 - stdout does not contain `echo hello-trace`
+
 ### Scenario: verbose with a JSON report keeps stdout pure and traces to stderr
 #### Given
 - Fixture file `ok.atago.yaml` is created.
+
 #### Inputs
 _Fixture `ok.atago.yaml`:_
 ```text
@@ -15271,9 +16447,11 @@ ${atago} run --verbose --report json ok.atago.yaml
 - exit code is `0`
 - stdout at `$.schema_version` equals `1`
 - stderr contains `exit 0`
+
 ### Scenario: a failing run under --verbose renders the FAILED block exactly once
 #### Given
 - Fixture file `bad.atago.yaml` is created.
+
 #### Inputs
 _Fixture `bad.atago.yaml`:_
 ```text
@@ -15298,6 +16476,7 @@ ${atago} run --verbose bad.atago.yaml
 - exit code is `1`
 - stdout contains `FAIL assert`, `FAILED:`
 - stdout does not match `/(?s)FAILED:.*FAILED:/`
+
 ## atago self-hosting / version
 Source: `test/e2e/atago/version.atago.yaml`
 ### Scenario: version command prints the binary name
@@ -15309,6 +16488,7 @@ ${atago} version
 - exit code is `0`
 - stdout contains `atago`
 - stderr is empty
+
 ### Scenario: unknown command is a configuration error
 #### When
 ```shell
@@ -15317,11 +16497,13 @@ ${atago} frobnicate
 #### Then
 - exit code is `3`
 - stderr contains `unknown command`
+
 ## atago self-hosting / yaml stream matcher
 Source: `test/e2e/atago/yaml.atago.yaml`
 ### Scenario: a yaml stream matcher selects and asserts a decoded value (#9)
 #### Given
 - Fixture file `yaml_ok.atago.yaml` is created.
+
 #### Inputs
 _Fixture `yaml_ok.atago.yaml`:_
 ```text
@@ -15355,9 +16537,11 @@ ${atago} run yaml_ok.atago.yaml
 - exit code is `0`
 - stdout contains `PASS`
 - stdout does not contain `matcher not supported yet`
+
 ### Scenario: a yaml matcher mismatch fails the inner spec (#9)
 #### Given
 - Fixture file `yaml_fail.atago.yaml` is created.
+
 #### Inputs
 _Fixture `yaml_fail.atago.yaml`:_
 ```text

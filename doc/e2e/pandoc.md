@@ -12,6 +12,7 @@
   - [an unknown output format is rejected](#scenario-an-unknown-output-format-is-rejected)
   - [markdown survives a round-trip through HTML](#scenario-markdown-survives-a-round-trip-through-html)
   - [a missing input file fails cleanly](#scenario-a-missing-input-file-fails-cleanly)
+
 ## pandoc + changes (a conversion writes exactly its output)
 Converting a document should produce the converted document — and nothing
 besides. This suite states that exactly: with the source file present as the
@@ -27,6 +28,7 @@ Source: `test/e2e/thirdparty/pandoc/changes.atago.yaml`
 _only when `pandoc --version` succeeds_
 #### Given
 - Fixture file `in.md` is created.
+
 #### Inputs
 _Fixture `in.md`:_
 ```text
@@ -42,6 +44,7 @@ pandoc in.md -o out.html
 - exit code is `0`
 - the step changed exactly created `out.html`, modified nothing, deleted nothing
 - file `out.html` contains `<em>emphasis</em>`
+
 ## pandoc (document conversion filter)
 [Pandoc](https://pandoc.org/) converts documents between formats, and it can
 be used two entirely different ways: as a file-to-file converter, or as a
@@ -60,6 +63,7 @@ Source: `test/e2e/thirdparty/pandoc/pandoc.atago.yaml`
 _only when `pandoc --version` succeeds_
 #### Given
 - Fixture file `doc.md` is created.
+
 #### Inputs
 _Fixture `doc.md`:_
 ```text
@@ -85,12 +89,15 @@ unzip -p doc.docx word/document.xml
 - after `unzip -p doc.docx word/document.xml`:
   - exit code is `0`
   - stdout contains `Title`, `bold text`
+
 #### Generated artifacts
 - `doc.docx`
+
 ### Scenario: pandoc is a stdin-to-stdout filter
 _only when `pandoc --version` succeeds_
 #### Given
 - Fixture file `snippet.md` is created.
+
 #### Inputs
 _Fixture `snippet.md`:_
 ```text
@@ -107,10 +114,12 @@ pandoc -f markdown -t html
 #### Then
 - exit code is `0`
 - stdout contains `<strong>strong</strong>`, `<em>italic</em>`
+
 ### Scenario: the JSON AST is a queryable contract
 _only when `pandoc --version` succeeds_
 #### Given
 - Fixture file `doc.md` is created.
+
 #### Inputs
 _Fixture `doc.md`:_
 ```text
@@ -126,10 +135,12 @@ pandoc -t json doc.md
 - exit code is `0`
 - stdout at `$.blocks[0].t` equals `Header`
 - stdout at `$['pandoc-api-version']` has length 3
+
 ### Scenario: standalone HTML carries the metadata title
 _only when `pandoc --version` succeeds_
 #### Given
 - Fixture file `doc.md` is created.
+
 #### Inputs
 _Fixture `doc.md`:_
 ```text
@@ -142,10 +153,12 @@ pandoc --metadata title=Atago -s doc.md -o standalone.html
 #### Then
 - exit code is `0`
 - file `standalone.html` contains `<title>Atago</title>`
+
 ### Scenario: an unknown output format is rejected
 _only when `pandoc --version` succeeds_
 #### Given
 - Fixture file `doc.md` is created.
+
 #### Inputs
 _Fixture `doc.md`:_
 ```text
@@ -158,10 +171,12 @@ pandoc -t nosuchformat doc.md
 #### Then
 - exit code is one of `21`, `22`, `23`
 - stderr contains `Unknown output format`
+
 ### Scenario: markdown survives a round-trip through HTML
 _only when `pandoc --version` succeeds_
 #### Given
 - Fixture file `doc.md` is created.
+
 #### Inputs
 _Fixture `doc.md`:_
 ```text
@@ -178,6 +193,7 @@ pandoc -f html -t markdown rt.html -o rt.md
 - after `pandoc -f html -t markdown rt.html -o rt.md`:
   - exit code is `0`
   - file `rt.md` contains `*emphasis*`, `**bold text**`
+
 ### Scenario: a missing input file fails cleanly
 _only when `pandoc --version` succeeds_
 #### When

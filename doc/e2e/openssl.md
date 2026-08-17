@@ -13,6 +13,7 @@
   - [symmetric encryption round-trips and a wrong password fails loudly](#scenario-symmetric-encryption-round-trips-and-a-wrong-password-fails-loudly)
   - [a self-signed certificate carries the requested subject](#scenario-a-self-signed-certificate-carries-the-requested-subject)
   - [signing with the private key verifies with the public key](#scenario-signing-with-the-private-key-verifies-with-the-public-key)
+
 ## openssl + changes (key and cert generation footprints)
 A tool that generates private key material should write exactly the file you
 named and nothing else — no copy, no temporary file left in the directory,
@@ -32,6 +33,7 @@ openssl genrsa -out key.pem 2048
 #### Then
 - exit code is `0`
 - the step changed exactly created `key.pem`, modified nothing, deleted nothing
+
 ### Scenario: a self-signed cert is the only new file the req step creates
 _only when `openssl version` succeeds_
 #### When
@@ -46,6 +48,7 @@ openssl req -new -x509 -key key.pem -out cert.pem -subj /CN=atago-test -days 1
   - exit code is `0`
   - the step changed exactly created `cert.pem`, modified nothing, deleted nothing
   - file `cert.pem` contains `BEGIN CERTIFICATE`
+
 ## openssl (third-party CLI, no build required)
 [OpenSSL](https://www.openssl.org/) is the cryptography tool most scripts
 reach for, and cryptography is where "it produced output" is the least
@@ -67,6 +70,7 @@ Source: `test/e2e/thirdparty/openssl/openssl.atago.yaml`
 _only when `openssl version` succeeds_
 #### Given
 - Fixture file `msg.txt` is created.
+
 #### Inputs
 _Fixture `msg.txt`:_
 ```text
@@ -79,6 +83,7 @@ openssl dgst -sha256 -r msg.txt
 #### Then
 - exit code is `0`
 - stdout contains `6e459fed18ddb06d57c8e9f0d000c302c7e01389926db6e89884bfbe91a2a5df`
+
 ### Scenario: base64 encode and decode round-trip via stdin
 _only when `openssl version` succeeds_
 #### Inputs
@@ -100,6 +105,7 @@ openssl base64 -d
 - after `openssl base64 -d`:
   - exit code is `0`
   - stdout contains `round-trip me`
+
 ### Scenario: rand -hex emits exactly the requested entropy
 _only when `openssl version` succeeds_
 #### When
@@ -109,6 +115,7 @@ openssl rand -hex 16
 #### Then
 - exit code is `0`
 - stdout matches `/^[0-9a-f]{32}\n?$/`
+
 ### Scenario: a generated private key is valid and yields its public half
 _only when `openssl version` succeeds_
 #### When
@@ -127,10 +134,12 @@ openssl pkey -in key.pem -pubout -out pub.pem
 - after `openssl pkey -in key.pem -pubout -out pub.pem`:
   - exit code is `0`
   - file `pub.pem` contains `BEGIN PUBLIC KEY`
+
 ### Scenario: symmetric encryption round-trips and a wrong password fails loudly
 _only when `openssl version` succeeds_
 #### Given
 - Fixture file `secret.txt` is created.
+
 #### Inputs
 _Fixture `secret.txt`:_
 ```text
@@ -153,8 +162,10 @@ openssl enc -d -aes-256-cbc -pbkdf2 -pass pass:wrong-password -in secret.enc -ou
 - after `openssl enc -d -aes-256-cbc -pbkdf2 -pass pass:wrong-password -in secret.enc -out garbage.txt`:
   - exit code is not `0`
   - stderr contains `bad decrypt`
+
 #### Generated artifacts
 - `secret.enc`
+
 ### Scenario: a self-signed certificate carries the requested subject
 _only when `openssl version` succeeds_
 #### When
@@ -172,11 +183,13 @@ openssl verify -CAfile ca.crt ca.crt
 - after `openssl verify -CAfile ca.crt ca.crt`:
   - exit code is `0`
   - stdout contains `OK`
+
 ### Scenario: signing with the private key verifies with the public key
 _only when `openssl version` succeeds_
 #### Given
 - Fixture file `payload.txt` is created.
 - Fixture file `payload.txt` is created.
+
 #### Inputs
 _Fixture `payload.txt`:_
 ```text

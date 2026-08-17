@@ -45,6 +45,7 @@
   - [inspect --fail-on warn app.apk (CI gate trips on AndroGoat)](#scenario-inspect---fail-on-warn-appapk-ci-gate-trips-on-androgoat)
   - [inspect --baseline prev.json app.apk](#scenario-inspect---baseline-prevjson-appapk)
   - [compare old.apk new.apk](#scenario-compare-oldapk-newapk)
+
 ## mobilepkg inspect --baseline
 Source: `test/e2e/tools/mobilepkg/baseline.atago.yaml`
 ### Scenario: diffing a package against its own baseline reports no changes
@@ -60,6 +61,7 @@ mobilepkg inspect --baseline base.json app.apk
   - stdout at `$.result.diff.identity_changed` equals `false`
   - stdout at `$.result.diff.version_changed` equals `false`
   - stdout at `$.result.diff.entry_changed` equals `false`
+
 ### Scenario: a missing baseline file is an error
 #### When
 ```shell
@@ -70,6 +72,7 @@ mobilepkg inspect --baseline no_such_baseline.json app.apk
 - after `mobilepkg inspect --baseline no_such_baseline.json app.apk`:
   - exit code is not `0`
   - stderr contains `baseline`
+
 ## mobilepkg CLI
 Source: `test/e2e/tools/mobilepkg/cli.atago.yaml`
 ### Scenario: version prints the tool version
@@ -80,6 +83,7 @@ mobilepkg version
 #### Then
 - exit code is `0`
 - stdout contains `mobilepkg`
+
 ### Scenario: --version is an alias for version
 #### When
 ```shell
@@ -88,6 +92,7 @@ mobilepkg --version
 #### Then
 - exit code is `0`
 - stdout contains `mobilepkg`
+
 ### Scenario: help lists the commands
 #### When
 ```shell
@@ -96,6 +101,7 @@ mobilepkg --help
 #### Then
 - exit code is `0`
 - stdout contains `inspect`, `compare`
+
 ### Scenario: no arguments prints usage and fails
 #### When
 ```shell
@@ -104,6 +110,7 @@ mobilepkg
 #### Then
 - exit code is not `0`
 - stderr contains `Usage`
+
 ### Scenario: unknown command fails with a helpful message
 #### When
 ```shell
@@ -112,6 +119,7 @@ mobilepkg bogus
 #### Then
 - exit code is not `0`
 - stderr contains `unknown command`
+
 ## mobilepkg compare
 Source: `test/e2e/tools/mobilepkg/compare.atago.yaml`
 ### Scenario: comparing a package with itself reports no identity or version change
@@ -127,6 +135,7 @@ mobilepkg compare app.apk app.apk
   - stdout at `$.version_changed` equals `false`
   - stdout at `$.old_platform` equals `android`
   - stdout at `$.new_format` equals `apk`
+
 ### Scenario: diff is an alias for compare
 #### When
 ```shell
@@ -137,6 +146,7 @@ mobilepkg diff app.apk app.apk
 - after `mobilepkg diff app.apk app.apk`:
   - exit code is `0`
   - stdout at `$.identity_changed` equals `false`
+
 ### Scenario: compare requires two files
 #### When
 ```shell
@@ -147,6 +157,7 @@ mobilepkg compare app.apk
 - after `mobilepkg compare app.apk`:
   - exit code is not `0`
   - stderr contains `Usage: mobilepkg compare`
+
 ## mobilepkg error handling
 Source: `test/e2e/tools/mobilepkg/errors.atago.yaml`
 ### Scenario: inspect with no file prints usage and fails
@@ -157,6 +168,7 @@ mobilepkg inspect
 #### Then
 - exit code is not `0`
 - stderr contains `Usage: mobilepkg inspect`
+
 ### Scenario: inspect on a missing file fails
 #### When
 ```shell
@@ -165,6 +177,7 @@ mobilepkg inspect does_not_exist.apk
 #### Then
 - exit code is not `0`
 - stderr contains `no such file`
+
 ### Scenario: inspect rejects an unknown output format
 #### When
 ```shell
@@ -175,9 +188,11 @@ mobilepkg inspect --format xml app.apk
 - after `mobilepkg inspect --format xml app.apk`:
   - exit code is not `0`
   - stderr contains `unknown format`
+
 ### Scenario: inspect rejects a file that is not a mobile package
 #### Given
 - Fixture file `notapkg.apk` is created.
+
 #### Inputs
 _Fixture `notapkg.apk`:_
 ```text
@@ -190,6 +205,7 @@ mobilepkg inspect notapkg.apk
 #### Then
 - exit code is not `0`
 - stderr contains `unsupported package format`
+
 ## mobilepkg inspect --fail-on
 Source: `test/e2e/tools/mobilepkg/fail_on.atago.yaml`
 ### Scenario: --fail-on error exits 1 on an app with error findings
@@ -201,6 +217,7 @@ mobilepkg inspect --fail-on error app.apk
 #### Then
 - after `mobilepkg inspect --fail-on error app.apk`:
   - exit code is `1`
+
 ### Scenario: --fail-on warn also exits 1 (warnings present)
 #### When
 ```shell
@@ -210,6 +227,7 @@ mobilepkg inspect --fail-on warn app.apk
 #### Then
 - after `mobilepkg inspect --fail-on warn app.apk`:
   - exit code is `1`
+
 ### Scenario: --fail-on embeds a failing verdict with triggering findings
 #### When
 ```shell
@@ -220,6 +238,7 @@ mobilepkg inspect --fail-on error app.apk || true
 - after `mobilepkg inspect --fail-on error app.apk || true`:
   - stdout at `$.verdict.passed` equals `false`
   - stdout at `$.verdict.triggering_findings[?(@.id=='manifest.debuggable')].severity` equals `error`
+
 ### Scenario: an unknown --fail-on threshold still trips the gate (lenient today)
 #### When
 ```shell
@@ -229,6 +248,7 @@ mobilepkg inspect --fail-on bogus app.apk
 #### Then
 - after `mobilepkg inspect --fail-on bogus app.apk`:
   - exit code is not `0`
+
 ## mobilepkg inspect (AndroGoat APK)
 Source: `test/e2e/tools/mobilepkg/inspect.atago.yaml`
 ### Scenario: reports platform and format for an APK
@@ -242,6 +262,7 @@ mobilepkg inspect app.apk
   - exit code is `0`
   - stdout at `$.result.platform` equals `android`
   - stdout at `$.result.format` equals `apk`
+
 ### Scenario: extracts identity and version from the manifest
 #### When
 ```shell
@@ -253,6 +274,7 @@ mobilepkg inspect app.apk
   - stdout at `$.result.identity.identifier` equals `owasp.sat.agoat`
   - stdout at `$.result.version.marketing` equals `1.0`
   - stdout at `$.result.entry.name` equals `owasp.sat.agoat.SplashActivity`
+
 ### Scenario: reports the debuggable and allow_backup manifest flags
 #### When
 ```shell
@@ -263,6 +285,7 @@ mobilepkg inspect app.apk
 - after `mobilepkg inspect app.apk`:
   - stdout at `$.result.debuggable` equals `true`
   - stdout at `$.result.allow_backup` equals `true`
+
 ### Scenario: flags a debug-signed APK
 #### When
 ```shell
@@ -273,6 +296,7 @@ mobilepkg inspect app.apk
 - after `mobilepkg inspect app.apk`:
   - stdout at `$.result.signing.certificates[0].subject` equals `Android Debug`
   - stdout at `$.result.findings[?(@.id=='signing.debug_cert')].severity` equals `error`
+
 ### Scenario: raises an error finding for the debuggable manifest
 #### When
 ```shell
@@ -282,6 +306,7 @@ mobilepkg inspect app.apk
 #### Then
 - after `mobilepkg inspect app.apk`:
   - stdout at `$.result.findings[?(@.id=='manifest.debuggable')].severity` equals `error`
+
 ### Scenario: flags an unguarded exported content provider
 #### When
 ```shell
@@ -291,6 +316,7 @@ mobilepkg inspect app.apk
 #### Then
 - after `mobilepkg inspect app.apk`:
   - stdout at `$.result.findings[?(@.id=='exported.provider.owasp.sat.agoat.ContentProviderActivity')].severity` equals `error`
+
 ### Scenario: warns about backup being allowed
 #### When
 ```shell
@@ -300,6 +326,7 @@ mobilepkg inspect app.apk
 #### Then
 - after `mobilepkg inspect app.apk`:
   - stdout at `$.result.findings[?(@.id=='manifest.allow_backup')].severity` equals `warn`
+
 ### Scenario: emits schema_version and tool_version envelope fields
 #### When
 ```shell
@@ -310,6 +337,7 @@ mobilepkg inspect app.apk
 - after `mobilepkg inspect app.apk`:
   - stdout at `$.schema_version` matches `/^[0-9]+\.[0-9]+\.[0-9]+$/`
   - stdout at `$.tool_version` matches `/^v?[0-9]/`
+
 ### Scenario: does not emit a verdict without --fail-on
 #### When
 ```shell
@@ -319,6 +347,7 @@ mobilepkg inspect app.apk
 #### Then
 - after `mobilepkg inspect app.apk`:
   - stdout does not contain `verdict`
+
 ## mobilepkg inspect --format markdown
 Source: `test/e2e/tools/mobilepkg/inspect_markdown.atago.yaml`
 ### Scenario: renders the report heading and package table
@@ -331,6 +360,7 @@ mobilepkg inspect --format markdown app.apk
 - after `mobilepkg inspect --format markdown app.apk`:
   - exit code is `0`
   - stdout contains `# mobilepkg Inspection Report`, `| Platform | android |`, `| Identifier | owasp.sat.agoat |`
+
 ### Scenario: includes the Top Findings and Exported Components sections
 #### When
 ```shell
@@ -340,6 +370,7 @@ mobilepkg inspect --format markdown app.apk
 #### Then
 - after `mobilepkg inspect --format markdown app.apk`:
   - stdout contains `## Top Findings`, `## Exported Components`
+
 ### Scenario: md is accepted as an alias for markdown
 #### When
 ```shell
@@ -350,6 +381,7 @@ mobilepkg inspect --format md app.apk
 - after `mobilepkg inspect --format md app.apk`:
   - exit code is `0`
   - stdout contains `# mobilepkg Inspection Report`
+
 ## mobilepkg README examples
 Source: `test/e2e/tools/mobilepkg/readme.atago.yaml`
 ### Scenario: inspect app.apk (default JSON)
@@ -362,6 +394,7 @@ mobilepkg inspect app.apk
 - after `mobilepkg inspect app.apk`:
   - exit code is `0`
   - stdout at `$.result.platform` equals `android`
+
 ### Scenario: inspect --format markdown app.apk
 #### When
 ```shell
@@ -372,6 +405,7 @@ mobilepkg inspect --format markdown app.apk
 - after `mobilepkg inspect --format markdown app.apk`:
   - exit code is `0`
   - stdout contains `# mobilepkg Inspection Report`
+
 ### Scenario: inspect --fail-on warn app.apk (CI gate trips on AndroGoat)
 #### When
 ```shell
@@ -381,6 +415,7 @@ mobilepkg inspect --fail-on warn app.apk
 #### Then
 - after `mobilepkg inspect --fail-on warn app.apk`:
   - exit code is `1`
+
 ### Scenario: inspect --baseline prev.json app.apk
 #### When
 ```shell
@@ -392,6 +427,7 @@ mobilepkg inspect --baseline prev.json app.apk
 - after `mobilepkg inspect --baseline prev.json app.apk`:
   - exit code is `0`
   - stdout at `$.result.diff.identity_changed` equals `false`
+
 ### Scenario: compare old.apk new.apk
 #### When
 ```shell

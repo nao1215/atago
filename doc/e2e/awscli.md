@@ -7,6 +7,7 @@
   - [head-object and list-objects expose a JSON contract](#scenario-head-object-and-list-objects-expose-a-json-contract)
   - [a presigned URL is fetchable without credentials](#scenario-a-presigned-url-is-fetchable-without-credentials)
   - [head-object on a missing key fails with Not Found](#scenario-head-object-on-a-missing-key-fails-with-not-found)
+
 ## aws-cli against MinIO (offline cloud-CLI story)
 The real AWS CLI, tested with no AWS account, no credentials that matter,
 and no network beyond loopback. A MinIO server stands in for S3 and
@@ -28,6 +29,7 @@ _only when `aws --version` succeeds_
 #### Given
 - Background service `minio` is started: `minio server data --address 127.0.0.1:18530`.
 - Fixture file `payload.txt` is created.
+
 #### Inputs
 _Fixture `payload.txt`:_
 ```text
@@ -59,11 +61,13 @@ aws --endpoint-url http://127.0.0.1:18530 s3 ls s3://mybucket/
 - after `aws --endpoint-url http://127.0.0.1:18530 s3 ls s3://mybucket/`:
   - exit code is `0`
   - stdout does not contain `key.txt`
+
 ### Scenario: head-object and list-objects expose a JSON contract
 _only when `aws --version` succeeds_
 #### Given
 - Background service `minio` is started: `minio server data --address 127.0.0.1:18531`.
 - Fixture file `obj.txt` is created.
+
 #### Inputs
 _Fixture `obj.txt`:_
 ```text
@@ -88,11 +92,13 @@ aws --endpoint-url http://127.0.0.1:18531 s3 ls s3://jsonbucket/
 - after `aws --endpoint-url http://127.0.0.1:18531 s3 ls s3://jsonbucket/`:
   - exit code is `0`
   - stdout contains `obj.txt`
+
 ### Scenario: a presigned URL is fetchable without credentials
 _only when `aws --version` succeeds_
 #### Given
 - Background service `minio` is started: `minio server data --address 127.0.0.1:18532`.
 - Fixture file `signed.txt` is created.
+
 #### Inputs
 _Fixture `signed.txt`:_
 ```text
@@ -114,10 +120,12 @@ curl -s "${url}"
 - after `curl -s "${url}"`:
   - exit code is `0`
   - stdout equals an exact value
+
 ### Scenario: head-object on a missing key fails with Not Found
 _only when `aws --version` succeeds_
 #### Given
 - Background service `minio` is started: `minio server data --address 127.0.0.1:18533`.
+
 #### When
 ```shell
 aws --endpoint-url http://127.0.0.1:18533 s3 mb s3://errbucket

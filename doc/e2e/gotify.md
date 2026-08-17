@@ -6,6 +6,7 @@
   - [the server reports health and version](#scenario-the-server-reports-health-and-version)
   - [an application pushes and the admin reads it back](#scenario-an-application-pushes-and-the-admin-reads-it-back)
   - [the app icon round-trips through a multipart upload](#scenario-the-app-icon-round-trips-through-a-multipart-upload)
+
 ## gotify (self-hosted notification server)
 [Gotify](https://gotify.net/) receives notifications and hands them back
 out. The full path is exercised against a real server on SQLite: an
@@ -28,6 +29,7 @@ _only when `command -v gotify` succeeds_
 #### Given
 - Background service `gotify` is started: `gotify`.
 - Fixture file `data/.keep` is created.
+
 #### When
 ```shell
 # HTTP GET /health via gotify
@@ -40,11 +42,13 @@ _only when `command -v gotify` succeeds_
 - after `HTTP GET /version`:
   - HTTP status is `200`
   - body at `$.version` matches `/^[0-9]+\.[0-9]+\.[0-9]+/`
+
 ### Scenario: an application pushes and the admin reads it back
 _only when `command -v gotify` succeeds_
 #### Given
 - Background service `gotify` is started: `gotify`.
 - Fixture file `data/.keep` is created.
+
 #### When
 ```shell
 # HTTP GET /message via gotify2
@@ -66,12 +70,14 @@ _only when `command -v gotify` succeeds_
   - HTTP status is `200`
   - body at `$.messages` has length 1
   - body at `$.messages[0].priority` equals `5`
+
 ### Scenario: the app icon round-trips through a multipart upload
 _only when `command -v gotify` succeeds_
 #### Given
 - Background service `gotify` is started: `gotify`.
 - Fixture file `data/.keep` is created.
 - Fixture file `icon.png` is created.
+
 #### When
 ```shell
 # HTTP POST /application via gotify3
@@ -89,5 +95,6 @@ _only when `command -v gotify` succeeds_
 - after `HTTP GET /${image_path}`:
   - HTTP status is `200`
   - image `fetched-icon.png` is `png`, width 1, height 1
+
 #### Generated artifacts
 - `fetched-icon.png`

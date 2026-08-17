@@ -9,6 +9,7 @@
   - [-y on a corrupted key file fails](#scenario--y-on-a-corrupted-key-file-fails)
   - [interactive passphrase generation prompts twice](#scenario-interactive-passphrase-generation-prompts-twice)
   - [the wrong passphrase is rejected](#scenario-the-wrong-passphrase-is-rejected)
+
 ## ssh-keygen (OpenSSH key generation)
 `ssh-keygen` is small, ships with OpenSSH everywhere, and happens to combine
 three things that are each awkward to test: an interactive passphrase
@@ -37,9 +38,11 @@ ssh-keygen -t ed25519 -N '' -f key -C test@atago
 - file `key.pub` exists
 - file `key.pub` contains `ssh-ed25519`
 - file `key.pub` is not executable
+
 #### Generated artifacts
 - `key`
 - `key.pub`
+
 ### Scenario: the fingerprint contract is exact
 _only when `command -v ssh-keygen` succeeds_
 #### When
@@ -53,6 +56,7 @@ ssh-keygen -lf key.pub
 - after `ssh-keygen -lf key.pub`:
   - exit code is `0`
   - stdout matches `/(?m)^256 SHA256:[A-Za-z0-9+/]+ test@atago \(ED25519\)$/`
+
 ### Scenario: -y regenerates the public key from the private key
 _only when `command -v ssh-keygen` succeeds_
 #### When
@@ -66,10 +70,12 @@ ssh-keygen -y -f key
 - after `ssh-keygen -y -f key`:
   - exit code is `0`
   - stdout contains `ssh-ed25519`
+
 ### Scenario: -y on a corrupted key file fails
 _only when `command -v ssh-keygen` succeeds_
 #### Given
 - Fixture file `corrupt` is created.
+
 #### Inputs
 _Fixture `corrupt`:_
 ```text
@@ -82,6 +88,7 @@ chmod 600 corrupt && ssh-keygen -y -f corrupt
 #### Then
 - exit code is one of `255`, `1`
 - stderr contains `error in libcrypto`
+
 ### Scenario: interactive passphrase generation prompts twice
 _only when `command -v ssh-keygen` succeeds · skipped on Windows_
 #### When
@@ -98,9 +105,11 @@ ssh-keygen -y -P "$PASSPHRASE" -f protected
 - after `ssh-keygen -y -P "$PASSPHRASE" -f protected`:
   - exit code is `0`
   - stdout contains `ssh-ed25519`
+
 #### Generated artifacts
 - `protected`
 - `protected.pub`
+
 ### Scenario: the wrong passphrase is rejected
 _only when `command -v ssh-keygen` succeeds · skipped on Windows_
 #### When

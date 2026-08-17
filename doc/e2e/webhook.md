@@ -8,6 +8,7 @@
   - [an HMAC signature is verified against an independent oracle](#scenario-an-hmac-signature-is-verified-against-an-independent-oracle)
   - [the http-methods allowlist rejects the wrong verb](#scenario-the-http-methods-allowlist-rejects-the-wrong-verb)
   - [a command that exits non-zero surfaces as a 500](#scenario-a-command-that-exits-non-zero-surfaces-as-a-500)
+
 ## webhook (self-hosted webhook receiver)
 [webhook](https://github.com/adnanh/webhook) turns an HTTP request into a
 command execution, which makes it a piece of security-relevant plumbing:
@@ -31,6 +32,7 @@ _only when `webhook -version` succeeds_
 - Background service `webhook` is started: `webhook -hooks hooks.json -ip 127.0.0.1 -port 18094`.
 - Fixture file `handler.sh` is created.
 - Fixture file `hooks.json` is created.
+
 #### Inputs
 _Fixture `handler.sh`:_
 ```text
@@ -64,12 +66,14 @@ _Fixture `hooks.json`:_
   - file `out.txt` contains `handled Alice`
 - after `HTTP POST /hooks/nope`:
   - HTTP status is `404`
+
 ### Scenario: a trigger-rule gates execution and blocks it when unsatisfied
 _only when `webhook -version` succeeds_
 #### Given
 - Background service `webhook` is started: `webhook -hooks hooks.json -ip 127.0.0.1 -port 18095`.
 - Fixture file `handler.sh` is created.
 - Fixture file `hooks.json` is created.
+
 #### Inputs
 _Fixture `handler.sh`:_
 ```text
@@ -108,12 +112,14 @@ _Fixture `hooks.json`:_
 - after `HTTP POST /hooks/guarded`:
   - HTTP status is `200`
   - file `ran.txt` contains `executed`
+
 ### Scenario: an HMAC signature is verified against an independent oracle
 _only when `webhook -version` succeeds_
 #### Given
 - Background service `webhook` is started: `webhook -hooks hooks.json -ip 127.0.0.1 -port 18096`.
 - Fixture file `handler.sh` is created.
 - Fixture file `hooks.json` is created.
+
 #### Inputs
 _Fixture `handler.sh`:_
 ```text
@@ -152,12 +158,14 @@ _Fixture `hooks.json`:_
 - after `HTTP POST /hooks/signed`:
   - HTTP status is `200`
   - file `ran.txt` contains `signed`
+
 ### Scenario: the http-methods allowlist rejects the wrong verb
 _only when `webhook -version` succeeds_
 #### Given
 - Background service `webhook` is started: `webhook -hooks hooks.json -ip 127.0.0.1 -port 18097`.
 - Fixture file `handler.sh` is created.
 - Fixture file `hooks.json` is created.
+
 #### Inputs
 _Fixture `handler.sh`:_
 ```text
@@ -182,12 +190,14 @@ _Fixture `hooks.json`:_
 ```
 #### Then
 - HTTP status is `405`
+
 ### Scenario: a command that exits non-zero surfaces as a 500
 _only when `webhook -version` succeeds_
 #### Given
 - Background service `webhook` is started: `webhook -hooks hooks.json -ip 127.0.0.1 -port 18098`.
 - Fixture file `handler.sh` is created.
 - Fixture file `hooks.json` is created.
+
 #### Inputs
 _Fixture `handler.sh`:_
 ```text

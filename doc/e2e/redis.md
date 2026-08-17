@@ -9,6 +9,7 @@
   - [connecting to a closed port fails loudly](#scenario-connecting-to-a-closed-port-fails-loudly)
   - [an unknown command reports ERR without killing the server](#scenario-an-unknown-command-reports-err-without-killing-the-server)
   - [SHUTDOWN NOSAVE stops the server and PING starts failing](#scenario-shutdown-nosave-stops-the-server-and-ping-starts-failing)
+
 ## redis (server + client, signal-step testbed)
 Redis ships a server and a client together, so one suite can cover a whole
 round trip: start the server, wait for it to actually be ready, talk to it,
@@ -29,6 +30,7 @@ Source: `test/e2e/thirdparty/redis/redis.atago.yaml`
 _only when `redis-server --version && redis-cli --version` succeeds · skipped on Windows_
 #### Given
 - Background service `redis` is started: `redis-server --port 16379 --save '' --appendonly no`.
+
 #### When
 ```shell
 redis-cli -p 16379 PING
@@ -36,10 +38,12 @@ redis-cli -p 16379 PING
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: server boots (port readiness) and round-trips SET/GET/INCR
 _only when `redis-server --version && redis-cli --version` succeeds · skipped on Windows_
 #### Given
 - Background service `redis` is started: `redis-server --port 16380 --save '' --appendonly no`.
+
 #### When
 ```shell
 redis-cli -p 16380 SET greeting hello
@@ -60,10 +64,12 @@ redis-cli -p 16380 INCR counter
 - after `redis-cli -p 16380 INCR counter`:
   - exit code is `0`
   - stdout equals an exact value
+
 ### Scenario: EXPIRE and TTL report lifetime state
 _only when `redis-server --version && redis-cli --version` succeeds · skipped on Windows_
 #### Given
 - Background service `redis` is started: `redis-server --port 16381 --save '' --appendonly no`.
+
 #### When
 ```shell
 redis-cli -p 16381 SET k v
@@ -87,6 +93,7 @@ redis-cli -p 16381 TTL no-such-key
 - after `redis-cli -p 16381 TTL no-such-key`:
   - exit code is `0`
   - stdout equals an exact value
+
 ### Scenario: connecting to a closed port fails loudly
 _only when `redis-cli --version` succeeds · skipped on Windows_
 #### When
@@ -96,10 +103,12 @@ redis-cli -p 16999 PING
 #### Then
 - exit code is `1`
 - stderr contains `Connection refused`
+
 ### Scenario: an unknown command reports ERR without killing the server
 _only when `redis-server --version && redis-cli --version` succeeds · skipped on Windows_
 #### Given
 - Background service `redis` is started: `redis-server --port 16382 --save '' --appendonly no`.
+
 #### When
 ```shell
 redis-cli -p 16382 NOSUCHCOMMAND arg; echo "rc=$?"
@@ -111,11 +120,13 @@ redis-cli -p 16382 PING
 - after `redis-cli -p 16382 PING`:
   - exit code is `0`
   - stdout equals an exact value
+
 ### Scenario: SHUTDOWN NOSAVE stops the server and PING starts failing
 _only when `redis-server --version && redis-cli --version` succeeds · skipped on Windows_
 #### Given
 - Background service `redis` is started: `redis-server --port 16383 --save '' --appendonly no`.
 - The step is retried up to 50 times every 100ms until exit code is not `0`.
+
 #### When
 ```shell
 redis-cli -p 16383 PING

@@ -8,6 +8,7 @@
   - [a malformed exposition body is rejected and never ingested](#scenario-a-malformed-exposition-body-is-rejected-and-never-ingested)
   - [POST merges into a group while PUT replaces it](#scenario-post-merges-into-a-group-while-put-replaces-it)
   - [a grouping label decorates every metric in the group](#scenario-a-grouping-label-decorates-every-metric-in-the-group)
+
 ## pushgateway (self-hosted metrics gateway)
 [Pushgateway](https://github.com/prometheus/pushgateway) exists so that a
 job too short-lived to be scraped can push its metrics somewhere Prometheus
@@ -25,6 +26,7 @@ Network policy: egress is allowed only to `127.0.0.1`.
 _only when `pushgateway --version` succeeds_
 #### Given
 - Background service `pushgateway` is started: `pushgateway --web.listen-address=127.0.0.1:18092`.
+
 #### When
 ```shell
 # HTTP POST /metrics/job/atago_e2e via push
@@ -37,10 +39,12 @@ _only when `pushgateway --version` succeeds_
   - HTTP status is `200`
   - body contains `job="atago_e2e"`
   - body matches `/atago_e2e_metric\{[^}]*job="atago_e2e"[^}]*\} 3.14/`
+
 ### Scenario: deleting a job group removes its metrics
 _only when `pushgateway --version` succeeds_
 #### Given
 - Background service `pushgateway` is started: `pushgateway --web.listen-address=127.0.0.1:18093`.
+
 #### When
 ```shell
 # HTTP POST /metrics/job/ephemeral via push2
@@ -55,10 +59,12 @@ _only when `pushgateway --version` succeeds_
 - after `HTTP GET /metrics`:
   - HTTP status is `200`
   - body does not contain `ephemeral_metric`
+
 ### Scenario: a malformed exposition body is rejected and never ingested
 _only when `pushgateway --version` succeeds_
 #### Given
 - Background service `pushgateway` is started: `pushgateway --web.listen-address=127.0.0.1:18099`.
+
 #### When
 ```shell
 # HTTP POST /metrics/job/badjob via push3
@@ -71,10 +77,12 @@ _only when `pushgateway --version` succeeds_
 - after `HTTP GET /metrics`:
   - HTTP status is `200`
   - body does not contain `job="badjob"`
+
 ### Scenario: POST merges into a group while PUT replaces it
 _only when `pushgateway --version` succeeds_
 #### Given
 - Background service `pushgateway` is started: `pushgateway --web.listen-address=127.0.0.1:18100`.
+
 #### When
 ```shell
 # HTTP POST /metrics/job/svc via push4
@@ -97,10 +105,12 @@ _only when `pushgateway --version` succeeds_
   - HTTP status is `200`
   - body contains `metric_c`
   - body does not contain `metric_a`, `metric_b`
+
 ### Scenario: a grouping label decorates every metric in the group
 _only when `pushgateway --version` succeeds_
 #### Given
 - Background service `pushgateway` is started: `pushgateway --web.listen-address=127.0.0.1:18101`.
+
 #### When
 ```shell
 # HTTP POST /metrics/job/svc/instance/host1 via push5

@@ -10,6 +10,7 @@
   - [passphrase mode encrypts and decrypts interactively](#scenario-passphrase-mode-encrypts-and-decrypts-interactively)
 - [age + changes (single-artifact generator)](#age--changes-single-artifact-generator) — 1 scenario
   - [age-keygen writes exactly the key file (HOME untouched)](#scenario-age-keygen-writes-exactly-the-key-file-home-untouched)
+
 ## age (modern file encryption)
 [age](https://age-encryption.org/) is a small, modern file-encryption CLI —
 a Go-native tool many people ship alongside their own commands, and the
@@ -38,10 +39,12 @@ age-keygen -y key.txt
 - after `age-keygen -y key.txt`:
   - exit code is `0`
   - stdout matches `/(?m)^age1[a-z0-9]+$/`
+
 ### Scenario: encrypt then decrypt round-trips binary bytes exactly
 _only when `age --version` succeeds_
 #### Given
 - Fixture file `data.bin` is created.
+
 #### When
 ```shell
 age-keygen -o key.txt
@@ -60,10 +63,12 @@ cmp data.bin out.bin
   - exit code is `0`
 - after `cmp data.bin out.bin`:
   - exit code is `0`
+
 ### Scenario: armored output is PEM-wrapped
 _only when `age --version` succeeds_
 #### Given
 - Fixture file `msg.txt` is created.
+
 #### Inputs
 _Fixture `msg.txt`:_
 ```text
@@ -82,10 +87,12 @@ age -a -r ${pubkey} -o armored.age msg.txt
 - after `age -a -r ${pubkey} -o armored.age msg.txt`:
   - exit code is `0`
   - file `armored.age` contains `-----BEGIN AGE ENCRYPTED FILE-----`
+
 ### Scenario: decrypting with the wrong identity fails
 _only when `age --version` succeeds_
 #### Given
 - Fixture file `msg.txt` is created.
+
 #### Inputs
 _Fixture `msg.txt`:_
 ```text
@@ -110,10 +117,12 @@ age -d -i other.txt secret.age
 - after `age -d -i other.txt secret.age`:
   - exit code is `1`
   - stderr contains `no identity matched`
+
 ### Scenario: passphrase mode encrypts and decrypts interactively
 _only when `age --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `msg.txt` is created.
+
 #### Inputs
 _Fixture `msg.txt`:_
 ```text
@@ -131,8 +140,10 @@ passphrase protected
 - after `interactive (pty): age -d -o out.txt secret.age`:
   - exit code is `0`
   - file `out.txt` contains `passphrase protected`
+
 #### Generated artifacts
 - `secret.age`
+
 ## age + changes (single-artifact generator)
 A key generator should create the key and nothing else. This companion to
 the main age suite states that as an exact contract: `age-keygen` writes
@@ -149,6 +160,7 @@ Source: `test/e2e/thirdparty/age/changes.atago.yaml`
 _only when `age --version` succeeds_
 #### Given
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### When
 ```shell
 age-keygen -o key.txt

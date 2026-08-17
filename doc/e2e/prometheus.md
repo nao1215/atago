@@ -7,6 +7,7 @@
   - [promtool unit-tests an alerting rule](#scenario-promtool-unit-tests-an-alerting-rule)
   - [the server boots from an authored config and answers the query API](#scenario-the-server-boots-from-an-authored-config-and-answers-the-query-api)
   - [a self-scrape is ingested and queryable as up == 1](#scenario-a-self-scrape-is-ingested-and-queryable-as-up--1)
+
 ## prometheus (self-hosted monitoring system)
 [Prometheus](https://prometheus.io/) ships as two things, and this suite
 covers both.
@@ -29,6 +30,7 @@ _only when `command -v promtool && command -v prometheus` succeeds_
 #### Given
 - Fixture file `prometheus.yml` is created.
 - Fixture file `broken.yml` is created.
+
 #### Inputs
 _Fixture `prometheus.yml`:_
 ```text
@@ -56,11 +58,13 @@ promtool check config broken.yml
 - after `promtool check config broken.yml`:
   - exit code is not `0`
   - stderr contains `not a valid duration string`
+
 ### Scenario: promtool unit-tests an alerting rule
 _only when `command -v promtool && command -v prometheus` succeeds_
 #### Given
 - Fixture file `rules.yml` is created.
 - Fixture file `rules_test.yml` is created.
+
 #### Inputs
 _Fixture `rules.yml`:_
 ```text
@@ -110,12 +114,14 @@ promtool test rules rules_test.yml
 - after `promtool test rules rules_test.yml`:
   - exit code is `0`
   - stdout contains `SUCCESS`
+
 ### Scenario: the server boots from an authored config and answers the query API
 _only when `command -v promtool && command -v prometheus` succeeds_
 #### Given
 - Background service `prometheus` is started: `prometheus --config.file=prometheus.yml --storage.tsdb.path=data --web.listen-address=127.0.0.1:18130`.
 - Fixture file `prometheus.yml` is created.
 - The step is retried up to 30 times every 500ms until HTTP status is `200`.
+
 #### Inputs
 _Fixture `prometheus.yml`:_
 ```text
@@ -144,12 +150,14 @@ scrape_configs: []
 - after `HTTP GET /api/v1/query?query=vector(42)`:
   - HTTP status is `200`
   - body at `$.data.result[0].value[1]` equals `42`
+
 ### Scenario: a self-scrape is ingested and queryable as up == 1
 _only when `command -v promtool && command -v prometheus` succeeds_
 #### Given
 - Background service `prometheus` is started: `prometheus --config.file=prometheus.yml --storage.tsdb.path=data --web.listen-address=127.0.0.1:18131`.
 - Fixture file `prometheus.yml` is created.
 - The step is retried up to 30 times every 500ms until body at `$.data.result[0].value[1]` equals `1`.
+
 #### Inputs
 _Fixture `prometheus.yml`:_
 ```text

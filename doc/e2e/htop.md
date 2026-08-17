@@ -7,6 +7,7 @@
   - [an unrecognized option is rejected without opening the TUI](#scenario-an-unrecognized-option-is-rejected-without-opening-the-tui)
   - [the finder loads its function-key bar and quits on q](#scenario-the-finder-loads-its-function-key-bar-and-quits-on-q)
   - [the rendered screen shows the live meters and column header](#scenario-the-rendered-screen-shows-the-live-meters-and-column-header)
+
 ## htop (third-party CLI, full-screen TUI testbed)
 [htop](https://htop.dev/) is a full-screen program in the strict sense: it
 switches the terminal to the alternate screen buffer, paints meters and a
@@ -30,6 +31,7 @@ htop --version
 #### Then
 - exit code is `0`
 - stdout matches `/^htop [0-9]+\.[0-9]+/`
+
 ### Scenario: an unrecognized option is rejected without opening the TUI
 _only when `htop --version` succeeds_
 #### When
@@ -39,6 +41,7 @@ htop --nonexistent-flag
 #### Then
 - exit code is not `0`
 - stderr contains `unrecognized option`
+
 ### Scenario: the finder loads its function-key bar and quits on q
 _only when `htop --version` succeeds · skipped on Windows_
 #### When
@@ -47,6 +50,7 @@ _only when `htop --version` succeeds · skipped on Windows_
 ```
 #### Then
 - exit code is `0`
+
 ### Scenario: the rendered screen shows the live meters and column header
 _only when `htop --version` succeeds · skipped on Windows_
 #### When
