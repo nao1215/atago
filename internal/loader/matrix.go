@@ -27,6 +27,11 @@ func validateMatrix(s *spec.Spec) []string {
 			errs = append(errs, fmt.Sprintf("%s.matrix must contain at least one row", where))
 			continue
 		}
+		// The name template is expanded from the row alone, so a reference no
+		// row binds survives into the expanded scenario name as literal text.
+		// VarRefs is the shared reader of what a reference looks like, so the
+		// `$${who}` escape stays literal here exactly as it does everywhere else.
+		nameRefs := spec.VarRefs(sc.Name)
 		for r, row := range sc.Matrix {
 			if len(row) == 0 {
 				errs = append(errs, fmt.Sprintf("%s.matrix[%d] must contain at least one variable", where, r))
@@ -34,6 +39,13 @@ func validateMatrix(s *spec.Spec) []string {
 			for k := range row {
 				if reservedVarName(k) {
 					errs = append(errs, fmt.Sprintf("%s.matrix[%d] key %q shadows a built-in variable (%s); choose another name", where, r, k, builtinList()))
+				}
+			}
+			for _, ref := range nameRefs {
+				if _, bound := row[ref]; !bound {
+					errs = append(errs, fmt.Sprintf(
+						"%s.matrix[%d] does not bind ${%s}, which the scenario name references, so the row expands to a name carrying the literal text ${%s}; add %s to the row or drop it from the name",
+						where, r, ref, ref, ref))
 				}
 			}
 		}
