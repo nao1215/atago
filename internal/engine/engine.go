@@ -490,6 +490,11 @@ func (e *Engine) assertEnv(rc runConfig, workdir, specDir string) assert.Env {
 		KeepSnapshots:   rc.keepSnapshots,
 		Secrets:         rc.masker.MaskBytes,
 		Scrub:           rc.scrubber.Apply,
+		// Named explicitly, not omitted: the mock records are the one field a
+		// caller supplies afterwards, because only the scenario step path has them.
+		// Spelling the nil out keeps this constructor exhaustive, which is what
+		// stops the next run-scoped field from reaching three of the four sites.
+		MockRecords: nil,
 	}
 }
 

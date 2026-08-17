@@ -16,6 +16,12 @@ linters:
     - errchkjson
     - errname
     - errorlint
+    # exhaustruct is scoped to assert.Env alone. Applied broadly it is noise, but
+    # that struct is built by exactly one production constructor whose whole job is
+    # to be complete: the run-scoped fields it wires reached three of the four
+    # assertion sites twice before, and each time the fix was to route everything
+    # through this one function. Now the function itself cannot forget a field.
+    - exhaustruct
     # forbidigo carries the rules that are specific to atago rather than to Go.
     # All four report nothing today; they exist so the next change cannot quietly
     # take one of these away. See settings.forbidigo for what each one protects.
@@ -82,6 +88,9 @@ linters:
       # for the same reason, so the switches and the coverage tests are checked
       # against one universe.
       ignore-enum-members: 'atago/internal/(spec\.(StepNone|AssertNone))$'
+    exhaustruct:
+      include:
+        - 'github.com/nao1215/atago/internal/assert\.Env'
     forbidigo:
       analyze-types: true
       forbid:
@@ -138,8 +147,11 @@ linters:
         source: defer
       # Tests legitimately read files via computed temp paths and embed sample
       # spec text; gosec's G304/G101 are noise there.
+      # Tests build an Env with just the field under test, which is the readable
+      # way to write them; the constructor the rule protects is production code.
       - linters:
           - gosec
+          - exhaustruct
         path: _test\.go
       # A test helper subprocess is the program under test: printing to its own
       # stdout is what the capture assertions read.
