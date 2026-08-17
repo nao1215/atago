@@ -1,7 +1,7 @@
 ---
 toc: true
 title: Comparison
-description: How atago compares with Bats-core v1.14.0, ShellSpec 0.28.1, commander v2.5.0, goss v0.4.10, runn v1.9.4, and venom v1.3.0 — feature by feature, versions stated, sourced from official documentation.
+description: How atago compares with Bats-core v1.14.0, ShellSpec 0.28.1, commander v2.5.0, goss v0.4.10, runn v1.9.4, venom v1.3.0, and Microsoft TUI Test 0.0.4 — feature by feature, versions stated, sourced from official documentation.
 ---
 
 Every tool here is good software, written by people who understood their
@@ -9,18 +9,20 @@ problem well; several of them shaped how atago thinks about testing. This page
 exists to answer one practical question — *which tool owns which layer* — not
 to rank projects.
 
-Compared releases, checked on 2026-08-14 against each project's official
-documentation and release pages (linked under [Sources](#sources)):
+Compared releases, checked against each project's official documentation and
+release pages (linked under [Sources](#sources)) on 2026-08-14, and TUI Test on
+2026-08-15:
 
 | Tool | Release compared | Released |
 |------|------------------|----------|
-| [atago](https://github.com/nao1215/atago) | v0.19.0 | 2026 |
+| [atago](https://github.com/nao1215/atago) | v0.20.1 | 2026-08-15 |
 | [Bats-core](https://github.com/bats-core/bats-core) | v1.14.0 | 2026-07-21 |
 | [ShellSpec](https://github.com/shellspec/shellspec) | 0.28.1 | 2021-01-11 |
 | [commander](https://github.com/commander-cli/commander) | v2.5.0 | 2023-03-28 |
 | [goss](https://github.com/goss-org/goss) | v0.4.10 | 2026-07-26 |
 | [runn](https://github.com/k1LoW/runn) | v1.9.4 | 2026-06-30 |
 | [venom](https://github.com/ovh/venom) | v1.3.0 | 2026-01-06 |
+| [TUI Test](https://github.com/microsoft/tui-test) | 0.0.4 | 2026-04-04 |
 
 In the tables below, — means the compared release does not provide the
 feature itself, as far as its official documentation shows. If we got
@@ -53,7 +55,7 @@ test, they are the better choice:
 
 Bats, ShellSpec, and commander overlap with atago directly: all four run a
 command and assert on what happened. The tables compare that shared job.
-Columns are atago v0.19.0, Bats-core v1.14.0, ShellSpec 0.28.1, and
+Columns are atago v0.20.1, Bats-core v1.14.0, ShellSpec 0.28.1, and
 commander v2.5.0.
 
 ### Writing and running tests
@@ -116,6 +118,33 @@ commander v2.5.0.
 | Coverage of shell scripts | — | — | kcov integration built in | — |
 | Report formats | console / JSON / JUnit / GHA / TAP | pretty / TAP / TAP13 / JUnit | documentation / TAP / JUnit / custom | — |
 
+## The terminal layer: TUI applications
+
+[TUI Test](https://github.com/microsoft/tui-test) from Microsoft is the closest tool to atago at driving a real terminal. Columns are atago v0.20.1 and TUI Test 0.0.4; [0.1.0-beta.1](https://github.com/microsoft/tui-test/releases/tag/0.1.0-beta.1) is a Rust rewrite with a different shape, so read its README too.
+
+| | atago v0.20.1 | TUI Test 0.0.4 |
+|---|---|---|
+| Tests are written in | YAML | TypeScript / JavaScript |
+| Ships as | single binary | npm package (Node 16.6+, or Bun on macOS/Linux) |
+| Terminal emulation | vt10x, in-process | [xterm.js](https://xtermjs.org/) |
+| Isolation | fresh workdir and PTY per scenario | fresh terminal context (terminal + PTY) per test |
+| Named keys, typing, submit | `send:` with a named-key vocabulary | `keyPress` and per-key helpers, `submit`, `write` |
+| Mouse | clicks, drags, wheel, as SGR 1006 reports | `mouseDown` / `mousePress` / `mouseTo` / `mouseUp` |
+| Resize mid-session | `resize:` | `resize()` |
+| Assert on visible text | `expect_screen:` / `screen:` | `getByText(...)` with `toBeVisible` |
+| Assert on colors and styling | `attrs:` — fg, bg, bold, italic, underline, reverse, blink | `toHaveFgColor` / `toHaveBgColor` |
+| Screen snapshots | `snapshot:` with normalization and `atago snapshot update` | `toMatchSnapshot` |
+| Retry / flake handling | `retry:`, `--repeat`, `--retry-failed`, flake reported | `retries`, auto-wait before assertions |
+| Parallel execution | `--parallel` | `workers` |
+| What a failure leaves behind | `--artifacts-dir` writes the actual and expected payloads | traces record everything the terminal received, replayed with `show-trace` |
+| Replaying the session itself | — | traces, via `show-trace` |
+| Authoring a first test from a real session | `atago record --pty` writes the spec | — |
+| Windows | native, ConPTY | supported (Bun on macOS/Linux only) |
+| Shells driven | any executable, shell or not | cmd, Windows PowerShell, PowerShell, bash, git-bash, fish, zsh, xonsh |
+
+Where atago loses: TUI Test replays a failing session from a trace, which atago
+cannot do, and its tests are TypeScript beside the rest of a Node project.
+
 ## Other tools you might be weighing
 
 Adjacent tools that come up in the same search, each with an honest placement
@@ -170,6 +199,8 @@ An honest table needs the reverse direction spelled out:
   XML assertions and a first-class docker execution node, which atago lacks.
 - goss / runn / venom own their layers outright, as described
   [above](#tools-that-own-a-different-layer).
+- TUI Test replays a failing terminal session from a trace, which atago
+  cannot do. See [the terminal layer](#the-terminal-layer-tui-applications).
 
 atago is also the youngest project on this page and still pre-1.0. The spec
 format is versioned and every feature ships with a runnable, CI-tested
@@ -192,4 +223,5 @@ release stated above:
 - goss: [README](https://github.com/goss-org/goss), [releases](https://github.com/goss-org/goss/releases)
 - runn: [README](https://github.com/k1LoW/runn), [releases](https://github.com/k1LoW/runn/releases)
 - venom: [README](https://github.com/ovh/venom), [releases](https://github.com/ovh/venom/releases)
+- TUI Test: [README at 0.0.4](https://github.com/microsoft/tui-test/blob/0.0.4/README.md), [beta README](https://github.com/microsoft/tui-test/blob/main/README.md), [releases](https://github.com/microsoft/tui-test/releases)
 - atago: the [reference](/reference/) and the [runnable examples](/cookbook/#every-feature-has-a-runnable-spec) behind every claim
