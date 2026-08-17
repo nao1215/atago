@@ -73,12 +73,16 @@ func listCmd(args []string, stdout, stderr io.Writer) int {
 // (--filter/--tag/--skip-tag) and to preview generated artifacts without reading
 // the full manifest or executing the suite.
 type listRow struct {
-	SpecPath  string   `json:"spec_path"`
-	Suite     string   `json:"suite"`
-	Scenario  string   `json:"scenario"`
-	Tags      []string `json:"tags,omitempty"`
-	Gates     []string `json:"gates,omitempty"`
-	Artifacts []string `json:"artifacts,omitempty"`
+	SpecPath string   `json:"spec_path"`
+	Suite    string   `json:"suite"`
+	Scenario string   `json:"scenario"`
+	Tags     []string `json:"tags,omitempty"`
+	Gates    []string `json:"gates,omitempty"`
+	// ExpectFail carries a scenario's declared known bug. A listing that cannot
+	// tell one from a healthy scenario reads as promising more than the suite
+	// does, which is why explain, doc, and the manifest all report it.
+	ExpectFail *manifest.ExpectFail `json:"expect_fail,omitempty"`
+	Artifacts  []string             `json:"artifacts,omitempty"`
 }
 
 type listDocument struct {
@@ -95,12 +99,13 @@ func listRows(doc manifest.Document) []listRow {
 	for _, sp := range doc.Specs {
 		for _, sc := range sp.Scenarios {
 			rows = append(rows, listRow{
-				SpecPath:  sp.SpecPath,
-				Suite:     sp.Suite,
-				Scenario:  sc.Name,
-				Tags:      sc.Tags,
-				Gates:     scenarioGates(sc),
-				Artifacts: sc.Generates,
+				SpecPath:   sp.SpecPath,
+				Suite:      sp.Suite,
+				Scenario:   sc.Name,
+				Tags:       sc.Tags,
+				Gates:      scenarioGates(sc),
+				ExpectFail: sc.ExpectFail,
+				Artifacts:  sc.Generates,
 			})
 		}
 	}
@@ -158,16 +163,29 @@ func writeListJSON(doc manifest.Document, stdout, stderr io.Writer) int {
 
 func writeListTable(doc manifest.Document, stdout, stderr io.Writer) int {
 	tw := tabwriter.NewWriter(stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "SUITE\tSCENARIO\tTAGS\tGATES\tARTIFACTS")
+	// The XFAIL column is what keeps a listing honest: without it a scenario
+	// documenting a known bug reads exactly like one that guarantees behavior.
+	fmt.Fprintln(tw, "SUITE\tSCENARIO\tTAGS\tGATES\tXFAIL\tARTIFACTS")
 	for _, r := range listRows(doc) {
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n",
-			r.Suite, r.Scenario, joinOrDash(r.Tags), joinOrDash(r.Gates), joinOrDash(r.Artifacts))
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n",
+			r.Suite, r.Scenario, joinOrDash(r.Tags), joinOrDash(r.Gates), expectFailCell(r.ExpectFail), joinOrDash(r.Artifacts))
 	}
 	if err := tw.Flush(); err != nil {
 		fmt.Fprintf(stderr, "atago list: %v\n", err)
 		return ExitInternal
 	}
 	return ExitOK
+}
+
+// expectFailCell renders the XFAIL column: the marker for a scenario that
+// documents a known bug, and a dash for one that guarantees its behavior. The
+// reason belongs to explain and doc, which have room for prose; the table only
+// has to make the two kinds of row distinguishable.
+func expectFailCell(ef *manifest.ExpectFail) string {
+	if ef == nil {
+		return "-"
+	}
+	return "XFAIL"
 }
 
 func joinOrDash(items []string) string {

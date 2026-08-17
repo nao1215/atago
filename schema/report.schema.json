@@ -20,6 +20,10 @@
       "description": "Spec files the run could not read (#120). They ran no scenario, so they appear in no suite above; omitted when there are none.",
       "type": "array",
       "items": {"$ref": "#/$defs/load_failure"}
+    },
+    "snapshots_updated": {
+      "description": "Number of snapshots this run WROTE (--update-snapshots) instead of comparing against, so a consumer can tell a run that rewrote the committed expected results from one that verified them. Omitted when zero.",
+      "type": "integer"
     }
   },
   "$defs": {

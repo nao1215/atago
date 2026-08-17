@@ -24,6 +24,11 @@ type jsonDocument struct {
 	// scenario, so they appear in no suite above. Omitted when there are none, so
 	// an ordinary run's document is unchanged.
 	LoadFailures []jsonLoadFailure `json:"load_failures,omitempty"`
+	// SnapshotsUpdated counts the snapshots this run WROTE (--update-snapshots)
+	// instead of comparing against. Rewriting the committed expected results is
+	// the one passing outcome a consumer has to be able to notice; omitted when
+	// zero, so an ordinary verify run's document is unchanged.
+	SnapshotsUpdated int `json:"snapshots_updated,omitempty"`
 }
 
 // jsonLoadFailure names one unreadable spec and why it could not be read.

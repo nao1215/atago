@@ -222,6 +222,111 @@ scenarios:
 	}
 }
 
+// TestBuild_StepDeclarativeFields is a regression: the manifest's charter is to
+// describe what a spec declares without replaying it, and a run step's reduction
+// dropped cwd, timeout, and the redirect targets while an http step's dropped
+// body_to — so "which steps have no explicit timeout" or "which steps run
+// outside the workdir root" was unanswerable from the document.
+func TestBuild_StepDeclarativeFields(t *testing.T) {
+	t.Parallel()
+	const src = `
+version: "1"
+suite:
+  name: fields
+runners:
+  api: {type: http, base_url: "http://127.0.0.1:8080"}
+scenarios:
+  - name: declarative knobs
+    steps:
+      - run:
+          command: build-tool compile
+          cwd: sub/dir
+          timeout: 90s
+          stdout_to: logs/build.log
+          stderr_to: logs/build.err
+      - http:
+          runner: api
+          method: GET
+          path: /report
+          body_to: downloads/report.json
+`
+	s, err := loader.LoadBytes("f.atago.yaml", []byte(src))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	steps := Build([]Input{{Spec: s, Path: "f.atago.yaml"}}).Specs[0].Scenarios[0].Steps
+	run := steps[0]
+	if run.Cwd != "sub/dir" || run.Timeout != "90s" {
+		t.Errorf("run cwd/timeout = %q/%q, want sub/dir and 90s", run.Cwd, run.Timeout)
+	}
+	if run.StdoutTo != "logs/build.log" || run.StderrTo != "logs/build.err" {
+		t.Errorf("run redirects = %q/%q", run.StdoutTo, run.StderrTo)
+	}
+	if steps[1].BodyTo != "downloads/report.json" {
+		t.Errorf("http body_to = %q", steps[1].BodyTo)
+	}
+	// A step that sets none of them keeps the fields out of the document.
+	plain, err := loader.LoadBytes("p.atago.yaml", []byte("version: \"1\"\nsuite:\n  name: p\nscenarios:\n  - name: s\n    steps:\n      - run: {command: echo}\n"))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	blob, err := json.Marshal(Build([]Input{{Spec: plain, Path: "p.atago.yaml"}}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, absent := range []string{"cwd", "timeout", "stdout_to", "stderr_to", "body_to"} {
+		if strings.Contains(string(blob), `"`+absent+`"`) {
+			t.Errorf("an unset %s reached the manifest:\n%s", absent, blob)
+		}
+	}
+}
+
+// TestBuild_RunnerDeclarativeFields is a regression: the runner reduction kept
+// name/type/host and dropped everything a reviewer audits — a cmd runner's cwd
+// and timeout, an ssh runner's user, and above all insecure_host_key, whose
+// per-step security note fires only when a run step uses that runner. Credential
+// material stays out, as `has_dsn` already established.
+func TestBuild_RunnerDeclarativeFields(t *testing.T) {
+	t.Parallel()
+	const src = `
+version: "1"
+suite:
+  name: runnerfields
+runners:
+  slowbox: {type: cmd, cwd: ./sub, timeout: 45s}
+  jump: {type: ssh, host: "shell.example:2222", user: deploy, password: hunter2, insecure_host_key: true}
+scenarios:
+  - name: uses both
+    steps:
+      - run: {runner: slowbox, command: "true"}
+      - run: {runner: jump, command: uptime}
+`
+	s, err := loader.LoadBytes("r.atago.yaml", []byte(src))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	doc := Build([]Input{{Spec: s, Path: "r.atago.yaml"}})
+	byName := map[string]Runner{}
+	for _, r := range doc.Specs[0].Runners {
+		byName[r.Name] = r
+	}
+	if got := byName["slowbox"]; got.Cwd != "./sub" || got.Timeout != "45s" {
+		t.Errorf("cmd runner = %+v, want cwd and timeout", got)
+	}
+	jump := byName["jump"]
+	if jump.User != "deploy" || !jump.InsecureHostKey {
+		t.Errorf("ssh runner = %+v, want the user and the host-key opt-out", jump)
+	}
+	// The password is credential material and must never reach the document.
+	blob, err := json.Marshal(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(blob), "hunter2") {
+		t.Errorf("an ssh password leaked into the manifest:\n%s", blob)
+	}
+}
+
 // TestBuild_RetryUntilAndHTTPRunner is a regression on two counts: the manifest
 // carried a retry's times and interval but dropped the until condition that
 // ends the loop, and an http step's action line named no runner while every

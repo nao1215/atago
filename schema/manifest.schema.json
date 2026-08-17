@@ -202,6 +202,22 @@
         "host": {
           "type": "string"
         },
+        "user": {
+          "description": "An ssh runner's login user. Credential material (password, key file) is never emitted.",
+          "type": "string"
+        },
+        "cwd": {
+          "description": "A cmd runner's working directory, relative to the scenario workdir.",
+          "type": "string"
+        },
+        "timeout": {
+          "description": "A cmd runner's default step timeout.",
+          "type": "string"
+        },
+        "insecure_host_key": {
+          "description": "True when an ssh runner connects without verifying the host key — the opt-out the loader forces every ssh runner to state explicitly.",
+          "type": "boolean"
+        },
         "has_dsn": {
           "description": "True when a db runner declares a dsn; the dsn value itself is never emitted.",
           "type": "boolean"
@@ -431,6 +447,26 @@
         },
         "target": {
           "description": "Assert target or store name.",
+          "type": "string"
+        },
+        "cwd": {
+          "description": "The step's working directory, relative to the scenario workdir.",
+          "type": "string"
+        },
+        "timeout": {
+          "description": "The step's own timeout, when it sets one. Absent means the step inherits the runner, defaults, or suite budget.",
+          "type": "string"
+        },
+        "stdout_to": {
+          "description": "File a run step redirects stdout into.",
+          "type": "string"
+        },
+        "stderr_to": {
+          "description": "File a run step redirects stderr into.",
+          "type": "string"
+        },
+        "body_to": {
+          "description": "File an http step writes the response body into.",
           "type": "string"
         },
         "retry": {

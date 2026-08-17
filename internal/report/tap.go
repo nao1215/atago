@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/nao1215/atago/internal/engine"
+	"github.com/nao1215/atago/internal/plural"
 )
 
 // writeTAP emits a Test Anything Protocol (TAP version 13) stream, the format
@@ -94,6 +95,13 @@ func writeTAP(w io.Writer, results []*engine.SuiteResult, loadFailures []LoadFai
 		if msg := firstStepFailureMessage(res.Teardown); msg != "" {
 			fmt.Fprintf(&b, "# suite teardown failed: %s\n", tapFlatten(msg))
 		}
+	}
+	// A snapshot rewrite is not a test point — nothing was verified — so it is a
+	// comment, the slot TAP has for a fact a consumer should see without it
+	// counting toward the plan.
+	if n := snapshotsUpdated(results); n > 0 {
+		fmt.Fprintf(&b, "# %s updated by --update-snapshots; the committed expected results were rewritten\n",
+			plural.Count(n, "snapshot", "snapshots"))
 	}
 	_, err := io.WriteString(w, b.String())
 	return err

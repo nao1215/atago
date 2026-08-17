@@ -212,9 +212,24 @@ func firstErrorMessage(sc *engine.ScenarioResult) string {
 	return "execution error"
 }
 
-// detailText renders the human failure block as plain text for the XML body.
+// detailText renders the human failure block as plain text for the XML body,
+// closing with any preserved background-service logs (#51) — evidence the run
+// wrote for whoever reads the failure, which only the console and the json
+// report used to reference.
 func detailText(sc *engine.ScenarioResult) string {
-	return stepsDetailText(sc.Steps)
+	body := stepsDetailText(sc.Steps)
+	if len(sc.ServiceLogs) == 0 {
+		return body
+	}
+	var b strings.Builder
+	b.WriteString(body)
+	if body != "" {
+		b.WriteByte('\n')
+	}
+	for _, sl := range sc.ServiceLogs {
+		fmt.Fprintf(&b, "Service log (%s): %s\n", sl.Name, sl.Path)
+	}
+	return strings.TrimRight(b.String(), "\n")
 }
 
 // stepsDetailText renders the failed checks and errored steps of any step list
@@ -244,6 +259,12 @@ func stepsDetailText(steps []engine.StepResult) string {
 			}
 			if ck.Hint != "" {
 				fmt.Fprintf(&b, "Hint: %s\n", ck.Hint)
+			}
+			// Reference the durable sidecars by path (#48). The console and the
+			// json report carried them and these formats did not, so the CI
+			// systems they exist for could not reach the files the run wrote.
+			for _, a := range ck.ArtifactFiles {
+				fmt.Fprintf(&b, "Artifact (%s): %s\n", a.Role, a.Path)
 			}
 		}
 		if step.ErrMsg != "" {

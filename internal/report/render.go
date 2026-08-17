@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/nao1215/atago/internal/engine"
+	"github.com/nao1215/atago/internal/plural"
 )
 
 // flakyMessage renders the one-line reason a scenario is flaky, in a form that
@@ -118,6 +119,36 @@ func WithLoadFailures(fails ...LoadFailure) Option {
 	return func(o *renderOptions) { o.loadFailures = fails }
 }
 
+// snapshotsUpdated counts the checks that WROTE their snapshot instead of
+// comparing against it. Rewriting the committed goldens is the one passing
+// outcome a reviewer has to be told about: a job carrying --update-snapshots by
+// accident rewrites every expected result to whatever the code currently does
+// and still reports green.
+func snapshotsUpdated(results []*engine.SuiteResult) int {
+	n := 0
+	for _, res := range results {
+		for i := range res.Scenarios {
+			for _, step := range res.Scenarios[i].Steps {
+				for _, ck := range step.Checks {
+					if ck != nil && ck.SnapshotUpdated {
+						n++
+					}
+				}
+			}
+		}
+	}
+	return n
+}
+
+// snapshotSuffix names the snapshot rewrites in a summary line, in the shape
+// the flaky and load-failure tails already use.
+func snapshotSuffix(n int) string {
+	if n == 0 {
+		return ""
+	}
+	return fmt.Sprintf(", %s updated", plural.Count(n, "snapshot", "snapshots"))
+}
+
 // loadFailureSuffix renders the ", N specs failed to load" tail the console and
 // gha summaries share. A spec that never parsed ran no scenario, so it cannot be
 // folded into the passed/failed tally without lying about how much was tested —
@@ -187,11 +218,11 @@ func Render(w io.Writer, f Format, results []*engine.SuiteResult, opts ...Option
 		if o.hasElapsed {
 			dur = o.elapsed
 		}
-		writeSummary(&b, color, agg, total, dur, hardFail, len(o.loadFailures), o.allowFlaky, o.allowXPass)
+		writeSummary(&b, color, agg, total, dur, hardFail, len(o.loadFailures), o.allowFlaky, o.allowXPass, snapshotsUpdated(results))
 		_, err := io.WriteString(w, b.String())
 		return err
 	case FormatJSON:
-		doc := jsonDocument{SchemaVersion: jsonSchemaVersion, Suites: make([]jsonReport, 0, len(results))}
+		doc := jsonDocument{SchemaVersion: jsonSchemaVersion, Suites: make([]jsonReport, 0, len(results)), SnapshotsUpdated: snapshotsUpdated(results)}
 		for _, res := range results {
 			doc.Suites = append(doc.Suites, buildJSON(res, o.allowXPass))
 		}
