@@ -100,6 +100,9 @@ type renderOptions struct {
 	// an XPASS fails the run by default, so the summary must read FAILED unless
 	// the caller accepted it.
 	allowXPass bool
+	// snapshotsUpdated is how many golden files the run rewrote under
+	// --update-snapshots, as counted by the engine's write recorder.
+	snapshotsUpdated int
 }
 
 // LoadFailure is one spec file the run was given and could not read: the path
@@ -119,25 +122,20 @@ func WithLoadFailures(fails ...LoadFailure) Option {
 	return func(o *renderOptions) { o.loadFailures = fails }
 }
 
-// snapshotsUpdated counts the checks that WROTE their snapshot instead of
-// comparing against it. Rewriting the committed goldens is the one passing
+// WithSnapshotsUpdated records how many golden files this run rewrote under
+// --update-snapshots. Rewriting the committed goldens is the one passing
 // outcome a reviewer has to be told about: a job carrying --update-snapshots by
 // accident rewrites every expected result to whatever the code currently does
 // and still reports green.
-func snapshotsUpdated(results []*engine.SuiteResult) int {
-	n := 0
-	for _, res := range results {
-		for i := range res.Scenarios {
-			for _, step := range res.Scenarios[i].Steps {
-				for _, ck := range step.Checks {
-					if ck != nil && ck.SnapshotUpdated {
-						n++
-					}
-				}
-			}
-		}
-	}
-	return n
+//
+// The count comes from the engine's write recorder rather than from the
+// reported results, because the results cannot answer the question. A walk over
+// them missed a scenario's teardown and both suite lifecycle blocks, never saw
+// the repeat/retry iterations that are not the surviving result — so a run that
+// went red after rewriting a golden reported no rewrite at all — and counted one
+// per matrix row where one file was written.
+func WithSnapshotsUpdated(n int) Option {
+	return func(o *renderOptions) { o.snapshotsUpdated = n }
 }
 
 // snapshotSuffix names the snapshot rewrites in a summary line, in the shape
@@ -218,11 +216,11 @@ func Render(w io.Writer, f Format, results []*engine.SuiteResult, opts ...Option
 		if o.hasElapsed {
 			dur = o.elapsed
 		}
-		writeSummary(&b, color, agg, total, dur, hardFail, len(o.loadFailures), o.allowFlaky, o.allowXPass, snapshotsUpdated(results))
+		writeSummary(&b, color, agg, total, dur, hardFail, len(o.loadFailures), o.allowFlaky, o.allowXPass, o.snapshotsUpdated)
 		_, err := io.WriteString(w, b.String())
 		return err
 	case FormatJSON:
-		doc := jsonDocument{SchemaVersion: jsonSchemaVersion, Suites: make([]jsonReport, 0, len(results)), SnapshotsUpdated: snapshotsUpdated(results)}
+		doc := jsonDocument{SchemaVersion: jsonSchemaVersion, Suites: make([]jsonReport, 0, len(results)), SnapshotsUpdated: o.snapshotsUpdated}
 		for _, res := range results {
 			doc.Suites = append(doc.Suites, buildJSON(res, o.allowXPass))
 		}
@@ -237,9 +235,9 @@ func Render(w io.Writer, f Format, results []*engine.SuiteResult, opts ...Option
 	case FormatJUnit:
 		return writeJUnit(w, buildJUnit(results, o.allowXPass, o.loadFailures))
 	case FormatGHA:
-		return writeGHA(w, results, o.allowXPass, o.loadFailures)
+		return writeGHA(w, results, o.allowXPass, o.loadFailures, o.snapshotsUpdated)
 	case FormatTAP:
-		return writeTAP(w, results, o.loadFailures)
+		return writeTAP(w, results, o.loadFailures, o.snapshotsUpdated)
 	default:
 		return fmt.Errorf("unknown report format %q", f)
 	}

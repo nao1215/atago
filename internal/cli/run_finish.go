@@ -40,7 +40,7 @@ func finishRun(ctx context.Context, opts *runOptions, suiteResults []*engine.Sui
 
 	exit = worseExit(exit, emptySelectionExit(ctx, opts, results))
 
-	if err := report.Render(opts.stdout, opts.format, results, report.WithLoadFailures(loadFailures...), report.WithElapsed(elapsed), report.WithAllowFlaky(opts.allowFlaky), report.WithAllowXPass(opts.allowXPass)); err != nil {
+	if err := report.Render(opts.stdout, opts.format, results, report.WithLoadFailures(loadFailures...), report.WithElapsed(elapsed), report.WithAllowFlaky(opts.allowFlaky), report.WithAllowXPass(opts.allowXPass), report.WithSnapshotsUpdated(opts.snapshotsUpdated)); err != nil {
 		fmt.Fprintf(opts.stderr, opts.label+": failed to write report: %v\n", err)
 		return worseExit(exit, ExitInternal)
 	}

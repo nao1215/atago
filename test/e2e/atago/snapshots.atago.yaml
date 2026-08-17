@@ -58,3 +58,102 @@ scenarios:
           exit_code: 0
           stdout:
             contains: "2 passed"
+      # Two scenarios sharing a golden rewrite ONE file, and the count names
+      # files: reporting two rewrites of one path overstates what changed.
+      - assert:
+          stdout:
+            not_contains: "2 snapshots updated"
+
+  # Regression: the rewrite count was derived by walking the scenarios' numbered
+  # steps, so a golden written by a teardown or by the suite lifecycle was
+  # rewritten with the summary reporting fewer — or none.
+  - name: the rewrite count covers teardown and the suite lifecycle
+    steps:
+      - fixture:
+          file: lifecycle.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: lifecycle
+              setup:
+                - run: {shell: true, command: "echo setup banner"}
+                - assert: {stdout: {snapshot: setup.snap}}
+              teardown:
+                - run: {shell: true, command: "echo suite teardown"}
+                - assert: {stdout: {snapshot: suite_teardown.snap}}
+            scenarios:
+              - name: writes goldens in every phase
+                steps:
+                  - run: {shell: true, command: "echo main output"}
+                  - assert: {stdout: {snapshot: main.snap}}
+                teardown:
+                  - run: {shell: true, command: "echo scenario teardown"}
+                  - assert: {stdout: {snapshot: scenario_teardown.snap}}
+      - run:
+          command: ${atago} run --parallel 1 --update-snapshots lifecycle.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "4 snapshots updated"
+      - assert:
+          file: {path: setup.snap, contains: "setup banner"}
+      - assert:
+          file: {path: suite_teardown.snap, contains: "suite teardown"}
+      - assert:
+          file: {path: scenario_teardown.snap, contains: "scenario teardown"}
+      # The goldens the run wrote verify on the next run, in every phase.
+      - run:
+          command: ${atago} run --parallel 1 lifecycle.atago.yaml
+      - assert:
+          exit_code: 0
+
+  # Regression: a run that goes red still rewrote whatever goldens it got to,
+  # and the count was read from the surviving result — which a --repeat fold
+  # replaces — so the rewrite was reported nowhere at all.
+  - name: a red run still reports the goldens it rewrote
+    steps:
+      - fixture:
+          file: unstable.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: unstable
+            scenarios:
+              - name: output differs between iterations
+                steps:
+                  - run: {shell: true, command: "date +%s%N"}
+                  - assert: {stdout: {snapshot: now.snap}}
+      - run:
+          command: ${atago} run --parallel 1 --repeat 2 --update-snapshots unstable.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: "1 snapshot updated"
+      - assert:
+          file: {path: now.snap, exists: true}
+
+  # Regression: a retry attempt clashing with the write its OWN first attempt
+  # made was reported as two scenarios sharing a path, sending the reader after
+  # a second scenario that does not exist.
+  - name: a clash with the scenario's own earlier attempt names the attempt
+    steps:
+      - fixture:
+          file: retry.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: retry
+            scenarios:
+              - name: snapshots a value that changes every attempt
+                steps:
+                  - run: {shell: true, command: "date +%s%N"}
+                  - assert: {stdout: {snapshot: attempt.snap}}
+                  - run: {shell: true, command: "exit 1"}
+                  - assert: {exit_code: 0}
+      - run:
+          command: ${atago} run --parallel 1 --retry-failed 1 --update-snapshots retry.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: "changed between attempts of this scenario"
+            not_contains: "two scenarios cannot share"

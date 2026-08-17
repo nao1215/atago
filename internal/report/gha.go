@@ -14,8 +14,7 @@ import (
 // failures surface inline in the Actions UI. One `::error::` line per failed or
 // errored scenario, plus a final `::notice::` summary. Rendered by Render
 // (FormatGHA).
-func writeGHA(w io.Writer, results []*engine.SuiteResult, allowXPass bool, loadFailures []LoadFailure) error {
-	snapsUpdated := snapshotsUpdated(results)
+func writeGHA(w io.Writer, results []*engine.SuiteResult, allowXPass bool, loadFailures []LoadFailure, snapsUpdated int) error {
 	var b strings.Builder
 	var agg engine.Counts
 	var total int

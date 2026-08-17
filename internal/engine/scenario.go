@@ -63,6 +63,13 @@ func (e *Engine) runScenario(ctx context.Context, scenarioIdx int, sc *spec.Scen
 		return ScenarioResult{Name: sc.Name, Status: StatusSkipped, SkipReason: reason}
 	}
 
+	// rc is this scenario's own copy. Naming the writer here — with the same
+	// identity the rerun ledger uses, so the two notions cannot drift — is what
+	// lets a snapshot clash tell a second scenario apart from this scenario's
+	// own earlier attempt. Matrix rows are distinct scenarios and get distinct
+	// names, which is what keeps a genuine shared-golden clash reported as one.
+	rc.snapshotWriter = ScenarioID(rc.specPath, sc.Name)
+
 	x := &scenarioRun{
 		e:            e,
 		idx:          scenarioIdx,

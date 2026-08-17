@@ -126,6 +126,14 @@ func New() *Engine {
 	}
 }
 
+// SnapshotsUpdated reports how many distinct golden files this engine's run
+// rewrote under --update-snapshots. It comes from the recorder the writes
+// themselves go through, which is the only place that sees all of them: a walk
+// over the reported results misses a teardown, a suite lifecycle block, and the
+// repeat/retry iterations that are not the surviving one, and it counts a check
+// per matrix row where one file was written.
+func (e *Engine) SnapshotsUpdated() int { return e.snapshotWrites.Count() }
+
 // builtinVars are variables seeded into every scenario's store. ${atago} is the
 // absolute path of the running atago binary, which lets self-hosted E2E specs
 // invoke atago from inside their isolated temp workdir.
@@ -452,6 +460,12 @@ type runConfig struct {
 	// suiteMocks are the suite-wide stub HTTP servers (#24), threaded here so
 	// scenario `mock:` asserts can read their recorded requests.
 	suiteMocks []*mockrunner.Server
+	// snapshotWriter identifies who a snapshot claim belongs to. runScenario
+	// sets it on its own copy to the scenario's identity, so a path claimed
+	// twice under that name is one scenario's own repeat/retry attempt rather
+	// than two scenarios sharing a golden. The suite lifecycle leaves it at the
+	// suite-block label it sets for itself.
+	snapshotWriter string
 }
 
 // absPath makes a path absolute for use as a spec variable, falling back to the

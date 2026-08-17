@@ -799,6 +799,12 @@ func TestJSON_ScenarioTeardownFailures(t *testing.T) {
 // and left no trace anywhere. A CI job that carries the flag by accident
 // rewrites every golden to whatever the code currently does and reports green,
 // with nothing in the output for a reviewer of the log to notice.
+//
+// The count is a property of the run rather than of the results, so it arrives
+// as an option: the engine's write recorder is the only place that sees a
+// rewrite made by a teardown, a suite lifecycle block, or a repeat iteration
+// that is not the surviving result. What this test pins is that every format
+// reports the number it is given.
 func TestSnapshotUpdates_AreReported(t *testing.T) {
 	t.Parallel()
 	res := &engine.SuiteResult{
@@ -815,23 +821,23 @@ func TestSnapshotUpdates_AreReported(t *testing.T) {
 		}},
 	}
 
-	console := render(t, FormatConsole, res)
+	console := render(t, FormatConsole, res, WithSnapshotsUpdated(1))
 	if !strings.Contains(console, "1 snapshot updated") {
 		t.Errorf("console summary does not report the update:\n%s", console)
 	}
 
 	var doc jsonDocument
-	if err := json.Unmarshal([]byte(render(t, FormatJSON, res)), &doc); err != nil {
+	if err := json.Unmarshal([]byte(render(t, FormatJSON, res, WithSnapshotsUpdated(1))), &doc); err != nil {
 		t.Fatalf("json invalid: %v", err)
 	}
 	if doc.SnapshotsUpdated != 1 {
 		t.Errorf("json snapshots_updated = %d, want 1", doc.SnapshotsUpdated)
 	}
 
-	if out := render(t, FormatGHA, res); !strings.Contains(out, "1 snapshot updated") {
+	if out := render(t, FormatGHA, res, WithSnapshotsUpdated(1)); !strings.Contains(out, "1 snapshot updated") {
 		t.Errorf("gha summary does not report the update:\n%s", out)
 	}
-	if out := render(t, FormatTAP, res); !strings.Contains(out, "# 1 snapshot updated") {
+	if out := render(t, FormatTAP, res, WithSnapshotsUpdated(1)); !strings.Contains(out, "# 1 snapshot updated") {
 		t.Errorf("tap stream does not report the update:\n%s", out)
 	}
 

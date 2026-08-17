@@ -114,6 +114,11 @@ type Env struct {
 	// two scenarios cannot silently claim one path with different output. Nil
 	// outside a run, where there is nothing to scope the writes to.
 	SnapshotWrites *SnapshotWrites
+	// Writer identifies whose write a snapshot claim is — a scenario, or a suite
+	// lifecycle block. A path claimed twice by the SAME writer is a repeat
+	// iteration or a retry attempt producing different output, which is a
+	// different finding from two scenarios sharing one golden.
+	Writer string
 }
 
 func pass(desc string) *CheckResult { return &CheckResult{OK: true, Desc: desc} }
