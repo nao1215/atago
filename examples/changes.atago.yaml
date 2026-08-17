@@ -13,6 +13,11 @@ version: "1"
 # nothing", and an omitted field is unconstrained. Fixture writes happen before
 # the step's pre-scan, so they are inputs, not changes.
 #
+# An entry is compared by everything a step can observably change about it:
+# content, symlink target, kind, and POSIX permission bits. A chmod is therefore
+# a modification even when the bytes are identical, and a planted FIFO or socket
+# is a creation.
+#
 # The multi-file setup uses a POSIX shell, so this scenario skips on Windows;
 # the delta computation itself is covered on every OS by unit tests.
 # Runs green as-is on Linux/macOS: atago run examples/changes.atago.yaml
@@ -78,3 +83,29 @@ scenarios:
               # instead of being parsed as a character class or brace alternation.
               - report\[2026\].csv
               - data\{v2\}.csv
+
+  # Permissions are part of the delta: a command that only widens a config's
+  # mode changes nothing about its bytes, and `modified: []` would have called
+  # that untouched. The same change is visible to `file: {executable: ...}`, so
+  # the two targets now agree about the same step.
+  - name: a permission change is a modification
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: deploy.sh
+          content: "#!/bin/sh\necho deploying\n"
+      - run:
+          shell: true
+          command: "chmod 755 deploy.sh"
+      - assert:
+          exit_code: 0
+          changes:
+            created: []
+            modified:
+              - deploy.sh
+            deleted: []
+      - assert:
+          file:
+            path: deploy.sh
+            executable: true

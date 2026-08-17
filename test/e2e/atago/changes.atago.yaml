@@ -120,12 +120,16 @@ scenarios:
     skip:
       os: windows
     steps:
-      # The delta is content-hash based, not event based: a file that is
-      # removed and rewritten with its ORIGINAL bytes is indistinguishable from
-      # untouched, so it appears in none of created/modified/deleted.
-      - fixture:
-          file: f.txt
-          content: "hello"
+      # The delta is state based, not event based: a file that is removed and
+      # rewritten with its ORIGINAL bytes and mode is indistinguishable from
+      # untouched, so it appears in none of created/modified/deleted. The seed
+      # is written by the shell rather than by a fixture so that both writes get
+      # the same umask-derived mode — a fixture is written 0600, and recreating
+      # it through the shell would be a permission change, which the delta does
+      # report.
+      - run:
+          shell: true
+          command: 'printf hello > f.txt'
       - run:
           shell: true
           command: 'rm f.txt && printf hello > f.txt'
@@ -500,3 +504,65 @@ scenarios:
           exit_code: 1
           stdout:
             contains: 'created entry "out.txt" matched no file the step created'
+
+  # The delta compares what a step can observably change about an entry, not
+  # only its bytes: a chmod is a modification, and an entry that is not a
+  # regular file at all is still a creation. Both used to slip past an
+  # exhaustive claim — a spec could assert `modified: []` on the same line as a
+  # `file: {executable: true}` that proved the step had just made the file
+  # world-writable and executable.
+  - name: a permission-only change is a modification
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: cfg.yaml
+          content: "k: v\n"
+      - run:
+          shell: true
+          command: "chmod 777 cfg.yaml"
+      - assert:
+          exit_code: 0
+          changes:
+            created: []
+            modified: [cfg.yaml]
+            deleted: []
+      # The other target that already saw this change agrees with the delta now.
+      - assert:
+          file:
+            path: cfg.yaml
+            executable: true
+
+  - name: a planted fifo is a creation and is never opened
+    skip:
+      os: windows
+    steps:
+      # A scan that opened the FIFO would block until a writer appeared, so this
+      # scenario is also the guard against the delta hanging a run.
+      - run:
+          shell: true
+          command: "mkfifo pipe"
+      - assert:
+          exit_code: 0
+          changes:
+            created: [pipe]
+            modified: []
+            deleted: []
+      # And an exhaustive claim that forgets it fails, rather than passing.
+      - fixture:
+          file: blind.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: blind}
+            scenarios:
+              - name: an undeclared fifo is not invisible
+                steps:
+                  - run: {shell: true, command: "mkfifo surprise"}
+                  - assert:
+                      changes:
+                        created: []
+      - run: {command: "${atago} run blind.atago.yaml"}
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: 'unexpected created file "surprise"'

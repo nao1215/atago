@@ -453,17 +453,20 @@ func TestScan_BrokenAndCyclicSymlinksNoCrash(t *testing.T) {
 // TestDiff_MetadataOnlyChangeNotDetected pins that the delta is purely
 // content-based: a chmod-only or mtime-only change leaves the hash unchanged and
 // is reported nowhere, so `changes:` does not flag a file whose bytes are equal.
-func TestDiff_MetadataOnlyChangeNotDetected(t *testing.T) {
+// TestDiff_TimestampOnlyChangeNotDetected pins what stays outside the delta: a
+// file whose mtime moved but whose content and permissions did not is untouched.
+// Timestamps are not behavior a spec can assert anywhere else in atago, and a
+// step that merely reads a file would otherwise show up as modifying it.
+// Permission bits are the opposite case — atago already treats the execute bit
+// as observable in file: {executable: ...} — and are covered by the specimen
+// table below.
+func TestDiff_TimestampOnlyChangeNotDetected(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	write(t, root, "perm.txt", "bytes")
 	write(t, root, "time.txt", "bytes")
 	pre, err := Scan(root)
 	if err != nil {
 		t.Fatalf("pre scan: %v", err)
-	}
-	if err := os.Chmod(filepath.Join(root, "perm.txt"), 0o600); err != nil {
-		t.Fatal(err)
 	}
 	old := time.Now().Add(-48 * time.Hour)
 	if err := os.Chtimes(filepath.Join(root, "time.txt"), old, old); err != nil {
@@ -474,8 +477,233 @@ func TestDiff_MetadataOnlyChangeNotDetected(t *testing.T) {
 		t.Fatalf("post scan: %v", err)
 	}
 	if d := Diff(pre, post); len(d.Created)+len(d.Modified)+len(d.Deleted) != 0 {
-		t.Errorf("metadata-only Diff() = %+v, want all empty (content unchanged)", d)
+		t.Errorf("timestamp-only Diff() = %+v, want all empty", d)
 	}
+}
+
+// entrySpecimen is one kind of filesystem entry the workdir delta has to have a
+// decision about. Every kind states whether a delta tracks it and, when it does
+// not, why — a kind nobody decided about fails the table below instead of
+// falling silently through the walk's kind filter, which is how a permission
+// change and a FIFO came to pass an exhaustive `modified: []`.
+type entrySpecimen struct {
+	name string
+	// plant creates the entry at path.
+	plant func(t *testing.T, path string)
+	// mutate makes the smallest observable change to an existing entry. nil
+	// means the kind has no in-place change to make, which is itself a decision.
+	mutate func(t *testing.T, path string)
+	// tracked says whether Scan records the entry at all. An untracked kind must
+	// say why in reason.
+	tracked bool
+	reason  string
+	// skip reports that this host cannot carry the specimen (a kind Windows has
+	// no equivalent of, a node only root can create).
+	skip func() string
+}
+
+func entrySpecimens() []entrySpecimen {
+	posixOnly := func(what string) func() string {
+		return func() string {
+			if runtime.GOOS == "windows" {
+				return "no " + what + " on Windows"
+			}
+			return ""
+		}
+	}
+	chmodTo := func(mode os.FileMode) func(*testing.T, string) {
+		return func(t *testing.T, path string) {
+			t.Helper()
+			if err := os.Chmod(path, mode); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	return []entrySpecimen{
+		{
+			name:    "regular file content",
+			plant:   func(t *testing.T, path string) { t.Helper(); writeFileAt(t, path, "before", 0o644) },
+			mutate:  func(t *testing.T, path string) { t.Helper(); writeFileAt(t, path, "after", 0o644) },
+			tracked: true,
+		},
+		{
+			name:    "regular file permissions",
+			plant:   func(t *testing.T, path string) { t.Helper(); writeFileAt(t, path, "same", 0o644) },
+			mutate:  chmodTo(0o777),
+			tracked: true,
+			skip:    posixOnly("meaningful POSIX mode bits"),
+		},
+		{
+			name:    "unreadable regular file",
+			plant:   func(t *testing.T, path string) { t.Helper(); writeFileAt(t, path, "secret", 0o000) },
+			mutate:  chmodTo(0o644),
+			tracked: true,
+			skip: func() string {
+				if runtime.GOOS == "windows" {
+					return "chmod 000 does not deny reads on Windows"
+				}
+				if os.Geteuid() == 0 {
+					return "root bypasses mode 000"
+				}
+				return ""
+			},
+		},
+		{
+			name:    "symlink",
+			plant:   func(t *testing.T, path string) { t.Helper(); symlinkAt(t, "target-a", path) },
+			mutate:  func(t *testing.T, path string) { t.Helper(); relinkAt(t, "target-b", path) },
+			tracked: true,
+			skip:    posixOnly("unprivileged symlinks"),
+		},
+		{
+			name:    "named pipe",
+			plant:   func(t *testing.T, path string) { t.Helper(); mkfifoAt(t, path, 0o644) },
+			mutate:  chmodTo(0o600),
+			tracked: true,
+			skip:    posixOnly("named pipes"),
+		},
+		{
+			name:    "unix socket",
+			plant:   func(t *testing.T, path string) { t.Helper(); socketAt(t, path) },
+			mutate:  chmodTo(0o600),
+			tracked: true,
+			skip:    posixOnly("unix sockets"),
+		},
+		{
+			name:  "directory",
+			plant: func(t *testing.T, path string) { t.Helper(); mkdirAt(t, path, 0o755) },
+			// A directory is not a file the assertion reasons about: an empty one
+			// is not a change anybody writes `created:` for, and every file inside
+			// it is reported on its own. A rename stays delete+create of the files.
+			tracked: false,
+			reason:  "directories are deliberately out of scope; their contents are tracked individually",
+		},
+	}
+}
+
+// TestScan_EveryEntryKindIsDecided crosses each entry kind with the four things
+// a step can do to it, so no kind can reach the delta without a stated
+// expectation. The permission and non-regular rows are the ones that used to
+// pass an exhaustive `modified: []` while the step plainly changed the workdir.
+func TestScan_EveryEntryKindIsDecided(t *testing.T) {
+	t.Parallel()
+	for _, sp := range entrySpecimens() {
+		t.Run(sp.name, func(t *testing.T) {
+			t.Parallel()
+			if sp.skip != nil {
+				if why := sp.skip(); why != "" {
+					t.Skip(why)
+				}
+			}
+			if !sp.tracked && sp.reason == "" {
+				t.Fatalf("specimen %q is untracked without a stated reason", sp.name)
+			}
+
+			t.Run("created", func(t *testing.T) {
+				t.Parallel()
+				root := t.TempDir()
+				pre := scanOrFail(t, root)
+				sp.plant(t, filepath.Join(root, "entry"))
+				post := scanOrFail(t, root)
+				wantDelta(t, Diff(pre, post), Delta{Created: trackedList(sp, "entry")}, sp)
+			})
+			t.Run("deleted", func(t *testing.T) {
+				t.Parallel()
+				root := t.TempDir()
+				sp.plant(t, filepath.Join(root, "entry"))
+				pre := scanOrFail(t, root)
+				if err := os.RemoveAll(filepath.Join(root, "entry")); err != nil {
+					t.Fatal(err)
+				}
+				post := scanOrFail(t, root)
+				wantDelta(t, Diff(pre, post), Delta{Deleted: trackedList(sp, "entry")}, sp)
+			})
+			t.Run("untouched", func(t *testing.T) {
+				t.Parallel()
+				root := t.TempDir()
+				sp.plant(t, filepath.Join(root, "entry"))
+				pre := scanOrFail(t, root)
+				post := scanOrFail(t, root)
+				wantDelta(t, Diff(pre, post), Delta{}, sp)
+			})
+			if sp.mutate == nil {
+				return
+			}
+			t.Run("modified", func(t *testing.T) {
+				t.Parallel()
+				root := t.TempDir()
+				sp.plant(t, filepath.Join(root, "entry"))
+				pre := scanOrFail(t, root)
+				sp.mutate(t, filepath.Join(root, "entry"))
+				post := scanOrFail(t, root)
+				wantDelta(t, Diff(pre, post), Delta{Modified: trackedList(sp, "entry")}, sp)
+			})
+		})
+	}
+}
+
+// trackedList is the expected path list for a tracked kind, and empty for a kind
+// the delta deliberately ignores.
+func trackedList(sp entrySpecimen, name string) []string {
+	if !sp.tracked {
+		return nil
+	}
+	return []string{name}
+}
+
+func wantDelta(t *testing.T, got, want Delta, sp entrySpecimen) {
+	t.Helper()
+	if !reflect.DeepEqual(got, want) {
+		if !sp.tracked {
+			t.Errorf("Diff() = %+v, want %+v (%s: %s)", got, want, sp.name, sp.reason)
+			return
+		}
+		t.Errorf("Diff() = %+v, want %+v", got, want)
+	}
+}
+
+func scanOrFail(t *testing.T, root string) Snapshot {
+	t.Helper()
+	snap, err := Scan(root)
+	if err != nil {
+		t.Fatalf("scan %s: %v", root, err)
+	}
+	return snap
+}
+
+func writeFileAt(t *testing.T, path, content string, mode os.FileMode) {
+	t.Helper()
+	if err := os.WriteFile(path, []byte(content), mode); err != nil {
+		t.Fatal(err)
+	}
+	// WriteFile applies the umask to a file it creates and leaves an existing
+	// file's mode alone, so state the mode explicitly.
+	if err := os.Chmod(path, mode); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(path, 0o600) })
+}
+
+func mkdirAt(t *testing.T, path string, mode os.FileMode) {
+	t.Helper()
+	if err := os.Mkdir(path, mode); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func symlinkAt(t *testing.T, target, path string) {
+	t.Helper()
+	if err := os.Symlink(target, path); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func relinkAt(t *testing.T, target, path string) {
+	t.Helper()
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	symlinkAt(t, target, path)
 }
 
 // TestDiff_EmptySnapshots covers the trivial edges: two empty snapshots produce

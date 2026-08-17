@@ -31,7 +31,7 @@
   - [an upload action without a file fails validation (exit 2)](#scenario-an-upload-action-without-a-file-fails-validation-exit-2)
   - [a download action without a click selector fails validation (exit 2)](#scenario-a-download-action-without-a-click-selector-fails-validation-exit-2)
   - [a navigate to a denied host is a policy violation (exit 6)](#scenario-a-navigate-to-a-denied-host-is-a-policy-violation-exit-6)
-- [atago self-hosting / changes (workdir delta assertions)](#atago-self-hosting--changes-workdir-delta-assertions) — 21 scenarios
+- [atago self-hosting / changes (workdir delta assertions)](#atago-self-hosting--changes-workdir-delta-assertions) — 23 scenarios
   - [a generator touches exactly the files it should (POSIX)](#scenario-a-generator-touches-exactly-the-files-it-should-posix)
   - [an unexpected creation breaks the exact contract (POSIX)](#scenario-an-unexpected-creation-breaks-the-exact-contract-posix)
   - [stdout_to counts as created, and modified nothing holds (portable)](#scenario-stdout_to-counts-as-created-and-modified-nothing-holds-portable)
@@ -53,6 +53,8 @@
   - [a changes entry naming a directory says what the path is](#scenario-a-changes-entry-naming-a-directory-says-what-the-path-is)
   - [an ignored path does not break an exhaustive delta](#scenario-an-ignored-path-does-not-break-an-exhaustive-delta)
   - [an ignored path cannot satisfy an entry that names it](#scenario-an-ignored-path-cannot-satisfy-an-entry-that-names-it)
+  - [a permission-only change is a modification](#scenario-a-permission-only-change-is-a-modification)
+  - [a planted fifo is a creation and is never opened](#scenario-a-planted-fifo-is-a-creation-and-is-never-opened)
 - [atago self-hosting / CLI scenario selection](#atago-self-hosting--cli-scenario-selection) — 9 scenarios
   - [filter selects by a name substring](#scenario-filter-selects-by-a-name-substring)
   - [filter is OR across a comma-separated list](#scenario-filter-is-or-across-a-comma-separated-list)
@@ -1344,20 +1346,15 @@ touch a; [ -f b ] && touch c; touch b; [ -f c ]
 - the step changed exactly created `c`, modified nothing, deleted nothing
 ### Scenario: deleting and recreating a byte-identical file appears in no list (POSIX)
 _skipped on Windows_
-#### Given
-- Fixture file `f.txt` is created.
-#### Inputs
-_Fixture `f.txt`:_
-```text
-hello
-```
 #### When
 ```shell
+printf hello > f.txt
 rm f.txt && printf hello > f.txt
 ```
 #### Then
-- exit code is `0`
-- the step changed exactly created nothing, modified nothing, deleted nothing
+- after `rm f.txt && printf hello > f.txt`:
+  - exit code is `0`
+  - the step changed exactly created nothing, modified nothing, deleted nothing
 ### Scenario: deleting and recreating with different content is modified only (POSIX)
 _skipped on Windows_
 #### Given
@@ -1644,6 +1641,52 @@ ${atago} run contradiction.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `created entry "out.txt" matched no file the step created`
+### Scenario: a permission-only change is a modification
+_skipped on Windows_
+#### Given
+- Fixture file `cfg.yaml` is created.
+#### Inputs
+_Fixture `cfg.yaml`:_
+```text
+k: v
+```
+#### When
+```shell
+chmod 777 cfg.yaml
+```
+#### Then
+- exit code is `0`
+- the step changed exactly created nothing, modified `cfg.yaml`, deleted nothing
+- file `cfg.yaml` is executable
+### Scenario: a planted fifo is a creation and is never opened
+_skipped on Windows_
+#### Given
+- Fixture file `blind.atago.yaml` is created.
+#### Inputs
+_Fixture `blind.atago.yaml`:_
+```text
+version: "1"
+suite: {name: blind}
+scenarios:
+  - name: an undeclared fifo is not invisible
+    steps:
+      - run: {shell: true, command: "mkfifo surprise"}
+      - assert:
+          changes:
+            created: []
+```
+#### When
+```shell
+mkfifo pipe
+${atago} run blind.atago.yaml
+```
+#### Then
+- after `mkfifo pipe`:
+  - exit code is `0`
+  - the step changed exactly created `pipe`, modified nothing, deleted nothing
+- after `${atago} run blind.atago.yaml`:
+  - exit code is `1`
+  - stdout contains `unexpected created file "surprise"`
 ## atago self-hosting / CLI scenario selection
 Source: `test/e2e/atago/cli_selection.atago.yaml`
 ### Scenario: filter selects by a name substring
