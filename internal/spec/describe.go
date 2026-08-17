@@ -106,6 +106,13 @@ func SecurityNotes(sc *Scenario, runners map[string]Runner) []string {
 	for i := range sc.Steps {
 		n.step(&sc.Steps[i], runners)
 	}
+	// Teardown steps always run — whether the scenario passed or failed — so an
+	// egress that only happens during cleanup is still egress the summary must
+	// name. The walk used to stop at Steps, and a scenario whose only network
+	// access was a cleanup call reported no security notes at all.
+	for i := range sc.Teardown {
+		n.step(&sc.Teardown[i], runners)
+	}
 	return n.out
 }
 
@@ -175,6 +182,44 @@ func (n *noteSet) step(step *Step, runners map[string]Runner) {
 		n.envRefs(envValues(step.GRPC.Header)...)
 	case StepCDP:
 		n.add("browser automation (CDP) via " + step.CDP.Runner)
+	case StepPTY:
+		n.ptyStep(step.PTY)
+	}
+}
+
+// ptyStep mirrors runStep for the interactive form: the pty child is a process
+// like any run step's, and the session's exec actions run commands on the HOST
+// mid-session — so both get the same shell/network/environment scrutiny. The
+// step used to be invisible here entirely, while the equivalent run step
+// produced a note for each.
+func (n *noteSet) ptyStep(p *PTY) {
+	if p.ShellEnabled() {
+		n.add("shell execution enabled: " + p.Command)
+	}
+	if NetworkCommand.MatchString(p.Command) {
+		n.add("network access: " + p.Command)
+	}
+	n.envRefs(p.Command)
+	n.envRefs(envValues(p.Env)...)
+	for _, a := range p.Session {
+		if a.Send != nil {
+			if a.Send.Text != nil {
+				n.envRefs(*a.Send.Text)
+			}
+			if a.Send.Paste != nil {
+				n.envRefs(*a.Send.Paste)
+			}
+		}
+		if a.Exec == nil {
+			continue
+		}
+		if a.Exec.ShellEnabled() {
+			n.add("shell execution enabled (pty exec): " + a.Exec.Command)
+		}
+		if NetworkCommand.MatchString(a.Exec.Command) {
+			n.add("network access (pty exec): " + a.Exec.Command)
+		}
+		n.envRefs(a.Exec.Command)
 	}
 }
 

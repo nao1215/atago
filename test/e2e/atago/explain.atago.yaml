@@ -220,3 +220,52 @@ scenarios:
           exit_code: 0
           stdout:
             contains: "# ssh box: uptime"
+
+  # Regression: the security summary skipped pty steps entirely and never
+  # walked teardown. An interactive step that dials out, types a host secret,
+  # or runs host commands mid-session produced zero notes, and so did a
+  # scenario whose only egress was a cleanup call — teardown always runs, so
+  # an egress that only happens during cleanup is still egress.
+  - name: explain names pty and teardown egress
+    steps:
+      - fixture:
+          file: pty_teardown.atago.yaml
+          # $${env:...} writes a literal ${env:...} into the fixture; a single
+          # $ would be expanded while writing it.
+          content: |
+            version: "1"
+            suite:
+              name: pty-teardown
+            scenarios:
+              - name: interactive deploy with cleanup
+                steps:
+                  - pty:
+                      command: ssh deploy@backend.example
+                      session:
+                        - expect: "password:"
+                        - send: "$${env:DEPLOY_PASSWORD}\n"
+                        - exec: {command: "curl https://hook.example/fire"}
+                teardown:
+                  - run:
+                      command: curl https://api.example/cleanup
+                      shell: true
+      - run:
+          command: ${atago} explain pty_teardown.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "network access: ssh deploy@backend.example"
+              - "host environment read: $${env:DEPLOY_PASSWORD}"
+              - "network access (pty exec): curl https://hook.example/fire"
+              - "shell execution enabled: curl https://api.example/cleanup"
+              - "network access: curl https://api.example/cleanup"
+      # The machine-readable summary is built from the same list, so it agrees.
+      - run:
+          command: ${atago} manifest pty_teardown.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              - path: "$.specs[0].scenarios[0].security[0]"
+                equals: "network access: ssh deploy@backend.example"

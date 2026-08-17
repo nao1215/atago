@@ -129,6 +129,79 @@ func TestSecurityNotes_RemoteRunnersAreNetworkAccess(t *testing.T) {
 	}
 }
 
+// TestSecurityNotes_PTYSteps is a regression: the step switch had no pty case,
+// so an interactive step was invisible to the security summary no matter what
+// it did — a shell-enabled command, a command that dials out over ssh, host
+// commands run mid-session by exec actions, and ${env:} reads in the command,
+// env, and typed input all produced zero notes while the equivalent run step
+// produced one for each.
+func TestSecurityNotes_PTYSteps(t *testing.T) {
+	t.Parallel()
+	sc := &Scenario{Steps: []Step{
+		{PTY: &PTY{Command: "mytui --menu", Shell: Bool(true)}},
+		{PTY: &PTY{Command: "ssh admin@backend.example"}},
+		{PTY: &PTY{
+			Command: "watcher ${env:WATCH_DIR}",
+			Env:     map[string]string{"TOKEN": "${env:API_TOKEN}"},
+			Session: []PTYAction{
+				{Send: SendText("${env:PASSWORD}\r")},
+				{Send: &PTYSend{Paste: strp("${env:PASTED_SECRET}")}},
+				{Exec: &PTYExec{Command: "curl https://hook.example/fire"}},
+				{Exec: &PTYExec{Command: "touch marker && date", Shell: Bool(true)}},
+			},
+		}},
+	}}
+	got := SecurityNotes(sc, nil)
+	for _, want := range []string{
+		"shell execution enabled: mytui --menu",
+		"network access: ssh admin@backend.example",
+		"host environment read: ${env:WATCH_DIR}",
+		"host environment read: ${env:API_TOKEN}",
+		"host environment read: ${env:PASSWORD}",
+		"host environment read: ${env:PASTED_SECRET}",
+		"network access (pty exec): curl https://hook.example/fire",
+		"shell execution enabled (pty exec): touch marker && date",
+	} {
+		if !contains(got, want) {
+			t.Errorf("SecurityNotes missing %q\n got: %v", want, got)
+		}
+	}
+}
+
+// TestSecurityNotes_TeardownSteps is a regression: the walk covered services
+// and steps but never teardown, and teardown steps always run — so a scenario
+// whose only egress was a cleanup call (an HTTP DELETE, a curl through the
+// shell, a command sent over ssh, a DELETE against a remote database) reported
+// no security notes at all.
+func TestSecurityNotes_TeardownSteps(t *testing.T) {
+	t.Parallel()
+	runners := map[string]Runner{
+		"box": {Type: "ssh", Host: "h.example", User: "u"},
+		"pg":  {Type: "db", DSN: "postgres://u:p@db.example:5432/app"},
+	}
+	sc := &Scenario{
+		Steps: []Step{{Run: &Run{Command: "echo hi"}}},
+		Teardown: []Step{
+			{HTTP: &HTTP{Method: "DELETE", Path: "/resource/1"}},
+			{Run: &Run{Command: "curl https://api.example/cleanup", Shell: Bool(true)}},
+			{Run: &Run{Runner: "box", Command: "rm -f /tmp/deploy.lock"}},
+			{Query: &Query{Runner: "pg", SQL: "DELETE FROM sessions"}},
+		},
+	}
+	got := SecurityNotes(sc, runners)
+	for _, want := range []string{
+		"network access: HTTP request",
+		"shell execution enabled: curl https://api.example/cleanup",
+		"network access: curl https://api.example/cleanup",
+		"network access (ssh box): rm -f /tmp/deploy.lock",
+		"network access: SQL query via pg",
+	} {
+		if !contains(got, want) {
+			t.Errorf("SecurityNotes missing teardown note %q\n got: %v", want, got)
+		}
+	}
+}
+
 func TestRunHost(t *testing.T) {
 	t.Parallel()
 	runners := map[string]Runner{

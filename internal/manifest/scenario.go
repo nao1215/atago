@@ -167,7 +167,7 @@ func buildStep(index int, step *spec.Step, vars map[string]bool, runners map[str
 	case spec.StepPTY:
 		pt := step.PTY
 		st.Command = pt.Command
-		st.Shell = pt.Shell != nil && *pt.Shell
+		st.Shell = pt.ShellEnabled()
 		st.ClearEnv = pt.ClearEnvEnabled()
 		st.PassEnv = pt.PassEnv
 		st.Action = "interactive (pty) " + pt.Command
