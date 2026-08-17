@@ -119,6 +119,13 @@ type Env struct {
 	// iteration or a retry attempt producing different output, which is a
 	// different finding from two scenarios sharing one golden.
 	Writer string
+	// KeepSnapshots exempts these checks from --update-snapshots: they compare
+	// against their golden as a verify run would. It is set for an expect_fail
+	// scenario (#395), whose golden holds the output the tool SHOULD produce
+	// once the bug is fixed — the recorded expectation the scenario fails
+	// against on purpose. Rewriting it with the current, wrong output destroys
+	// what the scenario documents and then reports the bug as fixed.
+	KeepSnapshots bool
 }
 
 func pass(desc string) *CheckResult { return &CheckResult{OK: true, Desc: desc} }

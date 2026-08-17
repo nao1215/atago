@@ -466,6 +466,12 @@ type runConfig struct {
 	// than two scenarios sharing a golden. The suite lifecycle leaves it at the
 	// suite-block label it sets for itself.
 	snapshotWriter string
+	// keepSnapshots freezes this scenario's snapshot goldens against
+	// --update-snapshots. runScenario sets it on its own copy for an
+	// expect_fail scenario, so it reaches every assert Env the scenario builds
+	// — the step loop, the retry `until` contexts, and http steps — while the
+	// suite lifecycle, which has no expect_fail, keeps updating.
+	keepSnapshots bool
 }
 
 // absPath makes a path absolute for use as a spec variable, falling back to the

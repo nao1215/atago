@@ -63,12 +63,16 @@ func (e *Engine) runScenario(ctx context.Context, scenarioIdx int, sc *spec.Scen
 		return ScenarioResult{Name: sc.Name, Status: StatusSkipped, SkipReason: reason}
 	}
 
-	// rc is this scenario's own copy. Naming the writer here — with the same
-	// identity the rerun ledger uses, so the two notions cannot drift — is what
-	// lets a snapshot clash tell a second scenario apart from this scenario's
-	// own earlier attempt. Matrix rows are distinct scenarios and get distinct
-	// names, which is what keeps a genuine shared-golden clash reported as one.
+	// rc is this scenario's own copy, so neither of these can leak into the
+	// scenarios running beside it. Naming the writer — with the same identity
+	// the rerun ledger uses, so the two notions cannot drift — is what lets a
+	// snapshot clash tell a second scenario apart from this scenario's own
+	// earlier attempt; matrix rows are distinct scenarios with distinct names,
+	// which keeps a genuine shared-golden clash reported as one. Freezing the
+	// goldens is what keeps an expect_fail scenario's recorded expectation from
+	// being rewritten with the output it documents as wrong (#395).
 	rc.snapshotWriter = ScenarioID(rc.specPath, sc.Name)
+	rc.keepSnapshots = sc.ExpectFail != nil
 
 	x := &scenarioRun{
 		e:            e,

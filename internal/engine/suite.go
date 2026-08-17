@@ -217,8 +217,9 @@ func (x *suiteStepper) execAssert(step *spec.Step, i int, sr *StepResult) bool {
 		SnapshotWrites:  x.e.snapshotWrites,
 		// A suite block is its own writer: it belongs to no scenario, and the two
 		// blocks are separate so a clash between them still names both sides.
-		Writer:  x.rc.specPath + " / " + x.label,
-		Secrets: x.rc.masker.MaskBytes,
+		Writer:          x.rc.specPath + " / " + x.label,
+		KeepSnapshots:   x.rc.keepSnapshots,
+		Secrets:         x.rc.masker.MaskBytes,
 		Scrub:           x.rc.scrubber.Apply,
 		MockRecords: func(name string) ([]mockrunner.Record, bool) {
 			for _, m := range x.rt.mocks {
