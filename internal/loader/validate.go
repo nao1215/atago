@@ -121,6 +121,13 @@ func validateScenario(add addFunc, s *spec.Spec, i int, seen, suiteServiceNames,
 	// `smoke` twice made the summary claim two scenarios carry it.
 	tags := map[string]bool{}
 	for _, tag := range sc.Tags {
+		// An empty tag selects nothing — no --tag invocation names it — while
+		// still counting in the indexes: `atago list` rendered ",smoke" and the
+		// generated docs summarized "Tags: `` (1)".
+		if strings.TrimSpace(tag) == "" {
+			add(diag.EmptyValue, "%s: tag must not be empty; a tag names a group to select with --tag/--skip-tag", where)
+			continue
+		}
 		if tags[tag] {
 			add(diag.DuplicateName, "%s: duplicate tag %q; a tag list is a set, and the generated docs count it twice", where, tag)
 		}
@@ -129,13 +136,11 @@ func validateScenario(add addFunc, s *spec.Spec, i int, seen, suiteServiceNames,
 	validateCondition(add, where, "skip", sc.Skip)
 	validateCondition(add, where, "only", sc.Only)
 	validateExpectFail(add, where, sc.ExpectFail)
-	validateServices(add, where, sc.Services)
+	// Both name sets start from the suite-wide declarations, so the validators
+	// catch a scenario resource that shadows a suite one and end up holding the
+	// full set a `signal:` or `mock:` target may name.
 	serviceNames := maps.Clone(suiteServiceNames)
-	for j := range sc.Services {
-		if sc.Services[j].Name != "" {
-			serviceNames[sc.Services[j].Name] = true
-		}
-	}
+	validateServices(add, where, sc.Services, serviceNames)
 	mockNames := maps.Clone(suiteMockNames)
 	validateMockServers(add, where, sc.MockServers, mockNames)
 	if len(sc.Steps) == 0 {

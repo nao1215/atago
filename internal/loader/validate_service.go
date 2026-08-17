@@ -9,18 +9,22 @@ import (
 	"github.com/nao1215/atago/internal/spec"
 )
 
-func validateServices(add addFunc, where string, services []spec.Service) {
-	seen := make(map[string]bool, len(services))
+// validateServices checks a scenario's services block and adds every declared
+// name to serviceNames, which arrives pre-seeded with the suite-wide service
+// names — so a scenario service reusing a suite service's name is caught here
+// rather than leaving a `signal:` step's target ambiguous. It mirrors
+// validateMockServers, which threads its name set the same way.
+func validateServices(add addFunc, where string, services []spec.Service, serviceNames map[string]bool) {
 	for i := range services {
 		svc := &services[i]
 		sw := fmt.Sprintf("%s.services[%d]", where, i)
 		if svc.Name == "" {
 			add(diag.RequiredKey, "%s.name is required", sw)
 		} else {
-			if seen[svc.Name] {
+			if serviceNames[svc.Name] {
 				add(diag.DuplicateName, "%s: duplicate service name %q", where, svc.Name)
 			}
-			seen[svc.Name] = true
+			serviceNames[svc.Name] = true
 			sw = fmt.Sprintf("%s service %q", where, svc.Name)
 		}
 		if svc.Command == "" {
@@ -50,6 +54,13 @@ func validateReady(add addFunc, where string, r *spec.Ready) {
 	}
 	if r.Store != "" && r.File == "" {
 		add(diag.KeyNeedsAnother, "%s.ready.store requires file (the file whose content is captured)", where)
+	}
+	// ready.store binds a variable like `store:` and `matrix:` do, so it is the
+	// third site that can shadow a built-in — silently, since the engine seeds
+	// the built-ins first and the capture overwrites one for the rest of the
+	// scenario.
+	if reservedVarName(r.Store) {
+		add(diag.ReservedName, "%s.ready.store %q shadows a built-in variable (%s); choose another name", where, r.Store, builtinList())
 	}
 	nonNegativeDuration(add, where+".ready.timeout", r.Timeout, "5s")
 	nonNegativeDuration(add, where+".ready.delay", r.Delay, "500ms")

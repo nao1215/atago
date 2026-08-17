@@ -122,3 +122,79 @@ scenarios:
           exit_code: 0
           stdout:
             contains: "`smoke` (2)"
+
+  # An empty tag selected nothing — no --tag invocation names it — while still
+  # counting in every index: `atago list` rendered the column as ",smoke" and
+  # the generated docs summarized "Tags: `` (1)".
+  - name: an empty tag is a load-time error
+    steps:
+      - fixture:
+          file: emptytag.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: carries an empty tag
+                tags: ["", smoke]
+                steps:
+                  - run: {shell: true, command: "true"}
+      - run:
+          command: ${atago} run emptytag.atago.yaml
+      - assert:
+          exit_code: 2
+          stderr:
+            contains: "tag must not be empty"
+
+  # ready.store binds a variable like store: and matrix: do, and the guard that
+  # refuses those from shadowing a built-in never learned this third site: a
+  # `ready: {store: workdir}` silently redefined ${workdir} for the rest of the
+  # scenario, so a later step read somewhere other than its own workdir.
+  - name: a ready.store that shadows a built-in is a load-time error
+    steps:
+      - fixture:
+          file: readyshadow.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: shadows the workdir
+                services:
+                  - name: writer
+                    command: ./writer
+                    ready: {file: marker.txt, store: workdir}
+                steps:
+                  - run: {shell: true, command: "true"}
+      - run:
+          command: ${atago} run readyshadow.atago.yaml
+      - assert:
+          exit_code: 2
+          stderr:
+            contains: "shadows a built-in variable"
+
+  # Duplicate names are refused within a scope, but a scenario service could
+  # reuse a suite service's name, leaving a signal: step's target ambiguous
+  # with nothing said about which process it reached.
+  - name: a scenario service that shadows a suite service is a load-time error
+    steps:
+      - fixture:
+          file: svcshadow.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+              setup:
+                - service: {name: peer, command: ./peer}
+            scenarios:
+              - name: declares its own peer
+                services:
+                  - {name: peer, command: ./peer}
+                steps:
+                  - run: {shell: true, command: "true"}
+      - run:
+          command: ${atago} run svcshadow.atago.yaml
+      - assert:
+          exit_code: 2
+          stderr:
+            contains: 'duplicate service name "peer"'

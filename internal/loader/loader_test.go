@@ -1768,3 +1768,77 @@ func TestLoadBytes_DuplicateTag(t *testing.T) {
 		t.Errorf("distinct tags were rejected: %v", err)
 	}
 }
+
+// TestLoadBytes_EmptyTag is a regression: an empty tag loaded cleanly and then
+// corrupted every tag index — `atago list` rendered the column as ",smoke" and
+// `atago doc` summarized "Tags: “ (1)" — while selecting nothing, since no
+// usable --tag invocation names it. It is the remaining hole in the set
+// semantics the duplicate-tag rule guards.
+func TestLoadBytes_EmptyTag(t *testing.T) {
+	t.Parallel()
+	for _, tag := range []string{`""`, `"   "`} {
+		src := "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    tags: [" + tag + ", smoke]\n    steps:\n      - run: {command: echo}"
+		_, err := LoadBytes("s.atago.yaml", []byte(src))
+		if err == nil {
+			t.Fatalf("tag %s was accepted", tag)
+		}
+		if !strings.Contains(err.Error(), "tag must not be empty") {
+			t.Errorf("tag %s: err = %v, want an empty-tag rejection", tag, err)
+		}
+	}
+}
+
+// TestLoadBytes_ReadyStoreShadowsBuiltin is a regression: `store:` and `matrix:`
+// are refused when they would bind a built-in name, and a service's ready.store
+// is the third binding site the guard never learned — `ready: {file: f, store:
+// workdir}` silently redefined ${workdir} for the rest of the scenario.
+func TestLoadBytes_ReadyStoreShadowsBuiltin(t *testing.T) {
+	t.Parallel()
+	src := "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    services:\n      - {name: s, command: ./srv, ready: {file: marker.txt, store: workdir}}\n    steps:\n      - run: {command: echo}"
+	_, err := LoadBytes("s.atago.yaml", []byte(src))
+	if err == nil {
+		t.Fatal("a ready.store shadowing ${workdir} was accepted")
+	}
+	if !strings.Contains(err.Error(), "shadows a built-in variable") {
+		t.Errorf("err = %v, want a built-in shadow rejection", err)
+	}
+
+	// A suite.setup service is the same binding site one scope up.
+	suiteSrc := "version: \"1\"\nsuite:\n  name: x\n  setup:\n    - service: {name: s, command: ./srv, ready: {file: marker.txt, store: specdir}}\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}"
+	if _, err := LoadBytes("s.atago.yaml", []byte(suiteSrc)); err == nil {
+		t.Error("a suite service ready.store shadowing ${specdir} was accepted")
+	}
+
+	// An ordinary capture name keeps loading.
+	ok := "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    services:\n      - {name: s, command: ./srv, ready: {file: marker.txt, store: addr}}\n    steps:\n      - run: {command: echo}"
+	if _, err := LoadBytes("s.atago.yaml", []byte(ok)); err != nil {
+		t.Errorf("an ordinary ready.store name was rejected: %v", err)
+	}
+}
+
+// TestLoadBytes_ScenarioServiceShadowsSuiteService is a regression: duplicate
+// names are refused within a scope, but a scenario service could reuse a
+// suite-level name, leaving a `signal:` step's target ambiguous with nothing
+// said. Mock servers had the identical cross-scope hole.
+func TestLoadBytes_ScenarioServiceShadowsSuiteService(t *testing.T) {
+	t.Parallel()
+	svc := "version: \"1\"\nsuite:\n  name: x\n  setup:\n    - service: {name: peer, command: ./peer}\nscenarios:\n  - name: a\n    services:\n      - {name: peer, command: ./peer}\n    steps:\n      - run: {command: echo}"
+	_, err := LoadBytes("s.atago.yaml", []byte(svc))
+	if err == nil {
+		t.Fatal("a scenario service shadowing a suite service was accepted")
+	}
+	if !strings.Contains(err.Error(), "duplicate service name") {
+		t.Errorf("err = %v, want a duplicate-service rejection", err)
+	}
+
+	mock := "version: \"1\"\nsuite:\n  name: x\n  setup:\n    - mock_server: {name: api, routes: []}\nscenarios:\n  - name: a\n    mock_servers:\n      - {name: api, routes: []}\n    steps:\n      - run: {command: echo}"
+	if _, err := LoadBytes("s.atago.yaml", []byte(mock)); err == nil {
+		t.Error("a scenario mock server shadowing a suite mock server was accepted")
+	}
+
+	// Distinct names across the scopes stay legal.
+	ok := "version: \"1\"\nsuite:\n  name: x\n  setup:\n    - service: {name: shared, command: ./peer}\nscenarios:\n  - name: a\n    services:\n      - {name: local, command: ./peer}\n    steps:\n      - run: {command: echo}"
+	if _, err := LoadBytes("s.atago.yaml", []byte(ok)); err != nil {
+		t.Errorf("distinct service names across scopes were rejected: %v", err)
+	}
+}
