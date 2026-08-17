@@ -19,6 +19,16 @@ func CDPActionSummary(c *CDP) string {
 	return "CDP via " + c.Runner + ": " + strings.Join(acts, " → ")
 }
 
+// ViaRunner renders the " via <name>" suffix that names the runner carrying a
+// step, or "" when the step names none. explain, doc, and the security notes
+// share it so a runner is named the same way wherever it appears.
+func ViaRunner(name string) string {
+	if name == "" {
+		return ""
+	}
+	return " via " + name
+}
+
 // RunHost names where a run step executes when that is not the machine running
 // atago: "ssh <runner>" for a command an ssh runner sends elsewhere, and "" for
 // anything local.
@@ -195,11 +205,24 @@ func (n *noteSet) service(svc *Service) {
 }
 
 func (n *noteSet) step(step *Step, runners map[string]Runner) {
+	// A runner's own fields are ${name}-expanded when a step uses it, so a
+	// ${env:} in a base_url, dsn, target, or ssh credential reads the invoking
+	// host's environment as surely as one written in the step. The walk covered
+	// steps and services only, so a database password taken from the
+	// environment produced no note at all.
+	if name := StepRunner(step); name != "" {
+		if r, ok := runners[name]; ok {
+			n.envRefs(RunnerVarFields(r)...)
+		}
+	}
 	switch step.Kind() {
 	case StepRun:
 		n.runStep(step.Run, runners)
 	case StepHTTP:
-		n.add("network access: HTTP request")
+		// Name the runner the way every other kind does: the note was the
+		// constant "network access: HTTP request", so requests to two different
+		// hosts de-duplicated into one anonymous line.
+		n.add("network access: HTTP request" + ViaRunner(step.HTTP.Runner))
 		n.envRefs(step.HTTP.Path, step.HTTP.Body)
 		n.envRefs(envValues(step.HTTP.Header)...)
 	case StepQuery:

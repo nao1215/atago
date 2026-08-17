@@ -39,9 +39,9 @@ _only when `command -v transfer.sh` succeeds_
 - Fixture file `pixel.png` is created.
 #### When
 ```shell
-# HTTP PUT /pixel.png
+# HTTP PUT /pixel.png via share
 # capture ${share_url} from the response body
-# HTTP GET ${share_url}
+# HTTP GET ${share_url} via share
 cmp pixel.png downloaded.png
 ```
 #### Then
@@ -69,10 +69,10 @@ shared through a multipart form
 ```
 #### When
 ```shell
-# HTTP POST /
+# HTTP POST / via share2
 # capture ${share_url} from the response body
-# HTTP GET ${share_url}
-# HTTP GET /no-such-token/notes.txt
+# HTTP GET ${share_url} via share2
+# HTTP GET /no-such-token/notes.txt via share2
 ```
 #### Then
 - after `HTTP POST /`:

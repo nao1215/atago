@@ -82,7 +82,7 @@ func buildService(svc *spec.Service) Service {
 // notes are derived separately from the shared spec model (#56).
 func buildStep(index int, step *spec.Step, vars map[string]bool, runners map[string]spec.Runner) Step {
 	st := Step{Index: index, Kind: string(step.Kind())}
-	spec.CollectStepVars(vars, step)
+	spec.CollectStepVars(vars, step, runners)
 	switch step.Kind() {
 	case spec.StepFixture:
 		st.File = step.Fixture.File
@@ -111,7 +111,7 @@ func buildStep(index int, step *spec.Step, vars map[string]bool, runners map[str
 			st.Action = "run via " + host + ": " + r.Command
 		}
 		if r.Retry != nil {
-			st.Retry = &Retry{Times: r.Retry.Times, Interval: r.Retry.Interval}
+			st.Retry = buildRetry(r.Retry)
 		}
 		if r.Deterministic != nil {
 			st.Deterministic = &Deterministic{
@@ -125,9 +125,11 @@ func buildStep(index int, step *spec.Step, vars map[string]bool, runners map[str
 		st.Method = h.Method
 		st.Path = h.Path
 		st.Runner = h.Runner
-		st.Action = fmt.Sprintf("HTTP %s %s", h.Method, h.Path)
+		// The structured runner field carries the name; the action line is
+		// prose, and read as runner-less while every other kind named one.
+		st.Action = fmt.Sprintf("HTTP %s %s%s", h.Method, h.Path, spec.ViaRunner(h.Runner))
 		if h.Retry != nil {
-			st.Retry = &Retry{Times: h.Retry.Times, Interval: h.Retry.Interval}
+			st.Retry = buildRetry(h.Retry)
 		}
 
 	case spec.StepQuery:
@@ -183,6 +185,20 @@ func buildStep(index int, step *spec.Step, vars map[string]bool, runners map[str
 		}
 	}
 	return st
+}
+
+// buildRetry reduces a step's retry policy, including the until condition that
+// ends the loop — the manifest carried times and interval and dropped the
+// condition entirely. run and http share the retry shape, so they share this.
+func buildRetry(r *spec.Retry) *Retry {
+	if r == nil {
+		return nil
+	}
+	out := &Retry{Times: r.Times, Interval: r.Interval}
+	if r.Until != nil {
+		out.Until = assertTarget(r.Until)
+	}
+	return out
 }
 
 // assertTarget returns the assertion target name (stdout, file, status …). When

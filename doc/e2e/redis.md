@@ -115,6 +115,7 @@ redis-cli -p 16382 PING
 _only when `redis-server --version && redis-cli --version` succeeds · skipped on Windows_
 #### Given
 - Background service `redis` is started: `redis-server --port 16383 --save '' --appendonly no`.
+- The step is retried up to 50 times every 100ms until exit code is not `0`.
 #### When
 ```shell
 redis-cli -p 16383 PING

@@ -684,6 +684,84 @@ scenarios:
 	}
 }
 
+// TestExplain_HTTPNamesItsRunnerAndRetry is a regression on two counts: an
+// http step was the one runner-backed kind that never named the runner
+// carrying it, so two requests to different hosts read identically; and a
+// retry — which changes how many times a step's side effects happen, the very
+// fact deterministic: earned a note for — was invisible.
+func TestExplain_HTTPNamesItsRunnerAndRetry(t *testing.T) {
+	t.Parallel()
+	src := `
+version: "1"
+suite:
+  name: httpretry
+runners:
+  internal: {type: http, base_url: "http://127.0.0.1:8080"}
+  billing: {type: http, base_url: "https://billing.example.com"}
+scenarios:
+  - name: talks to two hosts and polls one
+    steps:
+      - http: {runner: internal, method: GET, path: /health}
+      - http:
+          runner: billing
+          method: POST
+          path: /charge
+          retry:
+            times: 3
+            interval: 200ms
+            until:
+              status: 200
+      - run:
+          command: probe
+          retry:
+            times: 5
+            interval: 1s
+            until:
+              exit_code: 0
+      - assert: {exit_code: 0}
+`
+	out := mustExplain(t, src)
+	for _, want := range []string{
+		"HTTP GET /health via internal",
+		"HTTP POST /charge via billing",
+		"network access: HTTP request via internal",
+		"network access: HTTP request via billing",
+		"retried up to 3 times every 200ms until HTTP status is 200",
+		"retried up to 5 times every 1s until exit code is 0",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("explain output missing %q\n--- got ---\n%s", want, out)
+		}
+	}
+}
+
+// TestExplain_RunnerEnvReads is a regression: a ${env:} in a runner's own
+// fields is expanded when a step uses the runner, and neither the security
+// notes nor the variables summary walked the runner table.
+func TestExplain_RunnerEnvReads(t *testing.T) {
+	t.Parallel()
+	src := `
+version: "1"
+suite:
+  name: runnerenv
+runners:
+  pg: {type: db, dsn: "postgres://u:${env:DB_PASSWORD}@db.example:5432/app"}
+scenarios:
+  - name: queries through the runner
+    steps:
+      - query: {runner: pg, sql: "SELECT 1"}
+`
+	out := mustExplain(t, src)
+	for _, want := range []string{
+		"host environment read: ${env:DB_PASSWORD}",
+		"Variables used: env:DB_PASSWORD",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("explain output missing %q\n--- got ---\n%s", want, out)
+		}
+	}
+}
+
 // TestExplain_SignalStep covers describeSignal for both the fire-and-forget form
 // and the wait form. The default wait timeout rendered here (5s) must match the
 // engine's defaultSignalWait constant; a drift would mislead a reviewer about how

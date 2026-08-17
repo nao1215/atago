@@ -114,6 +114,7 @@ _only when `coredns -version` succeeds_
 - Background service `coredns` is started: `coredns -conf Corefile`.
 - Fixture file `Corefile` is created.
 - Fixture file `zones/example.test.zone` is created.
+- The step is retried up to 15 times every 500ms until HTTP status is `200`.
 #### Inputs
 _Fixture `Corefile`:_
 ```text
@@ -133,7 +134,7 @@ www 3600 IN A   192.0.2.10
 ```
 #### When
 ```shell
-# HTTP GET /health
+# HTTP GET /health via health
 dig @127.0.0.1 -p 18152 www.example.test A +short
 ```
 #### Then

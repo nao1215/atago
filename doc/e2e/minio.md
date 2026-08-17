@@ -28,8 +28,8 @@ _only when `minio --version` succeeds_
 - Background service `minio` is started: `minio server data --address 127.0.0.1:18120`.
 #### When
 ```shell
-# HTTP GET /minio/health/live
-# HTTP GET /minio/health/ready
+# HTTP GET /minio/health/live via s3
+# HTTP GET /minio/health/ready via s3
 ```
 #### Then
 - after `HTTP GET /minio/health/live`:
@@ -40,9 +40,10 @@ _only when `minio --version` succeeds_
 _only when `minio --version` succeeds_
 #### Given
 - Background service `minio` is started: `minio server data --address 127.0.0.1:18121`.
+- The step is retried up to 20 times every 250ms until HTTP status is `403`.
 #### When
 ```shell
-# HTTP GET /
+# HTTP GET / via s3_authz
 ```
 #### Then
 - HTTP status is `403`
@@ -125,10 +126,10 @@ published via bucket policy
 mc alias set publichost http://127.0.0.1:18124 atago atago-secret-key
 mc mb publichost/public-bucket
 mc cp page.txt publichost/public-bucket/
-# HTTP GET /public-bucket/page.txt
+# HTTP GET /public-bucket/page.txt via s3_public
 mc anonymous set download publichost/public-bucket
-# HTTP GET /public-bucket/page.txt
-# HTTP PUT /public-bucket/forbidden.txt
+# HTTP GET /public-bucket/page.txt via s3_public
+# HTTP PUT /public-bucket/forbidden.txt via s3_public
 ```
 #### Then
 - after `HTTP GET /public-bucket/page.txt`:

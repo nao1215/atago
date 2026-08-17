@@ -161,6 +161,32 @@ func writeScenario(md *markdown.Markdown, sc *spec.Scenario, specDir, outputDir 
 	}
 }
 
+// retryBullet renders a step's retry policy as a Given bullet, or "" for a step
+// that does not retry. It reads the retry through the step's own kind so run and
+// http — the two kinds that share the retry shape — are described identically.
+func retryBullet(step *spec.Step) string {
+	var r *spec.Retry
+	switch step.Kind() {
+	case spec.StepRun:
+		r = step.Run.Retry
+	case spec.StepHTTP:
+		r = step.HTTP.Retry
+	}
+	if r == nil {
+		return ""
+	}
+	desc := fmt.Sprintf("The step is retried up to %s", plural.Count(r.Times, "time", "times"))
+	if r.Interval != "" {
+		desc += " every " + r.Interval
+	}
+	if r.Until != nil {
+		if until := describeAsserts(r.Until); len(until) > 0 {
+			desc += " until " + strings.Join(until, " and ")
+		}
+	}
+	return desc + "."
+}
+
 // matrixExpander returns a display-only ${name} expander seeded with the
 // scenario's matrix-row variables. Runtime-captured variables (store,
 // ready.store) stay as ${name} — their values exist only at run time, and the
@@ -303,6 +329,12 @@ func givenBullets(sc *spec.Scenario, expand func(string) string) []string {
 	}
 	for i := range sc.Steps {
 		step := &sc.Steps[i]
+		// A retry decides how many times the step's side effects happen, so the
+		// published contract has to state it — the same reason `deterministic:`
+		// is documented. run and http share the retry shape and this bullet.
+		if note := retryBullet(step); note != "" {
+			out = append(out, note)
+		}
 		switch step.Kind() {
 		case spec.StepFixture:
 			out = append(out, fmt.Sprintf("Fixture file `%s` is created.", step.Fixture.File))
@@ -370,7 +402,9 @@ func commandLine(step *spec.Step, expand func(string) string, runners map[string
 		return expand(step.Run.Command), true
 	case spec.StepHTTP:
 		if step.HTTP != nil {
-			return fmt.Sprintf("# HTTP %s %s", step.HTTP.Method, expand(step.HTTP.Path)), true
+			// Name the runner like every other runner-backed kind: without it
+			// two requests to different hosts render as the same line.
+			return fmt.Sprintf("# HTTP %s %s%s", step.HTTP.Method, expand(step.HTTP.Path), spec.ViaRunner(step.HTTP.Runner)), true
 		}
 	case spec.StepQuery:
 		if step.Query != nil {

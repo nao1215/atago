@@ -33,6 +33,7 @@ _only when `command -v gitea` succeeds_
 #### Given
 - Background service `gitea` is started: `gitea web --config app.ini`.
 - Fixture file `app.ini` is created.
+- The step is retried up to 30 times every 1s until HTTP status is `200`.
 #### Inputs
 _Fixture `app.ini`:_
 ```text
@@ -60,8 +61,8 @@ ROOT = data/repos
 ```
 #### When
 ```shell
-# HTTP GET /api/healthz
-# HTTP GET /api/v1/version
+# HTTP GET /api/healthz via gitea
+# HTTP GET /api/v1/version via gitea
 ```
 #### Then
 - after `HTTP GET /api/healthz`:
@@ -74,6 +75,7 @@ _only when `command -v gitea` succeeds_
 #### Given
 - Background service `gitea` is started: `gitea web --config app.ini`.
 - Fixture file `app.ini` is created.
+- The step is retried up to 30 times every 1s until HTTP status is `200`.
 #### Inputs
 _Fixture `app.ini`:_
 ```text
@@ -101,14 +103,14 @@ ROOT = data/repos
 ```
 #### When
 ```shell
-# HTTP GET /api/healthz
+# HTTP GET /api/healthz via gitea2
 gitea --config app.ini admin user create --username atago --password atago-e2e-pass1 --email atago@example.com --admin --must-change-password=false
 gitea --config app.ini admin user generate-access-token --username atago --token-name e2e --scopes all --raw
 # capture ${token} from stdout
-# HTTP POST /api/v1/user/repos
-# HTTP POST /api/v1/repos/atago/demo/contents/hello.txt
-# HTTP POST /api/v1/repos/atago/demo/issues
-# HTTP GET /api/v1/repos/atago/demo/issues/1
+# HTTP POST /api/v1/user/repos via gitea2
+# HTTP POST /api/v1/repos/atago/demo/contents/hello.txt via gitea2
+# HTTP POST /api/v1/repos/atago/demo/issues via gitea2
+# HTTP GET /api/v1/repos/atago/demo/issues/1 via gitea2
 git clone http://atago:atago-e2e-pass1@127.0.0.1:18141/atago/demo.git checkout
 ```
 #### Then

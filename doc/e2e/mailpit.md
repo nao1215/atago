@@ -35,6 +35,7 @@ _only when `mailpit version --no-release-check` succeeds_
 #### Given
 - Background service `mailpit` is started: `mailpit --smtp 127.0.0.1:18170 --listen 127.0.0.1:18171 --database data.db`.
 - Fixture file `mail.txt` is created.
+- The step is retried up to 20 times every 250ms until body at `$.total` equals `1`.
 #### Inputs
 _Fixture `mail.txt`:_
 ```text
@@ -47,9 +48,9 @@ The deploy pipeline completed successfully.
 #### When
 ```shell
 curl -s --url smtp://127.0.0.1:18170 --mail-from alice@example.test --mail-rcpt bob@example.test --upload-file mail.txt
-# HTTP GET /api/v1/messages
+# HTTP GET /api/v1/messages via api
 # capture ${msg_id} from the response body
-# HTTP GET /api/v1/message/${msg_id}
+# HTTP GET /api/v1/message/${msg_id} via api
 ```
 #### Then
 - after `curl -s --url smtp://127.0.0.1:18170 --mail-from alice@example.test --mail-rcpt bob@example.test --upload-file mail.txt`:
@@ -67,6 +68,7 @@ _only when `mailpit version --no-release-check` succeeds_
 - Background service `mailpit` is started: `mailpit --smtp 127.0.0.1:18172 --listen 127.0.0.1:18173 --database data.db`.
 - Fixture file `mail1.txt` is created.
 - Fixture file `mail2.txt` is created.
+- The step is retried up to 20 times every 250ms until body at `$.total` equals `2`.
 #### Inputs
 _Fixture `mail1.txt`:_
 ```text
@@ -88,8 +90,8 @@ Please pay the hosting invoice.
 ```shell
 curl -s --url smtp://127.0.0.1:18172 --mail-from ci@example.test --mail-rcpt team@example.test --upload-file mail1.txt
 curl -s --url smtp://127.0.0.1:18172 --mail-from ci@example.test --mail-rcpt team@example.test --upload-file mail2.txt
-# HTTP GET /api/v1/messages
-# HTTP GET /api/v1/search?query=nightly
+# HTTP GET /api/v1/messages via api2
+# HTTP GET /api/v1/search?query=nightly via api2
 ```
 #### Then
 - after `HTTP GET /api/v1/search?query=nightly`:
@@ -101,6 +103,7 @@ _only when `mailpit version --no-release-check` succeeds_
 #### Given
 - Background service `mailpit` is started: `mailpit --smtp 127.0.0.1:18174 --listen 127.0.0.1:18175 --database data.db`.
 - Fixture file `mail.txt` is created.
+- The step is retried up to 20 times every 250ms until body at `$.total` equals `1`.
 #### Inputs
 _Fixture `mail.txt`:_
 ```text
@@ -125,9 +128,9 @@ east,42
 #### When
 ```shell
 curl -s --url smtp://127.0.0.1:18174 --mail-from reports@example.test --mail-rcpt audit@example.test --upload-file mail.txt
-# HTTP GET /api/v1/messages
+# HTTP GET /api/v1/messages via api3
 # capture ${msg_id} from the response body
-# HTTP GET /api/v1/message/${msg_id}
+# HTTP GET /api/v1/message/${msg_id} via api3
 ```
 #### Then
 - after `HTTP GET /api/v1/message/${msg_id}`:
@@ -139,6 +142,7 @@ _only when `mailpit version --no-release-check` succeeds_
 #### Given
 - Background service `mailpit` is started: `mailpit --smtp 127.0.0.1:18176 --listen 127.0.0.1:18177 --database data.db`.
 - Fixture file `mail.txt` is created.
+- The step is retried up to 20 times every 250ms until body at `$.total` equals `1`.
 #### Inputs
 _Fixture `mail.txt`:_
 ```text
@@ -151,9 +155,9 @@ Delete me.
 #### When
 ```shell
 curl -s --url smtp://127.0.0.1:18176 --mail-from temp@example.test --mail-rcpt trash@example.test --upload-file mail.txt
-# HTTP GET /api/v1/messages
-# HTTP DELETE /api/v1/messages
-# HTTP GET /api/v1/messages
+# HTTP GET /api/v1/messages via api4
+# HTTP DELETE /api/v1/messages via api4
+# HTTP GET /api/v1/messages via api4
 ```
 #### Then
 - after `HTTP DELETE /api/v1/messages`:

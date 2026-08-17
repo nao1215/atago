@@ -222,6 +222,48 @@ scenarios:
 	}
 }
 
+// TestBuild_RetryUntilAndHTTPRunner is a regression on two counts: the manifest
+// carried a retry's times and interval but dropped the until condition that
+// ends the loop, and an http step's action line named no runner while every
+// other runner-backed kind's did.
+func TestBuild_RetryUntilAndHTTPRunner(t *testing.T) {
+	t.Parallel()
+	const src = `
+version: "1"
+suite:
+  name: retryman
+runners:
+  billing: {type: http, base_url: "https://billing.example.com"}
+scenarios:
+  - name: polls the charge endpoint
+    steps:
+      - http:
+          runner: billing
+          method: POST
+          path: /charge
+          retry: {times: 3, interval: 200ms, until: {status: 200}}
+      - run:
+          command: probe
+          retry: {times: 5, until: {exit_code: 0, stdout: {contains: ready}}}
+`
+	s, err := loader.LoadBytes("r.atago.yaml", []byte(src))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	steps := Build([]Input{{Spec: s, Path: "r.atago.yaml"}}).Specs[0].Scenarios[0].Steps
+	if got := steps[0].Action; got != "HTTP POST /charge via billing" {
+		t.Errorf("http action = %q, want it to name the runner", got)
+	}
+	if steps[0].Retry == nil || steps[0].Retry.Until != "status" {
+		t.Errorf("http retry = %+v, want until %q", steps[0].Retry, "status")
+	}
+	// An until setting several targets names them all, the way an assert step's
+	// target does.
+	if steps[1].Retry == nil || steps[1].Retry.Until != "exit_code+stdout" {
+		t.Errorf("run retry = %+v, want until %q", steps[1].Retry, "exit_code+stdout")
+	}
+}
+
 // TestBuild_BrowserRunnerConfig proves the manifest surfaces the browser-runner
 // configuration so tooling sees the same runtime knobs the engine honors.
 func TestBuild_BrowserRunnerConfig(t *testing.T) {

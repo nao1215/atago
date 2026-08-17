@@ -115,7 +115,7 @@ func explainScenario(b *strings.Builder, sc *spec.Scenario, runners map[string]s
 		// Variable references are collected by the shared spec walk so explain and
 		// manifest never disagree about which ${name}s a step uses; the bucketing
 		// below only formats the human-facing summary lines.
-		spec.CollectStepVars(vars, step)
+		spec.CollectStepVars(vars, step, runners)
 		bucketScenarioStep(step, &fixtures, &commands, &expects, &stores, runners)
 	}
 
@@ -124,7 +124,7 @@ func explainScenario(b *strings.Builder, sc *spec.Scenario, runners map[string]s
 	var teardown []string
 	for i := range sc.Teardown {
 		step := &sc.Teardown[i]
-		spec.CollectStepVars(vars, step)
+		spec.CollectStepVars(vars, step, runners)
 		teardown = append(teardown, describeTeardownStep(step, runners)...)
 	}
 
@@ -161,7 +161,7 @@ func bucketScenarioStep(step *spec.Step, fixtures, commands, expects, stores *[]
 		}
 	case spec.StepHTTP:
 		if step.HTTP != nil {
-			*commands = append(*commands, fmt.Sprintf("HTTP %s %s", step.HTTP.Method, step.HTTP.Path))
+			*commands = append(*commands, describeHTTP(step.HTTP))
 		}
 	case spec.StepQuery:
 		if step.Query != nil {
@@ -274,7 +274,7 @@ func describeTeardownStep(step *spec.Step, runners map[string]spec.Runner) []str
 	case spec.StepRun:
 		return []string{describeRun(step.Run, runners)}
 	case spec.StepHTTP:
-		return []string{fmt.Sprintf("HTTP %s %s", step.HTTP.Method, step.HTTP.Path)}
+		return []string{describeHTTP(step.HTTP)}
 	case spec.StepQuery:
 		return []string{fmt.Sprintf("SQL query via %s: %s", step.Query.Runner, step.Query.SQL)}
 	case spec.StepGRPC:
@@ -360,6 +360,42 @@ func describeFixture(f *spec.Fixture) string {
 	return fmt.Sprintf("%s (%s)", f.File, kind)
 }
 
+// describeHTTP renders a one-line summary of an http step. It names the runner
+// that carried the request the way every other runner-backed kind does: the
+// line was a bare method and path, so two requests to different hosts read
+// identically. A retry is reported for the same reason a run step's is.
+func describeHTTP(h *spec.HTTP) string {
+	desc := fmt.Sprintf("HTTP %s %s", h.Method, h.Path)
+	if h.Runner != "" {
+		desc += " via " + h.Runner
+	}
+	if note := describeRetry(h.Retry); note != "" {
+		desc += "  (" + note + ")"
+	}
+	return desc
+}
+
+// describeRetry renders a step's retry policy — how many attempts, how far
+// apart, and the condition that ends the loop. A retry changes how many times
+// the step's side effects happen, which is exactly what a reader of a spec
+// summary needs to know (the reason `deterministic:` carries a note), and it
+// was invisible in both explain and doc.
+func describeRetry(r *spec.Retry) string {
+	if r == nil {
+		return ""
+	}
+	desc := fmt.Sprintf("retried up to %s", plural.Count(r.Times, "time", "times"))
+	if r.Interval != "" {
+		desc += " every " + r.Interval
+	}
+	if r.Until != nil {
+		if until := describeAsserts(r.Until); len(until) > 0 {
+			desc += " until " + strings.Join(until, " and ")
+		}
+	}
+	return desc
+}
+
 func describeRun(r *spec.Run, runners map[string]spec.Runner) string {
 	var notes []string
 	// Where it runs, when that is not here: every other step kind already says
@@ -369,6 +405,9 @@ func describeRun(r *spec.Run, runners map[string]spec.Runner) string {
 	}
 	if r.Timeout != "" {
 		notes = append(notes, "timeout "+r.Timeout)
+	}
+	if note := describeRetry(r.Retry); note != "" {
+		notes = append(notes, note)
 	}
 	if len(r.Env) > 0 {
 		notes = append(notes, "env: "+strings.Join(spec.SortedKeys(toSet(r.Env)), ", "))

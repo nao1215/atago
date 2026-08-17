@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-81 suites · 635 scenarios
+81 suites · 637 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -266,7 +266,7 @@
   - [junit routes an xfail to skipped and an xpass to failure](#scenario-junit-routes-an-xfail-to-skipped-and-an-xpass-to-failure)
   - [explain and doc show which scenarios document a known bug](#scenario-explain-and-doc-show-which-scenarios-document-a-known-bug)
   - [an expected failure without a reason is a load error](#scenario-an-expected-failure-without-a-reason-is-a-load-error)
-- [atago self-hosting / explain](#atago-self-hosting--explain) — 8 scenarios
+- [atago self-hosting / explain](#atago-self-hosting--explain) — 10 scenarios
   - [explain summarizes a spec without running it](#scenario-explain-summarizes-a-spec-without-running-it)
   - [explain describes every matcher of a composed stream assertion](#scenario-explain-describes-every-matcher-of-a-composed-stream-assertion)
   - [explain names the line a line-scoped matcher inspects](#scenario-explain-names-the-line-a-line-scoped-matcher-inspects)
@@ -275,6 +275,8 @@
   - [explain names pty and teardown egress](#scenario-explain-names-pty-and-teardown-egress)
   - [explain names suite lifecycle egress](#scenario-explain-names-suite-lifecycle-egress)
   - [explain lists pdf and teardown outputs under generates](#scenario-explain-lists-pdf-and-teardown-outputs-under-generates)
+  - [explain names an http runner and describes a retry](#scenario-explain-names-an-http-runner-and-describes-a-retry)
+  - [explain names a runner definition's host environment reads](#scenario-explain-names-a-runner-definitions-host-environment-reads)
 - [atago self-hosting / file equals and equals_file byte-equality (#155)](#atago-self-hosting--file-equals-and-equals_file-byte-equality-155) — 10 scenarios
   - [equals_file passes for two byte-identical files](#scenario-equals_file-passes-for-two-byte-identical-files)
   - [equals matches an inline literal byte-for-byte](#scenario-equals-matches-an-inline-literal-byte-for-byte)
@@ -1273,6 +1275,8 @@ echo produced
 - `result.txt`
 ### Scenario: the delta over a retried step reflects only the converged attempt (POSIX)
 _skipped on Windows_
+#### Given
+- The step is retried up to 3 times every 10ms until exit code is `0`.
 #### When
 ```shell
 touch a; [ -f b ] && touch c; touch b; [ -f c ]
@@ -6019,6 +6023,73 @@ ${atago} manifest gen.atago.yaml
 - after `${atago} manifest gen.atago.yaml`:
   - exit code is `0`
   - stdout at `$.specs[0].scenarios[0].generates[0]` equals `report.pdf`; at `$.specs[0].scenarios[0].generates[1]` equals `logs/audit.log`
+### Scenario: explain names an http runner and describes a retry
+#### Given
+- Fixture file `httpretry.atago.yaml` is created.
+#### Inputs
+_Fixture `httpretry.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: httpretry
+runners:
+  internal: {type: http, base_url: "http://127.0.0.1:8080"}
+  billing: {type: http, base_url: "https://billing.example.com"}
+scenarios:
+  - name: talks to two hosts and polls one
+    steps:
+      - http: {runner: internal, method: GET, path: /health}
+      - http:
+          runner: billing
+          method: POST
+          path: /charge
+          retry: {times: 3, interval: 200ms, until: {status: 200}}
+      - assert: {status: 200}
+```
+#### When
+```shell
+${atago} explain httpretry.atago.yaml
+${atago} doc httpretry.atago.yaml
+${atago} manifest httpretry.atago.yaml
+```
+#### Then
+- after `${atago} explain httpretry.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `HTTP GET /health via internal`, `HTTP POST /charge via billing`, `network access: HTTP request via internal`, `network access: HTTP request via billing`, `retried up to 3 times every 200ms until HTTP status is 200`
+- after `${atago} doc httpretry.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `# HTTP POST /charge via billing`, `The step is retried up to 3 times every 200ms until HTTP status is `200`.`
+- after `${atago} manifest httpretry.atago.yaml`:
+  - exit code is `0`
+  - stdout at `$.specs[0].scenarios[0].steps[1].action` equals `HTTP POST /charge via billing`; at `$.specs[0].scenarios[0].steps[1].retry.until` equals `status`
+### Scenario: explain names a runner definition's host environment reads
+#### Given
+- Fixture file `runnerenv.atago.yaml` is created.
+#### Inputs
+_Fixture `runnerenv.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: runnerenv
+runners:
+  pg: {type: db, dsn: 'postgres://u:$${env:DB_PASSWORD}@db.example:5432/app'}
+scenarios:
+  - name: queries through the runner
+    steps:
+      - query: {runner: pg, sql: "SELECT 1"}
+```
+#### When
+```shell
+${atago} explain runnerenv.atago.yaml
+${atago} manifest runnerenv.atago.yaml
+```
+#### Then
+- after `${atago} explain runnerenv.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `host environment read: $${env:DB_PASSWORD}`, `Variables used: env:DB_PASSWORD`
+- after `${atago} manifest runnerenv.atago.yaml`:
+  - exit code is `0`
+  - stdout at `$.specs[0].scenarios[0].variables[0]` equals `env:DB_PASSWORD`
 ## atago self-hosting / file equals and equals_file byte-equality (#155)
 Source: `test/e2e/atago/file_equals.atago.yaml`
 ### Scenario: equals_file passes for two byte-identical files

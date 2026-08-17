@@ -244,6 +244,71 @@ func TestSuiteSecurityNotes(t *testing.T) {
 	}
 }
 
+// TestSecurityNotes_RunnerEnvReads is a regression: the engine expands ${name}
+// in a runner's base_url, dsn, target, cwd, and ssh credentials, so a
+// ${env:NAME} in any of them reads the invoking host's environment — and the
+// summary walked steps and services only, never the runner table. A database
+// password pulled from the host environment produced no note at all.
+func TestSecurityNotes_RunnerEnvReads(t *testing.T) {
+	t.Parallel()
+	runners := map[string]Runner{
+		"api": {Type: "http", BaseURL: "https://${env:API_HOST}/v1"},
+		"pg":  {Type: "db", DSN: "postgres://u:${env:DB_PASSWORD}@db.example:5432/app"},
+		"rpc": {Type: "grpc", Target: "${env:RPC_TARGET}"},
+		"box": {Type: "ssh", Host: "${env:SSH_HOST}", User: "deploy", KeyFile: "${env:SSH_KEY}"},
+	}
+	sc := &Scenario{Steps: []Step{
+		{HTTP: &HTTP{Method: "GET", Path: "/health", Runner: "api"}},
+		{Query: &Query{Runner: "pg", SQL: "SELECT 1"}},
+		{GRPC: &GRPC{Runner: "rpc", Method: "pkg.S/M"}},
+		{Run: &Run{Runner: "box", Command: "uptime"}},
+	}}
+	got := SecurityNotes(sc, runners)
+	for _, want := range []string{
+		"host environment read: ${env:API_HOST}",
+		"host environment read: ${env:DB_PASSWORD}",
+		"host environment read: ${env:RPC_TARGET}",
+		"host environment read: ${env:SSH_HOST}",
+		"host environment read: ${env:SSH_KEY}",
+	} {
+		if !contains(got, want) {
+			t.Errorf("SecurityNotes missing %q\n got: %v", want, got)
+		}
+	}
+
+	// A runner the scenario never uses contributes nothing: the notes describe
+	// what this scenario touches.
+	unused := map[string]Runner{"idle": {Type: "http", BaseURL: "https://${env:UNUSED}/"}}
+	if notes := SecurityNotes(&Scenario{Steps: []Step{{Run: &Run{Command: "echo hi"}}}}, unused); len(notes) != 0 {
+		t.Errorf("an unused runner contributed notes: %v", notes)
+	}
+}
+
+// TestSecurityNotes_HTTPNamesItsRunner is a regression: every other step kind
+// names the runner that carried it, while an http step's note was the constant
+// "network access: HTTP request" — so requests to two different hosts
+// de-duplicated into one anonymous line.
+func TestSecurityNotes_HTTPNamesItsRunner(t *testing.T) {
+	t.Parallel()
+	runners := map[string]Runner{
+		"internal": {Type: "http", BaseURL: "http://127.0.0.1:8080"},
+		"billing":  {Type: "http", BaseURL: "https://billing.example.com"},
+	}
+	sc := &Scenario{Steps: []Step{
+		{HTTP: &HTTP{Method: "GET", Path: "/health", Runner: "internal"}},
+		{HTTP: &HTTP{Method: "POST", Path: "/charge", Runner: "billing"}},
+	}}
+	got := SecurityNotes(sc, runners)
+	for _, want := range []string{
+		"network access: HTTP request via internal",
+		"network access: HTTP request via billing",
+	} {
+		if !contains(got, want) {
+			t.Errorf("SecurityNotes missing %q\n got: %v", want, got)
+		}
+	}
+}
+
 func TestRunHost(t *testing.T) {
 	t.Parallel()
 	runners := map[string]Runner{

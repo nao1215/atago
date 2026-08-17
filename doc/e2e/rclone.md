@@ -175,9 +175,9 @@ _Fixture `src/api/data.json`:_
 ```
 #### When
 ```shell
-# HTTP GET /hello.txt
-# HTTP GET /api/data.json
-# HTTP GET /no-such-file.txt
+# HTTP GET /hello.txt via files
+# HTTP GET /api/data.json via files
+# HTTP GET /no-such-file.txt via files
 ```
 #### Then
 - after `HTTP GET /hello.txt`:
