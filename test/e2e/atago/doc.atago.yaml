@@ -310,3 +310,44 @@ scenarios:
           exit_code: 0
           stdout:
             contains: "3 passed"
+
+  # Regression: the published behavior doc said nothing about suite.setup and
+  # suite.teardown — a suite whose setup builds a helper and starts a
+  # suite-wide service documented only its scenarios, while explain and the
+  # manifest describe the lifecycle and the doc already renders a scenario's
+  # teardown for the same always-runs reason.
+  - name: doc renders the suite lifecycle blocks
+    steps:
+      - fixture:
+          file: lifecycle.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: lifecycle
+              setup:
+                - run:
+                    command: echo build
+                - service:
+                    name: relay
+                    command: echo serve
+                    ready:
+                      delay: 10ms
+              teardown:
+                - run:
+                    command: echo purge
+            scenarios:
+              - name: trivial
+                steps:
+                  - run: {command: echo hi}
+                  - assert: {exit_code: 0}
+      - run:
+          command: ${atago} doc lifecycle.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "### Suite setup (runs once before any scenario)"
+              - "echo build"
+              - "# start service relay: echo serve"
+              - "### Suite teardown (always runs after the last scenario)"
+              - "echo purge"

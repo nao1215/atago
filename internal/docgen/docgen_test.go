@@ -324,6 +324,60 @@ scenarios:
 	}
 }
 
+// TestGenerate_SuiteLifecycleBlocks is a regression: the published behavior
+// doc said nothing about suite.setup and suite.teardown — a suite whose setup
+// builds a helper and starts a suite-wide service, and whose teardown curls a
+// purge endpoint, documented only its scenarios, while explain and the
+// manifest describe the lifecycle and the doc already renders a scenario's
+// teardown for the same always-runs reason.
+func TestGenerate_SuiteLifecycleBlocks(t *testing.T) {
+	t.Parallel()
+	src := `
+version: "1"
+suite:
+  name: lifecycle
+  setup:
+    - run:
+        command: go build -o server ./cmd/server
+    - service:
+        name: relay
+        command: ./server --listen :0
+        ready:
+          delay: 50ms
+    - mock_server:
+        name: api
+        routes:
+          - {method: GET, path: /health, body: ok}
+  teardown:
+    - run:
+        command: curl https://api.example/purge
+        shell: true
+scenarios:
+  - name: trivial
+    steps:
+      - run: {command: echo hi}
+      - assert: {exit_code: 0}
+`
+	s := mustLoadSpec(t, "life.atago.yaml", src)
+	var b bytes.Buffer
+	if err := Generate(&b, []Source{{Path: "life.atago.yaml", Spec: s}}); err != nil {
+		t.Fatal(err)
+	}
+	out := b.String()
+	for _, w := range []string{
+		"### Suite setup (runs once before any scenario)",
+		"go build -o server ./cmd/server",
+		"# start service relay: ./server --listen :0",
+		"# start mock server api (1 route)",
+		"### Suite teardown (always runs after the last scenario)",
+		"curl https://api.example/purge",
+	} {
+		if !strings.Contains(out, w) {
+			t.Errorf("doc output missing suite lifecycle %q\n--- got ---\n%s", w, out)
+		}
+	}
+}
+
 // TestGenerate_PTYGroupsThenBullets proves a pty step is an action for
 // Then-grouping, the same defect #23 fixed for signal one kind over: a run +
 // pty scenario (each with asserts) rendered one flattened list — two "exit

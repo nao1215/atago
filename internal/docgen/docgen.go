@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/nao1215/atago/internal/plural"
 	"github.com/nao1215/atago/internal/spec"
 	"github.com/nao1215/atago/internal/store"
 	"github.com/nao1215/markdown"
@@ -88,6 +89,21 @@ func writeSuite(md *markdown.Markdown, src Source, outputDir string) {
 	// Always render the source path with forward slashes so the generated docs are
 	// byte-identical across platforms (Windows filepath.Clean uses backslashes).
 	md.PlainTextf("Source: `%s`", filepath.ToSlash(src.Path))
+
+	// The suite lifecycle is part of the documented behavior: setup runs once
+	// before any scenario and teardown always runs after the last, and explain
+	// and the manifest already describe both — the published doc was the one
+	// summary that hid the bootstrap and the cleanup entirely, while rendering
+	// a scenario's teardown for the same always-runs reason.
+	noExpand := func(s string) string { return s }
+	if cmds := commands(s.Suite.Setup, noExpand, s.Runners); len(cmds) > 0 {
+		md.H3("Suite setup (runs once before any scenario)")
+		md.CodeBlocks(markdown.SyntaxHighlightShell, strings.Join(cmds, "\n"))
+	}
+	if cmds := commands(s.Suite.Teardown, noExpand, s.Runners); len(cmds) > 0 {
+		md.H3("Suite teardown (always runs after the last scenario)")
+		md.CodeBlocks(markdown.SyntaxHighlightShell, strings.Join(cmds, "\n"))
+	}
 
 	// Golden files (snapshots, image baselines) are resolved relative to the spec
 	// file's directory, so the doc can inline/embed the committed expected result
@@ -367,6 +383,18 @@ func commandLine(step *spec.Step, expand func(string) string, runners map[string
 	case spec.StepPTY:
 		if step.PTY != nil {
 			return fmt.Sprintf("# interactive (pty): %s", expand(step.PTY.Command)), true
+		}
+	case spec.StepService:
+		// Suite-only kinds (the loader rejects them elsewhere): a comment like
+		// every other non-pasteable step, so the suite lifecycle block reads
+		// the way a scenario's When does.
+		if step.Service != nil {
+			return fmt.Sprintf("# start service %s: %s", step.Service.Name, expand(step.Service.Command)), true
+		}
+	case spec.StepMockServer:
+		if step.MockServer != nil {
+			return fmt.Sprintf("# start mock server %s (%s)", step.MockServer.Name,
+				plural.Count(len(step.MockServer.Routes), "route", "routes")), true
 		}
 	case spec.StepCDP:
 		if step.CDP != nil {
