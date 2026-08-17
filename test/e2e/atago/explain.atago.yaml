@@ -318,6 +318,48 @@ scenarios:
               - path: "$.specs[0].suite_security[0]"
                 equals: "shell execution enabled: curl https://seed.example/data"
 
+  # Regression: an ${env:} reference is a host-environment read wherever the
+  # engine expands it, and four step kinds were invisible to the security
+  # summary — a fixture's content, an assertion's matcher argument, a store's
+  # file path, and a cdp action all read the environment with no note, while
+  # the identical reference in a run command produced one.
+  - name: explain names environment reads in fixtures asserts and cdp actions
+    steps:
+      - fixture:
+          file: env_reads.atago.yaml
+          # $${env:...} writes a literal ${env:...} into the fixture; a single
+          # $ would be expanded while writing it.
+          content: |
+            version: "1"
+            suite:
+              name: env-reads
+            runners:
+              web: {type: browser}
+            scenarios:
+              - name: reads the environment from quiet corners
+                steps:
+                  - fixture:
+                      file: seed.txt
+                      content: "token=$${env:SEED_TOKEN}"
+                  - run:
+                      command: echo ready
+                  - assert:
+                      stdout:
+                        contains: "$${env:EXPECTED_GREETING}"
+                  - cdp:
+                      runner: web
+                      actions:
+                        - navigate: "https://host.example/?key=$${env:CDP_KEY}"
+      - run:
+          command: ${atago} explain env_reads.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "host environment read: $${env:SEED_TOKEN}"
+              - "host environment read: $${env:EXPECTED_GREETING}"
+              - "host environment read: $${env:CDP_KEY}"
+
   # Regression: the Generates list counted image assertions as declared
   # outputs but not pdf assertions — the same "inspected output the tool
   # wrote" one target over — and never walked teardown, whose redirects land
