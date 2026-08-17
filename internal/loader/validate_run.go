@@ -251,6 +251,14 @@ func validateDeterministic(add addFunc, where string, r *spec.Run) {
 		add(diag.OutOfRange, "%s.deterministic.runs is capped at %d; a larger number is a benchmark, not a test (got %d)",
 			where, spec.MaxDeterministicRuns, d.Runs)
 	}
+	// An explicitly empty list is not "compare nothing": Comparables falls back
+	// to the default pair, so the spec silently compares stdout and exit_code
+	// after asking for neither — and a deliberately nondeterministic command
+	// fails a comparison the author thought they had disabled. Absent stays the
+	// unset case the default exists for.
+	if d.Compare != nil && len(d.Compare) == 0 {
+		add(diag.EmptyList, "%s.deterministic.compare must not be empty — an empty list is not \"compare nothing\"; remove the deterministic block to compare nothing, or name the observables to compare", where)
+	}
 	seen := map[string]bool{}
 	for _, name := range d.Compare {
 		if !slices.Contains(spec.DeterministicObservables, name) {

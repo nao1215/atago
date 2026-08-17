@@ -322,3 +322,82 @@ scenarios:
           exit_code: 0
           stdout:
             contains: "1 passed"
+
+  - name: a gate with no condition is rejected
+    steps:
+      # `only: {}` reads as "this scenario is restricted" and restricts nothing.
+      # It is the shape left behind on the way to a gate that was never
+      # finished, or after the condition was deleted.
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                only: {}
+                steps: [{run: {command: echo}}]
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "only must name a condition (os, env, or command)"}
+
+  - name: skip and only naming the same condition are rejected
+    steps:
+      # Gated both ways by one condition, the scenario is skipped whether the
+      # condition holds or not: it can never run on any machine, and reports as
+      # an ordinary skip with exit 0 forever.
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                skip: {os: linux}
+                only: {os: linux}
+                steps: [{run: {command: echo}}]
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr:
+            contains:
+              - "skip.os and only.os both name"
+              - "can never run anywhere"
+
+  - name: gates naming different fields still load
+    steps:
+      # The refusal is per field and literal: a POSIX-only scenario that also
+      # needs a tool installed is an ordinary spec.
+      - fixture:
+          file: ok.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                skip: {os: windows}
+                only: {command: "no-such-tool-zzz"}
+                steps: [{run: {command: echo}}]
+      - run: {command: "${atago} run ok.atago.yaml"}
+      - assert:
+          exit_code: 0
+          stdout: {contains: "1 skipped"}
+
+  - name: an empty deterministic compare list is rejected
+    steps:
+      # An empty list is not "compare nothing": the default (stdout, exit_code)
+      # applied, so the run compared observables the author had just asked it
+      # not to.
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                steps: [{run: {command: echo, deterministic: {compare: []}}}]
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "deterministic.compare must not be empty"}

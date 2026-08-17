@@ -1251,6 +1251,14 @@ func TestBugHunt_Rejections(t *testing.T) {
 		// ---- validateCondition ----
 		{"skip bad os", scenarioTop("skip: {os: solaris}", "run: {command: echo}"), "skip.os \"solaris\" is invalid"},
 		{"only bad os", scenarioTop("only: {os: bsd}", "run: {command: echo}"), "only.os \"bsd\" is invalid"},
+		{"empty skip gate", scenarioTop("skip: {}", "run: {command: echo}"), "skip must name a condition"},
+		{"empty only gate", scenarioTop("only: {}", "run: {command: echo}"), "only must name a condition"},
+		{"cancelling os gates", scenarioTop("skip: {os: linux}\n    only: {os: linux}", "run: {command: echo}"), "skip.os and only.os both name \"linux\""},
+		{"cancelling env gates", scenarioTop("skip: {env: FEATURE_X}\n    only: {env: FEATURE_X}", "run: {command: echo}"), "skip.env and only.env both name \"FEATURE_X\""},
+		{"cancelling command gates", scenarioTop("skip: {command: \"true\"}\n    only: {command: \"true\"}", "run: {command: echo}"), "skip.command and only.command both name \"true\""},
+
+		// ---- validateDeterministic empty compare (#564) ----
+		{"deterministic empty compare", specSteps("run: {command: echo, deterministic: {compare: []}}"), "deterministic.compare must not be empty"},
 
 		// ---- validateStep ----
 		{"step no action", specSteps("{}"), "step must set exactly one of fixture/run/http/query/grpc/cdp/assert/store/pty/signal (got none)"},
@@ -1419,6 +1427,13 @@ func TestBugHunt_Acceptances(t *testing.T) {
 		{"assert duration after run", specSteps("run: {command: echo}", "assert: {duration: {lt: \"5s\"}}")},
 		{"skip valid os", scenarioTop("skip: {os: darwin}", "run: {command: echo}")},
 		{"only valid os", scenarioTop("only: {os: windows}", "run: {command: echo}")},
+		// Gates that name DIFFERENT fields compose normally: "this scenario is
+		// POSIX-only and needs fzf" is an ordinary spec, and so are two gates on
+		// one field with different values.
+		{"gates on different fields", scenarioTop("skip: {os: windows}\n    only: {command: fzf}", "run: {command: echo}")},
+		{"gates on one field with different values", scenarioTop("skip: {os: windows}\n    only: {os: linux}", "run: {command: echo}")},
+		{"deterministic compare listed", specSteps("run: {command: echo, deterministic: {compare: [stdout]}}")},
+		{"deterministic without compare", specSteps("run: {command: echo, deterministic: {runs: 3}}")},
 		{"suite setup kinds", "version: \"1\"\nsuite:\n  name: x\n  setup:\n    - fixture: {file: seed.txt, content: hi}\n    - run: {command: echo}\n    - store: {name: v, from: {stdout: {json: {path: \"$.a\"}}}}\n    - assert: {exit_code: 0}\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n"},
 	}
 
