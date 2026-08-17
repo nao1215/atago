@@ -109,6 +109,12 @@ func (e *Engine) newSuiteRuntime(s *spec.Spec, specDir, fixturesDir string) (*su
 // The returned bool reports whether every step succeeded.
 func (e *Engine) runSuiteSteps(ctx context.Context, steps []spec.Step, rt *suiteRuntime, rc runConfig, stopOnFailure bool, label string) ([]StepResult, bool) {
 	var out []StepResult
+	// rc is this block's own copy. A suite block is its own snapshot writer —
+	// it belongs to no scenario, and naming the two blocks separately keeps a
+	// clash between them naming both sides — set the same way runScenario names
+	// a scenario, so every Env built below it (asserts and `until` polls alike)
+	// carries it.
+	rc.snapshotWriter = rc.specPath + " / " + label
 	x := &suiteStepper{e: e, rt: rt, rc: rc, label: label}
 	ok := true
 
@@ -210,26 +216,16 @@ func (x *suiteStepper) execRun(ctx context.Context, step *spec.Step, i int, sr *
 
 // execAssert checks one suite-level assert against the latest run result.
 func (x *suiteStepper) execAssert(step *spec.Step, i int, sr *StepResult) bool {
-	crs := assert.CheckAll(expandAssert(x.rt.st, step.Assert), x.current, assert.Env{
-		Workdir:         x.rt.dir,
-		SpecDir:         x.rc.specDir,
-		UpdateSnapshots: x.e.UpdateSnapshots,
-		SnapshotWrites:  x.e.snapshotWrites,
-		// A suite block is its own writer: it belongs to no scenario, and the two
-		// blocks are separate so a clash between them still names both sides.
-		Writer:        x.rc.specPath + " / " + x.label,
-		KeepSnapshots: x.rc.keepSnapshots,
-		Secrets:       x.rc.masker.MaskBytes,
-		Scrub:         x.rc.scrubber.Apply,
-		MockRecords: func(name string) ([]mockrunner.Record, bool) {
-			for _, m := range x.rt.mocks {
-				if m.Name() == name {
-					return m.Records(), true
-				}
+	env := x.e.assertEnv(x.rc, x.rt.dir, x.rc.specDir)
+	env.MockRecords = func(name string) ([]mockrunner.Record, bool) {
+		for _, m := range x.rt.mocks {
+			if m.Name() == name {
+				return m.Records(), true
 			}
-			return nil, false
-		},
-	})
+		}
+		return nil, false
+	}
+	crs := assert.CheckAll(expandAssert(x.rt.st, step.Assert), x.current, env)
 	x.e.recordChecks(x.rc.masker, crs, suiteArtifactScope(x.rc, x.label), i)
 	sr.Checks = crs
 	return !assert.AllOK(crs)

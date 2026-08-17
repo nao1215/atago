@@ -237,17 +237,9 @@ func (x *scenarioRun) execStep(ctx context.Context, steps []spec.Step, i int, st
 	case spec.StepRun:
 		return x.execRunStep(ctx, steps, i, step, beforeAttempt)
 	case spec.StepAssert:
-		crs := assert.CheckAll(expandAssert(x.st, step.Assert), x.current, assert.Env{
-			Workdir:         x.workdir,
-			SpecDir:         x.specDir,
-			UpdateSnapshots: x.e.UpdateSnapshots,
-			SnapshotWrites:  x.e.snapshotWrites,
-			Writer:          x.rc.snapshotWriter,
-			KeepSnapshots:   x.rc.keepSnapshots,
-			Secrets:         x.masker.MaskBytes,
-			Scrub:           x.rc.scrubber.Apply,
-			MockRecords:     x.mockRecords,
-		})
+		env := x.e.assertEnv(x.rc, x.workdir, x.specDir)
+		env.MockRecords = x.mockRecords
+		crs := assert.CheckAll(expandAssert(x.st, step.Assert), x.current, env)
 		x.e.recordChecks(x.masker, crs, x.artifactScope(), i)
 		sr.Checks = crs
 		if !assert.AllOK(crs) {
@@ -499,8 +491,7 @@ func (e *Engine) runStep(ctx context.Context, run *spec.Run, st *store.Store, wo
 		}
 		return r, nil, nil
 	}
-	env := assert.Env{Workdir: workdir, SpecDir: specDir, UpdateSnapshots: e.UpdateSnapshots, SnapshotWrites: e.snapshotWrites, Writer: rc.snapshotWriter, KeepSnapshots: rc.keepSnapshots, Secrets: rc.masker.MaskBytes, Scrub: rc.scrubber.Apply}
-	return pollUntil(ctx, run.Retry, st, env, exec, beforeAttempt)
+	return pollUntil(ctx, run.Retry, st, e.assertEnv(rc, workdir, specDir), exec, beforeAttempt)
 }
 
 // resolveRunTarget decides whether a run step executes remotely and settles

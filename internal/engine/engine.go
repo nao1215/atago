@@ -474,6 +474,25 @@ type runConfig struct {
 	keepSnapshots bool
 }
 
+// assertEnv builds the assertion context every checking site shares: the step
+// loop, the run/http retry `until` polls, and the suite lifecycle. It is the
+// one place the run-scoped fields are wired, because hand-built Envs are how
+// they go missing — the snapshot-freeze flag and the clash writer were each
+// added to some of the four sites and had to be chased into the rest. A site
+// with extra context (mock records) sets it on the returned value.
+func (e *Engine) assertEnv(rc runConfig, workdir, specDir string) assert.Env {
+	return assert.Env{
+		Workdir:         workdir,
+		SpecDir:         specDir,
+		UpdateSnapshots: e.UpdateSnapshots,
+		SnapshotWrites:  e.snapshotWrites,
+		Writer:          rc.snapshotWriter,
+		KeepSnapshots:   rc.keepSnapshots,
+		Secrets:         rc.masker.MaskBytes,
+		Scrub:           rc.scrubber.Apply,
+	}
+}
+
 // absPath makes a path absolute for use as a spec variable, falling back to the
 // original when the working directory cannot be read.
 //
