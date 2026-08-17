@@ -37,6 +37,14 @@ func Explain(w io.Writer, s *spec.Spec, path string) error {
 	fmt.Fprintf(&b, "Network policy: %s\n", networkPolicy(s))
 	explainSuiteBlock(&b, "Suite setup (runs once before any scenario)", s.Suite.Setup, s.Runners)
 	explainSuiteBlock(&b, "Suite teardown (always runs after the last scenario)", s.Suite.Teardown, s.Runners)
+	// The suite lifecycle gets the same security summary a scenario gets: its
+	// steps run like any scenario's, and only the scenarios were flagged.
+	if notes := spec.SuiteSecurityNotes(&s.Suite, s.Runners); len(notes) > 0 {
+		b.WriteString("⚠ Suite security notes:\n")
+		for _, note := range notes {
+			fmt.Fprintf(&b, "  - %s\n", note)
+		}
+	}
 
 	for i := range s.Scenarios {
 		explainScenario(&b, &s.Scenarios[i], s.Runners)

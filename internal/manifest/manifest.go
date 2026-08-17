@@ -91,8 +91,14 @@ type Spec struct {
 	// setup/teardown steps (their commands, env, service ready probes, asserts).
 	// It mirrors a scenario's Variables so tooling can see which variables the
 	// suite lifecycle depends on.
-	SuiteVariables []string   `json:"suite_variables,omitempty"`
-	Scenarios      []Scenario `json:"scenarios"`
+	SuiteVariables []string `json:"suite_variables,omitempty"`
+	// SuiteSecurity mirrors a scenario's Security for the suite lifecycle:
+	// shell execution, network access, and host-environment reads performed by
+	// setup/teardown steps. Without it, a consumer auditing egress from the
+	// manifest saw no trace of a setup that curls or a suite service that
+	// opens an ssh tunnel.
+	SuiteSecurity []string   `json:"suite_security,omitempty"`
+	Scenarios     []Scenario `json:"scenarios"`
 }
 
 // Network summarizes the spec's network policy.
@@ -272,6 +278,7 @@ func buildSpec(in Input) Spec {
 		out.SuiteTeardown = append(out.SuiteTeardown, buildStep(i, &s.Suite.Teardown[i], suiteVars, s.Runners))
 	}
 	out.SuiteVariables = spec.SortedKeys(suiteVars)
+	out.SuiteSecurity = spec.SuiteSecurityNotes(&s.Suite, s.Runners)
 	for i := range s.Scenarios {
 		out.Scenarios = append(out.Scenarios, buildScenario(&s.Scenarios[i], in.Source, s.Runners))
 	}

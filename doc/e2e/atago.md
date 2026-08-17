@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-81 suites · 628 scenarios
+81 suites · 629 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -265,13 +265,14 @@
   - [junit routes an xfail to skipped and an xpass to failure](#scenario-junit-routes-an-xfail-to-skipped-and-an-xpass-to-failure)
   - [explain and doc show which scenarios document a known bug](#scenario-explain-and-doc-show-which-scenarios-document-a-known-bug)
   - [an expected failure without a reason is a load error](#scenario-an-expected-failure-without-a-reason-is-a-load-error)
-- [atago self-hosting / explain](#atago-self-hosting--explain) — 6 scenarios
+- [atago self-hosting / explain](#atago-self-hosting--explain) — 7 scenarios
   - [explain summarizes a spec without running it](#scenario-explain-summarizes-a-spec-without-running-it)
   - [explain describes every matcher of a composed stream assertion](#scenario-explain-describes-every-matcher-of-a-composed-stream-assertion)
   - [explain names the line a line-scoped matcher inspects](#scenario-explain-names-the-line-a-line-scoped-matcher-inspects)
   - [explain describes file not_contains and executable matchers](#scenario-explain-describes-file-not_contains-and-executable-matchers)
   - [explain names ssh and remote-database egress](#scenario-explain-names-ssh-and-remote-database-egress)
   - [explain names pty and teardown egress](#scenario-explain-names-pty-and-teardown-egress)
+  - [explain names suite lifecycle egress](#scenario-explain-names-suite-lifecycle-egress)
 - [atago self-hosting / file equals and equals_file byte-equality (#155)](#atago-self-hosting--file-equals-and-equals_file-byte-equality-155) — 10 scenarios
   - [equals_file passes for two byte-identical files](#scenario-equals_file-passes-for-two-byte-identical-files)
   - [equals matches an inline literal byte-for-byte](#scenario-equals-matches-an-inline-literal-byte-for-byte)
@@ -5905,6 +5906,44 @@ ${atago} manifest pty_teardown.atago.yaml
 - after `${atago} manifest pty_teardown.atago.yaml`:
   - exit code is `0`
   - stdout at `$.specs[0].scenarios[0].security[0]` equals `network access: ssh deploy@backend.example`
+### Scenario: explain names suite lifecycle egress
+#### Given
+- Fixture file `suite_egress.atago.yaml` is created.
+#### Inputs
+_Fixture `suite_egress.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: suite-egress
+  setup:
+    - run:
+        command: curl https://seed.example/data
+        shell: true
+    - service:
+        name: relay
+        command: ssh -N -L 8080:internal.example:80 jump.example
+  teardown:
+    - run:
+        command: curl https://api.example/purge
+        shell: true
+scenarios:
+  - name: quiet scenario
+    steps:
+      - run:
+          command: echo hi
+```
+#### When
+```shell
+${atago} explain suite_egress.atago.yaml
+${atago} manifest suite_egress.atago.yaml
+```
+#### Then
+- after `${atago} explain suite_egress.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `Suite security notes:`, `shell execution enabled: curl https://seed.example/data`, `network access (service relay): ssh -N -L 8080:internal.example:80 jump.example`, `network access: curl https://api.example/purge`
+- after `${atago} manifest suite_egress.atago.yaml`:
+  - exit code is `0`
+  - stdout at `$.specs[0].suite_security[0]` equals `shell execution enabled: curl https://seed.example/data`
 ## atago self-hosting / file equals and equals_file byte-equality (#155)
 Source: `test/e2e/atago/file_equals.atago.yaml`
 ### Scenario: equals_file passes for two byte-identical files
