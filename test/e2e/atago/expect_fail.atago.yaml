@@ -407,6 +407,138 @@ scenarios:
           stdout:
             contains: "expected to FAIL (known bug): wrong rounding"
 
+  # The golden of an expected failure holds what the tool SHOULD print once the
+  # bug is fixed, which is why the scenario fails against it on purpose. A
+  # blanket --update-snapshots rewrote it with the buggy output and then called
+  # the bug fixed. Both entry points reach the same engine, so both are checked.
+  - name: update-snapshots keeps the golden of an expected failure
+    steps:
+      - fixture:
+          file: desired.snap
+          content: |
+            the CORRECT output once fixed
+      - fixture:
+          file: inner_snap.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner xfail snap
+            scenarios:
+              - name: the output is still wrong
+                expect_fail:
+                  reason: "prints the pre-fix output"
+                steps:
+                  - run:
+                      shell: true
+                      command: echo current buggy output
+                  - assert:
+                      stdout:
+                        snapshot: desired.snap
+      - run:
+          command: ${atago} run --update-snapshots inner_snap.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "XFAIL:"
+              - "1 xfail"
+            not_contains: "snapshot updated"
+      - assert:
+          file:
+            path: desired.snap
+            contains: "the CORRECT output once fixed"
+      # `atago snapshot update` delegates to the same run pipeline.
+      - run:
+          command: ${atago} snapshot update inner_snap.atago.yaml
+      - assert:
+          exit_code: 0
+      - assert:
+          file:
+            path: desired.snap
+            contains: "the CORRECT output once fixed"
+
+  - name: update-snapshots still reports the day the documented bug is fixed
+    steps:
+      - fixture:
+          file: fixed.snap
+          content: |
+            fixed output
+      - fixture:
+          file: inner_fixed.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner xpass snap
+            scenarios:
+              - name: the output now matches the golden
+                expect_fail:
+                  reason: "prints the pre-fix output"
+                steps:
+                  - run:
+                      shell: true
+                      command: echo fixed output
+                  - assert:
+                      stdout:
+                        snapshot: fixed.snap
+      - run:
+          command: ${atago} run --update-snapshots inner_fixed.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - "XPASS:"
+              - "1 xpass"
+
+  - name: an ordinary scenario beside an expected failure is still re-recorded
+    steps:
+      - fixture:
+          file: ordinary.snap
+          content: |
+            stale
+      - fixture:
+          file: frozen.snap
+          content: |
+            desired
+      - fixture:
+          file: inner_mixed.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner mixed
+            scenarios:
+              - name: ordinary
+                steps:
+                  - run:
+                      shell: true
+                      command: echo fresh
+                  - assert:
+                      stdout:
+                        snapshot: ordinary.snap
+              - name: documents a bug
+                expect_fail:
+                  reason: "still broken"
+                steps:
+                  - run:
+                      shell: true
+                      command: echo buggy
+                  - assert:
+                      stdout:
+                        snapshot: frozen.snap
+      - run:
+          command: ${atago} run --update-snapshots inner_mixed.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "1 snapshot updated"
+      - assert:
+          file:
+            path: ordinary.snap
+            contains: fresh
+      - assert:
+          file:
+            path: frozen.snap
+            contains: desired
+
   - name: an expected failure without a reason is a load error
     steps:
       - fixture:

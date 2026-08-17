@@ -63,6 +63,10 @@ func (e *Engine) runScenario(ctx context.Context, scenarioIdx int, sc *spec.Scen
 		return ScenarioResult{Name: sc.Name, Status: StatusSkipped, SkipReason: reason}
 	}
 
+	// rc is this scenario's own copy, so freezing the goldens of an expect_fail
+	// scenario cannot leak into the scenarios running beside it (#395).
+	rc.keepSnapshots = sc.ExpectFail != nil
+
 	x := &scenarioRun{
 		e:            e,
 		idx:          scenarioIdx,
