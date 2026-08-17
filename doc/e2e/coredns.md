@@ -23,6 +23,7 @@ alongside, so "the process is up" and "the resolver is correct" are pinned
 separately.
 
 Source: `test/e2e/thirdparty/coredns/coredns.atago.yaml`
+Network policy: egress is allowed only to `127.0.0.1`.
 ### Scenario: the binary reports its version
 _only when `coredns -version` succeeds_
 #### When

@@ -351,3 +351,42 @@ scenarios:
               - "# start service relay: echo serve"
               - "### Suite teardown (always runs after the last scenario)"
               - "echo purge"
+
+  # Regression: a teardown assertion — a documented cleanup guarantee — and a
+  # suite.setup made only of fixtures vanished from the published contract,
+  # because both blocks rendered command-ish steps only. explain listed them
+  # all along. The spec-level guarantees (the hosts a suite is confined to and
+  # the secrets it declares) were missing from the doc for the same reason.
+  - name: doc keeps teardown assertions and states the suite guarantees
+    steps:
+      - fixture:
+          file: narrative.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: narrative
+              setup:
+                - fixture: {file: seed.json, content: "{}"}
+            permissions:
+              network:
+                allow: [api.example.com]
+            secrets: [API_TOKEN]
+            scenarios:
+              - name: cleans up after itself
+                steps:
+                  - run: {shell: true, command: "echo body > out.txt"}
+                  - assert: {exit_code: 0}
+                teardown:
+                  - assert: {file: {path: out.txt, exists: true}}
+      - run:
+          command: ${atago} doc narrative.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "Network policy: egress is allowed only to `api.example.com`."
+              - "Secrets declared: `API_TOKEN`."
+              - "### Suite setup (runs once before any scenario)"
+              - "# write fixture seed.json"
+              - "#### Finally (teardown, always runs)"
+              - "# expect file `out.txt` exists"

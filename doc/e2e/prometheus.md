@@ -23,6 +23,7 @@ That last one closes the loop — configuration, scrape, storage, and query
 all had to work for the sample to be there.
 
 Source: `test/e2e/thirdparty/prometheus/prometheus.atago.yaml`
+Network policy: egress is allowed only to `127.0.0.1`.
 ### Scenario: promtool accepts a valid config and rejects a broken one
 _only when `command -v promtool && command -v prometheus` succeeds_
 #### Given

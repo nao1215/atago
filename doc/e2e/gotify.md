@@ -22,6 +22,7 @@ as a real PNG — the same round trip a browser performs, asserted on the
 bytes that came back.
 
 Source: `test/e2e/thirdparty/gotify/gotify.atago.yaml`
+Network policy: egress is allowed only to `127.0.0.1`.
 ### Scenario: the server reports health and version
 _only when `command -v gotify` succeeds_
 #### Given

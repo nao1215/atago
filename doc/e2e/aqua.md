@@ -136,6 +136,7 @@ runs it — with no dependency on the public registry or on GitHub for the
 tool itself.
 
 Source: `test/e2e/thirdparty/aqua/install.atago.yaml`
+Network policy: egress is allowed only to `127.0.0.1`.
 ### Scenario: install downloads the tool and makes it runnable
 _only when `aqua version` succeeds_
 #### Given

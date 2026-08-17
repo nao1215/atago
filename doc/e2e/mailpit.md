@@ -21,6 +21,7 @@ survives as a distinct part, and that clearing the mailbox really empties
 it.
 
 Source: `test/e2e/thirdparty/mailpit/mailpit.atago.yaml`
+Network policy: egress is allowed only to `127.0.0.1`.
 ### Scenario: the binary reports its version
 _only when `mailpit version --no-release-check` succeeds_
 #### When

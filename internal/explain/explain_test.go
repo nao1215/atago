@@ -735,6 +735,45 @@ scenarios:
 	}
 }
 
+// TestExplain_NamesEveryGate is a regression: the scenario heading rendered OS
+// gates only, so an env- or command-gated scenario — including one gated by
+// defaults.scenario — read as unconditional, while `atago doc` names all three
+// and `atago list` shows them in its GATES column.
+func TestExplain_NamesEveryGate(t *testing.T) {
+	t.Parallel()
+	src := `
+version: "1"
+suite:
+  name: gates
+defaults:
+  scenario:
+    only:
+      command: "jq --version"
+scenarios:
+  - name: gated by the suite default
+    steps:
+      - run: {shell: true, command: "echo hi"}
+  - name: gated on an environment variable
+    skip: {env: CI}
+    steps:
+      - run: {shell: true, command: "echo hi"}
+  - name: gated on the os
+    only: {os: linux}
+    steps:
+      - run: {shell: true, command: "echo hi"}
+`
+	out := mustExplain(t, src)
+	for _, want := range []string{
+		`[only command="jq --version"]`,
+		"[skip env=CI]",
+		"[only os=linux]",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("explain heading missing %q\n--- got ---\n%s", want, out)
+		}
+	}
+}
+
 // TestExplain_RunnerEnvReads is a regression: a ${env:} in a runner's own
 // fields is expanded when a step uses the runner, and neither the security
 // notes nor the variables summary walked the runner table.

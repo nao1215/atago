@@ -24,6 +24,7 @@ own log output, the resulting ECS state is read back with
 assertion is about what the service actually looks like afterwards.
 
 Source: `test/e2e/thirdparty/ecspresso/deploy.atago.yaml`
+Network policy: egress is allowed only to `127.0.0.1`.
 ### Scenario: deploy registers the task definition, creates the service, and rolls it
 _only when `command -v ecspresso && command -v moto_server && command -v aws` succeeds_
 #### Given

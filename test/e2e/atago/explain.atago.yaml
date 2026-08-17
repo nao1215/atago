@@ -454,3 +454,36 @@ scenarios:
             json:
               - path: "$.specs[0].scenarios[0].variables[0]"
                 equals: "env:DB_PASSWORD"
+
+  # Regression: the scenario heading rendered OS gates only, so a scenario
+  # gated on an environment variable or a probe command — including one that
+  # inherits the gate from defaults.scenario — read as unconditional, while
+  # doc names all three and list shows them in its GATES column.
+  - name: explain names env and command gates
+    steps:
+      - fixture:
+          file: gates.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: gates
+            defaults:
+              scenario:
+                only:
+                  command: "jq --version"
+            scenarios:
+              - name: gated by the suite default
+                steps:
+                  - run: {shell: true, command: "echo hi"}
+              - name: gated on an environment variable
+                skip: {env: CI}
+                steps:
+                  - run: {shell: true, command: "echo hi"}
+      - run:
+          command: ${atago} explain gates.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - '[only command="jq --version"]'
+              - "[skip env=CI]"

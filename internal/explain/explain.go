@@ -195,11 +195,12 @@ func explainScenarioHeading(b *strings.Builder, sc *spec.Scenario) {
 	if len(sc.Tags) > 0 {
 		fmt.Fprintf(b, "  [tags: %s]", strings.Join(sc.Tags, ", "))
 	}
-	if sc.Only != nil && sc.Only.OS != "" {
-		fmt.Fprintf(b, "  [only os=%s]", sc.Only.OS)
-	}
-	if sc.Skip != nil && sc.Skip.OS != "" {
-		fmt.Fprintf(b, "  [skip os=%s]", sc.Skip.OS)
+	// Every gate, not just the OS: an env- or command-gated scenario read as
+	// unconditional here while doc named all three and list showed them in its
+	// GATES column, and a gate inherited from defaults.scenario was equally
+	// invisible.
+	for _, g := range append(gateMarkers("only", sc.Only), gateMarkers("skip", sc.Skip)...) {
+		fmt.Fprintf(b, "  [%s]", g)
 	}
 	if sc.ExpectFail != nil {
 		fmt.Fprintf(b, "  [expect_fail: %s]", sc.ExpectFail.Reason)
@@ -208,6 +209,26 @@ func explainScenarioHeading(b *strings.Builder, sc *spec.Scenario) {
 		}
 	}
 	b.WriteByte('\n')
+}
+
+// gateMarkers renders a scenario's selection gate as heading markers — one per
+// condition the gate sets, since os/env/command are independent claims. It
+// returns nothing for an unset gate.
+func gateMarkers(key string, c *spec.Condition) []string {
+	if c == nil {
+		return nil
+	}
+	var out []string
+	if c.OS != "" {
+		out = append(out, fmt.Sprintf("%s os=%s", key, c.OS))
+	}
+	if c.Env != "" {
+		out = append(out, fmt.Sprintf("%s env=%s", key, c.Env))
+	}
+	if c.Command != "" {
+		out = append(out, fmt.Sprintf("%s command=%q", key, c.Command))
+	}
+	return out
 }
 
 // describePTY renders a one-line summary of an interactive pty step: the

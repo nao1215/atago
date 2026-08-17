@@ -20,6 +20,7 @@ endpoint — so what is asserted is that the gateway stored and re-exposed the
 samples, in the format a Prometheus scrape would consume.
 
 Source: `test/e2e/thirdparty/pushgateway/pushgateway.atago.yaml`
+Network policy: egress is allowed only to `127.0.0.1`.
 ### Scenario: a pushed metric appears on the scrape endpoint
 _only when `pushgateway --version` succeeds_
 #### Given

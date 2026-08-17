@@ -22,6 +22,7 @@ so what is asserted is the response a browser would get, not a log line
 claiming the server came up.
 
 Source: `test/e2e/thirdparty/caddy/caddy.atago.yaml`
+Network policy: egress is allowed only to `127.0.0.1`, `localhost`.
 ### Scenario: the standard module set is compiled in
 _only when `caddy version` succeeds_
 #### When

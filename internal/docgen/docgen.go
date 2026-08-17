@@ -90,17 +90,30 @@ func writeSuite(md *markdown.Markdown, src Source, outputDir string) {
 	// byte-identical across platforms (Windows filepath.Clean uses backslashes).
 	md.PlainTextf("Source: `%s`", filepath.ToSlash(src.Path))
 
+	// The two spec-level declarations that are guarantees rather than steps: the
+	// hosts a suite is confined to, and the values masked in every output.
+	// explain and the manifest both report them; the published doc said nothing,
+	// so a reader could not tell a suite confined to one host from one that talks
+	// anywhere. An unrestricted policy and an empty secrets list are the absence
+	// of a guarantee, so they stay silent rather than adding a line per suite.
+	if s.Permissions != nil && s.Permissions.Network != nil && len(s.Permissions.Network.Allow) > 0 {
+		md.PlainTextf("Network policy: egress is allowed only to %s.", codeList(spec.StringList(s.Permissions.Network.Allow)))
+	}
+	if len(s.Secrets) > 0 {
+		md.PlainTextf("Secrets declared: %s.", codeList(spec.StringList(s.Secrets)))
+	}
+
 	// The suite lifecycle is part of the documented behavior: setup runs once
 	// before any scenario and teardown always runs after the last, and explain
 	// and the manifest already describe both — the published doc was the one
 	// summary that hid the bootstrap and the cleanup entirely, while rendering
 	// a scenario's teardown for the same always-runs reason.
 	noExpand := func(s string) string { return s }
-	if cmds := commands(s.Suite.Setup, noExpand, s.Runners); len(cmds) > 0 {
+	if cmds := narrative(s.Suite.Setup, noExpand, s.Runners); len(cmds) > 0 {
 		md.H3("Suite setup (runs once before any scenario)")
 		md.CodeBlocks(markdown.SyntaxHighlightShell, strings.Join(cmds, "\n"))
 	}
-	if cmds := commands(s.Suite.Teardown, noExpand, s.Runners); len(cmds) > 0 {
+	if cmds := narrative(s.Suite.Teardown, noExpand, s.Runners); len(cmds) > 0 {
 		md.H3("Suite teardown (always runs after the last scenario)")
 		md.CodeBlocks(markdown.SyntaxHighlightShell, strings.Join(cmds, "\n"))
 	}
@@ -145,7 +158,7 @@ func writeScenario(md *markdown.Markdown, sc *spec.Scenario, specDir, outputDir 
 
 	// Teardown always runs — pass, fail, error, or interrupt — so document the
 	// cleanup a scenario performs against external systems.
-	if td := commands(sc.Teardown, expand, runners); len(td) > 0 {
+	if td := narrative(sc.Teardown, expand, runners); len(td) > 0 {
 		md.H4("Finally (teardown, always runs)")
 		md.CodeBlocks(markdown.SyntaxHighlightShell, strings.Join(td, "\n"))
 	}
@@ -379,13 +392,47 @@ func clearedEnvBullet(passEnv []string) string {
 // and store steps appear as comments so a later ${name} reference is explained
 // where it is born instead of appearing out of nowhere.
 func commands(steps []spec.Step, expand func(string) string, runners map[string]spec.Runner) []string {
+	return renderSteps(steps, expand, runners, commandLine)
+}
+
+// narrative renders a block that documents a step sequence outside the
+// Given/When/Then split: a scenario's teardown and the suite lifecycle. Those
+// have no Given or Then of their own, so a fixture written or an assertion made
+// there has nowhere else to appear — and rendering them through `commands`
+// dropped both, which hid a documented cleanup guarantee and made a
+// fixture-only suite.setup produce no block at all.
+func narrative(steps []spec.Step, expand func(string) string, runners map[string]spec.Runner) []string {
+	return renderSteps(steps, expand, runners, narrativeLine)
+}
+
+// renderSteps is the shared walk behind commands and narrative: same loop, one
+// line per step, differing only in which renderer decides what a step says.
+func renderSteps(steps []spec.Step, expand func(string) string, runners map[string]spec.Runner,
+	line func(*spec.Step, func(string) string, map[string]spec.Runner) (string, bool)) []string {
 	var out []string
 	for i := range steps {
-		if line, ok := commandLine(&steps[i], expand, runners); ok {
-			out = append(out, line)
+		if l, ok := line(&steps[i], expand, runners); ok {
+			out = append(out, l)
 		}
 	}
 	return out
+}
+
+// narrativeLine renders one step of a teardown or suite lifecycle block: every
+// command line, plus the fixtures and assertions those blocks have no Given or
+// Then to carry. Both render as comments, like every other non-pasteable line.
+func narrativeLine(step *spec.Step, expand func(string) string, runners map[string]spec.Runner) (string, bool) {
+	switch step.Kind() {
+	case spec.StepFixture:
+		return "# write fixture " + expand(step.Fixture.File), true
+	case spec.StepAssert:
+		if desc := describeAsserts(step.Assert); len(desc) > 0 {
+			return "# expect " + expand(strings.Join(desc, " and ")), true
+		}
+		return "", false
+	default:
+		return commandLine(step, expand, runners)
+	}
 }
 
 // commandLine renders one step's "When" line; ok is false for a step kind that

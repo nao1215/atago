@@ -23,6 +23,7 @@ store built on top is exercised the same way, and the broker's monitoring
 endpoint is checked over HTTP alongside.
 
 Source: `test/e2e/thirdparty/nats/nats.atago.yaml`
+Network policy: egress is allowed only to `127.0.0.1`.
 ### Scenario: the binary reports its version
 _only when `nats-server --version` succeeds_
 #### When
