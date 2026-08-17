@@ -89,12 +89,14 @@ _only when `command -v ssh-keygen` succeeds · skipped on Windows_
 ssh-keygen -y -P "$PASSPHRASE" -f protected
 ```
 #### Then
-- exit code is `0`
-- file `protected` exists
-- file `protected.pub` exists
-- file `protected.pub` contains `ssh-ed25519`
-- exit code is `0`
-- stdout contains `ssh-ed25519`
+- after `interactive (pty): ssh-keygen -t ed25519 -f protected -C test@atago`:
+  - exit code is `0`
+  - file `protected` exists
+  - file `protected.pub` exists
+  - file `protected.pub` contains `ssh-ed25519`
+- after `ssh-keygen -y -P "$PASSPHRASE" -f protected`:
+  - exit code is `0`
+  - stdout contains `ssh-ed25519`
 #### Generated artifacts
 - `protected`
 - `protected.pub`
@@ -106,6 +108,8 @@ _only when `command -v ssh-keygen` succeeds · skipped on Windows_
 ssh-keygen -y -P definitely-not-the-passphrase -f protected
 ```
 #### Then
-- exit code is `0`
-- exit code is one of `255`, `1`
-- stderr contains `incorrect passphrase`
+- after `interactive (pty): ssh-keygen -t ed25519 -f protected -C test@atago`:
+  - exit code is `0`
+- after `ssh-keygen -y -P definitely-not-the-passphrase -f protected`:
+  - exit code is one of `255`, `1`
+  - stderr contains `incorrect passphrase`

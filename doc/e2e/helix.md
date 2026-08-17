@@ -93,8 +93,9 @@ alpha
 cat note.txt
 ```
 #### Then
-- exit code is `0`
-- stdout contains `alpha beta`
+- after `cat note.txt`:
+  - exit code is `0`
+  - stdout contains `alpha beta`
 ### Scenario: insert mode prefixes the first line and write quit saves it
 _only when `hx --version` succeeds · skipped on Windows_
 #### Given
@@ -119,8 +120,9 @@ alpha
 cat note.txt
 ```
 #### Then
-- exit code is `0`
-- stdout equals an exact value
+- after `cat note.txt`:
+  - exit code is `0`
+  - stdout equals an exact value
 ### Scenario: append mode after j edits only the second line
 _only when `hx --version` succeeds · skipped on Windows_
 #### Given
@@ -146,8 +148,9 @@ second
 cat note.txt
 ```
 #### Then
-- exit code is `0`
-- stdout equals an exact value
+- after `cat note.txt`:
+  - exit code is `0`
+  - stdout equals an exact value
 #### Expected output
 _expected stdout:_
 ```text
@@ -178,8 +181,9 @@ alpha
 cat note.txt
 ```
 #### Then
-- exit code is `0`
-- stdout equals an exact value
+- after `cat note.txt`:
+  - exit code is `0`
+  - stdout equals an exact value
 ### Scenario: saving a new file path creates the file on disk
 _only when `hx --version` succeeds · skipped on Windows_
 #### Given
@@ -199,8 +203,9 @@ auto-save = false
 cat fresh.txt
 ```
 #### Then
-- exit code is `0`
-- stdout equals an exact value
+- after `cat fresh.txt`:
+  - exit code is `0`
+  - stdout equals an exact value
 ### Scenario: saving a new file path under an existing directory creates the file
 _only when `hx --version` succeeds · skipped on Windows_
 #### Given
@@ -221,8 +226,9 @@ auto-save = false
 cat dir/fresh.txt
 ```
 #### Then
-- exit code is `0`
-- stdout equals an exact value
+- after `cat dir/fresh.txt`:
+  - exit code is `0`
+  - stdout equals an exact value
 ### Scenario: enter in insert mode writes multiple lines
 _only when `hx --version` succeeds · skipped on Windows_
 #### Given
@@ -242,8 +248,9 @@ auto-save = false
 cat lines.txt
 ```
 #### Then
-- exit code is `0`
-- stdout equals an exact value
+- after `cat lines.txt`:
+  - exit code is `0`
+  - stdout equals an exact value
 #### Expected output
 _expected stdout:_
 ```text
@@ -275,8 +282,9 @@ third
 cat note.txt
 ```
 #### Then
-- exit code is `0`
-- stdout equals an exact value
+- after `cat note.txt`:
+  - exit code is `0`
+  - stdout equals an exact value
 #### Expected output
 _expected stdout:_
 ```text
@@ -309,8 +317,9 @@ third
 cat note.txt
 ```
 #### Then
-- exit code is `0`
-- stdout equals an exact value
+- after `cat note.txt`:
+  - exit code is `0`
+  - stdout equals an exact value
 #### Expected output
 _expected stdout:_
 ```text
@@ -342,8 +351,9 @@ alpha
 cat note.txt
 ```
 #### Then
-- exit code is `0`
-- stdout equals an exact value
+- after `cat note.txt`:
+  - exit code is `0`
+  - stdout equals an exact value
 ### Scenario: x d then undo restores the deleted line before save
 _only when `hx --version` succeeds · skipped on Windows_
 #### Given
@@ -369,8 +379,9 @@ second
 cat note.txt
 ```
 #### Then
-- exit code is `0`
-- stdout equals an exact value
+- after `cat note.txt`:
+  - exit code is `0`
+  - stdout equals an exact value
 #### Expected output
 _expected stdout:_
 ```text
@@ -401,8 +412,9 @@ alpha beta gamma
 cat note.txt
 ```
 #### Then
-- exit code is `0`
-- stdout equals an exact value
+- after `cat note.txt`:
+  - exit code is `0`
+  - stdout equals an exact value
 ### Scenario: x then d deletes the selected line and saves the shorter file
 _only when `hx --version` succeeds · skipped on Windows_
 #### Given
@@ -428,8 +440,9 @@ second
 cat note.txt
 ```
 #### Then
-- exit code is `0`
-- stdout equals an exact value
+- after `cat note.txt`:
+  - exit code is `0`
+  - stdout equals an exact value
 ### Scenario: buffer-next switches to the second file in a multi-file session
 _only when `hx --version` succeeds · skipped on Windows_
 #### Given
@@ -459,8 +472,9 @@ two-start
 cat two.txt
 ```
 #### Then
-- exit code is `0`
-- stdout contains `two-start updated`
+- after `cat two.txt`:
+  - exit code is `0`
+  - stdout contains `two-start updated`
 ### Scenario: buffer-previous returns to the first file in a multi-file session
 _only when `hx --version` succeeds · skipped on Windows_
 #### Given
@@ -490,8 +504,9 @@ two-start
 cat one.txt
 ```
 #### Then
-- exit code is `0`
-- stdout contains `one-start updated`
+- after `cat one.txt`:
+  - exit code is `0`
+  - stdout contains `one-start updated`
 ### Scenario: buffer-next then buffer-previous can edit both buffers before quit
 _only when `hx --version` succeeds · skipped on Windows_
 #### Given
@@ -578,8 +593,9 @@ auto-save = false
 cat 日本語メモ.txt
 ```
 #### Then
-- exit code is `0`
-- stdout equals an exact value
+- after `cat 日本語メモ.txt`:
+  - exit code is `0`
+  - stdout equals an exact value
 ### Scenario: wide and combining characters round-trip through a save
 _only when `hx --version` succeeds · skipped on Windows_
 #### Given
@@ -599,5 +615,6 @@ auto-save = false
 od -An -tx1 -v unicode.txt
 ```
 #### Then
-- exit code is `0`
-- stdout contains `65 cc 81`
+- after `od -An -tx1 -v unicode.txt`:
+  - exit code is `0`
+  - stdout contains `65 cc 81`

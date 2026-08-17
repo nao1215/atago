@@ -124,10 +124,12 @@ passphrase protected
 # interactive (pty): age -d -o out.txt secret.age
 ```
 #### Then
-- exit code is `0`
-- file `secret.age` exists
-- exit code is `0`
-- file `out.txt` contains `passphrase protected`
+- after `interactive (pty): age -p -o secret.age msg.txt`:
+  - exit code is `0`
+  - file `secret.age` exists
+- after `interactive (pty): age -d -o out.txt secret.age`:
+  - exit code is `0`
+  - file `out.txt` contains `passphrase protected`
 #### Generated artifacts
 - `secret.age`
 ## age + changes (single-artifact generator)

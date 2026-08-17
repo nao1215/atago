@@ -119,10 +119,12 @@ python3 -c "import sys; print(sys.stdout.isatty())"
 # interactive (pty): python3 -c "import sys; print(sys.stdout.isatty())"
 ```
 #### Then
-- exit code is `0`
-- stdout equals an exact value
-- exit code is `0`
-- stdout contains `True`
+- after `python3 -c "import sys; print(sys.stdout.isatty())"`:
+  - exit code is `0`
+  - stdout equals an exact value
+- after `interactive (pty): python3 -c "import sys; print(sys.stdout.isatty())"`:
+  - exit code is `0`
+  - stdout contains `True`
 ### Scenario: an interactive session drives the REPL across exchanges
 _only when `python3 --version` succeeds · skipped on Windows_
 #### When

@@ -78,7 +78,7 @@ printf 'more\n' >> repo/a.txt
 # interactive (pty): lazygit -ucd ${workdir}/cfg -p ${workdir}/repo
 ```
 #### Then
-- after `printf 'more\n' >> repo/a.txt`:
+- after `interactive (pty): lazygit -ucd ${workdir}/cfg -p ${workdir}/repo`:
   - exit code is `0`
 ### Scenario: opening from a nested repository path rejects the subdirectory as invalid
 _only when `lazygit --version` succeeds · skipped on Windows_

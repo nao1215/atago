@@ -939,7 +939,8 @@ echo needle
 # interactive (pty): echo needle
 ```
 #### Then
-- rendered screen contains `${pat}`
+- after `interactive (pty): echo needle`:
+  - rendered screen contains `${pat}`
 ## atago self-hosting / browser (cdp) runner
 Source: `test/e2e/atago/cdp.atago.yaml`
 ### Scenario: a cdp step with no actions fails validation (exit 2)
@@ -9341,15 +9342,20 @@ _skipped on Windows_
 # interactive (pty): trap 'exit 130' INT; echo waiting; while true; do sleep 0.1; done
 ```
 #### Then
-- exit code is `0`
-- stdout contains `^[[Z`, `^[b`, `^[[1;5D`, `^[[1;2A`, `^[[2~`
-- exit code is `0`
-- stdout contains `^[^?X`
-- exit code is `0`
-- stdout contains `^[[B^[[B^[[B`
-- exit code is `0`
-- stdout contains `^[[Z`
-- exit code is `130`
+- after `interactive (pty): cat -v`:
+  - exit code is `0`
+  - stdout contains `^[[Z`, `^[b`, `^[[1;5D`, `^[[1;2A`, `^[[2~`
+- after `interactive (pty): stty raw -echo; printf "READY\r\n"; head -c 3 | cat -v`:
+  - exit code is `0`
+  - stdout contains `^[^?X`
+- after `interactive (pty): cat -v`:
+  - exit code is `0`
+  - stdout contains `^[[B^[[B^[[B`
+- after `interactive (pty): cat -v`:
+  - exit code is `0`
+  - stdout contains `^[[Z`
+- after `interactive (pty): trap 'exit 130' INT; echo waiting; while true; do sleep 0.1; done`:
+  - exit code is `130`
 ### Scenario: a bracketed paste is delivered wrapped, and refused when unasked for
 _skipped on Windows_
 #### Given
@@ -9375,10 +9381,12 @@ scenarios:
 ${atago} run unasked.atago.yaml
 ```
 #### Then
-- exit code is `0`
-- stdout contains `^[[200~ab^[[201~`
-- exit code is `4`
-- stdout contains `has not enabled bracketed paste`, `ESC [?2004h`
+- after `interactive (pty): stty raw -echo; printf "\033[?2004hREADY\r\n"; head -c 14 | cat -v`:
+  - exit code is `0`
+  - stdout contains `^[[200~ab^[[201~`
+- after `${atago} run unasked.atago.yaml`:
+  - exit code is `4`
+  - stdout contains `has not enabled bracketed paste`, `ESC [?2004h`
 ### Scenario: a resize delivers the new size and the screen follows it
 _skipped on Windows_
 #### When
@@ -9388,9 +9396,12 @@ _skipped on Windows_
 '; sleep 0.2
 ```
 #### Then
-- exit code is `0`
-- stdout contains `40 100`
-- rendered screen contains `"abcdefghij\nKL"`
+- after `interactive (pty): trap "stty size; exit 0" WINCH; stty size; while :; do sleep 0.05; done`:
+  - exit code is `0`
+  - stdout contains `40 100`
+- after `interactive (pty): printf 'abcdefghijKL
+'; sleep 0.2`:
+  - rendered screen contains `"abcdefghij\nKL"`
 ### Scenario: a session can change the world and watch the program notice
 _skipped on Windows_
 #### Given
@@ -9418,11 +9429,13 @@ scenarios:
 ${atago} run badexec.atago.yaml
 ```
 #### Then
-- exit code is `0`
-- stdout contains `FOUND`
-- file `marker.txt` exists
-- exit code is `4`
-- stdout contains `exited 7`, `the change the session waits for was not made`
+- after `interactive (pty): while :; do if [ -f marker.txt ]; then echo FOUND; break; fi; sleep 0.05; done`:
+  - exit code is `0`
+  - stdout contains `FOUND`
+  - file `marker.txt` exists
+- after `${atago} run badexec.atago.yaml`:
+  - exit code is `4`
+  - stdout contains `exited 7`, `the change the session waits for was not made`
 #### Generated artifacts
 - `marker.txt`
 ### Scenario: a mouse click is delivered as an SGR report, and refused when unasked for
@@ -9450,10 +9463,12 @@ scenarios:
 ${atago} run unasked_mouse.atago.yaml
 ```
 #### Then
-- exit code is `0`
-- stdout contains `^[[<0;12;5M^[[<0;12;5m`
-- exit code is `4`
-- stdout contains `has not enabled mouse reporting`, `ESC [?1000h`
+- after `interactive (pty): stty raw -echo; printf "\033[?1002h\033[?1006hREADY\r\n"; head -c 20 | cat -v`:
+  - exit code is `0`
+  - stdout contains `^[[<0;12;5M^[[<0;12;5m`
+- after `${atago} run unasked_mouse.atago.yaml`:
+  - exit code is `4`
+  - stdout contains `has not enabled mouse reporting`, `ESC [?1000h`
 ### Scenario: screen attrs check colors and styling, not only text
 _skipped on Windows_
 #### Given
@@ -9504,8 +9519,10 @@ ${atago} run badattrs.atago.yaml
 ${atago} run badflag.atago.yaml
 ```
 #### Then
-- rendered screen contains `ERROR` and shows "ERROR" in bold red and shows "plain" in not bold default and shows "SELECTED" in reverse on row 2
-- rendered screen is checked and shows "ITAL" in italic and shows "UNDER" in underlined and shows "BLINK" in blinking and shows "ONRED" in on red and shows "ITAL" in not underlined not blinking on default
+- after `interactive (pty): printf '\033[1;31mERROR\033[0m plain\r\n\033[7mSELECTED\033[0m\r\n'`:
+  - rendered screen contains `ERROR` and shows "ERROR" in bold red and shows "plain" in not bold default and shows "SELECTED" in reverse on row 2
+- after `interactive (pty): printf '\033[3mITAL\033[0m \033[4mUNDER\033[0m \033[5mBLINK\033[0m \033[41mONRED\033[0m\r\n'`:
+  - rendered screen is checked and shows "ITAL" in italic and shows "UNDER" in underlined and shows "BLINK" in blinking and shows "ONRED" in on red and shows "ITAL" in not underlined not blinking on default
 - after `${atago} run badattrs.atago.yaml`:
   - exit code is `1`
   - stdout contains `fg=red (wanted green)`
@@ -9943,10 +9960,12 @@ _skipped on Windows_
 ${atago} run generated.atago.yaml
 ```
 #### Then
-- exit code is `0`
-- file `generated.atago.yaml` contains `- pty:`, `- send:`
-- exit code is `0`
-- stdout contains `1 passed`
+- after `interactive (pty): ${atago} record --pty --out generated.atago.yaml -- sh -c 'printf PROMPT; read n; echo hi-$n'`:
+  - exit code is `0`
+  - file `generated.atago.yaml` contains `- pty:`, `- send:`
+- after `${atago} run generated.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `1 passed`
 ### Scenario: record --pty of a silent program anchors on nothing rather than on the echo
 _skipped on Windows_
 #### When
@@ -9955,10 +9974,12 @@ _skipped on Windows_
 ${atago} run silent.atago.yaml
 ```
 #### Then
-- exit code is `0`
-- file `silent.atago.yaml` does not contain `- expect:`
-- exit code is `0`
-- stdout contains `1 passed`
+- after `interactive (pty): ${atago} record --pty --out silent.atago.yaml -- sh -c 'read a; read b; echo done'`:
+  - exit code is `0`
+  - file `silent.atago.yaml` does not contain `- expect:`
+- after `${atago} run silent.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `1 passed`
 ### Scenario: record --pty of a no-input command yields a session-less spec that replays green
 _skipped on Windows_
 #### When
@@ -9967,11 +9988,13 @@ _skipped on Windows_
 ${atago} run echo.atago.yaml
 ```
 #### Then
-- exit code is `0`
-- file `echo.atago.yaml` contains `- pty:`, `command: echo done`
-- file `echo.atago.yaml` does not contain `- send:`, `session:`
-- exit code is `0`
-- stdout contains `1 passed`
+- after `interactive (pty): ${atago} record --pty --out echo.atago.yaml -- echo done`:
+  - exit code is `0`
+  - file `echo.atago.yaml` contains `- pty:`, `command: echo done`
+  - file `echo.atago.yaml` does not contain `- send:`, `session:`
+- after `${atago} run echo.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `1 passed`
 ### Scenario: a prompt with regex metacharacters is escaped in the generated expect
 _skipped on Windows_
 #### When
@@ -9980,10 +10003,12 @@ _skipped on Windows_
 ${atago} run meta.atago.yaml
 ```
 #### Then
-- exit code is `0`
-- file `meta.atago.yaml` contains `expect: "Continue\\? \\(y/n\\):"`, `- send:`
-- exit code is `0`
-- stdout contains `1 passed`
+- after `interactive (pty): ${atago} record --pty --out meta.atago.yaml -- sh -c 'printf "Continue? (y/n): "; read a; echo got-$a'`:
+  - exit code is `0`
+  - file `meta.atago.yaml` contains `expect: "Continue\\? \\(y/n\\):"`, `- send:`
+- after `${atago} run meta.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `1 passed`
 ### Scenario: recorded text containing dollar-brace round-trips as literal text
 _skipped on Windows_
 #### When
@@ -10009,9 +10034,10 @@ ${atago} run sec.atago.yaml
 ${atago} run sec.atago.yaml
 ```
 #### Then
-- exit code is `0`
-- file `sec.atago.yaml` contains `${env:ATAGO_SECRET_1}`
-- file `sec.atago.yaml` does not contain `hunter2`
+- after `interactive (pty): ${atago} record --pty --out sec.atago.yaml -- sh -c 'stty -echo; printf "Password: "; read pw; stty echo; printf "\naccepted\n"'`:
+  - exit code is `0`
+  - file `sec.atago.yaml` contains `${env:ATAGO_SECRET_1}`
+  - file `sec.atago.yaml` does not contain `hunter2`
 - after `${atago} run sec.atago.yaml`:
   - exit code is `0`
   - stdout contains `1 passed`
@@ -10026,11 +10052,13 @@ _skipped on Windows_
 ${atago} run tui.atago.yaml
 ```
 #### Then
-- exit code is `0`
-- file `tui.atago.yaml` contains `- send: "j"`
-- file `tui.atago.yaml` does not contain `ATAGO_SECRET`
-- exit code is `0`
-- stdout contains `1 passed`
+- after `interactive (pty): ${atago} record --pty --out tui.atago.yaml -- sh -c 'stty -icanon -echo min 1 time 0; printf READY; head -c 1 >/dev/null; stty sane; echo BYE'`:
+  - exit code is `0`
+  - file `tui.atago.yaml` contains `- send: "j"`
+  - file `tui.atago.yaml` does not contain `ATAGO_SECRET`
+- after `${atago} run tui.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `1 passed`
 ### Scenario: record --pty of a never-exiting program times out instead of hanging
 _skipped on Windows_
 #### When

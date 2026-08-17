@@ -431,7 +431,8 @@ c
 cat chosen.txt
 ```
 #### Then
-- stdout matches `/(?m)^.*/b-dir\n.*/c-dir\n?$/`
+- after `cat chosen.txt`:
+  - stdout matches `/(?m)^.*/b-dir\n.*/c-dir\n?$/`
 ### Scenario: inverse selection with one spaced file writes the other two
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -459,7 +460,8 @@ c
 cat chosen.txt
 ```
 #### Then
-- stdout matches `/(?m)^.*/b two\.txt\n.*/c three\.txt\n?$/`
+- after `cat chosen.txt`:
+  - stdout matches `/(?m)^.*/b two\.txt\n.*/c three\.txt\n?$/`
 ### Scenario: toggling the same directory twice removes the explicit selection
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -998,8 +1000,10 @@ keep
 stat -c '%h' src/alpha.txt
 ```
 #### Then
-- file `dst/alpha.txt` contains `alpha`
-- stdout equals an exact value
+- after `interactive (pty): yazi src`:
+  - file `dst/alpha.txt` contains `alpha`
+- after `stat -c '%h' src/alpha.txt`:
+  - stdout equals an exact value
 ### Scenario: ctrl-minus hardlinks a spaced file into a sibling directory
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -1022,8 +1026,10 @@ keep
 stat -c '%h' 'src/two words.txt'
 ```
 #### Then
-- file `dst/two words.txt` contains `alpha`
-- stdout equals an exact value
+- after `interactive (pty): yazi src`:
+  - file `dst/two words.txt` contains `alpha`
+- after `stat -c '%h' 'src/two words.txt'`:
+  - stdout equals an exact value
 ## yazi (third-party terminal file manager) / navigation and tabs
 Moving around is what a file manager does between operations, and it has to
 put the cursor exactly where the user believes it is — because the next
@@ -2597,7 +2603,8 @@ a
 readlink dst/a.txt
 ```
 #### Then
-- stdout matches `/^.+/src/a\.txt\n?$/`
+- after `readlink dst/a.txt`:
+  - stdout matches `/^.+/src/a\.txt\n?$/`
 ### Scenario: yank then underscore creates a relative symlink in the sibling directory
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -2616,7 +2623,8 @@ a
 readlink dst/a.txt
 ```
 #### Then
-- stdout equals an exact value
+- after `readlink dst/a.txt`:
+  - stdout equals an exact value
 ### Scenario: yanked directory can be absolute-symlinked into a sibling directory
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -2635,7 +2643,8 @@ a
 readlink dst/sub
 ```
 #### Then
-- stdout matches `/^.+/src/sub\n?$/`
+- after `readlink dst/sub`:
+  - stdout matches `/^.+/src/sub\n?$/`
 ### Scenario: yanked directory can be relative-symlinked into a sibling directory
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -2654,7 +2663,8 @@ a
 readlink dst/sub
 ```
 #### Then
-- stdout equals an exact value
+- after `readlink dst/sub`:
+  - stdout equals an exact value
 ### Scenario: modified time sort reorders the rendered list
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -2808,7 +2818,8 @@ c
 cat chosen.txt
 ```
 #### Then
-- stdout matches `/(?m)^.*/b\.txt\n.*/c\.txt\n?$/`
+- after `cat chosen.txt`:
+  - stdout matches `/(?m)^.*/b\.txt\n.*/c\.txt\n?$/`
 ### Scenario: direct tab switching with 1 and 2 preserves per-tab cwd
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -3138,7 +3149,8 @@ spaced
 readlink "dst/two words.txt"
 ```
 #### Then
-- stdout matches `/^.+/src/two words\.txt\n?$/`
+- after `readlink "dst/two words.txt"`:
+  - stdout matches `/^.+/src/two words\.txt\n?$/`
 ### Scenario: underscore symlinks a spaced filename with a relative target
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -3157,7 +3169,8 @@ spaced
 readlink "dst/two words.txt"
 ```
 #### Then
-- stdout equals an exact value
+- after `readlink "dst/two words.txt"`:
+  - stdout equals an exact value
 ### Scenario: dash symlinks a spaced directory with an absolute target
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -3176,7 +3189,8 @@ spaced
 readlink "dst/two words"
 ```
 #### Then
-- stdout matches `/^.+/src/two words\n?$/`
+- after `readlink "dst/two words"`:
+  - stdout matches `/^.+/src/two words\n?$/`
 ### Scenario: underscore symlinks a spaced directory with a relative target
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -3195,7 +3209,8 @@ spaced
 readlink "dst/two words"
 ```
 #### Then
-- stdout equals an exact value
+- after `readlink "dst/two words"`:
+  - stdout equals an exact value
 ### Scenario: hidden toggle can be turned back off
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -3474,7 +3489,8 @@ target
 readlink linked.txt
 ```
 #### Then
-- stdout equals an exact value
+- after `readlink linked.txt`:
+  - stdout equals an exact value
 ### Scenario: block shell command creates a symlink to a directory
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -3492,7 +3508,8 @@ a
 readlink linked-dir
 ```
 #### Then
-- stdout equals an exact value
+- after `readlink linked-dir`:
+  - stdout equals an exact value
 ### Scenario: block shell command renames a spaced filename
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -3527,7 +3544,8 @@ target
 readlink "linked file.txt"
 ```
 #### Then
-- stdout equals an exact value
+- after `readlink "linked file.txt"`:
+  - stdout equals an exact value
 ### Scenario: block shell command creates a symlink to a spaced directory
 _only when `yazi --version` succeeds · skipped on Windows_
 #### Given
@@ -3545,4 +3563,5 @@ a
 readlink "linked dir"
 ```
 #### Then
-- stdout equals an exact value
+- after `readlink "linked dir"`:
+  - stdout equals an exact value
