@@ -100,7 +100,12 @@ func usedCodes(t *testing.T) map[string][]string {
 		}
 		if d.IsDir() {
 			switch d.Name() {
-			case ".git", "dist", "node_modules", "public", "testdata", "diag":
+			// .claude holds git worktrees an agent may have checked out
+			// inside the repo: walking one scans a second copy of every
+			// package, which reports the same file twice and, on a worktree
+			// of another branch, attributes codes to paths that are not this
+			// tree's source.
+			case ".git", ".claude", "dist", "node_modules", "public", "testdata", "diag":
 				return fs.SkipDir
 			}
 			return nil

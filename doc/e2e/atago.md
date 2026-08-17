@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-81 suites · 632 scenarios
+81 suites · 635 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -574,11 +574,14 @@
   - [a redirect may not write through a symlinked directory](#scenario-a-redirect-may-not-write-through-a-symlinked-directory)
   - [a symlinked directory inside the workdir still resolves](#scenario-a-symlinked-directory-inside-the-workdir-still-resolves)
   - [a snapshot path may not escape the spec directory](#scenario-a-snapshot-path-may-not-escape-the-spec-directory)
-- [atago self-hosting / selection](#atago-self-hosting--selection) — 4 scenarios
+- [atago self-hosting / selection](#atago-self-hosting--selection) — 7 scenarios
   - [--filter runs only matching scenarios](#scenario---filter-runs-only-matching-scenarios)
   - [--filter selects multiple scenarios with OR (comma and repeated)](#scenario---filter-selects-multiple-scenarios-with-or-comma-and-repeated)
   - [--skip-tag drops tagged scenarios](#scenario---skip-tag-drops-tagged-scenarios)
   - [a repeated tag on one scenario is a load-time error](#scenario-a-repeated-tag-on-one-scenario-is-a-load-time-error)
+  - [an empty tag is a load-time error](#scenario-an-empty-tag-is-a-load-time-error)
+  - [a ready.store that shadows a built-in is a load-time error](#scenario-a-readystore-that-shadows-a-built-in-is-a-load-time-error)
+  - [a scenario service that shadows a suite service is a load-time error](#scenario-a-scenario-service-that-shadows-a-suite-service-is-a-load-time-error)
 - [atago self-hosting / background services](#atago-self-hosting--background-services) — 8 scenarios
   - [file readiness captures a dynamic value into a variable](#scenario-file-readiness-captures-a-dynamic-value-into-a-variable)
   - [log readiness waits for a line on the service output](#scenario-log-readiness-waits-for-a-line-on-the-service-output)
@@ -11675,6 +11678,78 @@ ${atago} doc shared.atago.yaml
 - after `${atago} doc shared.atago.yaml`:
   - exit code is `0`
   - stdout contains ``smoke` (2)`
+### Scenario: an empty tag is a load-time error
+#### Given
+- Fixture file `emptytag.atago.yaml` is created.
+#### Inputs
+_Fixture `emptytag.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: carries an empty tag
+    tags: ["", smoke]
+    steps:
+      - run: {shell: true, command: "true"}
+```
+#### When
+```shell
+${atago} run emptytag.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `tag must not be empty`
+### Scenario: a ready.store that shadows a built-in is a load-time error
+#### Given
+- Fixture file `readyshadow.atago.yaml` is created.
+#### Inputs
+_Fixture `readyshadow.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: shadows the workdir
+    services:
+      - name: writer
+        command: ./writer
+        ready: {file: marker.txt, store: workdir}
+    steps:
+      - run: {shell: true, command: "true"}
+```
+#### When
+```shell
+${atago} run readyshadow.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `shadows a built-in variable`
+### Scenario: a scenario service that shadows a suite service is a load-time error
+#### Given
+- Fixture file `svcshadow.atago.yaml` is created.
+#### Inputs
+_Fixture `svcshadow.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+  setup:
+    - service: {name: peer, command: ./peer}
+scenarios:
+  - name: declares its own peer
+    services:
+      - {name: peer, command: ./peer}
+    steps:
+      - run: {shell: true, command: "true"}
+```
+#### When
+```shell
+${atago} run svcshadow.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `duplicate service name "peer"`
 ## atago self-hosting / background services
 Source: `test/e2e/atago/services.atago.yaml`
 ### Scenario: file readiness captures a dynamic value into a variable
