@@ -116,3 +116,55 @@ scenarios:
           file:
             path: executed.marker
             exists: false
+
+  # Regression: the manifest describes what a spec declares without replaying
+  # it, and the reductions dropped the step's own bounds (cwd, timeout) and
+  # redirect targets, and the runner's cwd/timeout/user and — most of all —
+  # insecure_host_key, whose security note fires only when a run step uses that
+  # runner. Credential material stays out, as has_dsn already established.
+  - name: manifest carries the declarative fields of steps and runners
+    steps:
+      - fixture:
+          file: fields.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: fields
+            runners:
+              slowbox: {type: cmd, cwd: ./sub, timeout: 45s}
+              jump: {type: ssh, host: "shell.example:2222", user: deploy, password: hunter2, insecure_host_key: true}
+            scenarios:
+              - name: declarative knobs
+                steps:
+                  - run:
+                      command: build-tool compile
+                      cwd: sub/dir
+                      timeout: 90s
+                      stdout_to: logs/build.log
+                      stderr_to: logs/build.err
+      - run:
+          command: ${atago} manifest fields.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              - path: "$.specs[0].scenarios[0].steps[0].cwd"
+                equals: "sub/dir"
+              - path: "$.specs[0].scenarios[0].steps[0].timeout"
+                equals: "90s"
+              - path: "$.specs[0].scenarios[0].steps[0].stdout_to"
+                equals: "logs/build.log"
+              - path: "$.specs[0].scenarios[0].steps[0].stderr_to"
+                equals: "logs/build.err"
+              - path: "$.specs[0].runners[0].insecure_host_key"
+                equals: true
+              - path: "$.specs[0].runners[0].user"
+                equals: "deploy"
+              - path: "$.specs[0].runners[1].cwd"
+                equals: "./sub"
+              - path: "$.specs[0].runners[1].timeout"
+                equals: "45s"
+      # An ssh password is credential material: it must never reach the document.
+      - assert:
+          stdout:
+            not_contains: "hunter2"

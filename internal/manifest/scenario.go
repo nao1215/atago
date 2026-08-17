@@ -104,6 +104,10 @@ func buildStep(index int, step *spec.Step, vars map[string]bool, runners map[str
 		st.ClearEnv = r.ClearEnvEnabled()
 		st.PassEnv = r.PassEnv
 		st.Runner = r.Runner
+		st.Cwd = r.Cwd
+		st.Timeout = r.Timeout
+		st.StdoutTo = r.StdoutTo
+		st.StderrTo = r.StderrTo
 		st.Action = "run " + r.Command
 		// The structured runner field already carries the name; the action line
 		// is prose, and read as a local command without this.
@@ -125,6 +129,7 @@ func buildStep(index int, step *spec.Step, vars map[string]bool, runners map[str
 		st.Method = h.Method
 		st.Path = h.Path
 		st.Runner = h.Runner
+		st.BodyTo = h.BodyTo
 		// The structured runner field carries the name; the action line is
 		// prose, and read as runner-less while every other kind named one.
 		st.Action = fmt.Sprintf("HTTP %s %s%s", h.Method, h.Path, spec.ViaRunner(h.Runner))

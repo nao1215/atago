@@ -115,6 +115,17 @@ type Runner struct {
 	BaseURL string `json:"base_url,omitempty"`
 	Target  string `json:"target,omitempty"`
 	Host    string `json:"host,omitempty"`
+	// User is an ssh runner's login name, and Cwd/Timeout a cmd runner's
+	// declarative bounds. Credential material (password, key file) stays out,
+	// the rule has_dsn already established for a db runner's dsn.
+	User    string `json:"user,omitempty"`
+	Cwd     string `json:"cwd,omitempty"`
+	Timeout string `json:"timeout,omitempty"`
+	// InsecureHostKey reports that an ssh runner connects without verifying the
+	// host key. The loader forces every ssh runner to decide this explicitly,
+	// and the matching security note fires only when a run step actually uses
+	// the runner — so the runner table said nothing about the opt-out.
+	InsecureHostKey bool `json:"insecure_host_key,omitempty"`
 	// HasDSN reports that a db runner declares a dsn, without exposing the dsn
 	// itself (it may embed credentials).
 	HasDSN bool `json:"has_dsn,omitempty"`
@@ -204,7 +215,19 @@ type Step struct {
 	SQL      string   `json:"sql,omitempty"`
 	File     string   `json:"file,omitempty"`
 	Target   string   `json:"target,omitempty"` // assert target / store name
-	Retry    *Retry   `json:"retry,omitempty"`
+	// Cwd and Timeout are the step's own declarative bounds — where it runs and
+	// how long it may take. Without them a consumer cannot answer "which steps
+	// have no explicit timeout" or "which steps run outside the workdir root"
+	// from the document, which is what the manifest exists for.
+	Cwd     string `json:"cwd,omitempty"`
+	Timeout string `json:"timeout,omitempty"`
+	// StdoutTo / StderrTo (run) and BodyTo (http) are the files the step
+	// redirects into. The scenario's `generates` array names the paths but
+	// attributes them to no step.
+	StdoutTo string `json:"stdout_to,omitempty"`
+	StderrTo string `json:"stderr_to,omitempty"`
+	BodyTo   string `json:"body_to,omitempty"`
+	Retry    *Retry `json:"retry,omitempty"`
 	// Deterministic mirrors a run step's same-input-same-output claim (#398), so
 	// a reviewer reading the manifest sees that the command is run more than
 	// once and what is compared.
@@ -310,15 +333,19 @@ func buildRunners(runners map[string]spec.Runner, src SourceLocator) []Runner {
 	for _, name := range names {
 		r := runners[name]
 		mr := Runner{
-			Name:        name,
-			Type:        r.Type,
-			BaseURL:     r.BaseURL,
-			Target:      r.Target,
-			Host:        r.Host,
-			HasDSN:      r.DSN != "",
-			Headless:    r.Headless,
-			ExecPath:    r.ExecPath,
-			BrowserArgs: r.BrowserArgs,
+			Name:            name,
+			Type:            r.Type,
+			BaseURL:         r.BaseURL,
+			Target:          r.Target,
+			Host:            r.Host,
+			User:            r.User,
+			Cwd:             r.Cwd,
+			Timeout:         r.Timeout,
+			InsecureHostKey: r.InsecureHostKey,
+			HasDSN:          r.DSN != "",
+			Headless:        r.Headless,
+			ExecPath:        r.ExecPath,
+			BrowserArgs:     r.BrowserArgs,
 		}
 		if src != nil {
 			mr.Source = sourceFrom(src.RunnerPos(name))

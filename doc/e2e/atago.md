@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-81 suites · 641 scenarios
+81 suites · 642 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -416,9 +416,10 @@
   - [a missing target names the reason without syscall noise](#scenario-a-missing-target-names-the-reason-without-syscall-noise)
   - [an empty directory says how to create a first spec](#scenario-an-empty-directory-says-how-to-create-a-first-spec)
   - [a cwd that traverses out of the workdir is refused before running](#scenario-a-cwd-that-traverses-out-of-the-workdir-is-refused-before-running)
-- [atago self-hosting / manifest](#atago-self-hosting--manifest) — 2 scenarios
+- [atago self-hosting / manifest](#atago-self-hosting--manifest) — 3 scenarios
   - [manifest emits a stable JSON summary without running the spec](#scenario-manifest-emits-a-stable-json-summary-without-running-the-spec)
   - [manifest does not execute the spec's commands](#scenario-manifest-does-not-execute-the-specs-commands)
+  - [manifest carries the declarative fields of steps and runners](#scenario-manifest-carries-the-declarative-fields-of-steps-and-runners)
 - [atago self-hosting / matrix scenarios](#atago-self-hosting--matrix-scenarios) — 4 scenarios
   - [matrix expands into one scenario per row](#scenario-matrix-expands-into-one-scenario-per-row)
   - [matrix without a templated name gets a deterministic suffix](#scenario-matrix-without-a-templated-name-gets-a-deterministic-suffix)
@@ -8429,6 +8430,36 @@ ${atago} manifest side_effect.atago.yaml
 #### Then
 - exit code is `0`
 - file `executed.marker` does not exist
+### Scenario: manifest carries the declarative fields of steps and runners
+#### Given
+- Fixture file `fields.atago.yaml` is created.
+#### Inputs
+_Fixture `fields.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: fields
+runners:
+  slowbox: {type: cmd, cwd: ./sub, timeout: 45s}
+  jump: {type: ssh, host: "shell.example:2222", user: deploy, password: hunter2, insecure_host_key: true}
+scenarios:
+  - name: declarative knobs
+    steps:
+      - run:
+          command: build-tool compile
+          cwd: sub/dir
+          timeout: 90s
+          stdout_to: logs/build.log
+          stderr_to: logs/build.err
+```
+#### When
+```shell
+${atago} manifest fields.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout at `$.specs[0].scenarios[0].steps[0].cwd` equals `sub/dir`; at `$.specs[0].scenarios[0].steps[0].timeout` equals `90s`; at `$.specs[0].scenarios[0].steps[0].stdout_to` equals `logs/build.log`; at `$.specs[0].scenarios[0].steps[0].stderr_to` equals `logs/build.err`; at `$.specs[0].runners[0].insecure_host_key` equals `true`; at `$.specs[0].runners[0].user` equals `deploy`; at `$.specs[0].runners[1].cwd` equals `./sub`; at `$.specs[0].runners[1].timeout` equals `45s`
+- stdout does not contain `hunter2`
 ## atago self-hosting / matrix scenarios
 Source: `test/e2e/atago/matrix.atago.yaml`
 ### Scenario: matrix expands into one scenario per row
