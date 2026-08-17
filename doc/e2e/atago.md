@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-82 suites · 661 scenarios
+82 suites · 665 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -408,7 +408,7 @@
   - [list surfaces suites, scenarios, tags, and gates](#scenario-list-surfaces-suites-scenarios-tags-and-gates)
   - [list --json is a stable machine contract](#scenario-list---json-is-a-stable-machine-contract)
   - [list marks an expect_fail scenario](#scenario-list-marks-an-expect_fail-scenario)
-- [atago self-hosting / loader rejects malformed specs](#atago-self-hosting--loader-rejects-malformed-specs) — 18 scenarios
+- [atago self-hosting / loader rejects malformed specs](#atago-self-hosting--loader-rejects-malformed-specs) — 22 scenarios
   - [an empty scenario list is rejected](#scenario-an-empty-scenario-list-is-rejected)
   - [a wrong version string is rejected](#scenario-a-wrong-version-string-is-rejected)
   - [an unknown top-level field is rejected with its position](#scenario-an-unknown-top-level-field-is-rejected-with-its-position)
@@ -427,6 +427,10 @@
   - [a missing target names the reason without syscall noise](#scenario-a-missing-target-names-the-reason-without-syscall-noise)
   - [an empty directory says how to create a first spec](#scenario-an-empty-directory-says-how-to-create-a-first-spec)
   - [a cwd that traverses out of the workdir is refused before running](#scenario-a-cwd-that-traverses-out-of-the-workdir-is-refused-before-running)
+  - [a gate with no condition is rejected](#scenario-a-gate-with-no-condition-is-rejected)
+  - [skip and only naming the same condition are rejected](#scenario-skip-and-only-naming-the-same-condition-are-rejected)
+  - [gates naming different fields still load](#scenario-gates-naming-different-fields-still-load)
+  - [an empty deterministic compare list is rejected](#scenario-an-empty-deterministic-compare-list-is-rejected)
 - [atago self-hosting / manifest](#atago-self-hosting--manifest) — 4 scenarios
   - [manifest emits a stable JSON summary without running the spec](#scenario-manifest-emits-a-stable-json-summary-without-running-the-spec)
   - [manifest does not execute the spec's commands](#scenario-manifest-does-not-execute-the-specs-commands)
@@ -8754,6 +8758,87 @@ ${atago} run ok.atago.yaml
 - after `${atago} run ok.atago.yaml`:
   - exit code is `0`
   - stdout contains `1 passed`
+### Scenario: a gate with no condition is rejected
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    only: {}
+    steps: [{run: {command: echo}}]
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `only must name a condition (os, env, or command)`
+### Scenario: skip and only naming the same condition are rejected
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    skip: {os: linux}
+    only: {os: linux}
+    steps: [{run: {command: echo}}]
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `skip.os and only.os both name`, `can never run anywhere`
+### Scenario: gates naming different fields still load
+#### Given
+- Fixture file `ok.atago.yaml` is created.
+#### Inputs
+_Fixture `ok.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    skip: {os: windows}
+    only: {command: "no-such-tool-zzz"}
+    steps: [{run: {command: echo}}]
+```
+#### When
+```shell
+${atago} run ok.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout contains `1 skipped`
+### Scenario: an empty deterministic compare list is rejected
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    steps: [{run: {command: echo, deterministic: {compare: []}}}]
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `deterministic.compare must not be empty`
 ## atago self-hosting / manifest
 Source: `test/e2e/atago/manifest.atago.yaml`
 ### Scenario: manifest emits a stable JSON summary without running the spec

@@ -144,6 +144,10 @@ func validateScenario(add addFunc, s *spec.Spec, i int, seen, suiteServiceNames,
 	}
 	validateCondition(add, where, "skip", sc.Skip)
 	validateCondition(add, where, "only", sc.Only)
+	// The gates are compared on the EFFECTIVE conditions, after defaults have
+	// merged, so an inherited gate that cancels a scenario's own is caught and a
+	// scenario that overrides one side of an inherited pair is not blamed for it.
+	validateGates(add, where, sc.Skip, sc.Only)
 	validateExpectFail(add, where, sc.ExpectFail)
 	// Both name sets start from the suite-wide declarations, so the validators
 	// catch a scenario resource that shadows a suite one and end up holding the
@@ -398,6 +402,7 @@ func validateDefaults(add addFunc, d *spec.Defaults) {
 		// the default is therefore never applied.
 		validateCondition(add, "defaults.scenario", "only", scn.Only)
 		validateCondition(add, "defaults.scenario", "skip", scn.Skip)
+		validateGates(add, "defaults.scenario", scn.Skip, scn.Only)
 	}
 	if sv := d.Service; sv != nil {
 		if sv.Name != "" {
@@ -415,8 +420,43 @@ func validateCondition(add addFunc, where, key string, c *spec.Condition) {
 	if c == nil {
 		return
 	}
+	// A gate written with no condition restricts nothing while reading as if it
+	// does — the shape someone leaves behind on the way to a gate they have not
+	// finished, or after deleting the condition. `only: {}` is the worse half:
+	// it says the scenario is restricted and the scenario runs everywhere.
+	if c.OS == "" && c.Env == "" && c.Command == "" {
+		add(diag.EmptyValue, "%s.%s must name a condition (os, env, or command); an empty gate restricts nothing", where, key)
+	}
 	if c.OS != "" && !validOS[c.OS] {
 		add(diag.NotAllowedValue, "%s.%s.os %q is invalid (want linux, darwin, or windows)", where, key, c.OS)
+	}
+}
+
+// validateGates refuses a skip/only pair that cancels each other out. A scenario
+// gated by the same condition in both directions can never run on any machine:
+// the condition holds and `skip` excludes it, or it does not hold and `only`
+// excludes it. Nothing in a run says so — the scenario reports as an ordinary
+// skip with exit 0, on every OS and in every CI job, and only the skip REASON
+// changes between hosts.
+//
+// The comparison is per FIELD and literal on purpose. `skip: {os: windows}` with
+// `only: {command: fzf}` is an ordinary spec, and two different probe commands
+// may or may not disagree in practice, which is not something a loader can
+// prove. Only a field set on both sides with an equal value is refused.
+func validateGates(add addFunc, where string, skip, only *spec.Condition) {
+	if skip == nil || only == nil {
+		return
+	}
+	for _, f := range []struct{ field, skipVal, onlyVal string }{
+		{"os", skip.OS, only.OS},
+		{"env", skip.Env, only.Env},
+		{"command", skip.Command, only.Command},
+	} {
+		if f.skipVal == "" || f.skipVal != f.onlyVal {
+			continue
+		}
+		add(diag.ExclusiveKeys, "%s: skip.%s and only.%s both name %q, so the scenario is skipped whether the condition holds or not and can never run anywhere",
+			where, f.field, f.field, f.skipVal)
 	}
 }
 
