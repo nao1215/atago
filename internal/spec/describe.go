@@ -65,8 +65,7 @@ var NetworkCommand = regexp.MustCompile(`(?i)\b(curl|wget|nc|ncat|ssh|scp|telnet
 // spec summary but silently vanish from another (#56).
 func GeneratedArtifacts(sc *Scenario) []string {
 	a := &artifactSet{seen: map[string]bool{}}
-	a.steps(sc.Steps)
-	a.steps(sc.Teardown)
+	WalkScenarioSteps(sc, func(_ StepPhase, st *Step) { a.step(st) })
 	return a.out
 }
 
@@ -77,8 +76,7 @@ func GeneratedArtifacts(sc *Scenario) []string {
 // or the manifest.
 func SuiteGeneratedArtifacts(su *Suite) []string {
 	a := &artifactSet{seen: map[string]bool{}}
-	a.steps(su.Setup)
-	a.steps(su.Teardown)
+	WalkSuiteSteps(su, func(_ StepPhase, st *Step) { a.step(st) })
 	return a.out
 }
 
@@ -97,34 +95,36 @@ func (a *artifactSet) add(p string) {
 	}
 }
 
-func (a *artifactSet) steps(steps []Step) {
-	for i := range steps {
-		step := &steps[i]
-		switch step.Kind() {
-		case StepRun:
-			a.add(step.Run.StdoutTo)
-			a.add(step.Run.StderrTo)
-		case StepHTTP:
-			a.add(step.HTTP.BodyTo)
-		case StepAssert:
-			as := step.Assert
-			if as.File != nil && as.File.Exists != nil && *as.File.Exists {
-				a.add(as.File.Path)
-			}
-			if as.Image != nil {
-				a.add(as.Image.Path)
-			}
-			// A pdf assertion inspects an output the tool wrote, exactly like
-			// image; it arrived later (#73) and was the one inspecting target
-			// this list never learned.
-			if as.PDF != nil {
-				a.add(as.PDF.Path)
-			}
-		case StepCDP:
-			for _, act := range step.CDP.Actions {
-				if act.Screenshot != nil {
-					a.add(act.Screenshot.Path)
-				}
+// step folds one step's declared outputs into the set. The kinds absent from
+// the switch declare none: a fixture writes an INPUT, and query/grpc/store/
+// pty/signal/service/mock_server produce no file path of their own — a claim
+// TestGeneratedArtifacts_DecidesEveryStepKind pins per kind, so a new kind
+// cannot be skipped silently.
+func (a *artifactSet) step(step *Step) {
+	switch step.Kind() {
+	case StepRun:
+		a.add(step.Run.StdoutTo)
+		a.add(step.Run.StderrTo)
+	case StepHTTP:
+		a.add(step.HTTP.BodyTo)
+	case StepAssert:
+		as := step.Assert
+		if as.File != nil && as.File.Exists != nil && *as.File.Exists {
+			a.add(as.File.Path)
+		}
+		if as.Image != nil {
+			a.add(as.Image.Path)
+		}
+		// A pdf assertion inspects an output the tool wrote, exactly like
+		// image; it arrived later (#73) and was the one inspecting target
+		// this list never learned.
+		if as.PDF != nil {
+			a.add(as.PDF.Path)
+		}
+	case StepCDP:
+		for _, act := range step.CDP.Actions {
+			if act.Screenshot != nil {
+				a.add(act.Screenshot.Path)
 			}
 		}
 	}
@@ -146,16 +146,12 @@ func SecurityNotes(sc *Scenario, runners map[string]Runner) []string {
 	for i := range sc.Services {
 		n.service(&sc.Services[i])
 	}
-	for i := range sc.Steps {
-		n.step(&sc.Steps[i], runners)
-	}
 	// Teardown steps always run — whether the scenario passed or failed — so an
 	// egress that only happens during cleanup is still egress the summary must
 	// name. The walk used to stop at Steps, and a scenario whose only network
-	// access was a cleanup call reported no security notes at all.
-	for i := range sc.Teardown {
-		n.step(&sc.Teardown[i], runners)
-	}
+	// access was a cleanup call reported no security notes at all; walking
+	// through WalkScenarioSteps makes stopping early impossible to re-introduce.
+	WalkScenarioSteps(sc, func(_ StepPhase, st *Step) { n.step(st, runners) })
 	return n.out
 }
 
@@ -182,12 +178,7 @@ func SuiteSecurityNotes(s *Spec) []string {
 		}
 		n.envRefs(sub.Command)
 	}
-	for i := range s.Suite.Setup {
-		n.step(&s.Suite.Setup[i], s.Runners)
-	}
-	for i := range s.Suite.Teardown {
-		n.step(&s.Suite.Teardown[i], s.Runners)
-	}
+	WalkSuiteSteps(&s.Suite, func(_ StepPhase, st *Step) { n.step(st, s.Runners) })
 	return n.out
 }
 
@@ -214,6 +205,19 @@ func (n *noteSet) envRefs(fields ...string) {
 			if strings.HasPrefix(name, "env:") {
 				n.add("host environment read: ${" + name + "}")
 			}
+		}
+	}
+}
+
+// envNames notes each env:-prefixed variable name in an already-collected var
+// set, in sorted order for determinism. It exists for the kinds whose
+// variable-bearing field list lives in a collector (cdp's action walk):
+// re-listing the fields here to run envRefs over them is exactly the drift the
+// shared walkers prevent.
+func (n *noteSet) envNames(set map[string]bool) {
+	for _, name := range SortedKeys(set) {
+		if strings.HasPrefix(name, "env:") {
+			n.add("host environment read: ${" + name + "}")
 		}
 	}
 }
@@ -251,6 +255,30 @@ func (n *noteSet) step(step *Step, runners map[string]Runner) {
 		}
 	}
 	switch step.Kind() {
+	case StepFixture:
+		// Every fixture field is ${name}-expanded before the file is written
+		// (expandFixture), so a `content: ${env:TOKEN}` reads the invoking
+		// host's environment as surely as a run command would — and produced no
+		// note at all while the equivalent run reference did.
+		f := step.Fixture
+		n.envRefs(f.File, f.Content, f.From, f.Symlink)
+	case StepAssert:
+		// Matcher arguments are expanded through the same walker the engine
+		// expands with (expandAssert -> WalkAssertStrings), so an
+		// `equals: ${env:SECRET}` is a host environment read; the whole kind
+		// was previously invisible here.
+		WalkAssertStrings(step.Assert, func(s string) string {
+			n.envRefs(s)
+			return s
+		})
+	case StepStore:
+		// The one store field the engine expands (expandStore).
+		if step.Store.From != nil && step.Store.From.File != nil {
+			n.envRefs(step.Store.From.File.Path)
+		}
+	case StepSignal:
+		// The target service name is expanded before lookup (runSignal).
+		n.envRefs(step.Signal.Service)
 	case StepRun:
 		n.runStep(step.Run, runners)
 	case StepHTTP:
@@ -270,6 +298,15 @@ func (n *noteSet) step(step *Step, runners map[string]Runner) {
 		n.envRefs(envValues(step.GRPC.Header)...)
 	case StepCDP:
 		n.add("browser automation (CDP) via " + step.CDP.Runner)
+		// Action arguments are ${name}-expanded before the browser runs them
+		// (expandCDP), so a navigate URL or eval script reading ${env:} is a
+		// host environment read. The field list lives in the var collector;
+		// re-listing it here is the drift this file exists to prevent.
+		vars := map[string]bool{}
+		for _, a := range step.CDP.Actions {
+			collectCDPActionVars(vars, a)
+		}
+		n.envNames(vars)
 	case StepPTY:
 		n.ptyStep(step.PTY)
 	case StepService:

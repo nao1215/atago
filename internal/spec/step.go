@@ -19,45 +19,53 @@ const (
 	StepMockServer StepKind = "mock_server"
 )
 
+// stepActions is the one list of step action kinds: the key each carries in a
+// spec, paired with the question "does this Step set it?". It mirrors
+// assertTargets below, and exists for the same reason: many layers switch on a
+// step's kind — the loader's validation, the variable walk, the security and
+// artifact summaries, the doc/explain/manifest renderers — and each hand-written
+// switch silently skips a kind it does not know. Deriving SetKeys/Kind and
+// AllStepKinds from this table makes it the anchor the coverage tests pull on:
+// adding a field to Step without an entry here fails
+// TestStepActions_CoverEveryStepField, and a walker that never learned the new
+// kind fails its own coverage test against AllStepKinds.
+var stepActions = []struct {
+	kind StepKind
+	set  func(*Step) bool
+}{
+	{StepFixture, func(s *Step) bool { return s.Fixture != nil }},
+	{StepRun, func(s *Step) bool { return s.Run != nil }},
+	{StepHTTP, func(s *Step) bool { return s.HTTP != nil }},
+	{StepQuery, func(s *Step) bool { return s.Query != nil }},
+	{StepGRPC, func(s *Step) bool { return s.GRPC != nil }},
+	{StepCDP, func(s *Step) bool { return s.CDP != nil }},
+	{StepAssert, func(s *Step) bool { return s.Assert != nil }},
+	{StepStore, func(s *Step) bool { return s.Store != nil }},
+	{StepService, func(s *Step) bool { return s.Service != nil }},
+	{StepPTY, func(s *Step) bool { return s.PTY != nil }},
+	{StepSignal, func(s *Step) bool { return s.Signal != nil }},
+	{StepMockServer, func(s *Step) bool { return s.MockServer != nil }},
+}
+
+// AllStepKinds returns every step action kind, in SetKeys order. It exists so a
+// layer that must handle all of them can be tested against the list instead of
+// against a reader's memory — the step-kind twin of AllAssertTargets.
+func AllStepKinds() []StepKind {
+	out := make([]StepKind, len(stepActions))
+	for i, e := range stepActions {
+		out[i] = e.kind
+	}
+	return out
+}
+
 // SetKeys returns the action keys that are present on the step. A valid step has
 // exactly one; the loader uses this to enforce the one-of rule.
 func (s *Step) SetKeys() []StepKind {
 	var keys []StepKind
-	if s.Fixture != nil {
-		keys = append(keys, StepFixture)
-	}
-	if s.Run != nil {
-		keys = append(keys, StepRun)
-	}
-	if s.HTTP != nil {
-		keys = append(keys, StepHTTP)
-	}
-	if s.Query != nil {
-		keys = append(keys, StepQuery)
-	}
-	if s.GRPC != nil {
-		keys = append(keys, StepGRPC)
-	}
-	if s.CDP != nil {
-		keys = append(keys, StepCDP)
-	}
-	if s.Assert != nil {
-		keys = append(keys, StepAssert)
-	}
-	if s.Store != nil {
-		keys = append(keys, StepStore)
-	}
-	if s.Service != nil {
-		keys = append(keys, StepService)
-	}
-	if s.PTY != nil {
-		keys = append(keys, StepPTY)
-	}
-	if s.Signal != nil {
-		keys = append(keys, StepSignal)
-	}
-	if s.MockServer != nil {
-		keys = append(keys, StepMockServer)
+	for _, e := range stepActions {
+		if e.set(s) {
+			keys = append(keys, e.kind)
+		}
 	}
 	return keys
 }

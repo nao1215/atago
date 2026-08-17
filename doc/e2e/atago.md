@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-82 suites · 656 scenarios
+82 suites · 657 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -273,7 +273,7 @@
   - [update-snapshots still reports the day the documented bug is fixed](#scenario-update-snapshots-still-reports-the-day-the-documented-bug-is-fixed)
   - [an ordinary scenario beside an expected failure is still re-recorded](#scenario-an-ordinary-scenario-beside-an-expected-failure-is-still-re-recorded)
   - [an expected failure without a reason is a load error](#scenario-an-expected-failure-without-a-reason-is-a-load-error)
-- [atago self-hosting / explain](#atago-self-hosting--explain) — 11 scenarios
+- [atago self-hosting / explain](#atago-self-hosting--explain) — 12 scenarios
   - [explain summarizes a spec without running it](#scenario-explain-summarizes-a-spec-without-running-it)
   - [explain describes every matcher of a composed stream assertion](#scenario-explain-describes-every-matcher-of-a-composed-stream-assertion)
   - [explain names the line a line-scoped matcher inspects](#scenario-explain-names-the-line-a-line-scoped-matcher-inspects)
@@ -281,6 +281,7 @@
   - [explain names ssh and remote-database egress](#scenario-explain-names-ssh-and-remote-database-egress)
   - [explain names pty and teardown egress](#scenario-explain-names-pty-and-teardown-egress)
   - [explain names suite lifecycle egress](#scenario-explain-names-suite-lifecycle-egress)
+  - [explain names environment reads in fixtures asserts and cdp actions](#scenario-explain-names-environment-reads-in-fixtures-asserts-and-cdp-actions)
   - [explain lists pdf and teardown outputs under generates](#scenario-explain-lists-pdf-and-teardown-outputs-under-generates)
   - [explain names an http runner and describes a retry](#scenario-explain-names-an-http-runner-and-describes-a-retry)
   - [explain names a runner definition's host environment reads](#scenario-explain-names-a-runner-definitions-host-environment-reads)
@@ -6268,6 +6269,40 @@ ${atago} manifest suite_egress.atago.yaml
 - after `${atago} manifest suite_egress.atago.yaml`:
   - exit code is `0`
   - stdout at `$.specs[0].suite_security[0]` equals `shell execution enabled: curl https://seed.example/data`
+### Scenario: explain names environment reads in fixtures asserts and cdp actions
+#### Given
+- Fixture file `env_reads.atago.yaml` is created.
+#### Inputs
+_Fixture `env_reads.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: env-reads
+runners:
+  web: {type: browser}
+scenarios:
+  - name: reads the environment from quiet corners
+    steps:
+      - fixture:
+          file: seed.txt
+          content: "token=$${env:SEED_TOKEN}"
+      - run:
+          command: echo ready
+      - assert:
+          stdout:
+            contains: "$${env:EXPECTED_GREETING}"
+      - cdp:
+          runner: web
+          actions:
+            - navigate: "https://host.example/?key=$${env:CDP_KEY}"
+```
+#### When
+```shell
+${atago} explain env_reads.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout contains `host environment read: $${env:SEED_TOKEN}`, `host environment read: $${env:EXPECTED_GREETING}`, `host environment read: $${env:CDP_KEY}`
 ### Scenario: explain lists pdf and teardown outputs under generates
 #### Given
 - Fixture file `gen.atago.yaml` is created.
