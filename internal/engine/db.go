@@ -19,7 +19,7 @@ func (e *Engine) runQuery(ctx context.Context, q *spec.Query, st *store.Store, r
 	if err != nil {
 		return nil, err
 	}
-	return conn.Query(ctx, st.Expand(q.SQL))
+	return conn.Query(ctx, spec.WalkQueryStrings(q, st.Expand).SQL)
 }
 
 // dbConn returns the scenario's connection for a named db runner, opening it on

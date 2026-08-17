@@ -20,7 +20,7 @@ const defaultSignalWait = 5 * time.Second
 // so matrix instances can target parameterized services; the signal name is
 // normalized (an optional SIG prefix, any case) to match the loader's rule.
 func runSignal(sg *spec.Signal, st *store.Store, scenarioServices, suiteServices []*servicerunner.Proc) error {
-	name := st.Expand(sg.Service)
+	name := spec.WalkSignalStrings(sg, st.Expand).Service
 	proc := findServiceProc(name, scenarioServices, suiteServices)
 	if proc == nil {
 		return diag.ServiceNotRunning.Errorf("signal step targets unknown service %q (no scenario or suite service with that name is running)", name)
