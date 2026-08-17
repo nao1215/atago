@@ -123,6 +123,8 @@ func validateDir(add addFunc, where string, d *spec.DirAssert) {
 		add(diag.EmptyInterval, "%s: min_count %d exceeds max_count %d", where, *d.MinCount, *d.MaxCount)
 	}
 	validateDirComposition(add, where, d, n)
+	validateContainsOverlap(add, where, d.Contains, d.NotContains)
+	validateDirCountVsContains(add, where, d)
 	for _, pat := range d.Ignore {
 		trimmed := strings.TrimSuffix(pat, "/**")
 		if _, err := path.Match(trimmed, "probe"); err != nil {
@@ -166,6 +168,47 @@ func countDirMatchers(add addFunc, where string, d *spec.DirAssert) int {
 		}
 	}
 	return n
+}
+
+// validateDirCountVsContains refuses a dir assertion whose required children
+// cannot fit under its entry ceiling. `contains: [x]` with `count: 0` is the
+// clearest case: the entry list already requires a child, so the assertion runs
+// and then reports "directory %q has 1 entry, expected exactly 0" — a statement
+// about the program, for a spec no directory could have satisfied.
+//
+// The comparison uses the population the runtime counts. A non-recursive count
+// sees DIRECT entries, so what a contains entry requires is its first path
+// segment: `contains: [assets/app.css]` needs one direct entry, not two.
+// Recursive is left alone on purpose: there counts see files only while a
+// contains entry may name a directory, so a low ceiling and a required child
+// are not provably in conflict.
+func validateDirCountVsContains(add addFunc, where string, d *spec.DirAssert) {
+	if d.Recursive || len(d.Contains) == 0 {
+		return
+	}
+	required := map[string]bool{}
+	for _, entry := range d.Contains {
+		seg, _, _ := strings.Cut(path.Clean(entry), "/")
+		if seg != "" && seg != "." {
+			required[seg] = true
+		}
+	}
+	if len(required) == 0 {
+		return
+	}
+	if d.Count != nil && *d.Count == 0 {
+		add(diag.ExclusiveKeys, "%s: count: 0 cannot hold together with contains, which requires %d entr%s to exist",
+			where, len(required), map[bool]string{true: "y", false: "ies"}[len(required) == 1])
+		return
+	}
+	if d.MaxCount != nil && *d.MaxCount < len(required) {
+		add(diag.ExclusiveKeys, "%s: contains requires at least %d entries but max_count is %d, so nothing can satisfy both",
+			where, len(required), *d.MaxCount)
+	}
+	if d.Count != nil && *d.Count < len(required) {
+		add(diag.ExclusiveKeys, "%s: contains requires at least %d entries but count is %d, so nothing can satisfy both",
+			where, len(required), *d.Count)
+	}
 }
 
 // validateDirComposition enforces the tree snapshot rules (#25): the golden

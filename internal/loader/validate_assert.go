@@ -141,6 +141,10 @@ func validateStream(add addFunc, where string, s *spec.StreamAssert) {
 	}
 	validateStringList(add, where, "contains", s.Contains)
 	validateStringList(add, where, "not_contains", s.NotContains)
+	validateContainsOverlap(add, where, s.Contains, s.NotContains)
+	if s.Matches != nil && s.NotMatches != nil && *s.Matches == *s.NotMatches {
+		add(diag.ExclusiveKeys, "%s: matches and not_matches are the same pattern %q, so no output can satisfy both", where, *s.Matches)
+	}
 
 	if s.HasCount() {
 		validateStreamCount(add, where, s, matchers)
@@ -174,6 +178,15 @@ func validateStreamCount(add addFunc, where string, s *spec.StreamAssert, matche
 	}
 	if s.Matches != nil {
 		countable++
+		// Zero-width matches are counted, so an empty-matching pattern under a
+		// bound reports len(input)+1 occurrences of nothing: `max_count: 0` — the
+		// documented way to say "never" — can then never pass, and the reported
+		// count is about the length of the stream rather than about the pattern.
+		// The pattern is legitimate without a bound, which is why the refusal
+		// lives here rather than in validateRegexp.
+		if matchesEmpty(*s.Matches) {
+			add(diag.VacuousMatcher, "%s.matches %q matches the empty string, so a count bound counts one zero-width match per position rather than real occurrences; require at least one character (e.g. \"q+\")", where, *s.Matches)
+		}
 	}
 	switch {
 	case countable == 0:
@@ -393,6 +406,37 @@ func validateStringList(add addFunc, where, key string, l spec.StringList) {
 	}
 }
 
+// validateContainsOverlap refuses a contains/not_contains pair of one assert
+// that shares an entry: no output can both hold and not hold the same
+// substring, so the assertion runs and then fails with a message about the
+// program under test ("the substring %q was unexpectedly present"), which sends
+// a reviewer to the CLI instead of to the spec. Which half reports depends on
+// the observed output, so the same broken spec accuses different things on
+// different days.
+//
+// The comparison is literal apart from CRLF folding, which is what the engine
+// does to a needle before matching: comparing raw here would give the loader
+// and the engine different answers for a spec authored in a CRLF editor.
+// `contains: [abc]` against `not_contains: [abcd]` is satisfiable and keeps
+// loading.
+func validateContainsOverlap(add addFunc, where string, contains, notContains []string) {
+	if len(contains) == 0 || len(notContains) == 0 {
+		return
+	}
+	forbidden := make(map[string]bool, len(notContains))
+	for _, s := range notContains {
+		forbidden[spec.FoldCRLF(s)] = true
+	}
+	reported := map[string]bool{}
+	for _, s := range contains {
+		folded := spec.FoldCRLF(s)
+		if forbidden[folded] && !reported[folded] {
+			reported[folded] = true
+			add(diag.ExclusiveKeys, "%s: contains and not_contains both list %q, so nothing can satisfy the assertion", where, s)
+		}
+	}
+}
+
 // validateRegexp rejects an empty pattern and an uncompilable one for a
 // matches/not_matches matcher. An empty regexp matches everything, so `matches:
 // ""` is an always-true no-op and `not_matches: ""` can never pass — either is
@@ -403,8 +447,7 @@ func validateRegexp(add addFunc, where, key, pattern string) {
 		add(diag.VacuousMatcher, "%s.%s must not be an empty regexp, which matches everything (matches) or nothing (not_matches); remove it or give a real pattern", where, key)
 		return
 	}
-	re, err := regexp.Compile(pattern)
-	if err != nil {
+	if _, err := regexp.Compile(pattern); err != nil {
 		add(diag.BadRegexp, "%s.%s %q is not a valid regexp: %v", where, key, pattern, err)
 		return
 	}
@@ -412,11 +455,26 @@ func validateRegexp(add addFunc, where, key, pattern string) {
 	// "(foo)?", "x{0,3}") matches at position 0 of every input, so not_matches
 	// can never pass — the same trap as the empty pattern above. Caught at load
 	// time rather than failing at runtime with a confusing "unexpectedly matched"
-	// hint. An empty-matching pattern under matches is legitimate (it matches
-	// everything, which the author may intend), so this applies to not_matches only.
-	if key == "not_matches" && re.MatchString("") {
+	// hint. An empty-matching pattern under a bare matches is legitimate (it
+	// matches everything, which the author may intend); the places where it is
+	// not are refused by their own callers through matchesEmpty.
+	if key == "not_matches" && matchesEmpty(pattern) {
 		add(diag.VacuousMatcher, "%s.%s %q matches the empty string, so not_matches can never pass; anchor it or require at least one character (e.g. \"z+\")", where, key, pattern)
 	}
+}
+
+// matchesEmpty reports whether a pattern matches the empty string — the
+// `*`-where-`+`-was-meant shape ("q*", "[0-9]*", "(foo)?", "x{0,3}"). It is the
+// one predicate every caller asks, so the rules cannot drift: a pattern that
+// matches nothing at all still matches at position 0 of every input, which
+// makes an occurrence count meaningless (one zero-width match per byte plus
+// one), shreds a scrub placeholder between every byte, and captures the empty
+// string from a stream that plainly contains the value.
+//
+// A pattern that does not compile answers false; its own diagnostic says so.
+func matchesEmpty(pattern string) bool {
+	re, err := regexp.Compile(pattern)
+	return err == nil && re.MatchString("")
 }
 
 // validateDuration checks a duration assert (#31): at least one bound, lt/lte
