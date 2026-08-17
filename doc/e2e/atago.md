@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-81 suites · 625 scenarios
+81 suites · 627 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -465,7 +465,7 @@
   - [explain names the manifest that applied](#scenario-explain-names-the-manifest-that-applied)
   - [a manifest pointing at a missing fixtures dir fails to load](#scenario-a-manifest-pointing-at-a-missing-fixtures-dir-fails-to-load)
   - [an unknown manifest key is rejected](#scenario-an-unknown-manifest-key-is-rejected)
-- [atago self-hosting / pty](#atago-self-hosting--pty) — 17 scenarios
+- [atago self-hosting / pty](#atago-self-hosting--pty) — 19 scenarios
   - [a pty step sees a terminal where a run step sees a pipe](#scenario-a-pty-step-sees-a-terminal-where-a-run-step-sees-a-pipe)
   - [a never-matching expect fails with the pattern in the block](#scenario-a-never-matching-expect-fails-with-the-pattern-in-the-block)
   - [named keys transmit their documented bytes and ctrl-c aborts](#scenario-named-keys-transmit-their-documented-bytes-and-ctrl-c-aborts)
@@ -477,7 +477,9 @@
   - [screen attrs check colors and styling, not only text](#scenario-screen-attrs-check-colors-and-styling-not-only-text)
   - [an unknown key name is a load-time error listing the vocabulary](#scenario-an-unknown-key-name-is-a-load-time-error-listing-the-vocabulary)
   - [screen asserts see the final frame where the transcript sees history](#scenario-screen-asserts-see-the-final-frame-where-the-transcript-sees-history)
-  - [a wide character at the right margin does not autowrap yet](#scenario-a-wide-character-at-the-right-margin-does-not-autowrap-yet)
+  - [a wide character at the right margin autowraps](#scenario-a-wide-character-at-the-right-margin-autowraps)
+  - [a wide character that no longer fits wraps instead of vanishing](#scenario-a-wide-character-that-no-longer-fits-wraps-instead-of-vanishing)
+  - [screen preserves a decomposed grapheme's combining mark](#scenario-screen-preserves-a-decomposed-graphemes-combining-mark)
   - [a screen snapshot round-trips through update and compare](#scenario-a-screen-snapshot-round-trips-through-update-and-compare)
   - [a screen assert without a pty step is a load-time error](#scenario-a-screen-assert-without-a-pty-step-is-a-load-time-error)
   - [a send referencing an undefined variable is an execution error, not typed literally](#scenario-a-send-referencing-an-undefined-variable-is-an-execution-error-not-typed-literally)
@@ -9432,8 +9434,8 @@ _skipped on Windows_
 - rendered screen line `1` equals an exact value
 - rendered screen does not contain `loading`
 - stdout contains `loading`
-### Scenario: a wide character at the right margin does not autowrap yet
-_skipped on Windows · expected to FAIL (known bug): the emulator drops or clobbers a character that must autowrap after a wide one fills the last column_
+### Scenario: a wide character at the right margin autowraps
+_skipped on Windows_
 #### When
 ```shell
 # interactive (pty): printf '日本X'; sleep 0.2
@@ -9441,6 +9443,24 @@ _skipped on Windows · expected to FAIL (known bug): the emulator drops or clobb
 #### Then
 - rendered screen line `1` equals an exact value
 - rendered screen line `2` equals an exact value
+### Scenario: a wide character that no longer fits wraps instead of vanishing
+_skipped on Windows_
+#### When
+```shell
+# interactive (pty): printf '日本語'; sleep 0.2
+```
+#### Then
+- rendered screen line `1` equals an exact value
+- rendered screen line `2` equals an exact value
+### Scenario: screen preserves a decomposed grapheme's combining mark
+_skipped on Windows_
+#### When
+```shell
+# interactive (pty): printf '\303\251 e\314\201'; sleep 0.2
+```
+#### Then
+- rendered screen line `1` equals an exact value
+- rendered screen contains `é`
 ### Scenario: a screen snapshot round-trips through update and compare
 _skipped on Windows_
 #### Given

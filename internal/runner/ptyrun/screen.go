@@ -35,16 +35,9 @@ type screenResize struct {
 // and overwriting one half of a wide cell blanks it the way a terminal does
 // (#432).
 //
-// One edge remains upstream, and it is wider than "a dropped character": once a
-// wide character has filled the last column, AUTOWRAP is not armed, so whatever
-// comes next is written inside that row instead of on the following one. A wide
-// character that no longer fits is dropped (`日本語` in five columns renders
-// `日本`), and a narrow one overwrites the second half of the wide character
-// already there, blanking its first half — `日本X` in four columns renders
-// `日 X`, where a terminal shows `日本` and puts `X` on the next line. The
-// self-hosted suite carries this as an expect_fail scenario, so the day the
-// emulator learns to wrap it turns XPASS and this note comes out. TUIs position
-// with cursor addressing and explicit newlines, which render correctly.
+// Two edges of that emulator's grapheme handling are corrected on the way in
+// rather than lived with — the right margin after a wide character (#503) and a
+// combining mark on an ASCII base (#505). screenWriter explains both.
 //
 // For a session that changed size while it ran (#379), the transcript is
 // replayed in pieces, resizing the emulator at each recorded boundary, so every
@@ -115,16 +108,19 @@ func renderScreenCells(transcript []byte, p *spec.PTY, resizes []screenResize) (
 	}
 	sanitized, cuts := sanitizeTranscriptMarks(transcript, marks)
 
-	at := 0
+	// The transcript is written in ONE pass with the resizes handed to the
+	// writer as offsets, rather than sliced into pieces here: the writer applies
+	// each one at a boundary between whole units, so a resize offset that lands
+	// inside a grapheme cluster cannot separate a base character from the
+	// combining mark that belongs to it.
+	breaks := make([]screenBreak, 0, len(resizes))
+	prevCut := 0
 	for i, r := range resizes {
-		cut := min(max(cuts[i], at), len(sanitized))
-		writeTranscript(term, sanitized[at:cut])
-		// Resize takes width (cols) first; getting that backwards silently
-		// transposes every frame after a resize.
-		term.Resize(r.cols, r.rows)
-		at = cut
+		cut := min(max(cuts[i], prevCut), len(sanitized))
+		breaks = append(breaks, screenBreak{at: cut, cols: r.cols, rows: r.rows})
+		prevCut = cut
 	}
-	writeTranscript(term, sanitized[at:])
+	newScreenWriter(term).write(sanitized, breaks)
 
 	// Read the grid out of the emulator once and build both views from it. The
 	// emulator's own String() is not consulted: two independent reads of the same
@@ -206,20 +202,6 @@ func colorToIndex(c color.Color) uint32 {
 	default:
 		return uint32(ansi.Convert256(c))
 	}
-}
-
-// writeTranscript feeds the transcript to the emulator, containing any panic
-// from its escape parser. The transcript is arbitrary bytes chosen by the
-// program under test, and a crash there must not take down the whole atago
-// process mid-suite. The shapes that make an emulator loop for minutes on an
-// enormous CSI count are defused up front by sanitizeTranscript, which preserves
-// the rest of the frame; this recover is the backstop for whatever shape the
-// fuzzer has not met yet. On panic the screen state built so far still renders,
-// so the assertion compares against everything drawn before the malformed
-// sequence.
-func writeTranscript(term *vt.Emulator, transcript []byte) {
-	defer func() { _ = recover() }()
-	_, _ = term.Write(transcript)
 }
 
 // maxCSIParamDigits bounds a CSI numeric parameter before the transcript
