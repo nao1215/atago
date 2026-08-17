@@ -60,7 +60,11 @@ func checkSnapshot(desc, label, snapPath string, data []byte, env Env) *CheckRes
 	}
 	opt := snapshot.Options{Workdir: env.Workdir, Secrets: env.Secrets, Scrub: env.Scrub}
 
-	if env.UpdateSnapshots {
+	// A frozen golden is compared, never rewritten, even under
+	// --update-snapshots. It also stays unclaimed: the run wrote nothing to the
+	// path, so another scenario's legitimate write must not be refused as a
+	// conflict with a write that never happened.
+	if env.UpdateSnapshots && !env.KeepSnapshots {
 		// Claim the path with the bytes that would land on disk, so a second
 		// scenario writing different content to it is refused rather than
 		// overwriting the first — which the next verify run would then fail on.
@@ -78,6 +82,16 @@ func checkSnapshot(desc, label, snapPath string, data []byte, env Env) *CheckRes
 		return updated
 	}
 
+	// Under --update-snapshots a frozen golden's hints must not send the reader
+	// back to the flag they already passed: it deliberately skipped this check.
+	frozen := env.UpdateSnapshots && env.KeepSnapshots
+	rerecord := "update with --update-snapshots if intended"
+	create := "create it with: atago run --update-snapshots"
+	if frozen {
+		rerecord = "this scenario is expect_fail, so --update-snapshots keeps its golden; drop expect_fail: to re-record it"
+		create = "this scenario is expect_fail, so --update-snapshots does not create its golden; write the output the fix should produce, or drop expect_fail:"
+	}
+
 	ok, expected, actual, err := snapshot.Compare(env.SpecDir, path, data, opt)
 	switch {
 	case errors.Is(err, snapshot.ErrMissing):
@@ -85,7 +99,7 @@ func checkSnapshot(desc, label, snapPath string, data []byte, env Env) *CheckRes
 			Desc:     desc,
 			Expected: fmt.Sprintf("snapshot file %q", snapPath),
 			Actual:   "missing",
-			Hint:     fmt.Sprintf("snapshot %q does not exist; create it with: atago run --update-snapshots", snapPath),
+			Hint:     fmt.Sprintf("snapshot %q does not exist; %s", snapPath, create),
 		}
 	case err != nil:
 		return &CheckResult{Desc: desc, Hint: fmt.Sprintf("could not read snapshot %q: %v", snapPath, err)}
@@ -99,7 +113,7 @@ func checkSnapshot(desc, label, snapPath string, data []byte, env Env) *CheckRes
 			Desc:             desc,
 			Expected:         excerpt(expected),
 			Actual:           excerpt(actual),
-			Hint:             fmt.Sprintf("%s did not match snapshot %q (update with --update-snapshots if intended)", label, snapPath),
+			Hint:             fmt.Sprintf("%s did not match snapshot %q (%s)", label, snapPath, rerecord),
 			ArtifactKind:     "snapshot",
 			ArtifactActual:   []byte(actual),
 			ArtifactExpected: []byte(expected),

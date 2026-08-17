@@ -215,6 +215,7 @@ func (x *suiteStepper) execAssert(step *spec.Step, i int, sr *StepResult) bool {
 		SpecDir:         x.rc.specDir,
 		UpdateSnapshots: x.e.UpdateSnapshots,
 		SnapshotWrites:  x.e.snapshotWrites,
+		KeepSnapshots:   x.rc.keepSnapshots,
 		Secrets:         x.rc.masker.MaskBytes,
 		Scrub:           x.rc.scrubber.Apply,
 		MockRecords: func(name string) ([]mockrunner.Record, bool) {

@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-82 suites · 648 scenarios
+82 suites · 651 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -255,7 +255,7 @@
   - [a signal exit composes with the in matcher alongside normal codes](#scenario-a-signal-exit-composes-with-the-in-matcher-alongside-normal-codes)
   - [a missing command is 127 under the shell](#scenario-a-missing-command-is-127-under-the-shell)
   - [POSIX exit codes wrap modulo 256](#scenario-posix-exit-codes-wrap-modulo-256)
-- [atago self-hosting / expected failures](#atago-self-hosting--expected-failures) — 12 scenarios
+- [atago self-hosting / expected failures](#atago-self-hosting--expected-failures) — 15 scenarios
   - [a known bug that still fails keeps the run green](#scenario-a-known-bug-that-still-fails-keeps-the-run-green)
   - [a known bug that is fixed fails the run so it gets promoted](#scenario-a-known-bug-that-is-fixed-fails-the-run-so-it-gets-promoted)
   - [allow-xpass keeps the run green while the spec is promoted](#scenario-allow-xpass-keeps-the-run-green-while-the-spec-is-promoted)
@@ -267,6 +267,9 @@
   - [tap marks both verdicts with a TODO directive](#scenario-tap-marks-both-verdicts-with-a-todo-directive)
   - [junit routes an xfail to skipped and an xpass to failure](#scenario-junit-routes-an-xfail-to-skipped-and-an-xpass-to-failure)
   - [explain and doc show which scenarios document a known bug](#scenario-explain-and-doc-show-which-scenarios-document-a-known-bug)
+  - [update-snapshots keeps the golden of an expected failure](#scenario-update-snapshots-keeps-the-golden-of-an-expected-failure)
+  - [update-snapshots still reports the day the documented bug is fixed](#scenario-update-snapshots-still-reports-the-day-the-documented-bug-is-fixed)
+  - [an ordinary scenario beside an expected failure is still re-recorded](#scenario-an-ordinary-scenario-beside-an-expected-failure-is-still-re-recorded)
   - [an expected failure without a reason is a load error](#scenario-an-expected-failure-without-a-reason-is-a-load-error)
 - [atago self-hosting / explain](#atago-self-hosting--explain) — 11 scenarios
   - [explain summarizes a spec without running it](#scenario-explain-summarizes-a-spec-without-running-it)
@@ -5790,6 +5793,125 @@ ${atago} doc shown.atago.yaml
 - after `${atago} doc shown.atago.yaml`:
   - exit code is `0`
   - stdout contains `expected to FAIL (known bug): wrong rounding`
+### Scenario: update-snapshots keeps the golden of an expected failure
+#### Given
+- Fixture file `desired.snap` is created.
+- Fixture file `inner_snap.atago.yaml` is created.
+#### Inputs
+_Fixture `desired.snap`:_
+```text
+the CORRECT output once fixed
+```
+_Fixture `inner_snap.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner xfail snap
+scenarios:
+  - name: the output is still wrong
+    expect_fail:
+      reason: "prints the pre-fix output"
+    steps:
+      - run:
+          shell: true
+          command: echo current buggy output
+      - assert:
+          stdout:
+            snapshot: desired.snap
+```
+#### When
+```shell
+${atago} run --update-snapshots inner_snap.atago.yaml
+${atago} snapshot update inner_snap.atago.yaml
+```
+#### Then
+- after `${atago} run --update-snapshots inner_snap.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `XFAIL:`, `1 xfail`, does not contain `snapshot updated`
+  - file `desired.snap` contains `the CORRECT output once fixed`
+- after `${atago} snapshot update inner_snap.atago.yaml`:
+  - exit code is `0`
+  - file `desired.snap` contains `the CORRECT output once fixed`
+### Scenario: update-snapshots still reports the day the documented bug is fixed
+#### Given
+- Fixture file `fixed.snap` is created.
+- Fixture file `inner_fixed.atago.yaml` is created.
+#### Inputs
+_Fixture `fixed.snap`:_
+```text
+fixed output
+```
+_Fixture `inner_fixed.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner xpass snap
+scenarios:
+  - name: the output now matches the golden
+    expect_fail:
+      reason: "prints the pre-fix output"
+    steps:
+      - run:
+          shell: true
+          command: echo fixed output
+      - assert:
+          stdout:
+            snapshot: fixed.snap
+```
+#### When
+```shell
+${atago} run --update-snapshots inner_fixed.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `XPASS:`, `1 xpass`
+### Scenario: an ordinary scenario beside an expected failure is still re-recorded
+#### Given
+- Fixture file `ordinary.snap` is created.
+- Fixture file `frozen.snap` is created.
+- Fixture file `inner_mixed.atago.yaml` is created.
+#### Inputs
+_Fixture `ordinary.snap`:_
+```text
+stale
+```
+_Fixture `frozen.snap`:_
+```text
+desired
+```
+_Fixture `inner_mixed.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner mixed
+scenarios:
+  - name: ordinary
+    steps:
+      - run:
+          shell: true
+          command: echo fresh
+      - assert:
+          stdout:
+            snapshot: ordinary.snap
+  - name: documents a bug
+    expect_fail:
+      reason: "still broken"
+    steps:
+      - run:
+          shell: true
+          command: echo buggy
+      - assert:
+… (truncated, 2 more lines)
+```
+#### When
+```shell
+${atago} run --update-snapshots inner_mixed.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout contains `1 snapshot updated`
+- file `ordinary.snap` contains `fresh`
+- file `frozen.snap` contains `desired`
 ### Scenario: an expected failure without a reason is a load error
 #### Given
 - Fixture file `bad.atago.yaml` is created.
