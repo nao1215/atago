@@ -125,23 +125,7 @@ func CollectStepVars(set map[string]bool, step *Step) {
 			collectCDPActionVars(set, a)
 		}
 	case StepPTY:
-		pt := step.PTY
-		CollectVars(set, pt.Command, pt.Cwd)
-		for _, v := range pt.Env {
-			CollectVars(set, v)
-		}
-		for _, a := range pt.Session {
-			if a.Send != nil && a.Send.Text != nil {
-				CollectVars(set, *a.Send.Text)
-			}
-			CollectVars(set, a.Expect)
-			if a.ExpectScreen != nil {
-				WalkPTYExpectScreenStrings(a.ExpectScreen, func(s string) string {
-					CollectVars(set, s)
-					return s
-				})
-			}
-		}
+		collectPTYVars(set, step.PTY)
 	case StepSignal:
 		CollectVars(set, step.Signal.Service)
 	case StepAssert:
@@ -162,6 +146,35 @@ func CollectStepVars(set map[string]bool, step *Step) {
 		// variable the summaries must report.
 		if step.Store != nil && step.Store.From != nil && step.Store.From.File != nil {
 			CollectVars(set, step.Store.From.File.Path)
+		}
+	}
+}
+
+// collectPTYVars folds a pty step's ${name} references into set. Text, paste,
+// and exec.command are all expanded by the engine (expandPTYAction), so a
+// reference in any of them is a real variable use; paste and exec used to go
+// uncounted.
+func collectPTYVars(set map[string]bool, pt *PTY) {
+	CollectVars(set, pt.Command, pt.Cwd)
+	for _, v := range pt.Env {
+		CollectVars(set, v)
+	}
+	for _, a := range pt.Session {
+		if a.Send != nil && a.Send.Text != nil {
+			CollectVars(set, *a.Send.Text)
+		}
+		if a.Send != nil && a.Send.Paste != nil {
+			CollectVars(set, *a.Send.Paste)
+		}
+		if a.Exec != nil {
+			CollectVars(set, a.Exec.Command)
+		}
+		CollectVars(set, a.Expect)
+		if a.ExpectScreen != nil {
+			WalkPTYExpectScreenStrings(a.ExpectScreen, func(s string) string {
+				CollectVars(set, s)
+				return s
+			})
 		}
 	}
 }

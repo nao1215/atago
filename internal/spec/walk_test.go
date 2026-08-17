@@ -232,13 +232,17 @@ func TestCollectStepVars_KnownFields(t *testing.T) {
 			t.Errorf("run field %q not collected; got %v", want, got)
 		}
 	}
+	// paste and exec.command are expanded by the engine (expandPTYAction), so a
+	// ${name} in either is a real variable use; both used to go uncounted.
 	pty := &Step{PTY: &PTY{Command: "${pcmd}", Cwd: "${pcwd}", Env: map[string]string{"K": "${penv}"}, Session: []PTYAction{
 		{Expect: "${pexp}"},
 		{Send: SendText("${psend}")},
+		{Send: &PTYSend{Paste: strp("${ppaste}")}},
+		{Exec: &PTYExec{Command: "notify ${pexec}"}},
 		{ExpectScreen: &PTYExpectScreen{ScreenAssert: ScreenAssert{StreamAssert: StreamAssert{Contains: StringList{"${pscreen}"}}}}},
 	}}}
 	got = collectStep(pty)
-	for _, want := range []string{"pcmd", "pcwd", "penv", "pexp", "psend", "pscreen"} {
+	for _, want := range []string{"pcmd", "pcwd", "penv", "pexp", "psend", "ppaste", "pexec", "pscreen"} {
 		if !hasVar(got, want) {
 			t.Errorf("pty field %q not collected; got %v", want, got)
 		}
