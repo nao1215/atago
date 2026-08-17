@@ -16,6 +16,10 @@ linters:
     - errchkjson
     - errname
     - errorlint
+    # forbidigo carries the rules that are specific to atago rather than to Go.
+    # All four report nothing today; they exist so the next change cannot quietly
+    # take one of these away. See settings.forbidigo for what each one protects.
+    - forbidigo
     # exhaustive is the structural half of atago's oldest bug family: a new step
     # kind, assert target, or scenario status gets wired into some of the layers
     # that switch on it and quietly skipped by the rest. The coverage tests guard
@@ -78,6 +82,24 @@ linters:
       # for the same reason, so the switches and the coverage tests are checked
       # against one universe.
       ignore-enum-members: 'atago/internal/(spec\.(StepNone|AssertNone))$'
+    forbidigo:
+      analyze-types: true
+      forbid:
+        # atago's stdout is a machine-readable contract under --format json/junit/gha.
+        # A stray Print corrupts the document a CI job parses, and the failure lands
+        # on whoever wrote the parser. Every writer is injected; use it.
+        - pattern: '^fmt\.(Print|Printf|Println)$'
+          msg: "atago's stdout carries the report; write through the injected io.Writer instead"
+        # Process-global state and --parallel are incompatible: scenarios run
+        # concurrently in their own workdirs, so a chdir or a setenv from one of them
+        # is observable by all the others. The two deliberate exceptions in
+        # internal/cli run once at startup and say so.
+        - pattern: '^os\.(Chdir|Setenv|Unsetenv|Clearenv)$'
+          msg: "process-global state is visible to every scenario running in parallel"
+        # A test runner that is not reproducible cannot tell a real failure from its
+        # own noise. Seeded values belong in the spec, not in the runner.
+        - pattern: '^math/rand(/v2)?\.'
+          msg: "atago's output has to be reproducible; take the value from the spec"
     gocognit:
       min-complexity: 30
     recvcheck:
@@ -119,6 +141,12 @@ linters:
       - linters:
           - gosec
         path: _test\.go
+      # A test helper subprocess is the program under test: printing to its own
+      # stdout is what the capture assertions read.
+      - linters:
+          - forbidigo
+        path: _test\.go
+        text: fmt\.Print
       # Table-driven tests and fuzz harnesses are long by nature; the
       # complexity bounds are a production-code contract.
       - linters:

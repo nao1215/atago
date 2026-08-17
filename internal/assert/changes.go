@@ -3,7 +3,6 @@ package assert
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/nao1215/atago/internal/fsdelta"
 	"github.com/nao1215/atago/internal/fskind"
 	"github.com/nao1215/atago/internal/runner"
+	"github.com/nao1215/atago/internal/security"
 	"github.com/nao1215/atago/internal/spec"
 )
 
@@ -112,7 +112,14 @@ func untrackedKindNote(workdir, pat string) string {
 	if workdir == "" {
 		return ""
 	}
-	info, err := os.Lstat(filepath.Join(workdir, filepath.FromSlash(pat)))
+	// Through the shared resolver, not a bare join: a `changes:` entry is
+	// author-written, and probing it unconfined let the hint answer "does this
+	// exist, and what is it" about a path outside the scenario workdir.
+	full, err := security.ResolveWorkdirPath("assert.changes", workdir, pat)
+	if err != nil {
+		return ""
+	}
+	info, err := os.Lstat(full)
 	if err != nil {
 		return ""
 	}

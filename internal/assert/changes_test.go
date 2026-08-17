@@ -311,3 +311,34 @@ func TestCheckChanges_Ignore(t *testing.T) {
 		})
 	}
 }
+
+// TestCheckChanges_UntrackedKindHintStaysInsideTheWorkdir pins the confinement of
+// the hint's own filesystem probe. `changes:` entries are author-written patterns,
+// and untrackedKindNote used to stat them through a bare filepath.Join, so an
+// entry naming `../secret` reported the kind of a file outside the scenario
+// workdir — a hint that answers "does this exist, and what is it" about a path the
+// spec has no business reaching. Every other path-taking assertion resolves
+// through security.ResolveWorkdirPath; this one has to as well.
+func TestCheckChanges_UntrackedKindHintStaysInsideTheWorkdir(t *testing.T) {
+	t.Parallel()
+	base := t.TempDir()
+	wd := filepath.Join(base, "workdir")
+	if err := os.MkdirAll(wd, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	// A directory OUTSIDE the workdir: the kind the hint would happily report.
+	if err := os.MkdirAll(filepath.Join(base, "secret"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	got := checkChanges(
+		&spec.ChangesAssert{Created: list("../secret")},
+		changesResult(fsdelta.Delta{}),
+		Env{Workdir: wd},
+	)
+	if got.OK {
+		t.Fatal("an escaping entry cannot be satisfied by an empty delta")
+	}
+	if strings.Contains(got.Hint, "exists as a directory") {
+		t.Errorf("the hint probed outside the scenario workdir: %s", got.Hint)
+	}
+}
