@@ -1,18 +1,19 @@
 # atago Behavior Specs
 ## Summary
-82 suites · 658 scenarios
+82 suites · 659 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
   - [a single-quoted argument with a space stays one argument](#scenario-a-single-quoted-argument-with-a-space-stays-one-argument)
   - [a block-scalar command splits on newlines like spaces](#scenario-a-block-scalar-command-splits-on-newlines-like-spaces)
   - [a folded-scalar command drops its trailing newline](#scenario-a-folded-scalar-command-drops-its-trailing-newline)
-- [atago self-hosting / artifacts-dir failure payloads](#atago-self-hosting--artifacts-dir-failure-payloads) — 5 scenarios
+- [atago self-hosting / artifacts-dir failure payloads](#atago-self-hosting--artifacts-dir-failure-payloads) — 6 scenarios
   - [a failing stdout equals writes expected and actual sidecars](#scenario-a-failing-stdout-equals-writes-expected-and-actual-sidecars)
   - [a passing scenario writes no failure payload](#scenario-a-passing-scenario-writes-no-failure-payload)
   - [the artifacts directory is created when it does not exist](#scenario-the-artifacts-directory-is-created-when-it-does-not-exist)
   - [each repeat iteration keeps its own failure payloads](#scenario-each-repeat-iteration-keeps-its-own-failure-payloads)
   - [a file-content mismatch also writes a payload](#scenario-a-file-content-mismatch-also-writes-a-payload)
+  - [a teardown failure keeps the steps failure payloads](#scenario-a-teardown-failure-keeps-the-steps-failure-payloads)
 - [atago self-hosting / variable expansion in assertion matcher values](#atago-self-hosting--variable-expansion-in-assertion-matcher-values) — 6 scenarios
   - [stdout.equals expands ${workdir}](#scenario-stdoutequals-expands-workdir)
   - [stdout.contains and not_contains expand a stored variable](#scenario-stdoutcontains-and-not_contains-expand-a-stored-variable)
@@ -914,6 +915,41 @@ find farts -type f | wc -l
   - exit code is `1`
 - after `find farts -type f | wc -l`:
   - stdout does not match `/^\s*0\s*$/`
+### Scenario: a teardown failure keeps the steps failure payloads
+#### Given
+- Fixture file `bothfail.atago.yaml` is created.
+#### Inputs
+_Fixture `bothfail.atago.yaml`:_
+```text
+version: "1"
+suite: {name: bothfail}
+scenarios:
+  - name: both phases fail at index 1
+    steps:
+      - run: {shell: true, command: "printf 'STEPS-ACTUAL\\n'"}
+      - assert: {stdout: {equals: "STEPS-EXPECTED"}}
+    teardown:
+      - run: {shell: true, command: "printf 'TEARDOWN-ACTUAL\\n'"}
+      - assert: {stdout: {equals: "TEARDOWN-EXPECTED"}}
+```
+#### When
+```shell
+${atago} run --artifacts-dir tarts bothfail.atago.yaml
+cat tarts/*/*/step-01-stdout.actual.txt
+cat tarts/*/*/teardown/step-01-stdout.actual.txt
+find tarts -name '*.actual.txt' | wc -l | tr -d ' '
+```
+#### Then
+- after `${atago} run --artifacts-dir tarts bothfail.atago.yaml`:
+  - exit code is `1`
+- after `cat tarts/*/*/step-01-stdout.actual.txt`:
+  - exit code is `0`
+  - stdout equals an exact value
+- after `cat tarts/*/*/teardown/step-01-stdout.actual.txt`:
+  - exit code is `0`
+  - stdout equals an exact value
+- after `find tarts -name '*.actual.txt' | wc -l | tr -d ' '`:
+  - stdout equals an exact value
 ## atago self-hosting / variable expansion in assertion matcher values
 Source: `test/e2e/atago/assert_expand.atago.yaml`
 ### Scenario: stdout.equals expands ${workdir}

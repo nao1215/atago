@@ -144,6 +144,89 @@ func TestScenarioDir_AttemptSeparatesRepeatedExecutions(t *testing.T) {
 	}
 }
 
+// TestArtifactPath_SeparatesEveryAxis states the uniqueness claim as a test
+// rather than as a comment on FailurePath. Every axis a path is supposed to
+// separate — suite, scenario, scenario index, attempt, phase, step index, kind,
+// role — is enumerated here and the cross product must be free of duplicates,
+// so a payload written on one axis can never overwrite a payload written on
+// another while the report still points at it.
+//
+// The phase axis is the one that was missing: a teardown step's index counts
+// from zero again, so a teardown failure at index 1 wrote over the evidence for
+// the scenario step at index 1, under a filename that still said step-01.
+func TestArtifactPath_SeparatesEveryAxis(t *testing.T) {
+	t.Parallel()
+	specs := []string{"a/run.atago.yaml", "b/run.atago.yaml"}
+	names := []string{"first", "second"}
+	indexes := []int{0, 1}
+	attempts := []int{1, 2}
+	phases := []string{"", PhaseTeardown}
+	steps := []int{0, 1}
+	kinds := []string{"stdout", "stderr"}
+	roles := []string{"actual", "expected"}
+
+	seen := make(map[string]string)
+	for _, specPath := range specs {
+		for _, name := range names {
+			for _, idx := range indexes {
+				for _, attempt := range attempts {
+					for _, phase := range phases {
+						sc := Scenario{SpecPath: specPath, Name: name, Index: idx, Attempt: attempt, Phase: phase}
+						for _, step := range steps {
+							for _, kind := range kinds {
+								for _, role := range roles {
+									p := sc.FailurePath(step, kind, role, "txt")
+									key := fmt.Sprintf("%s|%s|%d|%d|%s|%d|%s|%s", specPath, name, idx, attempt, phase, step, kind, role)
+									if prev, dup := seen[p]; dup {
+										t.Errorf("path %q is written by two different executions:\n  %s\n  %s", p, prev, key)
+									}
+									seen[p] = key
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+// TestScenarioDir_PhaseSeparatesTeardown pins the shape of the phase segment:
+// the scenario's own steps keep the plain path a run has always written, the
+// teardown block gets a segment of its own, and the segment composes with the
+// attempt directory rather than collapsing back into the shared one.
+func TestScenarioDir_PhaseSeparatesTeardown(t *testing.T) {
+	t.Parallel()
+	steps := Scenario{SpecPath: "test/e2e/atago/artifacts.atago.yaml", Name: "both phases fail"}
+	if strings.Contains(steps.Dir(), PhaseTeardown) {
+		t.Errorf("steps dir = %q, want no phase segment", steps.Dir())
+	}
+
+	teardown := steps
+	teardown.Phase = PhaseTeardown
+	if want := steps.Dir() + "/" + PhaseTeardown; teardown.Dir() != want {
+		t.Errorf("teardown dir = %q, want %q", teardown.Dir(), want)
+	}
+
+	retried := teardown
+	retried.Attempt = 2
+	if want := steps.Dir() + "/attempt-2/" + PhaseTeardown; retried.Dir() != want {
+		t.Errorf("retried teardown dir = %q, want %q", retried.Dir(), want)
+	}
+
+	// A teardown's service and mock logs follow its failure payloads, so
+	// everything one phase produced stays together.
+	for _, p := range []string{
+		teardown.FailurePath(1, "stdout", "actual", "txt"),
+		teardown.ServiceLogPath("api"),
+		teardown.MockLogPath("api"),
+	} {
+		if dirOf(p) != teardown.Dir() {
+			t.Errorf("%q is not in the teardown dir %q", p, teardown.Dir())
+		}
+	}
+}
+
 func dirOf(p string) string {
 	if i := strings.LastIndex(p, "/"); i >= 0 {
 		return p[:i]
