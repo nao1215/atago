@@ -446,8 +446,16 @@ scenarios:
             - navigate: http://localhost:8080
             - screenshot: {path: home.png}
       - assert:
+          pdf:
+            path: report.pdf
+            min_pages: 1
+      - assert:
           value:
             contains: ok
+    teardown:
+      - run:
+          command: audit
+          stdout_to: logs/audit.log
 `
 	s := mustLoadSpec(t, "t.atago.yaml", src)
 	var b bytes.Buffer
@@ -455,7 +463,7 @@ scenarios:
 		t.Fatal(err)
 	}
 	out := b.String()
-	for _, w := range []string{"Generated artifacts", "`thumb.png`", "`out.txt`", "`home.png`"} {
+	for _, w := range []string{"Generated artifacts", "`thumb.png`", "`out.txt`", "`home.png`", "`report.pdf`", "`logs/audit.log`"} {
 		if !strings.Contains(out, w) {
 			t.Errorf("doc output missing generated artifact %q\n--- got ---\n%s", w, out)
 		}

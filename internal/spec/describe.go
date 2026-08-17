@@ -47,10 +47,12 @@ var NetworkCommand = regexp.MustCompile(`(?i)\b(curl|wget|nc|ncat|ssh|scp|telnet
 
 // GeneratedArtifacts returns, in declaration order and de-duplicated, the file
 // paths a scenario declares it produces: from `file` exists:true assertions,
-// `image` assertions (the inspected output the tool wrote), redirect targets
-// (run's stdout_to/stderr_to, http's body_to), and `cdp` screenshot actions.
-// explain, doc, and manifest all consume this so a generated output can never
-// appear in one spec summary but silently vanish from another (#56).
+// `image` and `pdf` assertions (the inspected output the tool wrote), redirect
+// targets (run's stdout_to/stderr_to, http's body_to), and `cdp` screenshot
+// actions — across the scenario's steps and its teardown, which always runs
+// and whose redirects land in the workdir like any other step's. explain, doc,
+// and manifest all consume this so a generated output can never appear in one
+// spec summary but silently vanish from another (#56).
 func GeneratedArtifacts(sc *Scenario) []string {
 	var out []string
 	seen := map[string]bool{}
@@ -60,30 +62,40 @@ func GeneratedArtifacts(sc *Scenario) []string {
 			out = append(out, p)
 		}
 	}
-	for i := range sc.Steps {
-		step := &sc.Steps[i]
-		switch step.Kind() {
-		case StepRun:
-			add(step.Run.StdoutTo)
-			add(step.Run.StderrTo)
-		case StepHTTP:
-			add(step.HTTP.BodyTo)
-		case StepAssert:
-			a := step.Assert
-			if a.File != nil && a.File.Exists != nil && *a.File.Exists {
-				add(a.File.Path)
-			}
-			if a.Image != nil {
-				add(a.Image.Path)
-			}
-		case StepCDP:
-			for _, act := range step.CDP.Actions {
-				if act.Screenshot != nil {
-					add(act.Screenshot.Path)
+	collect := func(steps []Step) {
+		for i := range steps {
+			step := &steps[i]
+			switch step.Kind() {
+			case StepRun:
+				add(step.Run.StdoutTo)
+				add(step.Run.StderrTo)
+			case StepHTTP:
+				add(step.HTTP.BodyTo)
+			case StepAssert:
+				a := step.Assert
+				if a.File != nil && a.File.Exists != nil && *a.File.Exists {
+					add(a.File.Path)
+				}
+				if a.Image != nil {
+					add(a.Image.Path)
+				}
+				// A pdf assertion inspects an output the tool wrote, exactly
+				// like image; it arrived later (#73) and was the one inspecting
+				// target this list never learned.
+				if a.PDF != nil {
+					add(a.PDF.Path)
+				}
+			case StepCDP:
+				for _, act := range step.CDP.Actions {
+					if act.Screenshot != nil {
+						add(act.Screenshot.Path)
+					}
 				}
 			}
 		}
 	}
+	collect(sc.Steps)
+	collect(sc.Teardown)
 	return out
 }
 

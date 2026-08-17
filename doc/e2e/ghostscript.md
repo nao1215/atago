@@ -55,6 +55,8 @@ gs -q -dNOPAUSE -dBATCH -sDEVICE=pdfwrite -o out.pdf doc.ps
 - the step changed exactly created `out.pdf`, modified nothing, deleted nothing
 - pdf `out.pdf` 2 pages
 - pdf `out.pdf` text contains `Quarterly earnings report`, `Appendix and totals`
+#### Generated artifacts
+- `out.pdf`
 ### Scenario: a DOCINFO pdfmark reaches the Info dictionary
 _only when `gs --version` succeeds_
 #### Given
@@ -75,6 +77,8 @@ gs -q -dNOPAUSE -dBATCH -sDEVICE=pdfwrite -o titled.pdf -c "[/Title (Quarterly R
 - exit code is `0`
 - pdf `titled.pdf` author contains `atago`, title contains `Quarterly Report`
 - pdf `titled.pdf` producer contains `Ghostscript`
+#### Generated artifacts
+- `titled.pdf`
 ### Scenario: selecting one page keeps that page's text and drops the other
 _only when `gs --version` succeeds_
 #### Given
@@ -103,6 +107,9 @@ gs -q -dNOPAUSE -dBATCH -sDEVICE=pdfwrite -dFirstPage=2 -dLastPage=2 -o second.p
   - pdf `second.pdf` 1 page
   - pdf `second.pdf` text contains `Second page marker`
   - pdf `second.pdf` text does not contain `First page marker`
+#### Generated artifacts
+- `whole.pdf`
+- `second.pdf`
 ### Scenario: merging two documents yields the sum of their pages
 _only when `gs --version` succeeds_
 #### Given
@@ -142,6 +149,10 @@ gs -q -dNOPAUSE -dBATCH -sDEVICE=pdfwrite -o merged.pdf one.pdf two.pdf
   - exit code is `0`
   - pdf `merged.pdf` 3 pages
   - pdf `merged.pdf` text contains `Document one`, `Document two page A`, `Document two page B`
+#### Generated artifacts
+- `one.pdf`
+- `two.pdf`
+- `merged.pdf`
 ### Scenario: txtwrite agrees with the text inside the PDF
 _only when `gs --version` succeeds_
 #### Given
@@ -166,6 +177,8 @@ gs -q -dNOPAUSE -dBATCH -sDEVICE=txtwrite -o extracted.txt out.pdf
 - after `gs -q -dNOPAUSE -dBATCH -sDEVICE=txtwrite -o extracted.txt out.pdf`:
   - exit code is `0`
   - file `extracted.txt` contains `Extractable sentence`
+#### Generated artifacts
+- `out.pdf`
 ### Scenario: rasterizing a page produces an image of the requested size
 _only when `gs --version` succeeds_
 #### Given
@@ -254,6 +267,8 @@ gs -q -dNOPAUSE -dBATCH -sDEVICE=pdfwrite -o out.pdf broken.ps
 - stderr contains `Unrecoverable error`
 - pdf `out.pdf` 1 page
 - pdf `out.pdf` text does not contain `this is not postscript`
+#### Generated artifacts
+- `out.pdf`
 ### Scenario: an unknown device is refused
 _only when `gs --version` succeeds_
 #### Given

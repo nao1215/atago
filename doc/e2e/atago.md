@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-81 suites · 629 scenarios
+81 suites · 630 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -265,7 +265,7 @@
   - [junit routes an xfail to skipped and an xpass to failure](#scenario-junit-routes-an-xfail-to-skipped-and-an-xpass-to-failure)
   - [explain and doc show which scenarios document a known bug](#scenario-explain-and-doc-show-which-scenarios-document-a-known-bug)
   - [an expected failure without a reason is a load error](#scenario-an-expected-failure-without-a-reason-is-a-load-error)
-- [atago self-hosting / explain](#atago-self-hosting--explain) — 7 scenarios
+- [atago self-hosting / explain](#atago-self-hosting--explain) — 8 scenarios
   - [explain summarizes a spec without running it](#scenario-explain-summarizes-a-spec-without-running-it)
   - [explain describes every matcher of a composed stream assertion](#scenario-explain-describes-every-matcher-of-a-composed-stream-assertion)
   - [explain names the line a line-scoped matcher inspects](#scenario-explain-names-the-line-a-line-scoped-matcher-inspects)
@@ -273,6 +273,7 @@
   - [explain names ssh and remote-database egress](#scenario-explain-names-ssh-and-remote-database-egress)
   - [explain names pty and teardown egress](#scenario-explain-names-pty-and-teardown-egress)
   - [explain names suite lifecycle egress](#scenario-explain-names-suite-lifecycle-egress)
+  - [explain lists pdf and teardown outputs under generates](#scenario-explain-lists-pdf-and-teardown-outputs-under-generates)
 - [atago self-hosting / file equals and equals_file byte-equality (#155)](#atago-self-hosting--file-equals-and-equals_file-byte-equality-155) — 10 scenarios
   - [equals_file passes for two byte-identical files](#scenario-equals_file-passes-for-two-byte-identical-files)
   - [equals matches an inline literal byte-for-byte](#scenario-equals-matches-an-inline-literal-byte-for-byte)
@@ -5944,6 +5945,41 @@ ${atago} manifest suite_egress.atago.yaml
 - after `${atago} manifest suite_egress.atago.yaml`:
   - exit code is `0`
   - stdout at `$.specs[0].suite_security[0]` equals `shell execution enabled: curl https://seed.example/data`
+### Scenario: explain lists pdf and teardown outputs under generates
+#### Given
+- Fixture file `gen.atago.yaml` is created.
+#### Inputs
+_Fixture `gen.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: gen
+scenarios:
+  - name: renders a report
+    steps:
+      - run:
+          command: mytool render
+      - assert:
+          pdf:
+            path: report.pdf
+            min_pages: 1
+    teardown:
+      - run:
+          command: mytool audit
+          stdout_to: logs/audit.log
+```
+#### When
+```shell
+${atago} explain gen.atago.yaml
+${atago} manifest gen.atago.yaml
+```
+#### Then
+- after `${atago} explain gen.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `Generates:`, `report.pdf`, `logs/audit.log`
+- after `${atago} manifest gen.atago.yaml`:
+  - exit code is `0`
+  - stdout at `$.specs[0].scenarios[0].generates[0]` equals `report.pdf`; at `$.specs[0].scenarios[0].generates[1]` equals `logs/audit.log`
 ## atago self-hosting / file equals and equals_file byte-equality (#155)
 Source: `test/e2e/atago/file_equals.atago.yaml`
 ### Scenario: equals_file passes for two byte-identical files
@@ -8891,6 +8927,8 @@ trailer
 ```
 #### Then
 - pdf `report.pdf` 1 page, >= 1 page, <= 3 pages, author contains `atago`, title contains `Quarterly`, text contains `Hello atago report`
+#### Generated artifacts
+- `report.pdf`
 ### Scenario: a non-pdf file fails the pdf target
 #### Given
 - Fixture file `notpdf.txt` is created.

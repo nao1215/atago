@@ -109,6 +109,8 @@ head -c 4 cv.pdf
 - after `head -c 4 cv.pdf`:
   - stdout equals an exact value
   - pdf `cv.pdf` >= 1 page
+#### Generated artifacts
+- `cv.pdf`
 ### Scenario: japanese-resume renders a PDF from a positional input
 #### When
 ```shell
