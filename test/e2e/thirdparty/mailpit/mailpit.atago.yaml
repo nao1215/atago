@@ -45,8 +45,12 @@ defaults:
     # Every scenario here drives mailpit. Without the program there is nothing to
     # test, so the suite skips rather than erroring: a missing tool is not a
     # result. The gate is declared once so no scenario can be left out of it.
+    # --no-release-check matters here just as it does in the version scenario
+    # below: without it the probe asks GitHub for the latest release and exits 1
+    # when that call fails, so an unauthenticated rate limit on a shared CI
+    # runner would skip the whole suite with mailpit installed and working.
     only:
-      command: mailpit version
+      command: mailpit version --no-release-check
 
 scenarios:
   - name: the binary reports its version
