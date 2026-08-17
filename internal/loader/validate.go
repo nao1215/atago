@@ -44,13 +44,22 @@ func firstControlChar(name string) string {
 // deciding which diagnostic it is, because omitting the code does not compile.
 type addFunc func(code diag.Code, format string, args ...any)
 
+// errorList is how every validation phase collects its problems. Its only
+// writer demands a diagnostic code, so a phase cannot hand a raw string back to
+// the caller — which is how the matrix validator ended up emitting five
+// uncoded messages beside coded ones in the same error list.
+type errorList struct{ msgs []string }
+
+// add records one problem under the code that names it.
+func (e *errorList) add(code diag.Code, format string, args ...any) {
+	e.msgs = append(e.msgs, code.Annotate(fmt.Sprintf(format, args...)))
+}
+
 // validate runs schema and semantic checks and
 // returns all problems found so the user can fix them in one pass.
 func validate(s *spec.Spec) []string {
-	var errs []string
-	add := func(code diag.Code, format string, args ...any) {
-		errs = append(errs, code.Annotate(fmt.Sprintf(format, args...)))
-	}
+	var errs errorList
+	add := errs.add
 
 	if s.Version != "1" {
 		add(diag.SpecVersion, "version must be \"1\" (got %q)", s.Version)
@@ -78,7 +87,7 @@ func validate(s *spec.Spec) []string {
 	for i := range s.Scenarios {
 		validateScenario(add, s, i, seen, suiteServiceNames, suiteMockNames)
 	}
-	return errs
+	return errs.msgs
 }
 
 // suiteResourceNames collects the names of services and mock servers declared

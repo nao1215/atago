@@ -137,6 +137,9 @@ func TestLoadBytes_MatrixErrors(t *testing.T) {
 			if !strings.Contains(err.Error(), tt.wantMsg) {
 				t.Errorf("error = %q, want substring %q", err.Error(), tt.wantMsg)
 			}
+			// Matrix problems are reported before expansion, through their own
+			// phase, and were the one family that reached the user uncoded.
+			requireDiagnosticCodes(t, tt.name, err)
 		})
 	}
 }

@@ -97,7 +97,11 @@ scenarios:
       - assert:
           exit_code: 2
           stderr:
-            contains: "matrix must contain at least one row"
+            contains:
+              # Every load error carries its diagnostic code, matrix errors
+              # included: the published reference can only explain what it names.
+              - "ATG2202: "
+              - "matrix must contain at least one row"
 
   - name: rows that expand to the same name are rejected as duplicates
     steps:
@@ -138,7 +142,9 @@ scenarios:
       - assert:
           exit_code: 2
           stderr:
-            contains: "does not bind ${who}"
+            contains:
+              - "ATG2403: "
+              - "does not bind ${who}"
       - fixture:
           file: escaped.atago.yaml
           content: |
