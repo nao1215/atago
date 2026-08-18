@@ -26,12 +26,20 @@
       "additionalProperties": false,
       "properties": {
         "name": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "minLength": 1,
           "description": "The suite name shown in reports and generated docs."
         },
         "description": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "description": "Optional prose describing what the suite guarantees, rendered as Markdown under the suite heading by `atago doc`. Documentation only: it never affects execution, and `${name}` references in it are not expanded."
         },
         "timeout": {
@@ -42,7 +50,11 @@
           "description": "Environment exported to every scenario, setup, and teardown step (a scenario's own env wins per key).",
           "type": "object",
           "additionalProperties": {
-            "type": "string"
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ]
           }
         },
         "setup": {
@@ -82,7 +94,11 @@
             "allow": {
               "type": "array",
               "items": {
-                "type": "string"
+                "type": [
+                  "string",
+                  "number",
+                  "boolean"
+                ]
               },
               "description": "Hosts that scenarios may contact; egress to any other host is a policy violation (exit 6). Enforced on http, grpc, ssh, and db egress, and on a cdp step's `navigate:` URLs — a page loaded from an allowed host may still fetch subresources from anywhere, which no `navigate:` action passes through (#486)."
             }
@@ -95,7 +111,11 @@
     "secrets": {
       "type": "array",
       "items": {
-        "type": "string"
+        "type": [
+          "string",
+          "number",
+          "boolean"
+        ]
       },
       "description": "Environment variable names whose VALUES are masked as `***` in output, reports, and snapshots."
     },
@@ -110,12 +130,20 @@
         "additionalProperties": false,
         "properties": {
           "pattern": {
-            "type": "string",
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ],
             "minLength": 1,
             "description": "A Go (RE2) regular expression; every match is replaced. Required."
           },
           "placeholder": {
-            "type": "string",
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ],
             "description": "Literal replacement text (no $1 expansion), e.g. \"`<ID>`\". Defaults to empty, which deletes matches."
           }
         }
@@ -139,13 +167,21 @@
       "description": "A contains/not_contains matcher argument: either a single substring, or a non-empty list of substrings that must all be present (contains) or all be absent (not_contains). The whole list counts as one matcher.",
       "oneOf": [
         {
-          "type": "string"
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ]
         },
         {
           "type": "array",
           "minItems": 1,
           "items": {
-            "type": "string"
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ]
           }
         }
       ]
@@ -161,7 +197,11 @@
           "additionalProperties": false,
           "properties": {
             "runner": {
-              "type": "string",
+              "type": [
+                "string",
+                "number",
+                "boolean"
+              ],
               "description": "Default runner name for every run step."
             },
             "shell": {
@@ -169,7 +209,11 @@
               "description": "Default `shell` for every run step (an authored `shell: false` on a step cannot override a defaulted `true`)."
             },
             "cwd": {
-              "type": "string",
+              "type": [
+                "string",
+                "number",
+                "boolean"
+              ],
               "description": "Default working directory for every run step. Precedence: step > runner > defaults.run."
             },
             "timeout": {
@@ -179,7 +223,11 @@
             "env": {
               "type": "object",
               "additionalProperties": {
-                "type": "string"
+                "type": [
+                  "string",
+                  "number",
+                  "boolean"
+                ]
               },
               "description": "Default env map shallow-merged beneath every run step's own `env`."
             },
@@ -190,7 +238,11 @@
             "pass_env": {
               "type": "array",
               "items": {
-                "type": "string",
+                "type": [
+                  "string",
+                  "number",
+                  "boolean"
+                ],
                 "minLength": 1
               },
               "description": "Host variables copied into the cleared environment (#16). Requires clear_env: true; unset host variables are skipped."
@@ -209,7 +261,11 @@
             "env": {
               "type": "object",
               "additionalProperties": {
-                "type": "string"
+                "type": [
+                  "string",
+                  "number",
+                  "boolean"
+                ]
               },
               "description": "Env map shallow-merged beneath every scenario's own `env`."
             },
@@ -233,13 +289,21 @@
               "description": "Default `shell` for every service."
             },
             "cwd": {
-              "type": "string",
+              "type": [
+                "string",
+                "number",
+                "boolean"
+              ],
               "description": "Default working directory for every service."
             },
             "env": {
               "type": "object",
               "additionalProperties": {
-                "type": "string"
+                "type": [
+                  "string",
+                  "number",
+                  "boolean"
+                ]
               },
               "description": "Default env map for every service."
             },
@@ -250,7 +314,11 @@
             "pass_env": {
               "type": "array",
               "items": {
-                "type": "string",
+                "type": [
+                  "string",
+                  "number",
+                  "boolean"
+                ],
                 "minLength": 1
               },
               "description": "Host variables copied into the cleared environment (#16). Requires clear_env: true; unset host variables are skipped."
@@ -260,15 +328,27 @@
               "additionalProperties": false,
               "properties": {
                 "file": {
-                  "type": "string",
+                  "type": [
+                    "string",
+                    "number",
+                    "boolean"
+                  ],
                   "description": "See `service.ready.file`."
                 },
                 "port": {
-                  "type": "string",
+                  "type": [
+                    "string",
+                    "number",
+                    "boolean"
+                  ],
                   "description": "See `service.ready.port`."
                 },
                 "log": {
-                  "type": "string",
+                  "type": [
+                    "string",
+                    "number",
+                    "boolean"
+                  ],
                   "description": "See `service.ready.log`."
                 },
                 "delay": {
@@ -280,7 +360,11 @@
                   "description": "See `service.ready.timeout`."
                 },
                 "store": {
-                  "type": "string",
+                  "type": [
+                    "string",
+                    "number",
+                    "boolean"
+                  ],
                   "description": "See `service.ready.store`."
                 }
               },
@@ -305,7 +389,11 @@
               "description": "Selects the `cmd` runner: local command execution (the implicit default for run steps)."
             },
             "cwd": {
-              "type": "string",
+              "type": [
+                "string",
+                "number",
+                "boolean"
+              ],
               "description": "Working directory for commands run through this runner, relative to the scenario workdir. Beaten by a step's own `cwd`, and beats `defaults.run.cwd`."
             },
             "timeout": {
@@ -322,7 +410,11 @@
               "description": "Selects the `http` runner: HTTP requests from http steps."
             },
             "cwd": {
-              "type": "string",
+              "type": [
+                "string",
+                "number",
+                "boolean"
+              ],
               "description": "Unused for http runners; accepted for uniformity."
             },
             "timeout": {
@@ -330,7 +422,11 @@
               "description": "Request timeout as a Go duration."
             },
             "base_url": {
-              "type": "string",
+              "type": [
+                "string",
+                "number",
+                "boolean"
+              ],
               "description": "Base URL every http step's `path` is appended to."
             }
           }
@@ -346,7 +442,11 @@
               "description": "Selects the `db` runner: SQL from query steps."
             },
             "cwd": {
-              "type": "string",
+              "type": [
+                "string",
+                "number",
+                "boolean"
+              ],
               "description": "Unused for db runners; accepted for uniformity."
             },
             "timeout": {
@@ -354,7 +454,11 @@
               "description": "Statement timeout as a Go duration."
             },
             "dsn": {
-              "type": "string",
+              "type": [
+                "string",
+                "number",
+                "boolean"
+              ],
               "description": "Data source name, e.g. \"sqlite:${workdir}/app.db\", \"postgres://user:pass@host/db\", or \"mysql://user:pass@host:3306/db\". Pure-Go drivers are bundled."
             },
             "driver": {
@@ -381,7 +485,11 @@
               "description": "Selects the `ssh` runner: running commands on a remote host."
             },
             "cwd": {
-              "type": "string",
+              "type": [
+                "string",
+                "number",
+                "boolean"
+              ],
               "description": "Remote working directory for commands."
             },
             "timeout": {
@@ -389,23 +497,43 @@
               "description": "Command timeout as a Go duration."
             },
             "host": {
-              "type": "string",
+              "type": [
+                "string",
+                "number",
+                "boolean"
+              ],
               "description": "Remote host, as host or host:port (default port 22)."
             },
             "user": {
-              "type": "string",
+              "type": [
+                "string",
+                "number",
+                "boolean"
+              ],
               "description": "Login user."
             },
             "password": {
-              "type": "string",
+              "type": [
+                "string",
+                "number",
+                "boolean"
+              ],
               "description": "Password authentication (prefer key_file, and keep the value in an env var)."
             },
             "key_file": {
-              "type": "string",
+              "type": [
+                "string",
+                "number",
+                "boolean"
+              ],
               "description": "Path to a private key for key authentication."
             },
             "known_hosts": {
-              "type": "string",
+              "type": [
+                "string",
+                "number",
+                "boolean"
+              ],
               "description": "known_hosts file verifying the host key (recommended)."
             },
             "insecure_host_key": {
@@ -425,7 +553,11 @@
               "description": "Selects the `grpc` runner: unary gRPC calls from grpc steps."
             },
             "cwd": {
-              "type": "string",
+              "type": [
+                "string",
+                "number",
+                "boolean"
+              ],
               "description": "Unused for grpc runners; accepted for uniformity."
             },
             "timeout": {
@@ -433,7 +565,11 @@
               "description": "Call timeout as a Go duration."
             },
             "target": {
-              "type": "string",
+              "type": [
+                "string",
+                "number",
+                "boolean"
+              ],
               "description": "host:port of the gRPC server; the schema is resolved via server reflection."
             },
             "tls": {
@@ -450,7 +586,11 @@
               "description": "Selects the `browser` runner: headless Chrome driven by cdp steps."
             },
             "cwd": {
-              "type": "string",
+              "type": [
+                "string",
+                "number",
+                "boolean"
+              ],
               "description": "Unused for browser runners; accepted for uniformity."
             },
             "timeout": {
@@ -462,13 +602,21 @@
               "description": "Run Chrome without a visible window (default true); set false to debug headed."
             },
             "exec_path": {
-              "type": "string",
+              "type": [
+                "string",
+                "number",
+                "boolean"
+              ],
               "description": "Path to a specific Chrome/Chromium binary instead of the one discovered on PATH."
             },
             "browser_args": {
               "type": "array",
               "items": {
-                "type": "string"
+                "type": [
+                  "string",
+                  "number",
+                  "boolean"
+                ]
               },
               "description": "Extra Chrome launch flags (bare names, no leading '--'), e.g. 'disable-gpu' or 'window-size=1280,720'."
             }
@@ -489,11 +637,19 @@
           "description": "Matches the host operating system (linux, darwin, windows)."
         },
         "env": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "description": "True when the named environment variable is non-empty."
         },
         "command": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "description": "True when this probe command (run through the shell) exits 0."
         }
       }
@@ -507,18 +663,30 @@
       "additionalProperties": false,
       "properties": {
         "name": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "minLength": 1,
           "description": "The scenario name shown in reports; with `matrix:`, `${var}` placeholders make each instance's name unique."
         },
         "description": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "description": "Optional prose describing the behavior this scenario pins down and why it matters, rendered as Markdown under the scenario heading by `atago doc`. Documentation only: it never affects execution, and `${name}` references in it are not expanded."
         },
         "tags": {
           "type": "array",
           "items": {
-            "type": "string"
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ]
           },
           "description": "Labels for run-time selection with `--tag` / `--skip-tag`."
         },
@@ -539,12 +707,20 @@
           "description": "Declares that this scenario documents a KNOWN bug (#395). Failing is reported as XFAIL and does NOT fail the run, so a reproduction can live in CI and execute on every commit. Passing is XPASS, which DOES fail the run (unless `--allow-xpass`): the fix landed, and the scenario has to be promoted into the suite that guards against a regression. An execution ERROR is still an error — expect_fail says the program gives the wrong answer, not that the spec cannot run.",
           "properties": {
             "reason": {
-              "type": "string",
+              "type": [
+                "string",
+                "number",
+                "boolean"
+              ],
               "minLength": 1,
               "description": "What is broken, in the author's words. Required: an expected failure with no stated reason is indistinguishable from a test somebody gave up on."
             },
             "issue": {
-              "type": "string",
+              "type": [
+                "string",
+                "number",
+                "boolean"
+              ],
               "minLength": 1,
               "description": "Where the bug is tracked. Optional, but it is what makes an XPASS actionable — the message can name the issue to close."
             }
@@ -553,7 +729,11 @@
         "env": {
           "type": "object",
           "additionalProperties": {
-            "type": "string"
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ]
           },
           "description": "Environment variables for every step in the scenario (a step's own `env` wins per key)."
         },
@@ -564,7 +744,11 @@
             "type": "object",
             "minProperties": 1,
             "additionalProperties": {
-              "type": "string"
+              "type": [
+                "string",
+                "number",
+                "boolean"
+              ]
             }
           },
           "description": "Makes the scenario a template: one concrete instance per row, with each row's key/value pairs seeded as `${name}` variables."
@@ -610,12 +794,20 @@
       "additionalProperties": false,
       "properties": {
         "name": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "minLength": 1,
           "description": "Identifies the service in diagnostics and `signal:` steps; unique per scenario."
         },
         "command": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "minLength": 1,
           "description": "The program to run. Tokenized and exec'd directly unless `shell: true`."
         },
@@ -624,13 +816,21 @@
           "description": "Runs the command through the POSIX shell (pipes, redirects, `${}`)."
         },
         "cwd": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "description": "Working directory relative to the scenario workdir."
         },
         "env": {
           "type": "object",
           "additionalProperties": {
-            "type": "string"
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ]
           },
           "description": "Environment variables, layered over the scenario env, with `${name}` expansion."
         },
@@ -641,7 +841,11 @@
         "pass_env": {
           "type": "array",
           "items": {
-            "type": "string",
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ],
             "minLength": 1
           },
           "description": "Host variables copied into the cleared environment (#16). Requires clear_env: true; unset host variables are skipped."
@@ -651,15 +855,27 @@
           "additionalProperties": false,
           "properties": {
             "file": {
-              "type": "string",
+              "type": [
+                "string",
+                "number",
+                "boolean"
+              ],
               "description": "Ready when this workdir-relative file exists and is non-empty — the canonical pattern for a server publishing its listen address."
             },
             "port": {
-              "type": "string",
+              "type": [
+                "string",
+                "number",
+                "boolean"
+              ],
               "description": "Ready when this TCP address (host:port) accepts a connection."
             },
             "log": {
-              "type": "string",
+              "type": [
+                "string",
+                "number",
+                "boolean"
+              ],
               "description": "Ready when the service's combined stdout/stderr matches this regular expression."
             },
             "delay": {
@@ -671,7 +887,11 @@
               "description": "Bounds the readiness wait as a Go duration (default \"5s\")."
             },
             "store": {
-              "type": "string",
+              "type": [
+                "string",
+                "number",
+                "boolean"
+              ],
               "description": "Used with `file`: captures the ready file's trimmed content into `${<name>}` so steps can reference a dynamic address or port."
             }
           },
@@ -809,7 +1029,11 @@
       "additionalProperties": false,
       "properties": {
         "runner": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "minLength": 1,
           "description": "Names the `browser` runner to drive."
         },
@@ -821,31 +1045,59 @@
             "additionalProperties": false,
             "properties": {
               "navigate": {
-                "type": "string",
+                "type": [
+                  "string",
+                  "number",
+                  "boolean"
+                ],
                 "description": "Loads a URL."
               },
               "wait_visible": {
-                "type": "string",
+                "type": [
+                  "string",
+                  "number",
+                  "boolean"
+                ],
                 "description": "Waits until the CSS selector is visible."
               },
               "wait_hidden": {
-                "type": "string",
+                "type": [
+                  "string",
+                  "number",
+                  "boolean"
+                ],
                 "description": "Waits until the CSS selector is hidden or absent."
               },
               "click": {
-                "type": "string",
+                "type": [
+                  "string",
+                  "number",
+                  "boolean"
+                ],
                 "description": "Clicks the element matched by the selector."
               },
               "check": {
-                "type": "string",
+                "type": [
+                  "string",
+                  "number",
+                  "boolean"
+                ],
                 "description": "Ticks the checkbox matched by the selector."
               },
               "uncheck": {
-                "type": "string",
+                "type": [
+                  "string",
+                  "number",
+                  "boolean"
+                ],
                 "description": "Unticks the checkbox matched by the selector."
               },
               "text": {
-                "type": "string",
+                "type": [
+                  "string",
+                  "number",
+                  "boolean"
+                ],
                 "description": "Captures the text of the element matched by the selector."
               },
               "title": {
@@ -853,7 +1105,11 @@
                 "description": "Captures the page title."
               },
               "eval": {
-                "type": "string",
+                "type": [
+                  "string",
+                  "number",
+                  "boolean"
+                ],
                 "description": "Evaluates a JavaScript expression and captures the result as JSON."
               },
               "send_keys": {
@@ -865,11 +1121,19 @@
                 "additionalProperties": false,
                 "properties": {
                   "selector": {
-                    "type": "string",
+                    "type": [
+                      "string",
+                      "number",
+                      "boolean"
+                    ],
                     "description": "The element to type into."
                   },
                   "value": {
-                    "type": "string",
+                    "type": [
+                      "string",
+                      "number",
+                      "boolean"
+                    ],
                     "description": "The text to type."
                   }
                 },
@@ -884,11 +1148,19 @@
                 "additionalProperties": false,
                 "properties": {
                   "selector": {
-                    "type": "string",
+                    "type": [
+                      "string",
+                      "number",
+                      "boolean"
+                    ],
                     "description": "The element to receive the key press."
                   },
                   "key": {
-                    "type": "string",
+                    "type": [
+                      "string",
+                      "number",
+                      "boolean"
+                    ],
                     "description": "The key to press (e.g. \"Enter\", \"Tab\", or a printable character)."
                   }
                 },
@@ -903,11 +1175,19 @@
                 "additionalProperties": false,
                 "properties": {
                   "selector": {
-                    "type": "string",
+                    "type": [
+                      "string",
+                      "number",
+                      "boolean"
+                    ],
                     "description": "The `<select>` element."
                   },
                   "value": {
-                    "type": "string",
+                    "type": [
+                      "string",
+                      "number",
+                      "boolean"
+                    ],
                     "description": "The option value to choose."
                   }
                 },
@@ -921,11 +1201,19 @@
                 "additionalProperties": false,
                 "properties": {
                   "path": {
-                    "type": "string",
+                    "type": [
+                      "string",
+                      "number",
+                      "boolean"
+                    ],
                     "description": "The workdir-relative PNG path to write."
                   },
                   "selector": {
-                    "type": "string",
+                    "type": [
+                      "string",
+                      "number",
+                      "boolean"
+                    ],
                     "description": "Limits the screenshot to this element (default: the whole page)."
                   }
                 },
@@ -940,11 +1228,19 @@
                 "additionalProperties": false,
                 "properties": {
                   "selector": {
-                    "type": "string",
+                    "type": [
+                      "string",
+                      "number",
+                      "boolean"
+                    ],
                     "description": "The element to read."
                   },
                   "name": {
-                    "type": "string",
+                    "type": [
+                      "string",
+                      "number",
+                      "boolean"
+                    ],
                     "description": "The attribute name to capture."
                   }
                 },
@@ -959,11 +1255,19 @@
                 "additionalProperties": false,
                 "properties": {
                   "selector": {
-                    "type": "string",
+                    "type": [
+                      "string",
+                      "number",
+                      "boolean"
+                    ],
                     "description": "The `<input type=file>` element."
                   },
                   "file": {
-                    "type": "string",
+                    "type": [
+                      "string",
+                      "number",
+                      "boolean"
+                    ],
                     "description": "The workdir-relative file to attach; must exist."
                   }
                 },
@@ -977,11 +1281,19 @@
                 "additionalProperties": false,
                 "properties": {
                   "click": {
-                    "type": "string",
+                    "type": [
+                      "string",
+                      "number",
+                      "boolean"
+                    ],
                     "description": "The element to click to start the download."
                   },
                   "dir": {
-                    "type": "string",
+                    "type": [
+                      "string",
+                      "number",
+                      "boolean"
+                    ],
                     "description": "Workdir-relative directory to save into (default: the workdir root)."
                   }
                 },
@@ -1002,12 +1314,20 @@
       "additionalProperties": false,
       "properties": {
         "runner": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "minLength": 1,
           "description": "Names the `db` runner declaring the dsn."
         },
         "sql": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "minLength": 1,
           "description": "The SQL statement. SELECT rows are captured as JSON for `rows:` asserts and `store from.rows`; other statements record their affected-row count."
         }
@@ -1022,19 +1342,31 @@
       "additionalProperties": false,
       "properties": {
         "runner": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "minLength": 1,
           "description": "Names the `grpc` runner declaring the target server."
         },
         "method": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "minLength": 1,
           "description": "The unary method to call as \"package.Service/Method\"; the schema is resolved via server reflection (no compiled stubs)."
         },
         "header": {
           "type": "object",
           "additionalProperties": {
-            "type": "string"
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ]
           },
           "description": "Request metadata headers."
         },
@@ -1049,33 +1381,61 @@
       "additionalProperties": false,
       "properties": {
         "file": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "minLength": 1,
           "description": "The workdir-relative path to create."
         },
         "content": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "description": "Inline text content for the file. Exactly one source (`content`/`base64`/`from`/`symlink`) is set."
         },
         "base64": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "description": "Inline binary content, base64-encoded — carries exact bytes YAML text cannot."
         },
         "from": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "description": "Copies an existing file (e.g. committed testdata), resolved relative to the spec file's directory."
         },
         "symlink": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "description": "Makes `file` a symbolic link to this target instead of a regular file. The target is written verbatim."
         },
         "mode": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "pattern": "^[0-7]{3,4}$",
           "description": "Octal file mode (e.g. \"0755\") applied after writing."
         },
         "mtime": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "description": "RFC3339 modification time applied after writing — pins timestamps for freshness/change-detection tests."
         }
       }
@@ -1088,12 +1448,20 @@
       "additionalProperties": false,
       "properties": {
         "command": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "minLength": 1,
           "description": "The program to run. Tokenized and exec'd directly unless `shell: true`."
         },
         "runner": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "description": "Names a declared runner to execute through (e.g. an `ssh` runner runs the command remotely). Default: local execution."
         },
         "shell": {
@@ -1101,7 +1469,11 @@
           "description": "Runs the command through the shell (/bin/sh on POSIX, cmd.exe on Windows) — for pipes, redirects, and builtins."
         },
         "cwd": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "description": "Working directory relative to the scenario workdir (default: the workdir itself)."
         },
         "timeout": {
@@ -1111,7 +1483,11 @@
         "env": {
           "type": "object",
           "additionalProperties": {
-            "type": "string"
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ]
           },
           "description": "Environment variables for the child process, layered over the scenario env; values get `${name}` expansion."
         },
@@ -1122,7 +1498,11 @@
         "pass_env": {
           "type": "array",
           "items": {
-            "type": "string",
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ],
             "minLength": 1
           },
           "description": "Host variables copied into the cleared environment (#16). Requires clear_env: true; unset host variables are skipped."
@@ -1135,7 +1515,11 @@
           "description": "Standard input for the command (#18): a plain string (inline text), {file: path} (workdir-relative, path-confined), or {base64: data} for binary bytes.",
           "oneOf": [
             {
-              "type": "string"
+              "type": [
+                "string",
+                "number",
+                "boolean"
+              ]
             },
             {
               "type": "object",
@@ -1145,7 +1529,11 @@
               ],
               "properties": {
                 "file": {
-                  "type": "string",
+                  "type": [
+                    "string",
+                    "number",
+                    "boolean"
+                  ],
                   "minLength": 1,
                   "description": "Feeds the command's stdin from a workdir-relative file."
                 }
@@ -1159,7 +1547,11 @@
               ],
               "properties": {
                 "base64": {
-                  "type": "string",
+                  "type": [
+                    "string",
+                    "number",
+                    "boolean"
+                  ],
                   "description": "Feeds the command's stdin with exact binary bytes, base64-encoded."
                 }
               }
@@ -1167,12 +1559,20 @@
           ]
         },
         "stdout_to": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "minLength": 1,
           "description": "Write the command's captured stdout to this workdir-relative file (create/truncate), without needing shell redirection."
         },
         "stderr_to": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "minLength": 1,
           "description": "Write the command's captured stderr to this workdir-relative file (create/truncate), without needing shell redirection."
         },
@@ -1201,7 +1601,11 @@
           "type": "array",
           "minItems": 1,
           "items": {
-            "type": "string",
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ],
             "enum": [
               "stdout",
               "stderr",
@@ -1244,7 +1648,11 @@
       "description": "Runs one command inside a real pseudo-terminal and drives it with a declarative expect/send session (#8) — for CLIs that branch on TTY-ness or present interactive prompts. POSIX-only at runtime; Windows reports a clear execution error.",
       "properties": {
         "command": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "minLength": 1,
           "description": "The program to run inside a real pseudo-terminal (a ConPTY on Windows). The captured transcript becomes the step's stdout."
         },
@@ -1253,7 +1661,11 @@
           "description": "Runs the command through the shell, like `run.shell`."
         },
         "cwd": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "description": "Working directory relative to the scenario workdir."
         },
         "rows": {
@@ -1273,7 +1685,11 @@
         "env": {
           "type": "object",
           "additionalProperties": {
-            "type": "string"
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ]
           },
           "description": "Environment variables for the pty child. The child gets TERM=xterm-256color by default; override here if needed."
         },
@@ -1284,7 +1700,11 @@
         "pass_env": {
           "type": "array",
           "items": {
-            "type": "string",
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ],
             "minLength": 1
           },
           "description": "Host variables copied into the cleared environment (#16). Requires clear_env: true; unset host variables are skipped."
@@ -1329,13 +1749,21 @@
             "description": "Exactly one of expect (wait until the transcript matches the regexp), send (write to the terminal; \"\" sends EOF/^D; {key: enter} presses a named key, #26; {paste: text} delivers a bracketed paste, #378), expect_screen (wait until the rendered screen matches, optionally stably for a duration), or resize (change the terminal size mid-session, #379). ${name}/${env:NAME} references in a send, expect, or expect_screen matcher are expanded against the store; a reference nothing resolves fails the step before any terminal I/O (#78) — write $${name} for literal text.",
             "properties": {
               "expect": {
-                "type": "string",
+                "type": [
+                  "string",
+                  "number",
+                  "boolean"
+                ],
                 "description": "Waits until the transcript (scanned after the previous match) matches this Go regular expression; a never-matching expect fails when the session timeout elapses."
               },
               "send": {
                 "oneOf": [
                   {
-                    "type": "string"
+                    "type": [
+                      "string",
+                      "number",
+                      "boolean"
+                    ]
                   },
                   {
                     "type": "object",
@@ -1364,11 +1792,19 @@
                     ],
                     "properties": {
                       "paste": {
-                        "type": "string",
+                        "type": [
+                          "string",
+                          "number",
+                          "boolean"
+                        ],
                         "description": "Delivers the text as a BRACKETED PASTE, wrapped in the markers a terminal puts around pasted input, so a REPL or editor takes its paste path instead of its typing path. The step fails if the program has not enabled bracketed paste (`ESC [?2004h`), because the markers would otherwise arrive as ordinary characters. Mutually exclusive with `key`."
                       },
                       "key": {
-                        "type": "string",
+                        "type": [
+                          "string",
+                          "number",
+                          "boolean"
+                        ],
                         "minLength": 1,
                         "description": "Named key: `enter`, `tab`, `shift-tab` (alias `backtab`), `esc`, `space`, `backspace`, `delete`, `insert`, arrows, home/end, pageup/pagedown, `f1`-`f12`, `ctrl-a`..`ctrl-z`, `alt-a`..`alt-z`, `alt-enter`, `alt-backspace`, modified arrows (`ctrl-left`, `shift-up`, …), `ctrl-space`/`ctrl-@`, `ctrl-[`, `ctrl-\\`, `ctrl-]`, `ctrl-^`, `ctrl-_`, `ctrl-hyphen`/`ctrl-minus`."
                       },
@@ -1424,7 +1860,11 @@
                             "description": "1-based screen column of the cell to act on."
                           },
                           "button": {
-                            "type": "string",
+                            "type": [
+                              "string",
+                              "number",
+                              "boolean"
+                            ],
                             "enum": [
                               "left",
                               "middle",
@@ -1435,7 +1875,11 @@
                             "description": "Which button (default `left`). A wheel button sends one scroll notch."
                           },
                           "action": {
-                            "type": "string",
+                            "type": [
+                              "string",
+                              "number",
+                              "boolean"
+                            ],
                             "enum": [
                               "click",
                               "press",
@@ -1446,7 +1890,11 @@
                           "mods": {
                             "type": "array",
                             "items": {
-                              "type": "string",
+                              "type": [
+                                "string",
+                                "number",
+                                "boolean"
+                              ],
                               "enum": [
                                 "shift",
                                 "alt",
@@ -1472,7 +1920,11 @@
                 "description": "Runs one command on the HOST while the program under test keeps running, so a session can test what a TUI does when the world changes underneath it — a commit made outside `lazygit`, a file another process creates, a line appended to a log a viewer is following. It blocks until the command exits, which is the point: after it, the change exists, so the `expect_screen` that follows is waiting on the program noticing rather than on a race. Runs in the scenario workdir with the same environment the pty child got, so `sandbox_home` / `clear_env` isolation still holds. A non-zero exit, a timeout, or a failure to start is an execution error — the command is scaffolding, not the subject under test. Its output never joins the transcript. Note that files it writes appear in a following `changes:` assert, so list or `ignore:` them.",
                 "oneOf": [
                   {
-                    "type": "string",
+                    "type": [
+                      "string",
+                      "number",
+                      "boolean"
+                    ],
                     "minLength": 1
                   },
                   {
@@ -1483,7 +1935,11 @@
                     ],
                     "properties": {
                       "command": {
-                        "type": "string",
+                        "type": [
+                          "string",
+                          "number",
+                          "boolean"
+                        ],
                         "minLength": 1,
                         "description": "The command to run on the host."
                       },
@@ -1620,19 +2076,35 @@
                     "description": "Requires every listed substring to be absent from the rendered screen."
                   },
                   "matches": {
-                    "type": "string",
+                    "type": [
+                      "string",
+                      "number",
+                      "boolean"
+                    ],
                     "description": "Requires the rendered screen to match this Go (RE2) regular expression."
                   },
                   "not_matches": {
-                    "type": "string",
+                    "type": [
+                      "string",
+                      "number",
+                      "boolean"
+                    ],
                     "description": "Requires the rendered screen NOT to match this Go (RE2) regular expression."
                   },
                   "equals": {
-                    "type": "string",
+                    "type": [
+                      "string",
+                      "number",
+                      "boolean"
+                    ],
                     "description": "Requires the rendered screen to equal this string exactly (CRLF and one trailing newline are normalized)."
                   },
                   "not_equals": {
-                    "type": "string",
+                    "type": [
+                      "string",
+                      "number",
+                      "boolean"
+                    ],
                     "description": "Requires the rendered screen NOT to equal this string."
                   },
                   "json": {
@@ -1654,7 +2126,11 @@
                       ],
                       "properties": {
                         "text": {
-                          "type": "string",
+                          "type": [
+                            "string",
+                            "number",
+                            "boolean"
+                          ],
                           "minLength": 1,
                           "description": "The literal substring whose cells are checked."
                         },
@@ -1664,11 +2140,19 @@
                           "description": "Restricts the search to this 1-based screen row, addressed the same way `line` addresses the text matchers."
                         },
                         "fg": {
-                          "type": "string",
+                          "type": [
+                            "string",
+                            "number",
+                            "boolean"
+                          ],
                           "description": "Foreground color: an ANSI name (`red`, `bright-red`), a 256-palette index (`203`), or `default` — the terminal's own color, which is how a `--no-color` contract becomes assertable."
                         },
                         "bg": {
-                          "type": "string",
+                          "type": [
+                            "string",
+                            "number",
+                            "boolean"
+                          ],
                           "description": "Background color, same vocabulary as `fg`."
                         },
                         "bold": {
@@ -1711,7 +2195,11 @@
       "description": "A declarative stub HTTP server (#24): routes match on exact method+path (query string excluded); an unmatched request answers 404 and is still recorded.",
       "properties": {
         "name": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "minLength": 1,
           "description": "Identifies the server: seeds `${<name>.url}` / `${<name>.port}` and is referenced by `mock:` asserts. Unique per scenario."
         },
@@ -1734,12 +2222,20 @@
       "description": "One canned response. At most one of json/body/body_file supplies the payload; status defaults to 200.",
       "properties": {
         "method": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "minLength": 1,
           "description": "HTTP method to match (case-insensitive)."
         },
         "path": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "pattern": "^/",
           "description": "Exact request path to match (query string excluded)."
         },
@@ -1753,18 +2249,30 @@
           "description": "Inline response document, marshaled with Content-Type: application/json."
         },
         "body": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "description": "Inline text response body."
         },
         "body_file": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "minLength": 1,
           "description": "Spec-relative response body file, confined to the spec directory."
         },
         "header": {
           "type": "object",
           "additionalProperties": {
-            "type": "string"
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ]
           },
           "description": "Extra response headers to set."
         },
@@ -1783,16 +2291,28 @@
       "description": "Checks what the CLI under test sent to a mock server (#24): filter by path/method, pin the exact count (or require at least one match), and match header/body of the LAST matching request.",
       "properties": {
         "name": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "minLength": 1,
           "description": "References a declared mock server by name."
         },
         "path": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "description": "Filters recorded requests by exact path."
         },
         "method": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "description": "Filters recorded requests by method (case-insensitive)."
         },
         "count": {
@@ -1820,12 +2340,20 @@
       "description": "Sends a named POSIX signal to a managed service's process group (#23) - the race-free alternative to kill/killall for graceful-shutdown tests. POSIX-only at runtime; Windows reports a clear execution error.",
       "properties": {
         "service": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "minLength": 1,
           "description": "A service declared in the scenario's services: list or started by a suite.setup service: step."
         },
         "signal": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "minLength": 1,
           "description": "TERM, INT, HUP, USR1, USR2, or KILL (optional SIG prefix accepted)."
         },
@@ -1850,38 +2378,66 @@
       "additionalProperties": false,
       "properties": {
         "runner": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "description": "Names the `http` runner declaring the base_url. With exactly one http runner declared it may be omitted."
         },
         "method": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "description": "The HTTP method (GET, POST, ...)."
         },
         "path": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "description": "Request path appended to the runner's base_url; `${name}` expansion applies."
         },
         "header": {
           "type": "object",
           "additionalProperties": {
-            "type": "string"
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ]
           },
           "description": "Request headers."
         },
         "json": true,
         "body": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "description": "Raw string payload sent verbatim (default Content-Type text/plain). The payload fields (json/body/body_file/form+files) are mutually exclusive."
         },
         "body_file": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "minLength": 1,
           "description": "Workdir-relative file streamed as the raw request body (binary-safe) — for upload endpoints that take file content directly."
         },
         "form": {
           "type": "object",
           "additionalProperties": {
-            "type": "string"
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ]
           },
           "description": "Form fields: application/x-www-form-urlencoded alone, multipart/form-data when files is also set."
         },
@@ -1898,24 +2454,40 @@
             "additionalProperties": false,
             "properties": {
               "field": {
-                "type": "string",
+                "type": [
+                  "string",
+                  "number",
+                  "boolean"
+                ],
                 "minLength": 1,
                 "description": "The multipart form field name the server reads the file from."
               },
               "path": {
-                "type": "string",
+                "type": [
+                  "string",
+                  "number",
+                  "boolean"
+                ],
                 "minLength": 1,
                 "description": "The workdir-relative file whose content becomes the part body."
               },
               "content_type": {
-                "type": "string",
+                "type": [
+                  "string",
+                  "number",
+                  "boolean"
+                ],
                 "description": "Overrides the part's Content-Type (default: detected from content, falling back to application/octet-stream)."
               }
             }
           }
         },
         "body_to": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "minLength": 1,
           "description": "Write the response body to this workdir-relative file, so file/image/pdf assertions can inspect a download (the http analog of run's stdout_to)."
         },
@@ -2196,7 +2768,11 @@
           "type": "array",
           "minItems": 1,
           "items": {
-            "type": "string",
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ],
             "minLength": 1
           },
           "description": "Workdir-relative doublestar globs whose matches are dropped from the observed delta before the categories are compared, for a path the program writes only sometimes (a state file, a cache in the sandboxed HOME). An ignored path neither counts as an unexpected change nor satisfies an entry, and an ignore glob that matches nothing is fine."
@@ -2207,12 +2783,20 @@
       "description": "A single workdir-relative path/glob, or a list of them (the empty list [] asserts the category changed nothing). Globs are doublestar and /-separated: `*` within a segment, `**` across `/`; a backslash escapes a literal metacharacter.",
       "oneOf": [
         {
-          "type": "string"
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ]
         },
         {
           "type": "array",
           "items": {
-            "type": "string"
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ]
           }
         }
       ]
@@ -2248,7 +2832,11 @@
       "additionalProperties": false,
       "properties": {
         "path": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "minLength": 1,
           "description": "The PDF under test, resolved against the scenario workdir when relative."
         },
@@ -2270,7 +2858,11 @@
         "metadata": {
           "type": "object",
           "additionalProperties": {
-            "type": "string"
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ]
           },
           "description": "Maps an Info-dictionary field (title, author, subject, keywords, creator, producer; case-insensitive) to a substring its value must contain. The field is read whether the producer leaves the Info dictionary in the clear or packs it into a compressed object stream (PDF 1.5+)."
         },
@@ -2288,7 +2880,11 @@
       "additionalProperties": false,
       "properties": {
         "path": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "minLength": 1,
           "description": "The directory under test, resolved against the scenario workdir when relative."
         },
@@ -2299,14 +2895,22 @@
         "contains": {
           "type": "array",
           "items": {
-            "type": "string"
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ]
           },
           "description": "Child paths (relative to `path`) that must exist; nested paths are allowed and confined to the directory."
         },
         "not_contains": {
           "type": "array",
           "items": {
-            "type": "string"
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ]
           },
           "description": "Child paths (relative to `path`) that must NOT exist."
         },
@@ -2326,7 +2930,11 @@
           "description": "Upper bound on the number of entries."
         },
         "glob": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "description": "Requires at least one entry to match this shell glob (basename match for patterns without `/`)."
         },
         "recursive": {
@@ -2334,13 +2942,21 @@
           "description": "Apply contains/not_contains/count/glob to the whole tree (#25): counts see files only; glob matches relative paths, or basenames for patterns without /."
         },
         "snapshot": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "description": "Golden tree manifest (#25): sorted relative paths, one line per entry (dir/file sha256/link). Composes only with ignore; refresh with --update-snapshots."
         },
         "ignore": {
           "type": "array",
           "items": {
-            "type": "string"
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ]
           },
           "description": "Glob patterns excluded from the recursive walk and the snapshot manifest (*.log, .git/**)."
         }
@@ -2468,19 +3084,35 @@
           "description": "Requires every listed substring to be absent."
         },
         "matches": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "description": "Requires the stream to match this Go (RE2) regular expression."
         },
         "not_matches": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "description": "Requires the stream NOT to match this Go (RE2) regular expression."
         },
         "equals": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "description": "Requires the stream to equal this string exactly (CRLF and one trailing newline are normalized)."
         },
         "not_equals": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "description": "Requires the stream NOT to equal this string."
         },
         "json": {
@@ -2492,7 +3124,11 @@
           "description": "Parses the stream as YAML and applies one JSONPath check, or a list of checks that must all hold."
         },
         "snapshot": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "description": "Compares the stream against a committed golden file (spec-relative path). Volatile details (ANSI, temp paths, UUIDs, timestamps, ports, CRLF) are normalized; refresh with `atago snapshot update`."
         },
         "count": {
@@ -2539,19 +3175,35 @@
           "description": "Requires every listed substring to be absent."
         },
         "matches": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "description": "Requires the stream to match this Go (RE2) regular expression."
         },
         "not_matches": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "description": "Requires the stream NOT to match this Go (RE2) regular expression."
         },
         "equals": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "description": "Requires the stream to equal this string exactly (CRLF and one trailing newline are normalized)."
         },
         "not_equals": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "description": "Requires the stream NOT to equal this string."
         },
         "json": {
@@ -2563,7 +3215,11 @@
           "description": "Parses the stream as YAML and applies one JSONPath check, or a list of checks that must all hold."
         },
         "snapshot": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "description": "Compares the stream against a committed golden file (spec-relative path). Volatile details (ANSI, temp paths, UUIDs, timestamps, ports, CRLF) are normalized; refresh with `atago snapshot update`."
         },
         "count": {
@@ -2596,7 +3252,11 @@
             ],
             "properties": {
               "text": {
-                "type": "string",
+                "type": [
+                  "string",
+                  "number",
+                  "boolean"
+                ],
                 "minLength": 1,
                 "description": "The literal substring whose cells are checked."
               },
@@ -2606,11 +3266,19 @@
                 "description": "Restricts the search to this 1-based screen row, addressed the same way `line` addresses the text matchers."
               },
               "fg": {
-                "type": "string",
+                "type": [
+                  "string",
+                  "number",
+                  "boolean"
+                ],
                 "description": "Foreground color: an ANSI name (`red`, `bright-red`), a 256-palette index (`203`), or `default` — the terminal's own color, which is how a `--no-color` contract becomes assertable."
               },
               "bg": {
-                "type": "string",
+                "type": [
+                  "string",
+                  "number",
+                  "boolean"
+                ],
                 "description": "Background color, same vocabulary as `fg`."
               },
               "bold": {
@@ -2709,7 +3377,11 @@
       ],
       "properties": {
         "path": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "minLength": 1,
           "description": "The file under test, resolved against the scenario workdir when relative (confined to it)."
         },
@@ -2760,11 +3432,19 @@
           "description": "Asserts whether the file has an executable bit set (POSIX). A directory fails: every directory carries the execute bit, which means \"can be entered\", not \"is a program\"."
         },
         "equals": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "description": "Byte-exact content match against an inline literal (no CRLF/newline normalization)."
         },
         "equals_file": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "minLength": 1,
           "description": "Byte-exact content match against another workdir-confined file (round-trip/idempotence; no CRLF/newline normalization)."
         },
@@ -2773,7 +3453,11 @@
           "description": "Parses the file as JSON and applies one JSONPath check, or a list of checks that must all hold."
         },
         "snapshot": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "description": "Compares the file content against a committed golden file, with the standard snapshot normalization."
         },
         "text": {
@@ -2837,7 +3521,11 @@
       ],
       "properties": {
         "path": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "minLength": 1,
           "description": "The image file under test, resolved against the scenario workdir when relative."
         },
@@ -2889,7 +3577,11 @@
           "description": "Asserts whether the image actually carries transparency (any non-opaque pixel), scanning decoded pixels."
         },
         "similar_to": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "minLength": 1,
           "description": "Baseline image to compare decoded pixels against. A relative path resolves against the spec file's directory (a committed golden), falling back to the scenario workdir when no such file is there — which is how two images the run itself produced, such as the two ends of an encoder round trip, are compared. Both images must share dimensions."
         },
@@ -2925,7 +3617,11 @@
       "additionalProperties": false,
       "properties": {
         "path": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "minLength": 1,
           "description": "JSONPath selecting the value under test (e.g. \"$.items[0].name\")."
         },
@@ -2933,7 +3629,11 @@
           "description": "Requires the selected value to equal this value, compared by JSON type (the string \"true\" does not equal the boolean true). Write null to assert the value is JSON null; omitting the key means no matcher was set."
         },
         "matches": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "description": "Requires the selected value (as a string) to match this Go regular expression."
         },
         "length": {
@@ -2983,19 +3683,35 @@
       ],
       "properties": {
         "name": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "description": "The header name to check (case-insensitive)."
         },
         "contains": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "description": "Requires the header value to contain this substring."
         },
         "equals": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "description": "Requires the header value to equal this string exactly."
         },
         "matches": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "description": "Regexp the header value must match - the natural shape for auth headers (^Bearer )."
         }
       }
@@ -3009,7 +3725,11 @@
       "additionalProperties": false,
       "properties": {
         "name": {
-          "type": "string",
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "minLength": 1,
           "description": "The variable name; later steps reference the captured value as `${name}`."
         },
@@ -3067,7 +3787,11 @@
               "description": "Reads a generated file: a `json` path selects a value, or `text: true` captures the whole content."
             },
             "header": {
-              "type": "string",
+              "type": [
+                "string",
+                "number",
+                "boolean"
+              ],
               "description": "Captures an HTTP response header value by name."
             },
             "rows": {
