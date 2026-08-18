@@ -17,6 +17,7 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Bug Fixes
 
+- The bats suite's pretty-formatter scenario states the condition bats actually applies. It read the formatter choice as "a terminal is attached", which is half the rule — bats stays on TAP when `CI` is set, however real the terminal is — so the scenario passed on a laptop and failed on the runner it was meant to protect. Both halves are now scenarios of their own, each setting `CI` explicitly, so the pair means the same thing wherever it runs.
 - A generated behavior doc renders a value that contains a backtick as the span it is. `atago doc` wrapped every asserted value in a single backtick, so an assertion on output that quotes a command — `` `false' failed ``, the shape most shells and test runners report a failure in — ended its code span at the value's own backtick and spilled the rest of the line into the page as prose the spec never wrote. The delimiter now grows past the longest backtick run inside the value, as CommonMark prescribes, and four committed docs regain the spans they had lost.
 
 ## [0.21.0] - 2026-08-18

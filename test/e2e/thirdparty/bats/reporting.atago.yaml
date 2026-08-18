@@ -275,7 +275,7 @@ scenarios:
           stdout:
             contains: "# (in test file fail.bats:2)"
 
-  - name: the pretty formatter exists only on a terminal
+  - name: the pretty formatter draws on a terminal
     steps:
       - fixture:
           file: mixed.bats
@@ -290,11 +290,12 @@ scenarios:
           sandbox_home: true
           env:
             LC_ALL: C
-          session:
-            - expect: "2 tests, 1 failure"
+            # bats picks the pretty formatter only when a terminal is attached
+            # and CI is unset. The variable is cleared here so the choice is the
+            # terminal's, whether this suite runs on a laptop or on a runner.
+            CI: ""
       - assert:
-          # With a terminal attached the default formatter changes from tap to
-          # pretty: the file is a heading, results are check and cross marks, and
+          # The file becomes a heading, results become check and cross marks, and
           # the run ends with a counted summary that plain TAP never prints.
           screen:
             contains:
@@ -305,3 +306,31 @@ scenarios:
       - assert:
           screen:
             not_contains: "1..2"
+
+  - name: a terminal under CI still reports TAP
+    steps:
+      - fixture:
+          file: mixed.bats
+          content: |
+            @test "passes" { true; }
+            @test "fails" { false; }
+      - pty:
+          command: bats mixed.bats
+          cols: 80
+          rows: 24
+          timeout: 30s
+          sandbox_home: true
+          env:
+            LC_ALL: C
+            CI: "true"
+          session:
+            - expect: "not ok 2 fails"
+      - assert:
+          # The terminal is real, so this is bats deciding rather than detecting:
+          # a log that scrolls past in a CI job is worth more as TAP than as
+          # progress redrawn in place.
+          screen:
+            contains:
+              - "1..2"
+              - "ok 1 passes"
+            not_contains: "✓ passes"

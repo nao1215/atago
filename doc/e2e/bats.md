@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-4 suites · 43 scenarios
+4 suites · 44 scenarios
 ## Contents
 - [bats (the verdict a test runner reports)](#bats-the-verdict-a-test-runner-reports) — 14 scenarios
   - [the version and the help text are answered on stdout](#scenario-the-version-and-the-help-text-are-answered-on-stdout)
@@ -28,7 +28,7 @@
   - [a test can read its own name, number, and file](#scenario-a-test-can-read-its-own-name-number-and-file)
   - [load pulls in a helper file next to the test](#scenario-load-pulls-in-a-helper-file-next-to-the-test)
   - [parallel jobs without the parallel binary fail as a raw shell error](#scenario-parallel-jobs-without-the-parallel-binary-fail-as-a-raw-shell-error)
-- [bats (formatters, reports, and gathered output)](#bats-formatters-reports-and-gathered-output) — 10 scenarios
+- [bats (formatters, reports, and gathered output)](#bats-formatters-reports-and-gathered-output) — 11 scenarios
   - [TAP version 13 carries the failure as a YAML block](#scenario-tap-version-13-carries-the-failure-as-a-yaml-block)
   - [the JUnit formatter reports counts and the failure element](#scenario-the-junit-formatter-reports-counts-and-the-failure-element)
   - [a report formatter writes a file and leaves stdout as TAP](#scenario-a-report-formatter-writes-a-file-and-leaves-stdout-as-tap)
@@ -38,7 +38,8 @@
   - [test output is hidden when it passes and shown when it fails](#scenario-test-output-is-hidden-when-it-passes-and-shown-when-it-fails)
   - [timing and tracing add to the report without changing the verdict](#scenario-timing-and-tracing-add-to-the-report-without-changing-the-verdict)
   - [the quoting and file reference in a failure are configurable](#scenario-the-quoting-and-file-reference-in-a-failure-are-configurable)
-  - [the pretty formatter exists only on a terminal](#scenario-the-pretty-formatter-exists-only-on-a-terminal)
+  - [the pretty formatter draws on a terminal](#scenario-the-pretty-formatter-draws-on-a-terminal)
+  - [a terminal under CI still reports TAP](#scenario-a-terminal-under-ci-still-reports-tap)
 - [bats (choosing which tests run)](#bats-choosing-which-tests-run) — 9 scenarios
   - [counting reports the number of tests and runs none of them](#scenario-counting-reports-the-number-of-tests-and-runs-none-of-them)
   - [the name filter is a regular expression, not a substring](#scenario-the-name-filter-is-a-regular-expression-not-a-substring)
@@ -997,7 +998,7 @@ bats --line-reference-format colon fail.bats
   - exit code is `1`
   - stdout contains `# (in test file fail.bats:2)`
 
-### Scenario: the pretty formatter exists only on a terminal
+### Scenario: the pretty formatter draws on a terminal
 _only when `bats --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `mixed.bats` is created.
@@ -1016,6 +1017,25 @@ _Fixture `mixed.bats`:_
 #### Then
 - rendered screen contains `mixed.bats`, `✓ passes`, `✗ fails`, `2 tests, 1 failure`
 - rendered screen does not contain `1..2`
+
+### Scenario: a terminal under CI still reports TAP
+_only when `bats --version` succeeds · skipped on Windows_
+#### Given
+- Fixture file `mixed.bats` is created.
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
+#### Inputs
+_Fixture `mixed.bats`:_
+```text
+@test "passes" { true; }
+@test "fails" { false; }
+```
+#### When
+```shell
+# interactive (pty): bats mixed.bats
+```
+#### Then
+- rendered screen contains `1..2`, `ok 1 passes`, does not contain `✓ passes`
 
 ## bats (choosing which tests run)
 Everything [Bats](https://github.com/bats-core/bats-core) offers for running
