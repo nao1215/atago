@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-83 suites · 681 scenarios
+83 suites · 683 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -410,7 +410,7 @@
   - [list surfaces suites, scenarios, tags, and gates](#scenario-list-surfaces-suites-scenarios-tags-and-gates)
   - [list --json is a stable machine contract](#scenario-list---json-is-a-stable-machine-contract)
   - [list marks an expect_fail scenario](#scenario-list-marks-an-expect_fail-scenario)
-- [atago self-hosting / loader rejects malformed specs](#atago-self-hosting--loader-rejects-malformed-specs) — 28 scenarios
+- [atago self-hosting / loader rejects malformed specs](#atago-self-hosting--loader-rejects-malformed-specs) — 30 scenarios
   - [an empty scenario list is rejected](#scenario-an-empty-scenario-list-is-rejected)
   - [a wrong version string is rejected](#scenario-a-wrong-version-string-is-rejected)
   - [an unknown top-level field is rejected with its position](#scenario-an-unknown-top-level-field-is-rejected-with-its-position)
@@ -439,6 +439,8 @@
   - [matchers of one assert that contradict each other are rejected](#scenario-matchers-of-one-assert-that-contradict-each-other-are-rejected)
   - [a file assertion with no matcher names the size bounds too](#scenario-a-file-assertion-with-no-matcher-names-the-size-bounds-too)
   - [a file assertion with two content matchers still names only those](#scenario-a-file-assertion-with-two-content-matchers-still-names-only-those)
+  - [a list written where one value belongs names the key and the shape](#scenario-a-list-written-where-one-value-belongs-names-the-key-and-the-shape)
+  - [a mapping written where text belongs names the key too](#scenario-a-mapping-written-where-text-belongs-names-the-key-too)
 - [atago self-hosting / manifest](#atago-self-hosting--manifest) — 6 scenarios
   - [manifest emits a stable JSON summary without running the spec](#scenario-manifest-emits-a-stable-json-summary-without-running-the-spec)
   - [manifest does not execute the spec's commands](#scenario-manifest-does-not-execute-the-specs-commands)
@@ -9754,6 +9756,57 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `must set exactly one of exists/contains/not_contains/executable/equals/equals_file/json/snapshot`
+
+### Scenario: a list written where one value belongs names the key and the shape
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    steps:
+      - run: {command: echo}
+      - assert:
+          stdout:
+            matches:
+              - "^h"
+              - "i$"
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `"matches" takes a single value, not a list`, `one assert per pattern`
+
+### Scenario: a mapping written where text belongs names the key too
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    steps:
+      - run:
+          command:
+            bin: echo
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `"command" takes a single value, not a mapping`
 
 ## atago self-hosting / manifest
 Source: `test/e2e/atago/manifest.atago.yaml`
