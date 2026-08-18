@@ -8,6 +8,10 @@ suite:
 
 scenarios:
   - name: setup runs once, shares stores and env, and teardown always runs
+    skip:
+      # The setup writes through `> ${suitedir}/t.txt`, and a Windows
+      # ${suitedir} carries backslashes a POSIX shell reads as escapes.
+      os: windows
     steps:
       - fixture:
           file: ok.atago.yaml
@@ -82,6 +86,10 @@ scenarios:
             not_contains: unreached
 
   - name: a suite service starts once and its store reaches every scenario
+    skip:
+      # Same: the suite service writes through a shell redirect into
+      # ${suitedir}, whose Windows spelling a POSIX shell mangles.
+      os: windows
     steps:
       - fixture:
           file: svc.atago.yaml

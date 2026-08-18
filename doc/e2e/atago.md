@@ -6262,6 +6262,8 @@ ${atago} run inner_skip.atago.yaml
 ### Scenario: an expected failure is not retried into a flake
 #### Given
 - Fixture file `inner_retry.atago.yaml` is created.
+- Environment variables are set: ATTEMPTS_FILE.
+- Environment variables are set: ATTEMPTS_FILE.
 
 #### Inputs
 _Fixture `inner_retry.atago.yaml`:_
@@ -6288,15 +6290,15 @@ scenarios:
 ```
 #### When
 ```shell
-ATTEMPTS_FILE=${workdir}/retry.count ${atago} run --retry-failed 3 inner_retry.atago.yaml
-ATTEMPTS_FILE=${workdir}/repeat.count ${atago} run --repeat 3 inner_retry.atago.yaml
+${atago} run --retry-failed 3 inner_retry.atago.yaml
+${atago} run --repeat 3 inner_retry.atago.yaml
 ```
 #### Then
-- after `ATTEMPTS_FILE=${workdir}/retry.count ${atago} run --retry-failed 3 inner_retry.atago.yaml`:
+- after `${atago} run --retry-failed 3 inner_retry.atago.yaml`:
   - exit code is `0`
   - stdout contains `1 xfail`, does not contain `flaky`
   - file `retry.count` contains `x` exactly 1 time
-- after `ATTEMPTS_FILE=${workdir}/repeat.count ${atago} run --repeat 3 inner_retry.atago.yaml`:
+- after `${atago} run --repeat 3 inner_retry.atago.yaml`:
   - exit code is `0`
   - stdout contains `1 xfail`, does not contain `REPEAT:`
   - file `repeat.count` contains `x` exactly 1 time
@@ -10783,6 +10785,7 @@ ${atago} run nonewline.atago.yaml
 ## atago self-hosting / directory manifest
 Source: `test/e2e/atago/project_manifest.atago.yaml`
 ### Scenario: a manifest applies to a spec nested below it
+_skipped on Windows_
 #### Given
 - Fixture file `atago.project.yaml` is created.
 - Fixture file `corpus/golden.txt` is created.
@@ -10901,6 +10904,7 @@ ${atago} run spec.atago.yaml
 - exit code is `0`
 
 ### Scenario: specdir points at the spec's own directory
+_skipped on Windows_
 #### Given
 - Fixture file `sub/marker.txt` is created.
 - Fixture file `sub/spec.atago.yaml` is created.
@@ -12474,7 +12478,7 @@ scenarios:
 ```shell
 ${atago} run --update-snapshots diffspec.atago.yaml
 ${atago} run diffspec.atago.yaml
-${atago} run --report json diffspec.atago.yaml; true
+${atago} run --report json diffspec.atago.yaml
 ```
 #### Then
 - after `${atago} run --update-snapshots diffspec.atago.yaml`:
@@ -12482,7 +12486,8 @@ ${atago} run --report json diffspec.atago.yaml; true
 - after `${atago} run diffspec.atago.yaml`:
   - exit code is `1`
   - stdout contains `Diff (-expected +actual):`, `--- snapshot (golden)`, `-beta`, `+BETA`, `snaps/out.txt`
-- after `${atago} run --report json diffspec.atago.yaml; true`:
+- after `${atago} run --report json diffspec.atago.yaml`:
+  - exit code is `1`
   - stdout contains `"diff":`
 
 ### Scenario: a failure names the command it was observed under
@@ -14413,6 +14418,7 @@ ${atago} snapshot update port.atago.yaml
 - file `g.txt` does not contain `54321`
 
 ### Scenario: the home directory is masked to a tilde in the golden
+_skipped on Windows_
 #### Given
 - Fixture file `home.atago.yaml` is created.
 
@@ -15791,6 +15797,7 @@ ${atago} run inner_escaped.atago.yaml
 ## atago self-hosting / suite setup
 Source: `test/e2e/atago/suite_setup.atago.yaml`
 ### Scenario: setup runs once, shares stores and env, and teardown always runs
+_skipped on Windows_
 #### Given
 - Fixture file `ok.atago.yaml` is created.
 
@@ -15857,6 +15864,7 @@ ${atago} run bad.atago.yaml
 - stdout does not contain `unreached`
 
 ### Scenario: a suite service starts once and its store reaches every scenario
+_skipped on Windows_
 #### Given
 - Fixture file `svc.atago.yaml` is created.
 
@@ -16352,6 +16360,7 @@ Gamma line
 ## atago self-hosting / variable resolution semantics
 Source: `test/e2e/atago/var_resolution.atago.yaml`
 ### Scenario: a doubled dollar keeps the braces literal
+_skipped on Windows_
 #### When
 ```shell
 echo pre-$${keep}-post

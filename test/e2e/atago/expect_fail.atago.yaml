@@ -269,8 +269,14 @@ scenarios:
       - run:
           # Retrying an expected failure is incoherent — retry exists to give a
           # scenario another chance to PASS — so the knob must not touch it.
-          shell: true
-          command: "ATTEMPTS_FILE=${workdir}/retry.count ${atago} run --retry-failed 3 inner_retry.atago.yaml"
+          #
+          # The counter path is passed through `env:` rather than a
+          # `VAR=value cmd` shell prefix so the step needs no shell at all: a
+          # Windows ${workdir} carries backslashes, which a POSIX shell would
+          # read as escapes and eat.
+          command: "${atago} run --retry-failed 3 inner_retry.atago.yaml"
+          env:
+            ATTEMPTS_FILE: "${workdir}/retry.count"
       - assert:
           exit_code: 0
           stdout:
@@ -285,8 +291,9 @@ scenarios:
       - run:
           # Same for --repeat: folding "failed every iteration" into a
           # deterministic failure would report the expected outcome as a bug.
-          shell: true
-          command: "ATTEMPTS_FILE=${workdir}/repeat.count ${atago} run --repeat 3 inner_retry.atago.yaml"
+          command: "${atago} run --repeat 3 inner_retry.atago.yaml"
+          env:
+            ATTEMPTS_FILE: "${workdir}/repeat.count"
       - assert:
           exit_code: 0
           stdout:

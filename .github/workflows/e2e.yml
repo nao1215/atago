@@ -83,10 +83,19 @@ jobs:
         run: ./dist/atago run --retry-failed 3 --allow-flaky ./test/e2e/tools/sqly
 
   # Windows regressions must fail a PR, not surface days later in the daily
-  # cross-platform run (#78 follow-up). This job runs the portable subset —
-  # specs whose commands are shell builtins of both /bin/sh and cmd.exe, or
-  # that only drive atago itself. The list is the single source of truth in
-  # scripts/windows_portable_specs.sh, shared with e2e-cross.yml.
+  # cross-platform run (#78 follow-up). The classification of every self-hosted
+  # target lives in scripts/windows_specs.tsv, shared with e2e-cross.yml and
+  # enforced complete by TestWindowsSpecs_EveryTargetClassified, so a new spec
+  # cannot ship without a decision about Windows.
+  #
+  # Two buckets run here. `cmd` is the NATIVE story: specs whose commands are
+  # builtins of both /bin/sh and cmd.exe, or that only drive atago itself, run
+  # under the shell a Windows user gets by default. `bash` is everything else,
+  # run with ATAGO_SHELL pointed at the bash that ships with Git for Windows —
+  # there the shell is scaffolding rather than the subject, and what the leg
+  # proves is that atago's own engine behaves on Windows across the whole
+  # feature surface instead of only where the scaffolding happened to be
+  # portable.
   e2e-windows:
     runs-on: windows-latest
     timeout-minutes: 15
@@ -110,10 +119,23 @@ jobs:
       # same commit was green. A retry re-runs in a fresh workdir and reports a
       # recovery as flaky, so a real regression still fails both attempts. See #339
       # for the cause; nothing here changes what any scenario asserts.
-      - name: Run the portable self-hosted E2E subset
+      - name: Run the cmd.exe bucket (the shell a Windows user gets by default)
         shell: bash
         run: |
-          mapfile -t targets < <(bash scripts/windows_portable_specs.sh)
+          mapfile -t targets < <(bash scripts/windows_specs.sh cmd)
+          go run . run --retry-failed 1 --allow-flaky "${targets[@]}"
+
+      # ATAGO_SHELL is atago's own documented way to choose the interpreter for
+      # `shell: true`, so this leg dogfoods it as well as widening coverage. The
+      # bash that ships with Git for Windows is preinstalled on the runner, and
+      # the `shell: bash` steps above already put its coreutils on PATH, which
+      # is what the argv-form steps (`cat`, `wc`, `cp`) resolve through.
+      - name: Run the POSIX-shell bucket (the rest of the feature surface)
+        shell: bash
+        env:
+          ATAGO_SHELL: C:\Program Files\Git\bin\bash.exe
+        run: |
+          mapfile -t targets < <(bash scripts/windows_specs.sh bash)
           go run . run --retry-failed 1 --allow-flaky "${targets[@]}"
 
       # Real-world proof that the ConPTY pty runner drives an INTERACTIVE CLI on

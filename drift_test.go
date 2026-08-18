@@ -160,9 +160,6 @@ var (
 	// thirdpartyDirRe extracts each suite directory the thirdparty.yml CI matrix
 	// runs (`dir: ./test/e2e/thirdparty/<name>`).
 	thirdpartyDirRe = regexp.MustCompile(`dir:\s*\./test/e2e/thirdparty/([a-zA-Z0-9_-]+)`)
-	// windowsSpecRe extracts each ./test/e2e spec path listed in the single-source
-	// scripts/windows_portable_specs.sh.
-	windowsSpecRe = regexp.MustCompile(`(\./test/e2e/\S+)`)
 	// thirdpartyRunsOnRe extracts the thirdparty workflow's Linux runner label.
 	thirdpartyRunsOnRe = regexp.MustCompile(`(?m)^\s*runs-on:\s*(\S+)\s*$`)
 )
@@ -416,25 +413,127 @@ func TestThirdParty_InstallersArePinned(t *testing.T) {
 	}
 }
 
-// TestWindowsPortableSubset_Exists asserts every spec path in the single-source
-// scripts/windows_portable_specs.sh resolves to a real file or directory, so a
-// spec rename fails here — a fast unit test — instead of only in the Windows CI
-// legs that read the script (e2e.yml and e2e-cross.yml).
-func TestWindowsPortableSubset_Exists(t *testing.T) {
-	data, err := os.ReadFile("scripts/windows_portable_specs.sh")
+// windowsSpecsTSV is the single source of truth for which self-hosted E2E
+// targets run on Windows and under which shell. Both Windows CI legs (e2e.yml
+// and e2e-cross.yml) expand it through scripts/windows_specs.sh.
+const windowsSpecsTSV = "scripts/windows_specs.tsv"
+
+// windowsBuckets are the classifications a row may carry. `none` is the only
+// one that must be justified, because it is the only one that means a target
+// goes untested on a supported OS.
+var windowsBuckets = map[string]bool{"cmd": true, "bash": true, "none": true}
+
+// windowsSpecRow is one classified target.
+type windowsSpecRow struct {
+	target string
+	bucket string
+	reason string
+	line   int
+}
+
+// readWindowsSpecs parses the classification table, failing on any row that is
+// not exactly target/bucket[/reason].
+func readWindowsSpecs(t *testing.T) []windowsSpecRow {
+	t.Helper()
+	data, err := os.ReadFile(windowsSpecsTSV)
 	if err != nil {
-		t.Fatalf("read scripts/windows_portable_specs.sh: %v", err)
+		t.Fatalf("read %s: %v", windowsSpecsTSV, err)
 	}
-	var paths []string
-	for _, m := range windowsSpecRe.FindAllSubmatch(data, -1) {
-		paths = append(paths, string(m[1]))
+	var rows []windowsSpecRow
+	for i, line := range strings.Split(string(data), "\n") {
+		if strings.TrimSpace(line) == "" || strings.HasPrefix(strings.TrimSpace(line), "#") {
+			continue
+		}
+		fields := strings.Split(line, "\t")
+		if len(fields) < 2 || len(fields) > 3 {
+			t.Fatalf("%s:%d: want target<TAB>bucket[<TAB>reason], got %q", windowsSpecsTSV, i+1, line)
+		}
+		row := windowsSpecRow{target: fields[0], bucket: fields[1], line: i + 1}
+		if len(fields) == 3 {
+			row.reason = fields[2]
+		}
+		rows = append(rows, row)
 	}
-	if len(paths) == 0 {
-		t.Fatal("no ./test/e2e spec paths found in scripts/windows_portable_specs.sh")
+	if len(rows) == 0 {
+		t.Fatalf("%s classifies nothing", windowsSpecsTSV)
 	}
-	for _, p := range paths {
-		if _, err := os.Stat(filepath.FromSlash(p)); err != nil {
-			t.Errorf("scripts/windows_portable_specs.sh lists %q which does not resolve: %v", p, err)
+	return rows
+}
+
+// TestWindowsSpecs_EveryTargetClassified is what keeps the Windows legs from
+// being a subset nobody decided on. Every spec under test/e2e/atago must appear
+// in the table exactly once, so a spec added without a thought about Windows
+// fails a fast unit test rather than silently going untested on a supported OS
+// for as long as nobody looks — which is how the subset came to hold under half
+// of them.
+func TestWindowsSpecs_EveryTargetClassified(t *testing.T) {
+	t.Parallel()
+	classified := map[string]int{}
+	for _, row := range readWindowsSpecs(t) {
+		classified[row.target]++
+	}
+	found := map[string]bool{}
+	entries, err := os.ReadDir(filepath.Join("test", "e2e", "atago"))
+	if err != nil {
+		t.Fatalf("read the self-hosted spec directory: %v", err)
+	}
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".atago.yaml") {
+			continue
+		}
+		found["./test/e2e/atago/"+e.Name()] = true
+	}
+	if len(found) == 0 {
+		t.Fatal("no self-hosted specs found; the directory layout moved")
+	}
+	for target := range found {
+		switch classified[target] {
+		case 1:
+		case 0:
+			t.Errorf("%s is not classified in %s; add it as cmd, bash, or none with a reason", target, windowsSpecsTSV)
+		default:
+			t.Errorf("%s is classified %d times in %s", target, classified[target], windowsSpecsTSV)
+		}
+	}
+}
+
+// TestWindowsSpecs_RowsAreWellFormed checks the three properties a row can get
+// wrong: an unknown bucket, a target that does not resolve, and an unjustified
+// `none`. The last is the point of the file — a target excluded from Windows
+// has to state a reason about the platform, not leave the exclusion implicit.
+func TestWindowsSpecs_RowsAreWellFormed(t *testing.T) {
+	t.Parallel()
+	for _, row := range readWindowsSpecs(t) {
+		if !windowsBuckets[row.bucket] {
+			t.Errorf("%s:%d: unknown bucket %q (want cmd, bash, or none)", windowsSpecsTSV, row.line, row.bucket)
+		}
+		if _, err := os.Stat(filepath.FromSlash(row.target)); err != nil {
+			t.Errorf("%s:%d: %q does not resolve: %v", windowsSpecsTSV, row.line, row.target, err)
+		}
+		switch row.bucket {
+		case "none":
+			if strings.TrimSpace(row.reason) == "" {
+				t.Errorf("%s:%d: %q is excluded from Windows with no reason", windowsSpecsTSV, row.line, row.target)
+			}
+		case "cmd", "bash":
+			if strings.TrimSpace(row.reason) != "" {
+				t.Errorf("%s:%d: %q runs on Windows, so the reason column must be empty", windowsSpecsTSV, row.line, row.target)
+			}
+		}
+	}
+}
+
+// TestWindowsSpecs_WorkflowsReadTheTable pins that both Windows CI legs expand
+// the classification rather than carrying a list of their own. The file only
+// prevents drift as long as it is what actually runs.
+func TestWindowsSpecs_WorkflowsReadTheTable(t *testing.T) {
+	t.Parallel()
+	for _, wf := range []string{".github/workflows/e2e.yml", ".github/workflows/e2e-cross.yml"} {
+		yml := readDoc(t, wf)
+		for _, bucket := range []string{"cmd", "bash"} {
+			if !strings.Contains(yml, "windows_specs.sh "+bucket) {
+				t.Errorf("%s does not run the %q bucket via scripts/windows_specs.sh", wf, bucket)
+			}
 		}
 	}
 }
