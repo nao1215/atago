@@ -262,9 +262,13 @@ func colorizeDiff(on bool, diff string) string {
 	lines := strings.Split(diff, "\n")
 	for i, l := range lines {
 		switch {
-		// The trailing space disambiguates structural lines from content
-		// lines that happen to start with --/++ (YAML document separators).
-		case strings.HasPrefix(l, "--- ") || strings.HasPrefix(l, "+++ ") || strings.HasPrefix(l, "@@ "):
+		// The file labels are structural only at their fixed positions, the
+		// first two lines: a removed content line "-- select" renders as
+		// "--- select" — the label prefix, trailing space included — and must
+		// keep its removal color. Hunk headers need no such guard: every
+		// content line carries a marker byte, so only a header starts with @@.
+		case i < 2 && (strings.HasPrefix(l, "--- ") || strings.HasPrefix(l, "+++ ")),
+			strings.HasPrefix(l, "@@ "):
 			lines[i] = colorize(true, cDim, l)
 		case strings.HasPrefix(l, "-"):
 			lines[i] = colorize(true, cRed, l)
