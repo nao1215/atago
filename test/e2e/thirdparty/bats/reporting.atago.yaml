@@ -1,0 +1,307 @@
+version: "1"
+
+suite:
+  name: bats (formatters, reports, and gathered output)
+  description: |
+    The same run, reported in every shape [Bats](https://github.com/bats-core/bats-core)
+    can report it: plain TAP, TAP version 13 with YAML diagnostics, JUnit XML on
+    stdout or written to a report directory, the per-test output files gathered
+    by `--gather-test-outputs-in`, and the pretty formatter that only appears
+    when a terminal is attached.
+
+    Formatters are where a test runner is easiest to break without noticing: the
+    tests still pass, and only the shape of the report changes. Each scenario
+    below runs one fixture — one passing test and one failing test — and pins
+    what a given flag makes of it, including which stream it lands on and which
+    files it leaves on disk. The pretty formatter is checked on a rendered
+    terminal screen, since that is the only place it exists.
+
+defaults:
+  scenario:
+    only:
+      command: bats --version
+    # bats is a Bash program, and these scenarios drive it through POSIX shell
+    # steps (mkdir, a pseudo-terminal), so the suite is scoped to POSIX rather
+    # than left to fail halfway on a Windows shell that has neither.
+    skip:
+      os: windows
+  run:
+    sandbox_home: true
+    env:
+      LC_ALL: C
+
+scenarios:
+  - name: TAP version 13 carries the failure as a YAML block
+    steps:
+      - fixture:
+          file: mixed.bats
+          content: |
+            @test "passes" { true; }
+            @test "fails" { false; }
+      - run:
+          command: bats --formatter tap13 mixed.bats
+      - assert:
+          # The plain TAP diagnostics become a machine-readable YAML document
+          # attached to the failing test, indented under it and terminated by
+          # the "..." line.
+          exit_code: 1
+          stdout:
+            equals: |
+              TAP version 13
+              1..2
+              ok 1 passes
+              not ok 2 fails
+                ---
+                message: |
+                  (in test file mixed.bats, line 2)
+                    `@test "fails" { false; }' failed
+                ...
+
+  - name: the JUnit formatter reports counts and the failure element
+    steps:
+      - fixture:
+          file: mixed.bats
+          content: |
+            @test "passes" { true; }
+            @test "fails" { false; }
+      - run:
+          command: bats --formatter junit mixed.bats
+      - assert:
+          # Durations, hostname and timestamp are environment-specific; the
+          # contract is the tallies, the per-test elements, and the failure body.
+          exit_code: 1
+          stdout:
+            contains:
+              - '<?xml version="1.0" encoding="UTF-8"?>'
+              - 'name="mixed.bats" tests="2" failures="1" errors="0" skipped="0"'
+              - '<testcase classname="mixed.bats" name="passes"'
+              - '<failure type="failure">(in test file mixed.bats, line 2)'
+
+  - name: a report formatter writes a file and leaves stdout as TAP
+    steps:
+      - fixture:
+          file: mixed.bats
+          content: |
+            @test "passes" { true; }
+            @test "fails" { false; }
+      - run:
+          shell: true
+          command: mkdir -p reports
+      - assert:
+          exit_code: 0
+      - run:
+          command: bats --report-formatter junit --output reports mixed.bats
+      - assert:
+          exit_code: 1
+          stdout:
+            # The console keeps its TAP; the XML goes to the file. Asking for a
+            # report also turns timing on, which is why the ok lines carry it.
+            matches: "^1\\.\\.2\\nok 1 passes # in [0-9]+ ms\\n"
+          changes:
+            created: [reports/report.xml]
+            modified: []
+            deleted: []
+      - assert:
+          file:
+            path: reports/report.xml
+            contains:
+              - 'tests="2" failures="1"'
+              - '<testcase classname="mixed.bats" name="fails"'
+
+  - name: a report directory that does not exist is refused before the run
+    steps:
+      - fixture:
+          file: mixed.bats
+          content: |
+            @test "passes" { true; }
+      - run:
+          command: bats --report-formatter junit --output nosuch mixed.bats
+      - assert:
+          # No directory is created for you, and no test runs: the refusal comes
+          # with the usage text on stderr, and stdout stays empty.
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            contains:
+              - "Error: Output path nosuch is not writeable"
+              - "Usage: bats [OPTIONS] <tests>"
+          changes:
+            created: []
+            modified: []
+            deleted: []
+
+  - name: gathered output is one file per test, named after it, holding what it printed
+    steps:
+      - fixture:
+          file: chatty.bats
+          content: |
+            @test "prints and passes" { echo "passing output"; }
+            @test "prints and fails" { echo "failing output"; false; }
+      - run:
+          # The directory is created by bats when it is missing; what it will not
+          # do is write into one that already holds files, which is the scenario
+          # after this one.
+          command: bats --gather-test-outputs-in gathered chatty.bats
+      - assert:
+          exit_code: 1
+      - assert:
+          # Passing tests are gathered too — the flag exists to get at output the
+          # console hides — and the file names carry the test number and name.
+          dir:
+            path: gathered
+            count: 2
+            contains:
+              - "1-prints and passes.log"
+              - "2-prints and fails.log"
+      - assert:
+          file:
+            path: "gathered/1-prints and passes.log"
+            equals: |
+              passing output
+      - assert:
+          file:
+            path: "gathered/2-prints and fails.log"
+            equals: |
+              failing output
+
+  - name: gathering into a directory that already has files is refused
+    steps:
+      - fixture:
+          file: chatty.bats
+          content: |
+            @test "prints and passes" { echo "passing output"; }
+      - fixture:
+          file: gathered/leftover.log
+          content: "from an earlier run\n"
+      - run:
+          command: bats --gather-test-outputs-in gathered chatty.bats
+      - assert:
+          # Refusing to mix runs is the safe choice, and it is taken before the
+          # tests run: the earlier file is left exactly as it was.
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            equals: |
+              Error: Directory 'gathered' must be empty for --gather-test-outputs-in
+          changes:
+            created: []
+            modified: []
+            deleted: []
+      - assert:
+          dir:
+            path: gathered
+            count: 1
+
+  - name: test output is hidden when it passes and shown when it fails
+    steps:
+      - fixture:
+          file: chatty.bats
+          content: |
+            @test "prints and passes" { echo "passing output"; }
+            @test "prints and fails" { echo "failing output"; false; }
+      - run:
+          command: bats chatty.bats
+      - assert:
+          # The default is silence for the tests that worked: only the failing
+          # test's output is quoted, as TAP diagnostics after its not ok line.
+          exit_code: 1
+          stdout:
+            contains: "# failing output"
+            not_contains: "# passing output"
+      - run:
+          command: bats --show-output-of-passing-tests chatty.bats
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - "# passing output"
+              - "# failing output"
+
+  - name: timing and tracing add to the report without changing the verdict
+    steps:
+      - fixture:
+          file: mixed.bats
+          content: |
+            @test "passes" { true; }
+            @test "fails" { false; }
+      - run:
+          command: bats --timing mixed.bats
+      - assert:
+          exit_code: 1
+          stdout:
+            matches: "^1\\.\\.2\\nok 1 passes in [0-9]+ms\\nnot ok 2 fails in [0-9]+ms\\n"
+      - run:
+          command: bats --trace mixed.bats
+      - assert:
+          # -x is set -x for the test body: the commands that ran are echoed as
+          # diagnostics under the test that ran them.
+          exit_code: 1
+          stdout:
+            contains:
+              - "# $ [mixed.bats, line 2]"
+              - "# $ false"
+
+  - name: the quoting and file reference in a failure are configurable
+    steps:
+      - fixture:
+          file: fail.bats
+          content: |
+            @test "fails" {
+              false
+            }
+      - run:
+          command: bats fail.bats
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - "# (in test file fail.bats, line 2)"
+              - "#   `false' failed"
+      - run:
+          command: bats --code-quote-style [] fail.bats
+      - assert:
+          # The two characters become the opening and closing quote, for editors
+          # and terminals where the default pair is hard to read.
+          exit_code: 1
+          stdout:
+            contains: "#   [false] failed"
+      - run:
+          command: bats --line-reference-format colon fail.bats
+      - assert:
+          # file:line is what editors and CI log linkers can jump to.
+          exit_code: 1
+          stdout:
+            contains: "# (in test file fail.bats:2)"
+
+  - name: the pretty formatter exists only on a terminal
+    steps:
+      - fixture:
+          file: mixed.bats
+          content: |
+            @test "passes" { true; }
+            @test "fails" { false; }
+      - pty:
+          command: bats mixed.bats
+          cols: 80
+          rows: 24
+          timeout: 30s
+          sandbox_home: true
+          env:
+            LC_ALL: C
+          session:
+            - expect: "2 tests, 1 failure"
+      - assert:
+          # With a terminal attached the default formatter changes from tap to
+          # pretty: the file is a heading, results are check and cross marks, and
+          # the run ends with a counted summary that plain TAP never prints.
+          screen:
+            contains:
+              - "mixed.bats"
+              - "✓ passes"
+              - "✗ fails"
+              - "2 tests, 1 failure"
+      - assert:
+          screen:
+            not_contains: "1..2"

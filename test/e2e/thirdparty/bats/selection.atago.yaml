@@ -1,0 +1,344 @@
+version: "1"
+
+suite:
+  name: bats (choosing which tests run)
+  description: |
+    Everything [Bats](https://github.com/bats-core/bats-core) offers for running
+    less than the whole suite: counting without running, `--filter` on the test
+    name, `--filter-tags` on the tags declared in the file, `--filter-status` on
+    what the previous run recorded, and a directory walked flat or recursively.
+
+    A selection flag has two halves, and only one of them shows up in the report:
+    the tests it runs, and the tests it does not. The scenarios below assert both
+    — the plan line counts what ran, and a test that writes a file proves what
+    stayed unexecuted. `--filter-status` is the interesting one, because it makes
+    the runner stateful: it reads a ledger the previous run wrote, and refuses,
+    with instructions, when the directory that ledger lives in does not exist.
+
+defaults:
+  scenario:
+    only:
+      command: bats --version
+    # bats is a Bash program, and these scenarios drive it through POSIX shell
+    # steps (mkdir, a pseudo-terminal), so the suite is scoped to POSIX rather
+    # than left to fail halfway on a Windows shell that has neither.
+    skip:
+      os: windows
+  run:
+    sandbox_home: true
+    env:
+      LC_ALL: C
+
+scenarios:
+  - name: counting reports the number of tests and runs none of them
+    steps:
+      - fixture:
+          file: side_effect.bats
+          content: |
+            @test "writes a file" { echo ran > "$BATS_TEST_DIRNAME/ran.txt"; }
+            @test "writes another" { echo ran >> "$BATS_TEST_DIRNAME/ran.txt"; }
+      - run:
+          command: bats --count side_effect.bats
+      - assert:
+          exit_code: 0
+          # Just the number, on stdout, with no plan line around it.
+          stdout:
+            equals: |
+              2
+          # Counting is not a dry run that swallows output; it never enters the
+          # test bodies at all, which is why the file they write is not here.
+          changes:
+            created: []
+            modified: []
+            deleted: []
+      - assert:
+          file:
+            path: ran.txt
+            exists: false
+
+  - name: the name filter is a regular expression, not a substring
+    steps:
+      - fixture:
+          file: names.bats
+          content: |
+            @test "alpha" { true; }
+            @test "alpha extended" { true; }
+            @test "beta" { true; }
+      - run:
+          command: bats --filter alpha names.bats
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              1..2
+              ok 1 alpha
+              ok 2 alpha extended
+      - run:
+          # Anchors prove the argument is matched as a regexp: the substring
+          # "alpha" appears in two names, but only one of them is exactly alpha.
+          command: bats --filter ^alpha$ names.bats
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              1..1
+              ok 1 alpha
+      - run:
+          command: bats --count --filter ^alpha$ names.bats
+      - assert:
+          # The count follows the filter, so it answers "how much would this run"
+          # rather than "how big is this file".
+          exit_code: 0
+          stdout:
+            equals: |
+              1
+
+  - name: a filter that matches nothing is an empty plan, not a failure
+    steps:
+      - fixture:
+          file: names.bats
+          content: |
+            @test "alpha" { true; }
+      - run:
+          command: bats --filter zzz names.bats
+      - assert:
+          # Selecting nothing is success. A CI job that filters too narrowly goes
+          # green with an empty plan — the plan line is the only thing that says
+          # so, which is why it is asserted exactly.
+          exit_code: 0
+          stdout:
+            equals: |
+              1..0
+
+  - name: tags select and deselect tests, and file tags apply to the whole file
+    steps:
+      - fixture:
+          file: tagged.bats
+          content: |
+            # bats file_tags=in-file
+
+            # bats test_tags=fast,unit
+            @test "fast unit" { true; }
+
+            # bats test_tags=fast
+            @test "fast only" { true; }
+
+            # bats test_tags=slow
+            @test "slow only" { true; }
+      - run:
+          command: bats --filter-tags fast tagged.bats
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              1..2
+              ok 1 fast unit
+              ok 2 fast only
+      - run:
+          # A comma-separated list is an AND, so this is the one test carrying
+          # both tags.
+          command: bats --filter-tags fast,unit tagged.bats
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              1..1
+              ok 1 fast unit
+      - run:
+          # Repeating the flag is an OR across the lists.
+          command: bats --filter-tags unit --filter-tags slow tagged.bats
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              1..2
+              ok 1 fast unit
+              ok 2 slow only
+      - run:
+          # A leading ! negates, which is how you exclude rather than include.
+          command: bats --filter-tags !fast tagged.bats
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              1..1
+              ok 1 slow only
+      - run:
+          # A file-level tag belongs to every test in the file.
+          command: bats --count --filter-tags in-file tagged.bats
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              3
+      - run:
+          command: bats --filter-tags never-used tagged.bats
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              1..0
+
+  - name: rerunning failures requires a run-log directory the user must create
+    steps:
+      - fixture:
+          file: mix.bats
+          content: |
+            @test "alpha passes" { true; }
+            @test "beta fails" { false; }
+            @test "gamma passes" { true; }
+      - run:
+          command: bats --filter-status failed mix.bats
+      - assert:
+          # bats will not create the ledger directory for you. The refusal names
+          # the exact path and says what to do with it, which is the difference
+          # between a usable error and a puzzle. Unlike the usage errors, which
+          # go to stderr, this one is printed on stdout.
+          exit_code: 1
+          stdout:
+            contains:
+              - ".bats/run-logs/' to save failed tests"
+              - "Please create this folder, add it to .gitignore and try again."
+          stderr:
+            empty: true
+      - assert:
+          dir:
+            path: .bats
+            exists: false
+
+  - name: with the run-log directory in place a run records it and the next run replays only the failures
+    steps:
+      - fixture:
+          file: mix.bats
+          content: |
+            @test "alpha passes" { true; }
+            @test "beta fails" { false; }
+            @test "gamma passes" { true; }
+      - run:
+          shell: true
+          command: mkdir -p .bats/run-logs
+      - assert:
+          exit_code: 0
+      - run:
+          command: bats mix.bats
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - "1..3"
+              - "not ok 2 beta fails"
+          # The ledger is the run's only side effect. Its name carries the run's
+          # timestamp, so it is matched as a glob rather than by name.
+          changes:
+            created: [".bats/run-logs/*.log"]
+            modified: []
+            deleted: []
+      - run:
+          command: bats --filter-status failed mix.bats
+      - assert:
+          # The selection came from disk: only the test that failed last time is
+          # in the plan, renumbered as test 1, and it is still failing.
+          exit_code: 1
+          stdout:
+            equals: |
+              1..1
+              not ok 1 beta fails
+              # (in test file mix.bats, line 2)
+              #   `@test "beta fails" { false; }' failed
+
+  - name: replaying with nothing to replay says so and stays green
+    steps:
+      - fixture:
+          file: green.bats
+          content: |
+            @test "alpha passes" { true; }
+            @test "beta passes too" { true; }
+      - run:
+          shell: true
+          command: mkdir -p .bats/run-logs
+      - assert:
+          exit_code: 0
+      - run:
+          command: bats green.bats
+      - assert:
+          exit_code: 0
+      - run:
+          command: bats --filter-status failed green.bats
+      - assert:
+          # Nothing failed last time, so this selects nothing — reported as a
+          # sentence on stderr and an empty plan on stdout, at exit 0. A CI step
+          # that always reruns failures therefore stays green on a clean run.
+          exit_code: 0
+          stdout:
+            equals: |
+              1..0
+          stderr:
+            equals: |
+              There were no tests of status 'failed' in the last recorded run.
+
+  - name: a test the ledger has never seen counts as missed
+    steps:
+      - fixture:
+          file: growing.bats
+          content: |
+            @test "already recorded" { true; }
+      - run:
+          shell: true
+          command: mkdir -p .bats/run-logs
+      - assert:
+          exit_code: 0
+      - run:
+          command: bats growing.bats
+      - assert:
+          exit_code: 0
+      - fixture:
+          file: growing.bats
+          content: |
+            @test "already recorded" { true; }
+            @test "added afterwards" { true; }
+      - run:
+          command: bats --filter-status missed growing.bats
+      - assert:
+          # This is what `missed` is for: the ledger records the first test as
+          # having run, so the one added since is the only test selected — and
+          # it is renumbered as test 1 of a plan of 1.
+          exit_code: 0
+          stdout:
+            equals: |
+              1..1
+              ok 1 added afterwards
+
+  - name: a directory is walked flat unless recursion is asked for
+    steps:
+      - fixture:
+          file: suite/top.bats
+          content: |
+            @test "top level" { true; }
+      - fixture:
+          file: suite/sub/nested.bats
+          content: |
+            @test "nested" { true; }
+      - fixture:
+          file: suite/notes.txt
+          content: "not a test file\n"
+      - run:
+          command: bats suite
+      - assert:
+          # Only the .bats file directly in the directory; the .txt beside it is
+          # ignored by extension and the subdirectory is not descended into.
+          exit_code: 0
+          stdout:
+            equals: |
+              1..1
+              ok 1 top level
+      - run:
+          command: bats --recursive suite
+      - assert:
+          # With -r the subdirectory joins in, ordered by path rather than by
+          # depth: suite/sub/nested.bats sorts before suite/top.bats.
+          exit_code: 0
+          stdout:
+            equals: |
+              1..2
+              ok 1 nested
+              ok 2 top level

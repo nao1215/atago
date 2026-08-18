@@ -147,7 +147,7 @@ mc anonymous set download publichost/public-bucket
   - HTTP status is `403`
 - after `mc anonymous set download publichost/public-bucket`:
   - exit code is `0`
-  - stdout contains `is set to `download``
+  - stdout contains `` is set to `download` ``
 - after `HTTP GET /public-bucket/page.txt`:
   - HTTP status is `200`
   - body contains `published via bucket policy`

@@ -22,9 +22,35 @@ import (
 // including non-ASCII, is rendered exactly as authored.
 func code(s string) string {
 	if strings.ContainsFunc(s, unicode.IsControl) {
-		return markdown.Code(strconv.Quote(s))
+		return inlineCode(strconv.Quote(s))
 	}
-	return markdown.Code(s)
+	return inlineCode(s)
+}
+
+// inlineCode wraps s in a backtick run long enough that a backtick inside s
+// cannot close the span. Asserted output carries backticks routinely — a bats
+// failure quotes the command that failed as `false' failed — and a single-tick
+// span around it ends at the value's own tick, so the rest of the value leaks
+// out as prose and the line renders as something the spec never said. The rule
+// is CommonMark's: use one more backtick than the longest run inside, and pad
+// with a space on both sides so a leading or trailing tick still belongs to the
+// content. The padding is stripped by the renderer, so the published span reads
+// exactly as authored.
+func inlineCode(s string) string {
+	if !strings.Contains(s, "`") {
+		return markdown.Code(s)
+	}
+	longest, current := 0, 0
+	for _, r := range s {
+		if r == '`' {
+			current++
+			longest = max(longest, current)
+			continue
+		}
+		current = 0
+	}
+	fence := strings.Repeat("`", longest+1)
+	return fence + " " + s + " " + fence
 }
 
 // codeRegex renders a regex matcher's pattern as an inline-code span. Control
@@ -34,7 +60,7 @@ func code(s string) string {
 // strconv.Quote would double every backslash (`\.` into `\\.`) and stop the
 // published pattern from reading as the regex the spec wrote.
 func codeRegex(pattern string) string {
-	return markdown.Code("/" + escapeInvisible(pattern) + "/")
+	return inlineCode("/" + escapeInvisible(pattern) + "/")
 }
 
 // escapeInvisible rewrites the runes a reader cannot see — CR, LF, tab, ESC, and

@@ -3617,7 +3617,7 @@ sqly user.csv
 #### Then
 - exit code is `0`
 - stdout is empty
-- stderr contains `dump `user` table to`
+- stderr contains `` dump `user` table to ``
 - file `dump.csv` exists
 
 #### Generated artifacts

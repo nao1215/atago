@@ -106,6 +106,7 @@ docs: ## Regenerate the committed behavior docs under doc/e2e/ and the error ref
 	env UPDATE_ERRORS=1 $(GO) test -run TestDocs_ErrorReferenceInSync .
 	./dist/$(APP) doc --out doc/e2e/atago.md      ./test/e2e/atago
 	./dist/$(APP) doc --out doc/e2e/actionlint.md  ./test/e2e/thirdparty/actionlint
+	./dist/$(APP) doc --out doc/e2e/bats.md        ./test/e2e/thirdparty/bats
 	./dist/$(APP) doc --out doc/e2e/aqua.md        ./test/e2e/thirdparty/aqua
 	./dist/$(APP) doc --out doc/e2e/ecspresso.md   ./test/e2e/thirdparty/ecspresso
 	./dist/$(APP) doc --out doc/e2e/git.md         ./test/e2e/thirdparty/git
