@@ -63,6 +63,36 @@ and layer those tools on top.
 - `--artifacts-dir DIR` persists the exact payloads a failed assertion compared — plus, for a failed scenario, its background services' logs and each mock server's recorded requests — so a failure stays reviewable after the job ends.
 - Environment variable names listed under `secrets:` are masked as `***` in all reports and snapshots.
 
+## Run the suite on more than one OS
+
+A CLI that ships binaries for three platforms has three behaviors to check, and the ones that differ are exactly the ones nobody writes a spec for: path separators, line endings, the shell, the exit code a signal produces. A matrix costs one block:
+
+```yaml
+name: behavior-specs
+on: [push, pull_request]
+jobs:
+  atago:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: nao1215/setup-atago@v0
+      - run: atago run --ci --report gha ./specs
+```
+
+Two things make the Windows leg pay off rather than turn red on the first commit. Gate what is genuinely POSIX — a `signal:` step, a symlink fixture, a permission assertion — with `skip: {os: windows}` rather than deleting the scenario, so the report says which platform it applies to instead of pretending it does not exist. And keep `shell: true` commands out of the specs where you can: `run.env:`, `run.stdin:`, and `run.stdout_to:` cover the variable prefixes and redirects most specs reach for a shell to get, and a command built from argv runs unchanged on all three. Where a POSIX shell really is needed, `ATAGO_SHELL` points atago at the bash that ships with Git for Windows, which is preinstalled on the GitHub runner:
+
+```yaml
+      - run: atago run --ci --report gha ./specs
+        env:
+          ATAGO_SHELL: ${{ runner.os == 'Windows' && 'C:\Program Files\Git\bin\bash.exe' || '' }}
+```
+
+[Platform support](/reference/#platform-support) is the full list of what differs.
+
 ## Review specs without running them
 
 `explain` describes what a spec does, `doc` generates Markdown (with fixtures, expected payloads, and golden files inlined), `manifest` emits a stable JSON summary for tooling, and `list` shows scenarios, tags, and artifacts. All of them load and validate the spec first — exit code 2 on a schema error — so any of them doubles as a lint step in CI:

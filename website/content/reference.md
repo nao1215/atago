@@ -111,6 +111,33 @@ version: "1"
 
 The report and manifest outputs have schemas too: [report.schema.json](https://github.com/nao1215/atago/blob/main/schema/report.schema.json) and [manifest.schema.json](https://github.com/nao1215/atago/blob/main/schema/manifest.schema.json).
 
+## Platform support
+
+atago runs on Linux, macOS, and Windows, and CI tests all three: the unit suite on every OS, the self-hosted E2E suite on Linux and macOS, and on Windows both under the native `cmd.exe` and under a POSIX shell. Almost everything behaves identically. This section is the short list of what does not, and why.
+
+| Behavior | Linux / macOS | Windows |
+|----------|---------------|---------|
+| `shell: true` | `/bin/sh -c`, resolved absolutely so the program under test cannot supply it | `%SystemRoot%\System32\cmd.exe /S /C`, resolved the same way. `ATAGO_SHELL` overrides on both |
+| `signal:` steps | delivers `TERM`, `INT`, `HUP`, `USR1`, `USR2`, `KILL` to the service's process group | not supported — Windows has no POSIX signals. Gate with `skip: {os: windows}` |
+| cancel / timeout teardown | kills the whole process group | kills the whole process tree (`taskkill /T`) |
+| `pty:` steps and `atago record --pty` | a real pty | a ConPTY, which needs Windows 10 version 1809 or later. `record --pty` cannot auto-detect a password prompt there, because a ConPTY exposes no echo state — convert a secret send to `${env:...}` by hand |
+| `file: {executable: ...}` | the mode bits | the file extension against `PATHEXT`, which is what Windows uses to decide what it runs by name. There is no execute bit to read |
+| `fixture: {mode: ...}` | sets the permission bits | no effect — Windows has no POSIX permissions |
+| `fixture: {symlink: ...}` | always available | needs Developer Mode or an elevated process |
+| `changes:` | compares content, symlink target, kind, and permission bits | compares content, symlink target, and kind. Permissions are left out: Go synthesizes a mode from the read-only attribute, so including it would make one spec report a different delta per OS |
+| `sandbox_home: true` | redirects `HOME` and the XDG base directories | redirects `USERPROFILE`, `APPDATA`, `LOCALAPPDATA`, `HOMEDRIVE`, `HOMEPATH` |
+| `clear_env: true` | starts from an empty environment plus `pass_env` | the same, plus `SystemRoot`, `SystemDrive`, `TEMP`, `TMP`, and `PATHEXT`, without which a process cannot start at all |
+
+### Choosing the shell
+
+`shell: true` runs the platform's own interpreter, so a command written for `/bin/sh` does not run under `cmd.exe`. Two ways out. Keep the command portable — `echo` and `exit` are builtins of both, and `run.env:`, `run.stdin:`, `run.stdout_to:` cover the variable prefixes and redirects a spec usually reaches for a shell to get. Or point atago at the shell you want:
+
+```shell
+ATAGO_SHELL='C:\Program Files\Git\bin\bash.exe' atago run ./e2e
+```
+
+`ATAGO_SHELL` takes an absolute path on either platform. atago picks the calling convention from the name: `/S /C` for `cmd.exe`, `-c` for anything else, which covers the bash that ships with Git for Windows and MSYS2 as well as PowerShell. One caveat when pairing a POSIX shell with Windows paths: `${workdir}`, `${specdir}`, and `${atago}` expand to backslash paths, and a POSIX shell reads a backslash as an escape — so interpolate them into argv-form commands (`shell: false`) rather than into shell commands.
+
 ## Shell completion
 
 `atago completion <bash|zsh|fish|powershell>` prints a completion script for your shell.
