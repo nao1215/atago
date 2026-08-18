@@ -1,6 +1,6 @@
 ---
 title: Install
-description: Install atago with go install, Homebrew, winget, Scoop, the AUR, prebuilt binaries for Linux/macOS/Windows, or the setup-atago GitHub Action — and verify what you download.
+description: Install atago with go install, Homebrew, Scoop, the AUR, prebuilt binaries for Linux/macOS/Windows, or the setup-atago GitHub Action — and verify what you download.
 ---
 
 ```shell
@@ -11,12 +11,6 @@ On macOS, Homebrew works too:
 
 ```shell
 brew install --cask nao1215/tap/atago
-```
-
-On Windows, winget installs it from the community repository:
-
-```shell
-winget install nao1215.atago
 ```
 
 [Scoop](https://scoop.sh/) installs it from atago's own bucket:
