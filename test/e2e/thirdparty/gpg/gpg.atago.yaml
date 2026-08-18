@@ -1,0 +1,388 @@
+version: "1"
+
+suite:
+  name: GnuPG (third-party CLI, cryptographic contracts)
+  description: |
+    [GnuPG](https://gnupg.org/) is the reference OpenPGP implementation, and its
+    contract is one where being approximately right is worse than failing: a
+    decryption that returns subtly wrong plaintext, or a verification that
+    accepts a modified file, is a security bug rather than a cosmetic one.
+
+    So the scenarios are built around round trips and negative space. Encrypting
+    and decrypting returns the original bytes; the ciphertext never contains the
+    plaintext; a single flipped byte is refused rather than decoded; a keyring
+    without the secret key cannot read the message; and a signature stops
+    verifying the moment the signed file changes.
+
+    gpg is also one of the few CLIs whose exit codes carry three different
+    meanings, and the machine-readable `--status-fd` protocol — GOODSIG, BADSIG,
+    NO_SECKEY, DECRYPTION_OKAY — is what a program integrating gpg actually
+    reads. Both are pinned here, in preference to the human prose, which is
+    translated and therefore not a contract at all.
+
+    Every key is generated inside the scenario workdir with a throwaway
+    passphrase, nothing is committed, and no network is used: key lookup is
+    disabled so a missing recipient fails locally instead of reaching for a key
+    server.
+
+defaults:
+  scenario:
+    only:
+      command: gpg --version
+    # The suite drives POSIX shells and a Unix-socket agent; the Windows story
+    # for GnuPG is a separate installation with its own paths.
+    skip:
+      os: windows
+  run:
+    sandbox_home: true
+    env:
+      GNUPGHOME: ${workdir}/gnupg
+      # Machine output is asserted below, but the human messages that do get
+      # asserted are pinned in English rather than the runner's locale.
+      LC_ALL: C
+
+scenarios:
+  - name: generating a key creates a keyring that lists the identity
+    steps:
+      - run:
+          shell: true
+          command: mkdir -m 700 -p "$GNUPGHOME"
+      - assert:
+          exit_code: 0
+      - run:
+          command: gpg --batch --pinentry-mode loopback --passphrase "" --quick-generate-key "Test User <test@example.com>" default default never
+      - assert:
+          exit_code: 0
+      # --with-colons is the documented machine-readable listing: field 1 is the
+      # record type, so the identity and its fingerprint can be asserted without
+      # depending on the human layout.
+      - run:
+          command: gpg --batch --list-keys --with-colons
+      - assert:
+          exit_code: 0
+          stdout:
+            matches: "(?m)^fpr:{9}[0-9A-F]{40}:"
+            contains:
+              - "pub:"
+              - "Test User <test@example.com>"
+      - run:
+          command: gpg --batch --list-secret-keys --with-colons
+      - assert:
+          exit_code: 0
+          stdout:
+            matches: "(?m)^sec:"
+      # The secret key material lives in the sandboxed home's keyring, not in
+      # the machine's real ~/.gnupg.
+      - assert:
+          dir:
+            path: gnupg/private-keys-v1.d
+            glob: "*.key"
+            min_count: 1
+    teardown:
+      # The agent is a daemon holding a socket in this workdir; stopping it
+      # keeps a scenario from outliving its own directory.
+      - run:
+          shell: true
+          command: gpgconf --kill all
+
+  - name: a message survives an encrypt and decrypt round trip
+    steps:
+      - run:
+          shell: true
+          command: mkdir -m 700 -p "$GNUPGHOME"
+      - fixture:
+          file: msg.txt
+          content: |
+            attack at dawn
+            second line
+      - run:
+          command: gpg --batch --pinentry-mode loopback --passphrase "" --quick-generate-key "Test User <test@example.com>" default default never
+      - assert:
+          exit_code: 0
+      - run:
+          command: gpg --batch --trust-model always --auto-key-locate clear --encrypt --recipient test@example.com --output msg.gpg msg.txt
+      - assert:
+          exit_code: 0
+          changes:
+            created:
+              - msg.gpg
+            modified: []
+            deleted: []
+            ignore:
+              - ".atago-home/**"
+              - "gnupg/**"
+      # The negative half of encryption: the ciphertext must not carry the
+      # plaintext, which is the one thing a broken "encryption" always gets
+      # wrong.
+      - assert:
+          file:
+            path: msg.gpg
+            not_contains:
+              - attack at dawn
+              - second line
+      - run:
+          command: gpg --batch --pinentry-mode loopback --passphrase "" --output back.txt --decrypt msg.gpg
+      - assert:
+          exit_code: 0
+      # Byte-exact, not "contains": a round trip that drops a trailing newline
+      # or rewrites a line ending has not round-tripped.
+      - assert:
+          file:
+            path: back.txt
+            equals_file: msg.txt
+    teardown:
+      # The agent is a daemon holding a socket in this workdir; stopping it
+      # keeps a scenario from outliving its own directory.
+      - run:
+          shell: true
+          command: gpgconf --kill all
+
+  - name: armor produces text that decodes back to the same bytes
+    steps:
+      - run:
+          shell: true
+          command: mkdir -m 700 -p "$GNUPGHOME"
+      - fixture:
+          file: msg.txt
+          content: "attack at dawn\n"
+      - run:
+          command: gpg --batch --pinentry-mode loopback --passphrase "" --quick-generate-key "Test User <test@example.com>" default default never
+      - assert:
+          exit_code: 0
+      - run:
+          command: gpg --batch --trust-model always --auto-key-locate clear --armor --encrypt --recipient test@example.com --output msg.asc msg.txt
+      - assert:
+          exit_code: 0
+      # ASCII armor exists to survive channels that only carry text, so its
+      # frame is part of the contract.
+      - assert:
+          file:
+            path: msg.asc
+            contains:
+              - "-----BEGIN PGP MESSAGE-----"
+              - "-----END PGP MESSAGE-----"
+      - assert:
+          file:
+            path: msg.asc
+            not_contains: attack at dawn
+      - run:
+          command: gpg --batch --pinentry-mode loopback --passphrase "" --output back.txt --decrypt msg.asc
+      - assert:
+          exit_code: 0
+      - assert:
+          file:
+            path: back.txt
+            equals_file: msg.txt
+    teardown:
+      # The agent is a daemon holding a socket in this workdir; stopping it
+      # keeps a scenario from outliving its own directory.
+      - run:
+          shell: true
+          command: gpgconf --kill all
+
+  - name: a single flipped byte is refused instead of decoded
+    steps:
+      - run:
+          shell: true
+          command: mkdir -m 700 -p "$GNUPGHOME"
+      - fixture:
+          file: msg.txt
+          content: "attack at dawn\n"
+      - run:
+          command: gpg --batch --pinentry-mode loopback --passphrase "" --quick-generate-key "Test User <test@example.com>" default default never
+      - assert:
+          exit_code: 0
+      - run:
+          command: gpg --batch --trust-model always --auto-key-locate clear --encrypt --recipient test@example.com --output msg.gpg msg.txt
+      - assert:
+          exit_code: 0
+      # Corrupt one byte deep inside the packet, the way a truncated transfer or
+      # a bit flip on disk would.
+      - run:
+          shell: true
+          command: printf 'X' | dd of=msg.gpg bs=1 seek=40 conv=notrunc status=none
+      - assert:
+          exit_code: 0
+      - run:
+          command: gpg --batch --pinentry-mode loopback --passphrase "" --output back.txt --decrypt msg.gpg
+      - assert:
+          # Integrity failure is what separates an encrypted message from an
+          # obfuscated one: the answer is a refusal, never approximate plaintext.
+          exit_code: 2
+          stderr:
+            contains: "decryption failed"
+      - assert:
+          file:
+            path: back.txt
+            exists: false
+    teardown:
+      # The agent is a daemon holding a socket in this workdir; stopping it
+      # keeps a scenario from outliving its own directory.
+      - run:
+          shell: true
+          command: gpgconf --kill all
+
+  - name: a keyring without the secret key cannot read the message
+    steps:
+      - run:
+          shell: true
+          command: mkdir -m 700 -p "$GNUPGHOME" && mkdir -m 700 -p "${workdir}/other"
+      - fixture:
+          file: msg.txt
+          content: "attack at dawn\n"
+      - run:
+          command: gpg --batch --pinentry-mode loopback --passphrase "" --quick-generate-key "Test User <test@example.com>" default default never
+      - assert:
+          exit_code: 0
+      - run:
+          command: gpg --batch --trust-model always --auto-key-locate clear --encrypt --recipient test@example.com --output msg.gpg msg.txt
+      - assert:
+          exit_code: 0
+      # A second, empty keyring stands in for anyone the message was not
+      # addressed to.
+      - run:
+          command: gpg --batch --status-fd 1 --output stolen.txt --decrypt msg.gpg
+          env:
+            GNUPGHOME: ${workdir}/other
+      - assert:
+          exit_code: 2
+          stdout:
+            contains:
+              - "NO_SECKEY"
+              - "DECRYPTION_FAILED"
+      - assert:
+          file:
+            path: stolen.txt
+            exists: false
+    teardown:
+      # The agent is a daemon holding a socket in this workdir; stopping it
+      # keeps a scenario from outliving its own directory.
+      - run:
+          shell: true
+          command: gpgconf --kill all
+
+  - name: a detached signature stops verifying when the file changes
+    steps:
+      - run:
+          shell: true
+          command: mkdir -m 700 -p "$GNUPGHOME"
+      - fixture:
+          file: release.txt
+          content: "v1.0.0 checksum 0123456789abcdef\n"
+      - run:
+          command: gpg --batch --pinentry-mode loopback --passphrase "" --quick-generate-key "Test User <test@example.com>" default default never
+      - assert:
+          exit_code: 0
+      - run:
+          command: gpg --batch --pinentry-mode loopback --passphrase "" --output release.sig --detach-sign release.txt
+      - assert:
+          exit_code: 0
+      - run:
+          command: gpg --batch --status-fd 1 --verify release.sig release.txt
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "GOODSIG"
+              - "VALIDSIG"
+      # One appended byte is the whole point of signing.
+      - run:
+          shell: true
+          command: printf '!' >> release.txt
+      - assert:
+          exit_code: 0
+      - run:
+          command: gpg --batch --status-fd 1 --verify release.sig release.txt
+      - assert:
+          # A bad signature is exit 1, distinct from the 2 that every other
+          # failure here reports: verification ran and answered no.
+          exit_code: 1
+          stdout:
+            contains: "BADSIG"
+            not_contains: "GOODSIG"
+    teardown:
+      # The agent is a daemon holding a socket in this workdir; stopping it
+      # keeps a scenario from outliving its own directory.
+      - run:
+          shell: true
+          command: gpgconf --kill all
+
+  - name: symmetric encryption answers only to its own passphrase
+    steps:
+      - run:
+          shell: true
+          command: mkdir -m 700 -p "$GNUPGHOME"
+      - fixture:
+          file: msg.txt
+          content: "attack at dawn\n"
+      - run:
+          command: gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 --symmetric --output msg.gpg msg.txt
+          stdin: "correct-horse-battery-staple"
+      - assert:
+          exit_code: 0
+      - assert:
+          file:
+            path: msg.gpg
+            not_contains: attack at dawn
+      - run:
+          command: gpg --batch --pinentry-mode loopback --passphrase-fd 0 --output back.txt --decrypt msg.gpg
+          stdin: "correct-horse-battery-staple"
+      - assert:
+          exit_code: 0
+      - assert:
+          file:
+            path: back.txt
+            equals_file: msg.txt
+      - run:
+          command: gpg --batch --pinentry-mode loopback --passphrase-fd 0 --output wrong.txt --decrypt msg.gpg
+          stdin: "not-the-passphrase"
+      - assert:
+          exit_code: 2
+          stderr:
+            contains: "decryption failed"
+      - assert:
+          file:
+            path: wrong.txt
+            exists: false
+    teardown:
+      # The agent is a daemon holding a socket in this workdir; stopping it
+      # keeps a scenario from outliving its own directory.
+      - run:
+          shell: true
+          command: gpgconf --kill all
+
+  - name: usage mistakes are refused offline, with the input named
+    steps:
+      - run:
+          shell: true
+          command: mkdir -m 700 -p "$GNUPGHOME"
+      - run:
+          command: gpg --batch --nosuchoption
+      - assert:
+          exit_code: 2
+          stdout:
+            empty: true
+          stderr:
+            contains: 'invalid option "--nosuchoption"'
+      - run:
+          command: gpg --batch --decrypt does-not-exist.gpg
+      - assert:
+          exit_code: 2
+          stderr:
+            contains: "does-not-exist.gpg"
+      # With key lookup disabled an unknown recipient is answered locally: the
+      # message names the recipient rather than a key server that was never
+      # contacted.
+      - fixture:
+          file: msg.txt
+          content: "attack at dawn\n"
+      - run:
+          command: gpg --batch --auto-key-locate clear --encrypt --recipient nobody@example.com --output msg.gpg msg.txt
+      - assert:
+          exit_code: 2
+          stderr:
+            contains: "nobody@example.com"
+      - assert:
+          file:
+            path: msg.gpg
+            exists: false
