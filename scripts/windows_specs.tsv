@@ -94,6 +94,7 @@
 ./test/e2e/atago/retry.atago.yaml	bash
 ./test/e2e/atago/run.atago.yaml	cmd
 ./test/e2e/atago/sandbox_home.atago.yaml	cmd
+./test/e2e/atago/scalar_verbatim.atago.yaml	bash
 ./test/e2e/atago/security.atago.yaml	bash
 ./test/e2e/atago/select.atago.yaml	cmd
 ./test/e2e/atago/services.atago.yaml	bash
