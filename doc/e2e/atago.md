@@ -624,9 +624,9 @@
   - [a step failure after the service is ready preserves the service log](#scenario-a-step-failure-after-the-service-is-ready-preserves-the-service-log)
   - [a green run with a healthy service writes no service log](#scenario-a-green-run-with-a-healthy-service-writes-no-service-log)
   - [a service that dies before readiness names its exit status](#scenario-a-service-that-dies-before-readiness-names-its-exit-status)
-- [atago self-hosting / harness shell is not shadowed by the program PATH](#atago-self-hosting--harness-shell-is-not-shadowed-by-the-program-path) — 2 scenarios
-  - [a PATH-resident fake sh does not hijack shell:true](#scenario-a-path-resident-fake-sh-does-not-hijack-shelltrue)
-  - [ATAGO_SHELL overrides the shell used for shell:true](#scenario-atago_shell-overrides-the-shell-used-for-shelltrue)
+- [atago self-hosting / the harness shell cannot be supplied by the program under test](#atago-self-hosting--the-harness-shell-cannot-be-supplied-by-the-program-under-test) — 2 scenarios
+  - [a shell planted on the inner atago's PATH does not hijack shell:true](#scenario-a-shell-planted-on-the-inner-atagos-path-does-not-hijack-shelltrue)
+  - [ATAGO_SHELL selects the shell the inner atago runs shell:true with](#scenario-atago_shell-selects-the-shell-the-inner-atago-runs-shelltrue-with)
 - [atago self-hosting / signal step (graceful shutdown)](#atago-self-hosting--signal-step-graceful-shutdown) — 4 scenarios
   - [SIGTERM reaches the trap handler and wait observes the exit](#scenario-sigterm-reaches-the-trap-handler-and-wait-observes-the-exit)
   - [SIGHUP triggers a reload without stopping the service](#scenario-sighup-triggers-a-reload-without-stopping-the-service)
@@ -13966,11 +13966,14 @@ ${atago} run crasher.atago.yaml
 - exit code is `4`
 - stdout contains `service exited before it became ready (exit status 3)`, `starting`
 
-## atago self-hosting / harness shell is not shadowed by the program PATH
+## atago self-hosting / the harness shell cannot be supplied by the program under test
 Source: `test/e2e/atago/shell_path.atago.yaml`
-### Scenario: a PATH-resident fake sh does not hijack shell:true
+### Scenario: a shell planted on the inner atago's PATH does not hijack shell:true
 #### Given
 - Fixture file `sh` is created.
+- Fixture file `cmd.bat` is created.
+- Fixture file `inner.atago.yaml` is created.
+- Environment variables are set: PATH.
 
 #### Inputs
 _Fixture `sh`:_
@@ -13979,22 +13982,59 @@ _Fixture `sh`:_
 echo HIJACKED
 exit 0
 ```
+_Fixture `cmd.bat`:_
+```text
+@echo HIJACKED
+```
+_Fixture `inner.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: the shell is the system one
+    steps:
+      - run:
+          shell: true
+          command: "echo real-shell"
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: real-shell
+```
 #### When
 ```shell
-echo real-shell
+${atago} run inner.atago.yaml
 ```
 #### Then
 - exit code is `0`
-- stdout equals an exact value
 - stdout does not contain `HIJACKED`
 
-### Scenario: ATAGO_SHELL overrides the shell used for shell:true
+### Scenario: ATAGO_SHELL selects the shell the inner atago runs shell:true with
+#### Given
+- Fixture file `inner.atago.yaml` is created.
+- Environment variables are set: ATAGO_SHELL.
+
+#### Inputs
+_Fixture `inner.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: a shell step
+    steps:
+      - run:
+          shell: true
+          command: "echo hi"
+```
 #### When
 ```shell
-printf '%s\n' ok
+${atago} run inner.atago.yaml
 ```
 #### Then
-- stdout equals an exact value
+- exit code is `4`
+- stdout contains `no-such-shell`
 
 ## atago self-hosting / signal step (graceful shutdown)
 Source: `test/e2e/atago/signal.atago.yaml`

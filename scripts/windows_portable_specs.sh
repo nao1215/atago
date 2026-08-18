@@ -49,4 +49,5 @@ printf '%s\n' \
   ./test/e2e/atago/cdp.atago.yaml \
   ./test/e2e/atago/pdf.atago.yaml \
   ./test/e2e/atago/pty_portable.atago.yaml \
+  ./test/e2e/atago/shell_path.atago.yaml \
   ./test/e2e/thirdparty/git

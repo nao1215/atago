@@ -47,15 +47,16 @@ func IsAvailable() bool {
 }
 
 // CommandLine builds the single command-line string ConPTY's CreateProcess
-// receives. A shell command reuses cmd.exe's documented `/S /C "<command>"`
-// contract (strip the outer quotes, run the rest verbatim) so it matches the cmd
-// runner's ConfigureShell. A shell-free command is tokenized with the same
+// receives. A shell command is composed by the cmd runner's ShellCmdLine, so a
+// pty session resolves the SAME absolute shell a run step does — including an
+// ATAGO_SHELL override — instead of a bare `cmd` taken from whatever PATH the
+// harness happens to carry. A shell-free command is tokenized with the same
 // splitter the cmd runner uses, then re-escaped with syscall.EscapeArg so the C
 // runtime re-parses it back to the identical argv — keeping pty/record and run
 // steps in agreement about how a command line splits on Windows.
 func CommandLine(command string, shell bool) (string, error) {
 	if shell {
-		return `cmd /S /C "` + command + `"`, nil
+		return runnercmd.ShellCmdLine(command), nil
 	}
 	name, args, err := runnercmd.CommandLine(command, false)
 	if err != nil {
