@@ -476,10 +476,15 @@ scenarios:
                         ignore: ["cache/**"]
                         created: []
       - run: {command: "${atago} run strict.atago.yaml"}
+      # The failure's Actual line shows the delta the assertion judged — the
+      # ignore globs applied — and names what they dropped, so the evidence and
+      # the verdict can both be true at once.
       - assert:
           exit_code: 1
           stdout:
-            contains: 'unexpected created file "surprise.txt"'
+            contains:
+              - 'unexpected created file "surprise.txt"'
+              - "created [surprise.txt], modified [], deleted [], ignored [cache/state.bin]"
 
   - name: an ignored path cannot satisfy an entry that names it
     steps:

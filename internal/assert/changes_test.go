@@ -312,6 +312,33 @@ func TestCheckChanges_Ignore(t *testing.T) {
 	}
 }
 
+// TestCheckChanges_IgnoredPathsStayOutOfTheEvidence pins what the failure
+// block presents. The Actual line must describe the delta the assertion
+// actually judged — the one with the ignore globs applied — and name what
+// ignore dropped. It used to render the raw delta, so an ignored debug.log sat
+// inside "created [...]" as evidence while the exhaustive created: list that
+// omits it raised no problem, and the reader could not reconcile the claim
+// with the evidence printed under it.
+func TestCheckChanges_IgnoredPathsStayOutOfTheEvidence(t *testing.T) {
+	t.Parallel()
+	got := checkChanges(&spec.ChangesAssert{
+		Ignore:  spec.StringList{"*.log"},
+		Created: list("out.txt", "missing.txt"),
+	}, changesResult(fsdelta.Delta{Created: []string{"debug.log", "out.txt"}}), Env{})
+	if got.OK {
+		t.Fatal("assertion should have failed: missing.txt matched nothing")
+	}
+	if strings.Contains(got.Actual, "created [debug.log") || strings.Contains(got.Actual, ", debug.log]") {
+		t.Errorf("Actual = %q, an ignored path must not appear as observed evidence", got.Actual)
+	}
+	if !strings.Contains(got.Actual, "created [out.txt]") {
+		t.Errorf("Actual = %q, want the judged delta", got.Actual)
+	}
+	if !strings.Contains(got.Actual, "ignored [debug.log]") {
+		t.Errorf("Actual = %q, want it to name what ignore dropped", got.Actual)
+	}
+}
+
 // TestCheckChanges_UntrackedKindHintStaysInsideTheWorkdir pins the confinement of
 // the hint's own filesystem probe. `changes:` entries are author-written patterns,
 // and untrackedKindNote used to stat them through a bare filepath.Join, so an

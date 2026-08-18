@@ -1706,7 +1706,7 @@ ${atago} run strict.atago.yaml
   - the step changed exactly created `out.txt`, modified nothing, deleted nothing, ignoring `cache/**`
 - after `${atago} run strict.atago.yaml`:
   - exit code is `1`
-  - stdout contains `unexpected created file "surprise.txt"`
+  - stdout contains `unexpected created file "surprise.txt"`, `created [surprise.txt], modified [], deleted [], ignored [cache/state.bin]`
 
 ### Scenario: an ignored path cannot satisfy an entry that names it
 #### Given

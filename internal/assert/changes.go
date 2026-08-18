@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/bmatcuk/doublestar/v4"
-	"github.com/nao1215/atago/internal/fsdelta"
 	"github.com/nao1215/atago/internal/fskind"
 	"github.com/nao1215/atago/internal/runner"
 	"github.com/nao1215/atago/internal/security"
@@ -31,42 +30,52 @@ func checkChanges(c *spec.ChangesAssert, res *runner.Result, env Env) *CheckResu
 	}
 	d := res.Changes
 
+	created, createdIgnored := ignorePaths(c.Ignore, d.Created)
+	modified, modifiedIgnored := ignorePaths(c.Ignore, d.Modified)
+	deleted, deletedIgnored := ignorePaths(c.Ignore, d.Deleted)
+
 	var problems []string
-	checkCategory("created", c.Created, ignorePaths(c.Ignore, d.Created), &problems, env.Workdir)
-	checkCategory("modified", c.Modified, ignorePaths(c.Ignore, d.Modified), &problems, env.Workdir)
-	checkCategory("deleted", c.Deleted, ignorePaths(c.Ignore, d.Deleted), &problems, env.Workdir)
+	checkCategory("created", c.Created, created, &problems, env.Workdir)
+	checkCategory("modified", c.Modified, modified, &problems, env.Workdir)
+	checkCategory("deleted", c.Deleted, deleted, &problems, env.Workdir)
 
 	if len(problems) == 0 {
 		return pass(desc)
 	}
 	sort.Strings(problems)
+	ignored := append(append(createdIgnored, modifiedIgnored...), deletedIgnored...)
 	return &CheckResult{
 		Desc:     desc,
 		Expected: describeChangesExpected(c),
-		Actual:   describeChangesActual(d),
+		Actual:   describeChangesActual(created, modified, deleted, ignored),
 		Hint:     strings.Join(problems, "; "),
 	}
 }
 
-// ignorePaths drops the observed paths matching any ignore glob (#327). The
-// filtering happens before the categories are compared, so an ignored path is
-// neither an unexpected observation nor something that can satisfy an entry: it
-// is simply not part of the delta the assertion is about.
-func ignorePaths(ignore spec.StringList, observed []string) []string {
+// ignorePaths splits the observed paths into those the assertion is about and
+// those an ignore glob drops (#327). The filtering happens before the
+// categories are compared, so an ignored path is neither an unexpected
+// observation nor something that can satisfy an entry: it is simply not part
+// of the delta the assertion is about. The dropped paths are returned too,
+// because a failure block that renders the delta must render the judged one —
+// and then say what ignore removed, or the evidence contradicts the verdict.
+func ignorePaths(ignore spec.StringList, observed []string) (kept, dropped []string) {
 	if len(ignore) == 0 {
-		return observed
+		return observed, nil
 	}
 	pats := make([]string, len(ignore))
 	for i, p := range ignore {
 		pats[i] = strings.TrimPrefix(p, "./")
 	}
-	kept := make([]string, 0, len(observed))
+	kept = make([]string, 0, len(observed))
 	for _, obs := range observed {
-		if !matchesAny(pats, obs) {
+		if matchesAny(pats, obs) {
+			dropped = append(dropped, obs)
+		} else {
 			kept = append(kept, obs)
 		}
 	}
-	return kept
+	return kept, dropped
 }
 
 // checkCategory enforces the exhaustive-set semantics for one category. A nil
@@ -223,10 +232,19 @@ func describeChangesExpected(c *spec.ChangesAssert) string {
 	return strings.Join(parts, ", ")
 }
 
-// describeChangesActual renders the observed delta for the failure block.
-func describeChangesActual(d *fsdelta.Delta) string {
-	return fmt.Sprintf("created %s, modified %s, deleted %s",
-		bracket(d.Created), bracket(d.Modified), bracket(d.Deleted))
+// describeChangesActual renders the delta the assertion judged — the ignore
+// globs already applied — and names what they dropped. Rendering the raw delta
+// put an ignored path inside "created [...]" as evidence while the exhaustive
+// entry list that omits it raised no problem, leaving the reader a claim and
+// an observation that could not both be true.
+func describeChangesActual(created, modified, deleted, ignored []string) string {
+	s := fmt.Sprintf("created %s, modified %s, deleted %s",
+		bracket(created), bracket(modified), bracket(deleted))
+	if len(ignored) > 0 {
+		sort.Strings(ignored)
+		s += ", ignored " + bracket(ignored)
+	}
+	return s
 }
 
 // bracket renders a path list as "[a, b]" (or "[]" when empty).
