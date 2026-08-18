@@ -326,15 +326,17 @@ func commandLine(run *spec.Run) (string, []string, error) {
 // the explicit shell opt-in. It is shared with the background
 // service runner so services tokenize and shell-quote identically to run steps.
 //
+// The shell is resolved to an ABSOLUTE path on both platforms (see shellPath in
+// shell_unix.go / shell_windows.go), so the program under test — whose directory
+// atago prepends to PATH — cannot supply the harness's shell.
+//
 // A Windows shell command additionally needs ConfigureShell on the built
-// *exec.Cmd: the ("cmd", "/c", command) argv returned here would be re-escaped
-// by Go with MSVCRT quoting rules that cmd.exe does not follow.
+// *exec.Cmd: the ("...cmd.exe", "/c", command) argv returned here would be
+// re-escaped by Go with MSVCRT quoting rules that cmd.exe does not follow.
 func CommandLine(command string, shell bool) (string, []string, error) {
 	if shell {
-		if runtime.GOOS == "windows" {
-			return "cmd", []string{"/c", command}, nil
-		}
-		return shellPath(), []string{"-c", command}, nil
+		sh := shellPath()
+		return sh, shellArgs(sh, command), nil
 	}
 	fields, err := splitArgv(command)
 	if err != nil {
@@ -421,29 +423,6 @@ func windowsFields(command string) ([]string, error) {
 // no-shell tokenizer agrees with POSIX on where fields begin and end.
 func isFieldSpace(r rune) bool {
 	return r == ' ' || r == '\t' || r == '\r' || r == '\n'
-}
-
-// shellPath returns an absolute path to the POSIX shell used for `shell: true`.
-//
-// It deliberately does NOT trust PATH: atago sets up PATH for the *program
-// under test*, and a CLI may legitimately ship its own `sh` applet (e.g.
-// mimixbox). If the harness resolved its shell through that PATH, the program
-// under test would hijack atago's shell — changing pipe/redirect semantics and
-// exit codes. So we prefer a fixed system location (mirroring ShellSpec's
-// absolute `--shell /bin/sh`). The ATAGO_SHELL env var allows an explicit
-// override; an absolute /bin/sh is the default; only as a last resort do we
-// fall back to a PATH lookup.
-func shellPath() string {
-	if s := os.Getenv("ATAGO_SHELL"); s != "" {
-		return s
-	}
-	if _, err := os.Stat("/bin/sh"); err == nil {
-		return "/bin/sh"
-	}
-	if p, err := exec.LookPath("sh"); err == nil {
-		return p
-	}
-	return "/bin/sh"
 }
 
 func parseTimeout(s string) (time.Duration, error) {

@@ -51,6 +51,15 @@ func runSessionExec(ctx context.Context, e *spec.PTYExec, dir string, env []stri
 	defer cancel()
 
 	cmd := exec.CommandContext(runCtx, name, args...) //nolint:gosec // the spec author's declared command is the point
+	if e.ShellEnabled() {
+		// Same reason the cmd runner does it: on Windows the argv above would be
+		// re-escaped with MSVCRT quoting rules cmd.exe does not follow, so an
+		// embedded double quote would reach the command as a literal \". A
+		// mid-session helper is usually the step that writes JSON or a config
+		// file for the program under test to react to, which is exactly the
+		// command that carries quotes. No-op on POSIX.
+		runnercmd.ConfigureShell(cmd, e.Command)
+	}
 	cmd.Dir = dir
 	cmd.Env = env
 	// Killing the command on timeout is not enough to get Run back: a helper run
