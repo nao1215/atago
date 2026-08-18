@@ -9,7 +9,7 @@ scenarios:
     steps:
       # Direct exec so the single failing command surfaces its real exit code.
       - run:
-          command: false
+          command: "false"
       - assert:
           exit_code: { not: 0 }
           stdout:
