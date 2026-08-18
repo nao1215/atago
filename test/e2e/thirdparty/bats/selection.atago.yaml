@@ -19,6 +19,11 @@ defaults:
   scenario:
     only:
       command: bats --version
+    # bats is a Bash program, and these scenarios drive it through POSIX shell
+    # steps (mkdir, a pseudo-terminal), so the suite is scoped to POSIX rather
+    # than left to fail halfway on a Windows shell that has neither.
+    skip:
+      os: windows
   run:
     sandbox_home: true
     env:

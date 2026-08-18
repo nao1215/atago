@@ -20,6 +20,11 @@ defaults:
   scenario:
     only:
       command: bats --version
+    # bats is a Bash program, and these scenarios drive it through POSIX shell
+    # steps (mkdir, a pseudo-terminal), so the suite is scoped to POSIX rather
+    # than left to fail halfway on a Windows shell that has neither.
+    skip:
+      os: windows
   run:
     sandbox_home: true
     env:
@@ -134,11 +139,9 @@ scenarios:
             @test "prints and passes" { echo "passing output"; }
             @test "prints and fails" { echo "failing output"; false; }
       - run:
-          shell: true
-          command: mkdir -p gathered
-      - assert:
-          exit_code: 0
-      - run:
+          # The directory is created by bats when it is missing; what it will not
+          # do is write into one that already holds files, which is the scenario
+          # after this one.
           command: bats --gather-test-outputs-in gathered chatty.bats
       - assert:
           exit_code: 1
@@ -273,8 +276,6 @@ scenarios:
             contains: "# (in test file fail.bats:2)"
 
   - name: the pretty formatter exists only on a terminal
-    skip:
-      os: windows
     steps:
       - fixture:
           file: mixed.bats

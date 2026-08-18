@@ -1327,7 +1327,7 @@ ${atago} run policy.atago.yaml
 ```
 #### Then
 - exit code is `6`
-- stdout contains `network policy denies host "denied.example"`, `holds `navigate:` to the policy`
+- stdout contains `network policy denies host "denied.example"`, `` holds `navigate:` to the policy ``
 
 ## atago self-hosting / changes (workdir delta assertions)
 Source: `test/e2e/atago/changes.atago.yaml`
@@ -3754,7 +3754,7 @@ ${atago} doc narrative.atago.yaml
 ```
 #### Then
 - exit code is `0`
-- stdout contains `Network policy: egress is allowed only to `api.example.com`.`, `Secrets declared: `API_TOKEN`.`, `### Suite setup (runs once before any scenario)`, `# write fixture seed.json`, `#### Finally (teardown, always runs)`, `# expect file `out.txt` exists`
+- stdout contains `` Network policy: egress is allowed only to `api.example.com`. ``, `` Secrets declared: `API_TOKEN`. ``, `### Suite setup (runs once before any scenario)`, `# write fixture seed.json`, `#### Finally (teardown, always runs)`, `` # expect file `out.txt` exists ``
 
 ## atago self-hosting / duration assertion
 Source: `test/e2e/atago/duration.atago.yaml`
@@ -6983,7 +6983,7 @@ ${atago} manifest httpretry.atago.yaml
   - stdout contains `HTTP GET /health via internal`, `HTTP POST /charge via billing`, `network access: HTTP request via internal`, `network access: HTTP request via billing`, `retried up to 3 times every 200ms until HTTP status is 200`
 - after `${atago} doc httpretry.atago.yaml`:
   - exit code is `0`
-  - stdout contains `# HTTP POST /charge via billing`, `The step is retried up to 3 times every 200ms until HTTP status is `200`.`
+  - stdout contains `# HTTP POST /charge via billing`, `` The step is retried up to 3 times every 200ms until HTTP status is `200`. ``
 - after `${atago} manifest httpretry.atago.yaml`:
   - exit code is `0`
   - stdout at `$.specs[0].scenarios[0].steps[1].action` equals `HTTP POST /charge via billing`; at `$.specs[0].scenarios[0].steps[1].retry.until` equals `status`
@@ -8874,7 +8874,7 @@ ${atago} doc nullspec.atago.yaml
   - stdout does not contain `<nil>`
 - after `${atago} doc nullspec.atago.yaml`:
   - exit code is `0`
-  - stdout contains `equals `null``
+  - stdout contains `` equals `null` ``
 
 ## atago self-hosting / line selector
 Source: `test/e2e/atago/line.atago.yaml`
@@ -12730,7 +12730,7 @@ ${atago} run wrongstream.atago.yaml
 ```
 #### Then
 - exit code is `1`
-- stdout contains `stderr satisfies this assertion (assert `stderr:` instead?)`
+- stdout contains `` stderr satisfies this assertion (assert `stderr:` instead?) ``
 
 ### Scenario: an empty stream that ended early says so in the failure block
 _skipped on Windows_
@@ -13912,7 +13912,7 @@ ${atago} doc shared.atago.yaml
   - stderr contains `duplicate tag "smoke"`
 - after `${atago} doc shared.atago.yaml`:
   - exit code is `0`
-  - stdout contains ``smoke` (2)`
+  - stdout contains `` `smoke` (2) ``
 
 ### Scenario: an empty tag is a load-time error
 #### Given

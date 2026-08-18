@@ -69,7 +69,7 @@ fixture is copied, and no test file is committed.
 
 Source: `test/e2e/thirdparty/bats/bats.atago.yaml`
 ### Scenario: the version and the help text are answered on stdout
-_only when `bats --version` succeeds_
+_only when `bats --version` succeeds · skipped on Windows_
 #### Given
 - Environment variables are set: LC_ALL.
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
@@ -91,7 +91,7 @@ bats --help
   - stdout contains `Usage: bats [OPTIONS] <tests>`, `-f, --filter <regex>`, `-F, --formatter <type>`
 
 ### Scenario: a passing file is TAP on stdout, exit 0, and no droppings
-_only when `bats --version` succeeds_
+_only when `bats --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `pass.bats` is created.
 - Environment variables are set: LC_ALL.
@@ -122,7 +122,7 @@ _expected stdout:_
 ok 1 adds numbers
 ```
 ### Scenario: a failing test is exit 1 and names the file, the line, and the command
-_only when `bats --version` succeeds_
+_only when `bats --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `fail.bats` is created.
 - Environment variables are set: LC_ALL.
@@ -153,7 +153,7 @@ not ok 1 fails
 #   `false' failed
 ```
 ### Scenario: one failure does not hide the tests that passed
-_only when `bats --version` succeeds_
+_only when `bats --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `mixed.bats` is created.
 - Environment variables are set: LC_ALL.
@@ -175,7 +175,7 @@ bats mixed.bats
 - stdout contains `1..3`, `ok 1 alpha passes`, `not ok 2 beta fails`, `ok 3 gamma passes`
 
 ### Scenario: a command failing mid-test aborts the rest of the test body
-_only when `bats --version` succeeds_
+_only when `bats --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `mid.bats` is created.
 - Environment variables are set: LC_ALL.
@@ -199,7 +199,7 @@ bats mid.bats
 - stdout contains `# (in test file mid.bats, line 3)`, `# before`, does not contain `after`
 
 ### Scenario: skipped tests are ok and keep the run green
-_only when `bats --version` succeeds_
+_only when `bats --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `skip.bats` is created.
 - Environment variables are set: LC_ALL.
@@ -234,28 +234,24 @@ ok 1 skipped with reason # skip not on this platform
 ok 2 skipped without reason # skip
 ```
 ### Scenario: nothing to run is not an error
-_only when `bats --version` succeeds_
+_only when `bats --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `empty.bats` is created.
 - Environment variables are set: LC_ALL.
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
-- Environment variables are set: LC_ALL.
-- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+- Fixture file `notests/none.bats` is created.
 - Environment variables are set: LC_ALL.
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 
 #### When
 ```shell
 bats empty.bats
-mkdir -p notests && cp empty.bats notests/none.bats
 bats notests
 ```
 #### Then
 - after `bats empty.bats`:
   - exit code is `0`
   - stdout equals an exact value
-- after `mkdir -p notests && cp empty.bats notests/none.bats`:
-  - exit code is `0`
 - after `bats notests`:
   - exit code is `0`
   - stdout equals an exact value
@@ -270,7 +266,7 @@ _expected stdout:_
 1..0
 ```
 ### Scenario: a test file that does not exist reports to stderr and leaves stdout empty
-_only when `bats --version` succeeds_
+_only when `bats --version` succeeds · skipped on Windows_
 #### Given
 - Environment variables are set: LC_ALL.
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
@@ -285,7 +281,7 @@ bats missing.bats
 - stderr contains `missing.bats" does not exist.`, `not ok 1 bats-gather-tests`
 
 ### Scenario: an unknown option is rejected before any test runs
-_only when `bats --version` succeeds_
+_only when `bats --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `pass.bats` is created.
 - Environment variables are set: LC_ALL.
@@ -306,7 +302,7 @@ bats --bogus pass.bats
 - stderr contains `Error: Bad command line option '--bogus'`, `Usage: bats [OPTIONS] <tests>`
 
 ### Scenario: no arguments is a usage error, not an empty run
-_only when `bats --version` succeeds_
+_only when `bats --version` succeeds · skipped on Windows_
 #### Given
 - Environment variables are set: LC_ALL.
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
@@ -321,7 +317,7 @@ bats
 - stderr contains `Error: Must specify at least one <test>`, `Usage: bats [OPTIONS] <tests>`
 
 ### Scenario: a file Bash cannot parse fails as the gather-tests pseudo test
-_only when `bats --version` succeeds_
+_only when `bats --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `broken.bats` is created.
 - Environment variables are set: LC_ALL.
@@ -342,7 +338,7 @@ bats broken.bats
 - stderr contains `not ok 1 bats-gather-tests`, `syntax error: unexpected end of file`
 
 ### Scenario: a minimum-version guard the runner cannot meet stops the file
-_only when `bats --version` succeeds_
+_only when `bats --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `future.bats` is created.
 - Environment variables are set: LC_ALL.
@@ -365,7 +361,7 @@ bats future.bats
 - stderr does not contain `ok 1 never runs`, matches `/does not meet required minimum 9\.9\.9/`
 
 ### Scenario: UTF-8 test names survive into the report
-_only when `bats --version` succeeds_
+_only when `bats --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `utf8.bats` is created.
 - Environment variables are set: LC_ALL.
@@ -391,7 +387,7 @@ _expected stdout:_
 ok 1 日本語のテスト ✓
 ```
 ### Scenario: several files on one command line are one numbered run
-_only when `bats --version` succeeds_
+_only when `bats --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `first.bats` is created.
 - Fixture file `second.bats` is created.
@@ -440,7 +436,7 @@ line nobody reads.
 
 Source: `test/e2e/thirdparty/bats/lifecycle.atago.yaml`
 ### Scenario: setup_file runs once, setup and teardown run around every test
-_only when `bats --version` succeeds_
+_only when `bats --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `order.bats` is created.
 - Environment variables are set: LC_ALL.
@@ -467,7 +463,7 @@ bats order.bats
 - file `order.log` equals exact bytes
 
 ### Scenario: a failing setup keeps the body from running and teardown still runs
-_only when `bats --version` succeeds_
+_only when `bats --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `brokensetup.bats` is created.
 - Environment variables are set: LC_ALL.
@@ -487,11 +483,11 @@ bats brokensetup.bats
 ```
 #### Then
 - exit code is `1`
-- stdout contains `not ok 1 body`, `# (from function `setup' in test file brokensetup.bats, line 1)`
+- stdout contains `not ok 1 body`, `` # (from function `setup' in test file brokensetup.bats, line 1) ``
 - file `order.log` equals exact bytes
 
 ### Scenario: teardown still runs when the test itself fails
-_only when `bats --version` succeeds_
+_only when `bats --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `teardown.bats` is created.
 - Environment variables are set: LC_ALL.
@@ -513,7 +509,7 @@ bats teardown.bats
 - file `order.log` equals exact bytes
 
 ### Scenario: the run helper captures the status, the output, and the lines
-_only when `bats --version` succeeds_
+_only when `bats --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `runhelper.bats` is created.
 - Environment variables are set: LC_ALL.
@@ -561,7 +557,7 @@ ok 2 an expected status is part of the call
 ok 3 separate stderr splits the streams
 ```
 ### Scenario: an unmet expected status fails the test with both codes named
-_only when `bats --version` succeeds_
+_only when `bats --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `expected.bats` is created.
 - Environment variables are set: LC_ALL.
@@ -585,7 +581,7 @@ bats expected.bats
 - stdout contains `failed, expected exit code 0, got 3`
 
 ### Scenario: using run flags without declaring the minimum version warns on stderr
-_only when `bats --version` succeeds_
+_only when `bats --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `unguarded.bats` is created.
 - Environment variables are set: LC_ALL.
@@ -605,7 +601,7 @@ bats unguarded.bats
 #### Then
 - exit code is `0`
 - stdout equals an exact value
-- stderr contains `The following warnings were encountered during tests:`, `BW02: Using flags on `run` requires at least BATS_VERSION=1.5.0.`, `Use `bats_require_minimum_version 1.5.0` to fix this message.`
+- stderr contains `The following warnings were encountered during tests:`, `` BW02: Using flags on `run` requires at least BATS_VERSION=1.5.0. ``, `` Use `bats_require_minimum_version 1.5.0` to fix this message. ``
 
 #### Expected output
 _expected stdout:_
@@ -614,7 +610,7 @@ _expected stdout:_
 ok 1 uses a run flag without the version guard
 ```
 ### Scenario: each test gets its own temporary directory, removed when the run ends
-_only when `bats --version` succeeds_
+_only when `bats --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `tmpdir.bats` is created.
 - Environment variables are set: LC_ALL.
@@ -651,7 +647,7 @@ bats --no-tempdir-cleanup tmpdir.bats
   - dir `tmproot` has 1 entry, matches glob `bats-run-*`
 
 ### Scenario: a test can read its own name, number, and file
-_only when `bats --version` succeeds_
+_only when `bats --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `identity.bats` is created.
 - Environment variables are set: LC_ALL.
@@ -677,7 +673,7 @@ bats identity.bats
 - file `identity.log` equals exact bytes
 
 ### Scenario: load pulls in a helper file next to the test
-_only when `bats --version` succeeds_
+_only when `bats --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `helper.bash` is created.
 - Fixture file `uses_helper.bats` is created.
@@ -713,7 +709,7 @@ _expected stdout:_
 ok 1 the helper is in scope
 ```
 ### Scenario: parallel jobs without the parallel binary fail as a raw shell error
-_only when `bats --version` succeeds_
+_only when `bats --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `mixed.bats` is created.
 - Environment variables are set: LC_ALL.
@@ -749,7 +745,7 @@ terminal screen, since that is the only place it exists.
 
 Source: `test/e2e/thirdparty/bats/reporting.atago.yaml`
 ### Scenario: TAP version 13 carries the failure as a YAML block
-_only when `bats --version` succeeds_
+_only when `bats --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `mixed.bats` is created.
 - Environment variables are set: LC_ALL.
@@ -783,7 +779,7 @@ not ok 2 fails
   ...
 ```
 ### Scenario: the JUnit formatter reports counts and the failure element
-_only when `bats --version` succeeds_
+_only when `bats --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `mixed.bats` is created.
 - Environment variables are set: LC_ALL.
@@ -804,7 +800,7 @@ bats --formatter junit mixed.bats
 - stdout contains `<?xml version="1.0" encoding="UTF-8"?>`, `name="mixed.bats" tests="2" failures="1" errors="0" skipped="0"`, `<testcase classname="mixed.bats" name="passes"`, `<failure type="failure">(in test file mixed.bats, line 2)`
 
 ### Scenario: a report formatter writes a file and leaves stdout as TAP
-_only when `bats --version` succeeds_
+_only when `bats --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `mixed.bats` is created.
 - Environment variables are set: LC_ALL.
@@ -833,7 +829,7 @@ bats --report-formatter junit --output reports mixed.bats
   - file `reports/report.xml` contains `tests="2" failures="1"`, `<testcase classname="mixed.bats" name="fails"`
 
 ### Scenario: a report directory that does not exist is refused before the run
-_only when `bats --version` succeeds_
+_only when `bats --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `mixed.bats` is created.
 - Environment variables are set: LC_ALL.
@@ -855,11 +851,9 @@ bats --report-formatter junit --output nosuch mixed.bats
 - the step changed exactly created nothing, modified nothing, deleted nothing
 
 ### Scenario: gathered output is one file per test, named after it, holding what it printed
-_only when `bats --version` succeeds_
+_only when `bats --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `chatty.bats` is created.
-- Environment variables are set: LC_ALL.
-- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 - Environment variables are set: LC_ALL.
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 
@@ -871,20 +865,16 @@ _Fixture `chatty.bats`:_
 ```
 #### When
 ```shell
-mkdir -p gathered
 bats --gather-test-outputs-in gathered chatty.bats
 ```
 #### Then
-- after `mkdir -p gathered`:
-  - exit code is `0`
-- after `bats --gather-test-outputs-in gathered chatty.bats`:
-  - exit code is `1`
-  - dir `gathered` contains `1-prints and passes.log`, contains `2-prints and fails.log`, has 2 entries
-  - file `gathered/1-prints and passes.log` equals exact bytes
-  - file `gathered/2-prints and fails.log` equals exact bytes
+- exit code is `1`
+- dir `gathered` contains `1-prints and passes.log`, contains `2-prints and fails.log`, has 2 entries
+- file `gathered/1-prints and passes.log` equals exact bytes
+- file `gathered/2-prints and fails.log` equals exact bytes
 
 ### Scenario: gathering into a directory that already has files is refused
-_only when `bats --version` succeeds_
+_only when `bats --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `chatty.bats` is created.
 - Fixture file `gathered/leftover.log` is created.
@@ -917,7 +907,7 @@ _expected stderr:_
 Error: Directory 'gathered' must be empty for --gather-test-outputs-in
 ```
 ### Scenario: test output is hidden when it passes and shown when it fails
-_only when `bats --version` succeeds_
+_only when `bats --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `chatty.bats` is created.
 - Environment variables are set: LC_ALL.
@@ -945,7 +935,7 @@ bats --show-output-of-passing-tests chatty.bats
   - stdout contains `# passing output`, `# failing output`
 
 ### Scenario: timing and tracing add to the report without changing the verdict
-_only when `bats --version` succeeds_
+_only when `bats --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `mixed.bats` is created.
 - Environment variables are set: LC_ALL.
@@ -973,7 +963,7 @@ bats --trace mixed.bats
   - stdout contains `# $ [mixed.bats, line 2]`, `# $ false`
 
 ### Scenario: the quoting and file reference in a failure are configurable
-_only when `bats --version` succeeds_
+_only when `bats --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `fail.bats` is created.
 - Environment variables are set: LC_ALL.
@@ -999,7 +989,7 @@ bats --line-reference-format colon fail.bats
 #### Then
 - after `bats fail.bats`:
   - exit code is `1`
-  - stdout contains `# (in test file fail.bats, line 2)`, `#   `false' failed`
+  - stdout contains `# (in test file fail.bats, line 2)`, `` #   `false' failed ``
 - after `bats --code-quote-style [] fail.bats`:
   - exit code is `1`
   - stdout contains `#   [false] failed`
@@ -1042,7 +1032,7 @@ with instructions, when the directory that ledger lives in does not exist.
 
 Source: `test/e2e/thirdparty/bats/selection.atago.yaml`
 ### Scenario: counting reports the number of tests and runs none of them
-_only when `bats --version` succeeds_
+_only when `bats --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `side_effect.bats` is created.
 - Environment variables are set: LC_ALL.
@@ -1070,7 +1060,7 @@ _expected stdout:_
 2
 ```
 ### Scenario: the name filter is a regular expression, not a substring
-_only when `bats --version` succeeds_
+_only when `bats --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `names.bats` is created.
 - Environment variables are set: LC_ALL.
@@ -1121,7 +1111,7 @@ _expected stdout:_
 1
 ```
 ### Scenario: a filter that matches nothing is an empty plan, not a failure
-_only when `bats --version` succeeds_
+_only when `bats --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `names.bats` is created.
 - Environment variables are set: LC_ALL.
@@ -1146,7 +1136,7 @@ _expected stdout:_
 1..0
 ```
 ### Scenario: tags select and deselect tests, and file tags apply to the whole file
-_only when `bats --version` succeeds_
+_only when `bats --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `tagged.bats` is created.
 - Environment variables are set: LC_ALL.
@@ -1237,7 +1227,7 @@ _expected stdout:_
 1..0
 ```
 ### Scenario: rerunning failures requires a run-log directory the user must create
-_only when `bats --version` succeeds_
+_only when `bats --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `mix.bats` is created.
 - Environment variables are set: LC_ALL.
@@ -1261,7 +1251,7 @@ bats --filter-status failed mix.bats
 - dir `.bats` does not exist
 
 ### Scenario: with the run-log directory in place a run records it and the next run replays only the failures
-_only when `bats --version` succeeds_
+_only when `bats --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `mix.bats` is created.
 - Environment variables are set: LC_ALL.
@@ -1304,7 +1294,7 @@ not ok 1 beta fails
 #   `@test "beta fails" { false; }' failed
 ```
 ### Scenario: replaying with nothing to replay says so and stays green
-_only when `bats --version` succeeds_
+_only when `bats --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `green.bats` is created.
 - Environment variables are set: LC_ALL.
@@ -1346,7 +1336,7 @@ _expected stderr:_
 There were no tests of status 'failed' in the last recorded run.
 ```
 ### Scenario: a test the ledger has never seen counts as missed
-_only when `bats --version` succeeds_
+_only when `bats --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `growing.bats` is created.
 - Environment variables are set: LC_ALL.
@@ -1389,7 +1379,7 @@ _expected stdout:_
 ok 1 added afterwards
 ```
 ### Scenario: a directory is walked flat unless recursion is asked for
-_only when `bats --version` succeeds_
+_only when `bats --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `suite/top.bats` is created.
 - Fixture file `suite/sub/nested.bats` is created.

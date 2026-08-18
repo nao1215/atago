@@ -26,6 +26,11 @@ defaults:
   scenario:
     only:
       command: bats --version
+    # bats is a Bash program, and these scenarios drive it through POSIX shell
+    # steps (mkdir, a pseudo-terminal), so the suite is scoped to POSIX rather
+    # than left to fail halfway on a Windows shell that has neither.
+    skip:
+      os: windows
   run:
     sandbox_home: true
     env:
@@ -184,11 +189,9 @@ scenarios:
           stdout:
             equals: |
               1..0
-      - run:
-          shell: true
-          command: mkdir -p notests && cp empty.bats notests/none.bats
-      - assert:
-          exit_code: 0
+      - fixture:
+          file: notests/none.bats
+          content: ""
       - run:
           command: bats notests
       - assert:

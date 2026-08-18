@@ -683,7 +683,7 @@ func writeThen(md *markdown.Markdown, sc *spec.Scenario, expand func(string) str
 			}
 			continue
 		}
-		fmt.Fprintf(&b, "- after %s:\n", markdown.Code(g.action))
+		fmt.Fprintf(&b, "- after %s:\n", inlineCode(g.action))
 		for _, bl := range g.bullets {
 			fmt.Fprintf(&b, "  - %s\n", bl)
 		}
@@ -698,7 +698,7 @@ func generatedArtifacts(sc *spec.Scenario) []string {
 	paths := spec.GeneratedArtifacts(sc)
 	out := make([]string, 0, len(paths))
 	for _, p := range paths {
-		out = append(out, markdown.Code(p))
+		out = append(out, inlineCode(p))
 	}
 	return out
 }

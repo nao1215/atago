@@ -60,6 +60,39 @@ func TestCode_QuotesInvisibleValues(t *testing.T) {
 	}
 }
 
+// TestInlineCode_SurvivesEmbeddedBackticks proves a value carrying backticks is
+// published as a span the reader sees whole. Asserted output quotes commands —
+// a bats failure reports `false' failed — and wrapping that in single ticks
+// ended the span at the value's own tick, spilling the rest of the assertion
+// into the page as prose. The delimiter now grows past the longest run inside
+// the value, and the space padding CommonMark strips keeps a leading or
+// trailing tick inside the span.
+func TestInlineCode_SurvivesEmbeddedBackticks(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{name: "no backtick keeps the single tick", in: "ok 1 passes", want: "`ok 1 passes`"},
+		{name: "one backtick inside", in: "`false' failed", want: "`` `false' failed ``"},
+		{name: "backtick at both ends", in: "`cmd`", want: "`` `cmd` ``"},
+		{name: "longest run wins", in: "a ``b`` c", want: "``` a ``b`` c ```"},
+		{name: "backtick only", in: "`", want: "`` ` ``"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := inlineCode(tt.in); got != tt.want {
+				t.Errorf("inlineCode(%q) = %s, want %s", tt.in, got, tt.want)
+			}
+			if got := code(tt.in); got != tt.want {
+				t.Errorf("code(%q) = %s, want %s", tt.in, got, tt.want)
+			}
+		})
+	}
+}
+
 // TestCodeList_QuotesInvisibleValues carries the same rule through the
 // contains/not_contains renderer, the path an assertion on a control character
 // actually takes.
