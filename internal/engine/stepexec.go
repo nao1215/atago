@@ -116,7 +116,8 @@ func timeoutKillCheck(res *runner.Result, steps []spec.Step, i int) *assert.Chec
 func unresolvedRunRefMsg(field, name string, shellExpandable bool) string {
 	if envName, isEnv := strings.CutPrefix(name, "env:"); isEnv {
 		return fmt.Sprintf(
-			"%s references ${env:%s}, but the environment variable %s is not set", field, envName, envName)
+			"%s references ${env:%s}, but the environment variable %s is not set; set it or write $${env:%s} for the literal text",
+			field, envName, envName, envName)
 	}
 	if shellExpandable {
 		return fmt.Sprintf(
@@ -160,27 +161,39 @@ func runRefGuard(st *store.Store, run *spec.Run, runners map[string]spec.Runner)
 	if isSSHRunner(run.Runner, runners) {
 		return ""
 	}
-	if !run.ShellEnabled() {
-		if names := st.Unresolved(run.Command); len(names) > 0 {
-			return unresolvedRunRefMsg("run.command", names[0], true)
+	return commandRefGuard(st, "run", run.Command, run.Cwd, run.ShellEnabled())
+}
+
+// commandRefGuard is the guard itself, over the command and working directory a
+// step starts a process with. It is shared by `run` and `pty` steps: a pty step
+// launches a process the same way, so a reference nothing can expand reaches the
+// OS the same way — and the session entries inside a pty step were guarded from
+// the start while the command that starts the session was not, which is a
+// difference the author of a spec has no reason to expect. prefix names the step
+// kind for the message ("run" / "pty").
+func commandRefGuard(st *store.Store, prefix, command, cwd string, shell bool) string {
+	commandField, cwdField := prefix+".command", prefix+".cwd"
+	if !shell {
+		if names := st.Unresolved(command); len(names) > 0 {
+			return unresolvedRunRefMsg(commandField, names[0], true)
 		}
 	} else {
-		for _, name := range st.Unresolved(run.Command) {
+		for _, name := range st.Unresolved(command) {
 			if strings.HasPrefix(name, "env:") {
-				return unresolvedRunRefMsg("run.command", name, true)
+				return unresolvedRunRefMsg(commandField, name, true)
 			}
 		}
 	}
-	if names := st.Unresolved(run.Cwd); len(names) > 0 {
-		return unresolvedRunRefMsg("run.cwd", names[0], false)
+	if names := st.Unresolved(cwd); len(names) > 0 {
+		return unresolvedRunRefMsg(cwdField, names[0], false)
 	}
-	if !run.ShellEnabled() {
-		if _, leaked := st.ExpandDetectingLeaks(run.Command); len(leaked) > 0 {
-			return leakedRunRefMsg("run.command", leaked[0])
+	if !shell {
+		if _, leaked := st.ExpandDetectingLeaks(command); len(leaked) > 0 {
+			return leakedRunRefMsg(commandField, leaked[0])
 		}
 	}
-	if _, leaked := st.ExpandDetectingLeaks(run.Cwd); len(leaked) > 0 {
-		return leakedRunRefMsg("run.cwd", leaked[0])
+	if _, leaked := st.ExpandDetectingLeaks(cwd); len(leaked) > 0 {
+		return leakedRunRefMsg(cwdField, leaked[0])
 	}
 	return ""
 }
@@ -319,7 +332,7 @@ func (x *scenarioRun) execRunStep(ctx context.Context, steps []spec.Step, i int,
 	sr := StepResult{Index: i, Kind: step.Kind()}
 	status := StatusPassed
 	if msg := runRefGuard(x.st, step.Run, x.rc.runners); msg != "" {
-		sr.ErrMsg = msg
+		sr.ErrMsg = diag.VariableUnresolved.Annotate(msg)
 		return sr, StatusError, false
 	}
 	run := mergeScenarioEnv(x.scEnv, expandRun(x.st, step.Run), x.st)

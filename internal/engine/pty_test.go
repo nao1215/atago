@@ -669,3 +669,118 @@ scenarios:
 		t.Fatalf("want a failing expect check, got %+v", fstep.Checks)
 	}
 }
+
+// TestEngine_PTY_UnresolvedCommandVarErrors closes the half of the pty step the
+// session guard never covered: the command that STARTS the session. Every entry
+// inside `session:` refuses an unresolved reference before any I/O, while the
+// command itself was expanded with the reference left verbatim and handed to
+// the OS — so `command: "myapp ${env:PROFILE}"` with PROFILE unset started a
+// program with the literal text as an argument, and the failure came from the
+// program rather than from the mistake in the spec.
+func TestEngine_PTY_UnresolvedCommandVarErrors(t *testing.T) {
+	skipOnWindows(t)
+	t.Parallel()
+	res := runSpec(t, `
+version: "1"
+suite:
+  name: v
+scenarios:
+  - name: typo in the pty command
+    steps:
+      - pty:
+          command: "cat ${no_such_var}"
+          timeout: 10s
+          session:
+            - send: {key: ctrl-d}
+`)
+	if res.Status != StatusError {
+		t.Fatalf("status = %s, want error: %+v", res.Status, res.Scenarios)
+	}
+	msg := res.Scenarios[0].Steps[0].ErrMsg
+	if !strings.Contains(msg, "${no_such_var}") || !strings.Contains(msg, "$${no_such_var}") {
+		t.Errorf("error should name the reference and the $${...} literal escape, got %q", msg)
+	}
+}
+
+// TestEngine_PTY_UnresolvedEnvCommandUnderShellErrors: with shell: true a bare
+// ${name} is the shell's own syntax and stays deferred, exactly as it is for a
+// run step — but ${env:NAME} is atago-only syntax no shell expands, so an unset
+// one is still the spec's mistake.
+func TestEngine_PTY_UnresolvedEnvCommandUnderShellErrors(t *testing.T) {
+	skipOnWindows(t)
+	t.Parallel()
+	res := runSpec(t, `
+version: "1"
+suite:
+  name: v
+scenarios:
+  - name: unset env reference in a shell pty command
+    steps:
+      - pty:
+          command: "cat ${env:ATAGO_SURELY_UNSET_PTY}"
+          shell: true
+          timeout: 10s
+          session:
+            - send: {key: ctrl-d}
+`)
+	if res.Status != StatusError {
+		t.Fatalf("status = %s, want error: %+v", res.Status, res.Scenarios)
+	}
+	msg := res.Scenarios[0].Steps[0].ErrMsg
+	if !strings.Contains(msg, "ATAGO_SURELY_UNSET_PTY") {
+		t.Errorf("error should name the env variable, got %q", msg)
+	}
+}
+
+// TestEngine_PTY_ShellCommandDefersBareReference is the other side of that
+// rule: under shell: true the shell expands ${HOME} itself, so atago must not
+// refuse it.
+func TestEngine_PTY_ShellCommandDefersBareReference(t *testing.T) {
+	skipOnWindows(t)
+	t.Parallel()
+	res := runSpec(t, `
+version: "1"
+suite:
+  name: v
+scenarios:
+  - name: a shell variable is the shell's business
+    steps:
+      - pty:
+          command: 'printf "%s\n" "${HOME}"'
+          shell: true
+          timeout: 10s
+          session:
+            - expect: "/"
+`)
+	if res.Status == StatusError {
+		t.Fatalf("status = error, want the shell to expand ${HOME}: %+v", res.Scenarios[0].Steps[0].ErrMsg)
+	}
+}
+
+// TestEngine_PTY_UnresolvedCwdVarErrors: cwd is passed to the OS verbatim and
+// never shell-expanded, so an unresolved reference there can only ever name a
+// directory that does not exist.
+func TestEngine_PTY_UnresolvedCwdVarErrors(t *testing.T) {
+	skipOnWindows(t)
+	t.Parallel()
+	res := runSpec(t, `
+version: "1"
+suite:
+  name: v
+scenarios:
+  - name: typo in the pty cwd
+    steps:
+      - pty:
+          command: cat
+          cwd: "${no_such_dir}"
+          timeout: 10s
+          session:
+            - send: {key: ctrl-d}
+`)
+	if res.Status != StatusError {
+		t.Fatalf("status = %s, want error: %+v", res.Status, res.Scenarios)
+	}
+	if msg := res.Scenarios[0].Steps[0].ErrMsg; !strings.Contains(msg, "${no_such_dir}") {
+		t.Errorf("error should name the reference, got %q", msg)
+	}
+}

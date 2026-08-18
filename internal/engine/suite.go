@@ -195,7 +195,7 @@ func (x *suiteStepper) execRun(ctx context.Context, step *spec.Step, i int, sr *
 	// typo in suite.setup errors with the explained diagnostic instead of
 	// leaking the literal reference into argv (#243).
 	if msg := runRefGuard(x.rt.st, step.Run, x.rc.runners); msg != "" {
-		sr.ErrMsg = msg
+		sr.ErrMsg = diag.VariableUnresolved.Annotate(msg)
 		return true
 	}
 	run := mergeScenarioEnv(resolvableEnv(x.rt.st, x.rt.env), expandRun(x.rt.st, step.Run), x.rt.st)
