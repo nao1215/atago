@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/spec"
 )
 
@@ -532,6 +533,31 @@ func TestDriveSession_ExecFailureIsHard(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestRunSessionExec_CancelIsNotATimeout pins the diagnostic identity of an
+// interrupted helper. A Ctrl-C that lands while an exec: runs is ATG4103 — the
+// run was interrupted — not ATG4101, whose published fix tells the author to
+// raise `timeout:`, a bound that had nothing to do with what happened. The
+// context is canceled before the call, so the command never starts and the
+// case is deterministic on every OS.
+func TestRunSessionExec_CancelIsNotATimeout(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	err := runSessionExec(ctx, &spec.PTYExec{Command: "unused-because-the-context-is-already-canceled"}, t.TempDir(), nil)
+	if err == nil {
+		t.Fatal("a canceled exec must be an error")
+	}
+	if !strings.Contains(err.Error(), "canceled") {
+		t.Errorf("error %q should say the exec was canceled", err)
+	}
+	if !strings.Contains(err.Error(), diag.RunInterrupted.String()) {
+		t.Errorf("error %q should carry %s, the interrupt diagnostic", err, diag.RunInterrupted)
+	}
+	if strings.Contains(err.Error(), diag.StepTimeout.String()) {
+		t.Errorf("error %q must not claim the step outlasted a timeout", err)
 	}
 }
 
