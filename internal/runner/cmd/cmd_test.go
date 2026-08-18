@@ -419,8 +419,8 @@ func TestRun_ParentCancelIsNotNormalExit(t *testing.T) {
 // TestRun_ShellCancelKillsChildPromptly is the regression for the pipe-orphan
 // hang: a cancelled `sh -c "sleep 30"` used to block cmd.Wait for the full 30s
 // because the orphaned sleep kept the captured stdout pipe open. Killing the
-// whole process group (POSIX) or force-closing the pipes after WaitDelay
-// (Windows) must let Run return in well under the sleep duration.
+// whole tree — the process group on POSIX, `taskkill /T` on Windows — must let
+// Run return in well under the sleep duration.
 func TestRun_ShellCancelKillsChildPromptly(t *testing.T) {
 	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
@@ -428,9 +428,9 @@ func TestRun_ShellCancelKillsChildPromptly(t *testing.T) {
 		time.Sleep(50 * time.Millisecond)
 		cancel()
 	}()
-	// Not t.TempDir(): on Windows the orphaned child (no process groups) may
-	// briefly outlive the kill while holding the workdir open, and TempDir's
-	// cleanup would fail the test on that unrelated race. Best-effort cleanup.
+	// Not t.TempDir(): a child that outlives the kill holds the workdir open, and
+	// TempDir's cleanup would then fail the test on that instead of on the
+	// elapsed-time assertion below. Best-effort cleanup.
 	//nolint:usetesting // Deliberate, for the reason above: TempDir's cleanup is fatal.
 	wd, err := os.MkdirTemp("", "atago-cancel-")
 	if err != nil {
