@@ -527,3 +527,50 @@ scenarios:
           stderr:
             contains:
               - "must set exactly one of exists/contains/not_contains/executable/equals/equals_file/json/snapshot"
+
+  - name: a list written where one value belongs names the key and the shape
+    steps:
+      # The decoder's own message names a Go type and the outermost struct
+      # field ("Spec.Scenarios of type string"), which is true and useless: the
+      # mistake is one key deep in the file, and the key next to it — contains —
+      # is the one that does take a list.
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                steps:
+                  - run: {command: echo}
+                  - assert:
+                      stdout:
+                        matches:
+                          - "^h"
+                          - "i$"
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr:
+            contains:
+              - '"matches" takes a single value, not a list'
+              - "one assert per pattern"
+
+  - name: a mapping written where text belongs names the key too
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                steps:
+                  - run:
+                      command:
+                        bin: echo
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr:
+            contains: '"command" takes a single value, not a mapping'

@@ -233,9 +233,9 @@ func loadBytesWithProject(path string, data []byte, proj *Project) (*spec.Spec, 
 func formatYAMLError(err error) string {
 	var yerr yaml.Error
 	if errors.As(err, &yerr) {
-		return suggestScalarMatcher(suggestUnknownField(yaml.FormatError(err, false, true)))
+		return suggestCollectionShape(suggestScalarMatcher(suggestUnknownField(yaml.FormatError(err, false, true))))
 	}
-	return suggestScalarMatcher(suggestUnknownField(err.Error()))
+	return suggestCollectionShape(suggestScalarMatcher(suggestUnknownField(err.Error())))
 }
 
 // classifyYAMLError picks the diagnostic for a decode failure. goccy reports
