@@ -87,7 +87,11 @@ func runSessionExec(ctx context.Context, e *spec.PTYExec, dir string, env []stri
 	case errors.Is(runCtx.Err(), context.DeadlineExceeded):
 		return diag.StepTimeout.Errorf("exec %q did not finish within %s%s", e.Command, timeout, execOutputSuffix(detail))
 	case errors.Is(ctx.Err(), context.Canceled):
-		return diag.StepTimeout.Errorf("exec %q was canceled after %s: %w", e.Command, time.Since(start).Round(time.Millisecond), ctx.Err())
+		// The session's OWN budget running out is the deadline case above; a
+		// cancel arriving through the parent context is an interrupt (Ctrl-C, a
+		// suite cancel), and must say so: the timeout code's published fix tells
+		// the author to raise `timeout:`, a bound that had nothing to do with it.
+		return diag.RunInterrupted.Errorf("exec %q was canceled after %s: %w", e.Command, time.Since(start).Round(time.Millisecond), ctx.Err())
 	}
 	var exitErr *exec.ExitError
 	if errors.As(runErr, &exitErr) {
