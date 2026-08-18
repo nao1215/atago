@@ -139,6 +139,7 @@ docs: ## Regenerate the committed behavior docs under doc/e2e/ and the error ref
 	./dist/$(APP) doc --out doc/e2e/age.md         ./test/e2e/thirdparty/age
 	./dist/$(APP) doc --out doc/e2e/sops.md        ./test/e2e/thirdparty/sops
 	./dist/$(APP) doc --out doc/e2e/kustomize.md   ./test/e2e/thirdparty/kustomize
+	./dist/$(APP) doc --out doc/e2e/kubectx.md     ./test/e2e/thirdparty/kubectx
 	./dist/$(APP) doc --out doc/e2e/prometheus.md  ./test/e2e/thirdparty/prometheus
 	./dist/$(APP) doc --out doc/e2e/rclone.md      ./test/e2e/thirdparty/rclone
 	./dist/$(APP) doc --out doc/e2e/restic.md      ./test/e2e/thirdparty/restic

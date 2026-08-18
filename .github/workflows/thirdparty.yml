@@ -16,7 +16,7 @@ name: ThirdParty
 # found minutes after it lands rather than at the next nightly. It deliberately
 # does NOT gate pull requests: one run in five fails for reasons that have
 # nothing to do with the change under review — a CDN hiccup installing one of
-# 44 programs, or a real terminal UI missing its budget on a loaded runner — and
+# 45 programs, or a real terminal UI missing its budget on a loaded runner — and
 # a gate that cries wolf at that rate teaches people to merge past it.
 on:
   workflow_dispatch:
@@ -189,6 +189,16 @@ jobs:
           - name: kustomize
             dir: ./test/e2e/thirdparty/kustomize
             install: go install sigs.k8s.io/kustomize/kustomize/v5@v5.8.1
+          # kubectx and kubens switch kubectl contexts and namespaces. The specs
+          # drive throwaway kubeconfigs in the scenario workdir and never reach a
+          # cluster, and fzf is installed so the interactive picker scenario runs
+          # instead of skipping.
+          - name: kubectx
+            dir: ./test/e2e/thirdparty/kubectx
+            install: |
+              go install github.com/ahmetb/kubectx/cmd/kubectx@v0.11.0
+              go install github.com/ahmetb/kubectx/cmd/kubens@v0.11.0
+              go install github.com/junegunn/fzf@v0.74.0
           # actionlint statically lints GitHub Actions workflows offline; the
           # specs disable shellcheck so results do not depend on its presence.
           - name: actionlint
