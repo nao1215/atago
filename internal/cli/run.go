@@ -236,6 +236,8 @@ func parseRunFlags(label string, args []string, stdout, stderr io.Writer) (*runO
 	}
 	if *ci {
 		// Force deterministic, color-free output. Secret masking is always on.
+		//nolint:forbidigo // Process-wide on purpose, and set once during flag parsing:
+		// --ci has to reach the color decision in every package, before any scenario runs.
 		_ = os.Setenv("NO_COLOR", "1")
 	}
 

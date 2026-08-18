@@ -127,6 +127,9 @@ func (a *artifactSet) step(step *Step) {
 				a.add(act.Screenshot.Path)
 			}
 		}
+	case StepFixture, StepQuery, StepGRPC, StepStore, StepService, StepPTY, StepSignal, StepMockServer:
+		// No generated artifact. A fixture writes an INPUT, and the rest produce
+		// no file path of their own.
 	}
 }
 
@@ -277,6 +280,10 @@ func (n *noteSet) step(step *Step, runners map[string]Runner) {
 		// elsewhere); the process it starts deserves the same scrutiny as a
 		// scenario-level service.
 		n.service(step.Service)
+	case StepFixture, StepAssert, StepStore, StepSignal, StepMockServer:
+		// No note of their own: none of these reaches the network or starts a
+		// process. Their host-environment reads are still reported, by the
+		// kind-independent CollectStepVars walk below.
 	}
 	// Host-environment reads are one rule for every kind: any ${env:} in a
 	// field the engine expands, found through the same walkers the engine

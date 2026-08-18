@@ -74,10 +74,10 @@ func (e *Engine) runRepeated(ctx context.Context, idx int, sc *spec.Scenario, rc
 	// "not a failure" alongside a pass.
 	passed, errored := 0, 0
 	for _, st := range iterations {
-		switch st {
-		case StatusPassed, StatusSkipped:
+		if st.cleanIteration() {
 			passed++
-		case StatusError:
+		}
+		if st == StatusError {
 			errored++
 		}
 	}
@@ -141,6 +141,12 @@ func applyExpectFail(sc *spec.Scenario, res ScenarioResult) ScenarioResult {
 		res.Status = StatusXFail
 	case StatusPassed:
 		res.Status = StatusXPass
+	case StatusSkipped, StatusError:
+		// Left alone, for the reasons above.
+	case StatusXFail, StatusXPass, StatusFlaky:
+		// Unreachable: this maps the verdict of the single run an expect_fail
+		// scenario gets, and one run never produces a folded or already-remapped
+		// status.
 	}
 	return res
 }

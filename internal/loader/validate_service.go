@@ -104,11 +104,12 @@ func validateMockRoutes(add addFunc, where string, routes []spec.MockRoute) {
 		if rt.Method == "" {
 			add(diag.RequiredKey, "%s.method is required", rw)
 		}
-		if rt.Path == "" {
+		switch {
+		case rt.Path == "":
 			add(diag.RequiredKey, "%s.path is required", rw)
-		} else if !strings.HasPrefix(rt.Path, "/") {
+		case !strings.HasPrefix(rt.Path, "/"):
 			add(diag.BadFormat, "%s.path %q must start with \"/\"", rw, rt.Path)
-		} else if strings.Contains(rt.Path, "?") {
+		case strings.Contains(rt.Path, "?"):
 			// Matching compares the request's path, which the server has already
 			// split from its query, so a declared query can never be part of a
 			// match. Serve on the path and assert the query with the mock

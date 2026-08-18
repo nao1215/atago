@@ -602,9 +602,13 @@ func parsePositiveDuration(s string) time.Duration {
 }
 
 func checkRenderedScreen(es *spec.PTYExpectScreen, screen []byte, cells [][]runner.ScreenCell) *assert.CheckResult {
+	// A mid-session screen check needs no run context: the loader rejects snapshot
+	// and trim inside expect_screen, so there is no workdir, spec directory, or
+	// snapshot bookkeeping for this comparison to read.
+	env := assert.Env{} //nolint:exhaustruct // deliberately empty, per the comment above
 	return assert.Check(&spec.Assert{Screen: &es.ScreenAssert}, &runner.Result{
 		IsPTY:       true,
 		Screen:      screen,
 		ScreenCells: cells,
-	}, assert.Env{})
+	}, env)
 }

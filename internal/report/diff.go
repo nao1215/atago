@@ -155,11 +155,12 @@ func diffOps(a, b []string) []diffOp {
 	}
 	for i := n - 1; i >= 0; i-- {
 		for j := m - 1; j >= 0; j-- {
-			if a[i] == b[j] {
+			switch {
+			case a[i] == b[j]:
 				lcs[i][j] = lcs[i+1][j+1] + 1
-			} else if lcs[i+1][j] >= lcs[i][j+1] {
+			case lcs[i+1][j] >= lcs[i][j+1]:
 				lcs[i][j] = lcs[i+1][j]
-			} else {
+			default:
 				lcs[i][j] = lcs[i][j+1]
 			}
 		}

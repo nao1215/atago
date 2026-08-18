@@ -167,7 +167,7 @@ func (m *Masker) Mask(s string) string {
 		return s
 	}
 	covered := make([]bool, len(s))
-	any := false
+	masked := false
 	for _, v := range m.values {
 		for i := 0; ; {
 			j := strings.Index(s[i:], v)
@@ -178,13 +178,13 @@ func (m *Masker) Mask(s string) string {
 			for k := start; k < start+len(v); k++ {
 				covered[k] = true
 			}
-			any = true
+			masked = true
 			// Advance by one, not len(v), so overlapping occurrences of the same
 			// secret are all covered — "aaaa" occurs three times in "aaaaaa".
 			i = start + 1
 		}
 	}
-	if !any {
+	if !masked {
 		return s
 	}
 	var b strings.Builder

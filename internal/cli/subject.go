@@ -194,10 +194,14 @@ func toSet(names []string) map[string]bool {
 func exposeSubjects(built []builtSubject) error {
 	for _, b := range built {
 		dir := filepath.Dir(b.Artifact)
+		//nolint:forbidigo // Process-wide on purpose, as the doc comment above explains,
+		// and done once after the build and before any scenario starts, so no parallel
+		// scenario ever observes the mutation happening.
 		if err := os.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH")); err != nil {
 			return err
 		}
 		for k, v := range b.Env {
+			//nolint:forbidigo // Same one-time subject exposure as the PATH prepend above.
 			if err := os.Setenv(k, v); err != nil {
 				return err
 			}

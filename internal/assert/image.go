@@ -146,29 +146,29 @@ func checkExactDim(path, dim string, want *int, got int) *CheckResult {
 	}
 }
 
-func checkMinDim(path, dim string, min *int, got int) *CheckResult {
-	if min == nil || got >= *min {
+func checkMinDim(path, dim string, want *int, got int) *CheckResult {
+	if want == nil || got >= *want {
 		return nil
 	}
-	desc := fmt.Sprintf("assert image %q %s >= %d", path, dim, *min)
+	desc := fmt.Sprintf("assert image %q %s >= %d", path, dim, *want)
 	return &CheckResult{
 		Desc:     desc,
-		Expected: fmt.Sprintf("%s >= %dpx", dim, *min),
+		Expected: fmt.Sprintf("%s >= %dpx", dim, *want),
 		Actual:   fmt.Sprintf("%s %dpx", dim, got),
-		Hint:     fmt.Sprintf("image %q %s %dpx is below the minimum %dpx", path, dim, got, *min),
+		Hint:     fmt.Sprintf("image %q %s %dpx is below the minimum %dpx", path, dim, got, *want),
 	}
 }
 
-func checkMaxDim(path, dim string, max *int, got int) *CheckResult {
-	if max == nil || got <= *max {
+func checkMaxDim(path, dim string, want *int, got int) *CheckResult {
+	if want == nil || got <= *want {
 		return nil
 	}
-	desc := fmt.Sprintf("assert image %q %s <= %d", path, dim, *max)
+	desc := fmt.Sprintf("assert image %q %s <= %d", path, dim, *want)
 	return &CheckResult{
 		Desc:     desc,
-		Expected: fmt.Sprintf("%s <= %dpx", dim, *max),
+		Expected: fmt.Sprintf("%s <= %dpx", dim, *want),
 		Actual:   fmt.Sprintf("%s %dpx", dim, got),
-		Hint:     fmt.Sprintf("image %q %s %dpx exceeds the maximum %dpx", path, dim, got, *max),
+		Hint:     fmt.Sprintf("image %q %s %dpx exceeds the maximum %dpx", path, dim, got, *want),
 	}
 }
 

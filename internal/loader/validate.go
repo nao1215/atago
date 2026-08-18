@@ -555,11 +555,12 @@ func validateSuiteBlock(add addFunc, where string, steps []spec.Step, runners ma
 				continue
 			}
 			svc := st.Service
-			if svc.Name == "" {
+			switch {
+			case svc.Name == "":
 				add(diag.RequiredKey, "%s.service.name is required", sw)
-			} else if seenService[svc.Name] {
+			case seenService[svc.Name]:
 				add(diag.DuplicateName, "%s: duplicate suite service name %q", where, svc.Name)
-			} else {
+			default:
 				seenService[svc.Name] = true
 			}
 			if svc.Command == "" {
@@ -575,15 +576,21 @@ func validateSuiteBlock(add addFunc, where string, steps []spec.Step, runners ma
 				continue
 			}
 			ms := st.MockServer
-			if ms.Name == "" {
+			switch {
+			case ms.Name == "":
 				add(diag.RequiredKey, "%s.mock_server.name is required", sw)
-			} else if seenMock[ms.Name] {
+			case seenMock[ms.Name]:
 				add(diag.DuplicateName, "%s: duplicate suite mock server name %q", where, ms.Name)
-			} else {
+			default:
 				seenMock[ms.Name] = true
 			}
 			validateMockRoutes(add, sw+".mock_server", ms.Routes)
-		default:
+		case spec.StepHTTP, spec.StepQuery, spec.StepGRPC, spec.StepCDP, spec.StepPTY, spec.StepSignal:
+			// The six per-scenario kinds, named rather than defaulted so a new step
+			// kind has to answer "does suite level allow this?" instead of
+			// inheriting "no" in silence. The one-action check above guarantees
+			// Kind() is one of the twelve, so these are exactly what the old
+			// default saw.
 			add(diag.BlockNotHere, "%s: %s steps are per-scenario (they need a scenario workdir and runners); move it into a scenario", sw, st.Kind())
 		}
 	}
@@ -667,9 +674,11 @@ func measurableStep(k spec.StepKind) bool {
 	switch k {
 	case spec.StepRun, spec.StepHTTP, spec.StepQuery, spec.StepGRPC, spec.StepPTY:
 		return true
-	default:
+	case spec.StepFixture, spec.StepCDP, spec.StepAssert, spec.StepStore, spec.StepService, spec.StepSignal, spec.StepMockServer:
+		// Not timed: none of these produces the result a duration assert reads.
 		return false
 	}
+	return false
 }
 
 // nonNegativeDuration validates a wall-clock duration field that may be zero

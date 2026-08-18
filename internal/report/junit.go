@@ -127,6 +127,9 @@ func buildJUnit(results []*engine.SuiteResult, allowXPass bool, loadFailures []L
 				}
 				tc.Failure = &junitMessage{Message: xpassMessage(sc), Body: detailText(sc)}
 				ts.Failures++
+			case engine.StatusPassed:
+				// A bare <testcase> with no child element: JUnit's way of saying
+				// it passed.
 			}
 			if td := stepsDetailText(sc.Teardown); td != "" {
 				tc.SystemErr = "teardown failed (the verdict is decided by the steps alone):\n" + td

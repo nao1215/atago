@@ -418,7 +418,10 @@ scenarios:
 		t.Errorf("manifest browser_args = %v, want two entries", web.BrowserArgs)
 	}
 	// The config must not leak into unrelated runner types when absent.
-	out, _ := json.Marshal(doc)
+	out, err := json.Marshal(doc)
+	if err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	}
 	if strings.Count(string(out), "\"headless\"") != 1 {
 		t.Errorf("headless should appear exactly once in the manifest JSON:\n%s", out)
 	}

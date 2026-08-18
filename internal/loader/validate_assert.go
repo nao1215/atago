@@ -62,8 +62,8 @@ func validateAssertTarget(add addFunc, where string, a *spec.Assert, target spec
 		validateChanges(add, where+".assert.changes", a.Changes)
 	case spec.AssertPDF:
 		validatePDF(add, where+".assert.pdf", a.PDF)
-	case spec.AssertGRPCStatus:
-		// grpc_status is a bare int; no further shape to validate.
+	case spec.AssertStatus, spec.AssertGRPCStatus:
+		// Both are a bare *int; there is no shape to validate beyond the decode.
 	}
 }
 

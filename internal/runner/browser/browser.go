@@ -146,6 +146,9 @@ func (r *Runner) Run(ctx context.Context, actions []spec.CDPAction, workdir stri
 	}
 
 	start := time.Now()
+	//nolint:contextcheck // runCtx is rooted at the persistent browser context rather than
+	// at ctx on purpose: the chromedp session has to outlive a single step. The caller's
+	// cancellation still reaches it through the AfterFunc above, which is what #14 asked for.
 	if err := chromedp.Run(runCtx, tasks...); err != nil {
 		return nil, fmt.Errorf("cdp run: %w", err)
 	}
@@ -285,12 +288,25 @@ func buildTasks(actions []spec.CDPAction, workdir string) (chromedp.Tasks, []cap
 	return tasks, caps, shots, nil
 }
 
+// jsStringLiteral renders s as a JavaScript string literal for embedding in an
+// evaluated snippet. json.Marshal is the correct escaper (a selector may carry
+// quotes, backslashes, or newlines) and cannot fail for a string, so the error is
+// swallowed here, once, with the reason written down.
+func jsStringLiteral(s string) string {
+	b, err := json.Marshal(s)
+	if err != nil {
+		// Unreachable: encoding a Go string never fails.
+		return `""`
+	}
+	return string(b)
+}
+
 // setChecked ticks or unticks a checkbox/radio by setting its checked property
 // and dispatching a change event, so listeners react as they would to a click.
 // Selecting by property (not a click) keeps the action deterministic regardless
 // of the element's current state.
 func setChecked(selector string, checked bool) chromedp.Action {
-	sel, _ := json.Marshal(selector)
+	sel := jsStringLiteral(selector)
 	js := fmt.Sprintf(`(() => {
 	const el = document.querySelector(%s);
 	if (!el) throw new Error('check: no element for selector ' + %s);

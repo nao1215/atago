@@ -34,7 +34,13 @@ type streamSanitizer struct {
 func (s *streamSanitizer) feed(chunk []byte) []byte {
 	buf := chunk
 	if len(s.carry) > 0 {
-		buf = append(s.carry, chunk...)
+		// A fresh slice rather than append(s.carry, chunk...): appending into
+		// carry's spare capacity would leave buf aliasing the carry buffer, and the
+		// next chunk's append could then rewrite bytes this call already handed to
+		// the emulator. Transcript bytes have been corrupted that way before.
+		buf = make([]byte, 0, len(s.carry)+len(chunk))
+		buf = append(buf, s.carry...)
+		buf = append(buf, chunk...)
 		s.carry = nil
 	}
 	split := incompleteEscapeStart(buf)

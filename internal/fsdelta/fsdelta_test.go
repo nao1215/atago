@@ -130,7 +130,7 @@ func TestScan_TracksSymlinksByTarget(t *testing.T) {
 		t.Skip("symlink creation is restricted on Windows")
 	}
 	root := t.TempDir()
-	target := filepath.Join(root, "real.txt")
+	target := filepath.Join(root, "regular.txt")
 	if err := os.WriteFile(target, []byte("data"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -148,11 +148,11 @@ func TestScan_TracksSymlinksByTarget(t *testing.T) {
 	if want := "symlink:" + filepath.ToSlash(target); got != want {
 		t.Errorf("symlink fingerprint = %q, want %q", got, want)
 	}
-	real, ok := snap["real.txt"]
+	regular, ok := snap["regular.txt"]
 	if !ok {
 		t.Fatalf("regular file should be tracked, snapshot = %v", snap)
 	}
-	if real == got {
+	if regular == got {
 		t.Errorf("symlink and its target share a fingerprint %q", got)
 	}
 }
@@ -520,6 +520,8 @@ func (sp entrySpecimen) specimenRoot(t *testing.T) string {
 // unix socket bound inside it fits in sun_path on macOS as well as Linux.
 func shortTempDir(t *testing.T) string {
 	t.Helper()
+	//nolint:usetesting // t.TempDir() embeds the test name, and a unix socket bound
+	// inside the result would overflow sun_path on macOS. The short prefix is the point.
 	dir, err := os.MkdirTemp("", "atg")
 	if err != nil {
 		t.Fatal(err)

@@ -77,6 +77,8 @@ func (rt *suiteRuntime) stop() {
 // nothing.
 func (e *Engine) newSuiteRuntime(s *spec.Spec, specDir, fixturesDir string) (*suiteRuntime, error) {
 	if len(s.Suite.Setup) == 0 && len(s.Suite.Teardown) == 0 && len(s.Suite.Env) == 0 {
+		//nolint:nilnil // A spec with no suite-level blocks needs no runtime; absent is not
+		// an error, and the caller's nil check is what keeps the common case free.
 		return nil, nil
 	}
 	dir, err := os.MkdirTemp("", "atago-suite-")
@@ -178,10 +180,13 @@ func (x *suiteStepper) exec(ctx context.Context, step *spec.Step, i int, sr *Ste
 		return x.execService(ctx, step, sr)
 	case spec.StepMockServer:
 		return x.execMockServer(ctx, step, sr)
-	default:
-		sr.ErrMsg = fmt.Sprintf("%s steps are not allowed at suite level", step.Kind())
-		return true
+	case spec.StepHTTP, spec.StepQuery, spec.StepGRPC, spec.StepCDP, spec.StepPTY, spec.StepSignal:
+		// Named rather than defaulted so a new step kind has to answer "is this
+		// allowed at suite level?" instead of inheriting "no" in silence. Each of
+		// these drives or produces the result a scenario owns.
 	}
+	sr.ErrMsg = fmt.Sprintf("%s steps are not allowed at suite level", step.Kind())
+	return true
 }
 
 // execRun runs one suite-level command and folds its retry `until` checks.
@@ -285,6 +290,8 @@ func (e *Engine) runSuiteTeardown(ctx context.Context, s *spec.Spec, rt *suiteRu
 	if rt == nil || len(s.Suite.Teardown) == 0 {
 		return nil
 	}
+	//nolint:contextcheck // Deliberately not derived from a done ctx, for the same reason
+	// as scenario teardown: suite teardown has to run even after an interrupt.
 	tctx := ctx
 	if ctx.Err() != nil {
 		var cancel context.CancelFunc

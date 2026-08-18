@@ -20,6 +20,7 @@ import (
 // test uses a fake.
 type pastDeadlineCtx struct {
 	context.Context
+
 	deadline time.Time
 }
 

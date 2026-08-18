@@ -431,6 +431,7 @@ func TestRun_ShellCancelKillsChildPromptly(t *testing.T) {
 	// Not t.TempDir(): on Windows the orphaned child (no process groups) may
 	// briefly outlive the kill while holding the workdir open, and TempDir's
 	// cleanup would fail the test on that unrelated race. Best-effort cleanup.
+	//nolint:usetesting // Deliberate, for the reason above: TempDir's cleanup is fatal.
 	wd, err := os.MkdirTemp("", "atago-cancel-")
 	if err != nil {
 		t.Fatal(err)
@@ -579,10 +580,10 @@ func TestWindowsFields_MatchesShellwords(t *testing.T) {
 // timeout/cancel is handled earlier and stays -1; a signal reaching here is the
 // program's own termination.
 func TestRun_SignalExitCode(t *testing.T) {
+	t.Parallel()
 	if runtime.GOOS == "windows" {
 		t.Skip("POSIX signals only; Windows has no 128+signal convention")
 	}
-	t.Parallel()
 	cases := []struct {
 		name   string
 		signal string
@@ -899,6 +900,7 @@ func TestRun_CaptureFailureIsNotSilentEmptyOutput(t *testing.T) {
 	// Windows a process that still exists can keep a directory from being
 	// removed. TempDir's cleanup would fail the test on that, so clean up
 	// best-effort like TestRun_ShellCancelKillsChildPromptly does.
+	//nolint:usetesting // Deliberate, for the reason above: TempDir's cleanup is fatal.
 	wd, err := os.MkdirTemp("", "atago-capture-")
 	if err != nil {
 		t.Fatal(err)

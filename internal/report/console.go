@@ -69,6 +69,12 @@ func writeDetail(b *strings.Builder, color bool, suite, specPath string, sc *eng
 		fmt.Fprintf(b, "\n%s\n", indent(expectFailNarrative(sc.ExpectFail, false)))
 	case engine.StatusError:
 		writeErroredSteps(b, color, suite, where, sc)
+	case engine.StatusPassed, engine.StatusSkipped:
+		// No failure block: there is nothing to explain about a green scenario,
+		// and a gated one is already named in the summary counts.
+	case engine.StatusFlaky:
+		// writeFlaky and writeRepeatRates own the flaky narrative, with the
+		// attempt count or the flake rate a bare failure block cannot carry.
 	}
 	// A failed teardown never flips the verdict — the steps decide that — but
 	// incomplete cleanup of external resources must stay loud.
@@ -186,6 +192,9 @@ func writeRepeatRates(b *strings.Builder, color bool, res *engine.SuiteResult) {
 			code = cYellow
 		case engine.StatusFailed, engine.StatusError:
 			code = cRed
+		case engine.StatusPassed, engine.StatusSkipped, engine.StatusXFail, engine.StatusXPass:
+			// Green: every iteration that mattered came out the way the scenario
+			// declared it would. The skipped case never reaches here.
 		}
 		fmt.Fprintf(b, "\n%s %s: %d/%d passed\n",
 			colorize(color, code+cBold, "REPEAT:"), sc.Name, passed, len(sc.Iterations))

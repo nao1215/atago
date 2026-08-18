@@ -299,6 +299,10 @@ func (e ExitCode) MarshalYAML() (any, error) {
 	case len(e.In) > 0:
 		return map[string][]int{"in": e.In}, nil
 	default:
+		//nolint:nilnil // yaml.Marshaler's way of saying "no value": nil emits null rather
+		// than the bogus three-field map the default struct marshal would write. The loader
+		// rejects a matcher-less exit_code (ATG-2104), so this is unreachable for any spec
+		// that was parsed, and TestExitCode_MarshalYAML_AllShapes pins the shape.
 		return nil, nil
 	}
 }

@@ -66,6 +66,10 @@ func writeGHA(w io.Writer, results []*engine.SuiteResult, allowXPass bool, loadF
 				// reviewers to ignore the annotation channel.
 				fmt.Fprintf(&b, "::notice title=%s::%s\n",
 					ghaEscapeProp(res.Suite+" / "+sc.Name), ghaEscapeData("xfail: "+expectFailSummary(sc)))
+			case engine.StatusPassed, engine.StatusSkipped:
+				// No annotation. Annotating every green or gated scenario would
+				// bury the ones a reviewer has to act on, which is the only
+				// thing the annotation channel is good for.
 			}
 			// A failed teardown never changes the verdict or the exit code, so
 			// it is a warning — the flaky pattern: green for the job, loud in

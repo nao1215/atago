@@ -253,15 +253,15 @@ func nativeMySQLHost(dsn string) string {
 	if at >= 0 {
 		rest = dsn[at+1:]
 	}
-	open := strings.Index(rest, "(")
-	close := strings.Index(rest, ")")
-	if open < 0 || close < open {
+	lparen := strings.Index(rest, "(")
+	rparen := strings.Index(rest, ")")
+	if lparen < 0 || rparen < lparen {
 		return ""
 	}
-	if !strings.EqualFold(rest[:open], "tcp") {
+	if !strings.EqualFold(rest[:lparen], "tcp") {
 		return ""
 	}
-	return rest[open+1 : close]
+	return rest[lparen+1 : rparen]
 }
 
 // Runner holds an open database/sql pool for one db runner.

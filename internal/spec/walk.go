@@ -80,9 +80,11 @@ func StepRunner(step *Step) string {
 		return step.GRPC.Runner
 	case StepCDP:
 		return step.CDP.Runner
-	default:
+	case StepFixture, StepAssert, StepStore, StepService, StepPTY, StepSignal, StepMockServer:
+		// No runner to name: none of these payloads carries a `runner:` key.
 		return ""
 	}
+	return ""
 }
 
 // RunnerVarFields returns the runner fields the engine ${name}-expands at use
@@ -142,6 +144,11 @@ func CollectStepVars(set map[string]bool, step *Step, runners map[string]Runner)
 		WalkAssertStrings(step.Assert, collect)
 	case StepStore:
 		WalkStoreStrings(step.Store, collect)
+	case StepMockServer:
+		// A mock server is started verbatim; nothing in it is expanded, so it has
+		// no references to collect. WalkStepStrings says the same for the same
+		// reason, and the two have to agree: a kind this function forgets is a
+		// kind explain and the security summary under-report.
 	}
 }
 

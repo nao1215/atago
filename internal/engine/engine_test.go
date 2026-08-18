@@ -848,7 +848,7 @@ func TestEngine_FailFastParallel(t *testing.T) {
 			failed++
 		case StatusSkipped:
 			skipped++
-		default:
+		case StatusPassed, StatusError, StatusXFail, StatusXPass, StatusFlaky:
 			other++
 		}
 	}

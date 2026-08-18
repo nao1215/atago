@@ -118,6 +118,7 @@ type PTYExpectScreen struct {
 	// the attribute matchers too (#382): the live frame is the same frame the
 	// post-step assert reads, so it deserves the same questions.
 	ScreenAssert `yaml:",inline"`
+
 	// Timeout bounds THIS wait only; when empty, the enclosing pty timeout
 	// supplies the budget.
 	Timeout string `yaml:"timeout,omitempty"`

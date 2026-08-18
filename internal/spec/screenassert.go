@@ -10,6 +10,7 @@ import "strings"
 // different questions about the same frame: what it says, and how it looks.
 type ScreenAssert struct {
 	StreamAssert `yaml:",inline"`
+
 	// Attrs checks how text is drawn (#382): the error line is red, the selected
 	// row is reverse-video, `--no-color` really did leave the frame uncolored.
 	// Every entry must hold.

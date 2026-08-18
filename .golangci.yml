@@ -3,38 +3,121 @@ run:
   go: "1.26"
 linters:
   enable:
+    - asasalint
     - asciicheck
     - bidichk
     - bodyclose
+    - canonicalheader
+    - contextcheck
     - copyloopvar
     - durationcheck
     - errcheck
+    - embeddedstructfieldcheck
+    - errchkjson
     - errname
     - errorlint
+    # exhaustruct is scoped to assert.Env alone. Applied broadly it is noise, but
+    # that struct is built by exactly one production constructor whose whole job is
+    # to be complete: the run-scoped fields it wires reached three of the four
+    # assertion sites twice before, and each time the fix was to route everything
+    # through this one function. Now the function itself cannot forget a field.
+    - exhaustruct
+    # forbidigo carries the rules that are specific to atago rather than to Go.
+    # All four report nothing today; they exist so the next change cannot quietly
+    # take one of these away. See settings.forbidigo for what each one protects.
+    - forbidigo
+    # exhaustive is the structural half of atago's oldest bug family: a new step
+    # kind, assert target, or scenario status gets wired into some of the layers
+    # that switch on it and quietly skipped by the rest. The coverage tests guard
+    # the walkers someone remembered to test; this guards every switch.
+    - exhaustive
+    - fatcontext
     - gocheckcompilerdirectives
     - gochecknoinits
+    - gocritic
     - gocognit
     - gosec
     - govet
+    - iface
     - ineffassign
+    - makezero
+    - mirror
     - misspell
+    # musttag guards the JSON side of atago's machine-readable contracts (the
+    # json/junit/gha reports, the manifest and rerun ledgers): a field added
+    # there without a tag silently changes key names for downstream consumers.
+    # goccy/go-yaml is deliberately not registered under settings.musttag:
+    # spec types like Stdin, ExitCode and PTYSend decode through hand-written
+    # UnmarshalYAML that accepts a bare scalar as well as a mapping, so their
+    # fields have no honest tag to carry.
+    - musttag
     - nestif
     - nilerr
+    - nilnil
+    - nilnesserr
     - noctx
     - nolintlint
+    - predeclared
+    - reassign
+    - recvcheck
+    - rowserrcheck
+    - sqlclosecheck
     - staticcheck
     - tagliatelle
     - thelper
+    - tparallel
     - unconvert
     - unused
+    - usetesting
     - usestdlibvars
     - wastedassign
     - whitespace
   settings:
     # The 2026-08 refactoring series brought every production function under
     # these bounds; the linters keep the next hot spot from growing back.
+    exhaustive:
+      # A `default:` clause does not excuse a missing case. Most of these switches
+      # HAVE a default, and inheriting its answer in silence is exactly how a kind
+      # goes half-wired.
+      default-signifies-exhaustive: false
+      # reflect.Kind has 27 members and the two switches over it are schema
+      # walkers that care about four.
+      ignore-enum-types: 'reflect\.Kind$'
+      # StepNone and AssertNone are the "not exactly one action" sentinels, not
+      # kinds a spec can carry. AllStepKinds and AllAssertTargets leave them out
+      # for the same reason, so the switches and the coverage tests are checked
+      # against one universe.
+      ignore-enum-members: 'atago/internal/(spec\.(StepNone|AssertNone))$'
+    exhaustruct:
+      include:
+        - 'github.com/nao1215/atago/internal/assert\.Env'
+    forbidigo:
+      analyze-types: true
+      forbid:
+        # atago's stdout is a machine-readable contract under --format json/junit/gha.
+        # A stray Print corrupts the document a CI job parses, and the failure lands
+        # on whoever wrote the parser. Every writer is injected; use it.
+        - pattern: '^fmt\.(Print|Printf|Println)$'
+          msg: "atago's stdout carries the report; write through the injected io.Writer instead"
+        # Process-global state and --parallel are incompatible: scenarios run
+        # concurrently in their own workdirs, so a chdir or a setenv from one of them
+        # is observable by all the others. The two deliberate exceptions in
+        # internal/cli run once at startup and say so.
+        - pattern: '^os\.(Chdir|Setenv|Unsetenv|Clearenv)$'
+          msg: "process-global state is visible to every scenario running in parallel"
+        # A test runner that is not reproducible cannot tell a real failure from its
+        # own noise. Seeded values belong in the spec, not in the runner.
+        - pattern: '^math/rand(/v2)?\.'
+          msg: "atago's output has to be reproducible; take the value from the spec"
     gocognit:
       min-complexity: 30
+    recvcheck:
+      # UnmarshalYAML has to take a pointer and MarshalYAML has to take a value:
+      # the two halves of the yaml codec cannot agree on a receiver, so the mixed
+      # pair is the interface's doing, not an inconsistency to fix.
+      exclusions:
+        - "*.UnmarshalYAML"
+        - "*.MarshalYAML"
     nestif:
       min-complexity: 5
     errcheck:
@@ -64,9 +147,18 @@ linters:
         source: defer
       # Tests legitimately read files via computed temp paths and embed sample
       # spec text; gosec's G304/G101 are noise there.
+      # Tests build an Env with just the field under test, which is the readable
+      # way to write them; the constructor the rule protects is production code.
       - linters:
           - gosec
+          - exhaustruct
         path: _test\.go
+      # A test helper subprocess is the program under test: printing to its own
+      # stdout is what the capture assertions read.
+      - linters:
+          - forbidigo
+        path: _test\.go
+        text: fmt\.Print
       # Table-driven tests and fuzz harnesses are long by nature; the
       # complexity bounds are a production-code contract.
       - linters:
