@@ -1,8 +1,8 @@
 # atago Behavior Specs
 ## Summary
-1 suite · 8 scenarios
+1 suite · 9 scenarios
 ## Contents
-- [GnuPG (third-party CLI, cryptographic contracts)](#gnupg-third-party-cli-cryptographic-contracts) — 8 scenarios
+- [GnuPG (third-party CLI, cryptographic contracts)](#gnupg-third-party-cli-cryptographic-contracts) — 9 scenarios
   - [generating a key creates a keyring that lists the identity](#scenario-generating-a-key-creates-a-keyring-that-lists-the-identity)
   - [a message survives an encrypt and decrypt round trip](#scenario-a-message-survives-an-encrypt-and-decrypt-round-trip)
   - [armor produces text that decodes back to the same bytes](#scenario-armor-produces-text-that-decodes-back-to-the-same-bytes)
@@ -11,6 +11,7 @@
   - [a detached signature stops verifying when the file changes](#scenario-a-detached-signature-stops-verifying-when-the-file-changes)
   - [symmetric encryption answers only to its own passphrase](#scenario-symmetric-encryption-answers-only-to-its-own-passphrase)
   - [usage mistakes are refused offline, with the input named](#scenario-usage-mistakes-are-refused-offline-with-the-input-named)
+  - [pinentry asks for the passphrase in the terminal](#scenario-pinentry-asks-for-the-passphrase-in-the-terminal)
 
 ## GnuPG (third-party CLI, cryptographic contracts)
 [GnuPG](https://gnupg.org/) is the reference OpenPGP implementation, and its
@@ -36,6 +37,7 @@ disabled so a missing recipient fails locally instead of reaching for a key
 server.
 
 Source: `test/e2e/thirdparty/gpg/gpg.atago.yaml`
+Secrets declared: `GPG_TEST_PASSPHRASE`.
 ### Scenario: generating a key creates a keyring that lists the identity
 _only when `gpg --version` succeeds · skipped on Windows_
 #### Given
@@ -375,3 +377,48 @@ gpg --batch --auto-key-locate clear --encrypt --recipient nobody@example.com --o
   - exit code is `2`
   - stderr contains `nobody@example.com`
   - file `msg.gpg` does not exist
+
+### Scenario: pinentry asks for the passphrase in the terminal
+_only when `command -v gpg && command -v pinentry-curses` succeeds · skipped on Windows_
+#### Given
+- Environment variables are set: GNUPGHOME, LC_ALL.
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+- Fixture file `msg.txt` is created.
+- Environment variables are set: GNUPGHOME, LC_ALL.
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+- Environment variables are set: GNUPGHOME, LC_ALL.
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+- Environment variables are set: GNUPGHOME, LC_ALL.
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
+#### Inputs
+_Fixture `msg.txt`:_
+```text
+attack at dawn
+```
+#### When
+```shell
+mkdir -m 700 -p "$GNUPGHOME" && printf 'pinentry-program %s\n' "$(command -v pinentry-curses)" > "$GNUPGHOME/gpg-agent.conf"
+gpg --batch --pinentry-mode loopback --passphrase "$GPG_TEST_PASSPHRASE" --quick-generate-key "Test User <test@example.com>" default default never
+gpg --batch --trust-model always --auto-key-locate clear --encrypt --recipient test@example.com --output msg.gpg msg.txt
+gpgconf --kill all
+# interactive (pty): export GPG_TTY=$(tty); gpg --pinentry-mode ask --output back.txt --decrypt msg.gpg
+```
+#### Then
+- after `mkdir -m 700 -p "$GNUPGHOME" && printf 'pinentry-program %s\n' "$(command -v pinentry-curses)" > "$GNUPGHOME/gpg-agent.conf"`:
+  - exit code is `0`
+- after `gpg --batch --pinentry-mode loopback --passphrase "$GPG_TEST_PASSPHRASE" --quick-generate-key "Test User <test@example.com>" default default never`:
+  - exit code is `0`
+- after `gpg --batch --trust-model always --auto-key-locate clear --encrypt --recipient test@example.com --output msg.gpg msg.txt`:
+  - exit code is `0`
+- after `gpgconf --kill all`:
+  - exit code is `0`
+- after `interactive (pty): export GPG_TTY=$(tty); gpg --pinentry-mode ask --output back.txt --decrypt msg.gpg`:
+  - exit code is `0`
+  - file `back.txt` is byte-identical to `msg.txt`
+
+#### Finally (teardown, always runs)
+```shell
+gpgconf --kill all
+```

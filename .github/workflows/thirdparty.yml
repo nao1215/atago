@@ -208,10 +208,11 @@ jobs:
           # go-installed (age and age-keygen provide the throwaway keys).
           # GnuPG from the pinned Ubuntu snapshot: the suite generates its own
           # throwaway keys inside each scenario workdir and never reaches a key
-          # server.
+          # server. pinentry-curses is what the interactive scenario drives, and
+          # without it that scenario skips instead of running.
           - name: gpg
             dir: ./test/e2e/thirdparty/gpg
-            install: bash ./scripts/install_ubuntu_snapshot_packages.sh gnupg
+            install: bash ./scripts/install_ubuntu_snapshot_packages.sh gnupg pinentry-curses
           - name: sops
             dir: ./test/e2e/thirdparty/sops
             install: |

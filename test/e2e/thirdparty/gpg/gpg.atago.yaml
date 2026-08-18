@@ -25,6 +25,11 @@ suite:
     disabled so a missing recipient fails locally instead of reaching for a key
     server.
 
+# The interactive scenario types a passphrase into a terminal; declaring it here
+# keeps it out of any transcript a failure would print.
+secrets:
+  - GPG_TEST_PASSPHRASE
+
 defaults:
   scenario:
     only:
@@ -386,3 +391,64 @@ scenarios:
           file:
             path: msg.gpg
             exists: false
+
+  - name: pinentry asks for the passphrase in the terminal
+    # The half of gpg that no non-interactive suite sees: with a terminal
+    # attached and no loopback pinentry, the agent draws a dialog and waits for
+    # a human. pinentry-curses needs more room than the default 24x80, which is
+    # why the session declares its own terminal size.
+    only:
+      command: command -v gpg && command -v pinentry-curses
+    skip:
+      os: windows
+    env:
+      GNUPGHOME: ${workdir}/gnupg
+      LC_ALL: C
+      GPG_TEST_PASSPHRASE: correct-horse-battery-staple
+    steps:
+      - run:
+          shell: true
+          command: mkdir -m 700 -p "$GNUPGHOME" && printf 'pinentry-program %s\n' "$(command -v pinentry-curses)" > "$GNUPGHOME/gpg-agent.conf"
+      - assert:
+          exit_code: 0
+      - fixture:
+          file: msg.txt
+          content: "attack at dawn\n"
+      - run:
+          shell: true
+          command: gpg --batch --pinentry-mode loopback --passphrase "$GPG_TEST_PASSPHRASE" --quick-generate-key "Test User <test@example.com>" default default never
+      - assert:
+          exit_code: 0
+      - run:
+          command: gpg --batch --trust-model always --auto-key-locate clear --encrypt --recipient test@example.com --output msg.gpg msg.txt
+      - assert:
+          exit_code: 0
+      # Stop the agent so the passphrase cannot be answered from its cache: the
+      # next decryption has to ask.
+      - run:
+          shell: true
+          command: gpgconf --kill all
+      - assert:
+          exit_code: 0
+      - pty:
+          shell: true
+          rows: 30
+          cols: 100
+          command: 'export GPG_TTY=$(tty); gpg --pinentry-mode ask --output back.txt --decrypt msg.gpg'
+          timeout: 60s
+          session:
+            - expect_screen:
+                contains: Passphrase
+                timeout: 30s
+            - send: "correct-horse-battery-staple"
+            - send: {key: enter}
+      - assert:
+          exit_code: 0
+      - assert:
+          file:
+            path: back.txt
+            equals_file: msg.txt
+    teardown:
+      - run:
+          shell: true
+          command: gpgconf --kill all
