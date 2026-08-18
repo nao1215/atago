@@ -1,0 +1,309 @@
+version: "1"
+
+suite:
+  name: bats (the harness around each test)
+  description: |
+    What [Bats](https://github.com/bats-core/bats-core) does around a test body:
+    the setup and teardown functions and the order they run in, the `run` helper
+    that captures a command's status and output, the per-test temporary
+    directory and its cleanup, the variables a test can read about itself, and
+    the helper files it can load.
+
+    These are the parts a test author relies on without asserting them, so they
+    are asserted from outside here. Ordering and "did this even run" are pinned
+    with an append-only log written by the fixture: the log content is the
+    oracle, so a teardown that stops running after a failure, or a body that
+    runs despite a broken setup, shows up as a diff rather than as a missing
+    line nobody reads.
+
+defaults:
+  scenario:
+    only:
+      command: bats --version
+  run:
+    sandbox_home: true
+    env:
+      LC_ALL: C
+
+scenarios:
+  - name: setup_file runs once, setup and teardown run around every test
+    steps:
+      - fixture:
+          file: order.bats
+          content: |
+            setup_file() { echo "setup_file" >> "$BATS_TEST_DIRNAME/order.log"; }
+            setup() { echo "setup" >> "$BATS_TEST_DIRNAME/order.log"; }
+            teardown() { echo "teardown" >> "$BATS_TEST_DIRNAME/order.log"; }
+            teardown_file() { echo "teardown_file" >> "$BATS_TEST_DIRNAME/order.log"; }
+
+            @test "first" { echo "first" >> "$BATS_TEST_DIRNAME/order.log"; }
+            @test "second" { echo "second" >> "$BATS_TEST_DIRNAME/order.log"; }
+      - run:
+          command: bats order.bats
+      - assert:
+          exit_code: 0
+          changes:
+            created: [order.log]
+            modified: []
+            deleted: []
+      - assert:
+          # The whole sequence, in order: the file-level pair wraps the run, the
+          # per-test pair wraps each test, and nothing repeats or is skipped.
+          file:
+            path: order.log
+            equals: |
+              setup_file
+              setup
+              first
+              teardown
+              setup
+              second
+              teardown
+              teardown_file
+
+  - name: a failing setup keeps the body from running and teardown still runs
+    steps:
+      - fixture:
+          file: brokensetup.bats
+          content: |
+            setup() { echo "setup" >> "$BATS_TEST_DIRNAME/order.log"; false; }
+            teardown() { echo "teardown" >> "$BATS_TEST_DIRNAME/order.log"; }
+
+            @test "body" { echo "body" >> "$BATS_TEST_DIRNAME/order.log"; }
+      - run:
+          command: bats brokensetup.bats
+      - assert:
+          # The failure is reported against the test, and points into setup
+          # rather than into the test body.
+          exit_code: 1
+          stdout:
+            contains:
+              - "not ok 1 body"
+              - "# (from function `setup' in test file brokensetup.bats, line 1)"
+      - assert:
+          # The body never ran; the cleanup did anyway, which is what makes
+          # teardown usable for releasing what setup half-acquired.
+          file:
+            path: order.log
+            equals: |
+              setup
+              teardown
+
+  - name: teardown still runs when the test itself fails
+    steps:
+      - fixture:
+          file: teardown.bats
+          content: |
+            teardown() { echo "teardown after $BATS_TEST_NAME" >> "$BATS_TEST_DIRNAME/order.log"; }
+
+            @test "fails" { false; }
+      - run:
+          command: bats teardown.bats
+      - assert:
+          exit_code: 1
+      - assert:
+          file:
+            path: order.log
+            equals: |
+              teardown after test_fails
+
+  - name: the run helper captures the status, the output, and the lines
+    steps:
+      - fixture:
+          file: runhelper.bats
+          content: |
+            bats_require_minimum_version 1.5.0
+
+            @test "status and output are captured, not fatal" {
+              run bash -c 'echo first; echo second; exit 3'
+              [ "$status" -eq 3 ]
+              [ "$output" = "first
+            second" ]
+              [ "${lines[0]}" = "first" ]
+              [ "${lines[1]}" = "second" ]
+            }
+
+            @test "an expected status is part of the call" {
+              run -3 bash -c 'exit 3'
+            }
+
+            @test "separate stderr splits the streams" {
+              run --separate-stderr bash -c 'echo to-stdout; echo to-stderr >&2'
+              [ "$output" = "to-stdout" ]
+              [ "$stderr" = "to-stderr" ]
+            }
+      - run:
+          command: bats runhelper.bats
+      - assert:
+          # A command that exits 3 does not fail the test when it is wrapped in
+          # run: that is the whole point of the helper.
+          exit_code: 0
+          stdout:
+            equals: |
+              1..3
+              ok 1 status and output are captured, not fatal
+              ok 2 an expected status is part of the call
+              ok 3 separate stderr splits the streams
+          stderr:
+            empty: true
+
+  - name: an unmet expected status fails the test with both codes named
+    steps:
+      - fixture:
+          file: expected.bats
+          content: |
+            bats_require_minimum_version 1.5.0
+
+            @test "expects the wrong status" {
+              run -0 bash -c 'exit 3'
+            }
+      - run:
+          command: bats expected.bats
+      - assert:
+          # The diagnostic names what was expected and what happened, so the
+          # failure is readable without rerunning anything by hand.
+          exit_code: 1
+          stdout:
+            contains: "failed, expected exit code 0, got 3"
+
+  - name: using run flags without declaring the minimum version warns on stderr
+    steps:
+      - fixture:
+          file: unguarded.bats
+          content: |
+            @test "uses a run flag without the version guard" {
+              run -3 bash -c 'exit 3'
+            }
+      - run:
+          command: bats unguarded.bats
+      - assert:
+          # The test passes; the warning is advice about portability, collected
+          # and printed after the run on stderr so it cannot be mistaken for TAP.
+          exit_code: 0
+          stdout:
+            equals: |
+              1..1
+              ok 1 uses a run flag without the version guard
+          stderr:
+            contains:
+              - "The following warnings were encountered during tests:"
+              - "BW02: Using flags on `run` requires at least BATS_VERSION=1.5.0."
+              - "Use `bats_require_minimum_version 1.5.0` to fix this message."
+
+  - name: each test gets its own temporary directory, removed when the run ends
+    steps:
+      - fixture:
+          file: tmpdir.bats
+          content: |
+            @test "writes into its own tmpdir" {
+              [ -d "$BATS_TEST_TMPDIR" ]
+              echo scratch > "$BATS_TEST_TMPDIR/scratch.txt"
+              echo "$BATS_TEST_TMPDIR" >> "$BATS_TEST_DIRNAME/paths.log"
+            }
+      - run:
+          shell: true
+          command: mkdir -p tmproot
+      - assert:
+          exit_code: 0
+      - run:
+          # TMPDIR is where bats roots the run's scratch space, so pointing it
+          # into the workdir makes the cleanup observable.
+          command: bats tmpdir.bats
+          env:
+            TMPDIR: ${workdir}/tmproot
+      - assert:
+          exit_code: 0
+      - assert:
+          # The test wrote a file in there and it is all gone: nothing of the
+          # run survives under TMPDIR.
+          dir:
+            path: tmproot
+            count: 0
+      - run:
+          command: bats --no-tempdir-cleanup tmpdir.bats
+          env:
+            TMPDIR: ${workdir}/tmproot
+      - assert:
+          # With cleanup off the run announces where it kept everything, on
+          # stderr so the TAP on stdout stays parseable.
+          exit_code: 0
+          stderr:
+            matches: "^BATS_RUN_TMPDIR: .*/tmproot/bats-run-"
+      - assert:
+          dir:
+            path: tmproot
+            count: 1
+            glob: "bats-run-*"
+
+  - name: a test can read its own name, number, and file
+    steps:
+      - fixture:
+          file: identity.bats
+          content: |
+            @test "first" {
+              echo "$BATS_TEST_NUMBER $BATS_TEST_NAME $(basename "$BATS_TEST_FILENAME")" >> "$BATS_TEST_DIRNAME/identity.log"
+            }
+
+            @test "second" {
+              echo "$BATS_TEST_NUMBER $BATS_TEST_NAME" >> "$BATS_TEST_DIRNAME/identity.log"
+            }
+      - run:
+          command: bats identity.bats
+      - assert:
+          exit_code: 0
+      - assert:
+          # The number counts from one within the run, and the name is the
+          # generated function name rather than the quoted description.
+          file:
+            path: identity.log
+            equals: |
+              1 test_first identity.bats
+              2 test_second
+
+  - name: load pulls in a helper file next to the test
+    steps:
+      - fixture:
+          file: helper.bash
+          content: |
+            greet() { echo "hello from the helper"; }
+      - fixture:
+          file: uses_helper.bats
+          content: |
+            load helper
+
+            @test "the helper is in scope" {
+              run greet
+              [ "$output" = "hello from the helper" ]
+            }
+      - run:
+          command: bats uses_helper.bats
+      - assert:
+          # load resolves relative to the test file and appends .bash, which is
+          # why the file is named helper.bash and loaded as "helper".
+          exit_code: 0
+          stdout:
+            equals: |
+              1..1
+              ok 1 the helper is in scope
+
+  - name: parallel jobs without the parallel binary fail as a raw shell error
+    steps:
+      - fixture:
+          file: mixed.bats
+          content: |
+            @test "passes" { true; }
+            @test "also passes" { true; }
+      - run:
+          # --jobs is documented as requiring GNU parallel. Naming a binary that
+          # is certainly absent pins that path deterministically, wherever this
+          # runs. What a user gets is the shell's "command not found" and a
+          # count mismatch — a plan is printed, then nothing executes.
+          command: bats --jobs 2 --parallel-binary-name definitely-not-a-parallel-binary mixed.bats
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - "1..2"
+              - "definitely-not-a-parallel-binary: command not found"
+              - "# bats warning: Executed 0 instead of expected 2 tests"
+            not_contains: "ok 1 passes"

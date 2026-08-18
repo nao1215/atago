@@ -1,0 +1,325 @@
+version: "1"
+
+suite:
+  name: bats (the verdict a test runner reports)
+  description: |
+    [Bats](https://github.com/bats-core/bats-core) runs test files written in
+    Bash and reports the result as TAP. Its own test suite is written in Bats,
+    so the runner is checked by the thing it runs; the contract those tests pin
+    is reproduced here from the outside, with atago watching the process rather
+    than Bash watching itself.
+
+    A test runner has one promise: the verdict it reports is the truth about
+    the tests, and the exit code carries that verdict to whatever ran it. This
+    file pins the verdict — the TAP plan and the ok/not ok lines, exit 0 for a
+    green run and exit 1 for a red one, which stream each kind of message goes
+    to, and the failures a runner meets before any test runs (no arguments, a
+    file that is not there, a file Bash cannot parse).
+
+    Every `.bats` file here is written by the scenario that runs it. No upstream
+    fixture is copied, and no test file is committed.
+
+# Gates and determinism, stated once: the suite runs only where bats is
+# installed, and LC_ALL=C keeps the messages Bash itself emits (syntax errors)
+# in one language regardless of the machine's locale.
+defaults:
+  scenario:
+    only:
+      command: bats --version
+  run:
+    sandbox_home: true
+    env:
+      LC_ALL: C
+
+scenarios:
+  - name: the version and the help text are answered on stdout
+    steps:
+      - run:
+          command: bats --version
+      - assert:
+          exit_code: 0
+          stdout:
+            matches: "^Bats [0-9]+\\.[0-9]+\\.[0-9]+"
+          stderr:
+            empty: true
+      - run:
+          command: bats --help
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "Usage: bats [OPTIONS] <tests>"
+              - "-f, --filter <regex>"
+              - "-F, --formatter <type>"
+
+  - name: a passing file is TAP on stdout, exit 0, and no droppings
+    steps:
+      - fixture:
+          file: pass.bats
+          content: |
+            @test "adds numbers" {
+              result=$(( 2 + 2 ))
+              [ "$result" -eq 4 ]
+            }
+      - run:
+          command: bats pass.bats
+      - assert:
+          exit_code: 0
+          # The whole of stdout, not a substring: the plan line comes first and
+          # a passing test says nothing beyond its ok line.
+          stdout:
+            equals: |
+              1..1
+              ok 1 adds numbers
+          stderr:
+            empty: true
+          # Running tests is not supposed to leave anything behind next to them.
+          changes:
+            created: []
+            modified: []
+            deleted: []
+
+  - name: a failing test is exit 1 and names the file, the line, and the command
+    steps:
+      - fixture:
+          file: fail.bats
+          content: |
+            @test "fails" {
+              false
+            }
+      - run:
+          command: bats fail.bats
+      - assert:
+          exit_code: 1
+          stdout:
+            equals: |
+              1..1
+              not ok 1 fails
+              # (in test file fail.bats, line 2)
+              #   `false' failed
+          changes:
+            created: []
+            modified: []
+            deleted: []
+
+  - name: one failure does not hide the tests that passed
+    steps:
+      - fixture:
+          file: mixed.bats
+          content: |
+            @test "alpha passes" { true; }
+            @test "beta fails" { false; }
+            @test "gamma passes" { true; }
+      - run:
+          command: bats mixed.bats
+      - assert:
+          # The plan still announces all three, both passes still report ok, and
+          # the single failure is what turns the exit code red.
+          exit_code: 1
+          stdout:
+            contains:
+              - "1..3"
+              - "ok 1 alpha passes"
+              - "not ok 2 beta fails"
+              - "ok 3 gamma passes"
+
+  - name: a command failing mid-test aborts the rest of the test body
+    steps:
+      - fixture:
+          file: mid.bats
+          content: |
+            @test "mid failure aborts the test" {
+              echo before
+              false
+              echo after
+            }
+      - run:
+          command: bats mid.bats
+      - assert:
+          exit_code: 1
+          stdout:
+            # The line reported is the one that failed, not the last line of the
+            # test, and "after" never ran: the echo before it is the only output.
+            contains:
+              - "# (in test file mid.bats, line 3)"
+              - "# before"
+            not_contains: "after"
+
+  - name: skipped tests are ok and keep the run green
+    steps:
+      - fixture:
+          file: skip.bats
+          content: |
+            @test "skipped with reason" {
+              skip "not on this platform"
+              false
+            }
+
+            @test "skipped without reason" {
+              skip
+              false
+            }
+      - run:
+          command: bats skip.bats
+      - assert:
+          # A skip suppresses the body — both tests would fail if it ran — and
+          # the reason is carried on the ok line as a TAP directive.
+          exit_code: 0
+          stdout:
+            equals: |
+              1..2
+              ok 1 skipped with reason # skip not on this platform
+              ok 2 skipped without reason # skip
+
+  - name: nothing to run is not an error
+    steps:
+      - fixture:
+          file: empty.bats
+          content: ""
+      - run:
+          command: bats empty.bats
+      - assert:
+          # A file with no @test is an empty plan, not a failure.
+          exit_code: 0
+          stdout:
+            equals: |
+              1..0
+      - run:
+          shell: true
+          command: mkdir -p notests && cp empty.bats notests/none.bats
+      - assert:
+          exit_code: 0
+      - run:
+          command: bats notests
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              1..0
+
+  - name: a test file that does not exist reports to stderr and leaves stdout empty
+    steps:
+      - run:
+          command: bats missing.bats
+      - assert:
+          # The surprise worth pinning: the TAP output moves to stderr with the
+          # error, so a script reading stdout for TAP sees nothing at all and
+          # has only the exit code to go on.
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            contains:
+              - "missing.bats\" does not exist."
+              - "not ok 1 bats-gather-tests"
+
+  - name: an unknown option is rejected before any test runs
+    steps:
+      - fixture:
+          file: pass.bats
+          content: |
+            @test "would have passed" { true; }
+      - run:
+          command: bats --bogus pass.bats
+      - assert:
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            contains:
+              - "Error: Bad command line option '--bogus'"
+              - "Usage: bats [OPTIONS] <tests>"
+
+  - name: no arguments is a usage error, not an empty run
+    steps:
+      - run:
+          command: bats
+      - assert:
+          # Distinct from the empty plan above: with no test path at all bats
+          # refuses, on stderr, with exit 1.
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            contains:
+              - "Error: Must specify at least one <test>"
+              - "Usage: bats [OPTIONS] <tests>"
+
+  - name: a file Bash cannot parse fails as the gather-tests pseudo test
+    steps:
+      - fixture:
+          file: broken.bats
+          content: |
+            @test "unterminated" {
+      - run:
+          command: bats broken.bats
+      - assert:
+          # Collecting the test names is itself reported as a test, so a file
+          # that does not parse produces one failure rather than a silent abort
+          # — and, like the missing file above, that report goes to stderr.
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            contains:
+              - "not ok 1 bats-gather-tests"
+              - "syntax error: unexpected end of file"
+
+  - name: a minimum-version guard the runner cannot meet stops the file
+    steps:
+      - fixture:
+          file: future.bats
+          content: |
+            bats_require_minimum_version 9.9.9
+
+            @test "never runs" { true; }
+      - run:
+          command: bats future.bats
+      - assert:
+          # A failure while the file is being read is a gather-tests failure, so
+          # again nothing reaches stdout and the named test never runs.
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            matches: "does not meet required minimum 9\\.9\\.9"
+            not_contains: "ok 1 never runs"
+
+  - name: UTF-8 test names survive into the report
+    steps:
+      - fixture:
+          file: utf8.bats
+          content: |
+            @test "日本語のテスト ✓" { true; }
+      - run:
+          command: bats utf8.bats
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              1..1
+              ok 1 日本語のテスト ✓
+
+  - name: several files on one command line are one numbered run
+    steps:
+      - fixture:
+          file: first.bats
+          content: |
+            @test "first file" { true; }
+      - fixture:
+          file: second.bats
+          content: |
+            @test "second file" { false; }
+      - run:
+          command: bats first.bats second.bats
+      - assert:
+          # Test numbers continue across files — the plan is the sum, and the
+          # run is red because one file in it was.
+          exit_code: 1
+          stdout:
+            equals: |
+              1..2
+              ok 1 first file
+              not ok 2 second file
+              # (in test file second.bats, line 1)
+              #   `@test "second file" { false; }' failed

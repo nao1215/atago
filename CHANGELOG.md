@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- Third-party E2E suite for [bats-core](https://github.com/bats-core/bats-core), in `test/e2e/thirdparty/bats/`: the Bash test runner whose own test suite is written in Bats, pinned here from outside the thing it runs. The TAP plan and its ok/not ok lines are asserted byte for byte next to the exit contract — 0 for a green run, 1 for a red one, and the failures that happen before any test does (no arguments, a missing file, a file Bash cannot parse) reporting to stderr with stdout left empty. Selection is checked on both halves: `--count` proving the bodies never ran, `--filter` behaving as a regexp rather than a substring, tag AND/OR/negation, and the stateful `--filter-status` replaying last run's failures from a run-log directory bats refuses to create for you. Each formatter is pinned in its own shape (tap13, JUnit on stdout and as a written report, gathered per-test output files, timing, trace, quote and file-reference styles), with the pretty formatter driven on a rendered terminal because a pipe never sees it, and the harness around a test body — setup/teardown ordering, a failing setup that stops the body while teardown still runs, the `run` helper, the per-test tmpdir and its cleanup — is proven by an append-only log the fixtures write. Every `.bats` file is authored by the scenario that runs it, so no upstream fixture is copied.
+
 ## [0.21.0] - 2026-08-18
 
 ### Added

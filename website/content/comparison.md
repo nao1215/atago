@@ -161,7 +161,9 @@ An honest table needs the reverse direction spelled out:
   history, active releases, and an ecosystem (bats-assert, bats-file,
   bats-mock, bats-detik) that atago has no equivalent of. If your tests *are*
   shell code — sourcing scripts, calling functions — Bats runs them
-  in-process; a black-box runner cannot.
+  in-process; a black-box runner cannot. atago does test the `bats` CLI
+  itself from the outside — its TAP output, selection flags, formatters, and
+  setup/teardown are pinned at [/real-world/bats/](/real-world/bats/).
 - ShellSpec is the most featureful shell unit-testing framework:
   function and command mocking, parameterized examples, built-in parallel
   runs, and kcov coverage. When shell scripts are the product, it is the
