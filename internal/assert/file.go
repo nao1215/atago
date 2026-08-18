@@ -220,15 +220,21 @@ func checkFileExecutable(f *spec.FileAssert, root, path string) *CheckResult {
 			Hint:     fmt.Sprintf("%q is a directory, not an executable file; a directory's execute bit means it can be entered", f.Path),
 		}
 	}
-	isExec := info.Mode().Perm()&0o111 != 0
-	if isExec == *f.Executable {
+	// What makes a file runnable is per-OS: the mode bits on POSIX, the file
+	// extension on Windows, where there is no execute bit to read at all. See
+	// executable_unix.go / executable_windows.go.
+	if isExecutable(info, path) == *f.Executable {
 		return pass(desc)
+	}
+	hint := fmt.Sprintf("expected file %q to %s executable", f.Path, executability(*f.Executable))
+	if extra := executableHint(path); extra != "" {
+		hint += "; " + extra
 	}
 	return &CheckResult{
 		Desc:     desc,
 		Expected: fmt.Sprintf("file %q executable=%t", f.Path, *f.Executable),
-		Actual:   fmt.Sprintf("executable=%t (mode %s)", isExec, info.Mode().Perm()),
-		Hint:     fmt.Sprintf("expected file %q to %s executable", f.Path, executability(*f.Executable)),
+		Actual:   executableActual(info, path),
+		Hint:     hint,
 	}
 }
 

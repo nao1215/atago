@@ -2853,7 +2853,8 @@ Full spec: [run_and_assert](../examples/run_and_assert.atago.yaml)
 ## Assert a generated script is executable
 
 A scaffolder that writes hook or build scripts makes two promises: the content
-and the mode bit. A `file:` assert checks one property at a time, so stack two:
+and that the file can actually be run. A `file:` assert checks one property at a
+time, so stack two:
 
 ```yaml
 version: "1"
@@ -2863,7 +2864,7 @@ suite:
 scenarios:
   - name: scaffold writes a runnable build script
     skip:
-      os: windows        # no executable bit to assert there
+      os: windows        # a .sh is not runnable by name there; see below
     steps:
       - run:
           command: mytool scaffold --with-scripts
@@ -2877,6 +2878,14 @@ scenarios:
             path: bin/build.sh
             contains: "#!/bin/sh"
 ```
+
+`executable:` answers the platform's own question. On POSIX it reads the mode
+bits; on Windows there are none — Go synthesizes a mode from the read-only
+attribute — so it reads the file extension against `PATHEXT`, the same rule
+Windows itself uses to decide what it will run by name, and the same rule
+`subject.artifact` follows when it appends `.exe` to a build output. A spec that
+asserts on a name portable in both senses — `bin/build.bat`, or the `.exe` a Go
+build produces — needs no OS gate at all.
 
 Full spec: [files_and_fixtures](../examples/files_and_fixtures.atago.yaml)
 

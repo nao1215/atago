@@ -142,9 +142,11 @@ scenarios:
           stdout:
             contains: "is a directory, not an executable file"
 
+  # `tool.bat` rather than `tool.sh` on purpose, so the scenario means the same
+  # thing on every OS: mode 0755 makes it executable on POSIX, and `.bat` is in
+  # PATHEXT on Windows, which is what decides there (Windows has no execute bit
+  # — Go synthesizes a mode from the read-only attribute).
   - name: a real file still satisfies both matchers
-    skip:
-      os: windows
     steps:
       - fixture:
           file: ok.atago.yaml
@@ -155,20 +157,61 @@ scenarios:
               - name: a real executable file
                 steps:
                   - fixture:
-                      file: tool.sh
-                      content: "#!/bin/sh\n"
+                      file: tool.bat
+                      content: "@echo hi\n"
                       mode: "0755"
+                  - fixture:
+                      file: notes.txt
+                      content: "plain\n"
+                      mode: "0644"
                   - run: {command: echo hi}
                   - assert:
-                      file: {path: tool.sh, exists: true}
+                      file: {path: tool.bat, exists: true}
                   - assert:
-                      file: {path: tool.sh, executable: true}
+                      file: {path: tool.bat, executable: true}
+                  # The negative half, also portable: no execute bit on POSIX,
+                  # and .txt is not in PATHEXT on Windows.
+                  - assert:
+                      file: {path: notes.txt, executable: false}
       - run:
           command: ${atago} run ok.atago.yaml
       - assert:
           exit_code: 0
           stdout:
             contains: PASSED
+
+  # The failure a POSIX author will hit first on Windows: they reach for chmod,
+  # and no permission change can ever satisfy the assertion. The message has to
+  # name the rule that actually applies.
+  - name: an executable failure on Windows names PATHEXT rather than a mode
+    only:
+      os: windows
+    steps:
+      - fixture:
+          file: noext.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: noext}
+            scenarios:
+              - name: a POSIX script is not runnable by name on Windows
+                steps:
+                  - fixture:
+                      file: tool.sh
+                      content: "echo hi\n"
+                      mode: "0755"
+                  - assert:
+                      file: {path: tool.sh, executable: true}
+      - run:
+          command: ${atago} run noext.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - PATHEXT
+              - 'extension ".sh"'
+            # The synthesized Windows mode would send the author looking for a
+            # permission problem that does not exist.
+            not_contains: "(mode "
 
   # A byte-exact comparison that fails on a carriage return printed the same two
   # words twice: the reader could see there was a difference but not what it
