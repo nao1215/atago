@@ -1,0 +1,432 @@
+version: "1"
+
+suite:
+  name: kubens (third-party CLI, namespace state machine)
+  description: |
+    [kubens](https://github.com/ahmetb/kubectx) is kubectx's sibling: it sets
+    the namespace of the current kubectl context. The contract has one more
+    dimension than kubectx's, because a namespace only means anything relative
+    to a context — the previous-namespace memory is kept per context, and every
+    command fails when no context is selected at all.
+
+    kubens ships its own Bats suite, and every test in it is reproduced here.
+    The scenarios then pin what that suite leaves open: which stream each line
+    goes to, that the chosen namespace really lands in the kubeconfig on disk,
+    that a rejected name changes nothing, and what `--force` does with a
+    namespace the cluster does not have.
+
+    Listing namespaces would need a cluster, so the suite sets the same
+    short-circuit environment variable kubens' own tests use and never opens a
+    socket.
+
+defaults:
+  scenario:
+    only:
+      command: kubens --help
+  run:
+    sandbox_home: true
+    env:
+      KUBECONFIG: ${workdir}/config
+      # kubens' own test suite sets this to answer namespace queries from a
+      # fixed list instead of the Kubernetes API. Without it, every scenario
+      # here would need a live cluster.
+      _MOCK_NAMESPACES: "1"
+
+scenarios:
+  - name: usage is printed for --help and -h
+    steps:
+      - run:
+          command: kubens --help
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "USAGE:"
+              - "kubens <NAME>"
+      - run:
+          command: kubens -h
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "USAGE:"
+
+  - name: listing without a kubeconfig fails
+    steps:
+      # kubectx answers the same situation with a warning and exit 0, because
+      # "no contexts" is a listable answer. kubens cannot: a namespace list is
+      # relative to a context that does not exist here, so this is an error.
+      - run:
+          command: kubens
+      - assert:
+          exit_code: 1
+          stdout:
+            empty: true
+
+  - name: the namespaces of the current context are listed
+    steps:
+      - fixture:
+          file: config
+          content: |
+            apiVersion: v1
+            kind: Config
+            clusters:
+              - name: cluster1
+                cluster: {server: https://cluster1.example.com}
+            users:
+              - name: user1
+                user: {}
+            contexts:
+              - name: user1@cluster1
+                context: {cluster: cluster1, user: user1}
+            current-context: "user1@cluster1"
+      - run:
+          command: kubens
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - ns1
+              - ns2
+          stderr:
+            empty: true
+
+  - name: switching writes the namespace into the current context
+    steps:
+      - fixture:
+          file: config
+          content: |
+            apiVersion: v1
+            kind: Config
+            clusters:
+              - name: cluster1
+                cluster: {server: https://cluster1.example.com}
+            users:
+              - name: user1
+                user: {}
+            contexts:
+              - name: user1@cluster1
+                context: {cluster: cluster1, user: user1}
+            current-context: "user1@cluster1"
+      - run:
+          command: kubens ns1
+      - assert:
+          exit_code: 0
+          stdout:
+            empty: true
+          stderr:
+            contains: 'Active namespace is "ns1"'
+          changes:
+            created: []
+            modified:
+              - config
+            deleted: []
+            ignore:
+              - ".atago-home/**"
+      # The kubeconfig is the oracle: the namespace is written onto the context
+      # entry, which is what kubectl reads later.
+      - assert:
+          file:
+            path: config
+            contains: "namespace: ns1"
+      - run:
+          command: kubens --current
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              ns1
+
+  - name: an unknown namespace is refused and changes nothing
+    steps:
+      - fixture:
+          file: config
+          content: |
+            apiVersion: v1
+            kind: Config
+            clusters:
+              - name: cluster1
+                cluster: {server: https://cluster1.example.com}
+            users:
+              - name: user1
+                user: {}
+            contexts:
+              - name: user1@cluster1
+                context: {cluster: cluster1, user: user1}
+            current-context: "user1@cluster1"
+      - run:
+          command: kubens unknown-namespace
+      - assert:
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            contains: 'no namespace exists with name "unknown-namespace"'
+          changes:
+            modified: []
+            deleted: []
+            ignore:
+              - ".atago-home/**"
+
+  - name: --force accepts a namespace the cluster does not have
+    steps:
+      # The escape hatch for a namespace that is about to exist. It is the same
+      # command with the same name, so the only observable difference is the
+      # verdict and the file it writes — which is exactly what a flag like this
+      # has to be tested for.
+      - fixture:
+          file: config
+          content: |
+            apiVersion: v1
+            kind: Config
+            clusters:
+              - name: cluster1
+                cluster: {server: https://cluster1.example.com}
+            users:
+              - name: user1
+                user: {}
+            contexts:
+              - name: user1@cluster1
+                context: {cluster: cluster1, user: user1}
+            current-context: "user1@cluster1"
+      - run:
+          command: kubens --force not-yet-created
+      - assert:
+          exit_code: 0
+          stderr:
+            contains: 'Active namespace is "not-yet-created"'
+      - assert:
+          file:
+            path: config
+            contains: "namespace: not-yet-created"
+
+  - name: the dash toggles between the last two namespaces
+    steps:
+      - fixture:
+          file: config
+          content: |
+            apiVersion: v1
+            kind: Config
+            clusters:
+              - name: cluster1
+                cluster: {server: https://cluster1.example.com}
+            users:
+              - name: user1
+                user: {}
+            contexts:
+              - name: user1@cluster1
+                context: {cluster: cluster1, user: user1}
+            current-context: "user1@cluster1"
+      - run:
+          command: kubens ns1
+      - assert:
+          exit_code: 0
+      - run:
+          command: kubens ns2
+      - assert:
+          exit_code: 0
+      # The memory is per context, which is why the file is named after one.
+      - assert:
+          file:
+            path: .atago-home/.cache/kubens/user1@cluster1
+            equals: ns1
+      - run:
+          command: kubens -
+      - assert:
+          exit_code: 0
+      - run:
+          command: kubens --current
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              ns1
+      - run:
+          command: kubens -
+      - assert:
+          exit_code: 0
+      - run:
+          command: kubens --current
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              ns2
+
+  - name: the dash fails when this context has no previous namespace
+    steps:
+      - fixture:
+          file: config
+          content: |
+            apiVersion: v1
+            kind: Config
+            clusters:
+              - name: cluster1
+                cluster: {server: https://cluster1.example.com}
+            users:
+              - name: user1
+                user: {}
+            contexts:
+              - name: user1@cluster1
+                context: {cluster: cluster1, user: user1}
+            current-context: "user1@cluster1"
+      - run:
+          command: kubens -
+      - assert:
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            contains: "No previous namespace found for current context"
+
+  - name: the dash fails when no context is selected
+    steps:
+      - fixture:
+          file: config
+          content: |
+            apiVersion: v1
+            kind: Config
+            clusters:
+              - name: cluster1
+                cluster: {server: https://cluster1.example.com}
+            users:
+              - name: user1
+                user: {}
+            contexts:
+              - name: user1@cluster1
+                context: {cluster: cluster1, user: user1}
+            current-context: ""
+      - run:
+          command: kubens -
+      - assert:
+          exit_code: 1
+          stderr:
+            contains: "current-context is not set"
+
+  - name: --current reports default before any namespace is chosen
+    steps:
+      - fixture:
+          file: config
+          content: |
+            apiVersion: v1
+            kind: Config
+            clusters:
+              - name: cluster1
+                cluster: {server: https://cluster1.example.com}
+            users:
+              - name: user1
+                user: {}
+            contexts:
+              - name: user1@cluster1
+                context: {cluster: cluster1, user: user1}
+            current-context: "user1@cluster1"
+      - run:
+          command: kubens -c
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              default
+      - run:
+          command: kubens --current
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              default
+
+  - name: --current reports the namespace after it is set
+    steps:
+      - fixture:
+          file: config
+          content: |
+            apiVersion: v1
+            kind: Config
+            clusters:
+              - name: cluster1
+                cluster: {server: https://cluster1.example.com}
+            users:
+              - name: user1
+                user: {}
+            contexts:
+              - name: user1@cluster1
+                context: {cluster: cluster1, user: user1}
+            current-context: "user1@cluster1"
+      - run:
+          command: kubens ns1
+      - assert:
+          exit_code: 0
+      - run:
+          command: kubens -c
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              ns1
+      - run:
+          command: kubens --current
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              ns1
+
+  - name: --current fails when no context is selected
+    steps:
+      - fixture:
+          file: config
+          content: |
+            apiVersion: v1
+            kind: Config
+            clusters:
+              - name: cluster1
+                cluster: {server: https://cluster1.example.com}
+            users:
+              - name: user1
+                user: {}
+            contexts:
+              - name: user1@cluster1
+                context: {cluster: cluster1, user: user1}
+            current-context: ""
+      - run:
+          command: kubens -c
+      - assert:
+          exit_code: 1
+      - run:
+          command: kubens --current
+      - assert:
+          exit_code: 1
+
+  - name: unsetting returns the context to the default namespace
+    steps:
+      - fixture:
+          file: config
+          content: |
+            apiVersion: v1
+            kind: Config
+            clusters:
+              - name: cluster1
+                cluster: {server: https://cluster1.example.com}
+            users:
+              - name: user1
+                user: {}
+            contexts:
+              - name: user1@cluster1
+                context: {cluster: cluster1, user: user1}
+            current-context: "user1@cluster1"
+      - run:
+          command: kubens ns2
+      - assert:
+          exit_code: 0
+      - run:
+          command: kubens -u
+      - assert:
+          exit_code: 0
+          stderr:
+            contains: 'Active namespace is "default"'
+      - run:
+          command: kubens --current
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              default

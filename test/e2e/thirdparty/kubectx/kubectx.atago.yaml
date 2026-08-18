@@ -1,0 +1,718 @@
+version: "1"
+
+suite:
+  name: kubectx (third-party CLI, kubeconfig state machine)
+  description: |
+    [kubectx](https://github.com/ahmetb/kubectx) switches the active kubectl
+    context. It is a small program with a large contract: it rewrites the
+    kubeconfig in place, remembers the previous context in a file under the
+    user's home so that `kubectx -` can toggle, splits machine-readable output
+    (context names) from human status lines, and answers with exit 1 for every
+    mistake a user can make with a context name.
+
+    kubectx keeps its own test suite in Bats, and every one of those tests is
+    reproduced here, so the two can be compared. The scenarios then go past what
+    a Bats suite observes: which stream each line went to, what the kubeconfig
+    on disk looks like afterwards, that a failed command leaves it untouched,
+    that the previous-context state lands under the isolated home rather than
+    the real one, and what the interactive picker does when a terminal is
+    attached.
+
+    No cluster is contacted. Every kubeconfig here is a throwaway fixture
+    written in the scenario workdir, naming servers that are never dialed.
+
+# Gates and isolation are stated once: the suite runs only where kubectx is
+# installed, every command reads the workdir's own kubeconfig, and HOME is
+# sandboxed so the previous-context state file lands under the workdir instead
+# of the machine's real ~/.kube.
+defaults:
+  scenario:
+    only:
+      command: kubectx --help
+  run:
+    sandbox_home: true
+    env:
+      KUBECONFIG: ${workdir}/config
+
+scenarios:
+  - name: usage is printed for --help and -h
+    steps:
+      - run:
+          command: kubectx --help
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "USAGE:"
+              - "kubectx <NEW_NAME>=<NAME>"
+      - run:
+          command: kubectx -h
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "USAGE:"
+
+  - name: listing without a kubeconfig warns on stderr and still succeeds
+    steps:
+      # Nothing was written into the workdir, so KUBECONFIG names a file that
+      # does not exist. This is the one warning path that still exits 0: there
+      # is nothing to list, which is not an error. The warning goes to stderr
+      # and stdout stays empty, so a script reading context names from stdout
+      # sees an empty list rather than a line of prose.
+      - run:
+          command: kubectx
+      - assert:
+          exit_code: 0
+          stdout:
+            empty: true
+          stderr:
+            equals: |
+              warning: kubeconfig file not found
+      - assert:
+          file:
+            path: config
+            exists: false
+
+  - name: one context is listed and listing changes nothing
+    steps:
+      - fixture:
+          file: config
+          content: |
+            apiVersion: v1
+            kind: Config
+            clusters:
+              - name: cluster1
+                cluster: {server: https://cluster1.example.com}
+            users:
+              - name: user1
+                user: {}
+            contexts:
+              - name: user1@cluster1
+                context: {cluster: cluster1, user: user1}
+            current-context: ""
+      - run:
+          command: kubectx
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              user1@cluster1
+          stderr:
+            empty: true
+          # Listing is a read: the kubeconfig it read must come out untouched.
+          changes:
+            created: []
+            modified: []
+            deleted: []
+            ignore:
+              - ".atago-home/**"
+
+  - name: both contexts are listed, one per line
+    steps:
+      - fixture:
+          file: config
+          content: |
+            apiVersion: v1
+            kind: Config
+            clusters:
+              - name: cluster1
+                cluster: {server: https://cluster1.example.com}
+            users:
+              - name: user1
+                user: {}
+              - name: user2
+                user: {}
+            contexts:
+              - name: user1@cluster1
+                context: {cluster: cluster1, user: user1}
+              - name: user2@cluster1
+                context: {cluster: cluster1, user: user2}
+            current-context: ""
+      - run:
+          command: kubectx
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              user1@cluster1
+              user2@cluster1
+
+  - name: switching writes the choice into the kubeconfig and reports it on stderr
+    steps:
+      - fixture:
+          file: config
+          content: |
+            apiVersion: v1
+            kind: Config
+            clusters:
+              - name: cluster1
+                cluster: {server: https://cluster1.example.com}
+            users:
+              - name: user1
+                user: {}
+              - name: user2
+                user: {}
+            contexts:
+              - name: user1@cluster1
+                context: {cluster: cluster1, user: user1}
+              - name: user2@cluster1
+                context: {cluster: cluster1, user: user2}
+            current-context: ""
+      - run:
+          command: kubectx user1@cluster1
+      - assert:
+          exit_code: 0
+          # The confirmation is a status line, not data: it belongs on stderr so
+          # that piping kubectx's stdout stays useful.
+          stdout:
+            empty: true
+          stderr:
+            contains: 'Switched to context "user1@cluster1".'
+      # The kubeconfig on disk is the independent oracle: kubectx saying it
+      # switched and kubectl later reading that context are two different
+      # claims, and only the file settles them.
+      - assert:
+          file:
+            path: config
+            contains: 'current-context: "user1@cluster1"'
+      - run:
+          command: kubectx user2@cluster1
+      - assert:
+          exit_code: 0
+      - assert:
+          file:
+            path: config
+            contains: 'current-context: "user2@cluster1"'
+      # Both spellings of the same question answer on stdout, so either can be
+      # read by a prompt or a script.
+      - run:
+          command: kubectx -c
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              user2@cluster1
+      - run:
+          command: kubectx --current
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              user2@cluster1
+
+  - name: the dash toggles between the last two contexts
+    steps:
+      - fixture:
+          file: config
+          content: |
+            apiVersion: v1
+            kind: Config
+            clusters:
+              - name: cluster1
+                cluster: {server: https://cluster1.example.com}
+            users:
+              - name: user1
+                user: {}
+              - name: user2
+                user: {}
+            contexts:
+              - name: user1@cluster1
+                context: {cluster: cluster1, user: user1}
+              - name: user2@cluster1
+                context: {cluster: cluster1, user: user2}
+            current-context: ""
+      - run:
+          command: kubectx user1@cluster1
+      - assert:
+          exit_code: 0
+      - run:
+          command: kubectx user2@cluster1
+      - assert:
+          exit_code: 0
+      # The toggle is state kubectx keeps for itself, in a cache file under the
+      # user's home. sandbox_home puts that home (and the XDG locations kubectx
+      # prefers) inside the workdir, so the state the next command depends on
+      # can be read rather than assumed — and the machine's real ~/.kube is
+      # never touched by the suite.
+      - assert:
+          file:
+            path: .atago-home/.cache/kubectx
+            equals: user1@cluster1
+      - run:
+          command: kubectx -
+      - assert:
+          exit_code: 0
+          stderr:
+            contains: 'Switched to context "user1@cluster1".'
+      - run:
+          command: kubectx --current
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              user1@cluster1
+      - run:
+          command: kubectx -
+      - assert:
+          exit_code: 0
+      - run:
+          command: kubectx --current
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              user2@cluster1
+
+  - name: the dash fails when no previous context was recorded
+    steps:
+      - fixture:
+          file: config
+          content: |
+            apiVersion: v1
+            kind: Config
+            clusters:
+              - name: cluster1
+                cluster: {server: https://cluster1.example.com}
+            users:
+              - name: user1
+                user: {}
+            contexts:
+              - name: user1@cluster1
+                context: {cluster: cluster1, user: user1}
+            current-context: ""
+      - run:
+          command: kubectx -
+      - assert:
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            contains: "no previous context found"
+          changes:
+            modified: []
+            deleted: []
+            ignore:
+              - ".atago-home/**"
+
+  - name: an unknown context name fails and leaves the kubeconfig untouched
+    steps:
+      - fixture:
+          file: config
+          content: |
+            apiVersion: v1
+            kind: Config
+            clusters:
+              - name: cluster1
+                cluster: {server: https://cluster1.example.com}
+            users:
+              - name: user1
+                user: {}
+            contexts:
+              - name: user1@cluster1
+                context: {cluster: cluster1, user: user1}
+            current-context: ""
+      - run:
+          command: kubectx unknown-context
+      - assert:
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            contains: 'no context exists with the name: "unknown-context"'
+          # The negative space: a rejected switch must not half-apply.
+          changes:
+            modified: []
+            deleted: []
+            ignore:
+              - ".atago-home/**"
+
+  - name: --current fails while no context is selected
+    steps:
+      - fixture:
+          file: config
+          content: |
+            apiVersion: v1
+            kind: Config
+            clusters:
+              - name: cluster1
+                cluster: {server: https://cluster1.example.com}
+            users:
+              - name: user1
+                user: {}
+            contexts:
+              - name: user1@cluster1
+                context: {cluster: cluster1, user: user1}
+            current-context: ""
+      - run:
+          command: kubectx -c
+      - assert:
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            contains: "current-context is not set"
+      - run:
+          command: kubectx --current
+      - assert:
+          exit_code: 1
+
+  - name: renaming replaces the old name in the listing
+    steps:
+      - fixture:
+          file: config
+          content: |
+            apiVersion: v1
+            kind: Config
+            clusters:
+              - name: cluster1
+                cluster: {server: https://cluster1.example.com}
+            users:
+              - name: user1
+                user: {}
+              - name: user2
+                user: {}
+            contexts:
+              - name: user1@cluster1
+                context: {cluster: cluster1, user: user1}
+              - name: user2@cluster1
+                context: {cluster: cluster1, user: user2}
+            current-context: ""
+      - run:
+          command: kubectx new-context=user1@cluster1
+      - assert:
+          exit_code: 0
+          stderr:
+            contains: "Context user1@cluster1 renamed to new-context."
+      - run:
+          command: kubectx
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              new-context
+              user2@cluster1
+      - assert:
+          file:
+            path: config
+            not_contains: "user1@cluster1"
+
+  - name: a dot renames the current context
+    steps:
+      - fixture:
+          file: config
+          content: |
+            apiVersion: v1
+            kind: Config
+            clusters:
+              - name: cluster1
+                cluster: {server: https://cluster1.example.com}
+            users:
+              - name: user1
+                user: {}
+              - name: user2
+                user: {}
+            contexts:
+              - name: user1@cluster1
+                context: {cluster: cluster1, user: user1}
+              - name: user2@cluster1
+                context: {cluster: cluster1, user: user2}
+            current-context: ""
+      - run:
+          command: kubectx user2@cluster1
+      - assert:
+          exit_code: 0
+      - run:
+          command: kubectx new-context=.
+      - assert:
+          exit_code: 0
+      - run:
+          command: kubectx
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              new-context
+              user1@cluster1
+      # Renaming the current context keeps it current under the new name.
+      - run:
+          command: kubectx --current
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              new-context
+
+  - name: deleting a context removes it from the listing
+    steps:
+      - fixture:
+          file: config
+          content: |
+            apiVersion: v1
+            kind: Config
+            clusters:
+              - name: cluster1
+                cluster: {server: https://cluster1.example.com}
+            users:
+              - name: user1
+                user: {}
+              - name: user2
+                user: {}
+            contexts:
+              - name: user1@cluster1
+                context: {cluster: cluster1, user: user1}
+              - name: user2@cluster1
+                context: {cluster: cluster1, user: user2}
+            current-context: ""
+      - run:
+          command: kubectx -d user1@cluster1
+      - assert:
+          exit_code: 0
+          stderr:
+            contains: "Deleted context user1@cluster1."
+      - run:
+          command: kubectx
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              user2@cluster1
+      # Deleting a context leaves the user and cluster entries it referenced,
+      # which is what the help text promises.
+      - assert:
+          file:
+            path: config
+            contains:
+              - "name: user1"
+              - "name: cluster1"
+
+  - name: a dot deletes the current context
+    steps:
+      - fixture:
+          file: config
+          content: |
+            apiVersion: v1
+            kind: Config
+            clusters:
+              - name: cluster1
+                cluster: {server: https://cluster1.example.com}
+            users:
+              - name: user1
+                user: {}
+              - name: user2
+                user: {}
+            contexts:
+              - name: user1@cluster1
+                context: {cluster: cluster1, user: user1}
+              - name: user2@cluster1
+                context: {cluster: cluster1, user: user2}
+            current-context: ""
+      - run:
+          command: kubectx user2@cluster1
+      - assert:
+          exit_code: 0
+      - run:
+          command: kubectx -d .
+      - assert:
+          exit_code: 0
+      - run:
+          command: kubectx
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              user1@cluster1
+
+  - name: deleting an unknown context fails and keeps the file intact
+    steps:
+      - fixture:
+          file: config
+          content: |
+            apiVersion: v1
+            kind: Config
+            clusters:
+              - name: cluster1
+                cluster: {server: https://cluster1.example.com}
+            users:
+              - name: user1
+                user: {}
+            contexts:
+              - name: user1@cluster1
+                context: {cluster: cluster1, user: user1}
+            current-context: ""
+      - run:
+          command: kubectx -d unknown-context
+      - assert:
+          exit_code: 1
+          stderr:
+            contains: "context does not exist"
+          changes:
+            modified: []
+            deleted: []
+            ignore:
+              - ".atago-home/**"
+
+  - name: several contexts are deleted in one call
+    steps:
+      - fixture:
+          file: config
+          content: |
+            apiVersion: v1
+            kind: Config
+            clusters:
+              - name: cluster1
+                cluster: {server: https://cluster1.example.com}
+            users:
+              - name: user1
+                user: {}
+              - name: user2
+                user: {}
+            contexts:
+              - name: user1@cluster1
+                context: {cluster: cluster1, user: user1}
+              - name: user2@cluster1
+                context: {cluster: cluster1, user: user2}
+            current-context: ""
+      - run:
+          command: kubectx -d user1@cluster1 user2@cluster1
+      - assert:
+          exit_code: 0
+      - run:
+          command: kubectx
+      - assert:
+          exit_code: 0
+          stdout:
+            empty: true
+
+  - name: a batch delete naming one unknown context fails after deleting the rest
+    steps:
+      # The interesting half of the contract: the batch is not atomic. The
+      # contexts named before the unknown one are gone, the run reports failure,
+      # and the one named after it survives.
+      - fixture:
+          file: config
+          content: |
+            apiVersion: v1
+            kind: Config
+            clusters:
+              - name: cluster1
+                cluster: {server: https://cluster1.example.com}
+            users:
+              - name: user1
+                user: {}
+              - name: user2
+                user: {}
+            contexts:
+              - name: user1@cluster1
+                context: {cluster: cluster1, user: user1}
+              - name: user2@cluster1
+                context: {cluster: cluster1, user: user2}
+            current-context: ""
+      - run:
+          command: kubectx -d user1@cluster1 non-existent user2@cluster1
+      - assert:
+          exit_code: 1
+      - run:
+          command: kubectx
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              user2@cluster1
+
+  - name: unsetting clears the selection
+    steps:
+      - fixture:
+          file: config
+          content: |
+            apiVersion: v1
+            kind: Config
+            clusters:
+              - name: cluster1
+                cluster: {server: https://cluster1.example.com}
+            users:
+              - name: user1
+                user: {}
+              - name: user2
+                user: {}
+            contexts:
+              - name: user1@cluster1
+                context: {cluster: cluster1, user: user1}
+              - name: user2@cluster1
+                context: {cluster: cluster1, user: user2}
+            current-context: ""
+      - run:
+          command: kubectx user1@cluster1
+      - assert:
+          exit_code: 0
+      - run:
+          command: kubectx -u
+      - assert:
+          exit_code: 0
+          stderr:
+            contains: "Active context unset"
+      - run:
+          command: kubectx --current
+      - assert:
+          exit_code: 1
+          stderr:
+            contains: "current-context is not set"
+      # The contexts themselves survive an unset; only the selection is gone.
+      - run:
+          command: kubectx
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              user1@cluster1
+              user2@cluster1
+
+  - name: the interactive picker selects a context by typed query
+    # kubectx hands the list to fzf when a terminal is attached, which is the
+    # half of the program no non-interactive suite observes: the picker draws,
+    # the query narrows it, Enter applies the selection, and the kubeconfig on
+    # disk is what proves it landed.
+    only:
+      command: fzf --version
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: config
+          content: |
+            apiVersion: v1
+            kind: Config
+            clusters:
+              - name: cluster1
+                cluster: {server: https://cluster1.example.com}
+            users:
+              - name: user1
+                user: {}
+              - name: user2
+                user: {}
+            contexts:
+              - name: user1@cluster1
+                context: {cluster: cluster1, user: user1}
+              - name: user2@cluster1
+                context: {cluster: cluster1, user: user2}
+            current-context: ""
+      - pty:
+          command: kubectx
+          timeout: 30s
+          session:
+            - expect_screen:
+                contains: "user2@cluster1"
+                timeout: 15s
+            - send: "user2"
+            # fzf's counter shows how many of the two lines still match, so the
+            # query is known to have been applied before Enter is sent.
+            - expect_screen:
+                contains: "1/2"
+                timeout: 15s
+            - send: {key: enter}
+            - expect_screen:
+                contains: Switched
+                timeout: 15s
+      - assert:
+          file:
+            path: config
+            contains: 'current-context: "user2@cluster1"'
