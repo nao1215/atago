@@ -93,3 +93,53 @@ scenarios:
           exit_code: 4
           stdout:
             contains: "environment variable ATAGO_SURELY_UNSET_VAR is not set"
+
+  - name: the same rule covers the command that starts a pty session
+    # Every entry inside `session:` was guarded from the start, while the
+    # command that starts the session was expanded with the reference left
+    # verbatim and handed to the OS — so the failure arrived from the program
+    # instead of from the mistake in the spec.
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: ptytypo.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: ptytypo}
+            scenarios:
+              - name: a misspelled variable in a pty command stops the run
+                steps:
+                  - pty:
+                      command: "cat $${no_such_file}"
+                      timeout: 10s
+                      session:
+                        - send: {key: ctrl-d}
+      - run: {command: "${atago} run ptytypo.atago.yaml"}
+      - assert:
+          exit_code: 4
+          stdout:
+            contains:
+              - "ATG4505"
+              - "pty.command references ${no_such_file}"
+
+  - name: an unresolved reference reports one diagnostic code everywhere
+    # The same failure used to be coded inside a pty session and uncoded for a
+    # run step, so `atago explain` could answer for one and not the other.
+    steps:
+      - fixture:
+          file: coded.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: coded}
+            scenarios:
+              - name: a run step
+                steps:
+                  - run: {command: "echo $${no_such_var}"}
+      - run: {command: "${atago} run coded.atago.yaml"}
+      - assert:
+          exit_code: 4
+          stdout:
+            contains:
+              - "ATG4505"
+              - "run.command references ${no_such_var}"

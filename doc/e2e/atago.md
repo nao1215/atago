@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-83 suites · 679 scenarios
+83 suites · 681 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -745,7 +745,7 @@
   - [a failing screen assert frames a CJK screen squarely](#scenario-a-failing-screen-assert-frames-a-cjk-screen-squarely)
   - [a screen assert sees wide characters at their true width](#scenario-a-screen-assert-sees-wide-characters-at-their-true-width)
   - [less -X renders a real pager onto the screen](#scenario-less--x-renders-a-real-pager-onto-the-screen)
-- [atago self-hosting / variable resolution semantics](#atago-self-hosting--variable-resolution-semantics) — 7 scenarios
+- [atago self-hosting / variable resolution semantics](#atago-self-hosting--variable-resolution-semantics) — 9 scenarios
   - [a doubled dollar keeps the braces literal](#scenario-a-doubled-dollar-keeps-the-braces-literal)
   - [the workdir builtin expands to the scenario directory](#scenario-the-workdir-builtin-expands-to-the-scenario-directory)
   - [the atago builtin resolves to the binary under test](#scenario-the-atago-builtin-resolves-to-the-binary-under-test)
@@ -753,6 +753,8 @@
   - [shell true defers an unknown reference to the shell](#scenario-shell-true-defers-an-unknown-reference-to-the-shell)
   - [an unresolved variable is a hard error, not a silent empty](#scenario-an-unresolved-variable-is-a-hard-error-not-a-silent-empty)
   - [an unset env reference names the missing variable](#scenario-an-unset-env-reference-names-the-missing-variable)
+  - [the same rule covers the command that starts a pty session](#scenario-the-same-rule-covers-the-command-that-starts-a-pty-session)
+  - [an unresolved reference reports one diagnostic code everywhere](#scenario-an-unresolved-reference-reports-one-diagnostic-code-everywhere)
 - [atago self-hosting / verbose](#atago-self-hosting--verbose) — 4 scenarios
   - [verbose shows a passing scenario's command, output, and verdicts](#scenario-verbose-shows-a-passing-scenarios-command-output-and-verdicts)
   - [without --verbose the trace is absent](#scenario-without---verbose-the-trace-is-absent)
@@ -16627,6 +16629,55 @@ ${atago} run unsetenv.atago.yaml
 #### Then
 - exit code is `4`
 - stdout contains `environment variable ATAGO_SURELY_UNSET_VAR is not set`
+
+### Scenario: the same rule covers the command that starts a pty session
+_skipped on Windows_
+#### Given
+- Fixture file `ptytypo.atago.yaml` is created.
+
+#### Inputs
+_Fixture `ptytypo.atago.yaml`:_
+```text
+version: "1"
+suite: {name: ptytypo}
+scenarios:
+  - name: a misspelled variable in a pty command stops the run
+    steps:
+      - pty:
+          command: "cat $${no_such_file}"
+          timeout: 10s
+          session:
+            - send: {key: ctrl-d}
+```
+#### When
+```shell
+${atago} run ptytypo.atago.yaml
+```
+#### Then
+- exit code is `4`
+- stdout contains `ATG4505`, `pty.command references ${no_such_file}`
+
+### Scenario: an unresolved reference reports one diagnostic code everywhere
+#### Given
+- Fixture file `coded.atago.yaml` is created.
+
+#### Inputs
+_Fixture `coded.atago.yaml`:_
+```text
+version: "1"
+suite: {name: coded}
+scenarios:
+  - name: a run step
+    steps:
+      - run: {command: "echo $${no_such_var}"}
+```
+#### When
+```shell
+${atago} run coded.atago.yaml
+```
+#### Then
+- exit code is `4`
+- stdout contains `ATG4505`, `run.command references ${no_such_var}`
 
 ## atago self-hosting / verbose
 Source: `test/e2e/atago/verbose.atago.yaml`

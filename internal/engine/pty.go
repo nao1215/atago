@@ -28,6 +28,15 @@ func (e *Engine) runPTY(ctx context.Context, p *spec.PTY, st *store.Store, scena
 	if err := checkPTYSessionResolved(p.Session, st); err != nil {
 		return nil, nil, err
 	}
+	// The command that STARTS the session gets the same guard a run step's
+	// command gets. Without it the session entries were checked while the
+	// program they talk to was launched from text carrying the reference
+	// verbatim, so `command: "myapp ${env:PROFILE}"` with PROFILE unset started
+	// a program with the literal `${env:PROFILE}` as an argument and the failure
+	// arrived from the program instead of from the mistake in the spec.
+	if msg := commandRefGuard(st, "pty", p.Command, p.Cwd, p.ShellEnabled()); msg != "" {
+		return nil, nil, diag.VariableUnresolved.Errorf("%s", msg)
+	}
 	// The shared walker is the one list of what a pty step expands (command,
 	// cwd, env values, and every session entry); the engine only composes the
 	// runtime environment on top of it.
