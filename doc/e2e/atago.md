@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-82 suites · 676 scenarios
+83 suites · 679 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -603,6 +603,10 @@
   - [Unix XDG family — write config, read it back, inspect it under the workdir](#scenario-unix-xdg-family--write-config-read-it-back-inspect-it-under-the-workdir)
   - [Windows APPDATA family — write config, read it back, inspect it under the workdir](#scenario-windows-appdata-family--write-config-read-it-back-inspect-it-under-the-workdir)
   - [cwd anchors the run, but sandbox_home stays at the workdir ROOT (Unix)](#scenario-cwd-anchors-the-run-but-sandbox_home-stays-at-the-workdir-root-unix)
+- [verbatim scalars](#verbatim-scalars) — 3 scenarios
+  - [unquoted literals keep their digits in matchers, env, and fixtures](#scenario-unquoted-literals-keep-their-digits-in-matchers-env-and-fixtures)
+  - [output that lacks the literal fails instead of matching a shortened one](#scenario-output-that-lacks-the-literal-fails-instead-of-matching-a-shortened-one)
+  - [a json matcher keeps YAML's typing, so true is not the text true](#scenario-a-json-matcher-keeps-yamls-typing-so-true-is-not-the-text-true)
 - [atago self-hosting / security](#atago-self-hosting--security) — 6 scenarios
   - [declared secrets are masked in failure output](#scenario-declared-secrets-are-masked-in-failure-output)
   - [a file assertion path may not escape the scenario workdir](#scenario-a-file-assertion-path-may-not-escape-the-scenario-workdir)
@@ -13475,6 +13479,75 @@ mkdir -p "$XDG_CONFIG_HOME/mytool" && printf editor=vim > "$XDG_CONFIG_HOME/myto
   - exit code is `0`
   - file `.atago-home/.config/mytool/config` contains `editor=vim`
   - file `sub/.atago-home/.config/mytool/config` does not exist
+
+## verbatim scalars
+Source: `test/e2e/atago/scalar_verbatim.atago.yaml`
+### Scenario: unquoted literals keep their digits in matchers, env, and fixtures
+#### Given
+- Fixture file `child.atago.yaml` is created.
+
+#### Inputs
+_Fixture `child.atago.yaml`:_
+```text
+version: "1"
+suite: {name: child}
+scenarios:
+  - name: a trailing zero survives into an exact match
+    steps:
+      - run: {command: echo 1.20}
+      - assert: {stdout: {equals: "1.20"}}
+  - name: leading zeros reach the program under test
+    steps:
+      - run: {shell: true, command: 'echo "[$V]"', env: {V: 007}}
+      - assert: {stdout: {equals: "[007]"}}
+  - name: a fixture keeps the digits it was written with
+    steps:
+      - fixture: {file: version.txt, content: 1.10}
+      - assert: {file: {path: version.txt, equals: "1.10"}}
+  - name: a boolean-looking command still names the program
+    steps:
+      - run: {command: true}
+      - assert: {exit_code: 0}
+```
+#### When
+```shell
+${atago} run --parallel 1 child.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout contains `4 passed`
+
+### Scenario: output that lacks the literal fails instead of matching a shortened one
+#### Given
+- Fixture file `child.atago.yaml` is created.
+
+#### Inputs
+_Fixture `child.atago.yaml`:_
+```text
+version: "1"
+suite: {name: child}
+scenarios:
+  - name: a
+    steps:
+      - run: {command: echo 1.2}
+      - assert: {stdout: {contains: 1.20}}
+```
+#### When
+```shell
+${atago} run child.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `1.20`
+
+### Scenario: a json matcher keeps YAML's typing, so true is not the text true
+#### When
+```shell
+echo '{"ok": true, "name": "true"}'
+
+```
+#### Then
+- stdout at `$.ok` equals `true`; at `$.name` equals `true`
 
 ## atago self-hosting / security
 Source: `test/e2e/atago/security.atago.yaml`

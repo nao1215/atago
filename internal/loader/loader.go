@@ -198,6 +198,12 @@ func loadBytesWithProject(path string, data []byte, proj *Project) (*spec.Spec, 
 		msg := formatYAMLError(err)
 		return nil, &Error{Path: path, Kind: KindParse, Code: classifyYAMLError(data, msg), Msg: msg}
 	}
+	// Restore the source text of any plain scalar that landed in a text field
+	// before anything reads those values: YAML types an unquoted 1.20 as a float,
+	// and a spec that compares literals must mean the characters the author
+	// wrote. It runs while the model still mirrors the document one-to-one,
+	// which is what lets the two be walked together.
+	applyVerbatimScalars(&s, data)
 	// Record each scenario's authored index before matrix expansion, so every
 	// expanded instance can be traced back to its authored source location (#80).
 	for i := range s.Scenarios {
