@@ -26,6 +26,8 @@ make e2e
 `make vet` runs `go vet` and `make fmt` formats the Go sources. `make test` also
 generates `cover.out` and `cover.html` locally (unit tests only).
 
+`make lint` runs golangci-lint once per target OS (`GOOS=linux`, `darwin`, `windows`), and CI enforces the same three legs. A linter only ever analyzes the files that build for the GOOS it runs under, so a Linux-only pass never opens the Windows halves of the pty, service, and command runners at all.
+
 `make coverage` reports the fuller picture: it combines unit-test coverage with
 the self-hosted E2E coverage. The E2E half runs a `go build -cover` atago binary
 and collects its runtime coverage via `GOCOVERDIR`, then merges both into the

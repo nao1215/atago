@@ -3,6 +3,7 @@
 package cmd
 
 import (
+	"context"
 	"os/exec"
 	"syscall"
 	"time"
@@ -13,7 +14,11 @@ import (
 // the child's pid; on cancel we signal -pid, so an orphaned grandchild — the
 // classic `sh -c "sleep 30"` case — dies too and releases the captured pipes.
 // WaitDelay bounds how long Wait lingers for I/O after that, as a safety net.
-func configureCancellation(cmd *exec.Cmd) {
+//
+// The context is unused here — signalling a process group needs no process of
+// its own — and is taken only so the Windows build, which has to spawn
+// taskkill, can inherit the caller's context values.
+func configureCancellation(_ context.Context, cmd *exec.Cmd) {
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.Cancel = func() error {
 		if cmd.Process == nil {

@@ -23,10 +23,14 @@ import (
 // captured stdout pipe open until WaitDelay force-closed it — so the step
 // reported a truncated stream and the survivor leaked into the rest of the run.
 // WaitDelay stays as the backstop for a descendant taskkill cannot reach.
-func configureCancellation(cmd *exec.Cmd) {
+func configureCancellation(ctx context.Context, cmd *exec.Cmd) {
+	// The teardown runs precisely because ctx is done, so it keeps ctx's VALUES
+	// and drops its cancellation: handing taskkill an already-cancelled context
+	// would kill the killer before it reached the tree.
+	teardown := context.WithoutCancel(ctx)
 	cmd.Cancel = func() error {
 		if cmd.Process != nil {
-			killTree(cmd.Process.Pid)
+			killTree(teardown, cmd.Process.Pid)
 		}
 		// The tree is going away either way and os/exec reports the outcome
 		// through Wait; a taskkill exit status adds nothing a caller can act on.
@@ -38,8 +42,6 @@ func configureCancellation(cmd *exec.Cmd) {
 // killTree force-terminates pid and every descendant. It mirrors
 // ptyrun.killTree; both are fire-and-forget, because the only failure worth
 // distinguishing — the process is already gone — needs no handling.
-func killTree(pid int) {
-	// Background is the honest context: this teardown runs precisely because the
-	// caller's context is already done.
-	_ = exec.CommandContext(context.Background(), "taskkill", "/T", "/F", "/PID", strconv.Itoa(pid)).Run() //nolint:gosec // fixed argv, pid from our own child
+func killTree(ctx context.Context, pid int) {
+	_ = exec.CommandContext(ctx, "taskkill", "/T", "/F", "/PID", strconv.Itoa(pid)).Run() //nolint:gosec // fixed argv, pid from our own child
 }
