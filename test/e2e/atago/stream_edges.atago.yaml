@@ -60,6 +60,32 @@ scenarios:
           stdout:
             empty: true
 
+  # Whitespace-only output counts as empty, so empty:false fails on it — and
+  # the failure's evidence must reveal the invisible bytes, instead of printing
+  # a blank block that looks even more empty than the "(empty)" a truly empty
+  # stream gets.
+  - name: an empty-false failure reveals whitespace-only bytes
+    steps:
+      - fixture:
+          file: inner_ws.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner ws
+            scenarios:
+              - name: whitespace is empty
+                steps:
+                  - run: {shell: true, command: 'printf "  \n\n"'}
+                  - assert:
+                      stdout:
+                        empty: false
+      - run:
+          command: ${atago} run inner_ws.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: '"  \n\n"'
+
   - name: equals tolerates output with no trailing newline
     steps:
       - run: {shell: true, command: "printf 'noeol'"}

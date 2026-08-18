@@ -3,6 +3,7 @@ package assert
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/nao1215/atago/internal/plural"
@@ -342,6 +343,17 @@ func excerpt(s string) string {
 	switch {
 	case s == "":
 		return EmptyExcerpt
+	case strings.TrimSpace(s) == "":
+		// A whitespace-only payload prints as a blank block — MORE
+		// empty-looking than the "(empty)" a truly empty one gets — exactly
+		// where the difference decides a verdict: `empty: false` fails on
+		// "  \n\n" because whitespace counts as empty, and the evidence has to
+		// show the bytes that made it so. Quote to reveal them; the truncation
+		// below never applies, because the quoted form only grows.
+		if len(s) > excerptLimit {
+			s = s[:excerptLimit]
+		}
+		return strconv.Quote(s)
 	case len(s) <= excerptLimit:
 		return s
 	default:

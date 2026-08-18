@@ -2139,6 +2139,37 @@ func TestExcerpt_Truncation(t *testing.T) {
 	}
 }
 
+// TestExcerpt_RevealsWhitespaceOnlyPayloads pins the rendering of an observed
+// payload that is invisible on a terminal. A truly empty payload says
+// "(empty)"; a whitespace-only one rendered as a blank block — MORE
+// empty-looking than (empty) — exactly where the distinction decides the
+// verdict: `empty: false` fails on "  \n\n" because whitespace counts as
+// empty, and the failure block gave the reader no way to see the bytes that
+// made it so. Quoting reveals them; a visible payload keeps its unquoted,
+// copy-pasteable form.
+func TestExcerpt_RevealsWhitespaceOnlyPayloads(t *testing.T) {
+	t.Parallel()
+	if got := excerpt("  \n\n"); got != `"  \n\n"` {
+		t.Errorf("excerpt(whitespace-only) = %q, want the payload quoted", got)
+	}
+	if got := excerpt(""); got != EmptyExcerpt {
+		t.Errorf("excerpt(empty) = %q, want %q", got, EmptyExcerpt)
+	}
+	if got := excerpt("visible\n"); got != "visible\n" {
+		t.Errorf("excerpt(visible) = %q, want it unchanged", got)
+	}
+
+	// The failure that motivated this: empty:false on whitespace-only output
+	// must show the invisible bytes as evidence.
+	cr := checkStream("stdout", &spec.StreamAssert{Empty: boolp(false)}, []byte("  \n\n"), true, Env{})
+	if cr.OK {
+		t.Fatal("empty:false must fail on whitespace-only output")
+	}
+	if !strings.Contains(cr.Actual, `\n`) {
+		t.Errorf("Actual = %q, want the whitespace revealed", cr.Actual)
+	}
+}
+
 func TestCheckStream_LineOutOfRange(t *testing.T) {
 	t.Parallel()
 	sa := &spec.StreamAssert{Line: intp(9), Contains: spec.StringList{"x"}}

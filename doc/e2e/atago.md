@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-82 suites · 673 scenarios
+82 suites · 674 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -680,7 +680,7 @@
 - [atago self-hosting / store whole-content trim and text selectors (#158)](#atago-self-hosting--store-whole-content-trim-and-text-selectors-158) — 2 scenarios
   - [trim captures an opaque token and round-trips it as an argument](#scenario-trim-captures-an-opaque-token-and-round-trips-it-as-an-argument)
   - [text captures a whole multi-line file verbatim](#scenario-text-captures-a-whole-multi-line-file-verbatim)
-- [atago self-hosting / stream matcher boundary values](#atago-self-hosting--stream-matcher-boundary-values) — 18 scenarios
+- [atago self-hosting / stream matcher boundary values](#atago-self-hosting--stream-matcher-boundary-values) — 19 scenarios
   - [equals a multibyte and emoji line](#scenario-equals-a-multibyte-and-emoji-line)
   - [contains a multibyte substring inside a longer line](#scenario-contains-a-multibyte-substring-inside-a-longer-line)
   - [a regex matches across multibyte runes](#scenario-a-regex-matches-across-multibyte-runes)
@@ -688,6 +688,7 @@
   - [not_contains a multibyte needle that is absent](#scenario-not_contains-a-multibyte-needle-that-is-absent)
   - [empty is true for a command that prints nothing](#scenario-empty-is-true-for-a-command-that-prints-nothing)
   - [empty is true for whitespace-only output](#scenario-empty-is-true-for-whitespace-only-output)
+  - [an empty-false failure reveals whitespace-only bytes](#scenario-an-empty-false-failure-reveals-whitespace-only-bytes)
   - [equals tolerates output with no trailing newline](#scenario-equals-tolerates-output-with-no-trailing-newline)
   - [a deliberate trailing blank line is addressable by index](#scenario-a-deliberate-trailing-blank-line-is-addressable-by-index)
   - [contains treats a needle with regex metacharacters literally](#scenario-contains-treats-a-needle-with-regex-metacharacters-literally)
@@ -15246,6 +15247,32 @@ printf '   \n\t\n'
 ```
 #### Then
 - stdout is empty
+
+### Scenario: an empty-false failure reveals whitespace-only bytes
+#### Given
+- Fixture file `inner_ws.atago.yaml` is created.
+
+#### Inputs
+_Fixture `inner_ws.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner ws
+scenarios:
+  - name: whitespace is empty
+    steps:
+      - run: {shell: true, command: 'printf "  \n\n"'}
+      - assert:
+          stdout:
+            empty: false
+```
+#### When
+```shell
+${atago} run inner_ws.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `"  \n\n"`
 
 ### Scenario: equals tolerates output with no trailing newline
 #### When
