@@ -79,12 +79,6 @@ On macOS, Homebrew works too:
 brew install --cask nao1215/tap/atago
 ```
 
-On Windows, winget installs it from the community repository:
-
-```shell
-winget install nao1215.atago
-```
-
 [Scoop](https://scoop.sh/) installs it from this repository's own bucket:
 
 ```shell
