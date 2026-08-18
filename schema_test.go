@@ -176,6 +176,101 @@ scenarios:
 	}
 }
 
+// durationProperties are the schema properties whose value is a Go duration
+// string, and the reason each stays strictly typed. A bare number is always
+// wrong there — 30 is not 30s, and the loader refuses it — so the schema
+// catching it in the editor costs nothing and saves a run.
+var durationProperties = map[string]string{
+	"timeout":    "a step, session, service, or suite bound",
+	"stable_for": "how long a screen must hold still",
+	"interval":   "the wait between retry attempts",
+	"delay":      "a mock route's or a readiness probe's pause",
+	"gt":         "a duration assertion's lower bound",
+	"gte":        "a duration assertion's lower bound",
+	"lt":         "a duration assertion's upper bound",
+	"lte":        "a duration assertion's upper bound",
+}
+
+// TestSchema_TextPropertiesAcceptAnyScalar pins the schema against the rule the
+// loader implements: in a text field the characters in the file are the value,
+// so an unquoted number or boolean means those characters. Declaring every such
+// property `"type": "string"` flagged `env: {PORT: 8080}` — the way anyone
+// writes a port — on a spec atago runs. Only the duration properties stay
+// strict, and this walks the whole document so a new strictly-typed text
+// property has to be a decision rather than a habit.
+func TestSchema_TextPropertiesAcceptAnyScalar(t *testing.T) {
+	data, err := os.ReadFile("schema/atago.schema.json")
+	if err != nil {
+		t.Fatalf("read schema: %v", err)
+	}
+	var root any
+	if err := json.Unmarshal(data, &root); err != nil {
+		t.Fatalf("parse schema: %v", err)
+	}
+	seen := map[string]bool{}
+	var walk func(node any, name string)
+	walk = func(node any, name string) {
+		m, ok := node.(map[string]any)
+		if !ok {
+			if arr, ok := node.([]any); ok {
+				for _, item := range arr {
+					walk(item, name)
+				}
+			}
+			return
+		}
+		if typ, ok := m["type"].(string); ok && typ == "string" {
+			seen[name] = true
+			if _, allowed := durationProperties[name]; !allowed {
+				t.Errorf("schema property %q is typed \"string\" alone, so an unquoted scalar there is flagged on a spec the loader accepts verbatim; widen it to [\"string\", \"number\", \"boolean\"] or record it in durationProperties", name)
+			}
+		}
+		for k, v := range m {
+			switch k {
+			case "properties", "$defs", "patternProperties":
+				if props, ok := v.(map[string]any); ok {
+					for pk, pv := range props {
+						walk(pv, pk)
+					}
+				}
+			case "items", "additionalProperties", "oneOf", "anyOf", "allOf", "not":
+				walk(v, name)
+			}
+		}
+	}
+	walk(root, "")
+	for name := range durationProperties {
+		if !seen[name] {
+			t.Errorf("durationProperties lists %q, which is no longer a strictly-typed schema property; remove the entry", name)
+		}
+	}
+}
+
+// TestSchema_AcceptsUnquotedScalarsInTextFields is the user-facing half of the
+// rule: the shapes people actually write — a port in env, a version in a
+// matcher, a program named true — validate and load alike.
+func TestSchema_AcceptsUnquotedScalarsInTextFields(t *testing.T) {
+	s := loadSchema(t)
+	src := `version: "1"
+suite:
+  name: x
+  env: {BUILD: 007}
+scenarios:
+  - name: a
+    env: {PORT: 8080}
+    steps:
+      - fixture: {file: v.txt, content: 1.10, mode: 0755}
+      - run: {command: true, env: {RETRIES: 3}}
+      - assert: {stdout: {contains: 1.20}}
+`
+	if _, err := loader.LoadBytes("t.atago.yaml", []byte(src)); err != nil {
+		t.Fatalf("loader rejected a spec of unquoted scalars: %v", err)
+	}
+	if err := s.Validate(yamlToAny(t, []byte(src))); err != nil {
+		t.Errorf("schema rejected unquoted scalars the loader takes verbatim:\n%v", err)
+	}
+}
+
 // TestSchema_AcceptsComposableFileMatchers pins the file assert shapes the
 // loader documents as composable: a size bound stands alone or joins a content
 // matcher, and min_size with max_size bounds a range. The schema used to model
