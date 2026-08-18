@@ -66,11 +66,13 @@ func (r *Runner) Run(ctx context.Context, run *spec.Run, workdir string) (*runne
 	}
 	cmd.Env = buildEnv(run.Env, run.ClearEnvEnabled(), run.PassEnv, sandbox)
 	// On cancellation (Ctrl-C / suite cancel / step timeout), kill the whole
-	// process group, not just the shell we spawned: `sh -c "sleep 30"` orphans its
+	// process tree, not just the shell we spawned: `sh -c "sleep 30"` orphans its
 	// child, and that orphan keeps the stdout/stderr pipe open, so cmd.Wait would
 	// otherwise block until it exits on its own. WaitDelay is a portable backstop
-	// that force-closes the pipes if a stray child still lingers.
-	configureCancellation(cmd)
+	// that force-closes the pipes if a stray child still lingers. ctx is passed
+	// for the teardown to inherit its VALUES from; the Windows build has to spawn
+	// taskkill at a moment when ctx is by definition already done.
+	configureCancellation(ctx, cmd)
 	stdin, err := stdinReader(run, workdir)
 	if err != nil {
 		return nil, err

@@ -25,6 +25,11 @@ import (
 // post-Start assignment lands would escape the job, though not taskkill).
 type processCmd struct {
 	cmd *exec.Cmd
+	// teardown carries the launch context's VALUES with its cancellation
+	// removed. killTree has to spawn taskkill at moments when the launch context
+	// is already done — that is what a cancel-driven teardown is — so an
+	// inherited cancellation would kill the killer before it reached the tree.
+	teardown context.Context
 
 	mu   sync.Mutex
 	job  windows.Handle
@@ -34,7 +39,7 @@ type processCmd struct {
 func newProcessCmd(ctx context.Context, name string, args []string) *processCmd {
 	c := exec.CommandContext(ctx, name, args...) //nolint:gosec // executing user-declared service commands is the purpose of atago
 	c.WaitDelay = 5 * time.Second
-	p := &processCmd{cmd: c}
+	p := &processCmd{cmd: c, teardown: context.WithoutCancel(ctx)}
 	// On scenario-context cancellation, tear down the whole tree, not just the
 	// leader — mirroring the POSIX runner's process-group kill on cancel.
 	c.Cancel = func() error { p.killTree(); return nil }
@@ -107,7 +112,7 @@ func (p *processCmd) killTree() {
 	// kill time, so it reaps descendants even one spawned in the window between
 	// Start and the job assignment. Mirrors the pty runner's killTree.
 	if p.cmd.Process != nil {
-		_ = exec.CommandContext(context.Background(), "taskkill", "/T", "/F", "/PID", strconv.Itoa(p.cmd.Process.Pid)).Run() //nolint:gosec // fixed argv, pid from our own child
+		_ = exec.CommandContext(p.teardown, "taskkill", "/T", "/F", "/PID", strconv.Itoa(p.cmd.Process.Pid)).Run() //nolint:gosec // fixed argv, pid from our own child
 	}
 	// Release the job. Its KILL_ON_JOB_CLOSE is crash-insurance (if atago dies
 	// without a clean teardown); the taskkill above already stopped the tree.

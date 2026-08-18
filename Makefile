@@ -43,8 +43,11 @@ vet: ## Run go vet
 fmt: ## Format Go source code
 	$(GO_FORMAT) $(GO_PKGROOT)
 
-lint: ## Run golangci-lint
-	golangci-lint run --config .golangci.yml
+lint: ## Run golangci-lint for every target OS (a linter only sees the files that build for its GOOS)
+	for goos in linux darwin windows; do \
+		echo "==> golangci-lint (GOOS=$$goos)"; \
+		env GOOS=$$goos golangci-lint run --config .golangci.yml || exit 1; \
+	done
 
 tools: ## Install developer tools used by this repository
 	$(GO_INSTALL) github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2

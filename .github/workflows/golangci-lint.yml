@@ -10,10 +10,28 @@ permissions:
   contents: read
 
 jobs:
+  # One leg per target OS. golangci-lint only ever sees the files that build for
+  # the GOOS it runs under, so a Linux-only run never analyzed a single line of
+  # the Windows halves — the ConPTY bindings, the pty and service and command
+  # teardowns, the exit-code mapping, the fsdelta permission handling — even
+  # though those are the files with the most platform-specific reasoning in the
+  # repository, and the ones a Linux author is least able to check by reading.
+  # It was reporting a clean tree while six findings sat in code it had not
+  # opened. macOS shares its files with Linux apart from the BSD terminal
+  # helper, so that leg is cheap insurance rather than new ground.
   golangci-lint:
-    name: golangci-lint
+    name: golangci-lint (${{ matrix.goos }})
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        goos: [linux, darwin, windows]
+    env:
+      # Cross-compiling for analysis only: no binary is produced and no cgo is
+      # involved, so the linter type-checks the other OSes' files on the Linux
+      # runner without needing one.
+      GOOS: ${{ matrix.goos }}
     steps:
       - name: Check out code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

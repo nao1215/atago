@@ -53,6 +53,11 @@ func Run(ctx context.Context, p *spec.PTY, workdir string, env []string) (*runne
 	}
 
 	pid := cpty.Pid()
+	// The teardown below runs precisely when ctx is done — a session timeout or
+	// an abort — so it keeps ctx's VALUES and drops its cancellation: handing
+	// taskkill an already-cancelled context would kill the killer before it
+	// reached the tree.
+	teardown := context.WithoutCancel(ctx)
 
 	// Reap in one place, mirroring the POSIX runner. cpty.Wait blocks on the
 	// process handle and returns its exit code; a parent-context cancel that
@@ -66,7 +71,7 @@ func Run(ctx context.Context, p *spec.PTY, workdir string, env []string) (*runne
 	proc := ptyProcess{
 		rw:        cpty,
 		exit:      exitCh,
-		kill:      func() { killTree(pid) },
+		kill:      func() { killTree(teardown, pid) },
 		closeTerm: func() { _ = cpty.Close() },
 		// ResizePseudoConsole notifies the ConPTY client of the new size, which
 		// is how a Windows console application learns about a window change —
@@ -81,8 +86,8 @@ func Run(ctx context.Context, p *spec.PTY, workdir string, env []string) (*runne
 // killTree force-terminates the child and every descendant. Windows has no
 // process groups, so taskkill /T walks the process tree — the closest analog to
 // the POSIX runner's kill of the whole Setsid group, so a timed-out or aborted
-// pty session never leaks a running child.
-func killTree(pid int) {
-	// A fire-and-forget teardown; Background is the honest context here.
-	_ = exec.CommandContext(context.Background(), "taskkill", "/T", "/F", "/PID", strconv.Itoa(pid)).Run() //nolint:gosec // fixed argv, pid from our own child
+// pty session never leaks a running child. ctx must outlive the cancellation
+// that triggered the teardown; see the caller.
+func killTree(ctx context.Context, pid int) {
+	_ = exec.CommandContext(ctx, "taskkill", "/T", "/F", "/PID", strconv.Itoa(pid)).Run() //nolint:gosec // fixed argv, pid from our own child
 }
