@@ -486,3 +486,44 @@ scenarios:
             contains:
               - 'contains and not_contains both list "abc"'
               - "count: 0 cannot hold together with contains"
+
+  - name: a file assertion with no matcher names the size bounds too
+    steps:
+      # The message used to list the content matchers only, while a size bound
+      # alone is a complete file assertion, so the author was sent looking for a
+      # matcher they may not have needed.
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                steps:
+                  - run: {command: echo}
+                  - assert: {file: {path: out.txt}}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr:
+            contains:
+              - "must set one of exists/contains/not_contains/executable/equals/equals_file/json/snapshot/size/min_size/max_size"
+
+  - name: a file assertion with two content matchers still names only those
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                steps:
+                  - run: {command: echo}
+                  - assert: {file: {path: out.txt, exists: true, snapshot: s.txt}}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr:
+            contains:
+              - "must set exactly one of exists/contains/not_contains/executable/equals/equals_file/json/snapshot"
