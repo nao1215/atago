@@ -16,7 +16,7 @@ name: ThirdParty
 # found minutes after it lands rather than at the next nightly. It deliberately
 # does NOT gate pull requests: one run in five fails for reasons that have
 # nothing to do with the change under review — a CDN hiccup installing one of
-# 45 programs, or a real terminal UI missing its budget on a loaded runner — and
+# 46 programs, or a real terminal UI missing its budget on a loaded runner — and
 # a gate that cries wolf at that rate teaches people to merge past it.
 on:
   workflow_dispatch:
@@ -206,6 +206,12 @@ jobs:
             install: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
           # sops encrypts structured files with age as the key backend; both are
           # go-installed (age and age-keygen provide the throwaway keys).
+          # GnuPG from the pinned Ubuntu snapshot: the suite generates its own
+          # throwaway keys inside each scenario workdir and never reaches a key
+          # server.
+          - name: gpg
+            dir: ./test/e2e/thirdparty/gpg
+            install: bash ./scripts/install_ubuntu_snapshot_packages.sh gnupg
           - name: sops
             dir: ./test/e2e/thirdparty/sops
             install: |

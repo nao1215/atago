@@ -148,6 +148,7 @@ docs: ## Regenerate the committed behavior docs under doc/e2e/ and the error ref
 	./dist/$(APP) doc --out doc/e2e/mailpit.md     ./test/e2e/thirdparty/mailpit
 	./dist/$(APP) doc --out doc/e2e/ntfy.md        ./test/e2e/thirdparty/ntfy
 	./dist/$(APP) doc --out doc/e2e/transfersh.md  ./test/e2e/thirdparty/transfersh
+	./dist/$(APP) doc --out doc/e2e/gpg.md         ./test/e2e/thirdparty/gpg
 	./dist/$(APP) doc --out doc/e2e/gotify.md      ./test/e2e/thirdparty/gotify
 	./dist/$(APP) doc --out doc/e2e/grafana.md     ./test/e2e/thirdparty/grafana
 	./dist/$(APP) doc --out doc/e2e/openfga.md     ./test/e2e/thirdparty/openfga
