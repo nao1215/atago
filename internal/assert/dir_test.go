@@ -77,6 +77,52 @@ func TestCheckDir_ChildrenAndCounts(t *testing.T) {
 	}
 }
 
+// TestCheckDir_RecursiveCountSpeaksInFiles pins the vocabulary of a recursive
+// count failure. The recursive counter looks at files only, while the listing
+// under Actual shows every walked path including directories, so a hint saying
+// "has 3 entries" contradicts both the rule the count applies and the four
+// paths the reader can count in the listing right below it. The failure must
+// call the counted things files — in the description and in the hint — and a
+// singular bound must not read "1 files".
+func TestCheckDir_RecursiveCountSpeaksInFiles(t *testing.T) {
+	wd := makeTree(t)
+	// site walks as 4 paths (assets/ plus 3 files); the count sees 3 files.
+	cr := checkDirOK(t, wd, &spec.DirAssert{Path: "site", Recursive: true, Count: ptrInt(9)})
+	if cr.OK {
+		t.Fatal("assertion should have failed")
+	}
+	if !strings.Contains(cr.Desc, "file count") {
+		t.Errorf("Desc = %q, want the recursive count described as a file count", cr.Desc)
+	}
+	if !strings.Contains(cr.Hint, "has 3 files") {
+		t.Errorf("Hint = %q, want it to say the tree holds 3 files", cr.Hint)
+	}
+	if strings.Contains(cr.Hint, "entries") {
+		t.Errorf("Hint = %q, must not call the file-only count entries", cr.Hint)
+	}
+
+	cr = checkDirOK(t, wd, &spec.DirAssert{Path: "site", Recursive: true, Count: ptrInt(1)})
+	if cr.OK {
+		t.Fatal("assertion should have failed")
+	}
+	if !strings.Contains(cr.Expected, "exactly 1 file in the tree") {
+		t.Errorf("Expected = %q, want a singular bound to read as one file", cr.Expected)
+	}
+
+	// The direct (non-recursive) count keeps its entry vocabulary: there every
+	// directory entry counts, so "entries" is the truthful word.
+	cr = checkDirOK(t, wd, &spec.DirAssert{Path: "site", Count: ptrInt(9)})
+	if cr.OK {
+		t.Fatal("assertion should have failed")
+	}
+	if !strings.Contains(cr.Desc, "entry count") {
+		t.Errorf("Desc = %q, want the direct count described as an entry count", cr.Desc)
+	}
+	if !strings.Contains(cr.Hint, "has 3 entries") {
+		t.Errorf("Hint = %q, want the direct count to keep speaking in entries", cr.Hint)
+	}
+}
+
 func TestCheckDir_Glob(t *testing.T) {
 	wd := makeTree(t)
 	if cr := checkDirOK(t, wd, &spec.DirAssert{Path: "site", Glob: "*.html"}); !cr.OK {

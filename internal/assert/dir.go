@@ -192,23 +192,33 @@ func checkDirCounts(d *spec.DirAssert, dirPath string) *CheckResult {
 	}
 	n := len(entries)
 	if d.Count != nil && n != *d.Count {
-		return dirCountFailure(d, n, "exactly "+plural.Count(*d.Count, "entry", "entries"), dirListing(dirPath))
+		return dirCountFailure(d, "entry count", entryPhrase(n), "exactly "+plural.Count(*d.Count, "entry", "entries"), dirListing(dirPath))
 	}
 	if d.MinCount != nil && n < *d.MinCount {
-		return dirCountFailure(d, n, "at least "+plural.Count(*d.MinCount, "entry", "entries"), dirListing(dirPath))
+		return dirCountFailure(d, "entry count", entryPhrase(n), "at least "+plural.Count(*d.MinCount, "entry", "entries"), dirListing(dirPath))
 	}
 	if d.MaxCount != nil && n > *d.MaxCount {
-		return dirCountFailure(d, n, "at most "+plural.Count(*d.MaxCount, "entry", "entries"), dirListing(dirPath))
+		return dirCountFailure(d, "entry count", entryPhrase(n), "at most "+plural.Count(*d.MaxCount, "entry", "entries"), dirListing(dirPath))
 	}
 	return nil
 }
 
-func dirCountFailure(d *spec.DirAssert, got int, want, listing string) *CheckResult {
+// entryPhrase renders the direct mode's observed count; its recursive
+// counterpart is filePhrase in tree.go.
+func entryPhrase(n int) string { return plural.Count(n, "entry", "entries") }
+
+// dirCountFailure reports a count bound miss. The two modes count different
+// things — the direct mode counts every directory entry, the recursive mode
+// counts files only while its listing still shows directories and links — so
+// the caller names what it counted (countKind for the description, gotPhrase
+// for the hint) in that mode's own vocabulary. Calling a file-only count
+// "entries" made the hint contradict the listing printed right below it.
+func dirCountFailure(d *spec.DirAssert, countKind, gotPhrase, want, listing string) *CheckResult {
 	return &CheckResult{
-		Desc:     fmt.Sprintf("assert dir %q entry count", d.Path),
+		Desc:     fmt.Sprintf("assert dir %q %s", d.Path, countKind),
 		Expected: want,
 		Actual:   listing,
-		Hint:     fmt.Sprintf("directory %q has %s, expected %s", d.Path, plural.Count(got, "entry", "entries"), want),
+		Hint:     fmt.Sprintf("directory %q has %s, expected %s", d.Path, gotPhrase, want),
 	}
 }
 

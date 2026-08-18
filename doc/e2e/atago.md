@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-82 suites · 672 scenarios
+82 suites · 673 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -123,9 +123,10 @@
   - [a dir assertion on a file path says the path is a file](#scenario-a-dir-assertion-on-a-file-path-says-the-path-is-a-file)
   - [a named pipe in the tree does not block the walk](#scenario-a-named-pipe-in-the-tree-does-not-block-the-walk)
   - [a file assertion on a named pipe fails instead of hanging](#scenario-a-file-assertion-on-a-named-pipe-fails-instead-of-hanging)
-- [atago self-hosting / recursive dir asserts + tree snapshots](#atago-self-hosting--recursive-dir-asserts--tree-snapshots) — 3 scenarios
+- [atago self-hosting / recursive dir asserts + tree snapshots](#atago-self-hosting--recursive-dir-asserts--tree-snapshots) — 4 scenarios
   - [record, compare green, then a mutation names the changed paths](#scenario-record-compare-green-then-a-mutation-names-the-changed-paths)
   - [recursive matchers and ignore globs walk the tree](#scenario-recursive-matchers-and-ignore-globs-walk-the-tree)
+  - [a recursive count failure speaks in files, not entries](#scenario-a-recursive-count-failure-speaks-in-files-not-entries)
   - [combining snapshot with matchers is a load-time error](#scenario-combining-snapshot-with-matchers-is-a-load-time-error)
 - [atago self-hosting / doc](#atago-self-hosting--doc) — 10 scenarios
   - [doc generates Markdown to a file](#scenario-doc-generates-markdown-to-a-file)
@@ -3350,6 +3351,39 @@ noise
 #### Then
 - dir `out` contains `a/deep/nested.md`, has 2 entries, matches glob `*.md`, (recursive), ignoring *.log
 - dir `out` does not contain `a/deep/missing.md`, (recursive)
+
+### Scenario: a recursive count failure speaks in files, not entries
+#### Given
+- Fixture file `inner_count.atago.yaml` is created.
+
+#### Inputs
+_Fixture `inner_count.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner count
+scenarios:
+  - name: tree file count misses
+    steps:
+      - fixture:
+          file: out/kept.txt
+          content: "kept\n"
+      - fixture:
+          file: out/sub/nested.txt
+          content: "nested\n"
+      - assert:
+          dir:
+            path: out
+            recursive: true
+            count: 5
+```
+#### When
+```shell
+${atago} run inner_count.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `assert dir "out" file count`, `directory "out" has 2 files, expected exactly 5 files in the tree`, does not contain `entries`
 
 ### Scenario: combining snapshot with matchers is a load-time error
 #### Given
