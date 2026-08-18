@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-82 suites · 671 scenarios
+82 suites · 672 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -289,7 +289,7 @@
   - [explain names an http runner and describes a retry](#scenario-explain-names-an-http-runner-and-describes-a-retry)
   - [explain names a runner definition's host environment reads](#scenario-explain-names-a-runner-definitions-host-environment-reads)
   - [explain names env and command gates](#scenario-explain-names-env-and-command-gates)
-- [atago self-hosting / file equals and equals_file byte-equality (#155)](#atago-self-hosting--file-equals-and-equals_file-byte-equality-155) — 10 scenarios
+- [atago self-hosting / file equals and equals_file byte-equality (#155)](#atago-self-hosting--file-equals-and-equals_file-byte-equality-155) — 11 scenarios
   - [equals_file passes for two byte-identical files](#scenario-equals_file-passes-for-two-byte-identical-files)
   - [equals matches an inline literal byte-for-byte](#scenario-equals-matches-an-inline-literal-byte-for-byte)
   - [equals_file fails the inner spec when the two files differ by one byte](#scenario-equals_file-fails-the-inner-spec-when-the-two-files-differ-by-one-byte)
@@ -297,6 +297,7 @@
   - [a file assertion is not satisfied by a directory](#scenario-a-file-assertion-is-not-satisfied-by-a-directory)
   - [an executable assertion is not satisfied by a directory](#scenario-an-executable-assertion-is-not-satisfied-by-a-directory)
   - [a real file still satisfies both matchers](#scenario-a-real-file-still-satisfies-both-matchers)
+  - [an executable failure on Windows names PATHEXT rather than a mode](#scenario-an-executable-failure-on-windows-names-pathext-rather-than-a-mode)
   - [an invisible difference is quoted in the failure output](#scenario-an-invisible-difference-is-quoted-in-the-failure-output)
   - [a trailing space difference is quoted too](#scenario-a-trailing-space-difference-is-quoted-too)
   - [an ordinary difference keeps its plain form](#scenario-an-ordinary-difference-keeps-its-plain-form)
@@ -7150,7 +7151,6 @@ ${atago} run execdir.atago.yaml
 - stdout contains `is a directory, not an executable file`
 
 ### Scenario: a real file still satisfies both matchers
-_skipped on Windows_
 #### Given
 - Fixture file `ok.atago.yaml` is created.
 
@@ -7163,14 +7163,21 @@ scenarios:
   - name: a real executable file
     steps:
       - fixture:
-          file: tool.sh
-          content: "#!/bin/sh\n"
+          file: tool.bat
+          content: "@echo hi\n"
           mode: "0755"
+      - fixture:
+          file: notes.txt
+          content: "plain\n"
+          mode: "0644"
       - run: {command: echo hi}
       - assert:
-          file: {path: tool.sh, exists: true}
+          file: {path: tool.bat, exists: true}
       - assert:
-          file: {path: tool.sh, executable: true}
+          file: {path: tool.bat, executable: true}
+      # The negative half, also portable: no execute bit on POSIX,
+      # and .txt is not in PATHEXT on Windows.
+… (truncated, 2 more lines)
 ```
 #### When
 ```shell
@@ -7179,6 +7186,34 @@ ${atago} run ok.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `PASSED`
+
+### Scenario: an executable failure on Windows names PATHEXT rather than a mode
+_only on Windows_
+#### Given
+- Fixture file `noext.atago.yaml` is created.
+
+#### Inputs
+_Fixture `noext.atago.yaml`:_
+```text
+version: "1"
+suite: {name: noext}
+scenarios:
+  - name: a POSIX script is not runnable by name on Windows
+    steps:
+      - fixture:
+          file: tool.sh
+          content: "echo hi\n"
+          mode: "0755"
+      - assert:
+          file: {path: tool.sh, executable: true}
+```
+#### When
+```shell
+${atago} run noext.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `PATHEXT`, `extension ".sh"`, does not contain `(mode `
 
 ### Scenario: an invisible difference is quoted in the failure output
 #### Given
