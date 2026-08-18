@@ -162,6 +162,7 @@ scenarios:
           stderr:
             contains: 'no namespace exists with name "unknown-namespace"'
           changes:
+            created: []
             modified: []
             deleted: []
             ignore:

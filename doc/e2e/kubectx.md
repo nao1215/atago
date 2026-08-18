@@ -346,7 +346,7 @@ kubectx -
 - exit code is `1`
 - stdout is empty
 - stderr contains `no previous context found`
-- the step changed exactly modified nothing, deleted nothing, ignoring `.atago-home/**`
+- the step changed exactly created nothing, modified nothing, deleted nothing, ignoring `.atago-home/**`
 
 ### Scenario: an unknown context name fails and leaves the kubeconfig untouched
 _only when `kubectx --help` succeeds_
@@ -379,7 +379,7 @@ kubectx unknown-context
 - exit code is `1`
 - stdout is empty
 - stderr contains `no context exists with the name: "unknown-context"`
-- the step changed exactly modified nothing, deleted nothing, ignoring `.atago-home/**`
+- the step changed exactly created nothing, modified nothing, deleted nothing, ignoring `.atago-home/**`
 
 ### Scenario: --current fails while no context is selected
 _only when `kubectx --help` succeeds_
@@ -659,7 +659,7 @@ kubectx -d unknown-context
 #### Then
 - exit code is `1`
 - stderr contains `context does not exist`
-- the step changed exactly modified nothing, deleted nothing, ignoring `.atago-home/**`
+- the step changed exactly created nothing, modified nothing, deleted nothing, ignoring `.atago-home/**`
 
 ### Scenario: several contexts are deleted in one call
 _only when `kubectx --help` succeeds_
@@ -838,6 +838,7 @@ current-context: ""
 # interactive (pty): kubectx
 ```
 #### Then
+- exit code is `0`
 - file `config` contains `current-context: "user2@cluster1"`
 
 ## kubens (third-party CLI, namespace state machine)
@@ -1002,7 +1003,7 @@ kubens unknown-namespace
 - exit code is `1`
 - stdout is empty
 - stderr contains `no namespace exists with name "unknown-namespace"`
-- the step changed exactly modified nothing, deleted nothing, ignoring `.atago-home/**`
+- the step changed exactly created nothing, modified nothing, deleted nothing, ignoring `.atago-home/**`
 
 ### Scenario: --force accepts a namespace the cluster does not have
 _only when `kubens --help` succeeds_
