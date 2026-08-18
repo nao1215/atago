@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -932,6 +933,96 @@ func TestExamples_HermeticRunGreen(t *testing.T) {
 				t.Errorf("status = %s, want passed (or skipped by an OS gate): %+v", res.Status, res.Scenarios)
 			}
 		})
+	}
+}
+
+// examplesDeadOnWindows records every hermetic example whose scenarios ALL skip
+// on Windows, with the reason. The README calls examples/ the syntax reference
+// and says it is tested on Linux, macOS, and Windows; TestExamples_HermeticRunGreen
+// accepts a skipped spec as green, so an example that executes nothing there
+// looks exactly like one that passes. Fifteen of them did.
+//
+// The map is EXACT, not a floor: an example listed here that starts running a
+// scenario on Windows fails the test, so the list shrinks as examples are made
+// portable instead of quietly outliving its reasons. Everything in it is
+// POSIX-shell scaffolding — the alternative is a second cmd.exe copy of every
+// scenario in the file readers are pointed at to learn the syntax, which would
+// cost more clarity than the coverage is worth.
+var examplesDeadOnWindows = map[string]string{
+	"examples/changes.atago.yaml":              "the steps that produce a delta are POSIX shell (rm, chmod, mkfifo)",
+	"examples/deterministic.atago.yaml":        "cat, and a JSON document read back through it",
+	"examples/extend_host_env.atago.yaml":      "POSIX PATH syntax: the : separator, sh, and command -v",
+	"examples/hermetic_env.atago.yaml":         "env and printf, which have no cmd.exe builtin",
+	"examples/mock_server.atago.yaml":          "curl, which the runner images do not guarantee on Windows",
+	"examples/project_manifest.atago.yaml":     "cat, plus a ${specdir} interpolated into a shell command",
+	"examples/pty.atago.yaml":                  "the inner programs are POSIX: [ -t 0 ], cat -v, and a SIGINT trap",
+	"examples/pty_screen.atago.yaml":           "the inner program draws with printf escapes and a POSIX read loop",
+	"examples/pty_stdout_split.atago.yaml":     "the inner program writes its UI to /dev/stderr from a POSIX shell",
+	"examples/retry.atago.yaml":                "the marker-file poll is POSIX shell test/touch",
+	"examples/scrub.atago.yaml":                "the volatile output is synthesized with $$ and $(date +%s)",
+	"examples/services.atago.yaml":             "the stand-in service is a POSIX shell loop",
+	"examples/signal.atago.yaml":               "signal steps are POSIX-only; Windows has no signals to deliver",
+	"examples/suite_env_from_setup.atago.yaml": "the setup exports through a POSIX shell",
+}
+
+// TestExamples_RunSomethingOnThisOS fails when a hermetic example skips every
+// scenario on the host OS without being recorded as dead there. On POSIX
+// nothing may be dead at all: an example that runs nothing on the platform it
+// was written for is a broken example, not a portability limit.
+func TestExamples_RunSomethingOnThisOS(t *testing.T) {
+	t.Parallel()
+	for path, hermetic := range exampleSpecs {
+		if !hermetic {
+			continue
+		}
+		t.Run(path, func(t *testing.T) {
+			t.Parallel()
+			s, err := loader.Load(path)
+			if err != nil {
+				t.Fatalf("load: %v", err)
+			}
+			res := engine.New().Run(context.Background(), s, path)
+			ran := 0
+			for _, sc := range res.Scenarios {
+				if sc.Status != engine.StatusSkipped {
+					ran++
+				}
+			}
+			reason, recorded := examplesDeadOnWindows[path]
+			if runtime.GOOS != "windows" {
+				if ran == 0 {
+					t.Errorf("every scenario skipped on %s; an example must run somewhere", runtime.GOOS)
+				}
+				return
+			}
+			switch {
+			case ran == 0 && !recorded:
+				t.Errorf("every scenario skips on Windows and the example is not recorded in examplesDeadOnWindows; "+
+					"make one scenario portable, or add it there with the reason (%d scenarios)", len(res.Scenarios))
+			case ran > 0 && recorded:
+				t.Errorf("%d of %d scenarios now run on Windows, so the examplesDeadOnWindows entry is stale "+
+					"(recorded reason: %s); remove it", ran, len(res.Scenarios), reason)
+			}
+		})
+	}
+}
+
+// TestExamples_DeadListNamesRealExamples keeps the record from outliving the
+// file it describes: an entry for an example that was renamed or made
+// non-hermetic would sit there forever claiming coverage nobody checks.
+func TestExamples_DeadListNamesRealExamples(t *testing.T) {
+	t.Parallel()
+	for path, reason := range examplesDeadOnWindows {
+		hermetic, known := exampleSpecs[path]
+		switch {
+		case !known:
+			t.Errorf("examplesDeadOnWindows names %q, which is not a categorized example", path)
+		case !hermetic:
+			t.Errorf("examplesDeadOnWindows names %q, which is validate-only and never run", path)
+		}
+		if strings.TrimSpace(reason) == "" {
+			t.Errorf("examplesDeadOnWindows[%q] has no reason", path)
+		}
 	}
 }
 
