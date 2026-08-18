@@ -12,6 +12,14 @@ suite:
 # in internal/store cover Windows).
 scenarios:
   - name: a doubled dollar keeps the braces literal
+    skip:
+      # The MSYS runtime brace-expands an argument before the Git-for-Windows
+      # `echo.exe` ever sees it, turning ${keep} into $keep. atago's own half —
+      # collapsing $${...} to a literal ${...} before the command is built — is
+      # platform-neutral and is pinned by the loader's unit tests; what this
+      # scenario cannot do on Windows is observe the result through a stand-in
+      # program that rewrites its own arguments.
+      os: windows
     steps:
       - run: {command: "echo pre-$${keep}-post"}
       - assert:

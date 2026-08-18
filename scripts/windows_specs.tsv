@@ -1,0 +1,121 @@
+# Windows coverage classification for atago's own E2E targets.
+#
+# atago's unit tests run on Linux, macOS and Windows, and the POSIX legs run the
+# whole self-hosted suite. This file is what stops the Windows leg from being a
+# smaller, unstated subset that quietly shrinks: every target is classified, and
+# TestWindowsSpecs_EveryTargetClassified fails when one is added without a
+# decision.
+#
+# Column 1  the run target (a spec file, or a directory of them).
+# Column 2  the bucket:
+#             cmd   runs on Windows under cmd.exe, the shell a Windows user gets
+#                   by default. This is the bucket that proves the NATIVE story:
+#                   commands that are builtins of both /bin/sh and cmd.exe, or
+#                   specs that only ever drive atago itself.
+#             bash  runs on Windows under a POSIX shell (ATAGO_SHELL pointed at
+#                   the bash that ships with Git for Windows). The shell here is
+#                   scaffolding, not the subject: what the leg proves is that
+#                   atago's own engine — paths, capture, reports, snapshots,
+#                   fsdelta, record, pty — behaves on Windows across the WHOLE
+#                   feature surface, not only where the scaffolding happened to
+#                   be portable.
+#
+#                   One thing this leg cannot carry: a Windows ${workdir},
+#                   ${specdir}, ${suitedir} or ${atago} is a backslash path, and
+#                   a POSIX shell reads backslashes as escapes, so a scenario
+#                   that interpolates one INTO a shell command loses them. Those
+#                   scenarios carry their own `skip: {os: windows}` with the
+#                   reason, since the limitation is per scenario rather than per
+#                   file. Where the shell was only there to set a variable or
+#                   swallow an exit code, the step drops it instead: `env:` and
+#                   an `exit_code:` assert are what atago offers for both.
+#             none  does not run on Windows at all. Column 3 must say why, and
+#                   the reason has to be about the platform rather than about
+#                   the effort of porting.
+# Column 3  the reason, for `none` only.
+#
+# Columns are tab-separated. scripts/windows_specs.sh <bucket> prints one
+# bucket's targets for a workflow to run.
+./test/e2e/atago/argv_quotes.atago.yaml	cmd
+./test/e2e/atago/artifacts.atago.yaml	bash
+./test/e2e/atago/assert_expand.atago.yaml	bash
+./test/e2e/atago/cdp.atago.yaml	cmd
+./test/e2e/atago/changes.atago.yaml	cmd
+./test/e2e/atago/cli_selection.atago.yaml	cmd
+./test/e2e/atago/completion.atago.yaml	cmd
+./test/e2e/atago/count_size.atago.yaml	bash
+./test/e2e/atago/db.atago.yaml	cmd
+./test/e2e/atago/defaults.atago.yaml	bash
+./test/e2e/atago/deterministic.atago.yaml	bash
+./test/e2e/atago/dir.atago.yaml	bash
+./test/e2e/atago/dir_tree.atago.yaml	cmd
+./test/e2e/atago/doc.atago.yaml	cmd
+./test/e2e/atago/duration.atago.yaml	cmd
+./test/e2e/atago/edge.atago.yaml	cmd
+./test/e2e/atago/env_workdir.atago.yaml	bash
+./test/e2e/atago/error_codes.atago.yaml	bash
+./test/e2e/atago/exit_code_in.atago.yaml	bash
+./test/e2e/atago/exit_codes.atago.yaml	cmd
+./test/e2e/atago/expect_fail.atago.yaml	bash
+./test/e2e/atago/explain.atago.yaml	cmd
+./test/e2e/atago/file_equals.atago.yaml	cmd
+./test/e2e/atago/fixture_from.atago.yaml	bash
+./test/e2e/atago/fixture_modes.atago.yaml	none	every scenario is a POSIX filesystem concept Windows has no counterpart for: a symlink (which needs elevation), fixture.mode permission bits (Go synthesizes a mode there), and `date -r` on the mtime
+./test/e2e/atago/flaky.atago.yaml	bash
+./test/e2e/atago/grpc.atago.yaml	cmd
+./test/e2e/atago/hermetic_env.atago.yaml	bash
+./test/e2e/atago/http.atago.yaml	cmd
+./test/e2e/atago/image.atago.yaml	bash
+./test/e2e/atago/init.atago.yaml	cmd
+./test/e2e/atago/init_templates.atago.yaml	cmd
+./test/e2e/atago/json_compare.atago.yaml	bash
+./test/e2e/atago/json_list.atago.yaml	cmd
+./test/e2e/atago/json_matcher_edges.atago.yaml	bash
+./test/e2e/atago/line.atago.yaml	bash
+./test/e2e/atago/line_endings.atago.yaml	bash
+./test/e2e/atago/list.atago.yaml	cmd
+./test/e2e/atago/loader_errors.atago.yaml	cmd
+./test/e2e/atago/manifest.atago.yaml	cmd
+./test/e2e/atago/matrix.atago.yaml	cmd
+./test/e2e/atago/matrix_edges.atago.yaml	cmd
+./test/e2e/atago/mock_server.atago.yaml	cmd
+./test/e2e/atago/multi_matcher.atago.yaml	bash
+./test/e2e/atago/not_equals.atago.yaml	bash
+./test/e2e/atago/parallel.atago.yaml	cmd
+./test/e2e/atago/paths_portable.atago.yaml	cmd
+./test/e2e/atago/pdf.atago.yaml	cmd
+./test/e2e/atago/project_manifest.atago.yaml	bash
+./test/e2e/atago/pty.atago.yaml	bash
+./test/e2e/atago/pty_portable.atago.yaml	cmd
+./test/e2e/atago/record.atago.yaml	cmd
+./test/e2e/atago/report_formats.atago.yaml	bash
+./test/e2e/atago/reports.atago.yaml	bash
+./test/e2e/atago/rerun.atago.yaml	cmd
+./test/e2e/atago/retry.atago.yaml	bash
+./test/e2e/atago/run.atago.yaml	cmd
+./test/e2e/atago/sandbox_home.atago.yaml	cmd
+./test/e2e/atago/security.atago.yaml	bash
+./test/e2e/atago/select.atago.yaml	cmd
+./test/e2e/atago/services.atago.yaml	bash
+./test/e2e/atago/shell_path.atago.yaml	cmd
+./test/e2e/atago/signal.atago.yaml	bash
+./test/e2e/atago/skip_command.atago.yaml	cmd
+./test/e2e/atago/snapshot.atago.yaml	bash
+./test/e2e/atago/snapshot_normalization.atago.yaml	bash
+./test/e2e/atago/snapshots.atago.yaml	bash
+./test/e2e/atago/ssh.atago.yaml	cmd
+./test/e2e/atago/stdin_sources.atago.yaml	bash
+./test/e2e/atago/store.atago.yaml	bash
+./test/e2e/atago/store_edges.atago.yaml	bash
+./test/e2e/atago/store_whole.atago.yaml	cmd
+./test/e2e/atago/stream_edges.atago.yaml	bash
+./test/e2e/atago/subject.atago.yaml	bash
+./test/e2e/atago/suite_env.atago.yaml	bash
+./test/e2e/atago/suite_setup.atago.yaml	bash
+./test/e2e/atago/timeouts.atago.yaml	bash
+./test/e2e/atago/tui.atago.yaml	bash
+./test/e2e/atago/var_resolution.atago.yaml	bash
+./test/e2e/atago/verbose.atago.yaml	bash
+./test/e2e/atago/version.atago.yaml	cmd
+./test/e2e/atago/yaml.atago.yaml	bash
+./test/e2e/thirdparty/git	cmd

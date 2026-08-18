@@ -1,16 +1,17 @@
 name: CrossPlatformE2E
 
 # atago's unit tests run on Linux/macOS/Windows; the PR-gating E2E baseline
-# (e2e.yml) runs the full suite on Ubuntu plus the portable subset on Windows.
-# This workflow adds the missing coverage on a schedule: the FULL suite on
-# macOS, and the portable Windows subset again as a drift check, so OS-specific
+# (e2e.yml) runs the full suite on Ubuntu plus the classified buckets on
+# Windows. This workflow adds the missing coverage on a schedule: the FULL suite
+# on macOS, and the Windows buckets again as a drift check, so OS-specific
 # regressions in path handling, shell semantics, and report generation surface
 # before release.
 #
-# Linux and macOS are POSIX and run the FULL self-hosted suite. Windows runs an
-# explicit, portable SUBSET — the atago-invoking-atago specs that use no
-# POSIX-only external commands — so the Windows story is intentional rather than
-# accidental.
+# Linux and macOS are POSIX and run the FULL self-hosted suite. Windows runs the
+# two buckets classified in scripts/windows_specs.tsv — `cmd` under the native
+# cmd.exe, `bash` with ATAGO_SHELL pointed at Git for Windows' bash — so the
+# Windows story is intentional rather than accidental, and a target that runs
+# nowhere on Windows has to say why in that file.
 #
 # It gates pull requests as well as running on a schedule. Every failure this
 # workflow has recorded was macOS-only and real — a behavior difference the
@@ -48,13 +49,10 @@ jobs:
             targets: "./test/e2e/atago ./test/e2e/thirdparty/git"
           - os: macos-latest
             targets: "./test/e2e/atago ./test/e2e/thirdparty/git"
-          # Portable subset: specs whose commands are shell builtins of both
-          # /bin/sh and cmd.exe, or that only drive atago itself. The list is
-          # the single source of truth in scripts/windows_portable_specs.sh
-          # (shared with the e2e-windows job in e2e.yml); the @portable sentinel
-          # is expanded from it in the run step below.
+          # The classified buckets, expanded from scripts/windows_specs.tsv
+          # (shared with the e2e-windows job in e2e.yml) by the run step below.
           - os: windows-latest
-            targets: "@portable"
+            targets: "@windows"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -68,16 +66,21 @@ jobs:
       # `go run .` compiles atago and runs it; os.Executable() (which seeds the
       # ${atago} spec variable) points at that binary, so specs self-invoke atago
       # correctly on every OS without per-platform binary-name handling. The
-      # Windows leg passes @portable, expanded from the shared spec list.
+      # Windows leg passes @windows and runs both classified buckets, each under
+      # the shell it is classified for.
       # --retry-failed 1 absorbs the rare self-hosted pty replay flakes this
       # scheduled drift job exists to surface early, not to gate every merge on:
       # a recovered scenario is still reported as flaky, while a real regression
       # fails both attempts.
       - name: Run the self-hosted E2E specs
         run: |
-          if [ "${{ matrix.targets }}" = "@portable" ]; then
-            mapfile -t targets < <(bash scripts/windows_portable_specs.sh)
-          else
+          if [ "${{ matrix.targets }}" != "@windows" ]; then
             read -ra targets <<< "${{ matrix.targets }}"
+            go run . run --retry-failed 1 --allow-flaky "${targets[@]}"
+            exit 0
           fi
-          go run . run --retry-failed 1 --allow-flaky "${targets[@]}"
+          mapfile -t native < <(bash scripts/windows_specs.sh cmd)
+          go run . run --retry-failed 1 --allow-flaky "${native[@]}"
+          mapfile -t posix < <(bash scripts/windows_specs.sh bash)
+          ATAGO_SHELL='C:\Program Files\Git\bin\bash.exe' \
+            go run . run --retry-failed 1 --allow-flaky "${posix[@]}"

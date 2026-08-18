@@ -9,6 +9,12 @@ suite:
 # against it, so nothing here depends on a committed layout.
 scenarios:
   - name: a manifest applies to a spec nested below it
+    skip:
+      # The inner spec reads ${fixtures} through a POSIX shell, and a Windows
+      # ${fixtures} carries backslashes the shell reads as escapes. The
+      # manifest resolution itself is platform-neutral and is covered by the
+      # scenarios below that do not go through a shell.
+      os: windows
     steps:
       - fixture:
           file: atago.project.yaml
@@ -109,6 +115,10 @@ scenarios:
           exit_code: 0
 
   - name: specdir points at the spec's own directory
+    skip:
+      # Same as above: the inner spec reaches its fixture through a POSIX
+      # shell, and a Windows ${specdir} carries backslashes the shell eats.
+      os: windows
     steps:
       - fixture:
           file: sub/marker.txt
