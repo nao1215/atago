@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/nao1215/atago/internal/fskind"
+	"github.com/nao1215/atago/internal/plural"
 	"github.com/nao1215/atago/internal/spec"
 )
 
@@ -176,6 +177,13 @@ func treeListing(entries []treeEntry) string {
 	return renderListing(names, "paths")
 }
 
+// filePhrase renders the recursive mode's observed count. The recursive
+// matcher family counts FILES only (directories are structure, not output), so
+// its failure text must say files: the listing beside it shows every walked
+// path, and a number labeled "entries" would disagree with what the reader can
+// count there.
+func filePhrase(n int) string { return plural.Count(n, "file", "files") }
+
 func checkDirRecursive(d *spec.DirAssert, dirPath string) *CheckResult {
 	entries, err := walkTree(dirPath, d.Ignore)
 	if err != nil {
@@ -198,13 +206,13 @@ func checkDirRecursive(d *spec.DirAssert, dirPath string) *CheckResult {
 	}
 
 	if d.Count != nil && files != *d.Count {
-		return dirCountFailure(d, files, fmt.Sprintf("exactly %d files in the tree", *d.Count), listing)
+		return dirCountFailure(d, "file count", filePhrase(files), "exactly "+filePhrase(*d.Count)+" in the tree", listing)
 	}
 	if d.MinCount != nil && files < *d.MinCount {
-		return dirCountFailure(d, files, fmt.Sprintf("at least %d files in the tree", *d.MinCount), listing)
+		return dirCountFailure(d, "file count", filePhrase(files), "at least "+filePhrase(*d.MinCount)+" in the tree", listing)
 	}
 	if d.MaxCount != nil && files > *d.MaxCount {
-		return dirCountFailure(d, files, fmt.Sprintf("at most %d files in the tree", *d.MaxCount), listing)
+		return dirCountFailure(d, "file count", filePhrase(files), "at most "+filePhrase(*d.MaxCount)+" in the tree", listing)
 	}
 
 	if d.Glob != "" && !treeGlobMatches(d.Glob, entries) {
