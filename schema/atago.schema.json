@@ -2639,12 +2639,13 @@
       }
     },
     "file": {
+      "description": "A file assertion: one content matcher and any of the size bounds, which compose (`{exists: true, size: 0}`, `{min_size: 1, max_size: 4096}`). At least one matcher is required here; the loader additionally rejects two content matchers on one assert (ATG2104).",
       "type": "object",
       "required": [
         "path"
       ],
       "additionalProperties": false,
-      "oneOf": [
+      "anyOf": [
         {
           "required": [
             "exists"
@@ -2916,48 +2917,12 @@
       ]
     },
     "jsonAssert": {
+      "description": "A json/yaml node: `path` selects the value, and a matcher decides what is asserted about it. An assertion needs exactly one matcher and the loader rejects it otherwise (ATG2104); a `store` capture takes the path alone, because it extracts the value instead of judging it.",
       "type": "object",
       "required": [
         "path"
       ],
       "additionalProperties": false,
-      "oneOf": [
-        {
-          "required": [
-            "equals"
-          ]
-        },
-        {
-          "required": [
-            "matches"
-          ]
-        },
-        {
-          "required": [
-            "length"
-          ]
-        },
-        {
-          "required": [
-            "gt"
-          ]
-        },
-        {
-          "required": [
-            "gte"
-          ]
-        },
-        {
-          "required": [
-            "lt"
-          ]
-        },
-        {
-          "required": [
-            "lte"
-          ]
-        }
-      ],
       "properties": {
         "path": {
           "type": "string",

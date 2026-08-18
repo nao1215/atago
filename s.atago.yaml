@@ -1,8 +1,0 @@
-version: "1"
-suite: {name: g}
-runners:
-  rpc: {type: grpc, target: "127.0.0.1:1", tls: true, timeout: 5s}
-scenarios:
-  - name: tls against a plaintext listener
-    steps:
-      - grpc: {runner: rpc, method: "pkg.Svc/M"}

@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io/fs"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -52,21 +54,67 @@ func yamlToAny(t *testing.T, data []byte) any {
 	return v
 }
 
-// TestSchema_RealSpecsConform guards against drift between the JSON Schema and
-// the specs we ship: every example/demo spec must validate against the schema.
-func TestSchema_RealSpecsConform(t *testing.T) {
-	s := loadSchema(t)
-	specs := []string{
-		"doc/demo/passing.atago.yaml",
-		"doc/demo/failing.atago.yaml",
+// shippedSpecPaths returns every *.atago.yaml this repository ships, walked
+// from the module root rather than from a list of directories: a suite added
+// under a new path is then covered by the guards below without anyone
+// remembering they exist, which is exactly how fourteen specs drifted out of
+// schema conformance while a two-file guard stayed green. Dot directories (the
+// git metadata, agent worktrees) and dist/ (release output) carry no shipped
+// spec, so the walk skips them wholesale.
+func shippedSpecPaths(t *testing.T) []string {
+	t.Helper()
+	var specs []string
+	err := filepath.WalkDir(".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			if name := d.Name(); path != "." && (strings.HasPrefix(name, ".") || name == "dist") {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if strings.HasSuffix(path, ".atago.yaml") || strings.HasSuffix(path, ".atago.yml") {
+			specs = append(specs, filepath.ToSlash(filepath.Clean(path)))
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk repository: %v", err)
 	}
+	// A walk that silently matches nothing turns every corpus guard into a
+	// no-op, so assert the two trees that must always contribute.
+	var examples, e2e int
 	for _, p := range specs {
+		switch {
+		case strings.HasPrefix(p, "examples/"):
+			examples++
+		case strings.HasPrefix(p, "test/e2e/"):
+			e2e++
+		}
+	}
+	if examples == 0 || e2e == 0 {
+		t.Fatalf("spec walk found %d specs but %d under examples/ and %d under test/e2e/; the corpus guards would pass on nothing", len(specs), examples, e2e)
+	}
+	return specs
+}
+
+// TestSchema_EveryShippedSpecConforms is the drift guard between the specs this
+// repository ships and the schema editors validate them against. It used to
+// check two demo files, which is how a schema that rejects a composable file
+// assert and every store json-path capture shipped while the guard stayed
+// green: a user copying examples/http.atago.yaml saw their editor reject it.
+// Every spec in the tree is validated here, so a schema change that narrows the
+// accepted vocabulary fails the build instead of a user's editor.
+func TestSchema_EveryShippedSpecConforms(t *testing.T) {
+	s := loadSchema(t)
+	for _, p := range shippedSpecPaths(t) {
 		data, err := os.ReadFile(p)
 		if err != nil {
 			t.Fatalf("read %s: %v", p, err)
 		}
 		if err := s.Validate(yamlToAny(t, data)); err != nil {
-			t.Errorf("%s does not conform to schema:\n%v", p, err)
+			t.Errorf("%s does not conform to schema/atago.schema.json:\n%v", p, err)
 		}
 	}
 }
@@ -123,6 +171,63 @@ scenarios:
 		t.Run(name, func(t *testing.T) {
 			if err := s.Validate(yamlToAny(t, []byte(src))); err != nil {
 				t.Errorf("schema rejected valid %s runner:\n%v", name, err)
+			}
+		})
+	}
+}
+
+// TestSchema_AcceptsComposableFileMatchers pins the file assert shapes the
+// loader documents as composable: a size bound stands alone or joins a content
+// matcher, and min_size with max_size bounds a range. The schema used to model
+// the matcher list with oneOf, which reads as "exactly one" and turned every one
+// of these into an editor error on a spec atago runs — including a shipped
+// example. Each case is loaded as well as validated, so the test fails if the
+// two ever disagree again in either direction.
+func TestSchema_AcceptsComposableFileMatchers(t *testing.T) {
+	s := loadSchema(t)
+	cases := map[string]string{
+		"exists with size":     `assert: {file: {path: out.txt, exists: true, size: 0}}`,
+		"size alone":           `assert: {file: {path: out.txt, size: 12}}`,
+		"size range":           `assert: {file: {path: out.txt, min_size: 1, max_size: 4096}}`,
+		"contains with count":  `assert: {file: {path: out.txt, contains: warn, count: 2}}`,
+		"contains with a size": `assert: {file: {path: out.txt, contains: warn, max_size: 4096}}`,
+	}
+	for name, step := range cases {
+		t.Run(name, func(t *testing.T) {
+			src := "version: \"1\"\nsuite: {name: x}\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n      - " + step + "\n"
+			if _, err := loader.LoadBytes("t.atago.yaml", []byte(src)); err != nil {
+				t.Fatalf("loader rejected %s: %v", name, err)
+			}
+			if err := s.Validate(yamlToAny(t, []byte(src))); err != nil {
+				t.Errorf("schema rejected %s, which the loader accepts:\n%v", name, err)
+			}
+		})
+	}
+}
+
+// TestSchema_AcceptsStoreCaptures pins the store shapes against the schema. A
+// capture selects a value rather than judging one, so its json node carries a
+// path and no matcher — the only spelling the loader accepts there. The schema
+// reached that node through the assert definition, whose oneOf demanded a
+// matcher, so every store-by-json-path spec in this repository (three shipped
+// examples among them) failed validation while running green.
+func TestSchema_AcceptsStoreCaptures(t *testing.T) {
+	s := loadSchema(t)
+	cases := map[string]string{
+		"stdout json path": `store: {name: id, from: {stdout: {json: {path: "$.id"}}}}`,
+		"stdout matches":   `store: {name: id, from: {stdout: {matches: "id=(\\d+)"}}}`,
+		"stdout trim":      `store: {name: all, from: {stdout: {trim: true}}}`,
+		"file json path":   `store: {name: v, from: {file: {path: out.json, json: {path: "$.v"}}}}`,
+		"file text":        `store: {name: body, from: {file: {path: out.txt, text: true}}}`,
+	}
+	for name, step := range cases {
+		t.Run(name, func(t *testing.T) {
+			src := "version: \"1\"\nsuite: {name: x}\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n      - " + step + "\n"
+			if _, err := loader.LoadBytes("t.atago.yaml", []byte(src)); err != nil {
+				t.Fatalf("loader rejected %s: %v", name, err)
+			}
+			if err := s.Validate(yamlToAny(t, []byte(src))); err != nil {
+				t.Errorf("schema rejected %s, which the loader accepts:\n%v", name, err)
 			}
 		})
 	}
