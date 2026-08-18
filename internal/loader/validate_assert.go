@@ -242,13 +242,34 @@ func validateSizeBounds(add addFunc, where string, exact, minSize, maxSize *int6
 // spelling it twice — for "none" and for "several" — is how the two messages
 // drift apart when a matcher is added.
 func requireExactlyOne(add addFunc, where, alternatives string, n int) {
+	requireOneOf(add, where, alternatives, alternatives, n)
+}
+
+// requireOneOf is requireExactlyOne for a block whose two rules cover different
+// key sets: satisfied names every key that satisfies the at-least-one rule, and
+// exclusive names only the keys that may not appear together. They differ where
+// a family composes instead of competing — a file assert is satisfied by a size
+// bound alone, which no content matcher excludes — and naming the exclusive set
+// in the "none" message sends the author looking for a matcher they may not
+// need.
+func requireOneOf(add addFunc, where, satisfied, exclusive string, n int) {
 	switch {
 	case n == 0:
-		add(diag.ChooseExactlyOne, "%s: must set one of %s", where, alternatives)
+		add(diag.ChooseExactlyOne, "%s: must set one of %s", where, satisfied)
 	case n > 1:
-		add(diag.ChooseExactlyOne, "%s: must set exactly one of %s", where, alternatives)
+		add(diag.ChooseExactlyOne, "%s: must set exactly one of %s", where, exclusive)
 	}
 }
+
+// fileContentMatchers are the file assert's mutually exclusive content matchers:
+// each makes its own claim about the bytes, so two of them on one assert is an
+// authoring mistake.
+const fileContentMatchers = "exists/contains/not_contains/executable/equals/equals_file/json/snapshot"
+
+// fileSizeMatchers are the file assert's size bounds. They compose with a
+// content matcher and stand alone (#397), so they satisfy the at-least-one rule
+// without joining the exclusive family.
+const fileSizeMatchers = "size/min_size/max_size"
 
 func validateFile(add addFunc, where string, f *spec.FileAssert) {
 	if f.Path == "" {
@@ -305,10 +326,10 @@ func validateFile(add addFunc, where string, f *spec.FileAssert) {
 			add(diag.ExclusiveKeys, "%s: size/min_size/max_size cannot be combined with snapshot — a snapshot already pins every byte", where)
 		}
 		if n > 1 {
-			add(diag.ChooseExactlyOne, "%s: must set exactly one of exists/contains/not_contains/executable/equals/equals_file/json/snapshot", where)
+			add(diag.ChooseExactlyOne, "%s: must set exactly one of %s", where, fileContentMatchers)
 		}
 	} else {
-		requireExactlyOne(add, where, "exists/contains/not_contains/executable/equals/equals_file/json/snapshot", n)
+		requireOneOf(add, where, fileContentMatchers+"/"+fileSizeMatchers, fileContentMatchers, n)
 	}
 
 	// A count bound counts the single `contains` substring (#396). A file assert
