@@ -114,6 +114,7 @@ docs: ## Regenerate the committed behavior docs under doc/e2e/ and the error ref
 	./dist/$(APP) doc --out doc/e2e/shdotenv.md    ./test/e2e/thirdparty/shdotenv
 	./dist/$(APP) doc --out doc/e2e/git-open.md    ./test/e2e/thirdparty/git-open
 	./dist/$(APP) doc --out doc/e2e/git-extras.md  ./test/e2e/thirdparty/git-extras
+	./dist/$(APP) doc --out doc/e2e/transcrypt.md  ./test/e2e/thirdparty/transcrypt
 	./dist/$(APP) doc --out doc/e2e/aqua.md        ./test/e2e/thirdparty/aqua
 	./dist/$(APP) doc --out doc/e2e/ecspresso.md   ./test/e2e/thirdparty/ecspresso
 	./dist/$(APP) doc --out doc/e2e/git.md         ./test/e2e/thirdparty/git
