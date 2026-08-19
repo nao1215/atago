@@ -1,0 +1,436 @@
+version: "1"
+
+suite:
+  name: curl (what actually goes on the wire)
+  description: |
+    Every flag of [curl](https://curl.se/) that shapes a request is a promise
+    about bytes a server will receive, and the one place that promise can be
+    checked is at the server. These scenarios declare an atago mock server, run
+    curl against it, and then assert the recorded request — its method, its
+    headers, its body, and how many of them there were.
+
+    What curl prints is asserted only where the transfer itself is the subject —
+    the body of a response, a status code asked for with `-w`, a timeout. The
+    flags that shape a request are checked at the server, because that is the
+    only place they show: `-d` and `--data-binary` differ in what is sent, not
+    in what is displayed, and `-X GET` with a body is a request no output would
+    warn you about.
+
+    No network is reached: the server is atago's own, on a loopback port that
+    only lives as long as the scenario.
+
+defaults:
+  scenario:
+    only:
+      command: curl --version
+    skip:
+      os: windows
+  run:
+    sandbox_home: true
+    env:
+      LC_ALL: C
+
+scenarios:
+  - name: a plain GET is a GET, with the headers curl adds on its own
+    mock_servers:
+      - name: api
+        routes:
+          - method: GET
+            path: /hello
+            body: "hi\n"
+    steps:
+      - run:
+          command: curl -s ${api.url}/hello
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              hi
+      - assert:
+          # What curl sends when asked for nothing in particular: no body, and
+          # the two headers it supplies unprompted.
+          mock:
+            name: api
+            method: GET
+            path: /hello
+            count: 1
+            body:
+              empty: true
+      - assert:
+          mock:
+            name: api
+            path: /hello
+            header: { name: User-Agent, matches: "^curl/[0-9]" }
+      - assert:
+          mock:
+            name: api
+            path: /hello
+            header: { name: Accept, equals: "*/*" }
+
+  - name: -d makes it a POST and names the form encoding
+    mock_servers:
+      - name: api
+        routes:
+          - method: POST
+            path: /submit
+            status: 201
+            body: "created\n"
+    steps:
+      - run:
+          command: curl -s -d name=ada -d role=engineer ${api.url}/submit
+      - assert:
+          exit_code: 0
+      - assert:
+          # Two -d flags are joined with & into one form body, and curl declares
+          # the encoding it just used — the request is a form POST although
+          # nothing in the command line says either word.
+          mock:
+            name: api
+            method: POST
+            path: /submit
+            count: 1
+            body:
+              equals: "name=ada&role=engineer"
+      - assert:
+          mock:
+            name: api
+            path: /submit
+            header: { name: Content-Type, equals: "application/x-www-form-urlencoded" }
+
+  - name: -d strips the newlines that --data-binary keeps
+    mock_servers:
+      - name: api
+        routes:
+          - method: POST
+            path: /upload
+            body: "ok\n"
+    steps:
+      - fixture:
+          file: payload.txt
+          content: |
+            first line
+            second line
+      - run:
+          command: curl -s -d @payload.txt ${api.url}/upload
+      - assert:
+          # The trap: reading a file with -d removes the line breaks, so what
+          # arrives is not what is on disk.
+          exit_code: 0
+          mock:
+            name: api
+            method: POST
+            path: /upload
+            body:
+              equals: "first linesecond line"
+      - run:
+          command: curl -s --data-binary @payload.txt ${api.url}/upload
+      - assert:
+          # --data-binary is the one that sends the file.
+          exit_code: 0
+          mock:
+            name: api
+            method: POST
+            path: /upload
+            body:
+              equals: "first line\nsecond line\n"
+
+  - name: --json sets both content types and sends the body untouched
+    only:
+      # --json arrived in curl 7.82; on anything older this scenario is not
+      # about a failure, it is about a flag that does not exist yet.
+      command: curl --help all | grep -q -- --json
+    mock_servers:
+      - name: api
+        routes:
+          - method: POST
+            path: /v1/items
+            status: 201
+            json: { id: "i-1" }
+    steps:
+      - fixture:
+          file: item.json
+          content: |
+            {"name": "ada", "tags": ["a", "b"]}
+      - run:
+          # @file is how a body of any size gets sent; the flag is what sets the
+          # two headers below.
+          command: curl -s --json @item.json ${api.url}/v1/items
+      - assert:
+          exit_code: 0
+      - assert:
+          # One flag, three effects: the method, the Content-Type, and an Accept
+          # that says what is wanted back.
+          mock:
+            name: api
+            method: POST
+            path: /v1/items
+            count: 1
+            body:
+              json: { path: "$.tags[1]", equals: "b" }
+      - assert:
+          mock:
+            name: api
+            path: /v1/items
+            header: { name: Content-Type, equals: "application/json" }
+      - assert:
+          mock:
+            name: api
+            path: /v1/items
+            header: { name: Accept, equals: "application/json" }
+
+  - name: -F builds a multipart body with a boundary in the header
+    mock_servers:
+      - name: api
+        routes:
+          - method: POST
+            path: /files
+            body: "stored\n"
+    steps:
+      - fixture:
+          file: note.txt
+          content: |
+            the file content
+      - run:
+          command: curl -s -F title=a-note -F file=@note.txt ${api.url}/files
+      - assert:
+          exit_code: 0
+      - assert:
+          # The parts, their names, the file name curl put in the disposition,
+          # and the content type it guessed for the part.
+          mock:
+            name: api
+            method: POST
+            path: /files
+            body:
+              contains:
+                - 'name="title"'
+                - "a-note"
+                - 'name="file"; filename="note.txt"'
+                - "the file content"
+      - assert:
+          mock:
+            name: api
+            path: /files
+            header: { name: Content-Type, matches: "^multipart/form-data; boundary=" }
+
+  - name: -H replaces a header curl would have sent, and can delete one
+    mock_servers:
+      - name: api
+        routes:
+          - method: GET
+            path: /hello
+            body: "hi\n"
+    steps:
+      - run:
+          command: 'curl -s -H "User-Agent: atago-suite/1.0" ${api.url}/hello'
+      - assert:
+          exit_code: 0
+          mock:
+            name: api
+            path: /hello
+            header: { name: User-Agent, equals: "atago-suite/1.0" }
+      - run:
+          command: 'curl -s -H "Accept:" ${api.url}/hello'
+      - assert:
+          # A header named with an empty value is a removal, not an empty
+          # header — the way to send a request without the Accept curl adds.
+          exit_code: 0
+          mock:
+            name: api
+            path: /hello
+            header: { name: Accept, equals: "" }
+
+  - name: -u builds the Authorization header
+    mock_servers:
+      - name: api
+        routes:
+          - method: GET
+            path: /private
+            body: "secret\n"
+    steps:
+      - fixture:
+          file: credential.txt
+          content: |
+            ada:test-password
+      - run:
+          shell: true
+          # The credential is read from a file rather than written on the
+          # command line, which is what a script does with one anyway.
+          command: curl -s -u "$(cat credential.txt)" ${api.url}/private
+      - assert:
+          # Basic auth is a base64 of user:password, and asserting the exact
+          # value is the only way to know curl encoded what was meant. The
+          # credential is invented for this scenario.
+          exit_code: 0
+          mock:
+            name: api
+            method: GET
+            path: /private
+            count: 1
+            header: { name: Authorization, equals: "Basic YWRhOnRlc3QtcGFzc3dvcmQ=" }
+
+  - name: -X renames the method and changes nothing else
+    mock_servers:
+      - name: api
+        routes:
+          - method: GET
+            path: /odd
+            body: "ok\n"
+    steps:
+      - run:
+          command: curl -s -X GET -d name=ada ${api.url}/odd
+      - assert:
+          # The request that surprises people: -X is a string substitution on
+          # the method line, so this is a GET carrying a form body and a
+          # Content-Type — which is exactly what the server records.
+          exit_code: 0
+          mock:
+            name: api
+            method: GET
+            path: /odd
+            count: 1
+            body:
+              equals: "name=ada"
+      - assert:
+          mock:
+            name: api
+            path: /odd
+            header: { name: Content-Type, equals: "application/x-www-form-urlencoded" }
+
+  - name: -G moves the data into the query string and leaves no body
+    mock_servers:
+      - name: api
+        routes:
+          - method: GET
+            path: /search
+            body: "results\n"
+    steps:
+      - run:
+          command: curl -s -G -d q=ada -d limit=10 ${api.url}/search
+      - assert:
+          # Same -d flags as the POST above; -G turns them into the query
+          # string, so the request is a GET with an empty body.
+          exit_code: 0
+          mock:
+            name: api
+            method: GET
+            path: /search
+            count: 1
+            body:
+              empty: true
+
+  - name: -L follows the redirect, and the server sees both requests
+    mock_servers:
+      - name: api
+        routes:
+          - method: POST
+            path: /old
+            status: 302
+            header: { Location: /new }
+          - method: GET
+            path: /new
+            body: "moved here\n"
+    steps:
+      - run:
+          command: curl -s -d name=ada ${api.url}/old
+      - assert:
+          # Without -L the redirect is the answer: one request, no body printed.
+          exit_code: 0
+          stdout:
+            empty: true
+          mock:
+            name: api
+            path: /old
+            count: 1
+      - run:
+          command: curl -s -L -d name=ada ${api.url}/old
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              moved here
+      - assert:
+          # The second request is the interesting one: after a 302, curl turns
+          # the POST into a GET and drops the body. Two paths, two records, and
+          # the mock is what shows the difference.
+          mock:
+            name: api
+            method: GET
+            path: /new
+            count: 1
+            body:
+              empty: true
+
+  - name: a path the server does not serve is a 404 that curl reports only when asked
+    mock_servers:
+      - name: api
+        routes:
+          - method: GET
+            path: /hello
+            body: "hi\n"
+    steps:
+      - run:
+          command: 'curl -s -o /dev/null -w "%{http_code}" ${api.url}/nowhere'
+      - assert:
+          # curl's default is that a 404 is a successful transfer: exit 0, and
+          # the status is only visible if you ask for it.
+          exit_code: 0
+          stdout:
+            equals: "404"
+      - run:
+          command: curl -s -f -o /dev/null ${api.url}/nowhere
+      - assert:
+          # --fail is the flag that makes an HTTP error an exit code.
+          exit_code: 22
+      - assert:
+          # Both attempts were recorded, unmatched though they were.
+          mock:
+            name: api
+            path: /nowhere
+            count: 2
+
+  - name: a slow route is a timeout with its own exit code
+    mock_servers:
+      - name: api
+        routes:
+          - method: GET
+            path: /slow
+            delay: 3s
+            body: "eventually\n"
+    steps:
+      - run:
+          command: curl -s --max-time 1 ${api.url}/slow
+      - assert:
+          # 28 is curl's timeout code, distinct from a connection failure and
+          # from an HTTP error.
+          exit_code: 28
+          stdout:
+            empty: true
+      # The mock records a request when its handler finishes, and this one is
+      # still sleeping, so there is nothing to assert on the server side here:
+      # the timeout is entirely curl's half of the exchange.
+
+  - name: the same request twice produces the same bytes
+    mock_servers:
+      - name: api
+        routes:
+          - method: GET
+            path: /v1/item
+            json: { id: "i-1", name: "ada" }
+    steps:
+      - run:
+          command: curl -s ${api.url}/v1/item
+          deterministic:
+            runs: 3
+            compare: [stdout, exit_code]
+      - assert:
+          # A canned response read three times has to come back byte-identical;
+          # if it did not, the loose matchers below would still pass and hide it.
+          exit_code: 0
+          stdout:
+            json: { path: "$.name", equals: "ada" }
+      - assert:
+          mock:
+            name: api
+            path: /v1/item
+            count: 3

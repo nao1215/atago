@@ -20,6 +20,7 @@ A browsable, repo-local index of atago's documentation, generated from repositor
 - [caddy.md](../doc/e2e/caddy.md)
 - [career.md](../doc/e2e/career.md)
 - [coredns.md](../doc/e2e/coredns.md)
+- [curl.md](../doc/e2e/curl.md)
 - [ecspresso.md](../doc/e2e/ecspresso.md)
 - [ffmpeg.md](../doc/e2e/ffmpeg.md)
 - [fx.md](../doc/e2e/fx.md)

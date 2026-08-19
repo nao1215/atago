@@ -366,6 +366,12 @@ jobs:
               git -C "$HOME/.pyenv-src" fetch -q --depth 1 https://github.com/pyenv/pyenv.git "$sha"
               git -C "$HOME/.pyenv-src" checkout -q FETCH_HEAD
               echo "$HOME/.pyenv-src/bin" >> "$GITHUB_PATH"
+          # curl from the pinned Ubuntu snapshot. This is the one suite whose
+          # subject is what a client sends rather than what it prints, so it
+          # runs against atago's own mock server and reaches no network.
+          - name: curl
+            dir: ./test/e2e/thirdparty/curl
+            install: bash ./scripts/install_ubuntu_snapshot_packages.sh curl
           # sops encrypts structured files with age as the key backend; both are
           # go-installed (age and age-keygen provide the throwaway keys).
           # GnuPG from the pinned Ubuntu snapshot: the suite generates its own
