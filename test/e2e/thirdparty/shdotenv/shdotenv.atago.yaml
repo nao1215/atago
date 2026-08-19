@@ -1,0 +1,361 @@
+version: "1"
+
+suite:
+  name: shdotenv (parsing a .env file safely)
+  description: |
+    [shdotenv](https://github.com/ko1nksm/shdotenv) loads .env files into the
+    environment without letting the file run anything. Its own test suite is
+    written in ShellSpec; what those tests check is pinned here from outside.
+
+    The safety promise is the center of this file, and it is asserted the only
+    way a security claim should be: a .env file that tries to run a command is
+    given every chance to, and the proof is that the file it would have created
+    does not exist. Around it are the parsing rules, the strict defaults that
+    make the tool usable in CI (an unset reference is an error, two files
+    defining the same key is an error), and the precedence between the file and
+    the environment already in place.
+
+defaults:
+  scenario:
+    only:
+      command: command -v shdotenv
+    skip:
+      os: windows
+  run:
+    sandbox_home: true
+    env:
+      LC_ALL: C
+
+scenarios:
+  - name: the version, the help, and an option that does not exist
+    steps:
+      - run:
+          command: shdotenv --version
+      - assert:
+          exit_code: 0
+          stdout:
+            matches: "^[0-9]+\\.[0-9]+\\.[0-9]+\\n$"
+      - run:
+          command: shdotenv --help
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "Usage: shdotenv [OPTION]... [--] [[COMMAND | export] [ARG]...]"
+              - "-d, --dialect DIALECT"
+              - "-f, --format FORMAT"
+      - run:
+          command: shdotenv --nope
+      - assert:
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            contains: "--nope"
+
+  - name: a file is read as data and printed as shell that can be evaluated
+    steps:
+      - fixture:
+          file: .env
+          content: |
+            # a comment line
+            NAME=world
+            GREETING="hello, ${NAME}"
+            EMPTY=
+            QUOTED='no ${expansion} here'
+      - run:
+          command: shdotenv
+      - assert:
+          # Every value comes back single-quoted, whatever it contained: the
+          # output is meant to be eval'd, so quoting is the whole job. The
+          # comment is gone, the empty value survives as an empty string, and
+          # ${NAME} was expanded from the line above while the single-quoted
+          # value was left exactly as written.
+          exit_code: 0
+          stdout:
+            equals: |
+              export NAME='world'
+              export GREETING='hello, world'
+              export EMPTY=''
+              export QUOTED='no ${expansion} here'
+      - run:
+          command: shdotenv -- sh -c "echo [$GREETING]"
+      - assert:
+          # And the other half of the tool: it can run the command itself, with
+          # the file already loaded.
+          exit_code: 0
+          stdout:
+            equals: |
+              [hello, world]
+
+  - name: a file that tries to run a command runs nothing
+    steps:
+      - fixture:
+          file: .env
+          content: |
+            EVIL=$(touch pwned-unquoted)
+      - run:
+          command: shdotenv
+      - assert:
+          # Refused while parsing, before anything could be evaluated.
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            contains: "spaces are not allowed without quoting"
+      - fixture:
+          file: .env
+          content: |
+            EVIL="$(touch pwned-quoted)"
+      - run:
+          command: shdotenv
+      - assert:
+          # Quoting does not get it past the parser either: the metacharacters
+          # that could start a command substitution have to be escaped, and the
+          # message names them.
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            contains: 'the following metacharacters must be escaped: $`"\'
+      - fixture:
+          file: .env
+          content: |
+            EVIL="`touch pwned-backtick`"
+      - run:
+          command: shdotenv
+      - assert:
+          exit_code: 1
+          stderr:
+            contains: 'the following metacharacters must be escaped: $`"\'
+          # The proof is not the message: it is that nothing was created. Three
+          # files were named by three attempts and none of them exists.
+          changes:
+            created: []
+            modified: []
+            deleted: []
+      - assert:
+          file:
+            path: pwned-unquoted
+            exists: false
+      - assert:
+          file:
+            path: pwned-quoted
+            exists: false
+      - assert:
+          file:
+            path: pwned-backtick
+            exists: false
+
+  - name: shell metacharacters inside a value stay text, even when a command runs
+    steps:
+      - fixture:
+          file: .env
+          content: |
+            PAYLOAD="x; touch pwned-semicolon"
+      - run:
+          command: shdotenv
+      - assert:
+          # A semicolon is not a metacharacter the parser objects to, because a
+          # value is only ever data. It comes back single-quoted, which is what
+          # keeps it data on the way out too.
+          exit_code: 0
+          stdout:
+            equals: |
+              export PAYLOAD='x; touch pwned-semicolon'
+      - run:
+          command: shdotenv -- sh -c "echo [$PAYLOAD]"
+      - assert:
+          # And with a real command running with it in the environment, it is
+          # still the string and not a command.
+          exit_code: 0
+          stdout:
+            equals: |
+              [x; touch pwned-semicolon]
+      - assert:
+          file:
+            path: pwned-semicolon
+            exists: false
+
+  - name: a reference to something unset is an error unless it is allowed
+    steps:
+      - fixture:
+          file: .env
+          content: |
+            VALUE="${NOT_SET_ANYWHERE}"
+      - run:
+          command: shdotenv
+      - assert:
+          # The strict default: a .env that silently expands to an empty string
+          # is how a deployment ends up pointing at nothing.
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            equals: |
+              shdotenv: NOT_SET_ANYWHERE: the key is not set
+      - run:
+          command: shdotenv --no-nounset
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              export VALUE=''
+
+  - name: the environment already in place is visible, and can be hidden
+    steps:
+      - fixture:
+          file: .env
+          content: |
+            DERIVED="from ${OUTSIDE}"
+      - run:
+          command: shdotenv
+          env:
+            OUTSIDE: the-host
+      - assert:
+          # Expansion sees the process environment, so a .env can build on what
+          # the deployment already set.
+          exit_code: 0
+          stdout:
+            equals: |
+              export DERIVED='from the-host'
+      - run:
+          command: shdotenv --ignore-environment
+          env:
+            OUTSIDE: the-host
+      - assert:
+          # And -i cuts that off, which turns the same file into a file with an
+          # unmet dependency — reported rather than expanded to nothing.
+          exit_code: 1
+          stderr:
+            equals: |
+              shdotenv: OUTSIDE: the key is not set
+
+  - name: the file is a default until overload is asked for
+    steps:
+      - fixture:
+          file: .env
+          content: |
+            PRESET=from-the-file
+      - run:
+          command: shdotenv -- sh -c "echo [$PRESET]"
+          env:
+            PRESET: from-the-environment
+      - assert:
+          # A variable already exported wins: the file supplies defaults, which
+          # is what makes it safe to load in a deployed environment.
+          exit_code: 0
+          stdout:
+            equals: |
+              [from-the-environment]
+      - run:
+          command: shdotenv --overload -- sh -c "echo [$PRESET]"
+          env:
+            PRESET: from-the-environment
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              [from-the-file]
+      - run:
+          command: shdotenv
+          env:
+            PRESET: from-the-environment
+      - assert:
+          # The printed form honors the same precedence, by omission: a variable
+          # that is already set is left out of the output entirely, so eval'ing
+          # it cannot overwrite what the deployment set.
+          exit_code: 0
+          stdout:
+            empty: true
+      - run:
+          command: shdotenv --overload
+          env:
+            PRESET: from-the-environment
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              export PRESET='from-the-file'
+
+  - name: two files that define the same key are refused rather than merged
+    steps:
+      - fixture:
+          file: first.env
+          content: |
+            SHARED=one
+            ONLY_FIRST=1
+      - fixture:
+          file: second.env
+          content: |
+            SHARED=two
+            ONLY_SECOND=2
+      - run:
+          command: shdotenv -e first.env -e second.env
+      - assert:
+          # No last-one-wins, no silent shadowing: the conflict is named, with
+          # both files in the message.
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            equals: |
+              shdotenv: second.env: `SHARED' is already defined in the first.env
+      - fixture:
+          file: second.env
+          content: |
+            ONLY_SECOND=2
+      - run:
+          command: shdotenv -e first.env -e second.env
+      - assert:
+          # Without the collision they merge, in the order given.
+          exit_code: 0
+          stdout:
+            equals: |
+              export SHARED='one'
+              export ONLY_FIRST='1'
+              export ONLY_SECOND='2'
+
+  - name: a file that is not there is not an error
+    steps:
+      - run:
+          command: shdotenv -e missing.env
+      - assert:
+          # Pinned as observed: a path that does not exist produces no output, no
+          # message, and exit 0. A typo in --env is indistinguishable from a file
+          # with nothing in it.
+          exit_code: 0
+          stdout:
+            empty: true
+          stderr:
+            empty: true
+
+  - name: quiet mode validates a file without printing it
+    steps:
+      - fixture:
+          file: .env
+          content: |
+            GOOD=value
+      - run:
+          command: shdotenv --quiet
+      - assert:
+          # What --quiet is for: checking that a .env parses, in CI, with the
+          # exit code as the whole answer.
+          exit_code: 0
+          stdout:
+            empty: true
+      - fixture:
+          file: .env
+          content: |
+            THIS IS NOT A DEFINITION
+      - run:
+          command: shdotenv --quiet
+      - assert:
+          # Quiet silences the output, not the diagnosis: the offending line is
+          # quoted back.
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            equals: |
+              shdotenv: `THIS IS NOT A DEFINITION': not a variable definition
