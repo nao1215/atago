@@ -1,0 +1,362 @@
+version: "1"
+
+suite:
+  name: rbenv (which version this directory selects)
+  description: |
+    [rbenv](https://github.com/rbenv/rbenv) picks the Ruby version a command
+    should run under. It keeps its own test suite in Bats; what those tests
+    check is pinned here from outside, against a root the scenario builds
+    itself.
+
+    No Ruby is installed and none is needed: a version is a directory under
+    `versions/`, so each scenario writes a couple of two-line executables and
+    exercises the real resolution rules against them. What is asserted is the
+    state machine — the file `global` writes, the file `local` writes, the
+    environment variable that beats both, the origin rbenv reports for its
+    choice, and the refusals that leave every one of those files untouched.
+
+defaults:
+  scenario:
+    only:
+      command: rbenv --version
+    # rbenv is a Bash program driven here through POSIX paths and permissions.
+    skip:
+      os: windows
+  run:
+    sandbox_home: true
+    env:
+      RBENV_ROOT: ${workdir}/root
+
+scenarios:
+  - name: the version, the usage text, and a command that does not exist
+    steps:
+      - run:
+          command: rbenv --version
+      - assert:
+          exit_code: 0
+          stdout:
+            matches: "^rbenv [0-9]+\\.[0-9]+"
+      - run:
+          command: rbenv
+      - assert:
+          # Asked for nothing, rbenv treats it as a mistake rather than a
+          # request: usage on stderr, exit 1, and stdout left clean for whatever
+          # was expecting a version string.
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            contains:
+              - "Usage: rbenv <command> [<args>...]"
+              - "version     Show the current Ruby version and its origin"
+      - run:
+          command: rbenv nosuchcommand
+      - assert:
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            equals: |
+              rbenv: no such command `nosuchcommand'
+
+  - name: an empty root has no versions but still answers with system
+    steps:
+      - run:
+          command: rbenv root
+      - assert:
+          exit_code: 0
+          stdout:
+            matches: "/root\\n$"
+      - run:
+          command: rbenv versions
+      - assert:
+          # Nothing installed is reported as a warning at exit 1, so a script
+          # that lists versions can tell "none" from "one".
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            equals: |
+              Warning: no Ruby detected on the system
+      - run:
+          command: rbenv version
+      - assert:
+          # The current version is still answerable: with nothing installed, the
+          # answer is whatever the operating system provides.
+          exit_code: 0
+          stdout:
+            equals: |
+              system
+
+  - name: installed versions are listed and the selected one is marked
+    steps:
+      - fixture:
+          file: root/versions/3.2.0/bin/ruby
+          mode: "0755"
+          content: |
+            #!/bin/sh
+            echo "ruby 3.2.0"
+      - fixture:
+          file: root/versions/3.3.1/bin/ruby
+          mode: "0755"
+          content: |
+            #!/bin/sh
+            echo "ruby 3.3.1"
+      - run:
+          command: rbenv versions
+      - assert:
+          # A version is a directory: rbenv found both without being told, and
+          # neither is marked because nothing has selected one yet.
+          exit_code: 0
+          stdout:
+            equals: "  3.2.0\n  3.3.1\n"
+      - run:
+          command: rbenv global 3.3.1
+      - assert:
+          exit_code: 0
+      - run:
+          command: rbenv versions
+      - assert:
+          # Now the list carries the selection and where it came from.
+          exit_code: 0
+          stdout:
+            matches: "^  3\\.2\\.0\\n\\* 3\\.3\\.1 \\(set by .*/root/version\\)\\n$"
+
+  - name: global writes one file in the root and nothing else
+    steps:
+      - fixture:
+          file: root/versions/3.2.0/bin/ruby
+          mode: "0755"
+          content: |
+            #!/bin/sh
+            echo "ruby 3.2.0"
+      - run:
+          command: rbenv global 3.2.0
+      - assert:
+          # The whole of the global setting is one file with one line in it.
+          exit_code: 0
+          stdout:
+            empty: true
+          changes:
+            created: [root/version]
+            modified: []
+            deleted: []
+      - assert:
+          file:
+            path: root/version
+            equals: |
+              3.2.0
+      - run:
+          command: rbenv global
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              3.2.0
+      - run:
+          command: rbenv version
+      - assert:
+          # The origin is the file, named in full, so "why is this the version"
+          # never needs a guess.
+          exit_code: 0
+          stdout:
+            matches: "^3\\.2\\.0 \\(set by .*/root/version\\)\\n$"
+
+  - name: local wins over global, and the environment wins over both
+    steps:
+      - fixture:
+          file: root/versions/3.2.0/bin/ruby
+          mode: "0755"
+          content: |
+            #!/bin/sh
+            echo "ruby 3.2.0"
+      - fixture:
+          file: root/versions/3.3.1/bin/ruby
+          mode: "0755"
+          content: |
+            #!/bin/sh
+            echo "ruby 3.3.1"
+      - run:
+          command: rbenv global 3.2.0
+      - assert:
+          exit_code: 0
+      - run:
+          command: rbenv local 3.3.1
+      - assert:
+          # The local setting is a file in the directory, which is what makes it
+          # something a repository can carry.
+          exit_code: 0
+          changes:
+            created: [.ruby-version]
+            modified: []
+            deleted: []
+      - assert:
+          file:
+            path: .ruby-version
+            equals: |
+              3.3.1
+      - run:
+          command: rbenv version
+      - assert:
+          exit_code: 0
+          stdout:
+            matches: "^3\\.3\\.1 \\(set by .*/\\.ruby-version\\)\\n$"
+      - run:
+          command: rbenv version
+          env:
+            RBENV_VERSION: 3.2.0
+      - assert:
+          # And a variable in the environment overrules the file, which is how a
+          # single command runs under another version without touching the repo.
+          exit_code: 0
+          stdout:
+            equals: |
+              3.2.0 (set by RBENV_VERSION environment variable)
+
+  - name: unsetting the local version falls back to the global one
+    steps:
+      - fixture:
+          file: root/versions/3.2.0/bin/ruby
+          mode: "0755"
+          content: |
+            #!/bin/sh
+            echo "ruby 3.2.0"
+      - fixture:
+          file: root/versions/3.3.1/bin/ruby
+          mode: "0755"
+          content: |
+            #!/bin/sh
+            echo "ruby 3.3.1"
+      - fixture:
+          file: .ruby-version
+          content: |
+            3.3.1
+      - run:
+          command: rbenv global 3.2.0
+      - assert:
+          exit_code: 0
+      - run:
+          command: rbenv local --unset
+      - assert:
+          # Unset removes the file rather than writing an empty one, so the
+          # directory goes back to having no opinion.
+          exit_code: 0
+          changes:
+            created: []
+            modified: []
+            deleted: [.ruby-version]
+      - run:
+          command: rbenv version
+      - assert:
+          exit_code: 0
+          stdout:
+            matches: "^3\\.2\\.0 \\(set by .*/root/version\\)\\n$"
+
+  - name: a version that is not installed is refused and nothing is written
+    steps:
+      - fixture:
+          file: root/versions/3.2.0/bin/ruby
+          mode: "0755"
+          content: |
+            #!/bin/sh
+            echo "ruby 3.2.0"
+      - fixture:
+          file: .ruby-version
+          content: |
+            3.2.0
+      - run:
+          command: rbenv local 9.9.9
+      - assert:
+          # The refusal quotes the version asked for, and — the part worth
+          # asserting — the existing selection survives it untouched.
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            equals: |
+              rbenv: version `9.9.9' not installed
+          changes:
+            created: []
+            modified: []
+            deleted: []
+      - assert:
+          file:
+            path: .ruby-version
+            equals: |
+              3.2.0
+      - run:
+          command: rbenv global 9.9.9
+      - assert:
+          exit_code: 1
+          stderr:
+            equals: |
+              rbenv: version `9.9.9' not installed
+          changes:
+            created: []
+            modified: []
+            deleted: []
+
+  - name: a version file naming an uninstalled version says which file to fix
+    steps:
+      - fixture:
+          file: root/versions/3.2.0/bin/ruby
+          mode: "0755"
+          content: |
+            #!/bin/sh
+            echo "ruby 3.2.0"
+      - fixture:
+          file: .ruby-version
+          content: |
+            9.9.9
+      - run:
+          command: rbenv version
+      - assert:
+          # A file can be written by hand, or by a colleague, or by a branch
+          # switch. The failure names the path that carries the bad value rather
+          # than only the value, which is the difference between a fix and a
+          # search.
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            matches: "^rbenv: version `9\\.9\\.9' is not installed \\(set by .*/\\.ruby-version\\)\\n$"
+
+  - name: which, prefix, version-name and version-origin agree on the selection
+    steps:
+      - fixture:
+          file: root/versions/3.3.1/bin/ruby
+          mode: "0755"
+          content: |
+            #!/bin/sh
+            echo "ruby 3.3.1"
+      - fixture:
+          file: .ruby-version
+          content: |
+            3.3.1
+      - run:
+          command: rbenv version-name
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              3.3.1
+      - run:
+          command: rbenv version-origin
+      - assert:
+          exit_code: 0
+          stdout:
+            matches: "/\\.ruby-version\\n$"
+      - run:
+          command: rbenv prefix
+      - assert:
+          exit_code: 0
+          stdout:
+            matches: "/root/versions/3\\.3\\.1\\n$"
+      - run:
+          command: rbenv which ruby
+      - assert:
+          # The four answers are one answer, taken apart: the name, where it came
+          # from, the directory it lives in, and the executable that will run.
+          exit_code: 0
+          stdout:
+            matches: "/root/versions/3\\.3\\.1/bin/ruby\\n$"
