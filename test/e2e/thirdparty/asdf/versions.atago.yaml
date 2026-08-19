@@ -24,7 +24,7 @@ defaults:
       LC_ALL: C
 
 scenarios:
-  - name: global writes the home file and local writes the directory's
+  - name: global writes the file in the home directory and local writes one here
     steps:
       - fixture:
           file: myplugin/bin/list-all

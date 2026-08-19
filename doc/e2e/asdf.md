@@ -8,7 +8,7 @@
   - [installing runs the plugin and lands a real program](#scenario-installing-runs-the-plugin-and-lands-a-real-program)
   - [removing the plugin takes its versions with it](#scenario-removing-the-plugin-takes-its-versions-with-it)
 - [asdf (which version this directory gets)](#asdf-which-version-this-directory-gets) — 3 scenarios
-  - [global writes the home file and local writes the directory's](#scenario-global-writes-the-home-file-and-local-writes-the-directorys)
+  - [global writes the file in the home directory and local writes one here](#scenario-global-writes-the-file-in-the-home-directory-and-local-writes-one-here)
   - [the shim runs whatever the directory says, with PATH never changing](#scenario-the-shim-runs-whatever-the-directory-says-with-path-never-changing)
   - [exec and which agree, and a missing version explains itself](#scenario-exec-and-which-agree-and-a-missing-version-explains-itself)
 
@@ -252,7 +252,7 @@ that prints which one it is, so "the directory decided" is asserted by
 running the program rather than by reading a report about it.
 
 Source: `test/e2e/thirdparty/asdf/versions.atago.yaml`
-### Scenario: global writes the home file and local writes the directory's
+### Scenario: global writes the file in the home directory and local writes one here
 _only when `command -v asdf` succeeds · skipped on Windows_
 #### Given
 - Fixture file `myplugin/bin/list-all` is created.
