@@ -247,6 +247,12 @@ scenarios:
           env:
             LC_ALL: C
             TERM: xterm
+            # After writing the file, git-changelog opens it in `git var
+            # GIT_EDITOR`, which on a bare machine is whatever editor happens to
+            # be installed — nano on a CI runner, which then owns the terminal
+            # until someone quits it. The scenario is about the file, so the
+            # editor is named here and does nothing.
+            GIT_EDITOR: "true"
       - assert:
           # Only the commits after the tag, newest first, under a heading whose
           # version is a placeholder until a release names it.
@@ -271,6 +277,12 @@ scenarios:
           env:
             LC_ALL: C
             TERM: xterm
+            # After writing the file, git-changelog opens it in `git var
+            # GIT_EDITOR`, which on a bare machine is whatever editor happens to
+            # be installed — nano on a CI runner, which then owns the terminal
+            # until someone quits it. The scenario is about the file, so the
+            # editor is named here and does nothing.
+            GIT_EDITOR: "true"
       - assert:
           # Pinned as observed: running it twice does not update the section, it
           # prepends a second copy of it. The file is a generated artifact that
