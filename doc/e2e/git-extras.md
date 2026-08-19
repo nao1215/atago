@@ -396,26 +396,20 @@ _only when `command -v git-summary` succeeds · skipped on Windows_
 #### Given
 - Environment variables are set: LC_ALL, TERM.
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
-- Environment variables are set: LC_ALL, TERM.
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
-- Environment variables are set: LC_ALL, TERM.
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 
 #### When
 ```shell
 git init -q && git config user.email author@example.com && git config user.name 'A Author' && echo one > a.txt && git add a.txt && git commit -q -m 'first release commit' && git tag v1.0.0 && echo two > b.txt && git add b.txt && git commit -q -m 'add the second thing' && echo three > c.txt && git add c.txt && git commit -q -m 'add the third thing'
-git changelog
-git changelog
+# interactive (pty): git changelog
+# interactive (pty): git changelog
 ```
 #### Then
 - after `git init -q && git config user.email author@example.com && git config user.name 'A Author' && echo one > a.txt && git add a.txt && git commit -q -m 'first release commit' && git tag v1.0.0 && echo two > b.txt && git add b.txt && git commit -q -m 'add the second thing' && echo three > c.txt && git add c.txt && git commit -q -m 'add the third thing'`:
   - exit code is `0`
-- after `git changelog`:
-  - exit code is `0`
-  - the step changed exactly created `History.md`, modified nothing, deleted nothing
+- after `interactive (pty): git changelog`:
   - file `History.md` contains `n.n.n / `, `  * add the third thing`, `  * add the second thing`
   - file `History.md` does not contain `first release commit`
-- after `git changelog`:
-  - exit code is `0`
-  - the step changed exactly created nothing, modified `History.md`, deleted nothing
+- after `interactive (pty): git changelog`:
   - file `History.md` contains `  * add the third thing` exactly 2 times
