@@ -24,10 +24,12 @@ checked is at the server. These scenarios declare an atago mock server, run
 curl against it, and then assert the recorded request — its method, its
 headers, its body, and how many of them there were.
 
-Nothing here asserts what curl printed, because that is not the contract:
-`-d` versus `--data-binary` differ in what is sent, not in what is shown,
-and `-X GET` with a body is a request no reasonable output would warn you
-about. The mock is the only witness.
+What curl prints is asserted only where the transfer itself is the subject —
+the body of a response, a status code asked for with `-w`, a timeout. The
+flags that shape a request are checked at the server, because that is the
+only place they show: `-d` and `--data-binary` differ in what is sent, not
+in what is displayed, and `-X GET` with a body is a request no output would
+warn you about.
 
 No network is reached: the server is atago's own, on a loopback port that
 only lives as long as the scenario.
@@ -102,7 +104,7 @@ curl -s --data-binary @payload.txt ${api.url}/upload
   - mock `api` received `POST /upload`
 
 ### Scenario: --json sets both content types and sends the body untouched
-_only when `curl --version` succeeds · skipped on Windows_
+_only when `curl --help all | grep -q -- --json` succeeds · skipped on Windows_
 #### Given
 - Stub HTTP server `api` serves 1 canned route(s) at `${api.url}` and records every request (#24).
 - Fixture file `item.json` is created.
