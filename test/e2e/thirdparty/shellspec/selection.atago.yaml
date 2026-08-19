@@ -1,0 +1,446 @@
+version: "1"
+
+suite:
+  name: shellspec (choosing which examples run)
+  description: |
+    Every way [ShellSpec](https://shellspec.info/) narrows a run: counting and
+    listing without running, `--dry-run`, the name filter, tags, focus, line and
+    id ranges, the file pattern, and quick mode — which remembers what did not
+    pass last time in a ledger on disk.
+
+    A selection flag is asserted on both halves here. The plan line says what
+    ran; a specfile whose examples write a file says what did not, so "counted
+    but not executed" is proven rather than assumed. Quick mode gets the full
+    state machine: the ledger appearing, the replay narrowing to what failed,
+    the ledger emptying once it passes, and the next run going wide again.
+
+defaults:
+  scenario:
+    only:
+      command: shellspec --version
+    skip:
+      os: windows
+  run:
+    sandbox_home: true
+
+scenarios:
+  - name: counting and listing report the suite without running it
+    steps:
+      - fixture:
+          file: .shellspec
+          content: ""
+      - fixture:
+          file: spec/side_effect_spec.sh
+          content: |
+            Describe 'side effects'
+              It 'writes a file'
+                When call touch ran.txt
+                The status should be success
+              End
+
+              It 'writes another'
+                When call touch ran-too.txt
+                The status should be success
+              End
+            End
+      - run:
+          command: shellspec --count
+      - assert:
+          exit_code: 0
+          # One specfile, two examples — the counts, and nothing else.
+          stdout:
+            equals: |
+              1 2
+          changes:
+            created: []
+            modified: []
+            deleted: []
+      - run:
+          command: shellspec --list examples
+      - assert:
+          # Examples are addressed by id: the first group, its first and second
+          # example. That id is what a range argument takes.
+          exit_code: 0
+          stdout:
+            equals: |
+              spec/side_effect_spec.sh:@1-1
+              spec/side_effect_spec.sh:@1-2
+      - run:
+          command: shellspec --list examples:lineno
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              spec/side_effect_spec.sh:2
+              spec/side_effect_spec.sh:7
+      - assert:
+          # Nothing ran: neither example's file exists.
+          file:
+            path: ran.txt
+            exists: false
+      - assert:
+          file:
+            path: ran-too.txt
+            exists: false
+
+  - name: a dry run prints the report a run would print, and runs nothing
+    steps:
+      - fixture:
+          file: .shellspec
+          content: ""
+      - fixture:
+          file: spec/side_effect_spec.sh
+          content: |
+            Describe 'side effects'
+              It 'writes a file and would fail'
+                When call touch ran.txt
+                The status should equal 9
+              End
+            End
+      - run:
+          command: shellspec --dry-run --format tap
+      - assert:
+          # Worth knowing before trusting it: a dry run reports every example as
+          # ok, including one that fails when it really runs. It answers "what
+          # would be run", not "what would pass".
+          exit_code: 0
+          stdout:
+            equals: |
+              1..1
+              ok 1 - side effects writes a file and would fail
+          changes:
+            created: []
+            modified: []
+            deleted: []
+      - assert:
+          file:
+            path: ran.txt
+            exists: false
+
+  - name: the name filter matches each name as a pattern, not as a substring
+    steps:
+      - fixture:
+          file: .shellspec
+          content: ""
+      - fixture:
+          file: spec/names_spec.sh
+          content: |
+            Describe 'arithmetic'
+              It 'adds numbers'
+                When call expr 2 + 2
+                The output should equal 4
+              End
+
+              It 'subtracts numbers'
+                When call expr 4 - 2
+                The output should equal 2
+              End
+            End
+      - run:
+          command: shellspec --example 'adds numbers' --format tap
+      - assert:
+          # The name of one group or example, in full, selects it.
+          exit_code: 0
+          stdout:
+            equals: |
+              1..1
+              ok 1 - arithmetic adds numbers
+      - run:
+          command: shellspec --example adds --format tap
+      - assert:
+          # The surprise, and the reason this scenario exists: the help says
+          # "names include PATTERN", but a bare substring selects nothing. The
+          # pattern is matched against each name whole.
+          exit_code: 0
+          stdout:
+            equals: |
+              1..0
+      - run:
+          command: shellspec --example '*adds*' --format tap
+      - assert:
+          # With glob wildcards the substring intent works.
+          exit_code: 0
+          stdout:
+            equals: |
+              1..1
+              ok 1 - arithmetic adds numbers
+      - run:
+          command: shellspec --example 'arithmetic adds numbers' --format tap
+      - assert:
+          # And the joined name a report prints is not a name the filter knows.
+          exit_code: 0
+          stdout:
+            equals: |
+              1..0
+
+  - name: tags select by name and by value
+    steps:
+      - fixture:
+          file: .shellspec
+          content: ""
+      - fixture:
+          file: spec/tagged_spec.sh
+          content: |
+            Describe 'tagged'
+              It 'fast one' speed:fast
+                When call true
+                The status should be success
+              End
+
+              It 'slow one' speed:slow
+                When call true
+                The status should be success
+              End
+            End
+      - run:
+          command: shellspec --tag speed --format tap
+      - assert:
+          # The tag name alone takes every example carrying it, whatever value.
+          exit_code: 0
+          stdout:
+            equals: |
+              1..2
+              ok 1 - tagged fast one
+              ok 2 - tagged slow one
+      - run:
+          command: shellspec --tag speed:fast --format tap
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              1..1
+              ok 1 - tagged fast one
+      - run:
+          command: shellspec --tag never-used --format tap
+      - assert:
+          # Selecting nothing is an empty plan at exit 0, so a mistyped tag goes
+          # green with no examples — the plan line is the only warning.
+          exit_code: 0
+          stdout:
+            equals: |
+              1..0
+
+  - name: a focused example narrows the run only when focus is asked for
+    steps:
+      - fixture:
+          file: .shellspec
+          content: ""
+      - fixture:
+          file: spec/focused_spec.sh
+          content: |
+            Describe 'focus'
+              fIt 'the one being worked on'
+                When call true
+                The status should be success
+              End
+
+              It 'the other one'
+                When call true
+                The status should be success
+              End
+            End
+      - run:
+          command: shellspec --focus --format tap
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              1..1
+              ok 1 - focus the one being worked on
+      - run:
+          command: shellspec --format tap
+      - assert:
+          # A forgotten fIt does not silently shrink the suite: everything runs,
+          # and the run says the marker is there and being ignored.
+          exit_code: 0
+          stdout:
+            contains:
+              - "1..2"
+              - "ok 1 - focus the one being worked on"
+              - "ok 2 - focus the other one"
+              - "You need to specify --focus option to run focused (underlined) example(s) only."
+
+  - name: a specfile can be addressed by line number or by example id
+    steps:
+      - fixture:
+          file: .shellspec
+          content: ""
+      - fixture:
+          file: spec/ranges_spec.sh
+          content: |
+            Describe 'ranges'
+              It 'first'
+                When call true
+                The status should be success
+              End
+
+              It 'second'
+                When call true
+                The status should be success
+              End
+            End
+      - run:
+          command: shellspec --format tap spec/ranges_spec.sh:7
+      - assert:
+          # The line number of the example — what an editor knows about the file.
+          exit_code: 0
+          stdout:
+            equals: |
+              1..1
+              ok 1 - ranges second
+      - run:
+          command: shellspec --format tap spec/ranges_spec.sh:@1-1
+      - assert:
+          # The id — what `--list examples` prints, stable against edits above it.
+          exit_code: 0
+          stdout:
+            equals: |
+              1..1
+              ok 1 - ranges first
+      - run:
+          command: shellspec --format tap spec/ranges_spec.sh:1
+      - assert:
+          # The group's own line takes everything inside it.
+          exit_code: 0
+          stdout:
+            equals: |
+              1..2
+              ok 1 - ranges first
+              ok 2 - ranges second
+
+  - name: which files count as specfiles is a pattern
+    steps:
+      - fixture:
+          file: .shellspec
+          content: ""
+      - fixture:
+          file: spec/normal_spec.sh
+          content: |
+            Describe 'normal'
+              It 'is collected by default'
+                When call true
+                The status should be success
+              End
+            End
+      - fixture:
+          file: spec/unusual_test.sh
+          content: |
+            Describe 'unusual'
+              It 'is collected only under a matching pattern'
+                When call true
+                The status should be success
+              End
+            End
+      - run:
+          command: shellspec --format tap
+      - assert:
+          # The default pattern is *_spec.sh, so the other file is not a test
+          # file — it is just a file in the directory.
+          exit_code: 0
+          stdout:
+            equals: |
+              1..1
+              ok 1 - normal is collected by default
+      - run:
+          command: shellspec --pattern '*_test.sh' --format tap
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              1..1
+              ok 1 - unusual is collected only under a matching pattern
+
+  - name: quick mode remembers what did not pass and forgets it once it does
+    steps:
+      - fixture:
+          file: .shellspec
+          content: ""
+      - fixture:
+          file: spec/quick_spec.sh
+          content: |
+            Describe 'quick'
+              It 'always passes'
+                When call true
+                The status should be success
+              End
+
+              It 'fails at first'
+                When call expr 2 + 2
+                The output should equal 5
+              End
+            End
+      - run:
+          command: shellspec --quick --format tap
+      - assert:
+          # The first quick run is a full run that writes the ledger.
+          exit_code: 101
+          stdout:
+            contains:
+              - "1..2"
+              - "not ok 2 - quick fails at first # FAILED"
+          changes:
+            created: [.shellspec-quick.log]
+            modified: []
+            deleted: []
+      - assert:
+          # The ledger names the example by id and by what happened to it.
+          file:
+            path: .shellspec-quick.log
+            equals: |
+              spec/quick_spec.sh:@1-2:failed
+      - run:
+          command: shellspec --quick --format tap
+      - assert:
+          # The replay is the ledger's content: one example, renumbered.
+          exit_code: 101
+          stdout:
+            equals: |
+              1..1
+              not ok 1 - quick fails at first # FAILED
+              # (in specfile spec/quick_spec.sh, line 9)
+              # When call expr 2 + 2
+              # The output should equal 5
+              # 
+              #   expected: 5
+              #        got: 4
+              # 
+      - fixture:
+          file: spec/quick_spec.sh
+          content: |
+            Describe 'quick'
+              It 'always passes'
+                When call true
+                The status should be success
+              End
+
+              It 'fails at first'
+                When call expr 2 + 2
+                The output should equal 4
+              End
+            End
+      - run:
+          command: shellspec --quick --format tap
+      - assert:
+          # Fixed, the replay passes and the run says the ledger is clear —
+          # "rerun to prevent regression" being the advice that the next run is
+          # the wide one again.
+          exit_code: 0
+          stdout:
+            contains:
+              - "1..1"
+              - "ok 1 - quick fails at first"
+              - "All examples have been passed. Rerun to prevent regression."
+      - assert:
+          file:
+            path: .shellspec-quick.log
+            equals: ""
+      - run:
+          command: shellspec --quick --format tap
+      - assert:
+          # And it is: with nothing outstanding, quick mode runs everything.
+          exit_code: 0
+          stdout:
+            equals: |
+              1..2
+              ok 1 - quick always passes
+              ok 2 - quick fails at first
