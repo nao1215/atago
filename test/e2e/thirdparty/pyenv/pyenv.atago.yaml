@@ -1,0 +1,245 @@
+version: "1"
+
+suite:
+  name: pyenv (more than one version at a time)
+  description: |
+    [pyenv](https://github.com/pyenv/pyenv) selects the Python a command runs
+    under. It keeps its own test suite in Bats, and it shares its ancestry with
+    rbenv — so this suite deliberately does not repeat what the
+    [rbenv suite](rbenv.md) already pins. What is here is what pyenv does
+    differently: a version file that names several versions at once, aliases
+    that sit beside real versions, and `whence`, which answers the question
+    those two raise — which of the selected versions actually provides this
+    command.
+
+    No Python is installed and none is needed: a version is a directory under
+    the root, so each scenario writes a couple of two-line executables and
+    exercises the real resolution rules against them.
+
+defaults:
+  scenario:
+    only:
+      command: pyenv --version
+    skip:
+      os: windows
+  run:
+    sandbox_home: true
+    env:
+      PYENV_ROOT: ${workdir}/root
+
+scenarios:
+  - name: a version file can name several versions, and order decides
+    steps:
+      - fixture:
+          file: root/versions/3.11.9/bin/python
+          mode: "0755"
+          content: |
+            #!/bin/sh
+            echo "Python 3.11.9"
+      - fixture:
+          file: root/versions/3.12.4/bin/python
+          mode: "0755"
+          content: |
+            #!/bin/sh
+            echo "Python 3.12.4"
+      - run:
+          command: pyenv local 3.12.4 3.11.9
+      - assert:
+          # One file, one version per line — the format is what makes several
+          # versions expressible at all.
+          exit_code: 0
+          changes:
+            created: [.python-version]
+            modified: []
+            deleted: []
+      - assert:
+          file:
+            path: .python-version
+            equals: |
+              3.12.4
+              3.11.9
+      - run:
+          command: pyenv version
+      - assert:
+          # Both are current, and both are reported with the file that chose
+          # them: this is a set, not a single value.
+          exit_code: 0
+          stdout:
+            matches: "(?m)^3\\.12\\.4 \\(set by .*/\\.python-version\\)$"
+      - assert:
+          stdout:
+            matches: "(?m)^3\\.11\\.9 \\(set by .*/\\.python-version\\)$"
+      - run:
+          command: pyenv which python
+      - assert:
+          # Both provide python, and the first one named wins.
+          exit_code: 0
+          stdout:
+            matches: "/root/versions/3\\.12\\.4/bin/python\\n$"
+
+  - name: whence answers which of them has the command
+    steps:
+      - fixture:
+          file: root/versions/3.11.9/bin/python
+          mode: "0755"
+          content: |
+            #!/bin/sh
+            echo "Python 3.11.9"
+      - fixture:
+          file: root/versions/3.11.9/bin/tox
+          mode: "0755"
+          content: |
+            #!/bin/sh
+            echo "tox from 3.11.9"
+      - fixture:
+          file: root/versions/3.12.4/bin/python
+          mode: "0755"
+          content: |
+            #!/bin/sh
+            echo "Python 3.12.4"
+      - run:
+          command: pyenv whence python
+      - assert:
+          # whence looks across every installed version rather than the selected
+          # ones, which is how you find out where a command lives before
+          # choosing anything.
+          exit_code: 0
+          stdout:
+            equals: |
+              3.11.9
+              3.12.4
+      - run:
+          command: pyenv whence tox
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              3.11.9
+      - run:
+          command: pyenv whence pip
+      - assert:
+          # Nothing provides it: exit 1, and nothing printed to be mistaken for
+          # a version.
+          exit_code: 1
+          stdout:
+            empty: true
+
+  - name: the shim reaches into whichever selected version has the command
+    steps:
+      - fixture:
+          file: root/versions/3.11.9/bin/python
+          mode: "0755"
+          content: |
+            #!/bin/sh
+            echo "Python 3.11.9"
+      - fixture:
+          file: root/versions/3.11.9/bin/tox
+          mode: "0755"
+          content: |
+            #!/bin/sh
+            echo "tox from 3.11.9"
+      - fixture:
+          file: root/versions/3.12.4/bin/python
+          mode: "0755"
+          content: |
+            #!/bin/sh
+            echo "Python 3.12.4"
+      - run:
+          shell: true
+          command: pyenv local 3.12.4 3.11.9 && pyenv rehash
+      - assert:
+          exit_code: 0
+      - assert:
+          # One shim per command name across all versions, as usual.
+          dir:
+            path: root/shims
+            count: 2
+            contains:
+              - python
+              - tox
+      - run:
+          shell: true
+          command: PATH="${workdir}/root/shims:$PATH" python
+      - assert:
+          # python is in both, so the order in the file decides.
+          exit_code: 0
+          stdout:
+            equals: |
+              Python 3.12.4
+      - run:
+          shell: true
+          command: PATH="${workdir}/root/shims:$PATH" tox
+      - assert:
+          # tox is in neither the first version nor on the system, and it runs
+          # anyway: the second selected version provides it. This is the whole
+          # point of naming several — a toolchain assembled out of more than one
+          # installation.
+          exit_code: 0
+          stdout:
+            equals: |
+              tox from 3.11.9
+
+  - name: an alias is a version to list and not a version to skip
+    steps:
+      - fixture:
+          file: root/versions/3.11.9/bin/python
+          mode: "0755"
+          content: |
+            #!/bin/sh
+            echo "Python 3.11.9"
+      - fixture:
+          file: root/versions/stable
+          symlink: 3.11.9
+      - run:
+          command: pyenv versions --bare
+      - assert:
+          # The symlink is a version like any other, which is what makes
+          # `pyenv local stable` work.
+          exit_code: 0
+          stdout:
+            equals: |
+              3.11.9
+              stable
+      - run:
+          command: pyenv versions --bare --skip-aliases
+      - assert:
+          # And the flag that tells them apart, for anything counting real
+          # installations.
+          exit_code: 0
+          stdout:
+            equals: |
+              3.11.9
+      - run:
+          command: pyenv local stable
+      - assert:
+          exit_code: 0
+      - run:
+          command: pyenv which python
+      - assert:
+          # Selecting the alias resolves through it to the directory it points
+          # at, so the answer is a real path rather than the alias.
+          exit_code: 0
+          stdout:
+            matches: "/root/versions/stable/bin/python\\n$"
+
+  - name: a version file naming something that is not installed says which file
+    steps:
+      - fixture:
+          file: root/versions/3.11.9/bin/python
+          mode: "0755"
+          content: |
+            #!/bin/sh
+            echo "Python 3.11.9"
+      - fixture:
+          file: .python-version
+          content: |
+            3.11.9
+            9.9.9
+      - run:
+          command: pyenv version
+      - assert:
+          # With several versions named, one of them missing is still an error,
+          # and the message names the file rather than only the value.
+          exit_code: 1
+          stderr:
+            matches: "pyenv: version `9\\.9\\.9' is not installed \\(set by .*/\\.python-version\\)"

@@ -59,6 +59,7 @@ A browsable, repo-local index of atago's documentation, generated from repositor
 - [pandoc.md](../doc/e2e/pandoc.md)
 - [prometheus.md](../doc/e2e/prometheus.md)
 - [pushgateway.md](../doc/e2e/pushgateway.md)
+- [pyenv.md](../doc/e2e/pyenv.md)
 - [python.md](../doc/e2e/python.md)
 - [rbenv.md](../doc/e2e/rbenv.md)
 - [rclone.md](../doc/e2e/rclone.md)
