@@ -340,6 +340,18 @@ jobs:
               git -C "$HOME/.mommy" checkout -q FETCH_HEAD
               make -C "$HOME/.mommy" build
               ln -sf "$HOME/.mommy/build/bin/mommy" "$(go env GOPATH)/bin/mommy"
+          # asdf 0.14.1 (the last shell implementation, whose test suite is
+          # Bats), pinned by commit. Its launcher derives its own directory, so
+          # it is put on PATH rather than symlinked; the specs write their own
+          # plugin and never reach the network.
+          - name: asdf
+            dir: ./test/e2e/thirdparty/asdf
+            install: |
+              sha="f00f759f3d8d405468d0071310a91b8f5a9c3798"
+              git init -q "$HOME/.asdf-vm"
+              git -C "$HOME/.asdf-vm" fetch -q --depth 1 https://github.com/asdf-vm/asdf.git "$sha"
+              git -C "$HOME/.asdf-vm" checkout -q FETCH_HEAD
+              echo "$HOME/.asdf-vm/bin" >> "$GITHUB_PATH"
           # sops encrypts structured files with age as the key backend; both are
           # go-installed (age and age-keygen provide the throwaway keys).
           # GnuPG from the pinned Ubuntu snapshot: the suite generates its own

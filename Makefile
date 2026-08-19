@@ -117,6 +117,7 @@ docs: ## Regenerate the committed behavior docs under doc/e2e/ and the error ref
 	./dist/$(APP) doc --out doc/e2e/transcrypt.md  ./test/e2e/thirdparty/transcrypt
 	./dist/$(APP) doc --out doc/e2e/nb.md          ./test/e2e/thirdparty/nb
 	./dist/$(APP) doc --out doc/e2e/mommy.md       ./test/e2e/thirdparty/mommy
+	./dist/$(APP) doc --out doc/e2e/asdf.md        ./test/e2e/thirdparty/asdf
 	./dist/$(APP) doc --out doc/e2e/aqua.md        ./test/e2e/thirdparty/aqua
 	./dist/$(APP) doc --out doc/e2e/ecspresso.md   ./test/e2e/thirdparty/ecspresso
 	./dist/$(APP) doc --out doc/e2e/git.md         ./test/e2e/thirdparty/git
