@@ -217,6 +217,19 @@ jobs:
               echo "${sha256}  bats-core.tar.gz" | sha256sum -c -
               tar -xzf bats-core.tar.gz
               "./bats-core-${ver}/install.sh" "$(go env GOPATH)"
+          # ShellSpec is a BDD test framework for POSIX shells. Like bats it is
+          # a shell program, pinned by version and SHA256; its launcher resolves
+          # its own symlink, so the tree is unpacked once and linked onto the
+          # PATH this job already exports.
+          - name: shellspec
+            dir: ./test/e2e/thirdparty/shellspec
+            install: |
+              ver="0.28.1"
+              sha256="400d835466429a5fe6c77a62775a9173729d61dd43e05dfa893e8cf6cb511783"
+              curl -fsSL "https://github.com/shellspec/shellspec/archive/refs/tags/${ver}.tar.gz" -o shellspec.tar.gz
+              echo "${sha256}  shellspec.tar.gz" | sha256sum -c -
+              tar -xzf shellspec.tar.gz -C "$HOME"
+              ln -sf "$HOME/shellspec-${ver}/shellspec" "$(go env GOPATH)/bin/shellspec"
           # sops encrypts structured files with age as the key backend; both are
           # go-installed (age and age-keygen provide the throwaway keys).
           # GnuPG from the pinned Ubuntu snapshot: the suite generates its own
