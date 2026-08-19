@@ -68,16 +68,15 @@ scenarios:
           stdout:
             matches: "/root\\n$"
       - run:
-          command: rbenv versions
+          command: rbenv versions --bare
       - assert:
-          # Nothing installed is reported as a warning at exit 1, so a script
-          # that lists versions can tell "none" from "one".
-          exit_code: 1
+          # --bare lists the versions rbenv manages and nothing else: no marker,
+          # and no `system` entry for whatever Ruby the machine happens to carry.
+          # That is the contract worth asserting, because it is the same answer
+          # on a machine with a Ruby and on one without.
+          exit_code: 0
           stdout:
             empty: true
-          stderr:
-            equals: |
-              Warning: no Ruby detected on the system
       - run:
           command: rbenv version
       - assert:
@@ -103,13 +102,14 @@ scenarios:
             #!/bin/sh
             echo "ruby 3.3.1"
       - run:
-          command: rbenv versions
+          command: rbenv versions --bare
       - assert:
-          # A version is a directory: rbenv found both without being told, and
-          # neither is marked because nothing has selected one yet.
+          # A version is a directory: rbenv found both without being told.
           exit_code: 0
           stdout:
-            equals: "  3.2.0\n  3.3.1\n"
+            equals: |
+              3.2.0
+              3.3.1
       - run:
           command: rbenv global 3.3.1
       - assert:
@@ -117,10 +117,15 @@ scenarios:
       - run:
           command: rbenv versions
       - assert:
-          # Now the list carries the selection and where it came from.
+          # The full listing carries the selection and where it came from. It is
+          # matched a line at a time rather than whole, because a machine with
+          # its own Ruby also gets a `system` line here.
           exit_code: 0
           stdout:
-            matches: "^  3\\.2\\.0\\n\\* 3\\.3\\.1 \\(set by .*/root/version\\)\\n$"
+            matches: "(?m)^\\* 3\\.3\\.1 \\(set by .*/root/version\\)$"
+      - assert:
+          stdout:
+            matches: "(?m)^  3\\.2\\.0$"
 
   - name: global writes one file in the root and nothing else
     steps:

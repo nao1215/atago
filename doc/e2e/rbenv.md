@@ -82,26 +82,21 @@ _only when `rbenv --version` succeeds · skipped on Windows_
 #### When
 ```shell
 rbenv root
-rbenv versions
+rbenv versions --bare
 rbenv version
 ```
 #### Then
 - after `rbenv root`:
   - exit code is `0`
   - stdout matches `//root\n$/`
-- after `rbenv versions`:
-  - exit code is `1`
+- after `rbenv versions --bare`:
+  - exit code is `0`
   - stdout is empty
-  - stderr equals an exact value
 - after `rbenv version`:
   - exit code is `0`
   - stdout equals an exact value
 
 #### Expected output
-_expected stderr:_
-```text
-Warning: no Ruby detected on the system
-```
 _expected stdout:_
 ```text
 system
@@ -131,25 +126,26 @@ echo "ruby 3.3.1"
 ```
 #### When
 ```shell
-rbenv versions
+rbenv versions --bare
 rbenv global 3.3.1
 rbenv versions
 ```
 #### Then
-- after `rbenv versions`:
+- after `rbenv versions --bare`:
   - exit code is `0`
   - stdout equals an exact value
 - after `rbenv global 3.3.1`:
   - exit code is `0`
 - after `rbenv versions`:
   - exit code is `0`
-  - stdout matches `/^  3\.2\.0\n\* 3\.3\.1 \(set by .*/root/version\)\n$/`
+  - stdout matches `/(?m)^\* 3\.3\.1 \(set by .*/root/version\)$/`
+  - stdout matches `/(?m)^  3\.2\.0$/`
 
 #### Expected output
 _expected stdout:_
 ```text
-  3.2.0
-  3.3.1
+3.2.0
+3.3.1
 ```
 ### Scenario: global writes one file in the root and nothing else
 _only when `rbenv --version` succeeds · skipped on Windows_
