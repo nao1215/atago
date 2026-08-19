@@ -355,6 +355,17 @@ jobs:
               git -C "$HOME/.asdf-vm" fetch -q --depth 1 https://github.com/asdf-vm/asdf.git "$sha"
               git -C "$HOME/.asdf-vm" checkout -q FETCH_HEAD
               echo "$HOME/.asdf-vm/bin" >> "$GITHUB_PATH"
+          # pyenv, pinned by commit. The suite covers only what pyenv does that
+          # rbenv does not (several versions in one file, aliases, whence), and
+          # builds its versions as directories, so no Python is installed for it.
+          - name: pyenv
+            dir: ./test/e2e/thirdparty/pyenv
+            install: |
+              sha="a71a378dacd210f5673550ff923715bf4d04324f"
+              git init -q "$HOME/.pyenv-src"
+              git -C "$HOME/.pyenv-src" fetch -q --depth 1 https://github.com/pyenv/pyenv.git "$sha"
+              git -C "$HOME/.pyenv-src" checkout -q FETCH_HEAD
+              echo "$HOME/.pyenv-src/bin" >> "$GITHUB_PATH"
           # sops encrypts structured files with age as the key backend; both are
           # go-installed (age and age-keygen provide the throwaway keys).
           # GnuPG from the pinned Ubuntu snapshot: the suite generates its own
