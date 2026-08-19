@@ -256,6 +256,20 @@ jobs:
               git -C "$HOME/.git-secrets" fetch -q --depth 1 https://github.com/awslabs/git-secrets.git "$sha"
               git -C "$HOME/.git-secrets" checkout -q FETCH_HEAD
               ln -sf "$HOME/.git-secrets/git-secrets" "$(go env GOPATH)/bin/git-secrets"
+          # getoptions generates POSIX-shell option parsers. Pinned by commit
+          # (v3.3.2) and built from source with its own Makefile, which is a
+          # shell script concatenation; both generated commands go onto the PATH
+          # this job already exports.
+          - name: getoptions
+            dir: ./test/e2e/thirdparty/getoptions
+            install: |
+              sha="139d121807db67f632b412b2a00ece851df73203"
+              git init -q "$HOME/.getoptions"
+              git -C "$HOME/.getoptions" fetch -q --depth 1 https://github.com/ko1nksm/getoptions.git "$sha"
+              git -C "$HOME/.getoptions" checkout -q FETCH_HEAD
+              make -C "$HOME/.getoptions" build
+              ln -sf "$HOME/.getoptions/bin/gengetoptions" "$(go env GOPATH)/bin/gengetoptions"
+              ln -sf "$HOME/.getoptions/bin/getoptions" "$(go env GOPATH)/bin/getoptions"
           # sops encrypts structured files with age as the key backend; both are
           # go-installed (age and age-keygen provide the throwaway keys).
           # GnuPG from the pinned Ubuntu snapshot: the suite generates its own
