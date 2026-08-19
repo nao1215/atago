@@ -38,12 +38,28 @@ scenarios:
       - run:
           command: mommy --help
       - assert:
+          # The help is a man page, found the way man finds any page: beside the
+          # bin directory mommy was run from. This is why mommy is put on PATH
+          # from its own tree rather than symlinked somewhere else.
           exit_code: 0
           stdout:
             contains:
               - "mommy - here to support you~"
               - "-s status, --status=status"
               - "-1     writes output to stdout instead of stderr~"
+      - run:
+          command: mommy --help
+          env:
+            MANPATH: /nonexistent
+      - assert:
+          # And when the page cannot be found, mommy says so and points at the
+          # README for the same version rather than printing nothing.
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            contains: "mommy couldn't find the help page."
+            matches: "https://github\\.com/fwdekker/mommy/blob/[0-9]+\\.[0-9]+\\.[0-9]+/README\\.md"
 
   - name: the wrapped command's status comes back untouched
     steps:
@@ -146,7 +162,7 @@ scenarios:
             equals: |
               that went well~
 
-  - name: pipefail is a choice, and it changes the verdict
+  - name: a pipeline is judged by its last command
     steps:
       - fixture:
           file: mommy.conf
@@ -162,14 +178,47 @@ scenarios:
           stderr:
             equals: |
               that went well~
+
+  - name: pipefail makes the head of the pipeline count, where the shell has it
+    only:
+      # mommy's own help says -p works only if /bin/sh supports pipefail. That
+      # is the condition, so it is the gate.
+      command: sh -c "set -o pipefail"
+    steps:
+      - fixture:
+          file: mommy.conf
+          content: |
+            MOMMY_COMPLIMENTS="that went well"
+            MOMMY_ENCOURAGEMENTS="that did not go well"
       - run:
           command: mommy -c ./mommy.conf -p -e "false | true"
       - assert:
-          # With -p the failure at the head of the pipeline is the verdict.
           exit_code: 1
           stderr:
             equals: |
               that did not go well~
+
+  - name: asking for pipefail where the shell has none is the shell's error
+    skip:
+      command: sh -c "set -o pipefail"
+    steps:
+      - fixture:
+          file: mommy.conf
+          content: |
+            MOMMY_COMPLIMENTS="that went well"
+            MOMMY_ENCOURAGEMENTS="that did not go well"
+      - run:
+          command: mommy -c ./mommy.conf -p -e "false | true"
+      - assert:
+          # The other half of the same documented caveat, on a /bin/sh without
+          # pipefail: the option is refused by the shell, that refusal is what
+          # the exit code reports, and the message about the command is printed
+          # anyway.
+          exit_code: 2
+          stderr:
+            contains:
+              - "set: Illegal option -o pipefail"
+              - "that did not go well~"
 
   - name: the message is a template the config fills in
     steps:
