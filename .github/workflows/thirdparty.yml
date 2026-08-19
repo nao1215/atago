@@ -306,6 +306,17 @@ jobs:
               git -C "$HOME/.git-extras" fetch -q --depth 1 https://github.com/tj/git-extras.git "$sha"
               git -C "$HOME/.git-extras" checkout -q FETCH_HEAD
               make -C "$HOME/.git-extras" install PREFIX="$(go env GOPATH)"
+          # transcrypt encrypts chosen files inside a git repository, using the
+          # openssl already present on the runner. Pinned by commit; it is a
+          # single script, linked onto the PATH this job already exports.
+          - name: transcrypt
+            dir: ./test/e2e/thirdparty/transcrypt
+            install: |
+              sha="1b59c8e505c0f0eb396dce4d36274a12a446e2d6"
+              git init -q "$HOME/.transcrypt"
+              git -C "$HOME/.transcrypt" fetch -q --depth 1 https://github.com/elasticdog/transcrypt.git "$sha"
+              git -C "$HOME/.transcrypt" checkout -q FETCH_HEAD
+              ln -sf "$HOME/.transcrypt/transcrypt" "$(go env GOPATH)/bin/transcrypt"
           # sops encrypts structured files with age as the key backend; both are
           # go-installed (age and age-keygen provide the throwaway keys).
           # GnuPG from the pinned Ubuntu snapshot: the suite generates its own

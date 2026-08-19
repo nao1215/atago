@@ -68,6 +68,7 @@ A browsable, repo-local index of atago's documentation, generated from repositor
 - [sqly.md](../doc/e2e/sqly.md)
 - [ssh-keygen.md](../doc/e2e/ssh-keygen.md)
 - [terraform.md](../doc/e2e/terraform.md)
+- [transcrypt.md](../doc/e2e/transcrypt.md)
 - [transfersh.md](../doc/e2e/transfersh.md)
 - [truss.md](../doc/e2e/truss.md)
 - [unzip.md](../doc/e2e/unzip.md)
