@@ -230,6 +230,15 @@ jobs:
               echo "${sha256}  shellspec.tar.gz" | sha256sum -c -
               tar -xzf shellspec.tar.gz -C "$HOME"
               ln -sf "$HOME/shellspec-${ver}/shellspec" "$(go env GOPATH)/bin/shellspec"
+          # rbenv selects the Ruby version a command runs under. No Ruby is
+          # installed for it: the specs build versions as directories under a
+          # root they own, which is all rbenv's resolution rules need. Cloned at
+          # a tag and linked onto the PATH this job already exports.
+          - name: rbenv
+            dir: ./test/e2e/thirdparty/rbenv
+            install: |
+              git clone --quiet --depth 1 --branch v1.3.2 https://github.com/rbenv/rbenv.git "$HOME/.rbenv"
+              ln -sf "$HOME/.rbenv/bin/rbenv" "$(go env GOPATH)/bin/rbenv"
           # sops encrypts structured files with age as the key backend; both are
           # go-installed (age and age-keygen provide the throwaway keys).
           # GnuPG from the pinned Ubuntu snapshot: the suite generates its own
