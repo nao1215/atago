@@ -50,6 +50,7 @@ A browsable, repo-local index of atago's documentation, generated from repositor
 - [minio.md](../doc/e2e/minio.md)
 - [mobilepkg.md](../doc/e2e/mobilepkg.md)
 - [nats.md](../doc/e2e/nats.md)
+- [nb.md](../doc/e2e/nb.md)
 - [ntfy.md](../doc/e2e/ntfy.md)
 - [openfga.md](../doc/e2e/openfga.md)
 - [openssl.md](../doc/e2e/openssl.md)

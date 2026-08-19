@@ -317,6 +317,17 @@ jobs:
               git -C "$HOME/.transcrypt" fetch -q --depth 1 https://github.com/elasticdog/transcrypt.git "$sha"
               git -C "$HOME/.transcrypt" checkout -q FETCH_HEAD
               ln -sf "$HOME/.transcrypt/transcrypt" "$(go env GOPATH)/bin/transcrypt"
+          # nb keeps notes as git repositories. Pinned by commit; it is a single
+          # bash script, linked onto the PATH this job already exports. Every
+          # notebook the specs create lives under a sandboxed home.
+          - name: nb
+            dir: ./test/e2e/thirdparty/nb
+            install: |
+              sha="a1e007dc191b7d821b14773978e720b67b6034d2"
+              git init -q "$HOME/.nb-src"
+              git -C "$HOME/.nb-src" fetch -q --depth 1 https://github.com/xwmx/nb.git "$sha"
+              git -C "$HOME/.nb-src" checkout -q FETCH_HEAD
+              ln -sf "$HOME/.nb-src/nb" "$(go env GOPATH)/bin/nb"
           # sops encrypts structured files with age as the key backend; both are
           # go-installed (age and age-keygen provide the throwaway keys).
           # GnuPG from the pinned Ubuntu snapshot: the suite generates its own
