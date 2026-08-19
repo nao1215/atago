@@ -1,0 +1,269 @@
+version: "1"
+
+suite:
+  name: mommy (a wrapper that must stay out of the way)
+  description: |
+    [mommy](https://github.com/FWDekker/mommy) runs your command and says
+    something encouraging about how it went. It keeps its own test suite in
+    ShellSpec; what those tests check is pinned here from outside.
+
+    A wrapper has two obligations before anything else: pass the exit status
+    through untouched, and stay off the wrapped command's stdout. Both are
+    asserted here for success, for failure, and for an arbitrary code, together
+    with the flag that deliberately moves the message onto stdout. The messages
+    themselves are made deterministic by a config file the scenario writes, so
+    the assertions are about which list was chosen rather than about which
+    sentence was drawn from it.
+
+defaults:
+  scenario:
+    only:
+      command: command -v mommy
+    skip:
+      os: windows
+  run:
+    sandbox_home: true
+    env:
+      LC_ALL: C
+
+scenarios:
+  - name: the version and the manual are answered without running anything
+    steps:
+      - run:
+          command: mommy --version
+      - assert:
+          exit_code: 0
+          stdout:
+            matches: "^mommy, v[0-9]+\\.[0-9]+\\.[0-9]+"
+      - run:
+          command: mommy --help
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "mommy - here to support you~"
+              - "-s status, --status=status"
+              - "-1     writes output to stdout instead of stderr~"
+
+  - name: the wrapped command's status comes back untouched
+    steps:
+      - fixture:
+          file: mommy.conf
+          content: |
+            MOMMY_COMPLIMENTS="that went well"
+            MOMMY_ENCOURAGEMENTS="that did not go well"
+      - run:
+          command: mommy -c ./mommy.conf true
+      - assert:
+          # Success: the compliment list, and the status of the command.
+          exit_code: 0
+          stdout:
+            empty: true
+          stderr:
+            equals: |
+              that went well~
+      - run:
+          command: mommy -c ./mommy.conf false
+      - assert:
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            equals: |
+              that did not go well~
+      - run:
+          command: mommy -c ./mommy.conf sh -c "exit 42"
+      - assert:
+          # Not clamped to 1, not replaced by mommy's own: a wrapper that loses
+          # the code is a wrapper you cannot put in a script.
+          exit_code: 42
+          stdout:
+            empty: true
+          stderr:
+            equals: |
+              that did not go well~
+
+  - name: the message stays off stdout unless it is asked for
+    steps:
+      - fixture:
+          file: mommy.conf
+          content: |
+            MOMMY_COMPLIMENTS="well done"
+      - run:
+          command: mommy -c ./mommy.conf -e "echo the-real-output | wc -l"
+      - assert:
+          # The wrapped pipeline's output is the only thing on stdout. This is
+          # what makes `mommy make build` safe inside another pipeline.
+          exit_code: 0
+          stdout:
+            equals: |
+              1
+          stderr:
+            equals: |
+              well done~
+      - run:
+          command: mommy -c ./mommy.conf -1 true
+      - assert:
+          # And when stdout is where you want it, -1 puts it there and leaves
+          # stderr empty.
+          exit_code: 0
+          stdout:
+            equals: |
+              well done~
+          stderr:
+            empty: true
+
+  - name: a status can be judged without running anything at all
+    steps:
+      - fixture:
+          file: mommy.conf
+          content: |
+            MOMMY_COMPLIMENTS="that went well"
+            MOMMY_ENCOURAGEMENTS="that did not go well"
+      - run:
+          command: mommy -c ./mommy.conf -s 3 sh -c "touch never-created"
+      - assert:
+          # -s answers about a code you already have — the `mommy -s $?` form —
+          # so the rest of the command line is not executed, and the code comes
+          # back as given.
+          exit_code: 3
+          stderr:
+            equals: |
+              that did not go well~
+          changes:
+            created: []
+            modified: []
+            deleted: []
+      - assert:
+          file:
+            path: never-created
+            exists: false
+      - run:
+          command: mommy -c ./mommy.conf -s 0
+      - assert:
+          exit_code: 0
+          stderr:
+            equals: |
+              that went well~
+
+  - name: pipefail is a choice, and it changes the verdict
+    steps:
+      - fixture:
+          file: mommy.conf
+          content: |
+            MOMMY_COMPLIMENTS="that went well"
+            MOMMY_ENCOURAGEMENTS="that did not go well"
+      - run:
+          command: mommy -c ./mommy.conf -e "false | true"
+      - assert:
+          # The shell's own rule: a pipeline is as good as its last command, so
+          # this is a success.
+          exit_code: 0
+          stderr:
+            equals: |
+              that went well~
+      - run:
+          command: mommy -c ./mommy.conf -p -e "false | true"
+      - assert:
+          # With -p the failure at the head of the pipeline is the verdict.
+          exit_code: 1
+          stderr:
+            equals: |
+              that did not go well~
+
+  - name: the message is a template the config fills in
+    steps:
+      - fixture:
+          file: mommy.conf
+          content: |
+            MOMMY_CAREGIVER="daddy"
+            MOMMY_SWEETIE="champ"
+            MOMMY_SUFFIX="!"
+            MOMMY_COMPLIMENTS="%%CAREGIVER%% is proud of %%SWEETIE%%"
+      - run:
+          command: mommy -c ./mommy.conf true
+      - assert:
+          # The placeholders are filled from the same config, and the suffix is
+          # appended rather than being part of the sentence — which is why every
+          # other scenario here sees a trailing ~ it never wrote.
+          exit_code: 0
+          stderr:
+            equals: |
+              daddy is proud of champ!
+
+  - name: the environment is not the configuration
+    steps:
+      - fixture:
+          file: mommy.conf
+          content: |
+            MOMMY_COMPLIMENTS="from the config file"
+      - run:
+          command: mommy -c ./mommy.conf true
+      - assert:
+          exit_code: 0
+          stderr:
+            equals: |
+              from the config file~
+      - run:
+          command: mommy -c ./mommy.conf true
+          env:
+            MOMMY_COMPLIMENTS: from the environment
+      - assert:
+          # Pinned as observed: exporting the same name has no effect, because
+          # the config file is sourced after the environment is read. The
+          # variables are configuration file syntax that happens to look like
+          # environment variables.
+          exit_code: 0
+          stderr:
+            equals: |
+              from the config file~
+
+  - name: the toggle is a file in the user's state directory
+    steps:
+      - fixture:
+          file: mommy.conf
+          content: |
+            MOMMY_COMPLIMENTS="that went well"
+            MOMMY_ENCOURAGEMENTS="that did not go well"
+      - run:
+          command: mommy -t
+      - assert:
+          # The toggle is deliberately not per-shell: it says so, and it writes
+          # the fact into the state directory under the home it was given. The
+          # notice arrives on stdout, unlike every message in the scenarios
+          # above, which are on stderr.
+          exit_code: 0
+          stdout:
+            contains: "mommy has been disabled for this user."
+          stderr:
+            empty: true
+          changes:
+            created: [.atago-home/.local/state/mommy/toggle]
+            modified: []
+            deleted: []
+      - run:
+          command: mommy -c ./mommy.conf false
+      - assert:
+          # Pinned as observed, and the reason this scenario is worth reading:
+          # while mommy is toggled off she is silent — and the wrapped command's
+          # failure is silent with her. `false` exits 1, and this exits 0. A CI
+          # step wrapped in mommy reports success for a build that failed, and
+          # the only clue is the missing message.
+          exit_code: 0
+          stdout:
+            empty: true
+          stderr:
+            empty: true
+      - run:
+          command: mommy -t
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "mommy has been enabled for this user."
+      - run:
+          command: mommy -c ./mommy.conf true
+      - assert:
+          exit_code: 0
+          stderr:
+            equals: |
+              that went well~
