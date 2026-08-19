@@ -23,6 +23,7 @@ A browsable, repo-local index of atago's documentation, generated from repositor
 - [ffmpeg.md](../doc/e2e/ffmpeg.md)
 - [fx.md](../doc/e2e/fx.md)
 - [fzf.md](../doc/e2e/fzf.md)
+- [getoptions.md](../doc/e2e/getoptions.md)
 - [ghostscript.md](../doc/e2e/ghostscript.md)
 - [git-secrets.md](../doc/e2e/git-secrets.md)
 - [git.md](../doc/e2e/git.md)
