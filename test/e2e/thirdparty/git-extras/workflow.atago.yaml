@@ -232,14 +232,21 @@ scenarios:
           command: git init -q && git config user.email author@example.com && git config user.name 'A Author' && echo one > a.txt && git add a.txt && git commit -q -m 'first release commit' && git tag v1.0.0 && echo two > b.txt && git add b.txt && git commit -q -m 'add the second thing' && echo three > c.txt && git add c.txt && git commit -q -m 'add the third thing'
       - assert:
           exit_code: 0
-      - run:
+      - pty:
+          # git-changelog asks the terminal how wide it is before it writes
+          # anything, so it is driven on one. Without a terminal it does not
+          # write the file it exists to write — on a machine with a controlling
+          # terminal it exits 0 and produces nothing, and on a CI runner without
+          # one it exits 1 — which is why this scenario does not run it through
+          # a pipe at all.
           command: git changelog
-      - assert:
-          exit_code: 0
-          changes:
-            created: [History.md]
-            modified: []
-            deleted: []
+          cols: 100
+          rows: 24
+          timeout: 60s
+          sandbox_home: true
+          env:
+            LC_ALL: C
+            TERM: xterm
       - assert:
           # Only the commits after the tag, newest first, under a heading whose
           # version is a placeholder until a release names it.
@@ -255,18 +262,19 @@ scenarios:
           file:
             path: History.md
             not_contains: "first release commit"
-      - run:
+      - pty:
           command: git changelog
+          cols: 100
+          rows: 24
+          timeout: 60s
+          sandbox_home: true
+          env:
+            LC_ALL: C
+            TERM: xterm
       - assert:
           # Pinned as observed: running it twice does not update the section, it
           # prepends a second copy of it. The file is a generated artifact that
           # only survives being generated once.
-          exit_code: 0
-          changes:
-            created: []
-            modified: [History.md]
-            deleted: []
-      - assert:
           file:
             path: History.md
             contains: "  * add the third thing"
