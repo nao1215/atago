@@ -270,6 +270,18 @@ jobs:
               make -C "$HOME/.getoptions" build
               ln -sf "$HOME/.getoptions/bin/gengetoptions" "$(go env GOPATH)/bin/gengetoptions"
               ln -sf "$HOME/.getoptions/bin/getoptions" "$(go env GOPATH)/bin/getoptions"
+          # shdotenv loads .env files without letting them run anything. Pinned
+          # by the commit v0.14.0 points at and built from source (its Makefile
+          # concatenates the shell script with its embedded awk).
+          - name: shdotenv
+            dir: ./test/e2e/thirdparty/shdotenv
+            install: |
+              sha="777e8edb65482b036e0275a895d4cb6be8511c7d"
+              git init -q "$HOME/.shdotenv"
+              git -C "$HOME/.shdotenv" fetch -q --depth 1 https://github.com/ko1nksm/shdotenv.git "$sha"
+              git -C "$HOME/.shdotenv" checkout -q FETCH_HEAD
+              make -C "$HOME/.shdotenv" build
+              ln -sf "$HOME/.shdotenv/shdotenv" "$(go env GOPATH)/bin/shdotenv"
           # sops encrypts structured files with age as the key backend; both are
           # go-installed (age and age-keygen provide the throwaway keys).
           # GnuPG from the pinned Ubuntu snapshot: the suite generates its own

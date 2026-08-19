@@ -59,6 +59,7 @@ A browsable, repo-local index of atago's documentation, generated from repositor
 - [rclone.md](../doc/e2e/rclone.md)
 - [redis.md](../doc/e2e/redis.md)
 - [restic.md](../doc/e2e/restic.md)
+- [shdotenv.md](../doc/e2e/shdotenv.md)
 - [shellspec.md](../doc/e2e/shellspec.md)
 - [sops.md](../doc/e2e/sops.md)
 - [sqlite3.md](../doc/e2e/sqlite3.md)
