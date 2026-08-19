@@ -330,7 +330,7 @@ jobs:
               ln -sf "$HOME/.nb-src/nb" "$(go env GOPATH)/bin/nb"
           # mommy wraps a command and comments on how it went. Pinned by commit
           # and built with its own Makefile, which assembles the script into
-          # build/bin; that one file is linked onto the PATH this job exports.
+          # build/bin.
           - name: mommy
             dir: ./test/e2e/thirdparty/mommy
             install: |
@@ -339,7 +339,10 @@ jobs:
               git -C "$HOME/.mommy" fetch -q --depth 1 https://github.com/FWDekker/mommy.git "$sha"
               git -C "$HOME/.mommy" checkout -q FETCH_HEAD
               make -C "$HOME/.mommy" build
-              ln -sf "$HOME/.mommy/build/bin/mommy" "$(go env GOPATH)/bin/mommy"
+              # mommy finds its own man page the way man does — by looking
+              # beside the bin directory it was run from — so the built tree goes
+              # on PATH rather than being symlinked into GOPATH.
+              echo "$HOME/.mommy/build/bin" >> "$GITHUB_PATH"
           # asdf 0.14.1 (the last shell implementation, whose test suite is
           # Bats), pinned by commit. Its launcher derives its own directory, so
           # it is put on PATH rather than symlinked; the specs write their own

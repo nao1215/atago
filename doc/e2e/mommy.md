@@ -1,13 +1,15 @@
 # atago Behavior Specs
 ## Summary
-1 suite · 8 scenarios
+1 suite · 10 scenarios
 ## Contents
-- [mommy (a wrapper that must stay out of the way)](#mommy-a-wrapper-that-must-stay-out-of-the-way) — 8 scenarios
+- [mommy (a wrapper that must stay out of the way)](#mommy-a-wrapper-that-must-stay-out-of-the-way) — 10 scenarios
   - [the version and the manual are answered without running anything](#scenario-the-version-and-the-manual-are-answered-without-running-anything)
   - [the wrapped command's status comes back untouched](#scenario-the-wrapped-commands-status-comes-back-untouched)
   - [the message stays off stdout unless it is asked for](#scenario-the-message-stays-off-stdout-unless-it-is-asked-for)
   - [a status can be judged without running anything at all](#scenario-a-status-can-be-judged-without-running-anything-at-all)
-  - [pipefail is a choice, and it changes the verdict](#scenario-pipefail-is-a-choice-and-it-changes-the-verdict)
+  - [a pipeline is judged by its last command](#scenario-a-pipeline-is-judged-by-its-last-command)
+  - [pipefail makes the head of the pipeline count, where the shell has it](#scenario-pipefail-makes-the-head-of-the-pipeline-count-where-the-shell-has-it)
+  - [asking for pipefail where the shell has none is the shell's error](#scenario-asking-for-pipefail-where-the-shell-has-none-is-the-shells-error)
   - [the message is a template the config fills in](#scenario-the-message-is-a-template-the-config-fills-in)
   - [the environment is not the configuration](#scenario-the-environment-is-not-the-configuration)
   - [the toggle is a file in the user's state directory](#scenario-the-toggle-is-a-file-in-the-users-state-directory)
@@ -33,10 +35,13 @@ _only when `command -v mommy` succeeds · skipped on Windows_
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 - Environment variables are set: LC_ALL.
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+- Environment variables are set: LC_ALL, MANPATH.
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 
 #### When
 ```shell
 mommy --version
+mommy --help
 mommy --help
 ```
 #### Then
@@ -46,6 +51,10 @@ mommy --help
 - after `mommy --help`:
   - exit code is `0`
   - stdout contains `mommy - here to support you~`, `-s status, --status=status`, `-1     writes output to stdout instead of stderr~`
+- after `mommy --help`:
+  - exit code is `1`
+  - stdout is empty
+  - stderr contains `mommy couldn't find the help page.`, matches `/https://github\.com/fwdekker/mommy/blob/[0-9]+\.[0-9]+\.[0-9]+/README\.md/`
 
 ### Scenario: the wrapped command's status comes back untouched
 _only when `command -v mommy` succeeds · skipped on Windows_
@@ -178,12 +187,10 @@ _expected stderr:_
 ```text
 that went well~
 ```
-### Scenario: pipefail is a choice, and it changes the verdict
+### Scenario: a pipeline is judged by its last command
 _only when `command -v mommy` succeeds · skipped on Windows_
 #### Given
 - Fixture file `mommy.conf` is created.
-- Environment variables are set: LC_ALL.
-- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 - Environment variables are set: LC_ALL.
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 
@@ -196,25 +203,63 @@ MOMMY_ENCOURAGEMENTS="that did not go well"
 #### When
 ```shell
 mommy -c ./mommy.conf -e "false | true"
-mommy -c ./mommy.conf -p -e "false | true"
 ```
 #### Then
-- after `mommy -c ./mommy.conf -e "false | true"`:
-  - exit code is `0`
-  - stderr equals an exact value
-- after `mommy -c ./mommy.conf -p -e "false | true"`:
-  - exit code is `1`
-  - stderr equals an exact value
+- exit code is `0`
+- stderr equals an exact value
 
 #### Expected output
 _expected stderr:_
 ```text
 that went well~
 ```
+### Scenario: pipefail makes the head of the pipeline count, where the shell has it
+_only when `sh -c "set -o pipefail"` succeeds · skipped on Windows_
+#### Given
+- Fixture file `mommy.conf` is created.
+- Environment variables are set: LC_ALL.
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
+#### Inputs
+_Fixture `mommy.conf`:_
+```text
+MOMMY_COMPLIMENTS="that went well"
+MOMMY_ENCOURAGEMENTS="that did not go well"
+```
+#### When
+```shell
+mommy -c ./mommy.conf -p -e "false | true"
+```
+#### Then
+- exit code is `1`
+- stderr equals an exact value
+
+#### Expected output
 _expected stderr:_
 ```text
 that did not go well~
 ```
+### Scenario: asking for pipefail where the shell has none is the shell's error
+_only when `command -v mommy` succeeds · skipped when `sh -c "set -o pipefail"` succeeds_
+#### Given
+- Fixture file `mommy.conf` is created.
+- Environment variables are set: LC_ALL.
+- The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
+#### Inputs
+_Fixture `mommy.conf`:_
+```text
+MOMMY_COMPLIMENTS="that went well"
+MOMMY_ENCOURAGEMENTS="that did not go well"
+```
+#### When
+```shell
+mommy -c ./mommy.conf -p -e "false | true"
+```
+#### Then
+- exit code is `2`
+- stderr contains `set: Illegal option -o pipefail`, `that did not go well~`
+
 ### Scenario: the message is a template the config fills in
 _only when `command -v mommy` succeeds · skipped on Windows_
 #### Given
