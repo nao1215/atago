@@ -395,7 +395,7 @@ export SECOND='2'
 environment without letting the file run anything. Its own test suite is
 written in ShellSpec; what those tests check is pinned here from outside.
 
-The safety promise is the centre of this file, and it is asserted the only
+The safety promise is the center of this file, and it is asserted the only
 way a security claim should be: a .env file that tries to run a command is
 given every chance to, and the proof is that the file it would have created
 does not exist. Around it are the parsing rules, the strict defaults that
