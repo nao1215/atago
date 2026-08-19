@@ -244,6 +244,18 @@ jobs:
               git -C "$HOME/.rbenv" fetch -q --depth 1 https://github.com/rbenv/rbenv.git "$sha"
               git -C "$HOME/.rbenv" checkout -q FETCH_HEAD
               ln -sf "$HOME/.rbenv/bin/rbenv" "$(go env GOPATH)/bin/rbenv"
+          # git-secrets scans for patterns that must never be committed, and
+          # installs git hooks that enforce them. Pinned by commit rather than by
+          # its 1.3.0 tag, and used as a git subcommand, so the launcher is
+          # linked onto the PATH this job already exports.
+          - name: git-secrets
+            dir: ./test/e2e/thirdparty/git-secrets
+            install: |
+              sha="ad82d68ee924906a0401dfd48de5057731a9bc84"
+              git init -q "$HOME/.git-secrets"
+              git -C "$HOME/.git-secrets" fetch -q --depth 1 https://github.com/awslabs/git-secrets.git "$sha"
+              git -C "$HOME/.git-secrets" checkout -q FETCH_HEAD
+              ln -sf "$HOME/.git-secrets/git-secrets" "$(go env GOPATH)/bin/git-secrets"
           # sops encrypts structured files with age as the key backend; both are
           # go-installed (age and age-keygen provide the throwaway keys).
           # GnuPG from the pinned Ubuntu snapshot: the suite generates its own

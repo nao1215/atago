@@ -1,0 +1,232 @@
+version: "1"
+
+suite:
+  name: git-secrets (hooks, blocked commits, and history)
+  description: |
+    The half of [git-secrets](https://github.com/awslabs/git-secrets) that runs
+    without being asked: the hooks it installs into a repository, the commit
+    they refuse, the message they read, the bypass that gets past them, and the
+    history scan that finds what the bypass let through.
+
+    A blocked commit is asserted as a commit that does not exist — the log is
+    the oracle, not the error text — and the bypass scenario carries it through
+    to the end: the secret reaches history, and `--scan-history` is what finds
+    it there, quoting the commit it lives in.
+
+defaults:
+  scenario:
+    only:
+      command: command -v git-secrets
+    skip:
+      os: windows
+  run:
+    sandbox_home: true
+    env:
+      LC_ALL: C
+      TERM: xterm
+
+scenarios:
+  - name: installing writes the three hooks that call back into the tool
+    steps:
+      - run:
+          shell: true
+          command: git init -q && git secrets --add topsecret-[0-9]+
+      - assert:
+          exit_code: 0
+      - run:
+          command: git secrets --install
+      - assert:
+          # Three hooks, and nothing else in the repository is touched. The
+          # exit code is asserted in the scenario after this one.
+          changes:
+            created:
+              - .git/hooks/commit-msg
+              - .git/hooks/pre-commit
+              - .git/hooks/prepare-commit-msg
+            modified: []
+            deleted: []
+      - assert:
+          # Each hook is two lines that hand the work back to git-secrets, so
+          # the rules live in the config rather than in the hook.
+          file:
+            path: .git/hooks/pre-commit
+            equals: |
+              #!/usr/bin/env bash
+              git secrets --pre_commit_hook -- "$@"
+      - assert:
+          file:
+            path: .git/hooks/pre-commit
+            executable: true
+      - run:
+          command: git secrets --install
+      - assert:
+          # Installing twice refuses rather than overwriting a hook that may not
+          # be the one it wrote.
+          exit_code: 1
+          stderr:
+            matches: "\\.git/hooks/commit-msg already exists\\. Use -f to force"
+          changes:
+            created: []
+            modified: []
+            deleted: []
+
+  - name: the installer reports a failure it did not have
+    skip:
+      os: darwin
+    steps:
+      - run:
+          shell: true
+          command: git init -q
+      - assert:
+          exit_code: 0
+      - run:
+          command: git secrets --install
+      - assert:
+          # Pinned as it behaves, not as it reads: the hooks are written and
+          # correct, and the command still exits 127 because the script calls a
+          # `say` that it never defines. On macOS a program of that name exists
+          # — the speech synthesizer — which is why this goes unnoticed there.
+          # A setup script that checks the exit code stops on a step that in
+          # fact succeeded, so this scenario skips only on darwin.
+          exit_code: 127
+          stderr:
+            contains: "say: command not found"
+      - assert:
+          dir:
+            path: .git/hooks
+            contains:
+              - commit-msg
+              - pre-commit
+              - prepare-commit-msg
+
+  - name: a commit carrying the pattern never happens
+    steps:
+      - run:
+          shell: true
+          # The installer's own exit code is the subject of its own scenario
+          # above; here what matters is that the hooks are in place, so the setup
+          # ends by checking for one rather than by trusting the code.
+          command: git init -q && git config user.email atago@example.com && git config user.name atago && git secrets --add topsecret-[0-9]+ && { git secrets --install --force || true; } && test -x .git/hooks/pre-commit
+      - assert:
+          exit_code: 0
+      - fixture:
+          file: clean.txt
+          content: |
+            nothing of interest here
+      - run:
+          shell: true
+          command: git add clean.txt && git commit -q -m "first commit"
+      - assert:
+          exit_code: 0
+      - fixture:
+          file: leaky.txt
+          content: |
+            token = topsecret-4242
+      - run:
+          shell: true
+          command: git add leaky.txt && git commit -m "add the file"
+      - assert:
+          # The hook's verdict is the commit's verdict: exit 1, with the match
+          # and the mitigations on stderr.
+          exit_code: 1
+          stderr:
+            contains:
+              - "leaky.txt:1:token = topsecret-4242"
+              - "[ERROR] Matched one or more prohibited patterns"
+      - run:
+          command: git log --oneline
+      - assert:
+          # The oracle is the history, not the message: there is still exactly
+          # one commit, and the staged file is still only staged.
+          exit_code: 0
+          stdout:
+            matches: "^[0-9a-f]+ first commit\\n$"
+      - run:
+          command: git status --porcelain
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              A  leaky.txt
+
+  - name: a commit message carrying the pattern is refused too
+    steps:
+      - run:
+          shell: true
+          # The installer's own exit code is the subject of its own scenario
+          # above; here what matters is that the hooks are in place, so the setup
+          # ends by checking for one rather than by trusting the code.
+          command: git init -q && git config user.email atago@example.com && git config user.name atago && git secrets --add topsecret-[0-9]+ && { git secrets --install --force || true; } && test -x .git/hooks/pre-commit
+      - assert:
+          exit_code: 0
+      - fixture:
+          file: clean.txt
+          content: |
+            nothing of interest here
+      - run:
+          shell: true
+          command: git add clean.txt && git commit -m "rotating topsecret-77 today"
+      - assert:
+          # The file is clean; the message is not. A secret pasted into a commit
+          # message is as published as one pasted into a file, and the hook
+          # reads both.
+          exit_code: 1
+          stderr:
+            contains:
+              - ".git/COMMIT_EDITMSG:1:rotating topsecret-77 today"
+              - "[ERROR] Matched one or more prohibited patterns"
+      - run:
+          command: git log --oneline
+      - assert:
+          # Nothing was committed at all: git has no history to show.
+          exit_code: 128
+          stdout:
+            empty: true
+          stderr:
+            contains: "does not have any commits yet"
+
+  - name: what the bypass lets through, the history scan finds
+    steps:
+      - run:
+          shell: true
+          # The installer's own exit code is the subject of its own scenario
+          # above; here what matters is that the hooks are in place, so the setup
+          # ends by checking for one rather than by trusting the code.
+          command: git init -q && git config user.email atago@example.com && git config user.name atago && git secrets --add topsecret-[0-9]+ && { git secrets --install --force || true; } && test -x .git/hooks/pre-commit
+      - assert:
+          exit_code: 0
+      - fixture:
+          file: leaky.txt
+          content: |
+            token = topsecret-4242
+      - run:
+          shell: true
+          command: git add leaky.txt && git commit -q --no-verify -m "sneak it in"
+      - assert:
+          # --no-verify is git's own escape hatch, and git-secrets is a hook like
+          # any other: it is not consulted at all.
+          exit_code: 0
+      - run:
+          command: git log --oneline
+      - assert:
+          exit_code: 0
+          stdout:
+            matches: "^[0-9a-f]+ sneak it in\\n$"
+      - run:
+          command: git secrets --scan-history
+      - assert:
+          # Which is why the history scan exists: it reads what was committed
+          # rather than what is being committed, and names the commit that
+          # carries it.
+          exit_code: 1
+          stderr:
+            matches: "^[0-9a-f]{40}:leaky\\.txt:1:token = topsecret-4242"
+      - run:
+          command: git secrets --scan-history
+          env:
+            LC_ALL: C
+            TERM: xterm
+      - assert:
+          # And it keeps finding it: a scan is not a cure. Removing the file in a
+          # later commit would leave this exactly as it is.
+          exit_code: 1
