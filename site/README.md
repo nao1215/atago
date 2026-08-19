@@ -49,6 +49,7 @@ A browsable, repo-local index of atago's documentation, generated from repositor
 - [mimixbox.md](../doc/e2e/mimixbox.md)
 - [minio.md](../doc/e2e/minio.md)
 - [mobilepkg.md](../doc/e2e/mobilepkg.md)
+- [mommy.md](../doc/e2e/mommy.md)
 - [nats.md](../doc/e2e/nats.md)
 - [nb.md](../doc/e2e/nb.md)
 - [ntfy.md](../doc/e2e/ntfy.md)

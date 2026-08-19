@@ -328,6 +328,18 @@ jobs:
               git -C "$HOME/.nb-src" fetch -q --depth 1 https://github.com/xwmx/nb.git "$sha"
               git -C "$HOME/.nb-src" checkout -q FETCH_HEAD
               ln -sf "$HOME/.nb-src/nb" "$(go env GOPATH)/bin/nb"
+          # mommy wraps a command and comments on how it went. Pinned by commit
+          # and built with its own Makefile, which assembles the script into
+          # build/bin; that one file is linked onto the PATH this job exports.
+          - name: mommy
+            dir: ./test/e2e/thirdparty/mommy
+            install: |
+              sha="2426f9174970d563315d11eeb559e006856448ef"
+              git init -q "$HOME/.mommy"
+              git -C "$HOME/.mommy" fetch -q --depth 1 https://github.com/FWDekker/mommy.git "$sha"
+              git -C "$HOME/.mommy" checkout -q FETCH_HEAD
+              make -C "$HOME/.mommy" build
+              ln -sf "$HOME/.mommy/build/bin/mommy" "$(go env GOPATH)/bin/mommy"
           # sops encrypts structured files with age as the key backend; both are
           # go-installed (age and age-keygen provide the throwaway keys).
           # GnuPG from the pinned Ubuntu snapshot: the suite generates its own
