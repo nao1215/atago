@@ -120,9 +120,7 @@ scenarios:
           # Now the list carries the selection and where it came from.
           exit_code: 0
           stdout:
-            contains:
-              - "* 3.3.1 (set by "
-              - "  3.2.0"
+            matches: "^  3\\.2\\.0\\n\\* 3\\.3\\.1 \\(set by .*/root/version\\)\\n$"
 
   - name: global writes one file in the root and nothing else
     steps:

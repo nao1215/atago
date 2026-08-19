@@ -143,7 +143,7 @@ rbenv versions
   - exit code is `0`
 - after `rbenv versions`:
   - exit code is `0`
-  - stdout contains `* 3.3.1 (set by `, `  3.2.0`
+  - stdout matches `/^  3\.2\.0\n\* 3\.3\.1 \(set by .*/root/version\)\n$/`
 
 #### Expected output
 _expected stdout:_

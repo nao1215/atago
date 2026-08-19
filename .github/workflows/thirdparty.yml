@@ -237,7 +237,12 @@ jobs:
           - name: rbenv
             dir: ./test/e2e/thirdparty/rbenv
             install: |
-              git clone --quiet --depth 1 --branch v1.3.2 https://github.com/rbenv/rbenv.git "$HOME/.rbenv"
+              # v1.3.2, pinned by commit: a tag can be moved, and this matrix
+              # exists to exercise a fixed third-party contract.
+              sha="10e96bfc473c7459a447fbbda12164745a72fd37"
+              git init -q "$HOME/.rbenv"
+              git -C "$HOME/.rbenv" fetch -q --depth 1 https://github.com/rbenv/rbenv.git "$sha"
+              git -C "$HOME/.rbenv" checkout -q FETCH_HEAD
               ln -sf "$HOME/.rbenv/bin/rbenv" "$(go env GOPATH)/bin/rbenv"
           # sops encrypts structured files with age as the key backend; both are
           # go-installed (age and age-keygen provide the throwaway keys).
