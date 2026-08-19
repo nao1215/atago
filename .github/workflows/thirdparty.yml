@@ -282,6 +282,17 @@ jobs:
               git -C "$HOME/.shdotenv" checkout -q FETCH_HEAD
               make -C "$HOME/.shdotenv" build
               ln -sf "$HOME/.shdotenv/shdotenv" "$(go env GOPATH)/bin/shdotenv"
+          # git-open turns the repository you are in into a web address. Pinned
+          # by commit; it is a single script, used as a git subcommand, so the
+          # launcher is linked onto the PATH this job already exports.
+          - name: git-open
+            dir: ./test/e2e/thirdparty/git-open
+            install: |
+              sha="63c0e77aaf18b72c839b1113c1e2f9514413643b"
+              git init -q "$HOME/.git-open"
+              git -C "$HOME/.git-open" fetch -q --depth 1 https://github.com/paulirish/git-open.git "$sha"
+              git -C "$HOME/.git-open" checkout -q FETCH_HEAD
+              ln -sf "$HOME/.git-open/git-open" "$(go env GOPATH)/bin/git-open"
           # sops encrypts structured files with age as the key backend; both are
           # go-installed (age and age-keygen provide the throwaway keys).
           # GnuPG from the pinned Ubuntu snapshot: the suite generates its own
