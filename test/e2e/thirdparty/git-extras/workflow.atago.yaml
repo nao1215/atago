@@ -1,0 +1,273 @@
+version: "1"
+
+suite:
+  name: git-extras (changing a repository)
+  description: |
+    The half of [git-extras](https://github.com/tj/git-extras) that writes:
+    branch creation, renaming and deletion, the merged-branch sweep, `undo`,
+    and the three commands that edit files or configuration — `ignore`, `alias`
+    and `changelog`.
+
+    Each of these is asserted on the repository afterwards rather than on what
+    it printed: the branch list, the git config, the working tree, and the file
+    contents are the oracle. Two of them are pinned as observed rather than as
+    intended, and say so.
+
+defaults:
+  scenario:
+    only:
+      command: command -v git-summary
+    skip:
+      os: windows
+  run:
+    sandbox_home: true
+    env:
+      LC_ALL: C
+      TERM: xterm
+
+scenarios:
+  - name: a branch is created, renamed, and deleted
+    steps:
+      - run:
+          shell: true
+          command: git init -q && git config user.email author@example.com && git config user.name 'A Author' && git commit -q --allow-empty -m first
+      - assert:
+          exit_code: 0
+      - run:
+          command: git create-branch feature/one
+      - assert:
+          exit_code: 0
+      - run:
+          command: git branch --show-current
+      - assert:
+          # create-branch does both halves of `git checkout -b`: the branch
+          # exists and it is the one checked out.
+          exit_code: 0
+          stdout:
+            equals: |
+              feature/one
+      - run:
+          command: git rename-branch feature/two
+      - assert:
+          exit_code: 0
+      - run:
+          command: git branch --show-current
+      - assert:
+          # rename-branch takes one argument, the new name, and renames the
+          # branch you are on rather than one you have to name twice.
+          exit_code: 0
+          stdout:
+            equals: |
+              feature/two
+      - run:
+          shell: true
+          command: git checkout -q master
+      - assert:
+          exit_code: 0
+      - run:
+          command: git delete-branch feature/two
+      - assert:
+          # Pinned as observed: the branch is deleted and the command reports
+          # success, but it also prints an error about a remote-tracking branch
+          # that was never there. A caller reading stderr sees a failure that
+          # did not happen.
+          exit_code: 0
+          stderr:
+            contains: "error: remote-tracking branch 'origin/feature/two' not found"
+      - run:
+          shell: true
+          command: git branch --format='%(refname:short)'
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              master
+
+  - name: the merged-branch sweep keeps the branches that still have work
+    steps:
+      - run:
+          shell: true
+          command: git init -q && git config user.email author@example.com && git config user.name 'A Author' && git commit -q --allow-empty -m first
+      - assert:
+          exit_code: 0
+      - run:
+          shell: true
+          command: git checkout -q -b merged && git commit -q --allow-empty -m 'merged work' && git checkout -q master && git merge -q merged && git checkout -q -b unmerged && git commit -q --allow-empty -m 'unmerged work' && git checkout -q master
+      - assert:
+          exit_code: 0
+      - run:
+          command: git delete-merged-branches
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "Deleted branch merged"
+      - run:
+          shell: true
+          command: git branch --format='%(refname:short)'
+      - assert:
+          # The distinction is the whole command: what was merged is gone, what
+          # was not is untouched, and the branch you are on is never a candidate.
+          exit_code: 0
+          stdout:
+            equals: |
+              master
+              unmerged
+
+  - name: undo takes back the last commit and leaves the work in place
+    steps:
+      - run:
+          shell: true
+          command: git init -q && git config user.email author@example.com && git config user.name 'A Author' && echo one > a.txt && git add a.txt && git commit -q -m first && echo two > b.txt && git add b.txt && git commit -q -m second
+      - assert:
+          exit_code: 0
+      - run:
+          command: git undo
+      - assert:
+          # The commit is gone and its content is not: the file is still there
+          # and still staged, ready to be committed again with a better message.
+          # Nothing in the working tree changed at all; the move of the branch
+          # itself is bookkeeping inside .git.
+          exit_code: 0
+          changes:
+            ignore: [".git/**"]
+            created: []
+            modified: []
+            deleted: []
+      - run:
+          command: git log --oneline
+      - assert:
+          exit_code: 0
+          stdout:
+            matches: "^[0-9a-f]+ first\\n$"
+      - run:
+          command: git status --porcelain
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              A  b.txt
+
+  - name: ignore adds patterns to the file git reads
+    steps:
+      - run:
+          shell: true
+          command: git init -q && git config user.email author@example.com && git config user.name 'A Author' && git commit -q --allow-empty -m first
+      - assert:
+          exit_code: 0
+      - run:
+          command: git ignore "*.log"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "Adding pattern(s) to: .gitignore"
+              - "... adding '*.log'"
+          changes:
+            created: [.gitignore]
+            modified: []
+            deleted: []
+      - run:
+          command: git ignore build/
+      - assert:
+          # A second pattern appends rather than replacing, which is the only
+          # sane behavior for a file the repository shares.
+          exit_code: 0
+          changes:
+            created: []
+            modified: [.gitignore]
+            deleted: []
+      - assert:
+          file:
+            path: .gitignore
+            equals: |
+              *.log
+              build/
+      - run:
+          shell: true
+          command: touch debug.log && git status --porcelain
+      - assert:
+          # And the proof that it is the file git reads: a file matching the
+          # pattern does not show up as untracked work.
+          exit_code: 0
+          stdout:
+            equals: |
+              ?? .gitignore
+
+  - name: alias writes a git alias and lists what is defined
+    steps:
+      - run:
+          shell: true
+          command: git init -q && git config user.email author@example.com && git config user.name 'A Author' && git commit -q --allow-empty -m first
+      - assert:
+          exit_code: 0
+      - run:
+          command: git alias last "log -1 HEAD --oneline"
+      - assert:
+          exit_code: 0
+          changes:
+            created: []
+            modified: [.git/config]
+            deleted: []
+      - run:
+          command: git alias
+      - assert:
+          # With no arguments it lists what is defined, which is the read side of
+          # the same command.
+          exit_code: 0
+          stdout:
+            equals: |
+              last = log -1 HEAD --oneline
+      - run:
+          command: git last
+      - assert:
+          # And the alias is a real git alias: git itself runs it.
+          exit_code: 0
+          stdout:
+            matches: "^[0-9a-f]+ first\\n$"
+
+  - name: changelog writes the commits since the last tag, and writes them again
+    steps:
+      - run:
+          shell: true
+          command: git init -q && git config user.email author@example.com && git config user.name 'A Author' && echo one > a.txt && git add a.txt && git commit -q -m 'first release commit' && git tag v1.0.0 && echo two > b.txt && git add b.txt && git commit -q -m 'add the second thing' && echo three > c.txt && git add c.txt && git commit -q -m 'add the third thing'
+      - assert:
+          exit_code: 0
+      - run:
+          command: git changelog
+      - assert:
+          exit_code: 0
+          changes:
+            created: [History.md]
+            modified: []
+            deleted: []
+      - assert:
+          # Only the commits after the tag, newest first, under a heading whose
+          # version is a placeholder until a release names it.
+          file:
+            path: History.md
+            contains:
+              - "n.n.n / "
+              - "  * add the third thing"
+              - "  * add the second thing"
+      - assert:
+          # The tag is the boundary: the commit it points at belongs to the
+          # release that already happened, so it is not in this section.
+          file:
+            path: History.md
+            not_contains: "first release commit"
+      - run:
+          command: git changelog
+      - assert:
+          # Pinned as observed: running it twice does not update the section, it
+          # prepends a second copy of it. The file is a generated artifact that
+          # only survives being generated once.
+          exit_code: 0
+          changes:
+            created: []
+            modified: [History.md]
+            deleted: []
+      - assert:
+          file:
+            path: History.md
+            contains: "  * add the third thing"
+            count: 2
