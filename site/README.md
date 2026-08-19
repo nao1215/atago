@@ -25,6 +25,7 @@ A browsable, repo-local index of atago's documentation, generated from repositor
 - [fzf.md](../doc/e2e/fzf.md)
 - [getoptions.md](../doc/e2e/getoptions.md)
 - [ghostscript.md](../doc/e2e/ghostscript.md)
+- [git-extras.md](../doc/e2e/git-extras.md)
 - [git-open.md](../doc/e2e/git-open.md)
 - [git-secrets.md](../doc/e2e/git-secrets.md)
 - [git.md](../doc/e2e/git.md)

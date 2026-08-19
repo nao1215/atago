@@ -293,6 +293,19 @@ jobs:
               git -C "$HOME/.git-open" fetch -q --depth 1 https://github.com/paulirish/git-open.git "$sha"
               git -C "$HOME/.git-open" checkout -q FETCH_HEAD
               ln -sf "$HOME/.git-open/git-open" "$(go env GOPATH)/bin/git-open"
+          # git-extras is a collection of git subcommands. Pinned by commit and
+          # installed with its own Makefile, whose PREFIX is GOPATH because this
+          # job already puts GOPATH/bin on PATH; the scripts source a helper the
+          # install step lays down, so running them from the checkout is not
+          # enough.
+          - name: git-extras
+            dir: ./test/e2e/thirdparty/git-extras
+            install: |
+              sha="dbf68bac59af47cd1adfa0b2317391c8315f8fad"
+              git init -q "$HOME/.git-extras"
+              git -C "$HOME/.git-extras" fetch -q --depth 1 https://github.com/tj/git-extras.git "$sha"
+              git -C "$HOME/.git-extras" checkout -q FETCH_HEAD
+              make -C "$HOME/.git-extras" install PREFIX="$(go env GOPATH)"
           # sops encrypts structured files with age as the key backend; both are
           # go-installed (age and age-keygen provide the throwaway keys).
           # GnuPG from the pinned Ubuntu snapshot: the suite generates its own
