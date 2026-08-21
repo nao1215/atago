@@ -17,7 +17,7 @@ require (
 	github.com/jhump/protoreflect/v2 v2.0.0-beta.2
 	github.com/k1LoW/grpcstub v0.26.5
 	github.com/lib/pq v1.12.3
-	github.com/mattn/go-runewidth v0.0.27
+	github.com/mattn/go-runewidth v0.0.28
 	github.com/mattn/go-shellwords v1.0.13
 	github.com/nao1215/markdown v1.0.0
 	github.com/ohler55/ojg v1.28.4
