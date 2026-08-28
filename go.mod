@@ -27,7 +27,7 @@ require (
 	golang.org/x/image v0.45.0
 	golang.org/x/sys v0.47.0
 	golang.org/x/term v0.45.0
-	google.golang.org/grpc v1.83.0
+	google.golang.org/grpc v1.83.2
 	google.golang.org/protobuf v1.36.12
 	modernc.org/sqlite v1.56.0
 )
@@ -68,7 +68,7 @@ require (
 	github.com/olekukonko/tablewriter v1.1.4 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
-	golang.org/x/net v0.57.0 // indirect
+	golang.org/x/net v0.58.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect
 	golang.org/x/text v0.41.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260526163538-3dc84a4a5aaa // indirect
