@@ -36,11 +36,21 @@ scenarios:
           file:
             path: result.ndjson.gz
             exists: true
-      # The payload is gzip-compressed, so the plaintext value is not present.
+      # This scenario deliberately does NOT assert that the plaintext value is
+      # absent from the file. That looks like a compression check and is not
+      # one: deflate may emit a STORED block for a payload this small, so a
+      # correctly written .gz can carry its content verbatim. Go 1.27 does
+      # exactly that where Go 1.26 compressed, which turned the old assertion
+      # into a failure with nothing wrong on sqly's side.
+      #
+      # What proves the gzip is real is the round-trip below, where sqly reads
+      # back the .gz it wrote. That cannot be done here because sqly imports
+      # jsonl rather than ndjson, and atago's file assert cannot match the
+      # gzip magic bytes (its matchers compare text, so 0x8b cannot be spelled).
       - assert:
           file:
             path: result.ndjson.gz
-            not_contains: booker12
+            min_size: 1
 
   - name: re-imports a gzip-compressed csv it wrote
     steps:
