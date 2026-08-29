@@ -17,9 +17,22 @@ jobs:
           - "windows-latest"
           - "macos-latest"
         go:
-          # go.mod requires go >= 1.26; the CI uses GOTOOLCHAIN=local, so an older
-          # toolchain cannot build the module. Test the declared minimum and latest.
-          - "1"
+          # go.mod requires go >= 1.26 (chromedp, cdproto and
+          # go-json-experiment/json all declare it), and the CI uses
+          # GOTOOLCHAIN=local, so an older toolchain cannot build the module.
+          # Test the declared minimum and the latest release.
+          #
+          # This is the only workflow that pins Go versions. Every other one uses
+          # "stable": go.mod states the oldest Go a user may build atago from, not
+          # the toolchain this repository's release artifacts, E2E and coverage
+          # should be produced with. Running the floor here is the only place that
+          # go.mod claim is actually checked.
+          #
+          # "stable", not "1", for the ceiling. setup-go resolves "1" to the
+          # newest release in its own manifest, which lagged: it was still
+          # handing out go1.26.7 after 1.27.0 shipped, so this leg was running
+          # the floor twice and two real 1.27 breakages reached main unnoticed.
+          - "stable"
           - "1.26"
       fail-fast: false
     runs-on: ${{ matrix.os }}
