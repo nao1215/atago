@@ -1967,7 +1967,7 @@ sqly --sql "SELECT user_name FROM user ORDER BY identifier LIMIT 1" user.csv --o
 - exit code is `0`
 - stderr contains `output mode=ndjson`
 - file `result.ndjson.gz` exists
-- file `result.ndjson.gz` does not contain `booker12`
+- file `result.ndjson.gz` is not empty
 
 #### Generated artifacts
 - `result.ndjson.gz`
