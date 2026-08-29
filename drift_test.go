@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"image/png"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -563,10 +564,51 @@ func TestSite_InSync(t *testing.T) {
 			t.Errorf("missing generated site file %s: %v (run `make site`)", name, err)
 			continue
 		}
+		if strings.HasSuffix(name, ".png") {
+			// PNG bytes are not reproducible across Go releases: image/png
+			// deflates its pixel data with compress/flate, whose output changed
+			// in Go 1.27, so byte equality fails on one toolchain or the other
+			// with the picture itself identical. Since the unit-test matrix runs
+			// the go.mod floor AND the newest release, no single committed byte
+			// sequence can satisfy both. What the site publishes is the image,
+			// so that is what is compared.
+			if err := samePNG(got, want); err != nil {
+				t.Errorf("%s is out of date with the generator (%v); regenerate with `make site`", name, err)
+			}
+			continue
+		}
 		if !bytes.Equal(got, want) {
 			t.Errorf("%s is out of date with the generator; regenerate with `make site`", name)
 		}
 	}
+}
+
+// samePNG reports whether two encoded PNGs carry the same picture, comparing
+// decoded pixels rather than compressed bytes.
+func samePNG(got, want []byte) error {
+	gotImg, err := png.Decode(bytes.NewReader(got))
+	if err != nil {
+		return fmt.Errorf("committed file is not a decodable PNG: %w", err)
+	}
+	wantImg, err := png.Decode(bytes.NewReader(want))
+	if err != nil {
+		return fmt.Errorf("generated file is not a decodable PNG: %w", err)
+	}
+	gotB, wantB := gotImg.Bounds(), wantImg.Bounds()
+	if gotB != wantB {
+		return fmt.Errorf("bounds %v, want %v", gotB, wantB)
+	}
+	for y := gotB.Min.Y; y < gotB.Max.Y; y++ {
+		for x := gotB.Min.X; x < gotB.Max.X; x++ {
+			gr, gg, gb, ga := gotImg.At(x, y).RGBA()
+			wr, wg, wb, wa := wantImg.At(x, y).RGBA()
+			if gr != wr || gg != wg || gb != wb || ga != wa {
+				return fmt.Errorf("pixel (%d,%d) is %v, want %v",
+					x, y, [4]uint32{gr, gg, gb, ga}, [4]uint32{wr, wg, wb, wa})
+			}
+		}
+	}
+	return nil
 }
 
 // TestDocs_ErrorReferenceInSync keeps the published error reference in lockstep
