@@ -174,7 +174,8 @@ func parsePDF(data []byte) pdfDoc {
 	// so metadata has to be looked for inside them too.
 	var text strings.Builder
 	var objectStreams [][]byte
-	for _, st := range pdfStreams(data) {
+	streams := pdfStreams(data)
+	for _, st := range streams {
 		decoded := st.payload
 		if inflated, err := inflate(st.payload); err == nil {
 			decoded = inflated
@@ -193,15 +194,44 @@ func parsePDF(data []byte) pdfDoc {
 	}
 	doc.text = strings.TrimSpace(text.String())
 
-	// Info metadata: read the value after each known field name. The raw bytes
-	// come first (a PDF 1.4-style writer leaves the Info dictionary in the
-	// clear); anything still missing is looked for in the decompressed object
-	// streams, which is where Ghostscript 10, LaTeX, and Word put it.
-	readMetadata(doc.metadata, data, false)
+	// Info metadata: read the value after each known field name. The document
+	// structure comes first (a PDF 1.4-style writer leaves the Info dictionary
+	// in the clear); anything still missing is looked for in the decompressed
+	// object streams, which is where Ghostscript 10, LaTeX, and Word put it.
+	//
+	// Stream payloads are masked out first. The Info dictionary is never inside
+	// a stream that is not an object stream, while page content routinely draws
+	// arbitrary text -- so scanning raw bytes let a page that renders the
+	// literal "/Title(...)" supply the document's title. That is not
+	// hypothetical: a deflate stream small enough to be emitted as a STORED
+	// block carries its text verbatim, which is what Go 1.27's compress/flate
+	// does where Go 1.26 emitted a compressed block.
+	readMetadata(doc.metadata, maskStreamPayloads(data, streams), false)
 	for _, decoded := range objectStreams {
 		readMetadata(doc.metadata, decoded, true)
 	}
 	return doc
+}
+
+// maskStreamPayloads returns a copy of data with every stream payload blanked,
+// leaving the document structure (objects, dictionaries, the trailer) in place.
+// Spaces are used rather than deletion so nothing outside a stream shifts and no
+// two structural tokens are accidentally joined across a removed payload.
+func maskStreamPayloads(data []byte, streams []pdfStream) []byte {
+	if len(streams) == 0 {
+		return data
+	}
+	masked := make([]byte, len(data))
+	copy(masked, data)
+	for _, st := range streams {
+		if st.from < 0 || st.to > len(masked) || st.from > st.to {
+			continue
+		}
+		for i := st.from; i < st.to; i++ {
+			masked[i] = ' '
+		}
+	}
+	return masked
 }
 
 // dictWindow is how far back from a `stream` keyword the object's dictionary is
@@ -214,6 +244,9 @@ const dictWindow = 512
 type pdfStream struct {
 	dict    []byte
 	payload []byte
+	// from and to bound the payload inside the file, so the raw metadata scan
+	// can exclude stream bytes without re-locating them.
+	from, to int
 }
 
 // pdfStreams walks the file and returns every stream object. The payload's end
@@ -242,7 +275,7 @@ func pdfStreams(data []byte) []pdfStream {
 		if end < 0 {
 			break
 		}
-		out = append(out, pdfStream{dict: dict, payload: data[payloadAt:end]})
+		out = append(out, pdfStream{dict: dict, payload: data[payloadAt:end], from: payloadAt, to: end})
 		pos = resume
 	}
 	return out
