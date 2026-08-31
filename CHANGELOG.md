@@ -26,7 +26,8 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Removed
 
-- The winget release pipe. GoReleaser generated the manifests and opened a pull request against microsoft/winget-pkgs on every stable tag, and those pull requests are still unmerged, so `winget install nao1215.atago` installs nothing and the pipe published nothing. It is gone from `.goreleaser.yml` along with the `WINGET_GITHUB_TOKEN` wiring in the release workflow, and the install instructions no longer offer a channel that does not exist. Windows users install with Scoop, `go install`, or a prebuilt archive.
+- The winget release pipe. GoReleaser generated the manifests and opened a pull request against microsoft/winget-pkgs on every stable tag, and those pull requests are still unmerged, so `winget install nao1215.atago` installs nothing and the pipe published nothing. It is gone from `.goreleaser.yml` along with the `WINGET_GITHUB_TOKEN` wiring in the release workflow, and the install instructions no longer offer a channel that does not exist.
+- The Scoop bucket, for the same reason the winget pipe went: a channel nobody can arrive through is not a channel. A bucket hosted in its own repository is not in Scoop's known-bucket list, so `scoop search atago` never found it — reaching it meant reading this README, already using Scoop, and typing the repository URL. It also publishes by committing into `main`, which fails outright the day this repository gets branch protection, and fails in the worst place: after the GitHub Release exists and before build provenance is attested, which cannot be added to a tag afterwards. That is not hypothetical; gup lost a tag's provenance to exactly this. Windows users install with `go install` or a prebuilt archive from the release page. Anyone who added the bucket can drop it with `scoop bucket rm nao1215`.
 
 ### Bug Fixes
 
