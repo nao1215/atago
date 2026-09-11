@@ -1,6 +1,6 @@
 module github.com/nao1215/atago
 
-go 1.26
+go 1.26.0
 
 require (
 	github.com/bmatcuk/doublestar/v4 v4.10.0
@@ -25,8 +25,8 @@ require (
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
 	golang.org/x/crypto v0.55.0
 	golang.org/x/image v0.45.0
-	golang.org/x/sys v0.47.0
-	golang.org/x/term v0.45.0
+	golang.org/x/sys v0.48.0
+	golang.org/x/term v0.46.0
 	google.golang.org/grpc v1.83.2
 	google.golang.org/protobuf v1.36.12
 	modernc.org/sqlite v1.57.0
