@@ -7,6 +7,8 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-09-12
+
 ### Added
 
 - `skip:` and `only:` gate on FreeBSD, OpenBSD and NetBSD as well as Linux, macOS and Windows. The value is what `runtime.GOOS` reports, so each BSD is named on its own rather than as a family: what FreeBSD `ps` prints is not what OpenBSD `ps` prints, and a scenario written for one of them says which. `bsd` is still not a value, and neither is `dragonfly` — modernc.org/libc, which the database runner reaches through modernc.org/sqlite, has no files for it, so atago does not build there and a gate naming it could never fire. golangci-lint runs for the three new systems too, since a linter only sees the files that build for its GOOS.
