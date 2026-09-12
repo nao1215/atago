@@ -280,7 +280,9 @@ type Subject struct {
 }
 
 // Condition gates a scenario by platform, environment, or a probe command
-// . For OS, skip/only compare against the host. For Env, the
+// . For OS, skip/only compare against the host as runtime.GOOS names it, so
+// each BSD is named on its own (freebsd, openbsd, netbsd) rather than as a
+// family. For Env, the
 // condition is true when the named environment variable is non-empty:
 // `skip: { env: X }` skips when X is set; `only: { env: X }` runs only when X is
 // set. For Command, the condition is true when the probe command succeeds (exits

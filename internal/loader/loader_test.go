@@ -1264,6 +1264,8 @@ func TestBugHunt_Rejections(t *testing.T) {
 
 		// ---- validateCondition ----
 		{"skip bad os", scenarioTop("skip: {os: solaris}", "run: {command: echo}"), "skip.os \"solaris\" is invalid"},
+		// "bsd" is not a system: each of them is a value of its own, and a
+		// gate that names the family would claim four platforms at once.
 		{"only bad os", scenarioTop("only: {os: bsd}", "run: {command: echo}"), "only.os \"bsd\" is invalid"},
 		{"empty skip gate", scenarioTop("skip: {}", "run: {command: echo}"), "skip must name a condition"},
 		{"empty only gate", scenarioTop("only: {}", "run: {command: echo}"), "only must name a condition"},
@@ -1442,6 +1444,13 @@ func TestBugHunt_Acceptances(t *testing.T) {
 		{"assert duration after run", specSteps("run: {command: echo}", "assert: {duration: {lt: \"5s\"}}")},
 		{"skip valid os", scenarioTop("skip: {os: darwin}", "run: {command: echo}")},
 		{"only valid os", scenarioTop("only: {os: windows}", "run: {command: echo}")},
+		// Each BSD is a gate of its own: a scenario for what FreeBSD ps
+		// prints says nothing about OpenBSD, and the values are the ones
+		// runtime.GOOS reports.
+		{"only os freebsd", scenarioTop("only: {os: freebsd}", "run: {command: echo}")},
+		{"skip os openbsd", scenarioTop("skip: {os: openbsd}", "run: {command: echo}")},
+		{"only os netbsd", scenarioTop("only: {os: netbsd}", "run: {command: echo}")},
+		{"gates naming two different BSDs", scenarioTop("skip: {os: freebsd}\n    only: {os: openbsd}", "run: {command: echo}")},
 		// Contradiction checks compare literally, so anything that can be
 		// satisfied keeps loading.
 		{"contains and not_contains that differ", specSteps("run: {command: echo}", "assert: {stdout: {contains: [abc], not_contains: [abcd]}}")},

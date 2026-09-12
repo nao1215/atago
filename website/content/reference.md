@@ -115,6 +115,8 @@ The report and manifest outputs have schemas too: [report.schema.json](https://g
 
 atago runs on Linux, macOS, and Windows, and CI tests all three: the unit suite on every OS, the self-hosted E2E suite on Linux and macOS, and on Windows both under the native `cmd.exe` and under a POSIX shell. Almost everything behaves identically. This section is the short list of what does not, and why.
 
+`skip:` and `only:` gate on the host as Go names it, so besides `linux`, `darwin` and `windows` they accept `freebsd`, `openbsd` and `netbsd`. Each is a host of its own rather than one BSD family: what FreeBSD `ps` prints is not what OpenBSD `ps` prints, so a gate names the one it means. `bsd` is not a value, and neither is `dragonfly`, where atago does not build. atago ships no binary for the three it accepts; `go install` builds one, and a gate for a host you never run on simply never fires.
+
 | Behavior | Linux / macOS | Windows |
 |----------|---------------|---------|
 | `shell: true` | `/bin/sh -c`, resolved absolutely so the program under test cannot supply it | `%SystemRoot%\System32\cmd.exe /S /C`, resolved the same way. `ATAGO_SHELL` overrides on both |
